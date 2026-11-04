@@ -21,6 +21,9 @@ on:
       max_run_usd:
         description: Spend cap per run in USD
         required: true
+      model:
+        description: Pinned metered model, for example anthropic/claude-haiku-5-5
+        required: true
 
 permissions:
   contents: read
@@ -41,6 +44,7 @@ jobs:
       BASE_REF: ${{ github.event.inputs.base_ref || github.event.pull_request.base.sha }}
       CANDIDATE_REF: ${{ github.event.inputs.candidate_ref || github.event.pull_request.head.sha }}
       REPEATS: ${{ github.event.inputs.repeats || '5' }}
+      MODEL: ${{ github.event.inputs.model || vars.CAIRN_EVAL_GATE_MODEL }}
       MAX_RUN_USD: ${{ github.event.inputs.max_run_usd || vars.CAIRN_EVAL_GATE_MAX_RUN_USD }}
       DATASETS_DIR: ${{ vars.CAIRN_EVAL_DATASETS_DIR }}
       RESULTS_DIR: ${{ github.workspace }}/eval-gate-results/${{ github.run_id }}-${{ github.run_attempt }}
@@ -91,6 +95,7 @@ jobs:
           set -euo pipefail
           test "$REPEATS" -ge 5
           test -n "$MAX_RUN_USD"
+          test -n "$MODEL"
           mkdir -p "$RESULTS_DIR/base" "$RESULTS_DIR/candidate"
           for arm in base candidate; do
             (cd "$arm/integration/eval/harbor/public" && uv sync --frozen)
@@ -102,11 +107,11 @@ jobs:
                 cd "$arm/integration/eval/harbor/public"
                 uv run python -m cairn_harbor.run_baseline job-config \
                   --tasks subset-1792.json --datasets-dir "$DATASETS_DIR" \
-                  --arm cairn --job-name "$job" --out "$RUNNER_TEMP/$job.json"
+                  --arm cairn --model "$MODEL" --job-name "$job" --out "$RUNNER_TEMP/$job.json"
                 uv run python -m cairn_harbor.run_baseline run \
                   --config "$RUNNER_TEMP/$job.json" --jobs-dir "$RUNNER_TEMP/jobs" \
                   --arm-label "$arm" --job-name "$job" --tasks subset-1792.json \
-                  --max-run-usd "$MAX_RUN_USD" --out-dir "$RESULTS_DIR/$arm-$i"
+                  --gate --max-run-usd "$MAX_RUN_USD" --out-dir "$RESULTS_DIR/$arm-$i"
               )
               cp "$RESULTS_DIR/$arm-$i/$arm.json" "$RESULTS_DIR/$arm/$i.json"
             done

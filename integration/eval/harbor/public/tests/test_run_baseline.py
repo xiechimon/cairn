@@ -31,7 +31,8 @@ def test_systemd_wrap_command_forwards_the_model_key() -> None:
         env={"OPENAI_API_KEY": "sk-test"},
     )
     setenv_at = wrapped.index("--setenv")
-    assert wrapped[setenv_at + 1] == "OPENAI_API_KEY=sk-test"
+    assert wrapped[setenv_at + 1] == "OPENAI_API_KEY"
+    assert "sk-test" not in " ".join(wrapped)
 
 
 def test_agent_config_for_oracle_runs_without_a_model() -> None:
@@ -227,3 +228,135 @@ def test_task_set_sha_pins_the_exact_bytes_of_the_tasks_file(tmp_path: Path) -> 
     assert task_set_sha(tasks) == hashlib.sha256(b'{"seed": 1}').hexdigest()
     tasks.write_text('{"seed": 2}')
     assert task_set_sha(tasks) != hashlib.sha256(b'{"seed": 1}').hexdigest()
+
+
+METERED = "anthropic/claude-test-1"
+
+
+def test_job_config_carries_the_explicit_model_without_the_free_channel(tmp_path: Path) -> None:
+    config = agent_config("cairn", METERED)
+    assert config["model_name"] == METERED
+    for key in ("base_url", "model_api_key_name", "kwargs"):
+        assert key not in config
+    assert agent_config("pi", METERED)["model_name"] == METERED
+
+
+def test_job_config_passes_the_model_into_every_agent(tmp_path: Path) -> None:
+    from cairn_harbor.run_baseline import SWE_DATASET_DIR_NAME
+
+    task = tmp_path / SWE_DATASET_DIR_NAME / "t1"
+    task.mkdir(parents=True)
+    payload = job_config({SWE_DATASET_DIR_NAME: ["t1"]}, tmp_path, "cairn", "job", model=METERED)
+    assert payload["agents"][0]["model_name"] == METERED
+
+
+def test_metered_job_env_maps_only_the_eval_key_to_the_provider_variable() -> None:
+    from cairn_harbor.run_baseline import job_env
+
+    environ = {
+        "CAIRN_EVAL_ANTHROPIC_API_KEY": "sk-ant-test",
+        "OPENAI_API_KEY": "sk-openai-ambient",
+        "ANTHROPIC_API_KEY": "sk-ant-ambient",
+        "ANTHROPIC_OAUTH_TOKEN": "oauth-ambient",
+        "PATH": "/usr/bin",
+    }
+    assert job_env(METERED, environ) == {"ANTHROPIC_API_KEY": "sk-ant-test"}
+
+
+def test_metered_run_without_the_eval_key_fails_before_any_run() -> None:
+    from cairn_harbor.run_baseline import MissingKeyError, job_env
+
+    with pytest.raises(MissingKeyError):
+        job_env(METERED, {"ANTHROPIC_API_KEY": "sk-ant-ambient"})
+
+
+def test_unsupported_provider_is_refused() -> None:
+    from cairn_harbor.run_baseline import job_env
+
+    with pytest.raises(ValueError, match="provider"):
+        job_env("openai/gpt-test", {"OPENAI_API_KEY": "x"})
+
+
+def test_free_model_still_forwards_only_the_openai_key() -> None:
+    from cairn_harbor.run_baseline import MODEL, job_env
+
+    assert job_env(MODEL, {"OPENAI_API_KEY": "k", "ANTHROPIC_API_KEY": "a"}) == {
+        "OPENAI_API_KEY": "k"
+    }
+
+
+def test_systemd_wrap_unsets_unrelated_provider_variables() -> None:
+    wrapped = systemd_wrap_command(
+        ["harbor", "run"], unit_name="u", memory_max="1G", env={"ANTHROPIC_API_KEY": "x"}
+    )
+    unset = [w for w in wrapped if w.startswith("UnsetEnvironment=")]
+    assert len(unset) == 1
+    names = unset[0].split("=", 1)[1].split()
+    assert "OPENAI_API_KEY" in names and "ANTHROPIC_OAUTH_TOKEN" in names
+    assert "ANTHROPIC_API_KEY" not in names
+
+
+def _run_args(tmp_path: Path, model: str, *extra: str) -> list[str]:
+    config = tmp_path / "job.json"
+    config.write_text(json.dumps({"job_name": "j", "agents": [{"model_name": model}]}))
+    tasks = tmp_path / "tasks.json"
+    from cairn_harbor import run_baseline
+
+    tasks.write_text(
+        json.dumps({"seed": 1, run_baseline.SWE_DATASET_DIR_NAME: [], run_baseline.TB_DATASET_DIR_NAME: []})
+    )
+    return [
+        "run_baseline", "run", "--config", str(config), "--arm-label", "B",
+        "--jobs-dir", str(tmp_path / "jobs"), "--job-name", "j", "--tasks", str(tasks),
+        "--max-run-usd", "1", "--out-dir", str(tmp_path / "out"), *extra,
+    ]
+
+
+def test_gate_mode_refuses_a_free_model_before_any_run(tmp_path: Path, monkeypatch) -> None:
+    from cairn_harbor import run_baseline
+
+    monkeypatch.setenv("CAIRN_EVAL_LEDGER", str(tmp_path / "spend.jsonl"))
+    started = []
+    monkeypatch.setattr(run_baseline, "run_job", lambda *a, **k: started.append(a))
+    monkeypatch.setattr("sys.argv", _run_args(tmp_path, "reflection/beam:free", "--gate"))
+    with pytest.raises(SystemExit):
+        run_baseline.main()
+    assert started == []
+    assert not (tmp_path / "spend.jsonl").exists()
+
+
+def test_metered_run_without_the_key_never_reserves_budget(tmp_path: Path, monkeypatch) -> None:
+    from cairn_harbor import run_baseline
+
+    monkeypatch.setenv("CAIRN_EVAL_LEDGER", str(tmp_path / "spend.jsonl"))
+    monkeypatch.delenv("CAIRN_EVAL_ANTHROPIC_API_KEY", raising=False)
+    started = []
+    monkeypatch.setattr(run_baseline, "run_job", lambda *a, **k: started.append(a))
+    monkeypatch.setattr("sys.argv", _run_args(tmp_path, METERED, "--gate"))
+    with pytest.raises(SystemExit):
+        run_baseline.main()
+    assert started == []
+    assert not (tmp_path / "spend.jsonl").exists()
+
+
+def test_metered_run_reserves_budget_and_hands_only_the_mapped_key_to_the_job(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from cairn_harbor import run_baseline
+
+    monkeypatch.setenv("CAIRN_EVAL_LEDGER", str(tmp_path / "spend.jsonl"))
+    monkeypatch.setenv("CAIRN_EVAL_ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-ambient")
+    seen = []
+
+    def fake_run_job(*args, **kwargs):
+        seen.append((args, kwargs))
+        return {"return_code": 0, "output_tail": "", "peak_container_mib": {}, "cgroup_peak_bytes": None, "unit_name": "u"}
+
+    monkeypatch.setattr(run_baseline, "run_job", fake_run_job)
+    monkeypatch.setattr("sys.argv", _run_args(tmp_path, METERED, "--gate"))
+    run_baseline.main()
+    env = seen[0][0][-1] if len(seen[0][0]) > 4 else seen[0][1]["env"]
+    assert env == {"ANTHROPIC_API_KEY": "sk-ant-test"}
+    kinds = [json.loads(line)["kind"] for line in (tmp_path / "spend.jsonl").read_text().splitlines()]
+    assert kinds == ["reserved", "settled"]
