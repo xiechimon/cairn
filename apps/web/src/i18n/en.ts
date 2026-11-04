@@ -400,6 +400,7 @@ export const EN: Record<string, string> = {
   暂无成员: 'No members yet',
   '创建 Agent 后，它会出现在这里。': 'Create an agent and it shows up here.',
   ' · 默认': ' · Default',
+  未配置模型: 'No model configured',
   未设置职责: 'No role set',
   '创建 Agent': 'Create Agent',
 
