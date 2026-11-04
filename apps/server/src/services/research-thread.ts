@@ -69,7 +69,12 @@ function chooseResearchAgent(deps: BuildDeps, input: OpenResearchThreadInput): s
       : Object.values(PREFERRED_MODEL).includes(row.modelId ?? '')
         ? 1
         : 2;
-  const [best] = candidates.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  const [best] = candidates.sort(
+    (a, b) =>
+      Number(a.persona !== null) - Number(b.persona !== null) ||
+      rank(a) - rank(b) ||
+      a.id.localeCompare(b.id),
+  );
   if (best === undefined) {
     throw new HttpError(
       409,
