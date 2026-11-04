@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { TranscriptBuffer } from '../journal.js';
@@ -271,7 +271,6 @@ export async function runOrbStep(
               finishTransport();
               clearTimeout(watchdog);
               deps.journal.remove(stepId);
-              rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
             },
           });
           for (let attempt = 0; ; attempt++) {
