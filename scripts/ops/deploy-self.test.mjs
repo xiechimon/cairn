@@ -140,9 +140,16 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
   fakeTool(
     bin,
     'systemctl',
-    `if [ "$2" = is-enabled ]; then [ -f "${fake}/orb-enabled" ]; exit $?; fi
+    `if [ "$2" = is-enabled ]; then
+  case "$4" in
+    cairn-daemon-orb.service) [ -f "${fake}/orb-enabled" ]; exit $? ;;
+    cairn-coordinator.service) [ -f "${fake}/coordinator-enabled" ]; exit $? ;;
+    *) exit 1 ;;
+  esac
+fi
 echo "systemctl $*" >> "${fake}/systemctl.log"
 [ ! -f "${fake}/orb-$2-fail" ] || [ "$3" != cairn-daemon-orb.service ] || exit 1
+[ ! -f "${fake}/coordinator-$2-fail" ] || [ "$3" != cairn-coordinator.service ] || exit 1
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
@@ -668,3 +675,32 @@ for (const action of ['start', 'stop']) {
     assert.doesNotMatch(result.stdout, /rolling back|restarting/);
   });
 }
+
+test('the enabled Coordinator sidecar stops with the daemon and starts after it', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  const calls = f.log('systemctl.log').trim().split('\n');
+  const stop = calls.indexOf('systemctl --user stop cairn-coordinator.service');
+  const start = calls.indexOf('systemctl --user start cairn-coordinator.service');
+  assert.ok(stop >= 0 && stop < calls.indexOf('systemctl --user stop cairn-server.service'));
+  assert.ok(start > calls.indexOf('systemctl --user start cairn-daemon.service'));
+});
+
+test('a Coordinator sidecar that is not enabled is never touched', () => {
+  const f = fixture();
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(f.log('systemctl.log'), /cairn-coordinator/);
+});
+
+test('a failing Coordinator start does not fail the deploy', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-start-fail'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /coordinator-unit-start-failed/);
+  assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
+});

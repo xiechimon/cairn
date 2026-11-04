@@ -45,6 +45,9 @@ KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
+COORDINATOR_UNIT=cairn-coordinator.service
+ORB_ALARM_TITLE="Orb daemon needs attention"
+COORDINATOR_ALARM_TITLE="Coordinator sidecar needs attention"
 DB="$DATA_DIR/server.db"
 
 EXIT_REFUSED=2
@@ -202,37 +205,60 @@ daemon_healthy() {
   return 1
 }
 
-orb_alarm() {
-  local reason="orb-unit-$1-failed" title="Orb daemon needs attention" open_issue
-  echo "$reason: $ORB_UNIT; continuing the deploy" >&2
+unit_alarm() {
+  local unit="$1" slug="$2" action="$3" title="$4" reason open_issue
+  reason="$slug-unit-$action-failed"
+  echo "$reason: $unit; continuing the deploy" >&2
   mkdir -p "$STATE/alarms" || return 0
   [ ! -e "$STATE/alarms/$reason" ] || return 0
   open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$title\" in:title" --json number --jq '.[0].number // empty')" || return 0
   if [ -n "$open_issue" ]; then
-    gh issue comment "$open_issue" -R "$REPO" -b "$reason: $ORB_UNIT on $MACHINE_NAME. Core deployment continues; inspect the unit logs." >/dev/null || return 0
+    gh issue comment "$open_issue" -R "$REPO" -b "$reason: $unit on $MACHINE_NAME. Core deployment continues; inspect the unit logs." >/dev/null || return 0
   else
-    gh issue create -R "$REPO" -t "$title" -b "$reason: $ORB_UNIT on $MACHINE_NAME. Core deployment continues; inspect the unit logs." -a xiechimon >/dev/null || return 0
+    gh issue create -R "$REPO" -t "$title" -b "$reason: $unit on $MACHINE_NAME. Core deployment continues; inspect the unit logs." -a xiechimon >/dev/null || return 0
   fi
   touch "$STATE/alarms/$reason" || true
 }
 
-ORB_STOP_FAILED=0
+unit_recovered() {
+  local slug="$1" action
+  shift
+  for action in "$@"; do rm -f "$STATE/alarms/$slug-unit-$action-failed"; done
+}
 
-orb_recovered() {
-  local action
-  for action in "$@"; do rm -f "$STATE/alarms/orb-unit-$action-failed"; done
+STOP_FAILED=""
+
+stop_optional_unit() {
+  local unit="$1" slug="$2" title="$3"
+  systemctl --user is-enabled --quiet "$unit" || return 0
+  if systemctl --user stop "$unit"; then
+    STOP_FAILED="${STOP_FAILED/ $slug/}"
+    unit_recovered "$slug" stop
+  else
+    STOP_FAILED="$STOP_FAILED $slug"
+    unit_alarm "$unit" "$slug" stop "$title"
+  fi
+}
+
+start_optional_unit() {
+  local unit="$1" slug="$2" title="$3"
+  systemctl --user is-enabled --quiet "$unit" || return 0
+  if [[ "$STOP_FAILED" == *" $slug"* ]]; then
+    if systemctl --user restart "$unit"; then
+      unit_recovered "$slug" stop start
+    else
+      unit_alarm "$unit" "$slug" start "$title"
+    fi
+  elif systemctl --user start "$unit"; then
+    unit_recovered "$slug" start
+  else
+    unit_alarm "$unit" "$slug" start "$title"
+  fi
 }
 
 stop_services() {
-  if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    if systemctl --user stop "$ORB_UNIT"; then
-      ORB_STOP_FAILED=0
-      orb_recovered stop
-    else
-      ORB_STOP_FAILED=1
-      orb_alarm stop
-    fi
-  fi
+  stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
+  stop_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
@@ -244,19 +270,8 @@ start_and_check() {
   started_ms="$(($(date +%s) * 1000))"
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
-  if systemctl --user is-enabled --quiet "$ORB_UNIT"; then
-    if [ "$ORB_STOP_FAILED" = 1 ]; then
-      if systemctl --user restart "$ORB_UNIT"; then
-        orb_recovered stop start
-      else
-        orb_alarm start
-      fi
-    elif systemctl --user start "$ORB_UNIT"; then
-      orb_recovered start
-    else
-      orb_alarm start
-    fi
-  fi
+  start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
+  start_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   return 0
 }
 

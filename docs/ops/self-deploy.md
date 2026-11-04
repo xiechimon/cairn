@@ -10,11 +10,13 @@ The result goes to `~/.local/state/cairn-deploy/deployed.json` and `~/.cairn/ser
 
 When the oldest undeployed main commit landed more than 2 hours ago, the watcher opens the issue `deploy lag: omarchy is behind main` (or comments on it once per main head) with the reason, and closes it once the deployed SHA equals main.
 
-Install from `scripts/ops/systemd/` into `~/.config/systemd/user/`, then:
+Install from `scripts/ops/systemd/` into `~/.config/systemd/user/`: `cairn-server.service`, `cairn-daemon.service`, `cairn-coordinator.service`, `cairn-self-deploy.service` and `cairn-self-deploy.timer`. The server binds `127.0.0.1:8787` and is reached through `tailscale serve`; host-specific settings (proxy, secrets) go in `~/.config/cairn/server.env` or unit drop-ins. The self-deploy service mints a GitHub App token with `~/.cairn/tools/app-token/token.mjs` for its `gh` calls. Then:
 
 ```sh
 systemctl --user daemon-reload
-systemctl --user enable --now cairn-self-deploy.timer
+systemctl --user enable --now cairn-server.service cairn-daemon.service cairn-self-deploy.timer
 ```
+
+`cairn-coordinator.service` is installed but enabled only at the D72 cutover (`docs/ops/coordinator-sidecar.md`); once enabled, a deploy stops it with the daemon and starts it after the daemon is healthy. A failed Coordinator start raises an alarm issue and does not fail the deploy, like the Orb unit.
 
 Deploy one SHA by hand with `scripts/ops/deploy-self.sh <sha>`; roll back by deploying the previous SHA, or by restoring a `stopped-*.db` snapshot with both units stopped.
