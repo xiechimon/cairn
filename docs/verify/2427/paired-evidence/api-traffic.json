@@ -1,0 +1,48 @@
+{
+  "codeHead": "7f777a6ad71fa3d07f70b88c7c9bbed57851c72b",
+  "mode": "real isolated HTTP + SQLite; transparent Swagger proxy",
+  "traffic": [
+    {
+      "method": "GET",
+      "path": "/api/flags",
+      "status": 200,
+      "body": {
+        "flags": [
+          {
+            "key": "feature-beta",
+            "released": false
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/flags/feature-beta/release",
+      "status": 200,
+      "body": {
+        "key": "feature-beta",
+        "released": true
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/flags",
+      "status": 200,
+      "body": {
+        "flags": [
+          {
+            "key": "feature-beta",
+            "released": true
+          }
+        ]
+      }
+    }
+  ],
+  "rows": [
+    {
+      "key": "feature-beta",
+      "userId": null,
+      "enabled": 1
+    }
+  ]
+}
