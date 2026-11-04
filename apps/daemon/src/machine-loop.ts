@@ -31,6 +31,8 @@ import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider } from './computer/provider.js';
+import { OutboundComputerScreens } from './computer/screen-channel.js';
+import { hostComputerScreen } from './computer/screen-provider.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -298,6 +300,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
+  const screens = new OutboundComputerScreens({
+    serverUrl: config.serverUrl,
+    getToken: () => inMemoryToken,
+    provider: hostComputerScreen,
+  });
 
   let networkFailures = 0;
   const presenceReporter = new ComputerPresenceReporter({
@@ -630,6 +637,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'sync') void deliverSync(ev.sync);
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
+            if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
           },
           () => {
             if (!announced) {
@@ -757,6 +765,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
+    void screens.close();
     caffeinate?.kill();
     await presenceReporter.close();
     await computerDispatcher.close();

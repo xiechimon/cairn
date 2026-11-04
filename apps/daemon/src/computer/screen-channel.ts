@@ -7,6 +7,7 @@ import {
   computerScreenRequestSchema,
 } from '@cairn/shared';
 import { WebSocket } from 'undici';
+import { ReadOnlyViewGate } from './view-input.js';
 
 export interface ComputerScreenConnection {
   stream: Duplex;
@@ -116,9 +117,23 @@ export class OutboundComputerScreens {
     });
     let pendingBytes = 0;
     const pending: Buffer[] = [];
+    const viewGate = request.kind === 'view' ? new ReadOnlyViewGate() : undefined;
     const write = (bytes: Buffer): void => {
       if (!connection || signal.aborted) return;
-      connection.stream.write(bytes, (error) => {
+      let outgoing = bytes;
+      if (viewGate) {
+        try {
+          outgoing = viewGate.accept(bytes);
+        } catch {
+          abort();
+          return;
+        }
+        if (outgoing.length === 0) {
+          pendingBytes -= bytes.length;
+          return;
+        }
+      }
+      connection.stream.write(outgoing, (error) => {
         pendingBytes -= bytes.length;
         if (error) abort();
       });
