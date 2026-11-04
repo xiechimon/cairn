@@ -1,0 +1,43 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "path": "/fixtures/session-check"
+    },
+    "response": {
+      "mode": "SIMULATED API and GitHub data; actual checker execution; NOT trial acceptance",
+      "codeHead": "24bbe258fdf301c78ee0bfdbfb0b048ef95b0187",
+      "checker": {
+        "ok": true,
+        "failures": [],
+        "lines": [
+          "push: ok",
+          "dist: ok",
+          "server: checked",
+          "trial-one: ok"
+        ]
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "path": "/fixtures/foreign-session-check"
+    },
+    "response": {
+      "mode": "SIMULATED API and GitHub data; actual checker execution; NOT trial acceptance",
+      "codeHead": "24bbe258fdf301c78ee0bfdbfb0b048ef95b0187",
+      "checker": {
+        "ok": false,
+        "failures": [
+          "server-machine: claimed build steps must resolve to omarchy-orb"
+        ],
+        "lines": [
+          "push: ok",
+          "dist: ok",
+          "server-machine: claimed build steps must resolve to omarchy-orb"
+        ]
+      }
+    }
+  }
+]
