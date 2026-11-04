@@ -38,7 +38,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 - Required CI checks must pass on the PR's current head before an agent enables merge; a local pass does not substitute for CI.
 - Agents may enable merge only when `.claude/workflows/pr-gate.js` returns go with `mergedBy: 'auto-merge'`; protected-path PRs and every other route go to ian. Never merge or arm auto-merge on ian's route unless ian authorizes it in chat.
-- ian may admin-merge. That authority does not extend to agents.
+- ian may admin-merge. When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs/ops/agent-bot-identity.md` gives its opener (`--squash` for a human-opened PR, `--rebase` for one opened by `app/cairnwright`), once every required check passes on the current head, `review-gate` included, and the PR body has no unchecked task. Without that per-PR authorization, agents never use `--admin`.
 - The eval ruler is protected so no PR can edit what judges it: `integration/eval/**`, `.claude/hillclimb/**`, the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
 - Never add the `needs-decision` label. Agents decide by their own recommendation, say what they chose and why in chat, and continue; ask ian for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him. A `needs-decision` label already on a PR keeps `pr-evidence` red and disarms auto-merge until it is removed; agents remove it only with `CAIRN_DECIDED=1` after ian gave the decision in chat.
 - Before asking ian about a PR with auto-merge armed, disarm it with `gh pr merge <n> --disable-auto`.
