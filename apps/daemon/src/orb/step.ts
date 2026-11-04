@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentSessionHandle, ClaimedStep, MachineDoneBody } from '@cairn/shared';
-import { TranscriptBuffer } from '../journal.js';
 import { MachineApiError } from '../machine-client.js';
 import { writePrivateFile } from '../private-fs.js';
 import { type RunStepDeps, type RunStepOptions, resumePendingUpload, runStep } from '../runner.js';
@@ -271,7 +270,6 @@ export async function runOrbStep(
               finishTransport();
               clearTimeout(watchdog);
               deps.journal.remove(stepId);
-              rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
             },
           });
           for (let attempt = 0; ; attempt++) {
@@ -348,7 +346,6 @@ export async function runOrbStep(
 
 export async function relayOrbStopped(deps: RunStepDeps, handle: OrbHandle): Promise<void> {
   if (!handle.lastStepId) return;
-  const transcript = new TranscriptBuffer(deps.paths.outboxDir, handle.lastStepId);
   const note = orbNote('orb: stopped');
   const row = {
     id: `orb-stopped-${handle.lastStepId}`,
@@ -356,6 +353,5 @@ export async function relayOrbStopped(deps: RunStepDeps, handle: OrbHandle): Pro
     content: `.agents/${note.name} hook ok (${note.ms}ms)\n${note.output}`,
     createdAt: Date.now(),
   };
-  transcript.upsert(row);
   await deps.client.transcriptRow?.(handle.lastStepId, row);
 }
