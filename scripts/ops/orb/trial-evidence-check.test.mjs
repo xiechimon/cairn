@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 import { checkTrialEvidence } from './trial-evidence-check.mjs';
 
 const sha = 'a'.repeat(40);
@@ -430,6 +430,58 @@ test('a failed build step followed by a completed retry on omarchy-orb passes', 
   assert.ok(result.lines.includes('trial-one: ok'));
 });
 
+test('a completed session execution satisfies the same issue, PR and machine joins', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'][0].kind = 'session';
+
+  const result = await w.run();
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
+  assert.ok(result.lines.includes('trial-one: ok'));
+});
+
+test('a foreign-machine session cannot hide beside a valid legacy build step', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'].push({
+    id: 'session-other',
+    buildId: 'build-1',
+    kind: 'session',
+    status: 'done',
+    machineId: 'other-machine',
+  });
+
+  const result = await w.run();
+
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((line) => line.startsWith('server-machine:')));
+  assert.ok(!result.lines.includes('trial-one: ok'));
+});
+
+for (const status of ['pending', 'claimed', 'failed']) {
+  test(`a session with no completed execution still fails: ${status}`, async () => {
+    const w = world();
+    Object.assign(w.responses['/api/builds/build-1/steps'][0], { kind: 'session', status });
+
+    const result = await w.run();
+
+    assert.equal(result.ok, false);
+    assert.ok(!result.lines.includes('trial-one: ok'));
+  });
+}
+
+for (const kind of ['review', 'verify', 'merge', 'plan']) {
+  test(`a completed ${kind} cannot stand in for execution`, async () => {
+    const w = world();
+    w.responses['/api/builds/build-1/steps'][0].kind = kind;
+
+    const result = await w.run();
+
+    assert.equal(result.ok, false);
+    assert.ok(!result.lines.includes('trial-one: ok'));
+  });
+}
+
 for (const [name, mutate] of [
   [
     'server-build',
@@ -620,11 +672,19 @@ test('CLI returns a named failure for a missing evidence file without node_modul
   assert.match(result.stdout, /evidence-file:/);
 });
 
-for (const scenario of ['ok', 'missing URL', 'missing token', 'missing both', 'server 401']) {
+for (const scenario of [
+  'ok',
+  'session',
+  'missing URL',
+  'missing token',
+  'missing both',
+  'server 401',
+]) {
   test(`CLI checks authenticated acceptance: ${scenario}`, async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-trial-'));
+    const dir = makeTestTempDir('orb-trial-');
     const w = world();
     const responses = serverWorld().responses;
+    if (scenario === 'session') responses['/api/builds/build-1/steps'][0].kind = 'session';
     const requests = [];
     const server = createServer((req, res) => {
       requests.push(req.url);
@@ -676,7 +736,7 @@ process.stdout.write(JSON.stringify(value));
           timeout: 15_000,
         },
       ).catch((error) => error);
-      if (scenario === 'ok') {
+      if (scenario === 'ok' || scenario === 'session') {
         assert.equal(result.stdout, 'push: ok\ndist: ok\nserver: checked\ntrial-one: ok\n');
         assert.equal(requests.length, 4);
       } else {
@@ -690,7 +750,7 @@ process.stdout.write(JSON.stringify(value));
       }
     } finally {
       await new Promise((resolve) => server.close(resolve));
-      rmSync(dir, { recursive: true, force: true });
+      releaseTestTempDir(dir);
     }
   });
 }

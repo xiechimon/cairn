@@ -264,7 +264,7 @@ export async function checkTrialEvidence(evidence, options = {}) {
       );
       const buildSteps = steps.filter(
         (step) =>
-          step.kind === 'build' &&
+          (step.kind === 'build' || step.kind === 'session') &&
           step.buildId === e.buildId &&
           step.machineId !== null &&
           step.machineId !== undefined,
