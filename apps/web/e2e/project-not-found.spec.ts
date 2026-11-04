@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, PROJECT } from './chief-home-mock';
+import { mockLive, PROJECT, TEAM } from './chief-home-mock';
 
 const KNOWN_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const notFound = (page: Page) => page.getByTestId('project-not-found');
@@ -81,6 +81,58 @@ test('a project list that fails to load shows an error with retry, not not-found
   await expect(notFound(page)).toHaveCount(0);
   await error.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByTestId('project-home')).toBeVisible();
+});
+
+test('team failure retries the prerequisite before projects and project failure retries only projects', async ({
+  page,
+}) => {
+  let teamRequests = 0;
+  let projectRequests = 0;
+  const requestedTeams: Array<string | null> = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams') {
+      teamRequests += 1;
+      return teamRequests <= 2 ? json({ error: 'team unavailable' }, 500) : json([TEAM]);
+    }
+    if (path === '/api/projects') {
+      projectRequests += 1;
+      requestedTeams.push(new URL(route.request().url()).searchParams.get('teamId'));
+      return projectRequests <= 2 ? json({ error: 'projects unavailable' }, 500) : json([PROJECT]);
+    }
+    return undefined;
+  });
+  await page.goto('/app?project=proj-1');
+  const error = page.getByTestId('project-load-error');
+  await expect(error).toBeVisible();
+  expect(teamRequests).toBe(2);
+  expect(projectRequests).toBe(0);
+  await expect(page.getByTestId('project-loading')).toHaveCount(0);
+  await expect(notFound(page)).toHaveCount(0);
+  await error.getByRole('button', { name: 'Retry' }).click();
+  await expect.poll(() => projectRequests).toBe(2);
+  await expect(error.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  expect(teamRequests).toBe(3);
+  expect(requestedTeams).toEqual(['t1', 't1']);
+  await error.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByTestId('project-home')).toBeVisible();
+  expect(projectRequests).toBe(3);
+  expect(teamRequests).toBe(3);
+  expect(requestedTeams).toEqual(['t1', 't1', 't1']);
+});
+
+test('a very long project query remains responsive and falls back to recent suggestions', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c');
+  await page.evaluate((projectId) => {
+    const query = new URLSearchParams({ scenario: 'home-c', project: projectId });
+    history.pushState(null, '', `/app?${query}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, `${'x'.repeat(100_000)}cairn`);
+  await expect(notFound(page)).toBeVisible();
+  await expect(notFound(page).getByRole('navigation', { name: 'Recent projects' })).toBeVisible();
+  await notFound(page).getByRole('button', { name: 'Open the Coordinator' }).click();
+  await expect(page.getByTestId('home-c')).toBeVisible();
 });
 
 test('live: an id missing from a loaded list is not-found with the list as suggestions', async ({

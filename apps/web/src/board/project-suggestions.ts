@@ -14,32 +14,33 @@ export interface ProjectSuggestions<P extends SuggestableProject> {
 }
 
 const MIN_SUBSTRING_LENGTH = 3;
+const MAX_MATCH_LENGTH = 256;
 
-const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+const normalize = (value: string) =>
+  value.length > MAX_MATCH_LENGTH ? '' : value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 
 function editDistance(a: string, b: string): number {
-  const rows: number[][] = [];
-  for (let i = 0; i <= a.length; i += 1) {
-    const row = [i];
-    for (let j = 1; j <= b.length; j += 1) {
-      if (i === 0) {
-        row[j] = j;
-        continue;
-      }
-      const previous = rows[i - 1] ?? [];
+  const longer = a.length >= b.length ? a : b;
+  const shorter = a.length >= b.length ? b : a;
+  let previous = Array.from({ length: shorter.length + 1 }, (_, index) => index);
+  let older = previous;
+  for (let i = 1; i <= longer.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= shorter.length; j += 1) {
       let best = Math.min(
-        (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1),
+        (previous[j - 1] ?? 0) + (longer[i - 1] === shorter[j - 1] ? 0 : 1),
         (previous[j] ?? 0) + 1,
-        (row[j - 1] ?? 0) + 1,
+        (current[j - 1] ?? 0) + 1,
       );
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-        best = Math.min(best, (rows[i - 2]?.[j - 2] ?? 0) + 1);
+      if (i > 1 && j > 1 && longer[i - 1] === shorter[j - 2] && longer[i - 2] === shorter[j - 1]) {
+        best = Math.min(best, (older[j - 2] ?? 0) + 1);
       }
-      row[j] = best;
+      current[j] = best;
     }
-    rows.push(row);
+    older = previous;
+    previous = current;
   }
-  return rows[a.length]?.[b.length] ?? 0;
+  return previous[shorter.length] ?? 0;
 }
 
 function closeness(target: string, candidate: string): number | null {
@@ -53,7 +54,8 @@ function closeness(target: string, candidate: string): number | null {
     return 1;
   }
   const allowed = Math.floor(Math.max(target.length, candidate.length) / 4);
-  return allowed >= 1 && editDistance(target, candidate) <= allowed ? 2 : null;
+  if (allowed < 1 || Math.abs(target.length - candidate.length) > allowed) return null;
+  return editDistance(target, candidate) <= allowed ? 2 : null;
 }
 
 const byRecency = (a: SuggestableProject, b: SuggestableProject) =>

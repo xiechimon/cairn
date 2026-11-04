@@ -92,7 +92,13 @@ export function ProjectNotFound({
   );
 }
 
-export function ProjectsFailed({ onRetry }: { onRetry: () => void }) {
+export function ProjectsFailed({
+  onRetry,
+  retrying = false,
+}: {
+  onRetry: () => void;
+  retrying?: boolean;
+}) {
   const { t } = useI18n();
   return (
     <section
@@ -104,7 +110,7 @@ export function ProjectsFailed({ onRetry }: { onRetry: () => void }) {
         icon={TriangleAlert}
         title={t('项目没能加载')}
         description={t('检查网络后再试一次。')}
-        action={{ label: t('重试'), onClick: onRetry }}
+        action={{ label: t('重试'), onClick: onRetry, disabled: retrying }}
         className="p-0"
       />
       <Button variant="ghost" size="sm" render={<Link to={COORDINATOR_HREF} />}>

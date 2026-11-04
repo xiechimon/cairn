@@ -80,11 +80,13 @@ export function BoardPage() {
   const projectLookup =
     homeProjectId === null || homeProject !== null || (!live && fixture.projectNames == null)
       ? 'resolved'
-      : !live || projectsQ.data !== undefined
-        ? 'unknown'
-        : projectsQ.isError
-          ? 'failed'
-          : 'loading';
+      : live && teamId === undefined && teamsQ.isError
+        ? 'failed'
+        : !live || projectsQ.data !== undefined
+          ? 'unknown'
+          : projectsQ.isError
+            ? 'failed'
+            : 'loading';
   const projectChat = searchParams.get('chat') === '1';
   const previousChiefView = useRef(chiefView);
   useEffect(() => {
@@ -168,7 +170,16 @@ export function BoardPage() {
         ) : projectLookup === 'loading' ? (
           <ProjectsLoading />
         ) : projectLookup === 'failed' ? (
-          <ProjectsFailed onRetry={() => void projectsQ.refetch()} />
+          <ProjectsFailed
+            retrying={teamsQ.isFetching || projectsQ.isFetching}
+            onRetry={() => {
+              if (teamId === undefined) {
+                void teamsQ.refetch();
+                return;
+              }
+              void projectsQ.refetch();
+            }}
+          />
         ) : projectLookup === 'unknown' && homeProjectId !== null ? (
           <ProjectNotFound
             unknownId={homeProjectId}
