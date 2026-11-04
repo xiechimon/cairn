@@ -7223,6 +7223,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_summary",
   "computer",
   "computer_call",
+  "feature_flag",
 ]
 `;
 
