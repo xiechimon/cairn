@@ -151,3 +151,21 @@ def test_collect_outcomes_scans_declared_harness_sessions(tmp_path: Path) -> Non
     assert outcomes[0].voided
     assert not outcomes[0].passed
     assert ScanFinding.HARNESS_SESSION_EDIT in outcomes[0].findings
+
+
+def test_free_and_oracle_runs_are_not_metered() -> None:
+    from cairn_harbor.run_baseline import is_metered
+
+    assert is_metered(None) is False
+    assert is_metered("reflection/beam:free") is False
+    assert is_metered("claude-test") is True
+
+
+def test_config_model_reads_the_first_agent(tmp_path: Path) -> None:
+    from cairn_harbor.run_baseline import config_model
+
+    path = tmp_path / "job.json"
+    path.write_text(json.dumps({"agents": [{"model_name": "claude-test"}]}))
+    assert config_model(path) == "claude-test"
+    path.write_text(json.dumps({"agents": [{"name": "oracle"}]}))
+    assert config_model(path) is None

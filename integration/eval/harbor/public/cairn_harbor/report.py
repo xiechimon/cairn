@@ -30,6 +30,7 @@ class ArmSummary:
     wilson_upper: float
     mean_wall_sec: float
     mean_tokens: float
+    total_cost_usd: float | None = None
     trial_rows: list[str] = field(default_factory=list)
 
 
@@ -39,9 +40,11 @@ def arm_summary(trials: list[TrialCost], label: str) -> ArmSummary:
     lower, upper = wilson_interval(passed, len(scored))
     wall_times = [trial.wall_sec for trial in scored if trial.wall_sec > 0]
     tokens = [trial.tokens for trial in scored if trial.tokens > 0]
+    costs = [trial.cost_usd for trial in trials]
+    total_cost = None if any(cost is None for cost in costs) else sum(costs)
     trial_rows = [
         f"| {trial.dataset} | {trial.name} | {_verdict(trial)} | "
-        f"{trial.wall_sec:.0f}s | {trial.tokens} | "
+        f"{trial.wall_sec:.0f}s | {trial.tokens} | {_usd(trial.cost_usd)} | "
         f"{', '.join(finding.value for finding in trial.findings) or '-'} |"
         for trial in trials
     ]
@@ -57,8 +60,13 @@ def arm_summary(trials: list[TrialCost], label: str) -> ArmSummary:
         wilson_upper=upper,
         mean_wall_sec=sum(wall_times) / len(wall_times) if wall_times else 0.0,
         mean_tokens=sum(tokens) / len(tokens) if tokens else 0.0,
+        total_cost_usd=total_cost,
         trial_rows=trial_rows,
     )
+
+
+def _usd(value: float | None) -> str:
+    return "unknown" if value is None else f"${value:.2f}"
 
 
 def _verdict(trial: TrialCost) -> str:
@@ -89,6 +97,13 @@ def build_report(
         "trajectory touched a test file or a benchmark site is voided and counted",
         "the same way, never as an agent failure.",
         "",
+        "## Cost",
+        "",
+        *(
+            f"- Arm {label}: Total cost: {_usd(arms[label].total_cost_usd)}"
+            for label in sorted(arms)
+        ),
+        "",
         "## Pass rates",
         "",
         "| Arm | Scored | Passed | Pass rate | Wilson 95% | Infra | Voided | Mean wall (s) | Mean tokens |",
@@ -109,8 +124,8 @@ def build_report(
             "",
             "## Per-trial results",
             "",
-            "| Dataset | Task | Verdict | Wall | Tokens | Scan |",
-            "|---|---|---|---|---|---|",
+            "| Dataset | Task | Verdict | Wall | Tokens | Cost | Scan |",
+            "|---|---|---|---|---|---|---|",
         ]
     )
     for label in sorted(arms):
