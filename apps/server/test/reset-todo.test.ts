@@ -61,6 +61,18 @@ describe('todo reset (#755)', () => {
     s.dispose();
   });
 
+  test('reset clears awaitingReply left by a parked session question', async () => {
+    const { s, id } = await setupStarted('building');
+    s.db.update(todoTable).set({ awaitingReply: true }).where(eq(todoTable.id, id)).run();
+    const { resetTodo } = await import('../src/services/todos.js');
+    const result = resetTodo(s.svc, id, undefined);
+    expect(result?.record.awaitingReply).toBeFalsy();
+    expect(s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.awaitingReply).toBe(
+      false,
+    );
+    s.dispose();
+  });
+
   test('a pending step: no stop signal (no machine to notify, it disappears with the deleted build)', async () => {
     const { s, id } = await setupStarted('building');
     const signals: Array<{ teamId: string; stepId: string }> = [];

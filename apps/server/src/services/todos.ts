@@ -720,6 +720,7 @@ export function resetTodo(
       hasPlan: false,
       hasChanges: false,
       latestBuildId: null,
+      awaitingReply: false,
       lastRunAt: null,
       userMessageAttachmentIds: [],
       v: row.v + 1,
