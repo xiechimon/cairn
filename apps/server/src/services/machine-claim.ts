@@ -22,6 +22,7 @@ import {
   WORKER_ASK_USER_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
+  WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, machine, skillAudit, step, todo } from '../db/schema.js';
@@ -741,7 +742,9 @@ export function workerRemoteTools(kind: StepKind, isGithubProject: boolean): Rem
   const base = (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
     (tool) => kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name),
   );
-  return kind === 'session' && routingRulesEnabled() ? [...base, WORKER_ASK_USER_TOOL] : [...base];
+  return kind === 'session' && routingRulesEnabled()
+    ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]
+    : [...base];
 }
 
 export async function claimStep(

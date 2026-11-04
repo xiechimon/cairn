@@ -190,6 +190,7 @@ export const build = sqliteTable('build', {
   baseSha: text('baseSha'),
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
+  reportLine: text('reportLine'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

@@ -32,7 +32,7 @@ import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
 import { updateTodo, writebackSelfIssueTitle } from './todos.js';
-import { askWorkerQuestion } from './worker-questions.js';
+import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js';
 
 export async function machineAsk(
   deps: MachineDeps,
@@ -160,6 +160,9 @@ async function executeWorkerMemoryToolCall(
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
   if (isThreadScheduleTool(name)) {
     return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
+  }
+  if (name === 'thread_report' && row.kind === 'session' && routingRulesEnabled()) {
+    return recordThreadReportLine(deps, row, params.line);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
