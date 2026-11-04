@@ -451,7 +451,10 @@ export async function sendBuildSteer(
           .run();
       }
       if (todoRow) {
-        if (!continuationOptions.schedule)
+        if (
+          !continuationOptions.schedule &&
+          (continuationOptions.human ?? deps.steerOptions?.human) !== false
+        )
           addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
         if (running) {
           deps.machineHub?.steerSignal(todoRow.teamId, running.id);

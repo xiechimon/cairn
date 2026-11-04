@@ -104,6 +104,14 @@ describe('POST /api/todos/:id/messages', () => {
     );
   });
 
+  test('a user steer with a same-team attachment token grants that attachment to the thread', async () => {
+    seedThread('building', 'claimed');
+    const token = `![shot.png](attachment:${H.teamId}/att-user.png)`;
+    const res = await send({ content: token, clientMessageId: 'c-att-user' });
+    expect(res.status).toBe(201);
+    expect(H.s.db.select().from(todo).get()?.userMessageAttachmentIds).toEqual(['att-user']);
+  });
+
   test('continues a done thread with a new turn', async () => {
     seedThread('done');
     const res = await send();

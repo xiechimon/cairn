@@ -317,6 +317,16 @@ describe('flag on', () => {
       expect(JSON.parse(String(marker.content))).toMatchObject({ by: 'coordinator' });
     });
 
+    test('does not grant attachments cited in Coordinator-originated content', async () => {
+      const { todoId, buildId } = await openThread();
+      claimSession(buildId);
+      const token = `![shot.png](attachment:${H.teamId}/att-coord.png)`;
+      await relay('message_thread', { todoId, content: token });
+      expect(
+        H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.userMessageAttachmentIds,
+      ).toEqual([]);
+    });
+
     test('the continuation step takes no person priority', async () => {
       const { todoId, buildId } = await openThread();
       H.s.db.update(step).set({ status: 'done' }).where(eq(step.buildId, buildId)).run();
