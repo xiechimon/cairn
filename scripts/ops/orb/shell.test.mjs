@@ -435,6 +435,12 @@ test('guest image installs bubblewrap for Claude Code subprocess isolation and v
   assert.match(script, /runuser -u agent -- \/usr\/bin\/bwrap --version/);
 });
 
+test('guest image installs jq for the repo pre-push checks and verifies it as agent', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  assert.match(script, /^pacstrap -K -M "\$stage" .*\bjq\b/m);
+  assert.match(script, /runuser -u agent -- \/usr\/bin\/jq --version/);
+});
+
 test('guest image installs socat for the Claude Code sandbox and verifies it as agent', () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   assert.match(script, /^pacstrap -K -M "\$stage" .*\bsocat\b/m);
