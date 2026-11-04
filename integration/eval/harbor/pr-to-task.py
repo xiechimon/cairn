@@ -381,32 +381,28 @@ def run_trial(prefix, task, name, agent_args, output, env=None):
         "timing": probe.timing_record(
             lock_requested, lock_acquired, harbor_finished, result, state.cpu_seconds()
         ),
+        "isolation": state.isolation(),
     }
     if status == "fail":
         control["failureKind"] = "assertion"
     if len(results) == 1:
         probe.write_outcome(results[0].parent, name, {"status": status})
-    return control, (results[0].parent if len(results) == 1 else None), state.isolation()
+    return control, (results[0].parent if len(results) == 1 else None)
 
 
 def check_controls(task, output):
     prefix = harbor_prefix()
     output.mkdir(parents=True, exist_ok=False)
     controls = {}
-    isolation = []
     wrote_outcome = False
     for agent in ("oracle", "nop"):
-        controls[agent], trial, observed = run_trial(
+        controls[agent], trial = run_trial(
             prefix, task, agent, ["-a", agent], output
         )
         if trial:
             wrote_outcome = wrote_outcome or probe.agent_wrote_outcome(trial)
-        isolation += observed
         (output / "controls.json").write_text(json.dumps(controls, indent=2) + "\n")
-    controls["isolation"] = isolation
-    controls["probe"] = probe.probe_verdict(
-        controls["oracle"], controls["nop"], isolation, wrote_outcome
-    )
+    controls["probe"] = probe.probe_verdict(controls["oracle"], controls["nop"], wrote_outcome)
     (output / "controls.json").write_text(json.dumps(controls, indent=2) + "\n")
     return controls
 
@@ -429,7 +425,7 @@ def check_cheats(task, output):
     env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parent)}
     report = {}
     for mode in cheats.MODES:
-        control, trial, isolation = run_trial(
+        control, trial = run_trial(
             prefix, task, f"cheat{mode}", cheat_arguments(task, mode), output, env
         )
         evidence_file = trial / "agent" / f"cheat-{mode}.txt" if trial else None
@@ -441,7 +437,6 @@ def check_cheats(task, output):
         outcome = json.loads((trial / "outcome.json").read_text()) if trial else {}
         report[mode] = {
             "control": control,
-            "isolation": isolation,
             "evidence": evidence,
             "agentWroteOutcome": probe.agent_wrote_outcome(trial) if trial else False,
             "outcome": outcome,
@@ -450,7 +445,6 @@ def check_cheats(task, output):
             mode,
             control,
             evidence,
-            isolation,
             report[mode]["agentWroteOutcome"],
             outcome,
         )

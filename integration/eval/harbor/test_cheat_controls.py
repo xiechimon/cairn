@@ -9,14 +9,12 @@ import control_probe as probe
 
 
 ISOLATED = [{"id": "a", "name": "n", "networkMode": "none"}]
-FAILED = {"status": "fail", "failureKind": "assertion"}
+FAILED = {"status": "fail", "failureKind": "assertion", "isolation": ISOLATED}
 PARENT = {"writer": "host-parent-process", "status": "fail"}
 
 
 def verdict(mode, evidence, **overrides):
-    args = dict(
-        control=FAILED, isolation=ISOLATED, forged=False, outcome=PARENT
-    )
+    args = dict(control=FAILED, forged=False, outcome=PARENT)
     return cheats.cheat_verdict(mode, evidence=evidence, **(args | overrides))
 
 
@@ -75,16 +73,22 @@ def test_each_cheat_is_blocked_when_scored_zero_with_evidence(mode, evidence, fo
 @pytest.mark.parametrize(
     "overrides,reason",
     [
-        ({"control": {"status": "pass"}}, "trial was not scored 0 on an assertion"),
         (
-            {"control": {"status": "infrastructure"}},
+            {"control": FAILED | {"status": "pass"}},
             "trial was not scored 0 on an assertion",
         ),
         (
-            {"isolation": [{"id": "a", "name": "n", "networkMode": "bridge"}]},
-            "container network is not none",
+            {"control": FAILED | {"status": "infrastructure"}},
+            "trial was not scored 0 on an assertion",
         ),
-        ({"isolation": []}, "container network is not none"),
+        (
+            {
+                "control": FAILED
+                | {"isolation": [{"id": "a", "name": "n", "networkMode": "bridge"}]}
+            },
+            "MODE container network is not none",
+        ),
+        ({"control": FAILED | {"isolation": []}}, "MODE had no observed containers"),
         ({"outcome": {"writer": "agent", "status": "fail"}}, "outcome was not written by the host parent"),
         ({"outcome": {"writer": "host-parent-process", "status": "pass"}}, "outcome was not written by the host parent"),
     ],
@@ -92,7 +96,7 @@ def test_each_cheat_is_blocked_when_scored_zero_with_evidence(mode, evidence, fo
 def test_every_cheat_fails_closed(mode, evidence, forged, overrides, reason):
     result = verdict(mode, evidence, forged=forged, **overrides)
     assert result["blocked"] is False
-    assert reason in result["reasons"]
+    assert reason.replace("MODE", mode) in result["reasons"]
 
 
 @pytest.mark.parametrize("mode", cheats.MODES)

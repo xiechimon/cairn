@@ -84,11 +84,13 @@ def test_agent_directory_must_not_hold_outcome_files(tmp_path):
     assert probe.agent_wrote_outcome(tmp_path) is True
 
 
+ISOLATED = [{"id": "a", "name": "n", "networkMode": "none"}]
+
+
 def record(**overrides):
     base = dict(
-        oracle={"status": "pass"},
-        nop={"status": "fail", "failureKind": "assertion"},
-        isolation=[{"id": "a", "name": "n", "networkMode": "none"}],
+        oracle={"status": "pass", "isolation": ISOLATED},
+        nop={"status": "fail", "failureKind": "assertion", "isolation": ISOLATED},
         agent_wrote_outcome=False,
     )
     return probe.probe_verdict(**(base | overrides))
@@ -101,14 +103,27 @@ def test_probe_passes_only_with_oracle_pass_nop_assertion_and_isolation():
 @pytest.mark.parametrize(
     "overrides,reason",
     [
-        ({"oracle": {"status": "infrastructure"}}, "oracle did not pass"),
-        ({"nop": {"status": "infrastructure"}}, "nop did not fail on an assertion"),
-        ({"nop": {"status": "pass"}}, "nop did not fail on an assertion"),
+        ({"oracle": {"status": "infrastructure", "isolation": ISOLATED}}, "oracle did not pass"),
         (
-            {"isolation": [{"id": "a", "name": "n", "networkMode": "bridge"}]},
-            "container network is not none",
+            {"nop": {"status": "infrastructure", "isolation": ISOLATED}},
+            "nop did not fail on an assertion",
         ),
-        ({"isolation": []}, "container network is not none"),
+        ({"nop": {"status": "pass", "isolation": ISOLATED}}, "nop did not fail on an assertion"),
+        (
+            {
+                "nop": {
+                    "status": "fail",
+                    "failureKind": "assertion",
+                    "isolation": [{"id": "a", "name": "n", "networkMode": "bridge"}],
+                }
+            },
+            "nop container network is not none",
+        ),
+        (
+            {"nop": {"status": "fail", "failureKind": "assertion", "isolation": []}},
+            "nop had no observed containers",
+        ),
+        ({"oracle": {"status": "pass"}}, "oracle had no observed containers"),
         ({"agent_wrote_outcome": True}, "agent container wrote an outcome file"),
     ],
 )
@@ -116,6 +131,16 @@ def test_probe_fails_for_each_failure_mode(overrides, reason):
     verdict = record(**overrides)
     assert verdict["passed"] is False
     assert reason in verdict["reasons"]
+
+
+def test_sampler_ignores_containers_that_existed_before_the_control_started():
+    state = probe.ContainerState(ignored={"old"})
+    state.observe("old", "task__prev__env-main-1", "bridge", 9_000_000)
+    state.observe("new", "task__this__env-main-1", "none", 1_000_000)
+    assert state.isolation() == [
+        {"id": "new", "name": "task__this__env-main-1", "networkMode": "none"}
+    ]
+    assert state.cpu_seconds() == 1.0
 
 
 def test_outcome_is_written_by_the_parent_with_its_pid(tmp_path):

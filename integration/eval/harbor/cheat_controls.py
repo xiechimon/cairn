@@ -166,14 +166,13 @@ def evidence_reasons(mode, evidence):
     return reasons
 
 
-def cheat_verdict(mode, control, evidence, isolation, forged, outcome):
+def cheat_verdict(mode, control, evidence, forged, outcome):
     reasons = []
     if control.get("status") != "fail":
         reasons.append(NOT_ZERO)
-    try:
-        probe.require_isolated(isolation)
-    except ValueError:
-        reasons.append("container network is not none")
+    reason = probe.isolation_reason(mode, control.get("isolation"))
+    if reason:
+        reasons.append(reason)
     if (
         outcome.get("writer") != "host-parent-process"
         or outcome.get("status") == "pass"

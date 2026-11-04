@@ -41,10 +41,13 @@ def cpu_seconds(cpu_stat):
 
 
 class ContainerState:
-    def __init__(self):
+    def __init__(self, ignored=frozenset()):
         self.containers = {}
+        self.ignored = set(ignored)
 
     def observe(self, container_id, name, network_mode, usage_usec):
+        if container_id in self.ignored:
+            return
         known = self.containers.setdefault(
             container_id, {"name": name, "networkMode": network_mode, "usage": None}
         )
@@ -89,16 +92,24 @@ def agent_wrote_outcome(trial):
     )
 
 
-def probe_verdict(oracle, nop, isolation, agent_wrote_outcome):
+def isolation_reason(name, isolation):
+    if not isolation:
+        return f"{name} had no observed containers"
+    if any(item["networkMode"] != "none" for item in isolation):
+        return f"{name} container network is not none"
+    return None
+
+
+def probe_verdict(oracle, nop, agent_wrote_outcome):
     reasons = []
     if oracle.get("status") != "pass":
         reasons.append("oracle did not pass")
     if nop.get("status") != "fail" or nop.get("failureKind") != "assertion":
         reasons.append("nop did not fail on an assertion")
-    try:
-        require_isolated(isolation)
-    except ValueError:
-        reasons.append("container network is not none")
+    for name, control in (("oracle", oracle), ("nop", nop)):
+        reason = isolation_reason(name, control.get("isolation"))
+        if reason:
+            reasons.append(reason)
     if agent_wrote_outcome:
         reasons.append("agent container wrote an outcome file")
     return {"passed": not reasons, "reasons": reasons}
@@ -125,23 +136,31 @@ def docker_json(*args):
     return json.loads(subprocess.check_output(["docker", *args], text=True))
 
 
-def sample_containers(task_name, state, stop, interval=0.25):
+def task_containers(task_name):
     prefix = f"{task_name.lower()}__"
+    listing = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "-a",
+            "--no-trunc",
+            "--format",
+            '{{.ID}}\t{{.Label "com.docker.compose.project"}}',
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout
+    return [
+        container_id
+        for container_id, _, project in (line.partition("\t") for line in listing.splitlines())
+        if project.startswith(prefix)
+    ]
+
+
+def sample_containers(task_name, state, stop, interval=0.25):
     while True:
-        listing = subprocess.run(
-            [
-                "docker",
-                "ps",
-                "-a",
-                "--format",
-                '{{.ID}}\t{{.Label "com.docker.compose.project"}}',
-            ],
-            capture_output=True,
-            text=True,
-        ).stdout
-        for line in listing.splitlines():
-            short_id, _, project = line.partition("\t")
-            if not project.startswith(prefix):
+        for short_id in task_containers(task_name):
+            if short_id in state.ignored:
                 continue
             try:
                 info = docker_json("inspect", short_id)[0]
@@ -161,7 +180,7 @@ def sample_containers(task_name, state, stop, interval=0.25):
 
 
 def start_sampler(task_name):
-    state = ContainerState()
+    state = ContainerState(ignored=task_containers(task_name))
     stop = threading.Event()
     thread = threading.Thread(
         target=sample_containers, args=(task_name, state, stop), daemon=True
