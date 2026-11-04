@@ -10,6 +10,7 @@ import {
   PHASE_VALUES,
   patchMachineBodySchema,
   patchProviderBodySchema,
+  patchScheduleBodySchema,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
@@ -66,7 +67,12 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
-import { createSchedule, deleteSchedule, listSchedules } from './services/schedules.js';
+import {
+  createSchedule,
+  deleteSchedule,
+  listSchedules,
+  setScheduleEnabled,
+} from './services/schedules.js';
 import { search } from './services/search.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
 import { importSkill, refreshSkill, type SkillImportOpts } from './services/skill-import.js';
@@ -122,6 +128,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       createdBy: ctx.user.id,
     });
     return c.json(record, 201);
+  });
+
+  app.patch('/api/schedules/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = parseWith(patchScheduleBodySchema, await jsonBody(c), 'body');
+    const record = setScheduleEnabled(svc, id, body);
+    if (!record) throw notFound(`schedule ${id}`);
+    return c.json(record);
   });
 
   app.delete('/api/schedules/:id', (c) => {
