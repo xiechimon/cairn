@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
-import { agent, build, chief, routingRule, step, todo } from '../src/db/schema.js';
+import { agent, build, chief, machine, routingRule, step, team, todo } from '../src/db/schema.js';
+import { claimStep } from '../src/services/machine-claim.js';
 import { openResearchThread } from '../src/services/research-thread.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
@@ -185,6 +186,52 @@ describe('openResearchThread', () => {
       setRoutingRulesEnabled(false);
     }
   });
+
+  test.each([
+    { executor: 'orb' as const },
+    { mcpServers: ['missing-search'] },
+    { models: ['unavailable-model'] },
+  ])(
+    'prefers a runnable persona agent when the general agent lacks %j',
+    async (requiredCapabilities) => {
+      const w = await world();
+      w.s.db.update(team).set({ claudeUsage: 'allow-paid' }).run();
+      w.s.db
+        .insert(machine)
+        .values({
+          id: 'research-host',
+          teamId: w.teamId,
+          name: 'Research host',
+          online: true,
+          enabledRuntimes: ['claude-code'],
+          capabilities: { mcpServers: [], skills: [], executor: 'host' },
+        })
+        .run();
+      addAgent(w.s, 'agent-general', { machineId: 'research-host', requiredCapabilities });
+      addAgent(w.s, 'agent-reviewer', { machineId: 'research-host', persona: 'test_engineer' });
+      const opened = openResearchThread(w.s.svc, {
+        teamId: w.teamId,
+        projectId: w.projectId,
+        tier: 1,
+        ...base,
+      });
+      expect(opened.agentId).toBe('agent-reviewer');
+      const claimed = await claimStep(
+        {
+          ...w.s.svc,
+          box: w.s.secretBox,
+          reposDir: w.s.reposDir,
+          attachmentsDir: w.s.attachmentsDir,
+        },
+        'research-host',
+        w.teamId,
+        0,
+        'http://localhost',
+      );
+      expect(claimed?.step.buildId).toBe(opened.buildId);
+      expect(claimed?.agent?.id).toBe('agent-reviewer');
+    },
+  );
 
   test('without the tier model, a sonnet or opus agent beats a haiku agent', async () => {
     const w = await world();
