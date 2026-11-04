@@ -73,3 +73,26 @@ test('a Bearer token that is itself a known credential stays one match', () => {
   expect(redactSecrets(`Bearer ${ghp('A')}`)).toEqual({ value: '[REDACTED]', count: 1 });
   expect(redactSecrets(`Bearer ${sk('A')}`)).toEqual({ value: '[REDACTED]', count: 1 });
 });
+
+test.each([
+  ['ghp_', `ghp_${'A'.repeat(10)}ghp_${'B'.repeat(22)}`],
+  ['sk-', `sk-${'A'.repeat(10)}sk-${'B'.repeat(22)}`],
+  ['github_pat_', `github_pat_${'A'.repeat(10)}ghp_${'B'.repeat(22)}`],
+])(
+  'a %s credential with an embedded prefix before its minimum length is fully redacted',
+  (_name, text) => {
+    expect(redactSecrets(text)).toEqual({ value: '[REDACTED]', count: 1 });
+  },
+);
+
+test.each([
+  ['ghp_', 'ghp_'],
+  ['sk-', 'sk-'],
+  ['Bearer', 'Bearer '],
+  ['v1:', 'v1:'],
+])('repeated %s prefixes redact in linear time', (_name, unit) => {
+  const text = unit.repeat(16384);
+  const started = performance.now();
+  redactSecrets(text);
+  expect(performance.now() - started).toBeLessThan(500);
+});
