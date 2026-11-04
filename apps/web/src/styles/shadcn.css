@@ -64,43 +64,9 @@
 :root {
   --dur-fast: 150ms;
   --dur-overlay: 200ms;
-  --dur-window: 320ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-pop: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --spring-snappy: linear(
-    0 0%,
-    0.0259 3.57%,
-    0.0912 7.14%,
-    0.1802 10.71%,
-    0.281 14.29%,
-    0.3851 17.86%,
-    0.4862 21.43%,
-    0.5805 25%,
-    0.6654 28.57%,
-    0.7398 32.14%,
-    0.8034 35.71%,
-    0.8565 39.29%,
-    0.8998 42.86%,
-    0.9343 46.43%,
-    0.9611 50%,
-    0.9813 53.57%,
-    0.996 57.14%,
-    1.0063 60.71%,
-    1.013 64.29%,
-    1.017 67.86%,
-    1.0189 71.43%,
-    1.0192 75%,
-    1.0185 78.57%,
-    1.0172 82.14%,
-    1.0154 85.71%,
-    1.0134 89.29%,
-    1.0114 92.86%,
-    1.0095 96.43%,
-    1 100%
-  );
-  --spring-snappy-dur: 380ms;
 
   --z-docked: 10;
   --z-floating: 15;
@@ -221,13 +187,13 @@
   --text-dim: #5d655f;
   --icon: #959c96;
   --card-button: #ebb550;
-  --focus-ring: #9cc78b;
-  --col-dot-building: #82b46f;
+  --focus-ring: var(--ring);
+  --col-dot-building: var(--running);
   --col-dot-done: #7fa3cc;
   --badge-attention: #e0a838;
   --badge-idle: #858c86;
-  --chip-idle-bg: #2a302b;
-  --chip-idle-fg: #b4bab3;
+  --chip-idle-bg: var(--secondary);
+  --chip-idle-fg: var(--text-secondary);
   --chip-plan-bg: #1f2c3a;
   --chip-plan-fg: #9cbbe0;
   --chip-confirm-bg: #3a2f17;
@@ -239,7 +205,7 @@
   --diff-add-fg: #9cc78b;
   --chip-failed-bg: #3c201b;
   --chip-failed-fg: #f6b6a8;
-  --fail-fg: #f09a88;
+  --fail-fg: var(--destructive);
   --diff-del-bg: #2f1f1b;
   --diff-add-word-bg: #2b3f29;
   --diff-del-word-bg: #48291f;
@@ -285,10 +251,10 @@
   --project-ink-4: color-mix(in oklab, var(--project-tile-4), white 40%);
   --project-ink-5: color-mix(in oklab, var(--project-tile-5), white 40%);
   --project-ink-6: color-mix(in oklab, var(--project-tile-6), white 40%);
-  --pebble-waiting: #e0a838;
-  --pebble-review: #7fa3cc;
-  --pebble-working: #82b46f;
-  --pebble-idle: #5d655f;
+  --pebble-waiting: var(--badge-attention);
+  --pebble-review: var(--col-dot-done);
+  --pebble-working: var(--running);
+  --pebble-idle: var(--text-dim);
   --pebble-resolved: #444b46;
   --danger-line: #8c4a3e;
 }
@@ -349,13 +315,13 @@
   --text-dim: #a8aea6;
   --icon: #5f665f;
   --card-button: #9a6500;
-  --focus-ring: #3f6c35;
-  --col-dot-building: #5f8f4f;
+  --focus-ring: var(--ring);
+  --col-dot-building: var(--running);
   --col-dot-done: #5379a0;
   --badge-attention: #d49a1c;
   --badge-idle: #7b827c;
-  --chip-idle-bg: #eceee8;
-  --chip-idle-fg: #4b534d;
+  --chip-idle-bg: var(--secondary);
+  --chip-idle-fg: var(--text-secondary);
   --chip-plan-bg: #d7e2ec;
   --chip-plan-fg: #2f5070;
   --chip-confirm-bg: #f3e3bd;
@@ -367,7 +333,7 @@
   --diff-add-fg: #2f5427;
   --chip-failed-bg: #f5ddd7;
   --chip-failed-fg: #8c2f21;
-  --fail-fg: #a33a2a;
+  --fail-fg: var(--destructive);
   --diff-del-bg: #f9e8e3;
   --diff-add-word-bg: #d2e4c7;
   --diff-del-word-bg: #f1d2c9;
@@ -413,10 +379,10 @@
   --project-ink-4: color-mix(in oklab, var(--project-tile-4), black 22%);
   --project-ink-5: color-mix(in oklab, var(--project-tile-5), black 22%);
   --project-ink-6: color-mix(in oklab, var(--project-tile-6), black 22%);
-  --pebble-waiting: #d49a1c;
-  --pebble-review: #5379a0;
-  --pebble-working: #5f8f4f;
-  --pebble-idle: #a8aea6;
+  --pebble-waiting: var(--badge-attention);
+  --pebble-review: var(--col-dot-done);
+  --pebble-working: var(--running);
+  --pebble-idle: var(--text-dim);
   --pebble-resolved: #c3c7bf;
   --danger-line: #d98c7d;
   --fab-surface: #2f5a2a;

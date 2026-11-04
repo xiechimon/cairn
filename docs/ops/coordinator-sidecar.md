@@ -58,7 +58,7 @@ The Coordinator runs in `apps/coordinator`, a separate process next to the serve
    The fold state is `{ "summary": "...", "at": <createdAt of the last folded row> }`. Rows after `at` are seeded verbatim, at most the newest 100; older ones stay readable through `read_history`.
 
 4. Restart the server with `CAIRN_COORDINATOR_MACHINE_ID=<machineId>`.
-5. Start the sidecar: `pnpm --filter @cairn/coordinator dev`. It logs `turn <step> claimed` and `turn <step> success` per turn. It holds `threads.lock` beside the store directory with its pid; a second sidecar on the same directory exits with `in use by another Coordinator sidecar`. To stop it, signal the pid in that file, not `pnpm`: killing `pnpm` with SIGKILL leaves the node process running.
+5. Start the sidecar: `pnpm --filter @cairn/coordinator dev`; on omarchy run `systemctl --user enable --now cairn-coordinator.service` instead. It logs `turn <step> claimed` and `turn <step> success` per turn. It holds `threads.lock` beside the store directory with its pid; a second sidecar on the same directory exits with `in use by another Coordinator sidecar`. To stop it, signal the pid in that file, not `pnpm`: killing `pnpm` with SIGKILL leaves the node process running.
 6. Send the Coordinator a message and check that its answer appears in the conversation.
 
 ## Rollback

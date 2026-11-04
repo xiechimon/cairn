@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   BLOCK_ROUND_CAP,
@@ -11,6 +12,7 @@ import {
   parseState,
   REQUEST_AFTER_MS,
   requestMarker,
+  requiresSecurityReview,
   retryMarker,
   retryStatus,
   reviewRequested,
@@ -462,4 +464,295 @@ test('a pass reports the blocked heads before it', () => {
   assert.equal(clean.conclusion, 'success');
   assert.match(clean.summary, /Cycles to pass: 3 blocked head/);
   assert.doesNotMatch(decide(pr, done, [], noRetries).summary, /Cycles to pass/);
+});
+
+const securityDone = { commitSha: SHA, status: 'completed', hasUnresolvedFindings: false };
+const securityDecision = (state) =>
+  decide(pr, done, [], noRetries, false, null, undefined, { state });
+
+test('security review blocks missing, stale, running, failed and unknown states despite completed code review', () => {
+  for (const state of [
+    null,
+    { ...securityDone, commitSha: OTHER },
+    ...['running', 'failed', 'queued', null, undefined].map((status) => ({
+      ...securityDone,
+      status,
+    })),
+    ...[true, null, undefined, 'false', 0].map((hasUnresolvedFindings) => ({
+      ...securityDone,
+      hasUnresolvedFindings,
+    })),
+  ]) {
+    const result = securityDecision(state);
+    assert.equal(result.status, 'completed', JSON.stringify(state));
+    assert.equal(result.conclusion, 'failure', JSON.stringify(state));
+    assert.match(result.title, /security review/i);
+  }
+});
+
+test('security review passes only the exact completed head with explicitly no unresolved findings', () => {
+  assert.equal(securityDecision(securityDone).conclusion, 'success');
+  assert.equal(
+    decide(pr, done, [thread('P1')], noRetries, false, null, undefined, { state: securityDone })
+      .conclusion,
+    'failure',
+  );
+  assert.equal(decide(pr, done, [], noRetries, false, null, undefined, null).conclusion, 'success');
+  assert.equal(
+    decide(pr, null, [], noRetries, false, null, undefined, { state: securityDone }).status,
+    'in_progress',
+  );
+});
+
+test('trusted security state ignores forged authors and keeps the latest incomplete summary', () => {
+  const summary = (security, user = CODEX, updated_at = '2026-01-01T00:00:01Z') => ({
+    body: `<!-- codex-review-state:v1 ${JSON.stringify({
+      code_review: { commit_sha: SHA, status: 'completed' },
+      security_review: security,
+    })} -->`,
+    user,
+    updated_at,
+  });
+  const clean = { commit_sha: SHA, status: 'completed', has_unresolved_findings: false };
+  const valid = summary(clean);
+  assert.deepEqual(trustedStateComment([valid], 'security_review').state, securityDone);
+  for (const user of [
+    { login: 'mallory', type: 'User' },
+    { login: CODEX.login, type: 'User' },
+    { login: 'other[bot]', type: 'Bot' },
+  ])
+    assert.equal(trustedStateComment([summary(clean, user)], 'security_review'), null);
+  const latest = summary(null, CODEX, '2026-01-01T00:00:02Z');
+  assert.equal(trustedStateComment([valid, latest], 'security_review').state, null);
+  latest.body = '<!-- codex-review-state:v1 {invalid} -->';
+  assert.equal(trustedStateComment([valid, latest], 'security_review').state, null);
+});
+
+test('every canonical security pattern is covered without expanding to other human queue categories', () => {
+  const cases = [
+    'apps/server/src/lib/secret-box.ts',
+    'apps/server/src/lib/keys.ts',
+    'apps/server/src/lib/token-auth.ts',
+    'apps/server/src/lib/attachments-token.ts',
+    'apps/server/src/services/secrets.ts',
+    'apps/server/src/services/credentials.ts',
+    'apps/server/src/services/api-keys.ts',
+    'apps/server/src/services/oauth.ts',
+    'apps/daemon/src/credentials.ts',
+    'apps/daemon/src/secret-channel.ts',
+    'apps/daemon/src/machine-client.ts',
+    'apps/server/src/routes-machine.ts',
+    'apps/server/src/services/machine.ts',
+    'apps/server/src/services/machine-claim.ts',
+    'apps/daemon/src/backend/command-gate.ts',
+    'apps/server/src/services/mcp-face.ts',
+    'apps/server/src/services/mcp-servers.ts',
+  ];
+  for (const filename of cases)
+    assert.equal(requiresSecurityReview([{ filename }]), true, filename);
+  for (const filename of [
+    'apps/server/src/services/nested/machine-claim.ts',
+    'apps/server/src/services/machine-claim.test.ts.backup',
+    'apps/server/src/services/machine-claim.tsx',
+    'apps/server/drizzle/0102.sql',
+    'scripts/ops/deploy-self.sh',
+    '.github/workflows/release.yml',
+  ])
+    assert.equal(requiresSecurityReview([{ filename }]), false, filename);
+});
+
+const receiptFixture = JSON.parse(
+  readFileSync(new URL('../../../docs/verify/D88/receipt-fixture.json', import.meta.url), 'utf8'),
+);
+function receiptDecision(fixture, threads = []) {
+  const state = parseState(fixture.evidence.comments[0].body, 'security_review');
+  return decide(
+    fixture.pr,
+    { commitSha: fixture.pr.head.sha, status: 'completed' },
+    threads,
+    noRetries,
+    false,
+    null,
+    undefined,
+    { state, receiptEvidence: fixture.evidence },
+  );
+}
+
+test('D88 accepts the live exact-head null verdict only with a fresh clean unambiguous SECURITY receipt and no open security threads', () => {
+  assert.equal(receiptDecision(receiptFixture).conclusion, 'success');
+});
+
+test('D88 never substitutes a receipt for invalid or missing security state fields', () => {
+  for (const raw of [
+    null,
+    {},
+    { commit_sha: receiptFixture.pr.head.sha, status: 'completed' },
+    ...[true, 'false', 0, undefined].map((has_unresolved_findings) => ({
+      commit_sha: receiptFixture.pr.head.sha,
+      status: 'completed',
+      has_unresolved_findings,
+    })),
+    ...['running', 'failed', null, undefined].map((status) => ({
+      commit_sha: receiptFixture.pr.head.sha,
+      status,
+      has_unresolved_findings: null,
+    })),
+    { commit_sha: OTHER, status: 'completed', has_unresolved_findings: null },
+  ]) {
+    const fixture = structuredClone(receiptFixture);
+    fixture.evidence.comments[0].body = fixture.evidence.comments[0].body.replace(
+      /<!-- codex-review-state:v1 .* -->/,
+      `<!-- codex-review-state:v1 ${JSON.stringify({ security_review: raw })} -->`,
+    );
+    assert.equal(receiptDecision(fixture).conclusion, 'failure', JSON.stringify(raw));
+  }
+});
+
+test('D88 rejects forged, code-only, stale, edited-to-look-fresh, ambiguous or unprovable receipts', () => {
+  const mutations = [
+    (f) => {
+      f.evidence.comments[1].user = { login: 'mallory', type: 'User' };
+    },
+    (f) => {
+      f.evidence.comments[1].user.type = 'User';
+    },
+    (f) => {
+      f.evidence.comments[1].body = f.evidence.comments[1].body.replace(
+        'Codex Security Review',
+        'Codex Review',
+      );
+    },
+    (f) => {
+      f.evidence.comments[1].body = f.evidence.comments[1].body.replace(
+        'No security issues were found',
+        'Security issues were found',
+      );
+    },
+    (f) => {
+      f.evidence.comments[1].body = f.evidence.comments[1].body.replace('7cd6bab608', 'bbbbbbbbbb');
+    },
+    (f) => {
+      f.evidence.comments[1].created_at = '2026-11-04T08:40:00Z';
+      f.evidence.comments[1].updated_at = '2026-11-04T08:53:18Z';
+    },
+    (f) => {
+      f.evidence.forcePushes = [{ createdAt: '2026-11-04T08:53:19Z' }];
+    },
+    (f) => {
+      f.evidence.forcePushes = null;
+    },
+    (f) => {
+      f.evidence.resolvedSha = OTHER;
+    },
+    (f) => {
+      delete f.evidence.resolvedSha;
+    },
+    (f) => {
+      f.evidence.commits.push(`7cd6bab608${'0'.repeat(30)}`);
+      f.pr.commits = 2;
+    },
+    (f) => {
+      f.pr.commits = 2;
+    },
+    (f) => {
+      f.evidence.comments[0].body = f.evidence.comments[0].body.split('\n')[0];
+    },
+    (f) => {
+      f.evidence.comments.push({
+        ...f.evidence.comments[1],
+        id: 9999999999,
+        body: f.evidence.comments[1].body.replace(
+          'No security issues were found',
+          'Security issues were found',
+        ),
+        created_at: '2026-11-04T08:53:19Z',
+      });
+    },
+    (f) => {
+      f.evidence.comments.push({
+        id: 9,
+        user: { login: 'owner', type: 'User' },
+        body: '@codex security review',
+        created_at: '2026-11-04T08:53:19Z',
+      });
+    },
+  ];
+  mutations.push(
+    (f) => {
+      delete f.evidence.refMatches;
+    },
+    (f) => {
+      f.evidence.refMatches = ['refs/tags/7cd6bab608'];
+    },
+    (f) => {
+      f.evidence.forcePushes = [{ createdAt: f.evidence.comments[1].created_at }];
+    },
+  );
+  for (const [i, mutate] of mutations.entries()) {
+    const fixture = structuredClone(receiptFixture);
+    mutate(fixture);
+    assert.equal(receiptDecision(fixture).conclusion, 'failure', `mutation ${i}`);
+  }
+});
+
+test('D88 open security findings block at every severity even outdated or pre-existing; code review stays independent', () => {
+  for (const level of ['P0', 'P1', 'P2', 'P3']) {
+    const securityThread = thread(level, {
+      body: `<!-- codex-security-review-finding:v1 -->\n${badge(level, 'Security finding')}`,
+      isOutdated: true,
+      preExisting: true,
+    });
+    assert.equal(receiptDecision(receiptFixture, [securityThread]).conclusion, 'failure', level);
+  }
+  assert.equal(receiptDecision(receiptFixture, [thread('P1')]).conclusion, 'failure');
+  const missing = structuredClone(receiptFixture);
+  assert.equal(
+    decide(missing.pr, null, [], noRetries, false, null, undefined, {
+      state: parseState(missing.evidence.comments[0].body, 'security_review'),
+      receiptEvidence: missing.evidence,
+    }).status,
+    'in_progress',
+  );
+});
+
+test('explicit false also requires every security thread resolved regardless of severity, diff age or parent heading', () => {
+  const cases = [
+    thread('P2', { body: '<!-- codex-security-review-finding:v1 -->\nMedium finding' }),
+    thread('P3', {
+      body: '<!-- codex-security-review-finding:v1 -->\nLow finding',
+      isOutdated: true,
+      preExisting: true,
+    }),
+    thread('P2', {
+      reviewBody: '### 🛡️ Codex Security Review',
+      isOutdated: true,
+      preExisting: true,
+    }),
+    thread('P2', { authorLogin: '' }),
+    thread('P2', { authorType: '' }),
+    thread('P2', { authorType: 'Unknown' }),
+    thread('P2', { body: undefined }),
+    thread('P2', { isResolved: null }),
+  ];
+  for (const [i, finding] of cases.entries()) {
+    const result = decide(pr, done, [finding], noRetries, false, null, undefined, {
+      state: securityDone,
+    });
+    assert.equal(result.conclusion, 'failure', `case ${i}`);
+  }
+  const resolved = thread('P2', {
+    body: '<!-- codex-security-review-finding:v1 -->\nMedium',
+    isResolved: true,
+  });
+  assert.equal(
+    decide(pr, done, [resolved], noRetries, false, null, undefined, { state: securityDone })
+      .conclusion,
+    'success',
+  );
+  assert.equal(
+    decide(pr, done, [thread('P2')], noRetries, false, null, undefined, { state: securityDone })
+      .conclusion,
+    'success',
+  );
+  assert.equal(decide(pr, done, [thread('P2')], noRetries).conclusion, 'success');
 });

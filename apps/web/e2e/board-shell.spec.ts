@@ -1,14 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-test('a project filter keeps home and marks the project; an unknown project leaves the home unfiltered', async ({
+test('a project filter keeps home and marks the project; an unknown project shows the not-found page', async ({
   page,
 }) => {
   const workbench = page
     .getByRole('complementary')
     .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
-  await page.goto('/app?scenario=home-c');
-  const unfiltered = await page.getByTestId('home-c-since').textContent();
-
   await page.goto('/app?scenario=home-c&project=ZAQczKCu0MOAzC1ZqcFlX');
   await expect(page.getByTestId('project-home')).toBeVisible();
   await expect(workbench).not.toHaveAttribute('aria-current', 'page');
@@ -17,7 +14,8 @@ test('a project filter keeps home and marks the project; an unknown project leav
   ).toContainText('cairn');
 
   await page.goto('/app?scenario=home-c&project=no-such-project');
-  await expect(page.getByTestId('home-c-since')).toHaveText(unfiltered ?? '');
+  await expect(page.getByTestId('project-not-found')).toBeVisible();
+  await expect(page.getByTestId('home-c')).toHaveCount(0);
   await expect(workbench).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('[data-slot="sidebar-project-row"][aria-current="page"]')).toHaveCount(0);
 });

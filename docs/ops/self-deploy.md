@@ -8,13 +8,15 @@ A deploy rehearses the target's migrations on an online copy of the live DB in a
 
 The result goes to `~/.local/state/cairn-deploy/deployed.json` and `~/.cairn/server/deploy.json`: `{sha, previous, result, failed, snapshot, at, host}` with `result` one of `deployed`, `rolled-back`, `rolled-back-code` or `rollback-unhealthy`.
 
-When the oldest undeployed main commit landed more than 2 hours ago, the watcher opens the issue `deploy lag: omarchy is behind main` (or comments on it once per main head) with the reason, and closes it once the deployed SHA equals main.
+When the oldest undeployed main commit landed more than 2 hours ago, the watcher opens the issue `deploy lag: omarchy is behind main` (or comments on it once per main head) with the reason, and closes it once the deployed SHA equals main. The lookup retains the bot-author filter and quoted lag-title search. A failed close makes the watcher tick fail, so the next tick retries recovery instead of reporting success.
 
-Install from `scripts/ops/systemd/` into `~/.config/systemd/user/`, then:
+Install from `scripts/ops/systemd/` into `~/.config/systemd/user/`: `cairn-server.service`, `cairn-daemon.service`, `cairn-coordinator.service`, `cairn-self-deploy.service` and `cairn-self-deploy.timer`. Every unit runs from the dedicated clone `~/Code/AgentProjects/cairn-exec`, which only deploys move; lanes work in `~/Code/AgentProjects/cairn` and its worktrees, so a deploy never switches a checkout under them. The server binds `127.0.0.1:8787` and is reached through `tailscale serve`; host-specific settings (proxy, secrets) go in `~/.config/cairn/server.env` or unit drop-ins. The self-deploy service starts without an App token. Each individual `gh` call invokes `~/.cairn/tools/app-token/as-bot.sh`; artifact installs, migrations and builds receive no inherited GitHub token or Git command-auth configuration. Before enabling the timer, install the reviewed `as-bot.sh`, `as-bot-policy.mjs` and `token.mjs` from `scripts/ops/host/tools/app-token/` together into `~/.cairn/tools/app-token/`, retaining the existing private key and App configuration. The policy admits only the exact deploy-lag recovery close command, with an explicit Cairn repository, numeric issue ID and full deployed SHA. Then:
 
 ```sh
 systemctl --user daemon-reload
-systemctl --user enable --now cairn-self-deploy.timer
+systemctl --user enable --now cairn-server.service cairn-daemon.service cairn-self-deploy.timer
 ```
+
+`cairn-coordinator.service` is installed but enabled only at the D72 cutover (`docs/ops/coordinator-sidecar.md`); once enabled, a deploy stops it with the daemon and starts it after the daemon is healthy. A failed Coordinator start raises an alarm issue and does not fail the deploy, like the Orb unit.
 
 Deploy one SHA by hand with `scripts/ops/deploy-self.sh <sha>`; roll back by deploying the previous SHA, or by restoring a `stopped-*.db` snapshot with both units stopped.

@@ -344,6 +344,26 @@
     "2756": {
       "destination": "existing-executors",
       "reason": "opened 11-04 for the flaky attachment-strip e2e that tripped the brake; fix pending"
+    },
+    "2853": {
+      "destination": "existing-executors",
+      "reason": "D85 assigns question deferral to B-UI lane 6; gallery drafts and measured browser evidence await the owner design choice before production work"
+    },
+    "2844": {
+      "destination": "hold",
+      "reason": "B2 seed-cache follow-up depends on #2278 and lane 8 D69 runtime integration; coordinate seed.ts ownership with #2761 before implementation"
+    },
+    "1517": {
+      "destination": "existing-executors",
+      "reason": "Reopened under C2 lane 7: 30 Harbor tasks, paired oracle/null proof and owner sampling remain required; the private evaluation corpus is in progress"
+    },
+    "2881": {
+      "destination": "existing-executors",
+      "reason": "Open PR #2882 implements the requested instant interaction feedback and scoped motion policy"
+    },
+    "2892": {
+      "destination": "existing-executors",
+      "reason": "Open PR #2894 implements the three-family font decision and heading role mapping"
     }
   }
 }

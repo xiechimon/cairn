@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { ContainerOrbProvider } from '../src/orb/container-provider.js';
 import { HostOrbProvider, NspawnOrbProvider } from '../src/orb/provider.js';
 import type { OrbRuntime, OrbSpawnSpec } from '../src/orb/runtime.js';
 import { createOrbProvider, ORB_RUNTIME_ENV, resolveOrbRuntime } from '../src/orb/select.js';
@@ -33,39 +34,72 @@ describe('resolveOrbRuntime', () => {
 });
 
 describe('createOrbProvider', () => {
-  const stateFile = '/nonexistent/orb-state/orbs.json';
+  const home = '/nonexistent/cairn-home';
+  const podmanEnv = {
+    CAIRN_EXECUTOR: 'orb',
+    CAIRN_ORB_RUNTIME: 'podman',
+    CAIRN_ORB_IMAGE: 'cairn-orb-base:0123456789ab',
+    XDG_RUNTIME_DIR: '/nonexistent/run',
+  };
 
   test('executor orb with no runtime selects nspawn', () => {
-    expect(createOrbProvider({ CAIRN_EXECUTOR: 'orb' }, stateFile)).toBeInstanceOf(
-      NspawnOrbProvider,
-    );
+    expect(createOrbProvider({ CAIRN_EXECUTOR: 'orb' }, home)).toBeInstanceOf(NspawnOrbProvider);
   });
 
   test('executor orb with an explicit nspawn selects nspawn', () => {
     expect(
-      createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: 'nspawn' }, stateFile),
+      createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: 'nspawn' }, home),
     ).toBeInstanceOf(NspawnOrbProvider);
   });
 
-  test.each(['podman', 'docker', 'apple'])(
+  test('executor orb with podman selects the container provider', () => {
+    expect(createOrbProvider(podmanEnv, home)).toBeInstanceOf(ContainerOrbProvider);
+  });
+
+  test('two daemon homes never share the transport runtime directory', () => {
+    const first = createOrbProvider(podmanEnv, `${home}/first`) as ContainerOrbProvider;
+    const second = createOrbProvider(podmanEnv, `${home}/second`) as ContainerOrbProvider;
+    expect(first.runtimeRoot).not.toBe(second.runtimeRoot);
+  });
+
+  test.each([
+    [
+      'without an image',
+      { CAIRN_ORB_IMAGE: undefined },
+      'CAIRN_ORB_IMAGE must name the built image',
+    ],
+    [
+      'with an unpinned image',
+      { CAIRN_ORB_IMAGE: 'cairn-orb-base:latest' },
+      'pinned cairn-orb-base',
+    ],
+    ['with a foreign image', { CAIRN_ORB_IMAGE: 'alpine:3' }, 'pinned cairn-orb-base'],
+    ['without a runtime directory', { XDG_RUNTIME_DIR: undefined }, 'XDG_RUNTIME_DIR must be set'],
+  ])('executor orb with podman %s fails instead of falling back', (_name, override, message) => {
+    expect(() => createOrbProvider({ ...podmanEnv, ...override }, home)).toThrow(message);
+  });
+
+  test.each(['docker', 'apple'])(
     'executor orb with %s fails instead of falling back to nspawn',
     (runtime) => {
       expect(() =>
-        createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: runtime }, stateFile),
-      ).toThrow(`CAIRN_ORB_RUNTIME=${runtime} is not implemented yet; only nspawn is available`);
+        createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: runtime }, home),
+      ).toThrow(
+        `CAIRN_ORB_RUNTIME=${runtime} is not implemented yet; only nspawn and podman are available`,
+      );
     },
   );
 
   test('executor orb with an unknown runtime fails', () => {
     expect(() =>
-      createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: 'lxc' }, stateFile),
+      createOrbProvider({ CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: 'lxc' }, home),
     ).toThrow('CAIRN_ORB_RUNTIME must be one of');
   });
 
   test.each([{}, { CAIRN_EXECUTOR: 'host' }])(
     'without the orb executor a garbage runtime is ignored (%j)',
     (env) => {
-      expect(createOrbProvider({ ...env, CAIRN_ORB_RUNTIME: 'garbage' }, stateFile)).toBeInstanceOf(
+      expect(createOrbProvider({ ...env, CAIRN_ORB_RUNTIME: 'garbage' }, home)).toBeInstanceOf(
         HostOrbProvider,
       );
     },
@@ -73,13 +107,19 @@ describe('createOrbProvider', () => {
 });
 
 describe('daemon startup', () => {
-  test('executor orb with podman rejects startup before enrolling', async () => {
-    const api = new FakeMachineApi();
-    await expect(
-      boot({ api, capEnv: { CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: 'podman' } }),
-    ).rejects.toThrow('CAIRN_ORB_RUNTIME=podman is not implemented yet');
-    expect(api.calls).toEqual([]);
-  });
+  test.each([
+    ['docker', 'CAIRN_ORB_RUNTIME=docker is not implemented yet'],
+    ['podman', 'CAIRN_ORB_IMAGE must name the built image'],
+  ])(
+    'executor orb with %s that cannot start rejects startup before enrolling',
+    async (runtime, message) => {
+      const api = new FakeMachineApi();
+      await expect(
+        boot({ api, capEnv: { CAIRN_EXECUTOR: 'orb', CAIRN_ORB_RUNTIME: runtime } }),
+      ).rejects.toThrow(message);
+      expect(api.calls).toEqual([]);
+    },
+  );
 
   test('executor orb with an unknown runtime rejects startup', async () => {
     await expect(

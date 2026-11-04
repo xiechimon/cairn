@@ -112,8 +112,16 @@ function fixture({ claimed = 0 } = {}) {
 
   fakeTool(
     bin,
+    'gh-wrapper',
+    `"${process.execPath}" "${join(import.meta.dirname, 'host/tools/app-token/as-bot-policy.mjs')}" "$@" || exit $?
+exec env GH_TOKEN=fixture-scoped-app-token "$@"`,
+  );
+
+  fakeTool(
+    bin,
     'gh',
     `echo "gh $*" >> "${fake}/gh.log"
+[ "\${GH_TOKEN-}" != fixture-scoped-app-token ] || echo authenticated >> "${fake}/gh-auth.log"
 case "$1 $2" in
   "api repos/"*)
     sha=$(echo "$2" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
@@ -122,17 +130,24 @@ case "$1 $2" in
     if [[ "$*" == *autonomy-paused* ]]; then cat "${fake}/paused" 2>/dev/null || echo 0
     else cat "${fake}/lag-issue" 2>/dev/null || true; fi ;;
   "issue create") echo "https://github.com/x/y/issues/77" ;;
+  "issue close") [ ! -f "${fake}/lag-close-fail" ] || exit 1 ;;
 esac`,
   );
   fakeTool(
     bin,
     'pnpm',
-    `echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/pnpm.log"; [ -f "${fake}/pnpm-fail" ] && [[ "$*" == *web* ]] && exit 1; exit 0`,
+    `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
+  [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
+done
+echo "pnpm $* @ $(git -C "${checkout}" rev-parse HEAD 2>/dev/null)" >> "${fake}/pnpm.log"; [ -f "${fake}/pnpm-fail" ] && [[ "$*" == *web* ]] && exit 1; exit 0`,
   );
   fakeTool(
     bin,
     'node',
-    `echo "node $*" >> "${fake}/node.log"
+    `for variable in GH_TOKEN GITHUB_TOKEN GIT_CONFIG_VALUE_0; do
+  [ -z "\${!variable-}" ] || echo "$variable" >> "${fake}/artifact-credential-names"
+done
+echo "node $*" >> "${fake}/node.log"
 [ -f "${fake}/migrate-fail" ] && exit 1
 db="\${@: -1}"
 sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
@@ -140,9 +155,36 @@ sqlite3 "$db" "insert into __drizzle_migrations(hash) values ('m1')"`,
   fakeTool(
     bin,
     'systemctl',
-    `if [ "$2" = is-enabled ]; then [ -f "${fake}/orb-enabled" ]; exit $?; fi
+    `if [ "$2" = is-enabled ]; then
+  case "$4" in
+    cairn-daemon-orb.service) [ -f "${fake}/orb-enabled" ]; exit $? ;;
+    cairn-coordinator.service) [ -f "${fake}/coordinator-enabled" ]; exit $? ;;
+    *) exit 1 ;;
+  esac
+fi
 echo "systemctl $*" >> "${fake}/systemctl.log"
+if [ "$2" = show ]; then
+  case "$3" in
+    cairn-coordinator.service) slug=coordinator ;;
+    cairn-daemon-orb.service) slug=orb ;;
+    *) exit 1 ;;
+  esac
+  count=$(cat "${fake}/$slug-health-count" 2>/dev/null || echo 0)
+  count=$((count + 1))
+  echo "$count" > "${fake}/$slug-health-count"
+  mode=$(cat "${fake}/$slug-health-mode" 2>/dev/null || true)
+  state=active; substate=running; pid=123; restarts=0
+  case "$mode" in
+    inactive) state=activating; substate=auto-restart; pid=0 ;;
+    restarts) restarts=$count ;;
+    pid) pid=$((123 + count)) ;;
+    one-active) if [ "$count" -gt 1 ]; then state=failed; substate=failed; pid=0; fi ;;
+  esac
+  printf 'ActiveState=%s\\nSubState=%s\\nMainPID=%s\\nNRestarts=%s\\n' "$state" "$substate" "$pid" "$restarts"
+  exit 0
+fi
 [ ! -f "${fake}/orb-$2-fail" ] || [ "$3" != cairn-daemon-orb.service ] || exit 1
+[ ! -f "${fake}/coordinator-$2-fail" ] || [ "$3" != cairn-coordinator.service ] || exit 1
 [ ! -f "${fake}/phase-on-start" ] || [ "$2" != start ] || echo "start $3 @ $(sed -n 's/^phase=//p' "${dir}/state/in-progress" 2>/dev/null)" >> "${fake}/phases.log"
 if [ "$2 $3" = "start cairn-server.service" ]; then
   head=$(git -C "${checkout}" rev-parse HEAD)
@@ -184,6 +226,7 @@ else printf 000; fi`,
     CAIRN_DEPLOY_BACKUPS: backups,
     CAIRN_DEPLOY_SCRATCH: join(dir, 'scratch'),
     CAIRN_REPO: 'xiechimon/cairn',
+    CAIRN_GH_WRAPPER: join(bin, 'gh-wrapper'),
     CAIRN_HEALTH_URL: 'http://127.0.0.1:8787',
     CAIRN_HEALTH_TRIES: '3',
     CAIRN_HEALTH_INTERVAL: '0',
@@ -685,3 +728,139 @@ for (const action of ['start', 'stop']) {
     assert.doesNotMatch(result.stdout, /rolling back|restarting/);
   });
 }
+
+test('the enabled Coordinator sidecar stops with the daemon and starts after it', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  const calls = f.log('systemctl.log').trim().split('\n');
+  const stop = calls.indexOf('systemctl --user stop cairn-coordinator.service');
+  const start = calls.indexOf('systemctl --user start cairn-coordinator.service');
+  assert.ok(stop >= 0 && stop < calls.indexOf('systemctl --user stop cairn-server.service'));
+  assert.ok(start > calls.indexOf('systemctl --user start cairn-daemon.service'));
+});
+
+test('a Coordinator sidecar that is not enabled is never touched', () => {
+  const f = fixture();
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(f.log('systemctl.log'), /cairn-coordinator/);
+});
+
+test('a failing Coordinator start does not fail the deploy', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-start-fail'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /coordinator-unit-start-failed/);
+  assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
+});
+
+for (const mode of ['inactive', 'restarts', 'pid', 'one-active']) {
+  test(`a Coordinator ${mode} startup preserves its alarm after a successful start command`, () => {
+    const f = fixture();
+    writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+    writeFileSync(join(f.fake, 'coordinator-health-mode'), mode);
+    mkdirSync(join(f.state, 'alarms'), { recursive: true });
+    const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
+    writeFileSync(alarm, '');
+    const result = f.run(DEPLOY, [pushTarget(f)]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(alarm), true);
+    assert.match(result.stderr, /coordinator-unit-start-failed/);
+  });
+}
+
+test('a Coordinator restart that returns success without staying active preserves both alarms', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-stop-fail'), '');
+  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'inactive');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  writeFileSync(join(f.state, 'alarms', 'coordinator-unit-start-failed'), '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  for (const action of ['start', 'stop'])
+    assert.equal(existsSync(join(f.state, 'alarms', `coordinator-unit-${action}-failed`)), true);
+});
+
+test('rollback preserves the Coordinator alarm when the old sidecar also crash-loops', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  writeFileSync(join(f.fake, 'broken-sha'), target);
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'restarts');
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(existsSync(join(f.state, 'alarms', 'coordinator-unit-start-failed')), true);
+});
+
+test('interrupted deployment recovery does not clear a crash-looping Coordinator alarm', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', '--detach', target);
+  mkdirSync(f.state, { recursive: true });
+  mkdirSync(f.backups, { recursive: true });
+  const snapshot = join(f.backups, 'stopped-interrupted.db');
+  sqlite(f.db, `vacuum into '${snapshot}'`);
+  writeFileSync(
+    join(f.state, 'in-progress'),
+    `phase=switching\ntarget=${target}\nprevious=${f.previous}\nsnapshot=${snapshot}\n`,
+  );
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  writeFileSync(join(f.fake, 'coordinator-health-mode'), 'inactive');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
+  writeFileSync(alarm, '');
+  const result = f.run(DEPLOY, ['--recover']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(alarm), true);
+});
+
+test('a stable Coordinator clears its start alarm only after three matching active observations', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'coordinator-enabled'), '');
+  mkdirSync(join(f.state, 'alarms'), { recursive: true });
+  const alarm = join(f.state, 'alarms', 'coordinator-unit-start-failed');
+  writeFileSync(alarm, '');
+  const result = f.run(DEPLOY, [pushTarget(f)]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(alarm), false);
+  assert.equal(readFileSync(join(f.fake, 'coordinator-health-count'), 'utf8').trim(), '3');
+});
+
+for (const script of [DEPLOY, WATCH]) {
+  test(`${script.endsWith('deploy-self.sh') ? 'deployment' : 'watch'} scopes App credentials to individual gh calls`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    const result = f.run(script, script === DEPLOY ? [target] : [], {
+      CAIRN_DEPLOY_SCRIPT: DEPLOY,
+      GH_TOKEN: 'fixture-inherited-app-token',
+      GITHUB_TOKEN: 'fixture-inherited-github-token',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'http.https://example.invalid/.extraheader',
+      GIT_CONFIG_VALUE_0: 'Authorization: fixture-inherited-header',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(f.log('artifact-credential-names'), '');
+    assert.ok(f.log('gh-auth.log').trim().split('\n').length > 0);
+    assert.equal(
+      f.log('gh-auth.log').trim().split('\n').length,
+      f.log('gh.log').trim().split('\n').length,
+    );
+  });
+}
+
+test('watch reports failed lag recovery when the identified issue cannot be closed', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lag-issue'), '77\n');
+  writeFileSync(join(f.fake, 'lag-close-fail'), '');
+  const result = f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /failed to close lag issue #77/);
+  assert.doesNotMatch(result.stdout, /closed lag issue/);
+  assert.match(f.log('gh.log'), /issue list .*--author @me .*deploy lag/);
+});

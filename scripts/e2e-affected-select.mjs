@@ -131,6 +131,7 @@ const AGENT = [
   'chief-home-digest',
 ];
 export const LIVE_SERVER = [
+  'account-feature-releases',
   'token-gate',
   'live-server-',
   'agent-fallback-models',
@@ -209,6 +210,7 @@ const RESOURCES = [
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
+  'motion-quiet',
   'color-freeze',
   'fixture-mode-chip',
   'orientation-variants',
@@ -246,6 +248,7 @@ export const FILE_RULES = new Map([
     ['account-', 'user-menu-', 'cds-density', 'push-device-switch'],
   ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
+  ['apps/web/src/routes/feature-releases.tsx', ['account-feature-releases']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],

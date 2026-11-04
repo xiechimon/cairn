@@ -323,26 +323,26 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
 
 ## Motion
 
-The stone is quiet. Motion comes in four kinds, each with one duration and one easing; values come from the motion slots in `src/styles/shadcn.css` (`--dur-fast` / `--dur-overlay` / `--dur-window` / `--ease-standard` / `--ease-pop` / `--ease-out-expo` / `--ease-drawer` / `--spring-snappy`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
+The stone is quiet. Motion only says where a surface came from or that something is still working. Anything the user triggers often, and any reply to their own input, is instant. Values come from the motion slots in `src/styles/shadcn.css` (`--dur-fast` / `--dur-overlay` / `--ease-standard` / `--ease-out-expo` / `--ease-drawer`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
 
 | Kind | Surface | Duration | Easing | Animated properties |
 |---|---|---|---|---|
 | Micro-interaction | Hover and press tint on rows, cards and buttons; segmented controls; disclosure chevrons | 150ms (`--dur-fast`) | `--ease-standard` (same as tw `ease-out`) | `background-color` / `color` / `box-shadow` / `transform` |
 | Micro-interaction | Task card hover lift and shadow | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
 | Overlay | Dialog, confirmation surface, ⌘K | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
-| Overlay | Chief window grows from and returns to the lower-right corner | 320ms in (`--dur-window`), 200ms out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin near the lower-right corner |
-| Overlay | Menu, popover, Select | 100ms in and out | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
-| Overlay | Tooltip | 150ms in and out (tw-animate default) | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
+| Overlay | Chief window grows from and returns to the lower-right corner | 200ms in and out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin near the lower-right corner |
+| Overlay | Menu, popover, Select | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
+| Overlay | Tooltip | 150ms in (tw-animate default), no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
 | Overlay | Inline popovers (mention, slash, chip) | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.98→1)` |
-| Arrival | New card on the board, column change, filter hit | 150ms | `--ease-pop` | `opacity` + `translateY(4px→0)` |
-| Arrival | Conversation message entry | 380ms (`--spring-snappy-dur`) | `--spring-snappy` | `opacity` + `translateY` |
+| Overlay | Side panel floating over the scrim (1100px and below) | 220ms in, scrim 200ms | `--ease-standard` | `opacity` + `translate(12px→0)` |
+| Overlay | Jump-to-latest button in the transcript | 200ms in, 150ms out (`--dur-fast`) | tw arbitrary ease in and out | `opacity` + `scale` + `translate` |
 | Loop | Running task card footer and the busy Coordinator: the spiral mark spins | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
 
 - Animate only `opacity` / `transform` / shadow / color, never layout properties (width / height / top).
-- Instant, no transition: press (`:active` darkening, card background tint), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames).
+- Instant, no transition: press (`:active` darkening, card background tint), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames), the user's own chat message, the composer ring on hover and focus, closing a menu, popover, Select or tooltip (the `[data-closed]` rule in `motion.css`), and the side panel docked beside the page.
 - `prefers-reduced-motion`: every keyframe animation shrinks to 0.01ms and loops run once (the site-wide rule in `motion.css`); transitions are untouched.
-- Not used: route transitions, list FLIP, cross-column flights, a spring family (only message entry uses `--spring-snappy`).
-- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the `anim-message-fade-up` class; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
+- Not used: route transitions, list FLIP, cross-column flights, entry animations on new board cards or chat messages, spring easings.
+- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the retired ones; `e2e/motion-quiet.spec.ts` pins the instant surfaces above and the floating panel slide; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
 
 ## Texture
 
