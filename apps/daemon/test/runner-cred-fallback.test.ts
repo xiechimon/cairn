@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -9,6 +9,7 @@ import type {
   MachineDoneBody,
   MachineStreamEvent,
   ToolCallRecord,
+  TranscriptUpload,
   WorktreeOps,
 } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
@@ -82,6 +83,7 @@ function claimedStep(
 class FakeClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
+  transcripts: TranscriptUpload[] = [];
   git: GitCredentials | null = null;
 
   async enroll(): Promise<never> {
@@ -137,7 +139,9 @@ class FakeClient implements MachineApi {
       })),
     };
   }
-  async putUpload() {}
+  async putUpload(_url: string, _headers: Record<string, string>, body: TranscriptUpload | string) {
+    if (typeof body !== 'string') this.transcripts.push(body);
+  }
   async done(stepId: string, body: MachineDoneBody) {
     this.doneBodies.push({ stepId, body });
     this.calls.push(`done:${stepId}:${body.status}`);
@@ -265,14 +269,8 @@ async function setup(
   return { client, lines, paths };
 }
 
-function transcriptRows(paths: {
-  outboxDir: string;
-}): { id: string; role: string; content: unknown }[] {
-  return JSON.parse(readFileSync(join(paths.outboxDir, 'step-s1.transcript.json'), 'utf8')) as {
-    id: string;
-    role: string;
-    content: unknown;
-  }[];
+function transcriptRows(client: FakeClient): TranscriptUpload['messages'] {
+  return client.transcripts.at(-1)?.messages ?? [];
 }
 
 describe('runner push credential fallback + provenance line (#1225)', () => {
@@ -282,7 +280,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
         throw new Error(MEA_AUTH_FAILURE);
       },
     });
-    const { client, lines, paths } = await setup(
+    const { client, lines } = await setup(
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
@@ -291,10 +289,10 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
       { branch: 'cairn/conv-conv-1', cred: null },
     ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
-    const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
+    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(row?.role).toBe('system');
     expect(String(row?.content)).toContain('machine');
-    const allText = `${JSON.stringify(transcriptRows(paths))}\n${lines.join('\n')}`;
+    const allText = `${JSON.stringify(transcriptRows(client))}\n${lines.join('\n')}`;
     expect(allText).not.toContain(GITHUB_TOKEN.password);
     expect(lines.some((l) => l.includes('machine credentials'))).toBe(true);
   }, 20_000);
@@ -326,12 +324,12 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
 
   test('failure mode 2: github token valid → single push (cred = token), provenance line integration', async () => {
     const workspace = fakeWorkspace({});
-    const { client, paths } = await setup(
+    const { client } = await setup(
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
     expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED }]);
-    const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
+    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('integration');
     expect(client.doneBodies[0]!.body.status).toBe('success');
   }, 20_000);
@@ -345,7 +343,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
         throw new Error("fatal: could not read Username for 'https://github.com'");
       },
     });
-    const { client, paths } = await setup(
+    const { client } = await setup(
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
@@ -356,9 +354,11 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(msg).toContain('Invalid username or token');
     expect(msg).toContain('machine credentials');
     expect(msg).toContain('could not read Username');
-    const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
+    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('integration');
-    expect(`${msg}\n${JSON.stringify(transcriptRows(paths))}`).not.toContain(GITHUB_TOKEN.password);
+    expect(`${msg}\n${JSON.stringify(transcriptRows(client))}`).not.toContain(
+      GITHUB_TOKEN.password,
+    );
   }, 20_000);
 
   test('failure mode 4: hosted auth failure → single push, no fallback, no provenance line (server per-step key untouched)', async () => {
@@ -367,14 +367,14 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
         throw new Error(MEA_AUTH_FAILURE);
       },
     });
-    const { client, paths } = await setup(
+    const { client } = await setup(
       claimedStep('build', { kind: 'hosted', cloneUrl: 'http://server/git/t/r' }),
       { git: { username: 'git', password: 'hosted_step_key' }, workspace },
     );
     expect(workspace.pushes).toHaveLength(1);
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(String(client.doneBodies[0]!.body.errorMessage)).toContain('Authentication failed');
-    expect(transcriptRows(paths).some((r) => r.id === 'git-credential-s1')).toBe(false);
+    expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
   test('failure mode 5: local push failure → single attempt, no fallback, no provenance line', async () => {
@@ -383,14 +383,14 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
         throw new Error('push failed (128): bad object');
       },
     });
-    const { client, paths } = await setup(
+    const { client } = await setup(
       claimedStep('build', { kind: 'local', cloneUrl: '/tmp/user-repo' }),
       { git: null, workspace },
     );
     expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(String(client.doneBodies[0]!.body.errorMessage)).toContain('bad object');
-    expect(transcriptRows(paths).some((r) => r.id === 'git-credential-s1')).toBe(false);
+    expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
   test('failure mode 6: prepare already fell back (provenance machine) → provenance line surfaces with prepare (visible even on rounds where push never fired)', async () => {
@@ -404,10 +404,10 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
         tools: ['合并分支'],
       },
     );
-    const { client, paths } = await setup(claimed, { git: GITHUB_TOKEN, workspace });
+    const { client } = await setup(claimed, { git: GITHUB_TOKEN, workspace });
     expect(workspace.pushes).toHaveLength(0);
     expect(client.doneBodies[0]!.body.status).toBe('success');
-    const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
+    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('machine');
   }, 20_000);
 });
