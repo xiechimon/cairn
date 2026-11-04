@@ -343,6 +343,7 @@ export function feedOf(row: CallRow): ComputerCommand | null {
     : (row.errorMessage ?? '');
   return {
     callId: row.id,
+    computerId: row.computerId,
     stepId: row.stepId,
     tool: row.tool as ComputerCommand['tool'],
     command: redact(command),

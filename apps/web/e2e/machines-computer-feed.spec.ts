@@ -9,6 +9,7 @@ const T0 = Date.now() - 2 * 3_600_000;
 const id = (n: number) => n.toString(16).padStart(64, '0');
 const command = (n: number, patch: Record<string, unknown> = {}) => ({
   callId: id(n),
+  computerId: 'comp-1',
   stepId: 'step-1',
   tool: 'shell',
   command: `echo ${n}`,
@@ -125,6 +126,27 @@ test('a new command appears live as running and the same entry settles to done',
   });
   await expect(entries(panel).nth(2)).toHaveAttribute('data-status', 'cancelled');
   await expect(entries(panel)).toHaveCount(4);
+});
+
+test('the computer feed excludes live commands from other computers and the host', async ({ page }) => {
+  const panel = await open(page, {
+    computers: [computer(), computer({ id: 'comp-2' })],
+    commands: [command(1)],
+  });
+  await expect(entries(panel)).toHaveCount(1);
+  await emit(page, {
+    type: 'computer.command',
+    command: command(2, { computerId: 'comp-2', command: 'other-computer-only' }),
+  });
+  await emit(page, {
+    type: 'computer.command',
+    command: command(3, { computerId: null, tool: 'user_computer_shell', command: 'host-only' }),
+  });
+  await emit(page, { type: 'computer.command', command: command(4) });
+  await expect(entries(panel)).toHaveCount(2);
+  await expect(panel).not.toContainText('other-computer-only');
+  await expect(panel).not.toContainText('host-only');
+  await expect(entries(panel).nth(1)).toHaveAttribute('data-call-id', id(4));
 });
 
 test('the feed follows new commands at the bottom and stays put once scrolled up', async ({

@@ -181,6 +181,17 @@ describe('computer feed routes', () => {
     expect(body.commands.map((command) => command.at)).toEqual([1, 3]);
   });
 
+  test('history commands identify the computer that produced them', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c1', 'm1');
+    addComputer(s, s.team.id, 'c2', 'm1');
+    addCall(s, s.team.id, 'c1', 'm1', 1);
+    addCall(s, s.team.id, 'c2', 'm1', 2);
+    const { body } = await commands(s, 'c1');
+    expect(body.commands).toEqual([expect.objectContaining({ computerId: 'c1' })]);
+  });
+
   test('read tools are not in the feed and running calls report running', async () => {
     const s = boot();
     addMachine(s, s.team.id, 'm1');

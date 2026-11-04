@@ -169,8 +169,12 @@ function CommandFeed({ computerId }: { computerId: string }) {
     computerFeedStore.snapshot,
   );
   const commands = useMemo(
-    () => mergeComputerFeed(history.data ?? [], liveCommands),
-    [history.data, liveCommands],
+    () =>
+      mergeComputerFeed(
+        history.data ?? [],
+        liveCommands.filter((command) => command.computerId === computerId),
+      ),
+    [history.data, liveCommands, computerId],
   );
   const scroller = useRef<HTMLUListElement>(null);
   const stuck = useRef(true);

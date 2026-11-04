@@ -27,6 +27,7 @@ class FakeEventSource {
 
 const command: ComputerCommand = {
   callId: '1'.repeat(64),
+  computerId: 'comp-1',
   stepId: 'step-1',
   tool: 'shell',
   command: 'echo first-team-only',
