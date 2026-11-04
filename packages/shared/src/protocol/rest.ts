@@ -14,6 +14,13 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams', note: '恒 seed 一行（02 §2.2）' },
   { method: 'GET', path: '/api/teams/{id}/members', note: 'Agent 列表实际走此端点（r5 §1）' },
   { method: 'GET', path: '/api/teams/{id}/machines' },
+  { method: 'GET', path: '/api/computers', note: 'the team computers (D75 P8a)' },
+  {
+    method: 'GET',
+    path: '/api/computers/{id}/commands',
+    query: ['limit'],
+    note: 'recent computer.command feed entries, newest last (D75 P8a)',
+  },
   {
     method: 'GET',
     path: '/api/server/backup',

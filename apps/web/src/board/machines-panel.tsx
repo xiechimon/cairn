@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { CoordinatorComputer } from './computer-feed.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -115,7 +116,7 @@ function MachineCard({ machine, coordinator }: { machine: MachineRow; coordinato
       >
         <span className={`flex items-center gap-2 ${online ? 'flex-col' : ''}`}>
           <MonitorSmartphone aria-hidden="true" className="size-5 opacity-60" />
-          {online ? t('打开桌面控制后，这里显示屏幕') : t('电脑离线')}
+          {online ? t('屏幕随桌面控制一起上线，到时显示在这里') : t('电脑离线')}
         </span>
       </div>
       <div className="flex items-center gap-3 px-3.5 py-3">
@@ -172,6 +173,7 @@ export function MachinesPanel({
             {t('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。')}
           </p>
         )}
+        <CoordinatorComputer />
         {ordered.map((machine) => (
           <MachineCard
             key={machine.id ?? machine.name}

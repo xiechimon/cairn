@@ -16,6 +16,7 @@ import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
 import { readStoredToken, useAuth } from './auth.js';
+import { computerFeedStore } from './computer-feed.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
@@ -42,6 +43,9 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
       (ev) => {
         for (const queryKey of teamEventInvalidations(ev, teamId)) {
           void invalidateConverged(qc, { queryKey });
+        }
+        if (ev.type === 'computer.command' && computerFeedStore.push(ev.command)) {
+          void invalidateConverged(qc, { queryKey: ['computers', teamId] });
         }
         if (ev.type === 'notification') {
           fireDesktopNotification(ev.notification as NotificationRecord);

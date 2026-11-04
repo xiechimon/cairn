@@ -301,7 +301,7 @@ function resultOfRow(row: CallRow): ComputerRelayResult {
   }
 }
 
-function feedOf(row: CallRow): ComputerCommand | null {
+export function feedOf(row: CallRow): ComputerCommand | null {
   if (!FEED_TOOLS.has(row.tool)) return null;
   const param = (key: string): string => {
     const value = row.params[key];
