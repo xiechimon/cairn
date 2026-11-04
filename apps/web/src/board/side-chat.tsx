@@ -147,6 +147,7 @@ function ThreadBody({
             messages={chat.queuedMessages ?? []}
             onSendNow={chat.sendQueuedNow}
             onRemove={chat.removeQueued}
+            onEdit={chat.editQueued}
           />
         </div>
       )}
@@ -175,6 +176,7 @@ function ThreadBody({
         queuedMessages={chat.queuedMessages}
         onSendQueuedNow={chat.sendQueuedNow}
         onRemoveQueued={chat.removeQueued}
+        onEditQueued={chat.editQueued}
       />
     </>
   );

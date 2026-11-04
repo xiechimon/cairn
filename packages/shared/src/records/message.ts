@@ -384,6 +384,7 @@ export const buildSteerBodySchema = z.object({
   mode: z.literal('queue').optional(),
   deliverAfterStop: z.boolean().optional(),
   cancelQueued: z.boolean().optional(),
+  editQueued: z.boolean().optional(),
   queuedMessageId: recordId.optional(),
 });
 export type BuildSteerBody = z.infer<typeof buildSteerBodySchema>;

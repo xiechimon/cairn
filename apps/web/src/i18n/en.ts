@@ -233,6 +233,11 @@ export const EN: Record<string, string> = {
   停止: 'Stop',
   丢弃修改: 'Discard changes',
   '取消失败，请重试。': 'Failed to cancel. Try again.',
+  编辑排队消息: 'Edit queued message',
+  取消编辑: 'Cancel edit',
+  '回车保存 · Esc 取消': 'Enter to save · Esc to cancel',
+  '这条排队消息已经发出，改动没有生效':
+    'That queued message was already sent; your edit was not applied',
   '丢弃本轮修改？': 'Discard this round’s changes?',
   // #1250（ADR 0018 层 1）verify 步状态与 fan-out 面。
   验证中: 'Verifying',

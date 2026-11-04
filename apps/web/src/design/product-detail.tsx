@@ -353,7 +353,7 @@ export function ProductDetailSection() {
         title="Queued messages"
         note={
           last ??
-          'Capsules inside the composer: send now or remove each one; a failed one offers Retry'
+          'Capsules inside the composer: click one to edit it in place, send it now or remove it; a failed one offers Retry'
         }
         stage="canvas"
       >
@@ -369,6 +369,10 @@ export function ProductDetailSection() {
             onRemoveQueued={(id) => {
               setQueued((all) => all.filter((m) => m.id !== id));
               return settle(`remove ${id}`);
+            }}
+            onEditQueued={(id, content) => {
+              setQueued((all) => all.map((m) => (m.id === id ? { ...m, content } : m)));
+              return settle(`edit ${id}`);
             }}
           />
         </div>
