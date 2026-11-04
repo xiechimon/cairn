@@ -5,9 +5,9 @@ import {
   MEMORY_QUOTA_PER_TEAM,
   type MemoryLayer,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, memorySaveConflict } from '../db/schema.js';
+import { agentMemory, memorySaveConflict, routingRule } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { routingRulesEnabled } from './routing-rules.js';
@@ -49,9 +49,41 @@ function notAdoptedDuplicate() {
   return isNull(agentMemory.adoptedFrom);
 }
 
-function ownerWhere(scope: { agentId: string; teamId: string; teamScoped?: boolean }) {
+function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] {
+  if (!routingRulesEnabled()) return [];
+  const ids = new Set<string>();
+  for (const rule of db
+    .select({
+      id: routingRule.id,
+      seededFromAgentId: routingRule.seededFromAgentId,
+      adoptedAgentIds: routingRule.adoptedAgentIds,
+    })
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'review')))
+    .all()) {
+    ids.add(rule.id);
+    if (rule.seededFromAgentId) ids.add(rule.seededFromAgentId);
+    for (const id of rule.adoptedAgentIds ?? []) ids.add(id);
+  }
+  return [...ids];
+}
+
+function ownerWhere(
+  db: Db | MemoryTx,
+  scope: { agentId: string; teamId: string; teamScoped?: boolean },
+) {
+  const independentAgentIds =
+    routingRulesEnabled() && scope.teamScoped !== false
+      ? independentMemoryAgentIds(db, scope.teamId)
+      : [];
   return routingRulesEnabled() && scope.teamScoped !== false
-    ? and(eq(agentMemory.teamId, scope.teamId), notAdoptedDuplicate())
+    ? and(
+        eq(agentMemory.teamId, scope.teamId),
+        notAdoptedDuplicate(),
+        independentAgentIds.length > 0
+          ? notInArray(agentMemory.agentId, independentAgentIds)
+          : undefined,
+      )
     : and(eq(agentMemory.agentId, scope.agentId), eq(agentMemory.teamId, scope.teamId));
 }
 
@@ -94,7 +126,7 @@ export function listMemoryEntries(
     .from(agentMemory)
     .where(
       and(
-        ownerWhere(scope),
+        ownerWhere(db, scope),
         includeInvalid ? undefined : stillValid,
         scratchpadVisible(scope.threadId),
       ),
@@ -116,13 +148,20 @@ export function injectMemories(
   return db.transaction((tx) => {
     const teamId = scope.teamId;
     const teamScoped = routingRulesEnabled() && teamId !== undefined;
+    const independentAgentIds = teamScoped ? independentMemoryAgentIds(tx, teamId) : [];
     const rows = tx
       .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
       .from(agentMemory)
       .where(
         and(
           teamScoped
-            ? and(eq(agentMemory.teamId, teamId), notAdoptedDuplicate())
+            ? and(
+                eq(agentMemory.teamId, teamId),
+                notAdoptedDuplicate(),
+                independentAgentIds.length > 0
+                  ? notInArray(agentMemory.agentId, independentAgentIds)
+                  : undefined,
+              )
             : eq(agentMemory.agentId, scope.agentId),
           injectLayerWhere(scope.threadId),
           stillValid,
@@ -169,7 +208,7 @@ export function memoriesInScope(
     .from(agentMemory)
     .where(
       and(
-        ownerWhere(scope),
+        ownerWhere(tx, scope),
         stillValid,
         layerWhere(scope),
         everyProject
@@ -208,7 +247,7 @@ export function saveMemoryEntry(
     const used = tx
       .select({ id: agentMemory.id })
       .from(agentMemory)
-      .where(and(ownerWhere(input), stillValid))
+      .where(and(ownerWhere(tx, input), stillValid))
       .all().length;
     if (used >= quota) {
       throw new HttpError(409, `memory quota exceeded (${quota}/${quotaLabel})`);
@@ -300,7 +339,7 @@ export function updateMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere(input),
+          ownerWhere(tx, input),
           scratchpadVisible(input.threadId),
         ),
       )
@@ -316,9 +355,11 @@ export function updateMemoryEntry(
     }
     validateMemoryText(row.title, input.content);
     if (row.content === input.content) return row;
-    const duplicate = memoriesInScope(tx, row, row.projectId === null).find(
-      (other) => other.id !== row.id && other.content === input.content,
-    );
+    const duplicate = memoriesInScope(
+      tx,
+      { ...row, teamScoped: input.teamScoped },
+      row.projectId === null,
+    ).find((other) => other.id !== row.id && other.content === input.content);
     if (duplicate) {
       throw new HttpError(409, `memory ${duplicate.id} already has this content`);
     }
@@ -367,7 +408,7 @@ export function promoteMemoryEntry(
 ): typeof agentMemory.$inferSelect | null {
   const where = and(
     eq(agentMemory.id, input.memoryId),
-    ownerWhere(input),
+    ownerWhere(db, input),
     scratchpadVisible(input.threadId),
   );
   const row = db.select().from(agentMemory).where(where).get();
@@ -394,7 +435,7 @@ export function deleteMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere(input),
+          ownerWhere(tx, input),
           scratchpadVisible(input.threadId),
         ),
       )

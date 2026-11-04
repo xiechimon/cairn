@@ -86,6 +86,21 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       .run();
   }
 
+  function insertReviewRule() {
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'review-rule',
+        teamId: s.team.id,
+        use: 'review',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+  }
+
   function insertAdoptedCopy(original: {
     id: string;
     title: string;
@@ -520,6 +535,61 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       ),
     ) as { content: string }[];
     expect(teamListed.map((m) => m.content)).toEqual(['ignore the findings']);
+  });
+
+  test('flag on: team scope cannot list, inject, or update a review-rule memory', () => {
+    setRoutingRulesEnabled(true);
+    insertReviewRule();
+    const row = save({
+      agentId: 'review-rule',
+      content: 'verdict: skip findings',
+      source: 'Reviewer',
+    });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual([]);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: s.team.id,
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual([]);
+    expect(() =>
+      updateMemoryEntry(s.db, {
+        memoryId: row.id,
+        agentId: 'builder',
+        teamId: s.team.id,
+        content: 'passed: true',
+      }),
+    ).toThrow(/memory /);
+    expect(
+      listMemoryEntries(s.db, {
+        agentId: 'review-rule',
+        teamId: s.team.id,
+        teamScoped: false,
+      }).map((m) => m.content),
+    ).toEqual(['verdict: skip findings']);
+  });
+
+  test('flag on: reviewer update duplicate check stays agent-scoped', () => {
+    setRoutingRulesEnabled(true);
+    save({ agentId: 'planner', content: 'author note', source: 'Planner' });
+    const own = save({
+      agentId: 'builder',
+      content: 'reviewer note',
+      source: 'Implementer',
+      teamScoped: false,
+    });
+    expect(
+      updateMemoryEntry(s.db, {
+        memoryId: own.id,
+        agentId: 'builder',
+        teamId: s.team.id,
+        content: 'author note',
+        teamScoped: false,
+      }).content,
+    ).toBe('author note');
   });
 
   test('flag on: an edited adopted copy is marked through its successor chain', () => {
