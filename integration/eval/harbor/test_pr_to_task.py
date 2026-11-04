@@ -556,3 +556,19 @@ def test_cheat_trials_are_classified_like_a_nop_control():
     assert converter.classify_control(failed, "AssertionError: x", "cheatgit") == "fail"
     passed = {"verifier_result": {"rewards": {"reward": 1}}, "exception_info": None}
     assert converter.classify_control(passed, "", "cheatbash") == "pass"
+
+
+def test_trial_environment_is_passed_through_the_privileged_prefix(monkeypatch):
+    monkeypatch.setenv("CAIRN_DOCKER_PREFIX", '["sudo","env","A=1"]')
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    command = converter.prefix_with_env(
+        ["sudo", "env", "A=1", "uv", "tool"], {"PYTHONPATH": "/x", "HOME": "/h"}
+    )
+    assert command[:3] == ["sudo", "env", "A=1"]
+    assert "PYTHONPATH=/x" in command
+    assert command[-2:] == ["uv", "tool"]
+
+
+def test_trial_prefix_is_unchanged_without_a_privileged_prefix(monkeypatch):
+    monkeypatch.delenv("CAIRN_DOCKER_PREFIX", raising=False)
+    assert converter.prefix_with_env(["uv"], {"PYTHONPATH": "/x"}) == ["uv"]

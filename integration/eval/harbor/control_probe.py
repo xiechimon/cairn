@@ -132,21 +132,31 @@ def write_outcome(trial, agent, outcome, pid=None):
     return path
 
 
+def privileged(command, extra_env=None):
+    prefix = json.loads(os.environ.get("CAIRN_DOCKER_PREFIX", "[]"))
+    if not prefix:
+        return list(command)
+    assignments = [f"{key}={value}" for key, value in (extra_env or {}).items()]
+    return [*prefix, *assignments, *command]
+
+
 def docker_json(*args):
-    return json.loads(subprocess.check_output(["docker", *args], text=True))
+    return json.loads(subprocess.check_output(privileged(["docker", *args]), text=True))
 
 
 def task_containers(task_name):
     prefix = f"{task_name.lower()}__"
     listing = subprocess.run(
-        [
-            "docker",
-            "ps",
-            "-a",
-            "--no-trunc",
-            "--format",
-            '{{.ID}}\t{{.Label "com.docker.compose.project"}}',
-        ],
+        privileged(
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--no-trunc",
+                "--format",
+                '{{.ID}}\t{{.Label "com.docker.compose.project"}}',
+            ]
+        ),
         capture_output=True,
         text=True,
     ).stdout

@@ -343,11 +343,21 @@ def classify_control(result, output, agent):
 
 
 def harbor_prefix():
-    prefix = ["uv", "tool", "run", "--from", f"harbor=={HARBOR_VERSION}", "harbor"]
+    prefix = probe.privileged(
+        ["uv", "tool", "run", "--from", f"harbor=={HARBOR_VERSION}", "harbor"]
+    )
     version = run(*prefix, "--version").strip()
     if version != HARBOR_VERSION:
         raise ValueError(f"Expected Harbor {HARBOR_VERSION}, got {version}")
     return prefix
+
+
+def prefix_with_env(prefix, env):
+    if not os.environ.get("CAIRN_DOCKER_PREFIX") or not env:
+        return prefix
+    extra = {key: value for key, value in env.items() if os.environ.get(key) != value}
+    split = len(json.loads(os.environ["CAIRN_DOCKER_PREFIX"]))
+    return [*prefix[:split], *(f"{key}={value}" for key, value in extra.items()), *prefix[split:]]
 
 
 def run_trial(prefix, task, name, agent_args, output, env=None):
@@ -360,7 +370,7 @@ def run_trial(prefix, task, name, agent_args, output, env=None):
         with log.open("w") as stream:
             trial = subprocess.run(
                 [
-                    *prefix,
+                    *prefix_with_env(prefix, env),
                     "run",
                     "-p",
                     str(task.resolve()),
@@ -376,7 +386,7 @@ def run_trial(prefix, task, name, agent_args, output, env=None):
                 stdout=stream,
                 stderr=subprocess.STDOUT,
                 timeout=1800,
-                env=env,
+                env=None if os.environ.get("CAIRN_DOCKER_PREFIX") else env,
             )
         harbor_finished = time.monotonic()
     stop.set()

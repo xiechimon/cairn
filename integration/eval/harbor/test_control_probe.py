@@ -151,3 +151,18 @@ def test_outcome_is_written_by_the_parent_with_its_pid(tmp_path):
         "writer": "host-parent-process",
         "writerPid": 4242,
     }
+
+
+def test_privileged_commands_are_unchanged_without_a_prefix(monkeypatch):
+    monkeypatch.delenv("CAIRN_DOCKER_PREFIX", raising=False)
+    assert probe.privileged(["docker", "ps"]) == ["docker", "ps"]
+
+
+def test_privileged_commands_use_the_configured_prefix(monkeypatch):
+    monkeypatch.setenv(
+        "CAIRN_DOCKER_PREFIX", '["sudo","-n","-u","ian","-g","docker","env","A=1"]'
+    )
+    assert probe.privileged(["docker", "ps"]) == [
+        "sudo", "-n", "-u", "ian", "-g", "docker", "env", "A=1", "docker", "ps",
+    ]
+    assert probe.privileged(["harbor"], {"PYTHONPATH": "/x"})[-2:] == ["PYTHONPATH=/x", "harbor"]
