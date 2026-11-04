@@ -1,5 +1,7 @@
 # D75 P8a computer panel proof
 
+[Original requirement screenshot → actual running product screenshot → one-sentence checks](paired/README.md) use the pinned GitHub Preview requirement document and current949 UI, with REAL, SYNTHETIC, MOCK and UNCOVERED boundaries stated explicitly.
+
 The before image runs base `a35e83f5b02977780f89050d2c3a9bedb1692f8d` in an isolated server/Vite stack. The after images run commit `df75ddcd1878ac559570b6ef507d9cbb9aac2dde`, including stable dispatch timestamps and computer-scoped live events. Both stacks use fresh scratch homes and synthetic machine/computer/command rows. URLs use `/app?pane=machines`, without fixture scenarios. The unchanged image is the base Coordinator home with the panel closed.
 
 The live API returns three command records, each carrying `computerId: c-proof`. The browser shows the same three records at desktop width 1280 and an emulated iPhone width of 390, in light and dark themes, with no horizontal document overflow. The output is expanded for the failed command. The persisted API response is in `live-proof.json`.

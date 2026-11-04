@@ -1,0 +1,114 @@
+{
+  "implementation": "949642219ba49f5b3ca8905615906784b81823c0",
+  "sourceCommit": "24e2786542c240fbd11ec986afd5945e5f3c1bc6",
+  "sourceUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+  "capturedAt": "2026-11-04T10:50:24.525Z",
+  "requirements": [
+    {
+      "file": "requirement-private-scope.png",
+      "url": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "pageUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+      "mode": "REAL GitHub rendered Markdown"
+    },
+    {
+      "file": "requirement-model-state.png",
+      "url": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#33-model-and-provisioning",
+      "pageUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+      "mode": "REAL GitHub rendered Markdown"
+    },
+    {
+      "file": "requirement-tools.png",
+      "url": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#34-tools-rakazos-names-and-shapes",
+      "pageUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+      "mode": "REAL GitHub rendered Markdown"
+    },
+    {
+      "file": "requirement-transport.png",
+      "url": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#35-transport",
+      "pageUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+      "mode": "REAL GitHub rendered Markdown"
+    },
+    {
+      "file": "requirement-panel-p8.png",
+      "url": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#5-pr-list-and-order",
+      "pageUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+      "mode": "REAL GitHub rendered Markdown"
+    }
+  ],
+  "product": [
+    {
+      "file": "running-949-command-feed.png",
+      "route": "/app?pane=machines",
+      "mode": "REAL949 UI +REAL REST/SSE +SYNTHETIC daemon",
+      "runningCommand": true,
+      "outputRedacted": true,
+      "actualComputerBadge": "\u5173\u7740"
+    },
+    {
+      "file": "running-949-panel-uncovered-actions.png",
+      "route": "/app?pane=machines",
+      "mode": "REAL949 UI +REAL REST/SSE +SYNTHETIC daemon",
+      "completedCommand": true,
+      "renderedHostCards": 0,
+      "screenCanvases": 0,
+      "uncovered": [
+        "actual lifecycle badge",
+        "screen",
+        "Files",
+        "Take control",
+        "More computer actions"
+      ]
+    },
+    {
+      "file": "running-949-feed-phone-dark.png",
+      "mode": "REAL949 UI +REAL REST/SSE +SYNTHETIC daemon",
+      "device": "iPhone13",
+      "width": 390,
+      "horizontalOverflow": false
+    }
+  ],
+  "limits": [
+    "Actual GitHub-rendered requirement document; no recreated HTML report.",
+    "Actual949 server/Vite/browser and real machine HTTP/SSE, stateful synthetic daemon; provider/Orb/model not exercised.",
+    "Real provider lifecycle remains uncovered; the row honestly remains stopped.",
+    "Actual Rakazo runtime walk not performed.",
+    "Cache boundary screenshots are actual949 client with mocked REST/EventSource, not actual two-user login.",
+    "Screen, Files, Take control and More computer actions remain uncovered in P8a."
+  ],
+  "privateApiTruth": {
+    "commandsStatus": 200,
+    "commands": [
+      {
+        "tool": "shell",
+        "status": "done",
+        "output": "first line\n[REDACTED]\nsecond line\n",
+        "computerIdPresent": true
+      }
+    ]
+  },
+  "pageErrors": [],
+  "result": "PASS",
+  "cacheImageProvenance": {
+    "code": "949642219ba49f5b3ca8905615906784b81823c0",
+    "captureMode": "Actual client code subsequently committed as949; mocked REST/EventSource",
+    "reviewedBy": "implementer and lane owner",
+    "realSecondUserLogin": false
+  },
+  "checks": {
+    "source": "actual github.com rendered Preview",
+    "clientServer": "actual949 Vite/server, real HTTP/SSE",
+    "execution": "synthetic daemon, no provider/model",
+    "phone": "iPhone13 device emulation390, no horizontal overflow",
+    "screens": "uncovered; zero canvas/host card",
+    "lifecycle": "uncovered; actual stopped badge"
+  },
+  "imageReview": {
+    "implementer": "Personally viewed original GitHub source and actual product captures",
+    "laneOwner": [
+      "requirement-model-state.png",
+      "running-949-command-feed.png",
+      "auth-gate-private-cleared.png",
+      "auth-next-scope-after-late.png"
+    ]
+  }
+}
