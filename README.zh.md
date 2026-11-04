@@ -4,9 +4,9 @@
     <img alt="Cairn：agent 在山路上垒石堆，人在山门口把关" src="site/img/banner-light.webp" width="100%">
   </picture>
 
-  <p><b>你写票，agent 在你自己的机器上干活，自动合并要过证据闸，证据绑定到具体那份补丁。</b></p>
+  <p><b>你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活，自动合并要过证据闸，证据绑定到具体那份补丁。</b></p>
 
-  <p>自托管、开源的多 agent 编排工作台，而且它在开发它自己。</p>
+  <p>自托管、开源的 agent 团队，而且它在开发它自己。</p>
 
   <p>
     <a href="https://cairn.xmon.me">官网</a> ·
@@ -23,51 +23,14 @@
   </p>
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="site/img/board-zh-dark.webp">
-  <img alt="Cairn 看板：任务从待开始、规划、执行到待审核、已完成，每张票都由一个 agent 领走" src="site/img/board-zh-light.webp">
-</picture>
-
 ## 亮点
 
-<table align="center">
-  <tr>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-chief-dark.webp">
-        <img alt="chief agent" src="site/img/crew-chief-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>chief</b> 派活</sub>
-    </td>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-coder-dark.webp">
-        <img alt="coder agent" src="site/img/crew-coder-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>coder</b> 实现</sub>
-    </td>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-reviewer-dark.webp">
-        <img alt="reviewer agent" src="site/img/crew-reviewer-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>reviewer</b> 审改动</sub>
-    </td>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-you-dark.webp">
-        <img alt="你" src="site/img/crew-you-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>你</b>来把关</sub>
-    </td>
-  </tr>
-</table>
-
-- **多 agent 编排。** 每个 agent 有自己的模型、职责、技能、MCP、密钥和记忆。负责调度的 chief 只派活不写代码，上下文保持干净；写代码和审代码交给 coder、reviewer。
+- **一个 Coordinator，很多 thread。** 你在任何设备上只跟一个 Coordinator 对话。它负责听、为每件活开一个 thread，然后不插手。每个 thread 跑一个 agent 会话（用你订阅的 Claude Code 或 Gemini CLI，或内置的 pi 运行时接任意模型服务），从计划一路做到 PR。
+- **只给你看需要你的事。** 首页置顶等你拍板的决定；进展和结果留在对话和每日汇报里。只有需要人动手时才推送。
 - **合并闸绑定证据。** agent 合并前，闸只认绑定到当前补丁摘要的审核结论，head 在结论之后变了就拒绝；这些规则用 TLA+ 做过模型检查。手动合并按钮目前只核对钉住的提交（见 spec 18 的 F1）。受保护路径仍然停下等你；AI 审核者能直接拦下合并，不只是留评论。
+- **harness 改动经评测把关。** 每次构建记录基线提交和 harness 哈希，驳回写成结构化记录，改 Coordinator 调度 harness 的提交必须先过评测回归下限才能合入；提示词、技能、路由改动的配对试验采纳机制还在计划中。这里的「训练」指优化 harness，不微调模型。
+- **跑在你自己的机器上。** 在任意主机上跑 daemon 就能登记成执行机。thread 会派到满足运行时、模型和工具要求的任意机器上，在独立的 git worktree 里干活；主机支持时也可以每个任务一个用完即弃的 Orb 容器（`CAIRN_EXECUTOR=orb`，目前需手动开启）。计划、diff、工具调用实时推回来。
 - **自举闭环。** Cairn 自己领票、实现、审核、开 PR，正在用它自己开发它自己。
-- **评测与轨迹驱动。** 每次构建记录基线提交和 harness 哈希，驳回写成结构化记录，改 chief 调度 harness 的提交必须先过评测回归下限才能合入；提示词、技能、路由改动的配对试验采纳机制还在计划中。这里的「训练」指优化 harness，不微调模型。
-- **跑在你自己的机器上。** 在任意主机上跑 daemon 就能登记成执行机，每次构建在独立的 git worktree 里进行，计划、diff、工具调用实时推回看板。
 
 ## 作品
 
@@ -81,12 +44,14 @@
 
 ## 功能
 
-- **任务与阶段** — 看板 + 带序号的任务、标签、按周期自动重跑的定时。
-- **Agent** — 配了模型、职责、技能、MCP 服务器、密钥与记忆的执行角色；每用户一个「总管」agent 负责分派。
-- **机器** — 在任意主机跑 daemon 即登记为执行机；build 在其上受监督执行。机器是你的，规则也是你的。
-- **模型服务** — api_key / OAuth（GitHub Copilot、OpenAI Codex）/ 自定义端点三协议接入。
+- **Coordinator** — 一个永不结束的对话：开 thread、回报结果。上下文自动压缩，记忆按项目分开。
+- **Thread** — 一件活对应一个 agent 会话，从计划、测试、实现走到 PR。任何 thread 都能在侧边对话里打开，直接插话。
+- **项目** — 项目主页，含项目说明、项目记忆、项目密钥和并发上限；人的消息永远插队。
+- **定时任务** — 按周期重跑一个 thread。
+- **机器与路由** — 用 daemon 登记执行机；路由规则为每一步选运行时、模型、工具和机器。
+- **模型服务** — Claude Code 与 Gemini CLI 订阅、API key、OAuth（GitHub Copilot、OpenAI Codex）或自定义端点。
 - **仓库** — server 自托管 git 仓（API key 走 push/pull），或从 GitHub 接入。
-- **全实时** — 看板与会话走 SSE 流、通知、按 build × 模型记账 token 用量。
+- **全实时** — 对话与 thread 走 SSE 流、Web Push、按 build × 模型记账 token 用量。
 
 ## 快速开始
 
@@ -154,7 +119,7 @@ watch 模式开发栈，每进程一条：`pnpm dev:web`、`pnpm dev:server`、`
 
 ## 部署
 
-把 server 自托管在常开机上，手机经私有 tailnet 随时连回看板。将 server 绑到 `127.0.0.1`，用 `tailscale serve` 反代到 `http://127.0.0.1:<端口>`，并设 `CAIRN_TAILSCALE_USERS` 让白名单内的 Tailscale 身份免输入访问令牌直接登录。完整 walkthrough 见 [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md)。要走公网路线，见上文 Railway 模板。
+把 server 自托管在常开机上，手机经私有 tailnet 随时连回 Cairn。将 server 绑到 `127.0.0.1`，用 `tailscale serve` 反代到 `http://127.0.0.1:<端口>`，并设 `CAIRN_TAILSCALE_USERS` 让白名单内的 Tailscale 身份免输入访问令牌直接登录。完整 walkthrough 见 [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md)。要走公网路线，见上文 Railway 模板。
 
 ## 配置
 
@@ -205,7 +170,7 @@ pnpm test         # vitest
 | `apps/server` | server：Hono REST + SSE + SQLite（包名 `@xiechimon/cairn`，目录名 ≠ 包名） |
 | `apps/daemon` | 执行机 daemon（包名 `@xiechimon/cairn-cli`，目录名 ≠ 包名） |
 | `packages/shared` | 协议词表 / 记录形状 / 品牌槽单源（`@cairn/shared`） |
-| `docs/spec/` | 实现正典 00–25 册（中文） |
+| `docs/spec/` | 实现正典 00–29 册（中文） |
 | `docs/research/` | r1–r15 原站盘点与后续产品调研（历史档案） |
 | `scripts/` | 构建期工具（含 `generate-icons.mjs`） |
 

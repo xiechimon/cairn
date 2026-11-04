@@ -171,6 +171,9 @@ export async function executeMcpTool(
     case 'read_thread':
     case 'reply_thread':
     case 'thread_pull_requests':
+    case 'wait_thread':
+    case 'interrupt_thread':
+    case 'search_threads':
       return json(await executeThreadMcpTool(deps, ctx.teamId, name, args));
     case 'todos': {
       const projectId = optStr(args, 'projectId');

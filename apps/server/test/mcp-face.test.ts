@@ -104,14 +104,14 @@ describe('/api/mcp tool whitelist preserves legacy tools and adds Thread entry',
     s.dispose();
   });
 
-  test('full grant -> tools/list exactly 29 items = registry list (14 read + 15 write)', async () => {
+  test('full grant -> tools/list exactly 32 items = registry list (16 read + 16 write)', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: ALL_READ, write: ALL_WRITE });
     const res = await rpc(s.app, key, 'tools/list', {});
     const body = res.body as JsonRpcResponse;
     const names = (body.result?.tools ?? []).map((t) => t.name).sort();
     expect(names).toEqual(MCP_TOOL_REGISTRY.map((t) => t.name).sort());
-    expect(names).toHaveLength(29);
+    expect(names).toHaveLength(32);
     s.dispose();
   });
 
