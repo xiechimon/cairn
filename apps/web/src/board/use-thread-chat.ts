@@ -8,6 +8,7 @@ import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
   useBuild,
+  useBuildChanges,
   useMachines,
   useMessages,
   usePlans,
@@ -29,6 +30,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
+import { deriveThreadChanges, type ThreadChanges } from './thread-changes.js';
 import { useMarkThreadRead } from './use-mark-thread-read.js';
 
 export type ThreadChatLoad = 'ready' | 'loading' | 'error' | 'missing';
@@ -43,6 +45,10 @@ export interface ThreadChat {
   buildAgentId: string | null;
   planDoc: DocBlock[] | undefined;
   planVersions: PlanVersion[] | undefined;
+  changes: ThreadChanges;
+  changesExpanded: boolean;
+  toggleChangesExpanded: () => void;
+  retryChanges: () => void;
   wire: WireTodo | null;
   started: boolean;
   locked: boolean;
@@ -93,6 +99,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   useMarkThreadRead(todoId);
   const buildId = live ? (wire?.latestBuildId ?? null) : (listed?.latestBuildId ?? null);
   const buildQ = useBuild(buildId, live);
+  const changesQ = useBuildChanges(buildId, live);
+  const [changesExpanded, setChangesExpanded] = useState(true);
   const stepsQ = useSteps(buildId, live);
   const messagesQ = useMessages(buildId, live);
   const plansQ = usePlans(buildId, live);
@@ -272,6 +280,14 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         }
       : undefined;
 
+  const changes = deriveThreadChanges({
+    live,
+    buildId,
+    query: { status: changesQ.status, data: changesQ.data },
+    fixture: fixtureDetail?.changes,
+    expanded: changesExpanded,
+  });
+
   const streamingItem = transcript.findLast((item) => item.kind === 'streaming');
 
   return {
@@ -287,6 +303,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         : undefined
       : fixtureDetail?.doc,
     planVersions: live ? mapPlanVersions(plans) : fixtureDetail?.planVersions,
+    changes,
+    changesExpanded,
+    toggleChangesExpanded: () => setChangesExpanded((value) => !value),
+    retryChanges: () => {
+      void changesQ.refetch();
+    },
     wire,
     buildLegDone: steps.some((step) => step.kind === 'build' && step.status === 'done'),
     started,
