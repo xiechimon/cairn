@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -92,5 +100,86 @@ test('protected paths route to the owner', (t) => {
 
 test('a malformed head sha is refused', () => {
   const result = spawnSync(process.execPath, [script, 'HEAD'], { encoding: 'utf8' });
+  assert.equal(result.status, 2);
+});
+
+function fakeGh(t, { labels = [], failWrites = false } = {}) {
+  const bin = mkdtempSync(join(tmpdir(), 'merge-route-gh-'));
+  t.after(() => rmSync(bin, { recursive: true, force: true }));
+  const log = join(bin, 'calls.log');
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/bin/sh
+echo "$*" >> "${log}"
+case "$*" in
+  *"--method"*) ${failWrites ? 'echo denied >&2; exit 1' : 'exit 0'} ;;
+  *) printf '%s\\n' ${labels.map((name) => `'${name}'`).join(' ')} ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const writes = () =>
+    (existsSync(log) ? readFileSync(log, 'utf8') : '')
+      .split('\n')
+      .filter((line) => line.includes('--method'));
+  return { bin, writes };
+}
+
+const routeLabelling = ({ dir, head }, gh) =>
+  spawnSync(process.execPath, [script, head, '--label-pr', '7'], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${gh.bin}:${process.env.PATH}`, GITHUB_REPOSITORY: 'o/r' },
+  });
+
+const protectedChange = { 'scripts/x.mjs': 'export {};\n' };
+const queueableChange = { 'apps/web/src/a.ts': 'export const a = 1;\n' };
+
+test('an owner-routed head gets the owner-route label', (t) => {
+  const gh = fakeGh(t);
+  const result = routeLabelling(repoWith(t, protectedChange), gh);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.equal(gh.writes().length, 1);
+  assert.match(gh.writes()[0], /--method POST repos\/o\/r\/issues\/7\/labels .*owner-route/);
+});
+
+test('an owner-routed head that already has the label is not written again', (t) => {
+  const gh = fakeGh(t, { labels: ['owner-route', 'review-gate'] });
+  const result = routeLabelling(repoWith(t, protectedChange), gh);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.deepEqual(gh.writes(), []);
+});
+
+test('a queueable head loses a stale owner-route label', (t) => {
+  const gh = fakeGh(t, { labels: ['owner-route'] });
+  const result = routeLabelling(repoWith(t, queueableChange), gh);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(gh.writes().length, 1);
+  assert.match(gh.writes()[0], /--method DELETE repos\/o\/r\/issues\/7\/labels\/owner-route/);
+});
+
+test('a queueable head without the label is not written', (t) => {
+  const gh = fakeGh(t, { labels: ['review-gate'] });
+  const result = routeLabelling(repoWith(t, queueableChange), gh);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.deepEqual(gh.writes(), []);
+});
+
+test('a failed label write keeps the routing verdict', (t) => {
+  const gh = fakeGh(t, { failWrites: true });
+  const owner = routeLabelling(repoWith(t, protectedChange), gh);
+  assert.equal(owner.status, 1);
+  assert.match(owner.stderr, /owner-route label/);
+  const queueable = routeLabelling(repoWith(t, queueableChange), fakeGh(t, { failWrites: true }));
+  assert.equal(queueable.status, 0);
+});
+
+test('--label-pr without a repository is refused', (t) => {
+  const { dir, head } = repoWith(t, queueableChange);
+  const result = spawnSync(process.execPath, [script, head, '--label-pr', '7'], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: { ...process.env, GITHUB_REPOSITORY: '' },
+  });
   assert.equal(result.status, 2);
 });
