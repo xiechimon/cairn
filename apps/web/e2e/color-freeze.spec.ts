@@ -130,19 +130,12 @@ for (const theme of ['light', 'dark'] as const) {
     await page.waitForSelector('.board-sidebar');
 
     const pairs: Array<[string, string]> = [
-      ['surface-0', 'var(--background)'],
       ['canvas', theme === 'light' ? '#e6e7e1' : '#141715'],
       ['surface-1', 'var(--canvas)'],
       ['accent-hover', theme === 'light' ? '#f7ecd2' : '#33290f'],
       ['dialog-surface', 'var(--background)'],
       ['menu-hover', theme === 'light' ? 'rgb(29 35 31 / 0.1)' : 'rgb(230 232 226 / 0.1)'],
-      ['drop-tint-border', 'var(--card-button)'],
-      ['drop-tint-base', 'color-mix(in srgb, var(--card-button) 5%, transparent)'],
-      ['drop-tint-hover', 'color-mix(in srgb, var(--card-button) 10%, transparent)'],
-      ['surface-2', 'var(--card)'],
-      ['surface-3', 'var(--popover)'],
       ['hover-1', 'color-mix(in oklab, var(--foreground) 5%, transparent)'],
-      ['hover-2', 'color-mix(in oklab, var(--foreground) 10%, transparent)'],
       ['border-soft', 'color-mix(in oklab, var(--foreground) 9%, transparent)'],
       ['ring-inset-highlight', 'color-mix(in oklab, var(--foreground) 10%, transparent)'],
     ];

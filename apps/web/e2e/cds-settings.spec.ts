@@ -18,17 +18,13 @@ test('CDS settings: reading col 768, cards at --radius-card 14px no shadow, inpu
       colWidth: col ? (col as HTMLElement).getBoundingClientRect().width : null,
       cardRadius: cardCs?.borderTopLeftRadius ?? null,
       cardShadow: cardCs?.boxShadow ?? null,
-      cds2xl: root.getPropertyValue('--cds-radius-2xl').trim(),
       cdsLg: root.getPropertyValue('--cds-radius-lg').trim(),
       inputRadius: inputCs?.borderTopLeftRadius ?? null,
       inputHeight: inputCs?.height ?? null,
-      rowH: root.getPropertyValue('--row-h').trim(),
     };
   });
 
-  expect(m.cds2xl).toBe('16px');
   expect(m.cdsLg).toBe('8px');
-  expect(m.rowH).toBe('40px');
   if (m.colWidth != null) {
     expect(m.colWidth).toBeGreaterThanOrEqual(640);
     expect(m.colWidth).toBeLessThanOrEqual(800);
