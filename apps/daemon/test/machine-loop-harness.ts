@@ -1,6 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -13,6 +10,8 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
 } from '@cairn/shared';
+import { onTestFinished } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { loadDaemonConfig } from '../src/config.js';
@@ -21,10 +20,6 @@ import type { MachineApi } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
 import type { OrbProvider } from '../src/orb/provider.js';
 import { ensureStateDirs, type StatePaths, saveMachineJson, statePaths } from '../src/state.js';
-
-function tmpHome(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-loop-'));
-}
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -270,52 +265,69 @@ export async function boot(opts: {
   orbProvider?: OrbProvider;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
 }) {
-  const home = tmpHome();
-  const { logger, lines } = captureLogger();
-  const config = loadDaemonConfig(
-    {
-      serverUrl: 'http://server',
-      apiKey: 'cairn_k',
-      teamId: 'team-1',
-      home,
-      name: 'test-mbp',
-    },
-    {},
-  );
-  const paths = statePaths(home, config.workspacesDir);
-  opts.seedJournal?.(paths);
-  if (opts.preEnrolled) {
-    ensureStateDirs(paths);
-    saveMachineJson(paths, {
-      machineId: 'm-old',
-      token: 'b'.repeat(64),
-      teamId: 'team-1',
-      serverUrl: opts.preEnrolled.serverUrl,
+  const home = makeTestTempDir('loop-');
+  try {
+    const { logger, lines } = captureLogger();
+    const config = loadDaemonConfig(
+      {
+        serverUrl: 'http://server',
+        apiKey: 'cairn_k',
+        teamId: 'team-1',
+        home,
+        name: 'test-mbp',
+      },
+      {},
+    );
+    const paths = statePaths(home, config.workspacesDir);
+    opts.seedJournal?.(paths);
+    if (opts.preEnrolled) {
+      ensureStateDirs(paths);
+      saveMachineJson(paths, {
+        machineId: 'm-old',
+        token: 'b'.repeat(64),
+        teamId: 'team-1',
+        serverUrl: opts.preEnrolled.serverUrl,
+      });
+    }
+    const api = opts.api ?? new FakeMachineApi();
+    const handle = await runMachine({
+      config,
+      paths,
+      logger,
+      client: api,
+      ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
+      claudeCodeBackend: opts.claudeCodeBackend,
+      claudeCodeAuthProbe:
+        opts.claudeCodeAuthProbe ??
+        (async () => ({ state: 'logged-in', method: 'claude.ai', provider: 'firstParty' })),
+      readClaudeOauthExpiresAt: opts.readClaudeOauthExpiresAt ?? (() => null),
+      ...(opts.capabilitiesProbe !== undefined
+        ? { capabilitiesProbe: opts.capabilitiesProbe }
+        : {}),
+      idleSleepPrevention: false,
+      presenceIntervalMs: opts.presenceIntervalMs ?? 60_000,
+      ...(opts.presenceTimeoutMs !== undefined
+        ? { presenceTimeoutMs: opts.presenceTimeoutMs }
+        : {}),
+      claimBackoffBaseMs: 10,
+      proxyEnv: {},
+      ...(opts.orbProvider !== undefined ? { orbProvider: opts.orbProvider } : {}),
+      ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
+      ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
     });
+    onTestFinished(async () => {
+      try {
+        await handle.stop();
+        await handle.done;
+      } finally {
+        releaseTestTempDir(home);
+      }
+    });
+    return { handle, api, lines, paths, home };
+  } catch (error) {
+    releaseTestTempDir(home);
+    throw error;
   }
-  const api = opts.api ?? new FakeMachineApi();
-  const handle = await runMachine({
-    config,
-    paths,
-    logger,
-    client: api,
-    ...(opts.useDefaultBackend ? {} : { backend: opts.backend ?? fakeBackend([]).backend }),
-    claudeCodeBackend: opts.claudeCodeBackend,
-    claudeCodeAuthProbe:
-      opts.claudeCodeAuthProbe ??
-      (async () => ({ state: 'logged-in', method: 'claude.ai', provider: 'firstParty' })),
-    readClaudeOauthExpiresAt: opts.readClaudeOauthExpiresAt ?? (() => null),
-    ...(opts.capabilitiesProbe !== undefined ? { capabilitiesProbe: opts.capabilitiesProbe } : {}),
-    idleSleepPrevention: false,
-    presenceIntervalMs: opts.presenceIntervalMs ?? 60_000,
-    ...(opts.presenceTimeoutMs !== undefined ? { presenceTimeoutMs: opts.presenceTimeoutMs } : {}),
-    claimBackoffBaseMs: 10,
-    proxyEnv: {},
-    ...(opts.orbProvider !== undefined ? { orbProvider: opts.orbProvider } : {}),
-    ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
-    ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
-  });
-  return { handle, api, lines, paths, home };
 }
 
 export function defer<T = void>(): { promise: Promise<T>; resolve: (v: T) => void } {

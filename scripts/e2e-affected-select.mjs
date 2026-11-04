@@ -86,6 +86,7 @@ const DETAIL = [
   'cds-composer',
   'cds-dialogs',
   'cds-transcript',
+  'turn-folding',
   'checkbox-unified',
   'composer-inline-mention',
   'composer-paste',
@@ -215,6 +216,8 @@ export const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 export const FILE_RULES = new Map([
+  ['apps/web/src/components/thread/pr-card.tsx', ['pr-card']],
+  ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card']],
   ['apps/web/src/design/components-overlays.tsx', ['menu-keys', 'shadcn-primitives']],
   [
     'apps/web/src/components/menu-keys.tsx',

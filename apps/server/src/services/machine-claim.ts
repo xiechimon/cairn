@@ -9,6 +9,7 @@ import {
   claudeLoginBlocksClaim,
   claudeRateBlock,
   formatSkillRouteSection,
+  isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
@@ -571,7 +572,7 @@ async function tryClaim(
     if (!allowed) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
     const guardPr =
-      cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
+      cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
@@ -728,7 +729,7 @@ async function tryClaim(
       remoteTools: (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
         (tool) =>
           cand.stepRow.kind === 'plan' ||
-          cand.stepRow.kind === 'build' ||
+          isBuildStepKind(cand.stepRow.kind) ||
           !isThreadScheduleTool(tool.name),
       ),
       localTools: claimLocalTools(agentRow.tools),

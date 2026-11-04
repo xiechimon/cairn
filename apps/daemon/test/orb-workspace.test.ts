@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { gitPrim } from '../src/git.js';
 import { createDaemonLogger } from '../src/log.js';
-import { ORB_AGENT_HOME, ORB_WORKSPACES_ROOT } from '../src/orb/worker.js';
+import { orbAgentHome, orbWorkspacesRoot } from '../src/orb/worker.js';
 import { WorkspaceManager } from '../src/workspace.js';
 
 test('seeds a private base clone, fetches with the step credential and leaves the seed untouched', async () => {
@@ -70,7 +70,11 @@ test('seeds a private base clone, fetches with the step credential and leaves th
   }
 }, 30_000);
 
-test('orb worker workspaces live under the agent home the image creates', () => {
-  expect(ORB_WORKSPACES_ROOT.startsWith(`${ORB_AGENT_HOME}/`)).toBe(true);
-  expect(ORB_WORKSPACES_ROOT).not.toBe('/work');
+test('the orb worker home is the passwd home of the user it runs as, not a fixed image path', () => {
+  expect(orbAgentHome()).toBe(userInfo().homedir);
+});
+
+test('orb worker workspaces live under that home', () => {
+  expect(orbWorkspacesRoot()).toBe(`${orbAgentHome()}/work`);
+  expect(orbWorkspacesRoot()).not.toBe('/work');
 });

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
+import { openChiefWindow, expandTurns } from './helpers.js';
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
@@ -82,6 +82,7 @@ test.describe('chief drawer model row (#615)', () => {
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/app/schedules?scenario=114');
+    await expandTurns(page);
     await expect(drawer(page)).toBeVisible();
 
     const copy = page.getByTestId('chief-msg-tools').getByRole('button', { name: '复制' });
@@ -106,6 +107,7 @@ test.describe('chief drawer model row (#615)', () => {
     page,
   }) => {
     await page.goto('/app/schedules?scenario=114');
+    await expandTurns(page);
     await expect(drawer(page)).toBeVisible();
 
     const restore = page

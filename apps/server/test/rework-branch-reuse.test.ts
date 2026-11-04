@@ -5,6 +5,7 @@ import {
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
+  SESSION_BRIEF,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -22,6 +23,7 @@ import type { FetchLike } from '../src/lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, completeStep } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
+import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bindAllAgents, bootServer, type TestServer } from './helpers.js';
 
@@ -363,6 +365,39 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     const steps = stepsOf(w, newId);
     expect(steps[0]!.prompt).toBe(buildRestartPrompt('普通重启'));
     expect(steps[0]!.freshSession).toBe(false);
+  });
+
+  test('fresh restart after a session build -> a session step with the session brief', async () => {
+    const w = makeWorld({ prFields: false });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-sess-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'session',
+        status: 'failed',
+        createdAt: nowMs() - 50_000,
+      })
+      .run();
+    await restart(w, '会话重启');
+    const newId = todoRowOf(w).latestBuildId!;
+    expect(newId).not.toBe(w.buildId);
+    const steps = stepsOf(w, newId);
+    expect(steps[0]!.kind).toBe('session');
+    expect(steps[0]!.prompt?.startsWith(SESSION_BRIEF)).toBe(true);
+    expect(buildsOf(w).find((b) => b.id === newId)!.withPlan).toBe(false);
+  });
+
+  test('fresh restart with routing rules on -> a session step', async () => {
+    setRoutingRulesEnabled(true);
+    try {
+      const w = makeWorld({ prFields: false });
+      await restart(w, '规则开启重启');
+      const steps = stepsOf(w, todoRowOf(w).latestBuildId!);
+      expect(steps[0]!.kind).toBe('session');
+    } finally {
+      setRoutingRulesEnabled(false);
+    }
   });
 
   test('failure mode 7: legacy builds with several PRs -> rework lands on the latest PR build', async () => {

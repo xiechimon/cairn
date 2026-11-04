@@ -244,8 +244,32 @@ export function dropComputerWaiters(): void {
   pendingCalls.clear();
 }
 
-export function computerCallId(stepId: string, toolCallId: string): string {
-  return createHash('sha256').update(`${stepId}\0${toolCallId}`).digest('hex');
+export function computerCallId(stepId: string, toolCallId: string, attempt = 1): string {
+  const base = `${stepId}\0${toolCallId}`;
+  return createHash('sha256')
+    .update(attempt <= 1 ? base : `${base}\0${attempt}`)
+    .digest('hex');
+}
+
+function latestComputerAttempt(
+  db: Db,
+  stepId: string,
+  toolCallId: string,
+): { row: CallRow; attempt: number } | null {
+  const byId = new Map(
+    db
+      .select()
+      .from(computerCall)
+      .where(and(eq(computerCall.stepId, stepId), eq(computerCall.toolCallId, toolCallId)))
+      .all()
+      .map((row) => [row.id, row]),
+  );
+  let latest: { row: CallRow; attempt: number } | null = null;
+  for (let attempt = 1; ; attempt++) {
+    const row = byId.get(computerCallId(stepId, toolCallId, attempt));
+    if (!row) return latest;
+    latest = { row, attempt };
+  }
 }
 
 export function computerMachineName(scopeKey: string): string {
@@ -524,10 +548,11 @@ function acquireExecutionLease(
     row.executionLeaseExpiresAt !== null &&
     row.executionLeaseExpiresAt > now;
   if (held && row.executionStepId !== stepId) throw new HttpError(409, COMPUTER_BUSY);
+  const renewed = Math.max(now + COMPUTER_EXECUTION_LEASE_MS, deadlineAt);
   db.update(computer)
     .set({
       executionStepId: stepId,
-      executionLeaseExpiresAt: Math.max(now + COMPUTER_EXECUTION_LEASE_MS, deadlineAt),
+      executionLeaseExpiresAt: held ? Math.max(row.executionLeaseExpiresAt ?? 0, renewed) : renewed,
       executionFence: held ? row.executionFence : row.executionFence + 1,
       updatedAt: now,
     })
@@ -585,9 +610,10 @@ export async function forwardComputerCall(
     (opts.ownComputerGate ?? refuseOwnComputerUntilGated)({ stepId, tool });
   }
   const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
-  const callId = computerCallId(stepId, body.toolCallId);
-
-  const existing = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const latest = latestComputerAttempt(db, stepId, body.toolCallId);
+  const existing = latest?.row;
+  const previousAttempt = latest?.attempt ?? 0;
+  const callId = existing ? existing.id : computerCallId(stepId, body.toolCallId);
   if (existing && existing.tool !== tool) {
     throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${existing.tool}`);
   }
@@ -638,17 +664,35 @@ export async function forwardComputerCall(
     startedAt: null,
     finishedAt: null,
   };
+  const dispatchId = existing
+    ? computerCallId(stepId, body.toolCallId, previousAttempt + 1)
+    : callId;
   if (existing) {
     clearPendingComputerOutput(callId);
-    db.update(computerCall).set(fresh).where(eq(computerCall.id, callId)).run();
-  } else {
-    db.insert(computerCall)
-      .values({ id: callId, teamId: thread.teamId, stepId, toolCallId: body.toolCallId, ...fresh })
-      .run();
+    if (!isFinalState(existing.state)) {
+      db.update(computerCall)
+        .set({
+          state: 'interrupted',
+          errorMessage: 'superseded by a rerun',
+          errorDelivery: 'unknown',
+          finishedAt: nowMs(),
+        })
+        .where(eq(computerCall.id, callId))
+        .run();
+    }
   }
+  db.insert(computerCall)
+    .values({
+      id: dispatchId,
+      teamId: thread.teamId,
+      stepId,
+      toolCallId: body.toolCallId,
+      ...fresh,
+    })
+    .run();
 
   const call: ComputerCall = {
-    callId,
+    callId: dispatchId,
     stepId,
     tool,
     params: body.params,
@@ -656,11 +700,11 @@ export async function forwardComputerCall(
     ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
   };
   if (!deps.machineHub.pushComputer(target.machineId, call)) {
-    db.delete(computerCall).where(eq(computerCall.id, callId)).run();
+    db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
   const pending = openPending(deps, thread.teamId, call);
-  const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishFeed(deps.hub, thread.teamId, row);
   return waitForCall(pending, opts.signal);
 }

@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { TurnFold, useTurnFold } from '../components/chat/turn-fold.js';
 import { Button } from '../components/ui/button.js';
 import {
   Collapsible,
@@ -14,6 +15,13 @@ import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock, Copy, ExternalLink, FileTab } from '../icons/index.js';
+import {
+  groupTurns,
+  latestOpenTurnId,
+  type TurnRow,
+  type TurnSegment,
+  transcriptTurns,
+} from '../lib/turn-fold.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 import { InjectedSkills, WorkTrace } from './work-trace.js';
@@ -28,6 +36,7 @@ interface TranscriptProps {
   liveStep?: LiveStep | null;
   agent?: { displayName: string; avatarUrl: string | null } | null;
   onOpenPlan?: () => void;
+  fold?: boolean;
 }
 
 function formatElapsed(seconds: number, t: TFunc): string {
@@ -237,7 +246,12 @@ function Row({
             {t('由定时发起')}
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <Transcript transcript={item.items} agent={agent} onOpenPlan={onOpenPlan} />
+            <Transcript
+              transcript={item.items}
+              agent={agent}
+              onOpenPlan={onOpenPlan}
+              fold={false}
+            />
           </CollapsibleContent>
         </Collapsible>
       );
@@ -631,8 +645,10 @@ export function Transcript({
   agent = null,
   onOpenPlan,
   liveStep = null,
+  fold = true,
 }: TranscriptProps) {
   const { t } = useI18n();
+  const turnFold = useTurnFold();
   const previous = useRef<{ live: boolean; ids: Set<string> }>({ live: false, ids: new Set() });
   const live = transcript.some((item) => item.kind === 'streaming');
   const workItems = transcript.filter((item) => item.kind === 'work');
@@ -655,25 +671,45 @@ export function Transcript({
   });
   const lastWork = workItems.at(-1);
 
+  const segments: TurnSegment<TranscriptItem>[] = fold
+    ? groupTurns(transcript, transcriptTurns)
+    : transcript.map((item, index) => ({ kind: 'row', row: { item, index } }));
+  const openTurnId = latestOpenTurnId(segments, transcriptTurns);
+  const renderRow = ({ item, index }: TurnRow<TranscriptItem>) => {
+    const id = 'id' in item ? item.id : undefined;
+    return (
+      <MessageScrollerItem key={id ?? index} messageId={id} style={SCROLLER_ITEM_STYLE}>
+        <Row
+          item={item}
+          prev={transcript[index - 1]}
+          t={t}
+          onOpenPlan={onOpenPlan}
+          agent={agent}
+          liveStep={liveStep}
+          defaultExpanded={item === lastWork}
+          entering={entering}
+        />
+      </MessageScrollerItem>
+    );
+  };
+
   return (
     <>
-      {transcript.map((item, i) => {
-        const id = 'id' in item ? item.id : undefined;
-        return (
-          <MessageScrollerItem key={id ?? i} messageId={id} style={SCROLLER_ITEM_STYLE}>
-            <Row
-              item={item}
-              prev={transcript[i - 1]}
-              t={t}
-              onOpenPlan={onOpenPlan}
-              agent={agent}
-              liveStep={liveStep}
-              defaultExpanded={item === lastWork}
-              entering={entering}
-            />
-          </MessageScrollerItem>
-        );
-      })}
+      {segments.map((segment) =>
+        segment.kind === 'row' ? (
+          renderRow(segment.row)
+        ) : (
+          <TurnFold
+            key={segment.turn.id}
+            turn={segment.turn}
+            open={turnFold.isOpen(segment.turn, openTurnId)}
+            defaultOpenId={openTurnId}
+            onToggle={turnFold.toggle}
+          >
+            {segment.turn.rows.map(renderRow)}
+          </TurnFold>
+        ),
+      )}
     </>
   );
 }

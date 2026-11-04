@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ComputerCall, ComputerFrame, MachineStreamEvent } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -351,7 +352,7 @@ describe('forwardComputerCall replay', () => {
     expect(calls).toHaveLength(1);
   });
 
-  test('a safe call retried is re-dispatched with its frame state reset', async () => {
+  test('a safe call retried is re-dispatched under a new attempt id with fresh frame state', async () => {
     const ctx = boot();
     addMachine(ctx.s, 'omarchy', { computer: true });
     const calls = connect(ctx.s, 'omarchy');
@@ -363,13 +364,51 @@ describe('forwardComputerCall replay', () => {
     };
     const first = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
     const id = computerCallId('step-a', 'r1');
+    expect(calls[0]?.callId).toBe(createHash('sha256').update('step-a\0r1').digest('hex'));
     receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(1, 'first')]);
     expect((await first).text).toBe('first');
     const second = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
     expect(calls).toHaveLength(2);
-    expect(callRow(ctx.s, id)).toMatchObject({ state: 'dispatched', lastSeq: 0, resultText: null });
-    receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(1, 'second')]);
+    const rerunId = computerCallId('step-a', 'r1', 2);
+    expect(calls[1]?.callId).toBe(rerunId);
+    expect(rerunId).not.toBe(id);
+    expect(callRow(ctx.s, rerunId)).toMatchObject({
+      state: 'dispatched',
+      lastSeq: 0,
+      resultText: null,
+    });
+    receiveComputerFrames(ctx.s.db, 'omarchy', rerunId, [done(1, 'second')]);
     expect((await second).text).toBe('second');
+  });
+
+  test('a late done from the superseded execution is refused and does not resolve the rerun', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    const calls = connect(ctx.s, 'omarchy');
+    const read = {
+      computer: true as const,
+      name: 'read_file' as const,
+      toolCallId: 'r1',
+      params: { path: 'a' },
+    };
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
+    dropComputerWaiters();
+    const rerun = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
+    const [original, again] = calls;
+    expect(again?.callId).not.toBe(original?.callId);
+    expect(callRow(ctx.s, computerCallId('step-a', 'r1'))).toMatchObject({
+      state: 'interrupted',
+      errorMessage: 'superseded by a rerun',
+    });
+    expect(() =>
+      receiveComputerFrames(ctx.s.db, 'omarchy', computerCallId('step-a', 'r1'), [
+        done(1, 'stale'),
+      ]),
+    ).toThrow(expect.objectContaining({ status: 409 }));
+    receiveComputerFrames(ctx.s.db, 'omarchy', computerCallId('step-a', 'r1', 2), [
+      done(1, 'fresh'),
+    ]);
+    expect((await rerun).text).toBe('fresh');
   });
 
   test('concurrent duplicate requests for the same callId dispatch once and share the result', async () => {
@@ -498,6 +537,28 @@ describe('leases', () => {
     expect(s.db.select().from(computerTable).get()?.executionFence).toBe(1);
     void forwardComputerCall(deps, 'sidecar', 'step-a', shell('pwd', 'tc-2'));
     expect(s.db.select().from(computerTable).get()?.executionFence).toBe(1);
+  });
+
+  test('a short call by the holder does not shorten a longer lease', async () => {
+    const { s, deps } = await twoSteps();
+    const long = s.db.select().from(computerTable).get()?.executionLeaseExpiresAt ?? 0;
+    const hour = 3_600_000;
+    s.db
+      .update(computerTable)
+      .set({ executionLeaseExpiresAt: Date.now() + hour })
+      .run();
+    void forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'read_file',
+      toolCallId: 'obs',
+      params: { path: 'a' },
+    });
+    const kept = s.db.select().from(computerTable).get()?.executionLeaseExpiresAt ?? 0;
+    expect(kept).toBeGreaterThan(Date.now() + hour - 5_000);
+    expect(kept).toBeGreaterThan(long);
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-b', shell('ls', 'tc-b')),
+    ).rejects.toThrow(COMPUTER_BUSY);
   });
 
   test('an expired lease is taken over with the fence incremented', async () => {

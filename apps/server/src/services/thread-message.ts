@@ -11,6 +11,12 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, sendBuildSteer } from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
+import {
+  claimClientMessage,
+  coalesceClientMessage,
+  findClientMessage,
+  replayAfterConflict,
+} from './client-message.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -46,7 +52,12 @@ async function deliver(
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
   const running = hasClaimedStep(deps, buildId);
   if (running || row.phase === 'building' || row.phase === 'done') {
-    const sent = await sendBuildSteer(deps, buildId, { content: body.content }, { human: true });
+    const sent = await sendBuildSteer(
+      deps,
+      buildId,
+      { content: body.content, clientMessageId: body.clientMessageId },
+      { human: true },
+    );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
   if (row.phase === 'confirm' || row.phase === 'review') {
@@ -72,7 +83,7 @@ async function deliver(
 function recordInCoordinator(
   deps: BuildDeps,
   row: TodoRow,
-  content: string,
+  body: ThreadMessageBody,
   sent: { conversationId: string; delivered: ThreadMessageDelivery },
 ): void {
   const thread = coordinatorThreadRow(deps, ensureChief(deps, row.teamId));
@@ -81,7 +92,7 @@ function recordInCoordinator(
     todoId: row.id,
     seqNum: row.seqNum,
     title: row.title,
-    excerpt: excerptOf(content),
+    excerpt: excerptOf(body.content),
     delivered: sent.delivered,
     conversationId: sent.conversationId,
   };
@@ -91,10 +102,13 @@ function recordInCoordinator(
     content: JSON.stringify(marker),
     createdAt: nowMs(),
   };
-  deps.db
-    .insert(chiefMessage)
-    .values({ ...message, threadId: thread.id, projectId: row.projectId })
-    .run();
+  deps.db.transaction(() => {
+    claimClientMessage(deps.db, row.id, body.clientMessageId, { todoId: row.id, ...sent });
+    deps.db
+      .insert(chiefMessage)
+      .values({ ...message, threadId: thread.id, projectId: row.projectId })
+      .run();
+  });
   deps.convHub?.publishMessage(thread.id, message);
 }
 
@@ -110,11 +124,20 @@ export async function messageThreadAsUser(
     .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `todo ${todoId}`);
+  const replay = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
+  if (replay !== undefined) return replay;
   if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
-  const sent = await deliver(deps, row, row.latestBuildId, body);
-  recordInCoordinator(deps, row, body.content, sent);
-  return { todoId: row.id, ...sent };
+  const buildId = row.latestBuildId;
+  return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
+    const sent = await deliver(deps, row, buildId, body);
+    try {
+      recordInCoordinator(deps, row, body, sent);
+    } catch (error) {
+      return replayAfterConflict<ThreadMessageResult>(deps.db, row.id, body.clientMessageId, error);
+    }
+    return { todoId: row.id, ...sent };
+  });
 }

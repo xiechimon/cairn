@@ -1,10 +1,16 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, queuedMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
-import { type BuildDeps, sendBuildSteer } from './builds.js';
+import { type BuildDeps, type BuildSteerResult, sendBuildSteer } from './builds.js';
+import {
+  claimClientMessage,
+  completeClientMessage,
+  findClientMessage,
+  replayAfterConflict,
+} from './client-message.js';
 
 const delivering = new WeakMap<Db, Map<string, Promise<unknown>>>();
 
@@ -30,12 +36,30 @@ function activeStep(db: Db, conversationId: string) {
     .get();
 }
 
+export interface QueuedTaskMessageResult {
+  conversationId: string;
+  message: {
+    id: string;
+    conversationId: string;
+    content: string;
+    deliverAfterStop: boolean;
+    createdAt: number;
+  };
+}
+
 export async function queueTaskMessage(
   deps: BuildDeps,
   conversationId: string,
   content: string,
   deliverAfterStop = false,
-) {
+  clientMessageId?: string,
+): Promise<BuildSteerResult | QueuedTaskMessageResult> {
+  const replay = findClientMessage<BuildSteerResult | QueuedTaskMessageResult>(
+    deps.db,
+    conversationId,
+    clientMessageId,
+  );
+  if (replay !== undefined) return replay;
   const row = deps.db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!row) throw new HttpError(404, `conversation ${conversationId}`);
   const task = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
@@ -47,7 +71,7 @@ export async function queueTaskMessage(
   )
     throw new HttpError(409, 'Task cannot accept a queued message');
   if (!activeStep(deps.db, conversationId))
-    return sendBuildSteer(deps, conversationId, { content }, true);
+    return sendBuildSteer(deps, conversationId, { content, clientMessageId }, true);
   const message = {
     id: newRecordId(),
     conversationId,
@@ -55,10 +79,24 @@ export async function queueTaskMessage(
     deliverAfterStop,
     createdAt: nowMs(),
   };
-  deps.db.insert(queuedMessage).values(message).run();
-  addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
+  const queued = { conversationId, message };
+  try {
+    deps.db.transaction(() => {
+      claimClientMessage(deps.db, conversationId, clientMessageId);
+      deps.db.insert(queuedMessage).values(message).run();
+      addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
+      completeClientMessage(deps.db, conversationId, clientMessageId, queued);
+    });
+  } catch (error) {
+    return replayAfterConflict<QueuedTaskMessageResult>(
+      deps.db,
+      conversationId,
+      clientMessageId,
+      error,
+    );
+  }
   deps.convHub?.publishMessage(conversationId, { ...message, role: 'user' });
-  return { conversationId, message };
+  return queued;
 }
 
 export async function deliverQueuedMessage(
@@ -113,6 +151,31 @@ export function cancelQueuedMessage(deps: BuildDeps, conversationId: string, mes
     .where(and(eq(queuedMessage.id, messageId), eq(queuedMessage.conversationId, conversationId)))
     .run();
   return { conversationId };
+}
+
+export function editQueuedMessage(
+  deps: BuildDeps,
+  conversationId: string,
+  messageId: string,
+  content: string,
+) {
+  const updated = deps.db
+    .update(queuedMessage)
+    .set({ content })
+    .where(
+      and(
+        eq(queuedMessage.id, messageId),
+        eq(queuedMessage.conversationId, conversationId),
+        isNull(queuedMessage.error),
+      ),
+    )
+    .returning({ id: queuedMessage.id })
+    .all();
+  if (updated.length === 0) throw new HttpError(409, 'Queued message was already delivered');
+  const row = deps.db.select().from(build).where(eq(build.id, conversationId)).get();
+  const task = row && deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  if (task) addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
+  return { conversationId, message: { id: messageId, content } };
 }
 
 export async function drainTaskMessageQueue(

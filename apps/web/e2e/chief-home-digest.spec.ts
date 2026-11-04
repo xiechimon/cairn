@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 import { HISTORY, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
 
@@ -73,6 +74,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
   }) => {
     await mockDigest(page, withDigest('daily'));
     await page.goto('/app');
+    await expandTurns(page);
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const toggle = stream.getByRole('button', { name: '总管把昨天的对话整理成了 4 条摘要' });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -163,6 +165,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     const empty = { ...digestRow('daily'), content: JSON.stringify({ kind: 'chief_digest', reason: 'daily', coversUntil: 12, madeAt: 1, items: [] }) };
     await mockDigest(page, [...HISTORY.slice(0, 3), empty, ...HISTORY.slice(3)]);
     await page.goto('/app');
+    await expandTurns(page);
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await expect(stream).toContainText('已经补给它了');
     await expect(stream.getByTestId('chief-digest')).toHaveCount(0);

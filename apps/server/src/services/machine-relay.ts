@@ -5,6 +5,7 @@ import {
   createSkillBodySchema,
   derivePlaceholderTitle,
   FIXED_TAGS,
+  isBuildStepKind,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -84,7 +85,7 @@ export async function executeRelayToolCall(
 ): Promise<string> {
   const row = ownedStep(deps, machineId, stepId);
   if (isThreadScheduleTool(name)) {
-    if (row.kind !== 'plan' && row.kind !== 'build') {
+    if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
       throw new HttpError(400, 'schedule tools require a plan or build step');
     }
     if (row.status !== 'claimed') {

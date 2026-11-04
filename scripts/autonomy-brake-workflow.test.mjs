@@ -49,6 +49,28 @@ test('workflow_run success does not pause or sweep', (t) => {
   assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), '');
 });
+test('a cancelled main ci run does not pause or sweep', (t) => {
+  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+    EVENT_NAME: 'workflow_run',
+    CONCLUSION: 'cancelled',
+    HEAD_BRANCH: 'main',
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.equal(f.calls(), '');
+});
+for (const conclusion of ['failure', 'timed_out', 'startup_failure', 'action_required']) {
+  test(`a main ci run that ends ${conclusion} still pauses`, (t) => {
+    const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+      EVENT_NAME: 'workflow_run',
+      CONCLUSION: conclusion,
+      HEAD_BRANCH: 'main',
+      FAILED_SHA: 'a'.repeat(40),
+      RUN_URL: 'https://example.test/run/1',
+    });
+    assert.equal(f.result.status, 0, f.result.stderr);
+    assert.match(f.calls(), /pause --reason/);
+  });
+}
 test('schedule without a marker restores head signals without opening a marker', (t) => {
   const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'schedule',
@@ -152,7 +174,7 @@ test('the trusted brake copy runs alone from RUNNER_TEMP', () => {
     assert.equal(pick(strip(brake)), pick(strip(shared)), name);
   }
 });
-for (const conclusion of ['cancelled', 'timed_out'])
+for (const conclusion of ['timed_out'])
   test(`main push conclusion ${conclusion} applies the brake`, (t) => {
     const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
       EVENT_NAME: 'workflow_run',

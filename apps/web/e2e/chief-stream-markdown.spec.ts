@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
 declare global {
   interface Window {
@@ -270,6 +271,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     page,
   }) => {
     await page.goto('/app/schedules?scenario=114');
+    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
@@ -287,6 +289,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
   }) => {
 
     await page.goto('/app/schedules?scenario=113');
+    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 
@@ -330,6 +333,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
 
     state.final = true;
     await es.emit({ type: 'message', message: FINAL_ROW });
+    await expandTurns(page);
 
     await expect(drawer.getByTestId('chief-msg')).toHaveCount(2);
     await expect(drawer.getByTestId('chief-msg').filter({ hasText: '正在验证' })).toHaveCount(0);
@@ -359,6 +363,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     };
     await mockChiefLiveApi(page, state);
     await page.goto('/app/schedules?chief=chief-bbb');
+    await expandTurns(page);
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -408,6 +413,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
 
     state.final = true;
     await es.emit({ type: 'message', message: FINAL_ROW });
+    await expandTurns(page);
     await expect(drawer.getByRole('button', { name: /实时步骤/ })).toHaveCount(0);
     await expect(drawer.getByTestId('chief-msg').filter({ hasText: '正在验证' })).toHaveCount(0);
     const final = drawer.getByTestId('chief-msg').last();
@@ -527,6 +533,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     state.messages = [...state.messages, FINAL_ROW];
     state.final = true;
     await es.emit({ type: 'message', message: FINAL_ROW });
+    await expandTurns(page);
     await expect(drawer.getByRole('button', { name: /实时步骤/ })).toHaveCount(0);
     await expect(drawer.getByTestId('chief-turn-tools')).toHaveCount(0);
     const final = drawer.getByTestId('chief-msg').last();
@@ -540,6 +547,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await stubCdnAvatar(page);
     await mockChiefLiveApi(page, { final: true });
     await page.goto('/app/schedules?chief=chief-bbb');
+    await expandTurns(page);
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -629,18 +637,21 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
   }) => {
     const drawer = await boot(page);
 
+    await expandTurns(page);
     const items = drawer.locator('[data-slot="message-scroller-item"]');
-    await expect(items).toHaveCount(4);
+    await expect(items).toHaveCount(5);
     await expect(items.nth(0)).toHaveAttribute('data-message-id', 'm1');
     await expect(items.nth(1)).toHaveAttribute('data-message-id', 'm2');
-    await expect(items.nth(2)).toHaveAttribute('data-message-id', 'm3');
-    await expect(items.nth(3)).toHaveAttribute('data-message-id', 'm9');
+    await expect(items.nth(2).getByTestId('turn-header')).toHaveCount(1);
+    await expect(items.nth(3)).toHaveAttribute('data-message-id', 'm3');
+    await expect(items.nth(4)).toHaveAttribute('data-message-id', 'm9');
   });
 
   test('F-R16: single-paragraph plain-text bubble geometry does not drift (one-line pill); multi-block bubble first/last block margin trimming works', async ({
     page,
   }) => {
     const drawer = await boot(page);
+    await expandTurns(page);
 
     const plain = drawer.getByTestId('chief-bubble').filter({ hasText: PLAIN_USER });
     const geo = await plain.evaluate((el) => {
@@ -666,6 +677,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     page,
   }) => {
     await page.goto('/app/schedules?scenario=chief-md');
+    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const bubble = page.getByTestId('chief-stream').getByTestId('chief-bubble');
     await expect(bubble).toHaveCount(1);
@@ -829,6 +841,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
     };
     await mockChiefLiveApi(page, state);
     await page.goto('/app/schedules?chief=chief-bbb');
+    await expandTurns(page);
 
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
@@ -853,6 +866,7 @@ test.describe('chief drawer user-bubble markdown face (live mock, #742)', () => 
 
     state.activeRun = null;
     await page.goto('/app/schedules?chief=chief-bbb');
+    await expandTurns(page);
     await expectFolded();
   });
 

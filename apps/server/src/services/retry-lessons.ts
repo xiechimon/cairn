@@ -8,7 +8,7 @@ import {
   type VerifyVerdict,
   verifyVerdictSchema,
 } from '@cairn/shared';
-import { and, desc, eq, gte, like } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -52,7 +52,7 @@ export function retryLessonsOf(db: Db, buildId: string): string | null {
     .where(
       and(
         eq(step.buildId, buildId),
-        eq(step.kind, 'build'),
+        inArray(step.kind, ['build', 'session']),
         like(step.prompt, `${CI_FIX_PROMPT_HEAD}%`),
         gte(step.createdAt, roundStart),
       ),

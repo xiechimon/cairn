@@ -196,3 +196,14 @@ def settlement(
         return max(reserved_usd, known), UNKNOWN_SETTLED_AT_RESERVATION
     sources = sorted({trial.cost_source for trial in trials if trial.cost_source})
     return known, "; ".join(sources) or NO_TOKENS_SOURCE
+
+
+def settled_usd(run_ids: Sequence[str]) -> dict[str, float | None]:
+    settled: dict[str, float | None] = {run_id: None for run_id in run_ids}
+    path = ledger_path()
+    if not path.exists():
+        return settled
+    for entry in _read(path):
+        if entry["kind"] == "settled" and entry["run_id"] in settled:
+            settled[entry["run_id"]] = float(entry["actual_usd"])
+    return settled

@@ -359,6 +359,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "enum": [
             "plan",
             "build",
+            "session",
             "merge",
             "chief",
             "review",
@@ -1016,6 +1017,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                   "enum": [
                     "plan",
                     "build",
+                    "session",
                     "merge",
                     "chief",
                     "review",
@@ -2083,6 +2085,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "enum": [
               "plan",
               "build",
+              "session",
               "merge",
               "chief",
               "review",
@@ -3963,6 +3966,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "enum": [
                 "plan",
                 "build",
+                "session",
                 "merge",
                 "chief",
                 "review",
@@ -4945,6 +4949,57 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
       },
       "type": "array",
     },
+    "filters": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "is",
+              "project",
+              "pr",
+              "by",
+              "after",
+              "cost",
+            ],
+            "type": "string",
+          },
+          "negated": {
+            "type": "boolean",
+          },
+          "raw": {
+            "type": "string",
+          },
+          "reason": {
+            "enum": [
+              "empty",
+              "unknown_state",
+              "bad_pr",
+              "bad_date",
+              "bad_cost",
+              "unknown_project",
+              "unknown_person",
+            ],
+            "type": "string",
+          },
+          "valid": {
+            "type": "boolean",
+          },
+          "value": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "key",
+          "raw",
+          "value",
+          "negated",
+          "valid",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "projects": {
       "items": {
         "additionalProperties": false,
@@ -5375,6 +5430,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "enum": [
         "plan",
         "build",
+        "session",
         "merge",
         "chief",
         "review",
@@ -5987,6 +6043,8 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "github-issue",
                     "github-issue-self",
                     "orchestration",
+                    "research-intake",
+                    "research-intake-item",
                   ],
                   "type": "string",
                 },
@@ -6825,6 +6883,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "researchIntakeProjectId": "CAIRN_RESEARCH_INTAKE_PROJECT_ID",
     "routingRules": "CAIRN_ROUTING_RULES",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
@@ -7320,6 +7379,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "computer",
   "computer_call",
   "feature_flag",
+  "client_message",
 ]
 `;
 
@@ -7377,6 +7437,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "backup-status.json next to server.db (#2162)",
     "path": "/api/server/backup",
+  },
+  {
+    "method": "GET",
+    "note": "deploy.json next to server.db, written by deploy-self.sh (#2427)",
+    "path": "/api/server/deploy",
   },
   {
     "method": "POST",
@@ -7461,7 +7526,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
+    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {
@@ -7534,7 +7599,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, clientMessageId}; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
+    "note": "body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
     "path": "/api/todos/{id}/messages",
   },
   {
@@ -9570,6 +9635,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > ste
       "enum": [
         "plan",
         "build",
+        "session",
         "merge",
         "chief",
         "review",
@@ -10082,6 +10148,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "github-issue",
             "github-issue-self",
             "orchestration",
+            "research-intake",
+            "research-intake-item",
           ],
           "type": "string",
         },

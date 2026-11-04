@@ -1,5 +1,10 @@
-import type { ChiefReportContent, ChiefReportTodoRef, RetroProposal } from '@cairn/shared';
-import { useState } from 'react';
+import type {
+  ChiefReportContent,
+  ChiefReportTodoRef,
+  IntakeItem,
+  RetroProposal,
+} from '@cairn/shared';
+import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -29,7 +34,13 @@ function TodoRefs({ refs }: { refs: readonly ChiefReportTodoRef[] }) {
   );
 }
 
-function ProposalItem({ proposal }: { proposal: RetroProposal }) {
+function Decision({
+  proposal,
+  children,
+}: {
+  proposal: Pick<RetroProposal, 'id' | 'status' | 'todoId'>;
+  children: (status: RetroProposal['status'], footer: ReactNode) => ReactNode;
+}) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
@@ -49,75 +60,130 @@ function ProposalItem({ proposal }: { proposal: RetroProposal }) {
       },
     );
   };
-  const source = proposal.source;
-  return (
-    <li
-      data-testid="chief-report-proposal"
-      data-status={status}
-      className="flex min-w-0 flex-col gap-1 data-[status=dismissed]:opacity-60"
-    >
-      <span className="font-medium text-foreground">{proposal.title}</span>
-      <span>{proposal.what}</span>
-      <span className="text-meta text-content-tertiary">
-        {t('为什么没拦住：{why}', { why: proposal.why })}
+  const footer =
+    status === 'draft' ? (
+      <span className="flex gap-2 pt-1">
+        <Button
+          size="sm"
+          disabled={mutations.decideRetroProposal.isPending}
+          onClick={() => decide('accept')}
+        >
+          {t('建成线程')}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={mutations.decideRetroProposal.isPending}
+          onClick={() => decide('dismiss')}
+        >
+          {t('不用了')}
+        </Button>
       </span>
+    ) : (
       <span className="text-meta text-content-tertiary">
-        {t('防护：{safeguard}', { safeguard: proposal.safeguard })}
-      </span>
-      <span className="text-meta text-content-tertiary">
-        {t('出处：')}
-        {source.todoId === null ? (
-          t('协调者对话')
+        {status === 'accepted' ? (
+          todoId === null ? (
+            t('已建成线程')
+          ) : (
+            <ThreadLink todoId={todoId} className={REF_CLS}>
+              {t('已建成线程')}
+            </ThreadLink>
+          )
         ) : (
-          <ThreadLink todoId={source.todoId} className={REF_CLS}>
-            {source.label}
-          </ThreadLink>
+          t('已忽略')
         )}
       </span>
-      {status === 'draft' ? (
-        <span className="flex gap-2 pt-1">
-          <Button
-            size="sm"
-            disabled={mutations.decideRetroProposal.isPending}
-            onClick={() => decide('accept')}
-          >
-            {t('建成线程')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={mutations.decideRetroProposal.isPending}
-            onClick={() => decide('dismiss')}
-          >
-            {t('不用了')}
-          </Button>
-        </span>
-      ) : (
-        <span className="text-meta text-content-tertiary">
-          {status === 'accepted' ? (
-            todoId === null ? (
-              t('已建成线程')
+    );
+  return children(status, footer);
+}
+
+function ProposalItem({ proposal }: { proposal: RetroProposal }) {
+  const { t } = useI18n();
+  const source = proposal.source;
+  return (
+    <Decision proposal={proposal}>
+      {(status, footer) => (
+        <li
+          data-testid="chief-report-proposal"
+          data-status={status}
+          className="flex min-w-0 flex-col gap-1 data-[status=dismissed]:opacity-60"
+        >
+          <span className="font-medium text-foreground">{proposal.title}</span>
+          <span>{proposal.what}</span>
+          <span className="text-meta text-content-tertiary">
+            {t('为什么没拦住：{why}', { why: proposal.why })}
+          </span>
+          <span className="text-meta text-content-tertiary">
+            {t('防护：{safeguard}', { safeguard: proposal.safeguard })}
+          </span>
+          <span className="text-meta text-content-tertiary">
+            {t('出处：')}
+            {source.todoId === null ? (
+              t('协调者对话')
             ) : (
-              <ThreadLink todoId={todoId} className={REF_CLS}>
-                {t('已建成线程')}
+              <ThreadLink todoId={source.todoId} className={REF_CLS}>
+                {source.label}
               </ThreadLink>
-            )
-          ) : (
-            t('已忽略')
-          )}
-        </span>
+            )}
+          </span>
+          {footer}
+        </li>
       )}
-    </li>
+    </Decision>
+  );
+}
+
+function sourceHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function IntakeRow({ item }: { item: IntakeItem }) {
+  const { t } = useI18n();
+  return (
+    <Decision proposal={item}>
+      {(status, footer) => (
+        <li
+          data-testid="chief-report-intake-item"
+          data-status={status}
+          className="flex min-w-0 flex-col gap-1 data-[status=dismissed]:opacity-60"
+        >
+          <span className="font-medium text-foreground">{item.claim}</span>
+          <span className="text-meta text-content-tertiary">
+            {t('来源：')}
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className={REF_CLS}>
+              {sourceHost(item.url)}
+            </a>
+          </span>
+          <span className="text-meta text-content-tertiary">
+            {t('对应：{matches}', { matches: item.matches })}
+          </span>
+          <span className="text-meta text-content-tertiary">
+            {t('建议动作：{action}', { action: item.action })}
+          </span>
+          {footer}
+        </li>
+      )}
+    </Decision>
   );
 }
 
 export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
   const { t } = useI18n();
   const y = report.yesterday;
+  const intake = report.intake ?? [];
   const quietYesterday =
     y.finishedCount + y.mergedCount + y.failedCount + y.retries + y.quotaWaits === 0 &&
     y.verdicts.pass + y.verdicts.block === 0;
-  if (report.status === 'posted' && quietYesterday && report.retro.length === 0)
+  if (
+    report.status === 'posted' &&
+    quietYesterday &&
+    report.retro.length === 0 &&
+    intake.length === 0
+  )
     return (
       <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
         <p className={ONE_LINE_CLS} data-testid="chief-report" data-variant="one-line">
@@ -225,6 +291,16 @@ export function ChiefReportRow({ report }: { report: ChiefReportContent }) {
                 ))}
               </ul>
             )}
+          </div>
+        )}
+        {report.status === 'posted' && intake.length > 0 && (
+          <div className={SECTION_CLS} data-testid="chief-report-intake">
+            <span className={LABEL_CLS}>{t('外部动态')}</span>
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {intake.map((item) => (
+                <IntakeRow key={item.id} item={item} />
+              ))}
+            </ul>
           </div>
         )}
         {(report.truncated.length > 0 || report.retro.length > 0) && (
