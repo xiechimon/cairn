@@ -1,0 +1,591 @@
+import type { ComputerCall, ComputerFrame, MachineStreamEvent } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/orb/computer.js';
+import {
+  agent as agentTable,
+  chief as chiefTable,
+  chiefThread as chiefThreadTable,
+  computerCall as computerCallTable,
+  computer as computerTable,
+  machine as machineTable,
+  step as stepTable,
+} from '../src/db/schema.js';
+import {
+  COMPUTER_BUSY,
+  COMPUTER_EXECUTION_LEASE_MS,
+  COMPUTER_NOT_CONNECTED,
+  COMPUTER_USER_CONTROL,
+  computerCallId,
+  computerDeadlineMs,
+  computerMachineName,
+  dropComputerWaiters,
+  forwardComputerCall,
+  OWN_COMPUTER_UNGATED_MESSAGE,
+  receiveComputerFrames,
+  stopStepComputer,
+} from '../src/services/machine-computer.js';
+import type { MachineDeps } from '../src/services/machine-deps.js';
+import { bootServer, type TestServer } from './helpers.js';
+
+vi.setConfig({ testTimeout: 30_000 });
+
+const THREAD = 'chief-forward-thread';
+const FAKE_TOKEN = `ghp_${'a1B2c3D4e5'.repeat(3)}`;
+
+let server: TestServer | null = null;
+afterEach(() => {
+  vi.useRealTimers();
+  dropComputerWaiters();
+  server?.dispose();
+  server = null;
+});
+
+function addMachine(
+  s: TestServer,
+  id: string,
+  capabilities: { computer?: true; ownComputer?: true },
+  lastSeenAt = 1,
+) {
+  s.db
+    .insert(machineTable)
+    .values({
+      id,
+      teamId: s.team.id,
+      name: id,
+      online: true,
+      lastSeenAt,
+      capabilities: { mcpServers: [], skills: [], ...capabilities },
+    })
+    .run();
+}
+
+function connect(s: TestServer, machineId: string): ComputerCall[] {
+  const calls: ComputerCall[] = [];
+  s.machineHub.subscribeMachine(s.team.id, machineId, (ev: MachineStreamEvent) => {
+    if (ev.type === 'computer') calls.push(ev.call);
+  });
+  return calls;
+}
+
+function watchFeed(s: TestServer): Record<string, unknown>[] {
+  const events: Record<string, unknown>[] = [];
+  s.hub.subscribe(s.team.id, {
+    nextSeq: () => 1,
+    send: async (payload) => {
+      events.push(payload as Record<string, unknown>);
+    },
+  });
+  return events;
+}
+
+function addStep(s: TestServer, id: string, machineId: string, status = 'claimed') {
+  s.db
+    .insert(stepTable)
+    .values({
+      id,
+      buildId: THREAD,
+      kind: 'chief',
+      machineId,
+      status: status as 'claimed',
+      prompt: 'work',
+      createdAt: 2,
+    })
+    .run();
+}
+
+function boot(): { s: TestServer; deps: MachineDeps; chiefId: string } {
+  const s = bootServer();
+  server = s;
+  addMachine(s, 'sidecar', {});
+  s.db
+    .insert(agentTable)
+    .values({
+      id: 'agent-forward',
+      teamId: s.team.id,
+      displayName: 'Coordinator',
+      machineId: 'sidecar',
+      status: 'active',
+      avatarUrl: null,
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      thinkingLevel: null,
+      tools: [],
+      secrets: [],
+      skillsAllowlist: null,
+      mcpServers: [],
+    })
+    .run();
+  const chiefId = `chief-${s.svc.user.id}-${s.team.id}`;
+  s.db
+    .insert(chiefTable)
+    .values({
+      id: chiefId,
+      userId: s.svc.user.id,
+      teamId: s.team.id,
+      agentId: 'agent-forward',
+      charter: '',
+      createdAt: 1,
+    })
+    .onConflictDoUpdate({ target: chiefTable.id, set: { agentId: 'agent-forward' } })
+    .run();
+  s.db
+    .insert(chiefThreadTable)
+    .values({
+      id: THREAD,
+      chiefId,
+      userId: s.svc.user.id,
+      teamId: s.team.id,
+      title: 'forward',
+      createdAt: 1,
+      updatedAt: 1,
+      sessionRuntime: 'pi',
+      sessionId: '',
+      sessionOpenedAt: 1,
+      pendingSessionResumeAt: null,
+      toolDefHashes: {},
+      toolResultHashes: {},
+      activeRun: null,
+      archivedAt: 1,
+    })
+    .run();
+  addStep(s, 'step-a', 'sidecar');
+  const deps: MachineDeps = {
+    ...s.svc,
+    box: s.secretBox,
+    reposDir: s.reposDir,
+    attachmentsDir: s.attachmentsDir,
+    skillsDir: s.skillsDir,
+  };
+  return { s, deps, chiefId };
+}
+
+function shell(command: string, toolCallId = 'tc-1') {
+  return { computer: true as const, name: 'shell' as const, toolCallId, params: { command } };
+}
+
+function callRow(s: TestServer, id: string) {
+  const row = s.db.select().from(computerCallTable).where(eq(computerCallTable.id, id)).get();
+  if (!row) throw new Error('call row missing');
+  return row;
+}
+
+function done(seq: number, text: string, exitCode: number | null = 0): ComputerFrame {
+  return { kind: 'done', seq, text, exitCode };
+}
+
+describe('forwardComputerCall target and presence', () => {
+  test('an offline target fails at once, sends no stream event and writes no row', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    const calls: ComputerCall[] = [];
+    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'))).rejects.toThrow(
+      COMPUTER_NOT_CONNECTED,
+    );
+    expect(calls).toEqual([]);
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+    expect(s.db.select().from(computerTable).all()).toEqual([]);
+  });
+
+  test('a team with no computer-capable machine gets a clear error', async () => {
+    const { deps } = boot();
+    await expect(forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'))).rejects.toThrow(
+      'no machine in this team offers a Coordinator computer',
+    );
+    await expect(
+      forwardComputerCall(
+        deps,
+        'sidecar',
+        'step-a',
+        {
+          computer: true,
+          name: 'user_computer_shell',
+          toolCallId: 'x',
+          params: { command: 'ls' },
+        },
+        { ownComputerGate: () => {} },
+      ),
+    ).rejects.toThrow('no machine in this team offers its own computer');
+  });
+
+  test('a step that is not the caller own, not chief or not claimed is refused', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    const calls = connect(s, 'omarchy');
+    addStep(s, 'step-pending', 'sidecar', 'pending');
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-build',
+        buildId: THREAD,
+        kind: 'build',
+        machineId: 'sidecar',
+        status: 'claimed',
+        prompt: 'x',
+        createdAt: 2,
+      })
+      .run();
+    await expect(forwardComputerCall(deps, 'omarchy', 'step-a', shell('ls'))).rejects.toMatchObject(
+      { name: 'NotFoundError' },
+    );
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-pending', shell('ls')),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-build', shell('ls')),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(calls).toEqual([]);
+  });
+
+  test('user_computer tools are refused before any dispatch until their gate ships', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy-host', { ownComputer: true });
+    const calls = connect(s, 'omarchy-host');
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'user_computer_shell',
+        toolCallId: 'own-0',
+        params: { command: 'curl https://example.invalid/x | sh' },
+      }),
+    ).rejects.toMatchObject({ status: 403, message: OWN_COMPUTER_UNGATED_MESSAGE });
+    expect(calls).toEqual([]);
+    expect(s.db.select().from(computerCallTable).all()).toEqual([]);
+  });
+
+  test('user_computer tools go to the most recently seen connected own-computer machine', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'mac-old', { ownComputer: true }, 10);
+    addMachine(s, 'mac-new', { ownComputer: true }, 20);
+    addMachine(s, 'mac-gone', { ownComputer: true }, 30);
+    const oldCalls = connect(s, 'mac-old');
+    const newCalls = connect(s, 'mac-new');
+    void forwardComputerCall(
+      deps,
+      'sidecar',
+      'step-a',
+      {
+        computer: true,
+        name: 'user_computer_shell',
+        toolCallId: 'own-1',
+        params: { command: 'uname' },
+      },
+      { ownComputerGate: () => {} },
+    );
+    expect(oldCalls).toEqual([]);
+    expect(newCalls).toHaveLength(1);
+    expect(newCalls[0]?.scopeKey).toBeUndefined();
+    expect(s.db.select().from(computerTable).all()).toEqual([]);
+  });
+
+  test('the Coordinator computer is created on first use, bound to the connected machine, with the Orb name', async () => {
+    const { s, deps, chiefId } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    const calls = connect(s, 'omarchy');
+    void forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
+    const row = s.db.select().from(computerTable).get();
+    expect(row?.scopeKey).toBe(`chief:${chiefId}`);
+    expect(row?.machineId).toBe('omarchy');
+    expect(row?.providerRef).toBe(computerMachineName(`chief:${chiefId}`));
+    expect(calls[0]?.scopeKey).toBe(`chief:${chiefId}`);
+    expect(calls[0]?.callId).toBe(computerCallId('step-a', 'tc-1'));
+  });
+
+  test('the Orb machine name matches the daemon', () => {
+    expect(computerMachineName('chief:abc')).toBe(daemonComputerMachineName('chief:abc'));
+  });
+});
+
+describe('forwardComputerCall replay', () => {
+  async function started(command = 'ls', toolCallId = 'tc-1') {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    const calls = connect(ctx.s, 'omarchy');
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell(command, toolCallId));
+    return { ...ctx, calls, result, id: computerCallId('step-a', toolCallId) };
+  }
+
+  test('a finished unsafe call retried with the same toolCallId returns the stored result and dispatches nothing', async () => {
+    const { s, deps, calls, result, id } = await started();
+    receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'file-a', 0)]);
+    expect(await result).toEqual({ text: 'file-a' });
+    const again = await forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
+    expect(again).toEqual({ text: 'file-a' });
+    expect(calls).toHaveLength(1);
+  });
+
+  test('a non-zero exit code is part of the stored result', async () => {
+    const { s, result, id } = await started();
+    receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'boom', 2)]);
+    expect((await result).text).toBe('boom\n[exit code 2]');
+  });
+
+  test('an unsafe call in flight whose waiter is gone is marked interrupted and not re-dispatched', async () => {
+    const { s, deps, calls, id } = await started();
+    dropComputerWaiters();
+    const again = await forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
+    expect(again.text).toContain('interrupted, may have partially run');
+    expect(calls).toHaveLength(1);
+    expect(callRow(s, id).state).toBe('interrupted');
+  });
+
+  test('a toolCallId reused with a different tool is refused and the stored call is kept', async () => {
+    const { s, deps } = boot();
+    addMachine(s, 'omarchy', { computer: true });
+    const calls = connect(s, 'omarchy');
+    const first = forwardComputerCall(deps, 'sidecar', 'step-a', shell('rm -rf build', 'reuse'));
+    const [sent] = calls;
+    if (!sent) throw new Error('no dispatch');
+    receiveComputerFrames(s.db, 'omarchy', sent.callId, [
+      { kind: 'done', seq: 1, text: 'ok', exitCode: 0 },
+    ]);
+    await first;
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'read_file',
+        toolCallId: 'reuse',
+        params: { path: 'x' },
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(calls).toHaveLength(1);
+  });
+
+  test('a safe call retried is re-dispatched with its frame state reset', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    const calls = connect(ctx.s, 'omarchy');
+    const read = {
+      computer: true as const,
+      name: 'read_file' as const,
+      toolCallId: 'r1',
+      params: { path: 'a' },
+    };
+    const first = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
+    const id = computerCallId('step-a', 'r1');
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(1, 'first')]);
+    expect((await first).text).toBe('first');
+    const second = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
+    expect(calls).toHaveLength(2);
+    expect(callRow(ctx.s, id)).toMatchObject({ state: 'dispatched', lastSeq: 0, resultText: null });
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(1, 'second')]);
+    expect((await second).text).toBe('second');
+  });
+
+  test('concurrent duplicate requests for the same callId dispatch once and share the result', async () => {
+    const { s, deps, calls, id } = await started();
+    const dup = forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
+    const dup2 = forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
+    expect(calls).toHaveLength(1);
+    receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'once')]);
+    expect(await dup).toEqual({ text: 'once' });
+    expect(await dup2).toEqual({ text: 'once' });
+  });
+});
+
+describe('forwardComputerCall daemon errors and deadlines', () => {
+  async function started() {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    const calls = connect(ctx.s, 'omarchy');
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
+    return { ...ctx, calls, result, id: computerCallId('step-a', 'tc-1') };
+  }
+
+  test('an error frame with not_delivered says the action did not run', async () => {
+    const { s, result, id } = await started();
+    receiveComputerFrames(s.db, 'omarchy', id, [
+      { kind: 'error', seq: 1, message: 'orb is down', delivery: 'not_delivered' },
+    ]);
+    const text = (await result).text;
+    expect(text).toContain('orb is down');
+    expect(text).toContain('did not run');
+  });
+
+  test('an error frame with unknown delivery says the action may have partially run', async () => {
+    const { s, result, id } = await started();
+    receiveComputerFrames(s.db, 'omarchy', id, [
+      { kind: 'error', seq: 1, message: 'socket closed', delivery: 'unknown' },
+    ]);
+    expect((await result).text).toContain('may have partially run');
+  });
+
+  test('a deadline with no frames marks an unsafe call interrupted and a safe call error', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] });
+    const { s, deps, result, id } = await started();
+    const read = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'read_file',
+      toolCallId: 'r1',
+      params: { path: 'a' },
+    });
+    await vi.advanceTimersByTimeAsync(11 * 60_000);
+    expect((await result).text).toContain('interrupted, may have partially run');
+    expect(callRow(s, id).state).toBe('interrupted');
+    expect((await read).text).toContain('timed out');
+    expect(callRow(s, computerCallId('step-a', 'r1')).state).toBe('error');
+  });
+
+  test('deadlines follow Rakazo: shell timeout plus 30 s, screen 2 min, the rest 10 min', () => {
+    expect(computerDeadlineMs('shell', { command: 'x' })).toBe(5 * 60_000 + 30_000);
+    expect(computerDeadlineMs('user_computer_shell', { command: 'x', timeoutMs: 60_000 })).toBe(
+      90_000,
+    );
+    expect(computerDeadlineMs('shell', { command: 'x', timeoutMs: 99 * 3_600_000 })).toBe(
+      5 * 60_000 + 30_000,
+    );
+    expect(computerDeadlineMs('computer_act', {})).toBe(120_000);
+    expect(computerDeadlineMs('open_path', {})).toBe(120_000);
+    expect(computerDeadlineMs('read_file', {})).toBe(600_000);
+    expect(computerDeadlineMs('browser_navigate', {})).toBe(600_000);
+  });
+});
+
+describe('stop and finish', () => {
+  test('a stopped step cancels its call: the row is cancelled, the waiter resolves and the frames post answers cancelled', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('sleep 99'));
+    const id = computerCallId('step-a', 'tc-1');
+    ctx.s.machineHub.stopSignal(ctx.s.team.id, 'step-a');
+    expect((await result).text).toContain('cancelled');
+    expect(callRow(ctx.s, id).state).toBe('cancelled');
+    const answer = receiveComputerFrames(ctx.s.db, 'omarchy', id, [{ kind: 'heartbeat', seq: 1 }]);
+    expect(answer).toEqual({ ok: true, cancelled: true });
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+  });
+
+  test('frames for a call whose step is no longer claimed are answered cancelled', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
+    const id = computerCallId('step-a', 'tc-1');
+    ctx.s.db.update(stepTable).set({ status: 'stopped' }).where(eq(stepTable.id, 'step-a')).run();
+    const answer = receiveComputerFrames(ctx.s.db, 'omarchy', id, [{ kind: 'heartbeat', seq: 1 }]);
+    expect(answer.cancelled).toBe(true);
+    expect((await result).text).toContain('cancelled');
+  });
+
+  test('stopStepComputer releases the lease of a finished step', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBe('step-a');
+    stopStepComputer(ctx.deps, 'step-a');
+    expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
+  });
+});
+
+describe('leases', () => {
+  async function twoSteps() {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    const calls = connect(ctx.s, 'omarchy');
+    addStep(ctx.s, 'step-b', 'sidecar');
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
+    return { ...ctx, calls };
+  }
+
+  test('a second step is refused while the lease is held, and the holder keeps its fence', async () => {
+    const { s, deps, calls } = await twoSteps();
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-b', shell('ls', 'tc-b')),
+    ).rejects.toThrow(COMPUTER_BUSY);
+    expect(calls).toHaveLength(1);
+    expect(s.db.select().from(computerTable).get()?.executionFence).toBe(1);
+    void forwardComputerCall(deps, 'sidecar', 'step-a', shell('pwd', 'tc-2'));
+    expect(s.db.select().from(computerTable).get()?.executionFence).toBe(1);
+  });
+
+  test('an expired lease is taken over with the fence incremented', async () => {
+    const { s, deps, calls } = await twoSteps();
+    s.db
+      .update(computerTable)
+      .set({ executionLeaseExpiresAt: Date.now() - 1 })
+      .run();
+    void forwardComputerCall(deps, 'sidecar', 'step-b', shell('ls', 'tc-b'));
+    const row = s.db.select().from(computerTable).get();
+    expect(calls).toHaveLength(2);
+    expect(row?.executionStepId).toBe('step-b');
+    expect(row?.executionFence).toBe(2);
+    expect(row?.executionLeaseExpiresAt).toBeGreaterThan(
+      Date.now() + COMPUTER_EXECUTION_LEASE_MS - 5_000,
+    );
+  });
+
+  test('while ian holds control every bot call is refused except read-only safe tools', async () => {
+    const { s, deps, calls } = await twoSteps();
+    s.db
+      .update(computerTable)
+      .set({ executionStepId: null, executionLeaseExpiresAt: null, controlHolder: 'user' })
+      .run();
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', shell('rm x', 'tc-3')),
+    ).rejects.toThrow(COMPUTER_USER_CONTROL);
+    void forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'read_file',
+      toolCallId: 'r1',
+      params: { path: 'a' },
+    });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.tool).toBe('read_file');
+  });
+});
+
+describe('feed and redaction', () => {
+  test('a token in the command and the output reaches neither the hub event nor the stored rows', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    const calls = connect(ctx.s, 'omarchy');
+    const feed = watchFeed(ctx.s);
+    const result = forwardComputerCall(
+      ctx.deps,
+      'sidecar',
+      'step-a',
+      shell(`curl -H "Authorization: Bearer ${FAKE_TOKEN}" x && echo ${FAKE_TOKEN}`),
+    );
+    const id = computerCallId('step-a', 'tc-1');
+    expect(calls[0]?.params.command).toContain(FAKE_TOKEN);
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: `token ${FAKE_TOKEN}\n` },
+      done(2, `token ${FAKE_TOKEN}`),
+    ]);
+    await result;
+    const commands = feed.filter((e) => e.type === 'computer.command');
+    expect(commands.map((e) => (e.command as { status: string }).status)).toEqual([
+      'running',
+      'done',
+    ]);
+    expect(JSON.stringify(feed)).not.toContain(FAKE_TOKEN);
+    expect(JSON.stringify(callRow(ctx.s, id))).not.toContain(FAKE_TOKEN);
+    expect(JSON.stringify(feed)).toContain('[REDACTED]');
+  });
+
+  test('file and app actions get one feed line and reads get none', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const feed = watchFeed(ctx.s);
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'launch_app',
+      toolCallId: 'l1',
+      params: { application: 'firefox', uri: 'https://example.com' },
+    });
+    void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'read_file',
+      toolCallId: 'r1',
+      params: { path: 'a' },
+    });
+    expect(feed).toHaveLength(1);
+    expect(feed[0]).toMatchObject({
+      type: 'computer.command',
+      command: { tool: 'launch_app', command: 'firefox https://example.com' },
+    });
+  });
+});
