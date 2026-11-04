@@ -13,7 +13,7 @@ import { openResearchThread } from './research-thread.js';
 export const RESEARCH_BEFORE_PLAN_HOLD = 'research-before-plan';
 const HOLD_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const TIER2_CHARS = 4_000;
-const FINISHED = new Set(['done', 'failed', 'closed']);
+const TERMINAL = new Set(['done', 'failed', 'closed']);
 
 const PERFORMANCE = /\b(faster|performance|latency|slow(?:er|ness)?)\b/i;
 const MECHANISM = /\b(new mechanism|dependenc(?:y|ies)|technology choice)\b/i;
@@ -92,6 +92,11 @@ export function holdCodeThreadForPriorResearch(
     .run();
 }
 
+function researchSettled(deps: BuildDeps, blocker: typeof todo.$inferSelect): boolean {
+  if (TERMINAL.has(blocker.phase)) return true;
+  return blocker.phase === 'review' && reportLesson(deps, blocker.id) !== null;
+}
+
 function reportLesson(deps: BuildDeps, researchTodoId: string): string | null {
   const research = deps.db.select().from(todo).where(eq(todo.id, researchTodoId)).get();
   if (research?.latestBuildId == null) return null;
@@ -131,7 +136,8 @@ export function releaseResearchBeforePlanHolds(deps: BuildDeps): void {
             .where(inArray(todo.id, ids))
             .all()
             .filter((blocker) => blocker.sourceKind === RESEARCH_BEFORE_PLAN_SOURCE_KIND);
-    if (research.length > 0 && research.some((blocker) => !FINISHED.has(blocker.phase))) continue;
+    if (research.length > 0 && research.some((blocker) => !researchSettled(deps, blocker)))
+      continue;
     const lesson = research
       .map((blocker) => reportLesson(deps, blocker.id))
       .filter((text): text is string => text !== null)

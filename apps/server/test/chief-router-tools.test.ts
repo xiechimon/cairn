@@ -20,6 +20,7 @@ import {
 } from '../src/db/schema.js';
 import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chief.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
+import { storeInfoReport } from '../src/services/info-handoff.js';
 import { releaseResearchBeforePlanHolds } from '../src/services/research-before-plan.js';
 import { chiefRemoteTools, setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { createSecret } from '../src/services/secrets.js';
@@ -280,11 +281,60 @@ describe('flag on', () => {
       expect(session?.kind).toBe('session');
       expect(session?.holdReason).toBe('research-before-plan');
       expect(session?.holdUntil ?? 0).toBeGreaterThan(Date.now() + 24 * 60 * 60_000);
-      H.s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, research[0]!.id)).run();
+      H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, research[0]!.id)).run();
+      releaseResearchBeforePlanHolds(toolDeps());
+      expect(H.s.db.select().from(step).where(eq(step.id, session!.id)).get()?.holdReason).toBe(
+        'research-before-plan',
+      );
+      storeInfoReport(
+        { db: H.s.db, attachmentsDir: H.s.attachmentsDir },
+        {
+          buildId: research[0]!.latestBuildId as string,
+          teamId: H.teamId,
+          createdBy: toolDeps().user.id,
+          report: 'Use a streaming export.\nhttps://example.com/export',
+        },
+      );
       releaseResearchBeforePlanHolds(toolDeps());
       const released = H.s.db.select().from(step).where(eq(step.id, session!.id)).get();
       expect(released?.holdUntil).toBeNull();
       expect(released?.holdReason).toBeNull();
+      expect(released?.prompt ?? '').toContain('Use a streaming export.');
+    });
+
+    test('resuming a stopped faster thread holds the replacement session', async () => {
+      H.s.db
+        .insert(agent)
+        .values({
+          id: 'agent-claude',
+          teamId: H.teamId,
+          displayName: 'Claude',
+          description: 'research',
+          status: 'active',
+          avatarUrl: null,
+          provider: 'claude-code',
+          modelId: 'claude-sonnet-5-5',
+          thinkingLevel: null,
+          tools: [],
+          secrets: [],
+          defaultSkill: null,
+          skillsAllowlist: null,
+          mcpServers: [],
+        })
+        .run();
+      const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
+      const opened = (await relay('open_thread', { todoId: id })) as { buildId: string };
+      await relay('stop_thread', { todoId: id });
+      await relay('message_thread', { todoId: id, content: 'Try a smaller export.' });
+      const resumed = H.s.db.select().from(todo).where(eq(todo.id, id)).get();
+      expect(resumed?.latestBuildId).not.toBe(opened.buildId);
+      const session = H.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, resumed?.latestBuildId as string))
+        .get();
+      expect(session?.holdReason).toBe('research-before-plan');
+      expect(session?.status).toBe('pending');
     });
 
     test('a second open on the same todo points at message_thread', async () => {
