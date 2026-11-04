@@ -67,6 +67,13 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Write PR bodies per `.claude/skills/pr-cairn/SKILL.md`: Proof first, then What, with Review and Risk collapsed; visible prose is capped at 600 characters.
 - Commit format: `<scope>(<ticket>): <subject>`, in English. Put `closes #N` in the commit message for the closing segment, never only in the PR body; do not close a parent ticket from an intermediate segment.
 
+## Review guidelines
+
+- Review only what the PR changes. Report a defect on a line the PR did not add or modify only when the PR's change makes it reachable or worse; otherwise leave it for the nightly scan, which files old-code problems as issues.
+- On a later review of the same PR, read only the commits pushed since the last review and do not repeat a finding that is already raised or resolved.
+- Name the bug class of each finding and list every instance of it in the diff, so one push fixes the class instead of one line per round.
+- Use P0 or P1 only for a defect that breaks behavior, loses data or opens a security hole; style, naming and missing polish are P2 or P3 and never block.
+
 ## Worktrees and ports
 
 - Branch from `origin/main`. Create worktrees from the main checkout using absolute paths: `git worktree add "$(git rev-parse --show-toplevel)/.claude/worktrees/<name>" <branch>`.

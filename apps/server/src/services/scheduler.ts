@@ -55,6 +55,7 @@ import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from './pr-feedback.j
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
+import { planResearchIntake } from './research-intake.js';
 import {
   ARCHIVED_SCHEDULE_PAUSE_REASON,
   assertWorkerScheduleInterval,
@@ -77,6 +78,7 @@ import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 export interface SchedulerOptions {
   tickMs: number;
   pushDigestTimes?: readonly string[];
+  researchIntakeProjectId?: string | null;
 }
 
 export interface CiPollRun {
@@ -218,6 +220,7 @@ export function createScheduler(
   let timer: NodeJS.Timeout | null = null;
   const lastDigestRun = new Map<string, number>();
   let digestSweeping = false;
+  let lastResearchIntakeFailure: string | null = null;
   let alertsSweeping = false;
   const ciPoller =
     ci !== undefined && ci !== null
@@ -486,6 +489,15 @@ export function createScheduler(
     sweepIdleChiefUnread(deps, now);
     sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
+    try {
+      planResearchIntake(deps, opts.researchIntakeProjectId ?? null, now);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      if (reason !== lastResearchIntakeFailure) {
+        lastResearchIntakeFailure = reason;
+        process.stderr.write(`Research intake failed: ${reason}\n`);
+      }
+    }
     planChiefDigests(deps, now);
     planChiefSummaries(deps, now);
     sweepStaleMachines(deps);

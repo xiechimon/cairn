@@ -29,3 +29,4 @@ export * from './tables.js';
 export * from './task-failure.js';
 export * from './task-meta.js';
 export * from './trajectory-pack.js';
+export * from './web-search.js';

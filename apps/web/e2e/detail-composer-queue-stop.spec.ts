@@ -67,7 +67,7 @@ async function runningTask(page: Page) {
       skillInjection: null,
     },
   ];
-  const sent: { content: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean }[] = [];
+  const sent: { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean }[] = [];
   const stops: { discard: boolean }[] = [];
   const queuedMessages: { id: string; content: string; createdAt: number; error?: string; deliverAfterStop?: boolean }[] = [];
   const steerPending: string[] = [];
@@ -128,7 +128,7 @@ async function runningTask(page: Page) {
     }
     if (path === `/api/conversations/${build.id}/messages`) {
       if (request.method() === 'POST') {
-        const input = request.postDataJSON() as { content: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean };
+        const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean };
         sent.push(input);
         const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), deliverAfterStop: input.deliverAfterStop };
         if (input.cancelQueued) {
@@ -187,7 +187,7 @@ for (const chord of ['Meta+Enter', 'Control+Enter']) {
     await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
     await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
     expect(task.steerPending).toEqual([]);
-    expect(task.sent).toEqual([{ content: 'Run the next turn', mode: 'queue' }]);
+    expect(task.sent).toEqual([{ content: 'Run the next turn', mode: 'queue', clientMessageId: expect.any(String) }]);
     await expect(task.input).toHaveValue('');
     await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
     await page.reload();
@@ -246,7 +246,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   await expect(task.input).toHaveValue('');
   expect(task.stops).toHaveLength(1);
-  expect(task.sent).toEqual([{ content: 'A stays queued', mode: 'queue' }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true }]);
+  expect(task.sent).toEqual([{ content: 'A stays queued', mode: 'queue', clientMessageId: expect.any(String) }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true, clientMessageId: expect.any(String) }]);
   expect(task.steerPending).toEqual([]);
   expect(task.turns()).toBe(0);
   task.finish('stopped');
