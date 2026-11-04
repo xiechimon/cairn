@@ -27,7 +27,7 @@ describe('host lifecycle guard syntax and actions', () => {
     'printf %s k\\{il,il\\}l',
     '{ echo ok; }',
     'printf %s {}',
-    'printf %s "${HOME}"',
+    `printf %s "\${HOME}"`,
     'cat > notes.md <<\'EOF\'\n{"ok":true}\nEOF',
   ])('retains literal braces and standalone groups: %s', (command) => {
     expect(protectedComputerLifecycleRefusal(command)).toBeUndefined();
