@@ -209,6 +209,7 @@ const RESOURCES = [
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
+  'motion-quiet',
   'color-freeze',
   'fixture-mode-chip',
   'orientation-variants',

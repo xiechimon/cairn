@@ -154,11 +154,9 @@ const RADII = [
 
 const MOTION = [
   { name: 'Hover and press', dur: '--dur-fast', ease: '--ease-standard' },
-  { name: 'Card arrives', dur: '--dur-fast', ease: '--ease-pop' },
   { name: 'Dialog opens', dur: '--dur-overlay', ease: '--ease-standard' },
   { name: 'Card lifts', dur: null, ease: '--ease-out-expo' },
-  { name: 'Chief window grows', dur: '--dur-window', ease: '--ease-drawer' },
-  { name: 'Message enters', dur: '--spring-snappy-dur', ease: '--spring-snappy' },
+  { name: 'Chief window grows', dur: '--dur-overlay', ease: '--ease-drawer' },
 ];
 
 const TILES = [1, 2, 3, 4, 5, 6] as const;
