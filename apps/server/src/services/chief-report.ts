@@ -14,6 +14,7 @@ import {
   INTAKE_SOURCE_KIND,
   ISSUE_FENCE_OPEN,
   quoteIssueLines,
+  RESEARCH_INTAKE_ITEM_SOURCE_KIND,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
@@ -1057,6 +1058,9 @@ export function decideRetroProposal(
       spec,
       createdBy: deps.user.id,
       ownerId: deps.user.id,
+      ...(row.sourceKind === INTAKE_SOURCE_KIND
+        ? { sourceKind: RESEARCH_INTAKE_ITEM_SOURCE_KIND, sourceRef: row.sourceId }
+        : {}),
     }).id;
     db.update(retroProposal).set({ todoId }).where(eq(retroProposal.id, proposalId)).run();
   });

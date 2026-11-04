@@ -26,11 +26,13 @@ export const buildHistoryEntrySchema = z.object({
 });
 
 export const RESEARCH_INTAKE_SOURCE_KIND = 'research-intake';
+export const RESEARCH_INTAKE_ITEM_SOURCE_KIND = 'research-intake-item';
 export const TASK_SOURCE_KINDS = [
   'github-issue',
   'github-issue-self',
   'orchestration',
   RESEARCH_INTAKE_SOURCE_KIND,
+  RESEARCH_INTAKE_ITEM_SOURCE_KIND,
 ] as const;
 export const todoSourceKindSchema = z.enum(TASK_SOURCE_KINDS);
 export type TodoSourceKind = z.infer<typeof todoSourceKindSchema>;

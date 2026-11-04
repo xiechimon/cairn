@@ -8,7 +8,7 @@ import {
 import { and, count, desc, eq, gte, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { message, retroProposal, todo } from '../db/schema.js';
+import { chiefReport, message, retroProposal, todo } from '../db/schema.js';
 import { newRecordId } from '../lib/ids.js';
 
 const DAY_MS = 86_400_000;
@@ -119,7 +119,15 @@ function landedReport(db: Db, buildId: string): string | null {
   return report.success ? report.data.content : null;
 }
 
-export function ingestIntake(db: Db, report: { id: string; teamId: string }, now: number): number {
+export function ingestIntake(
+  db: Db,
+  report: { id: string; teamId: string; chiefId: string },
+  now: number,
+): number {
+  const ownReports = db
+    .select({ id: chiefReport.id })
+    .from(chiefReport)
+    .where(eq(chiefReport.chiefId, report.chiefId));
   const recent = db
     .select()
     .from(todo)
@@ -135,6 +143,7 @@ export function ingestIntake(db: Db, report: { id: string; teamId: string }, now
     .where(
       and(
         eq(retroProposal.teamId, report.teamId),
+        inArray(retroProposal.reportId, ownReports),
         eq(retroProposal.sourceKind, INTAKE_SOURCE_KIND),
         gte(retroProposal.createdAt, now - RESEARCH_INTAKE_HISTORY_DAYS * DAY_MS),
       ),
@@ -147,6 +156,7 @@ export function ingestIntake(db: Db, report: { id: string; teamId: string }, now
       .from(retroProposal)
       .where(
         and(
+          inArray(retroProposal.reportId, ownReports),
           eq(retroProposal.sourceKind, INTAKE_SOURCE_KIND),
           inArray(
             retroProposal.sourceTodoId,

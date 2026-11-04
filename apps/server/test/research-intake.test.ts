@@ -4,7 +4,8 @@ import {
   CHIEF_REPORT_ROW_ID_PREFIX,
   chiefReportContentSchema,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   agent,
@@ -16,11 +17,15 @@ import {
   message,
   retroProposal,
   todo,
+  user,
 } from '../src/db/schema.js';
 import { planChiefDigests } from '../src/services/chief-digest.js';
+import { decideRetroProposal } from '../src/services/chief-report.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { intakeTally, normalizeIntakeUrl, parseIntakeItems } from '../src/services/intake-items.js';
 import { planResearchIntake } from '../src/services/research-intake.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 const TZ = 'Asia/Shanghai';
@@ -37,10 +42,32 @@ afterEach(() => {
   for (const dispose of disposables.splice(0)) dispose();
 });
 
-async function world() {
-  const s = bootServer();
+async function world(opts: { github?: { calls: string[] } } = {}) {
+  const calls = opts.github?.calls;
+  const s = bootServer(
+    calls === undefined
+      ? {}
+      : {
+          githubFetch: async (input, init) => {
+            calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+            return {
+              ok: false,
+              status: 404,
+              headers: { get: () => null },
+              json: async () => ({}),
+              text: async () => '',
+            };
+          },
+        },
+  );
   disposables.push(() => s.dispose());
-  const projectId = await postProject(s.app, 'cairn');
+  if (calls !== undefined)
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, login: 'octo', accessToken: 'ghp_intake_token', scope: 'repo' },
+    );
+  const projectId =
+    calls === undefined ? await postProject(s.app, 'cairn') : await postGithubProject(s.app);
   const teamId = s.team.id;
   s.db
     .insert(agent)
@@ -82,6 +109,50 @@ async function world() {
     })
     .run();
   return { s, projectId, teamId };
+}
+
+async function postGithubProject(app: Hono): Promise<string> {
+  const res = await req(app, 'POST', '/api/projects', {
+    name: 'cairn',
+    kind: 'github',
+    githubRepo: 'octo/cairn',
+  });
+  if (res.status !== 201) throw new Error(`postGithubProject: ${res.status}`);
+  return ((await res.json()) as { id: string }).id;
+}
+
+function addCoordinator(w: World, n: number) {
+  const userId = `user-${n}`;
+  w.s.db
+    .insert(user)
+    .values({ id: userId, displayName: `user ${n}` })
+    .run();
+  w.s.db
+    .insert(chiefTable)
+    .values({
+      id: `chief-${n}`,
+      userId,
+      teamId: w.teamId,
+      agentId: 'agent-coord',
+      tz: TZ,
+      createdAt: 1,
+    })
+    .run();
+  w.s.db
+    .insert(chiefThread)
+    .values({
+      id: `thread-${n}`,
+      chiefId: `chief-${n}`,
+      userId,
+      teamId: w.teamId,
+      title: 'main',
+      sessionId: `sess-${n}`,
+      sessionOpenedAt: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+  return { ...w.s.svc, user: { ...w.s.user, id: userId } };
 }
 
 type World = Awaited<ReturnType<typeof world>>;
@@ -162,18 +233,22 @@ function finishedYesterday(w: World, at: number): void {
     .run();
 }
 
-function postedReport(w: World, day: string): ChiefReportContent {
+function postedReport(w: World, day: string, chiefId = 'chief-1'): ChiefReportContent {
   const row = w.s.db
     .select()
     .from(chiefMessage)
-    .where(eq(chiefMessage.id, `${CHIEF_REPORT_ROW_ID_PREFIX}${reportIdOf(w, day)}`))
+    .where(eq(chiefMessage.id, `${CHIEF_REPORT_ROW_ID_PREFIX}${reportIdOf(w, day, chiefId)}`))
     .get();
   if (!row) throw new Error(`no report for ${day}`);
   return chiefReportContentSchema.parse(JSON.parse(String(row.content)));
 }
 
-function reportIdOf(w: World, day: string): string {
-  const rec = w.s.db.select().from(chiefReport).where(eq(chiefReport.day, day)).get();
+function reportIdOf(w: World, day: string, chiefId: string): string {
+  const rec = w.s.db
+    .select()
+    .from(chiefReport)
+    .where(and(eq(chiefReport.day, day), eq(chiefReport.chiefId, chiefId)))
+    .get();
   if (!rec) throw new Error(`no report row for ${day}`);
   return rec.id;
 }
@@ -403,6 +478,18 @@ describe('intake items in the 08:00 report', () => {
         item(4, { url: 'https://example.com/post-4' }),
       ]),
     );
+    w.s.db
+      .insert(chiefReport)
+      .values({
+        id: 'earlier',
+        chiefId: 'chief-1',
+        teamId: w.teamId,
+        day: '2026-10-20',
+        threadId: 'thread-main',
+        status: 'posted',
+        createdAt: 1,
+      })
+      .run();
     const seen = (id: string, url: string, createdAt: number) =>
       w.s.db
         .insert(retroProposal)
@@ -475,6 +562,88 @@ describe('intake items in the 08:00 report', () => {
     if (intake) land(w, intake.id, block([item(1)]));
     runReport(w, D1_0830);
     expect(postedReport(w, '2026-10-27').intake).toHaveLength(1);
+  });
+});
+
+describe('several Coordinators in one team', () => {
+  async function twoCoordinators() {
+    const w = await world();
+    const second = addCoordinator(w, 2);
+    runIntake(w, D1_0630);
+    const [intake] = intakeTodos(w);
+    if (intake) land(w, intake.id, block([item(1), item(2)]));
+    runReport(w, D1_0830);
+    return { w, second };
+  }
+
+  test('each Coordinator gets the same items in its own report', async () => {
+    const { w } = await twoCoordinators();
+    const urls = (chiefId: string) =>
+      postedReport(w, '2026-10-27', chiefId).intake?.map((i) => i.url);
+    expect(urls('chief-1')).toEqual(['https://example.com/post-1', 'https://example.com/post-2']);
+    expect(urls('chief-2')).toEqual(urls('chief-1'));
+  });
+
+  test('each Coordinator accepts its own item and cannot decide the other one', async () => {
+    const { w, second } = await twoCoordinators();
+    const [mine] = postedReport(w, '2026-10-27', 'chief-1').intake ?? [];
+    const [theirs] = postedReport(w, '2026-10-27', 'chief-2').intake ?? [];
+    if (!mine || !theirs) throw new Error('missing items');
+    expect(() => decideRetroProposal(second, w.teamId, mine.id, 'accept')).toThrow(
+      /not found|404|retro proposal/,
+    );
+    expect(decideRetroProposal(w.s.svc, w.teamId, mine.id, 'accept')).toMatchObject({
+      status: 'accepted',
+    });
+    expect(decideRetroProposal(second, w.teamId, theirs.id, 'accept')).toMatchObject({
+      status: 'accepted',
+    });
+  });
+
+  test('a repeat for the same Coordinator is still dropped', async () => {
+    const { w } = await twoCoordinators();
+    runIntake(w, D2_0630);
+    finishedYesterday(w, D2_0830);
+    runReport(w, D2_0830);
+    for (const chiefId of ['chief-1', 'chief-2'])
+      expect(postedReport(w, '2026-10-28', chiefId).intake ?? []).toEqual([]);
+    expect(w.s.db.select().from(retroProposal).all()).toHaveLength(4);
+  });
+});
+
+describe('accepting an intake item on a GitHub-backed project', () => {
+  test('opens an unstarted thread of its own kind and files no issue', async () => {
+    const calls: string[] = [];
+    const w = await world({ github: { calls } });
+    runIntake(w, D1_0630);
+    const [intake] = intakeTodos(w);
+    if (intake) land(w, intake.id, block([item(1)]));
+    runReport(w, D1_0830);
+    const [first] = postedReport(w, '2026-10-27').intake ?? [];
+    if (!first) throw new Error('no intake item');
+    const res = await req(
+      w.s.app,
+      'POST',
+      `/api/teams/${w.teamId}/chief/retro-proposals/${first.id}/accept`,
+    );
+    expect(res.status).toBe(200);
+    await flushSelfIssueWrites();
+    const accepted = w.s.db
+      .select()
+      .from(retroProposal)
+      .where(eq(retroProposal.id, first.id))
+      .get();
+    const created = w.s.db
+      .select()
+      .from(todo)
+      .where(eq(todo.id, String(accepted?.todoId)))
+      .get();
+    expect(created).toMatchObject({
+      sourceKind: 'research-intake-item',
+      sourceRef: 'https://example.com/post-1',
+      phase: 'todo',
+    });
+    expect(calls).toEqual([]);
   });
 });
 
