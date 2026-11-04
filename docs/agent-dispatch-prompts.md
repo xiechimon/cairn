@@ -36,7 +36,7 @@ Measured on 2026-11-02 in a scratch repo set up like cairn (results on #2566):
 
 Rules:
 
-- Layers that are owner-routed (protected paths): build them with `gh stack` (`gh extension install github/gh-stack`), one PR per layer, and land the stack bottom-up with `gh stack merge` once every layer has CI and a Codex review on its head. The Codex review reads each PR against its own base, so each layer is reviewed on its own diff.
+- Layers that are owner-routed (protected paths): build them with `gh stack` (`gh extension install github/gh-stack`), one PR per layer, and report the stack ready once every layer has CI and a Codex review on its head. Only the owner (or the coordinator, or an agent with ian's chat authorization) lands it, bottom-up with `gh stack merge`; green checks alone never authorize merging protected paths. The Codex review reads each PR against its own base, so each layer is reviewed on its own diff.
 - Layers the merge queue would admit: do not stack them. Open the lower PR on `main`, wait for the queue to merge it, then branch the next one from the new `origin/main`. A stacked PR would sit outside the queue.
 - Never point a PR at a lane branch by hand; a hand-made base branch has no stack rule behind it.
 
