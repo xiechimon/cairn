@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { epochMs, recordId } from './common.js';
 
 export const MEMORY_QUOTA_PER_AGENT = 100;
+export const MEMORY_QUOTA_PER_TEAM = 100;
+
+export const MEMORY_LAYERS = ['core', 'log', 'scratchpad', 'searchable'] as const;
+export type MemoryLayer = (typeof MEMORY_LAYERS)[number];
 
 export const MEMORY_TOOLS = ['save_memory', 'update_memory', 'delete_memory', 'memories'] as const;
 
@@ -16,6 +20,9 @@ export const memoryRecordSchema = z.object({
   projectId: recordId.nullable(),
   sourceTodoId: recordId.nullable(),
   sourceBuildId: z.string().nullable(),
+  source: z.string().nullable().optional(),
+  layer: z.enum(MEMORY_LAYERS).optional(),
+  threadId: recordId.nullable().optional(),
   createdAt: epochMs,
   updatedAt: epochMs,
   invalidAt: epochMs.nullable().optional(),

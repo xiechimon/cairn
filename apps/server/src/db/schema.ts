@@ -19,6 +19,7 @@ import type {
   INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MemoryCandidateStatus,
+  MemoryLayer,
   ModelRef,
   NamedPromptOverrides,
   NotificationType,
@@ -582,6 +583,9 @@ export const agentMemory = sqliteTable('agent_memory', {
   projectId: text('projectId'),
   sourceTodoId: text('sourceTodoId'),
   sourceBuildId: text('sourceBuildId'),
+  source: text('source'),
+  layer: text('layer').$type<MemoryLayer>().notNull().default('core'),
+  threadId: text('threadId'),
   history: json<{ title: string; content: string; updatedAt: number }[]>('history')
     .notNull()
     .default(sql`'[]'`),

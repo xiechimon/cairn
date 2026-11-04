@@ -8085,7 +8085,22 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > age
         },
       ],
     },
+    "layer": {
+      "enum": [
+        "core",
+        "log",
+        "scratchpad",
+        "searchable",
+      ],
+      "type": "string",
+    },
     "projectId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "source": {
       "type": [
         "string",
         "null",
@@ -8111,6 +8126,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > age
     },
     "teamId": {
       "type": "string",
+    },
+    "threadId": {
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "title": {
       "type": "string",

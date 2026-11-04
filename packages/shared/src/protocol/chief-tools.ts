@@ -718,6 +718,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           description: 'Explicitly confirm adding despite similar candidates; default false.',
         },
         projectId: str('Optional project id for provenance.'),
+        layer: str(
+          'core (always in the prompt), log, scratchpad (this thread only), or searchable. Default core.',
+        ),
       },
       ['title', 'content'],
     ),
@@ -868,6 +871,9 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         },
         projectId: str('Optional project id for provenance.'),
         sourceTodoId: str('Optional source todo id; defaults to the running task.'),
+        layer: str(
+          'core (always in the prompt), log, scratchpad (this thread only), or searchable. Default core.',
+        ),
       },
       ['title', 'content'],
     ),

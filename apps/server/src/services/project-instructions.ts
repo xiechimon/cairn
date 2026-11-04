@@ -20,6 +20,7 @@ export function projectTurnContext(
       ? []
       : injectMemories(db, {
           agentId: scope.agentId,
+          teamId: scope.teamId,
           projectId: scope.projectId,
           projectOnly: true,
         });
