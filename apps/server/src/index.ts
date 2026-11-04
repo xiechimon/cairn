@@ -18,6 +18,7 @@ import {
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { computerScreensOf } from './services/computer-screen.js';
 import {
   setCoordinatorMachineId,
   setCoordinatorServerContextEnabled,
@@ -194,10 +195,15 @@ const server = serve(
   },
 );
 
+const computerScreens = computerScreensOf({ db, machineHub, secretBox });
+computerScreens.recover();
+computerScreens.attach(server);
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     scheduler.stop();
     killInFlightPick();
+    computerScreens.close();
     server.close();
     close();
     process.exit(0);

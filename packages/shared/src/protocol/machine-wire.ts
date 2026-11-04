@@ -24,6 +24,7 @@ import {
   machineComputerFramesResponseSchema,
 } from './computer.js';
 import { computerPresenceListSchema } from './computer-presence.js';
+import { computerScreenRequestSchema } from './computer-screen.js';
 import { machineJsonSchema } from './executor.js';
 
 export const MACHINE_AUTH_HEADER = 'authorization';
@@ -254,6 +255,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stop'), stepId: recordId }),
   z.object({ type: z.literal('sync'), sync: machineSyncCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
+  z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 

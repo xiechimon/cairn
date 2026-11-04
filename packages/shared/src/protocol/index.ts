@@ -2,6 +2,7 @@ export * from './chief-tools.js';
 export * from './client-state.js';
 export * from './computer.js';
 export * from './computer-presence.js';
+export * from './computer-screen.js';
 export * from './executor.js';
 export * from './feishu.js';
 export * from './fs-list.js';

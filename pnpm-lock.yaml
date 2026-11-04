@@ -354,6 +354,9 @@ importers:
       web-push:
         specifier: ^3.6.7
         version: 3.6.7(supports-color@10.2.2)
+      ws:
+        specifier: 8.22.1
+        version: 8.22.1
     devDependencies:
       '@cairn/shared':
         specifier: workspace:*
@@ -370,6 +373,9 @@ importers:
       '@types/web-push':
         specifier: ^3.6.4
         version: 3.6.4
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
       cron-parser:
         specifier: 5.10.1
         version: 5.10.1
@@ -421,6 +427,9 @@ importers:
       '@dnd-kit/sortable':
         specifier: 10.0.0
         version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
+      '@novnc/novnc':
+        specifier: 1.7.0
+        version: 1.7.0
       '@shadcn/react':
         specifier: 0.3.1
         version: 0.3.1(@types/react@19.3.0)(react@19.3.0)
@@ -470,6 +479,9 @@ importers:
       '@types/node':
         specifier: 26.6.2
         version: 26.6.2
+      '@types/novnc__novnc':
+        specifier: 1.6.0
+        version: 1.6.0
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
@@ -1485,6 +1497,9 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
+  '@novnc/novnc@1.7.0':
+    resolution: {integrity: sha512-ucEJOx4T2avIRCleodk7YobZj5O2Ga2AeLfQ69A/yjG9HHba2+PDgwSkN3FttrmG+70ZGx21sElNFouK13RzyA==}
+
   '@oxc-project/types@0.150.0':
     resolution: {integrity: sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw==}
 
@@ -1789,6 +1804,9 @@ packages:
   '@types/node@26.6.2':
     resolution: {integrity: sha512-X1P21scMv4zGKLYqjdGjaKa7COa0RKVYYZZN/NfvLQ1JegxFhdhpZG/Lyn8AXx6CDUavKAd11v6BvfpkDByK8g==}
 
+  '@types/novnc__novnc@1.6.0':
+    resolution: {integrity: sha512-kIH/PQACbf9qj6whiSXRKECpyzgs6IFNVsW4wohyqQUZfQHdLhuGRMLi9XEhBiISSh0lKCSbBa7kScuPu9Gk+Q==}
+
   '@types/react-dom@19.3.0':
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
     peerDependencies:
@@ -1802,6 +1820,9 @@ packages:
 
   '@types/web-push@3.6.4':
     resolution: {integrity: sha512-GnJmSr40H3RAnj0s34FNTcJi1hmWFV5KXugE0mYWnYhgTAHLJ/dJKAwDmvPJYMke0RplY2XE9LnM4hqSqKIjhQ==}
+
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -3405,6 +3426,18 @@ packages:
       utf-8-validate:
         optional: true
 
+  ws@8.22.1:
+    resolution: {integrity: sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
@@ -4357,6 +4390,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@novnc/novnc@1.7.0': {}
+
   '@oxc-project/types@0.150.0': {}
 
   '@pinojs/redact@0.4.0': {}
@@ -4573,6 +4608,8 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
+  '@types/novnc__novnc@1.6.0': {}
+
   '@types/react-dom@19.3.0(@types/react@19.3.0)':
     dependencies:
       '@types/react': 19.3.0
@@ -4584,6 +4621,10 @@ snapshots:
   '@types/retry@0.12.0': {}
 
   '@types/web-push@3.6.4':
+    dependencies:
+      '@types/node': 26.6.2
+
+  '@types/ws@8.18.2':
     dependencies:
       '@types/node': 26.6.2
 
@@ -5937,6 +5978,8 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.21.3: {}
+
+  ws@8.22.1: {}
 
   y18n@5.0.8: {}
 

@@ -2342,6 +2342,77 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       ],
       "type": "object",
     },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "additionalProperties": false,
+          "properties": {
+            "computerId": {
+              "type": "string",
+            },
+            "controlFence": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "controlLeaseId": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+            "expiresAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "generation": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "id": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string",
+            },
+            "kind": {
+              "enum": [
+                "view",
+                "control",
+                "terminal",
+              ],
+              "type": "string",
+            },
+            "scopeKey": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "computerId",
+            "scopeKey",
+            "generation",
+            "kind",
+            "expiresAt",
+            "controlLeaseId",
+            "controlFence",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "computer.screen",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "channel",
+      ],
+      "type": "object",
+    },
   ],
 }
 `;
@@ -7487,6 +7558,26 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   {
     "method": "GET",
     "path": "/api/teams/{id}/machines",
+  },
+  {
+    "method": "POST",
+    "note": "D75: mint one sealed viewer capability for a screen or controlled terminal",
+    "path": "/api/teams/{teamId}/computers/{computerId}/screen",
+  },
+  {
+    "method": "POST",
+    "note": "D75: acquire the user control lease",
+    "path": "/api/teams/{teamId}/computers/{computerId}/control",
+  },
+  {
+    "method": "PATCH",
+    "note": "D75: renew the matching live user control lease",
+    "path": "/api/teams/{teamId}/computers/{computerId}/control",
+  },
+  {
+    "method": "DELETE",
+    "note": "D75: release user control and close its live channels",
+    "path": "/api/teams/{teamId}/computers/{computerId}/control",
   },
   {
     "method": "GET",

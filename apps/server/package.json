@@ -35,7 +35,8 @@
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "ws": "8.22.1"
   },
   "devDependencies": {
     "@cairn/shared": "workspace:*",
@@ -43,6 +44,7 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@types/better-sqlite3": "9.6.0",
     "@types/web-push": "^3.6.4",
+    "@types/ws": "8.18.2",
     "cron-parser": "5.10.1",
     "diff": "catalog:",
     "drizzle-kit": "0.31.10",
