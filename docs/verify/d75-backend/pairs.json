@@ -1,0 +1,74 @@
+{
+  "testedHead": "5e9acd34812de04af00e027f30d5ccf533ca5efe",
+  "prerequisiteHead": "413c40a813327ad1c77dff10717a1d67e3258d61",
+  "originalHead": "24e2786542c240fbd11ec986afd5945e5f3c1bc6",
+  "result": "PASS_LOCAL_UNPUBLISHED",
+  "rows": [
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "originalAsset": "requirement-private-scope.png",
+      "actualAsset": "swagger-control-acquire-201.png",
+      "actualResponse": "swagger-control-acquire-201.json",
+      "check": "The actual owner acquires one user-control lease while synthetic machine presence is connected.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    },
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "originalAsset": "requirement-private-scope.png",
+      "actualAsset": "swagger-private-owner-200.png",
+      "actualResponse": "swagger-private-owner-200.json",
+      "check": "The current seeded owner renews its own persisted private computer lease through the shared access helper.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    },
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "originalAsset": "requirement-private-scope.png",
+      "actualAsset": "swagger-private-foreign-404.png",
+      "actualResponse": "swagger-private-foreign-404.json",
+      "check": "The same principal and team cannot renew a known same-team foreign private row, even with its fixture lease identifier.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    },
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#35-transport",
+      "originalAsset": "requirement-transport.png",
+      "actualAsset": "swagger-view-capability-201.png",
+      "actualResponse": "swagger-view-capability-201.json",
+      "check": "The actual server mints a sealed view capability in wsProtocols while the URL has no query bearer.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    },
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#35-transport",
+      "originalAsset": "requirement-transport.png",
+      "actualAsset": "swagger-control-capability-201.png",
+      "actualResponse": "swagger-control-capability-201.json",
+      "check": "The actual server mints a distinct control capability only with the matching live user lease.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    },
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "originalAsset": "requirement-private-scope.png",
+      "actualAsset": "swagger-control-release-200.png",
+      "actualResponse": "swagger-control-release-200.json",
+      "check": "The actual owner releases the lease; a real PTY teardown is outside this synthetic provider run.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    },
+    {
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "originalAsset": "requirement-private-scope.png",
+      "actualAsset": "swagger-released-control-refused-409.png",
+      "actualResponse": "swagger-released-control-refused-409.json",
+      "check": "A released lease cannot mint another control capability; the actual server refuses it with HTTP 409.",
+      "mode": "REAL HTTP and API/SQLite logic; MOCK rows and machine presence; UNCOVERED real provider/multi-login/WS screenshots"
+    }
+  ],
+  "uncovered": [
+    "real Orb/RFB/PTY provider",
+    "full Takeover gate screenshot against active bot execution",
+    "production daemon/dispatcher",
+    "separate live logins",
+    "computerCallOwnerUserId event-audience consumer is outside these P7 HTTP captures; P8 owns its runtime evidence",
+    "WebSocket replay/Origin screenshots: Swagger UI is an HTTP client; no invented WS operation is added"
+  ],
+  "cleanup": "Browser, loopback server, in-memory SQLite and shared temp released after capture.",
+  "publishing": "No Git/remote asset operation authorized yet; do not embed diagnostic or prior-run images."
+}

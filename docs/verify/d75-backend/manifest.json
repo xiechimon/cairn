@@ -1,0 +1,215 @@
+{
+  "capturedAt": "2026-11-04T11:08:22.204Z",
+  "testedHead": "5e9acd34812de04af00e027f30d5ccf533ca5efe",
+  "prerequisiteHead": "413c40a813327ad1c77dff10717a1d67e3258d61",
+  "sourceHead": "24e2786542c240fbd11ec986afd5945e5f3c1bc6",
+  "sourceBaseUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md",
+  "tool": {
+    "name": "official swagger-ui-dist",
+    "version": "5.34.1",
+    "installedWithScriptsDisabled": true,
+    "indexSha256": "bb9928afd0ea8c12e124c42fef58fb080f36770389684badb2a4dcf548624eeb"
+  },
+  "surface": "Official Swagger UI against actual isolated Cairn createApp HTTP server",
+  "real": [
+    "Cairn route handlers",
+    "HTTP request/response",
+    "in-memory SQLite ownership and lease logic",
+    "sealed capability mint"
+  ],
+  "mock": [
+    "synthetic own/foreign user/chief/computer rows",
+    "synthetic connected machine presence and SSE sink"
+  ],
+  "uncovered": [
+    "real Orb/RFB/PTY provider",
+    "full Takeover gate screenshot against active bot execution",
+    "production daemon/dispatcher",
+    "separate live logins",
+    "computerCallOwnerUserId event-audience consumer is outside these P7 HTTP captures; P8 owns its runtime evidence",
+    "WebSocket replay/Origin screenshots: Swagger UI is an HTTP client; no invented WS operation is added"
+  ],
+  "singletonPrincipal": "ELINgzJCTn8CYRH5ypyHR",
+  "teamId": "cX4yeD2dJdHtwNMcATPMO",
+  "captures": [
+    {
+      "kind": "original-requirement",
+      "name": "requirement-private-scope",
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#32-two-kinds-of-computer-as-in-rakazo",
+      "source": "real GitHub rendered Markdown",
+      "heading": "3.2 Two kinds of computer, as in Rakazo",
+      "asset": "requirement-private-scope.png",
+      "sha256": "852cb65600daaf5505cde792b689c1f8b5218fedf0fc9a35c129245bdaaef076",
+      "visualInspection": "Passed: real GitHub rendered document, pinned commit visible; relevant private/control fields or sealed-capability paragraph readable. Source heading may be above sticky header; screenshot claims only visible requirement text."
+    },
+    {
+      "kind": "original-requirement",
+      "name": "requirement-transport",
+      "originalUrl": "https://github.com/xiechimon/cairn/blob/24e2786542c240fbd11ec986afd5945e5f3c1bc6/docs/research/coordinator-computer.md#35-transport",
+      "source": "real GitHub rendered Markdown",
+      "heading": "3.5 Transport",
+      "asset": "requirement-transport.png",
+      "sha256": "57e231cd76a01b47b35baaabafc1f225db49f2f26c6b4e48bb15185a007295c3",
+      "visualInspection": "Passed: real GitHub rendered document, pinned commit visible; relevant private/control fields or sealed-capability paragraph readable. Source heading may be above sticky header; screenshot claims only visible requirement text."
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-control-acquire-201",
+      "capturedAt": "2026-11-04T11:08:23.079Z",
+      "asset": "swagger-control-acquire-201.png",
+      "assetSha256": "28261407d6e2a1e4c1308236782c4429ae9a5a5f48cfdd4d3a9ba7907038bd74",
+      "responseArtifact": "swagger-control-acquire-201.json",
+      "responseSha256": "5b3baae39898cf0f0e08d9cd6a7097aee02cdc055c89085640738fa22e4a690b",
+      "tool": "official Swagger UI",
+      "request": "POST /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/control",
+      "status": 201,
+      "requirement": "requirement-private-scope.png",
+      "check": "The actual owner acquires one user-control lease while synthetic machine presence is connected.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-private-owner-200",
+      "capturedAt": "2026-11-04T11:08:23.599Z",
+      "asset": "swagger-private-owner-200.png",
+      "assetSha256": "ce892a51024a7fb20c933ce9bb39a38ba830ba476ca11cbe0d22f16a09891104",
+      "responseArtifact": "swagger-private-owner-200.json",
+      "responseSha256": "8044bcdf4057ab338d610fae50befcdaef7d6ecc3766251b99113265e7559db6",
+      "tool": "official Swagger UI",
+      "request": "PATCH /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/control",
+      "status": 200,
+      "requirement": "requirement-private-scope.png",
+      "check": "The current seeded owner renews its own persisted private computer lease through the shared access helper.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-private-foreign-404",
+      "capturedAt": "2026-11-04T11:08:24.133Z",
+      "asset": "swagger-private-foreign-404.png",
+      "assetSha256": "35147ed108d0e498fbf6d8ee725951ee4887e28011f297ab84af39fcf33c0933",
+      "responseArtifact": "swagger-private-foreign-404.json",
+      "responseSha256": "a9bf499edc74bc7ec6a3a13c07b90ff0222519e502372a63f48088be4e358544",
+      "tool": "official Swagger UI",
+      "request": "PATCH /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-foreign/control",
+      "status": 404,
+      "requirement": "requirement-private-scope.png",
+      "check": "The same principal and team cannot renew a known same-team foreign private row, even with its fixture lease identifier.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-view-capability-201",
+      "capturedAt": "2026-11-04T11:08:24.643Z",
+      "asset": "swagger-view-capability-201.png",
+      "assetSha256": "e184220c5f2ca4bad181b5b08b372eed4b57834d8a50ec39c5d156910d79f9a6",
+      "responseArtifact": "swagger-view-capability-201.json",
+      "responseSha256": "6a92938ea25306bb4d4d809e58b375d9ab85a09c75f8dec5d3c302c85f2178d9",
+      "tool": "official Swagger UI",
+      "request": "POST /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/screen",
+      "status": 201,
+      "requirement": "requirement-transport.png",
+      "check": "The actual server mints a sealed view capability in wsProtocols while the URL has no query bearer.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-control-capability-201",
+      "capturedAt": "2026-11-04T11:08:25.156Z",
+      "asset": "swagger-control-capability-201.png",
+      "assetSha256": "0dda7da7da8ef73258ac1e00c6b69302bb211c456806bb8829b65f1b5dd31ba8",
+      "responseArtifact": "swagger-control-capability-201.json",
+      "responseSha256": "6ae29ce36ed6ad198f8cee8ca85afd552af25b5ef093acde276bad66aa8be8dd",
+      "tool": "official Swagger UI",
+      "request": "POST /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/screen",
+      "status": 201,
+      "requirement": "requirement-transport.png",
+      "check": "The actual server mints a distinct control capability only with the matching live user lease.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-control-release-200",
+      "capturedAt": "2026-11-04T11:08:25.662Z",
+      "asset": "swagger-control-release-200.png",
+      "assetSha256": "44abca1b6627400d58b89f6f4c9131d64bd21c51000bb75a4bef3e752b71a239",
+      "responseArtifact": "swagger-control-release-200.json",
+      "responseSha256": "1294a643d0282f67773e70c7966f8b7868efa91031e236d51ccde52dd691000a",
+      "tool": "official Swagger UI",
+      "request": "DELETE /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/control",
+      "status": 200,
+      "requirement": "requirement-private-scope.png",
+      "check": "The actual owner releases the lease; a real PTY teardown is outside this synthetic provider run.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    },
+    {
+      "kind": "actual-tool-request-response",
+      "name": "swagger-released-control-refused-409",
+      "capturedAt": "2026-11-04T11:08:26.162Z",
+      "asset": "swagger-released-control-refused-409.png",
+      "assetSha256": "01647156c7711ef920ea0a214ab507be7e0c03140c47747459f4c341011297ff",
+      "responseArtifact": "swagger-released-control-refused-409.json",
+      "responseSha256": "17a3e0a2d4316e188f4d95e082092495feec525a8a0313fb51467decf602156c",
+      "tool": "official Swagger UI",
+      "request": "POST /api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/screen",
+      "status": 409,
+      "requirement": "requirement-private-scope.png",
+      "check": "A released lease cannot mint another control capability; the actual server refuses it with HTTP 409.",
+      "provenance": "REAL HTTP + MOCK synthetic data/presence; UNCOVERED real provider and multi-login"
+    }
+  ],
+  "foreignLeaseUnchanged": true,
+  "pullRequests": {
+    "2877": [
+      "swagger-private-owner-200",
+      "swagger-private-foreign-404"
+    ],
+    "2880": [
+      "swagger-control-acquire-201",
+      "swagger-view-capability-201",
+      "swagger-control-capability-201",
+      "swagger-control-release-200",
+      "swagger-released-control-refused-409"
+    ]
+  },
+  "fixtureDatabase": {
+    "owner": {
+      "userId": "ELINgzJCTn8CYRH5ypyHR",
+      "chiefId": "chief-ELINgzJCTn8CYRH5ypyHR-cX4yeD2dJdHtwNMcATPMO",
+      "computerId": "computer-owner"
+    },
+    "foreign": {
+      "userId": "synthetic-foreign-owner",
+      "chiefId": "chief-synthetic-foreign-owner-cX4yeD2dJdHtwNMcATPMO",
+      "computerId": "computer-foreign",
+      "sameTeam": true
+    },
+    "database": ":memory:",
+    "productionDataTouched": false
+  },
+  "sourceSectionCorrection": "Original source labels private scope in sections3.2 and3.3; section3.4 is the tool table.",
+  "machineEvents": [
+    {
+      "type": "computer.screen",
+      "kind": "view"
+    },
+    {
+      "type": "computer.screen",
+      "kind": "control"
+    }
+  ],
+  "result": "PASS",
+  "helperBinding": {
+    "prerequisiteCommit": "413c40a813327ad1c77dff10717a1d67e3258d61",
+    "testedCommit": "5e9acd34812de04af00e027f30d5ccf533ca5efe",
+    "path": "apps/server/src/services/computer-access.ts",
+    "prerequisiteIsAncestor": true,
+    "sameBlob": true,
+    "blobSha": "fa3b1884715c9f8039a6bc7ea27079ae9632b57b",
+    "diffIsEmpty": true
+  },
+  "publicationBoundary": "Synthetic fixture data and ephemeral local capability outputs only; isolated server is closed. No production credentials or data. No private absolute workspace paths.",
+  "visualInspection": "All nine selected PNGs personally inspected: real GitHub source or official Swagger UI, with readable actual request/curl and Server response.",
+  "cleanup": "Browser, loopback HTTP server, in-memory SQLite and shared temporary directory released. No capture process remains.",
+  "artifactEncoding": "Network JSON values are unchanged; published JSON formatting is normalized. Hashes refer to published files; original local capture records remain outside the repository."
+}

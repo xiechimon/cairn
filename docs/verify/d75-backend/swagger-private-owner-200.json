@@ -1,0 +1,22 @@
+{
+  "method": "PATCH",
+  "url": "http://127.0.0.1:34993/api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/control",
+  "requestBody": {
+    "leaseId": "iVjuMlIgGxiesOEV5svoD"
+  },
+  "status": 200,
+  "responseBody": {
+    "leaseId": "iVjuMlIgGxiesOEV5svoD",
+    "expiresAt": 1793792303458,
+    "controlFence": 1
+  },
+  "responseHeaders": {
+    "cache-control": "no-store",
+    "content-length": "78",
+    "keep-alive": "timeout=5",
+    "date": "Wed, 04 Nov 2026 11:08:23 GMT",
+    "content-type": "application/json",
+    "connection": "keep-alive",
+    "referrer-policy": "no-referrer"
+  }
+}

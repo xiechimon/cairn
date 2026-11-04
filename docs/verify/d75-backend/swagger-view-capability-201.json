@@ -1,0 +1,27 @@
+{
+  "method": "POST",
+  "url": "http://127.0.0.1:34993/api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-owner/screen",
+  "requestBody": {
+    "kind": "view"
+  },
+  "status": 201,
+  "responseBody": {
+    "path": "/api/computer-screen/ae19206f0d16172888f736834dd0fee0e7abc5027652285204517d477005a69b",
+    "wsProtocols": [
+      "binary",
+      "cairn-screen.djE6Tk9GM3V6cEc4UWxqZDh2VHFxTjVQTlR5VzZkS2lNUTZVSjVzOTlPem51RzM5VitGUDFZSlZETzhteHBRU3VUWG1JVWVBdjR0b1VNNWtIbVFnZ2FmVXhlb1pVVCtUK1kycGwxS0hQMllsbTI1blFwaTJ4eUxmajNaQ2hVV1M0ZVpJKzBNSHJIYlR4S3VNM3J3K3k3b05DNm1BWWN1SU11OU5DdE94ZjdqMHRvY0tTeTE2NE1pUWZYNTlJM1U5czFtRThFVlV5WWxZclF4a3J0aUpZT240OEFlV1F5T0R4S3IrWXlDeEpOQlg3ejF0QXRHNFU3dXpYSDF4NG1iSGNCc1NQVTkxUU5iaG03SmowYUcxWDdpbTVPRWRtclllYzVEc0FMNW5mZHd3Q3ZITTFpTWpMNmlYQzlUOXJoWW1MTDRMTTRDK0hXYkhDZTlQSVBoc0xLVmZQb254Uyt4Wjl2Ynl6OUpzR0NjVzY1Njdmc2ozODh0azdnYlA1R3VwazQ2YXA0a0crWHBkVVlJTnhRZHVNdTBSb0hFY3ZqeVNNaHEydzdwcE5PdGp6em9uNElYZlUyRTgzNndsTUQ0YUlXVkJBeGtGYktCcWc9PQ"
+    ],
+    "kind": "view",
+    "expiresAt": 1793790804506,
+    "generation": 0
+  },
+  "responseHeaders": {
+    "cache-control": "no-store",
+    "content-length": "810",
+    "keep-alive": "timeout=5",
+    "date": "Wed, 04 Nov 2026 11:08:24 GMT",
+    "content-type": "application/json",
+    "connection": "keep-alive",
+    "referrer-policy": "no-referrer"
+  }
+}

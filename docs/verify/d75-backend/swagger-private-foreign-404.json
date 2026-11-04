@@ -1,0 +1,20 @@
+{
+  "method": "PATCH",
+  "url": "http://127.0.0.1:34993/api/teams/cX4yeD2dJdHtwNMcATPMO/computers/computer-foreign/control",
+  "requestBody": {
+    "leaseId": "synthetic-foreign-lease"
+  },
+  "status": 404,
+  "responseBody": {
+    "error": "computer not found"
+  },
+  "responseHeaders": {
+    "cache-control": "no-store",
+    "content-length": "30",
+    "keep-alive": "timeout=5",
+    "date": "Wed, 04 Nov 2026 11:08:23 GMT",
+    "content-type": "application/json",
+    "connection": "keep-alive",
+    "referrer-policy": "no-referrer"
+  }
+}

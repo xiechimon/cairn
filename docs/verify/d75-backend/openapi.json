@@ -1,0 +1,249 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "D75 P7 / private computer evidence",
+    "version": "5e9acd34812de04af00e027f30d5ccf533ca5efe",
+    "description": "REAL: exact published Cairn HTTP routes and SQLite ownership/control logic. MOCK: synthetic seeded own/foreign rows and connected machine presence. UNCOVERED: real Orb/RFB/PTY, production daemon/dispatcher and separate live logins. Local no-auth mode uses the actual fixed seeded AppContext user; request parameters cannot select a principal."
+  },
+  "paths": {
+    "/api/teams/{teamId}/computers/{computerId}/control": {
+      "post": {
+        "operationId": "acquireControl",
+        "tags": [
+          "D75 real HTTP, synthetic data"
+        ],
+        "summary": "Acquire control: owner 201",
+        "description": "Actual POST route; synthetic connected machine, no running Coordinator or desktop provider.",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "cX4yeD2dJdHtwNMcATPMO"
+            }
+          },
+          {
+            "name": "computerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "computer-owner"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "HTTP 200; actual body appears only in the live Server response below Execute"
+          },
+          "201": {
+            "description": "HTTP 201; actual body appears only in the live Server response below Execute"
+          },
+          "400": {
+            "description": "HTTP 400; actual body appears only in the live Server response below Execute"
+          },
+          "404": {
+            "description": "HTTP 404; actual body appears only in the live Server response below Execute"
+          },
+          "409": {
+            "description": "HTTP 409; actual body appears only in the live Server response below Execute"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "renewControl",
+        "tags": [
+          "D75 real HTTP, synthetic data"
+        ],
+        "summary": "Private access: owner 200 / same-team foreign 404",
+        "description": "Same actual request principal and team in both runs. Shared #2877 helper must hide the persisted foreign private row.",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "cX4yeD2dJdHtwNMcATPMO"
+            }
+          },
+          {
+            "name": "computerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "computer-owner"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "leaseId": "set-from-real-acquire-response"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "HTTP 200; actual body appears only in the live Server response below Execute"
+          },
+          "201": {
+            "description": "HTTP 201; actual body appears only in the live Server response below Execute"
+          },
+          "400": {
+            "description": "HTTP 400; actual body appears only in the live Server response below Execute"
+          },
+          "404": {
+            "description": "HTTP 404; actual body appears only in the live Server response below Execute"
+          },
+          "409": {
+            "description": "HTTP 409; actual body appears only in the live Server response below Execute"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "releaseControl",
+        "tags": [
+          "D75 real HTTP, synthetic data"
+        ],
+        "summary": "Release matching control: owner 200",
+        "description": "Releases the actual database lease. No claim about a real PTY process subtree.",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "cX4yeD2dJdHtwNMcATPMO"
+            }
+          },
+          {
+            "name": "computerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "computer-owner"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "leaseId": "set-from-real-acquire-response"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "HTTP 200; actual body appears only in the live Server response below Execute"
+          },
+          "201": {
+            "description": "HTTP 201; actual body appears only in the live Server response below Execute"
+          },
+          "400": {
+            "description": "HTTP 400; actual body appears only in the live Server response below Execute"
+          },
+          "404": {
+            "description": "HTTP 404; actual body appears only in the live Server response below Execute"
+          },
+          "409": {
+            "description": "HTTP 409; actual body appears only in the live Server response below Execute"
+          }
+        }
+      }
+    },
+    "/api/teams/{teamId}/computers/{computerId}/screen": {
+      "post": {
+        "operationId": "mintScreen",
+        "tags": [
+          "D75 real HTTP, synthetic data"
+        ],
+        "summary": "Mint sealed view/control capability: owner 201",
+        "description": "Actual server capability mint. Capability is returned in wsProtocols, never a URL query. Mock machine presence receives SSE; no real screen provider or WebSocket UI execution is claimed.",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "cX4yeD2dJdHtwNMcATPMO"
+            }
+          },
+          {
+            "name": "computerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "computer-owner"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "kind": "view"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "HTTP 200; actual body appears only in the live Server response below Execute"
+          },
+          "201": {
+            "description": "HTTP 201; actual body appears only in the live Server response below Execute"
+          },
+          "400": {
+            "description": "HTTP 400; actual body appears only in the live Server response below Execute"
+          },
+          "404": {
+            "description": "HTTP 404; actual body appears only in the live Server response below Execute"
+          },
+          "409": {
+            "description": "HTTP 409; actual body appears only in the live Server response below Execute"
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:34993"
+    }
+  ]
+}
