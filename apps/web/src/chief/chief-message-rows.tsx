@@ -281,7 +281,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-message-marker">
           <MarkerContent className={MARKER_CONTENT_CLS}>
             <ThreadLink todoId={item.todoId} className="hover:underline">
-              {t('你直接对 #{n} 说：{excerpt}', { n: item.seqNum, excerpt: item.excerpt })}
+              {t(
+                item.by === 'coordinator'
+                  ? '总管直接对 #{n} 说：{excerpt}'
+                  : '你直接对 #{n} 说：{excerpt}',
+                { n: item.seqNum, excerpt: item.excerpt },
+              )}
             </ThreadLink>
           </MarkerContent>
         </Marker>
