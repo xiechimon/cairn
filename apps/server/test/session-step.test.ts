@@ -2,7 +2,7 @@ import { SESSION_BRIEF, threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, message, step, todo } from '../src/db/schema.js';
-import { completeStep, startBuilds } from '../src/services/builds.js';
+import { completeStep, maybeEnqueueVerifyStep, startBuilds } from '../src/services/builds.js';
 import { countMarkedRounds } from '../src/services/ci-loop.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
@@ -87,9 +87,8 @@ describe('session step kind (flag on)', () => {
     expect(stepRow.kind).toBe('plan');
   });
 
-  test('a finished session step lands in review without a separate verify step', () => {
-    const { todoId, buildId, stepRow } = startSession(false);
-    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+  test('a finished session build with a verifier assigned still gets a verify step', () => {
+    const { todoId, buildId } = startSession(false);
     H.s.db
       .update(todo)
       .set({
@@ -97,16 +96,18 @@ describe('session step kind (flag on)', () => {
       })
       .where(eq(todo.id, todoId))
       .run();
-    setTodoPhase(deps(), todoId, 'review');
+    const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    if (row === undefined) throw new Error('todo missing');
+    maybeEnqueueVerifyStep(deps(), row, buildId);
     expect(
       H.s.db
         .select()
         .from(step)
         .where(eq(step.buildId, buildId))
         .all()
-        .map((r) => r.kind),
-    ).toEqual(['session']);
-    expect(stepRow.kind).toBe('session');
+        .map((r) => r.kind)
+        .sort(),
+    ).toEqual(['session', 'verify']);
   });
 
   test('rework at review continues the same session as a session step, not a plan', async () => {

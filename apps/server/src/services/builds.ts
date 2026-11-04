@@ -1075,7 +1075,7 @@ export function maybeEnqueueVerifyStep(
   opts: { reverify?: boolean } = {},
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
-  if (verifyAgentId == null || buildRunsSession(deps, buildId)) return;
+  if (verifyAgentId == null) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
