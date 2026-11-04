@@ -36,6 +36,9 @@ export const createScheduleBodySchema = z.discriminatedUnion('kind', [
 ]);
 export type CreateScheduleBody = z.infer<typeof createScheduleBodySchema>;
 
+export const patchScheduleBodySchema = z.object({ enabled: z.boolean() }).strict();
+export type PatchScheduleBody = z.infer<typeof patchScheduleBodySchema>;
+
 export const scheduleRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
