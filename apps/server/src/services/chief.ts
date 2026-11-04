@@ -32,6 +32,7 @@ import {
   newChiefThreadId,
   orchestratedTodoIdOf,
   PLAN_PRIOR_ART_RULE,
+  redactSecrets,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
 } from '@cairn/shared';
@@ -65,6 +66,7 @@ import {
 import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
+import { tidyText } from '../lib/tidy-text.js';
 import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
 import {
   CHIEF_ABANDONED_STEP_MS,
@@ -600,7 +602,11 @@ function directThreadMessagesSinceLastTurn(db: Db, threadId: string): string | n
       const parsed = threadMessageContentSchema.safeParse(
         typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
       );
-      return parsed.success ? [`- #${parsed.data.seqNum}：${parsed.data.excerpt}`] : [];
+      return parsed.success && (parsed.data.by ?? 'user') === 'user'
+        ? [
+            `- #${parsed.data.seqNum}：${tidyText(redactSecrets(parsed.data.excerpt).value as string)}`,
+          ]
+        : [];
     });
   return lines.length === 0
     ? null

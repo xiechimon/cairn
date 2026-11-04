@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 import { build, message, type step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { tidyText } from '../lib/tidy-text.js';
 import { postThreadReport } from './chief.js';
 import { ASK_PARK_MS } from './chief-questions.js';
 import { notifyTodoPhase } from './notifications.js';
@@ -45,15 +46,8 @@ function safeBody(text: string | undefined): string {
   return clean.length > PUSH_BODY_MAX ? `${clean.slice(0, PUSH_BODY_MAX - 1)}…` : clean;
 }
 
-function tidyReportText(text: string): string {
-  return text
-    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function questionReportLine(text: string | undefined): string | undefined {
-  const clean = tidyReportText(redactSecrets(text ?? '').value as string);
+  const clean = tidyText(redactSecrets(text ?? '').value as string);
   if (clean === '') return undefined;
   return clean.length > THREAD_REPORT_LINE_MAX
     ? `${clean.slice(0, THREAD_REPORT_LINE_MAX - 1)}…`
@@ -154,7 +148,7 @@ export function settleWorkerReply(deps: TodoDeps, buildId: string, text: string)
 }
 
 export function recordThreadReportLine(deps: TodoDeps, row: StepRow, line: unknown): string {
-  const text = typeof line === 'string' ? tidyReportText(redactSecrets(line).value as string) : '';
+  const text = typeof line === 'string' ? tidyText(redactSecrets(line).value as string) : '';
   if (text === '') throw new HttpError(400, 'thread_report expects a non-empty line');
   if (text.length > THREAD_REPORT_LINE_MAX) {
     throw new HttpError(

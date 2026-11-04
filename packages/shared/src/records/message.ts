@@ -219,6 +219,7 @@ export const threadMessageContentSchema = z.object({
   excerpt: z.string().max(THREAD_MESSAGE_EXCERPT_MAX),
   delivered: threadMessageDeliverySchema,
   conversationId: recordId,
+  by: z.enum(['user', 'coordinator']).optional(),
 });
 export type ThreadMessageContent = z.infer<typeof threadMessageContentSchema>;
 

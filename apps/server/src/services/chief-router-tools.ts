@@ -8,9 +8,10 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, todo } from '../db/schema.js';
+import { agent, build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
+import { tidyText } from '../lib/tidy-text.js';
 import { cancelBuild, startBuilds } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
@@ -79,7 +80,7 @@ function teamTodo(db: Db, todoId: string, teamId: string): TodoRow {
 }
 
 function tidy(text: string, max: number): string {
-  const clean = (redactSecrets(text).value as string).replace(/\s+/g, ' ').trim();
+  const clean = tidyText(redactSecrets(text).value as string);
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
@@ -97,7 +98,14 @@ function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): str
     const [started] = startBuilds(deps, {
       projectId: row.projectId,
       todoIds: [row.id],
-      assignment: { plan: null, build: null },
+      assignment:
+        row.assignment?.source === 'intake-label'
+          ? {
+              source: row.assignment.source,
+              plan: row.assignment.plan,
+              build: row.assignment.build,
+            }
+          : { plan: null, build: null },
       withPlan: false,
       triggerSource: 'chief',
     });
@@ -118,7 +126,20 @@ async function messageThread(
     { content: params.content, clientMessageId: newRecordId() },
     'params',
   );
-  return json(await messageThreadAsUser(deps, ctx.teamId, str(params, 'todoId'), body));
+  const chiefName =
+    ctx.chiefAgentId === null
+      ? undefined
+      : deps.db
+          .select({ name: agent.displayName })
+          .from(agent)
+          .where(eq(agent.id, ctx.chiefAgentId))
+          .get()?.name;
+  return json(
+    await messageThreadAsUser(deps, ctx.teamId, str(params, 'todoId'), body, {
+      origin: 'coordinator',
+      actor: chiefName ?? 'Chief',
+    }),
+  );
 }
 
 function stopThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {

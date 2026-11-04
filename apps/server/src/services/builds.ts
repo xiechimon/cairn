@@ -237,6 +237,7 @@ interface BuildSteerOptions {
   allowReviewContinuation?: boolean;
   afterTurn?: boolean;
   human?: boolean;
+  actor?: string;
   schedule?: { id: string; createdBy: string; at: number };
 }
 
@@ -404,10 +405,11 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      if (human) settleWorkerReply(deps, conversationId, body.content);
+      if (human || continuationOptions.actor !== undefined)
+        settleWorkerReply(deps, conversationId, body.content);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
-        actor: human ? deps.user.displayName : null,
+        actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
         role: 'user' as const,
         content: body.content,
         createdAt: now,
@@ -1687,7 +1689,7 @@ export async function applyBuildStepAction(
       todoRecord.teamId,
       `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
       false,
-      true,
+      origin === 'person',
     );
     return;
   }
@@ -1696,7 +1698,7 @@ export async function applyBuildStepAction(
     todoRecord.phase === 'review'
       ? buildReviewRejectPrompt(body.feedback)
       : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, true);
+  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, origin === 'person');
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {

@@ -19,7 +19,9 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chief.js';
+import { resolveStepCredentials } from '../src/services/credentials.js';
 import { chiefRemoteTools, setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import { createSecret } from '../src/services/secrets.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
@@ -198,6 +200,46 @@ describe('flag on', () => {
       expect(chiefRow?.watches).toEqual([]);
     });
 
+    test('keeps the intake-label trust marker and withholds secrets from the opened thread', async () => {
+      const id = seedTodo({
+        assignment: {
+          source: 'intake-label',
+          plan: { agentId: AGENT2_ID },
+          build: { agentId: AGENT2_ID },
+        },
+      });
+      const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
+      const row = H.s.db.select().from(todo).where(eq(todo.id, id)).get()!;
+      expect(row.assignment).toEqual({
+        source: 'intake-label',
+        plan: { agentId: AGENT2_ID },
+        build: { agentId: AGENT2_ID },
+      });
+      const secret = createSecret(
+        { db: H.s.db, box: H.s.secretBox },
+        { teamId: H.teamId, name: 'LATE_SECRET', description: null, value: 'late-secret-value' },
+      );
+      H.s.db
+        .update(agent)
+        .set({ secrets: [secret.id] })
+        .where(eq(agent.id, AGENT2_ID))
+        .run();
+      const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get()!;
+      expect(session.kind).toBe('session');
+      expect(
+        resolveStepCredentials({ db: H.s.db, box: H.s.secretBox }, session.id).secrets,
+      ).toEqual({});
+    });
+
+    test('a todo without the intake marker still starts with an empty assignment', async () => {
+      const id = seedTodo({ assignment: { plan: { agentId: AGENT2_ID }, build: null } });
+      await relay('open_thread', { todoId: id });
+      expect(H.s.db.select().from(todo).where(eq(todo.id, id)).get()!.assignment).toEqual({
+        plan: null,
+        build: null,
+      });
+    });
+
     test('a second open on the same todo points at message_thread', async () => {
       const { todoId } = await openThread();
       await expectRejected(relay('open_thread', { todoId }), 409, /already open.*message_thread/);
@@ -257,6 +299,35 @@ describe('flag on', () => {
           .all()
           .map((m) => m.content),
       ).toContain('Use the cached index');
+    });
+
+    test('is attributed to the Chief, not the user, and marks the marker as coordinator-sent', async () => {
+      const { todoId, buildId } = await openThread();
+      claimSession(buildId);
+      await relay('message_thread', { todoId, content: 'Use the cached index' });
+      const sent = H.s.db.select().from(message).all().at(-1)!;
+      expect(sent.actor).toBe(AGENT_ID);
+      expect(sent.actor).not.toBe(H.s.user.displayName);
+      expect(sent.id.startsWith('human-')).toBe(false);
+      const marker = H.s.db
+        .select()
+        .from(chiefMessage)
+        .all()
+        .find((row) => String(row.content).includes('thread-message'))!;
+      expect(JSON.parse(String(marker.content))).toMatchObject({ by: 'coordinator' });
+    });
+
+    test('the continuation step takes no person priority', async () => {
+      const { todoId, buildId } = await openThread();
+      H.s.db.update(step).set({ status: 'done' }).where(eq(step.buildId, buildId)).run();
+      H.s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, todoId)).run();
+      const out = (await relay('message_thread', { todoId, content: 'One more thing' })) as {
+        delivered: string;
+      };
+      expect(out.delivered).toBe('new-turn');
+      const queued = H.s.db.select().from(step).where(eq(step.status, 'pending')).all();
+      expect(queued).toHaveLength(1);
+      expect(queued[0]!.byPerson).toBe(false);
     });
 
     test('is the answer to a parked worker question and clears awaitingReply', async () => {
@@ -375,6 +446,17 @@ describe('flag on', () => {
   });
 
   describe('threads', () => {
+    test('titles and lines come back without control or format characters', async () => {
+      const a = await openThread({ seqNum: 1, title: 'Al\u202epha\u200b\u0007 job' });
+      H.s.db
+        .update(build)
+        .set({ reportLine: 'Half\u202ewa\u200by' })
+        .where(eq(build.id, a.buildId))
+        .run();
+      const out = (await relay('threads', {})) as { threads: { title: string; line: string }[] };
+      expect(out.threads[0]).toMatchObject({ title: 'Al pha job', line: 'Half wa y' });
+    });
+
     test('lists open threads with phase, awaiting flag and report line; leaves out unstarted, done, closed, archived and other teams', async () => {
       const a = await openThread({ seqNum: 1, title: 'Alpha' });
       H.s.db
