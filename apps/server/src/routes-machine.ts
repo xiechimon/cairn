@@ -349,12 +349,25 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/machine/stream', (c) => {
     const row = me(c);
+    const token = bearer(c) ?? '';
     return streamSSE(c, async (stream) => {
-      const unsubscribe = ctx.machineHub.subscribeMachine(row.teamId, row.id, (ev) => {
-        void stream.writeSSE({ data: JSON.stringify(ev) });
-      });
+      let lastWrite: Promise<unknown> = Promise.resolve();
+      const unsubscribe = ctx.machineHub.subscribeMachine(
+        row.teamId,
+        row.id,
+        (ev) => {
+          lastWrite = stream.writeSSE({ data: JSON.stringify(ev) }).catch(() => {});
+        },
+        () => {
+          void lastWrite.then(() => release());
+        },
+      );
       // undici's default 300s body timeout (measured per received chunk) silently drops an idle SSE stream.
       const pingTimer = setInterval(() => {
+        if (findMachineByToken(ctx.db, token)?.id !== row.id) {
+          release();
+          return;
+        }
         void stream.write(': ping\n\n').catch(() => {});
       }, ctx.pingIntervalMs);
       let release: () => void = () => {};
@@ -362,12 +375,12 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         release = resolve;
       });
       stream.onAbort(() => {
-        clearInterval(pingTimer);
-        unsubscribe();
         markOffline(deps, row.id);
         release();
       });
       await held;
+      clearInterval(pingTimer);
+      unsubscribe();
     });
   });
 

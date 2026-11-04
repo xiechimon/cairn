@@ -13,7 +13,12 @@ export class MachineWakeHub {
   private readonly wakeSeqs = new Map<string, number>();
   private readonly streamsByMachine = new Map<
     string,
-    { teamId: string; send: (ev: MachineStreamEvent) => void }
+    {
+      teamId: string;
+      send: (ev: MachineStreamEvent) => void;
+      close: () => void;
+      release: () => void;
+    }
   >();
 
   wakeSeq(teamId: string): number {
@@ -89,6 +94,7 @@ export class MachineWakeHub {
     teamId: string,
     machineId: string,
     send: (ev: MachineStreamEvent) => void,
+    close: () => void = () => {},
   ): () => void {
     const unsubscribeTeam = this.subscribe(teamId, send);
     const prev = this.streamsByMachine.get(machineId);
@@ -98,9 +104,8 @@ export class MachineWakeHub {
         prev.send({ type: 'shutdown' });
       } catch {}
     }
-    this.streamsByMachine.set(machineId, { teamId, send });
     let released = false;
-    return () => {
+    const release = () => {
       if (released) return;
       released = true;
       unsubscribeTeam();
@@ -110,6 +115,21 @@ export class MachineWakeHub {
         for (const listener of this.disconnectListeners) listener(machineId);
       }
     };
+    this.streamsByMachine.set(machineId, { teamId, send, close, release });
+    return release;
+  }
+
+  revokeMachine(machineId: string): void {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return;
+    this.streamsByMachine.delete(machineId);
+    entry.release();
+    try {
+      entry.send({ type: 'shutdown' });
+    } catch {}
+    try {
+      entry.close();
+    } catch {}
   }
 
   pushSync(machineId: string, cmd: MachineSyncCommand): boolean {
