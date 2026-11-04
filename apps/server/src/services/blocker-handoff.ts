@@ -4,6 +4,7 @@ import {
   clipHandoffFiles,
   clipHandoffSummary,
   conversationBranch,
+  isBuildStepKind,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -32,7 +33,7 @@ export async function blockerHandoffForClaim(
   stepRow: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect,
 ): Promise<BlockerHandoffRecord | null> {
-  if (stepRow.kind !== 'plan' && stepRow.kind !== 'build') return null;
+  if (stepRow.kind !== 'plan' && !isBuildStepKind(stepRow.kind)) return null;
   const snapshot = deps.db
     .select({ blockerHandoff: step.blockerHandoff })
     .from(step)

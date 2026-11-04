@@ -206,12 +206,12 @@ describe('routeForStep: the session rule replaces the agent model and machine', 
     expect(agentForStep(w.s.db, todoRow, 'review', prompt)?.modelId).toBe('agent-model');
   });
 
-  test('flag on: the claimed build step carries the rule model to the daemon', async () => {
+  test('flag on: the claimed session step carries the rule model to the daemon', async () => {
     const w = await setupWorld();
     insertRule(w.s, { teamId: w.s.team.id });
     await buildTodo(w);
     const claimed = await claim(w);
-    expect(claimed?.step.kind).toBe('build');
+    expect(claimed?.step.kind).toBe('session');
     expect(claimed?.agent?.modelId).toBe('rule-model');
     expect(claimed?.agent?.provider).toBe('rule-provider');
   });
@@ -666,5 +666,42 @@ describe('work_policy: tools, MCP, skills and secrets live on the policy', () =>
     expect(policy.use).toBe('review');
     expect(policy.tools).toEqual(['read-only-tool']);
     expect(policy.secrets).toEqual([]);
+  });
+});
+
+describe('session step claim and worker ask_user over the machine API', () => {
+  test('flag on: the claimed session step carries ask_user and thread_report and the ask parks the thread', async () => {
+    const w = await setupWorld();
+    insertRule(w.s, { teamId: w.s.team.id });
+    const todoRow = await buildTodo(w);
+    const claimed = await claim(w);
+    expect(claimed?.step.kind).toBe('session');
+    const names = claimed?.remoteTools?.map((tool) => tool.name) ?? [];
+    expect(names).toContain('ask_user');
+    expect(names).toContain('thread_report');
+    const asked = await w.s.app.request(`/api/machine/ask/${claimed?.step.id}?holdMs=0`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${w.machineToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requestId: 'ask-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        questions: [{ header: 'Scope', question: 'Which scope?', options: [] }],
+      }),
+    });
+    expect(asked.status).toBe(200);
+    expect(((await asked.json()) as { status: string }).status).toBe('pending');
+    const fresh = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoRow.id)).get()!;
+    expect(fresh.awaitingReply).toBe(true);
+  });
+
+  test('flag on: a build step does not get the session-only tools', async () => {
+    const w = await setupWorld();
+    setRoutingRulesEnabled(false);
+    await buildTodo(w);
+    setRoutingRulesEnabled(true);
+    const claimed = await claim(w);
+    expect(claimed?.step.kind).toBe('build');
+    const names = claimed?.remoteTools?.map((tool) => tool.name) ?? [];
+    expect(names).not.toContain('ask_user');
+    expect(names).not.toContain('thread_report');
   });
 });

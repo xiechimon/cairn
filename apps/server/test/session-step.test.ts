@@ -1,0 +1,265 @@
+import { SESSION_BRIEF, threadReportContentSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { build, chiefMessage, message, step, todo } from '../src/db/schema.js';
+import { startBuilds } from '../src/services/builds.js';
+import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import { messageThreadAsUser } from '../src/services/thread-message.js';
+import { getTodo, setTodoPhase } from '../src/services/todos.js';
+import { askWorkerQuestion, recordThreadReportLine } from '../src/services/worker-questions.js';
+import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+
+registerChiefHarness();
+beforeEach(() => setRoutingRulesEnabled(true));
+afterEach(() => setRoutingRulesEnabled(false));
+
+const REQUEST = 'ask-11111111-2222-3333-4444-555555555555';
+const QUESTIONS = [
+  {
+    header: 'Format',
+    question: 'Which export format?',
+    options: [{ label: 'CSV' }, { label: 'JSON' }],
+  },
+];
+
+function deps() {
+  return {
+    db: H.s.db,
+    hub: H.s.hub,
+    convHub: H.s.convHub,
+    machineHub: H.s.machineHub,
+    user: H.s.user,
+  };
+}
+
+function seedTodo(id = 'session-todo') {
+  H.s.db
+    .insert(todo)
+    .values({
+      id,
+      teamId: H.teamId,
+      projectId: H.projectId,
+      title: 'Export the board',
+      spec: 'Add an export.',
+      phase: 'todo',
+      phaseAt: 1,
+      seqNum: 3,
+    })
+    .run();
+  return id;
+}
+
+function startSession(withPlan = true) {
+  const todoId = seedTodo();
+  const [started] = startBuilds(deps(), {
+    projectId: H.projectId,
+    todoIds: [todoId],
+    assignment: { plan: null, build: { agentId: AGENT_ID } },
+    withPlan,
+  });
+  const stepRow = H.s.db.select().from(step).where(eq(step.buildId, started!.id)).get()!;
+  return { todoId, buildId: started!.id, stepRow };
+}
+
+function reports() {
+  return H.s.db
+    .select()
+    .from(chiefMessage)
+    .all()
+    .filter((row) => String(row.content).includes('thread-report'))
+    .map((row) => threadReportContentSchema.parse(JSON.parse(String(row.content))));
+}
+
+describe('session step kind (flag on)', () => {
+  test('startBuilds enqueues one session step carrying the brief, even when a plan was requested', () => {
+    const { buildId, stepRow } = startSession(true);
+    const steps = H.s.db.select().from(step).where(eq(step.buildId, buildId)).all();
+    expect(steps).toHaveLength(1);
+    expect(stepRow.kind).toBe('session');
+    expect(stepRow.prompt).toContain(SESSION_BRIEF);
+    expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.withPlan).toBe(false);
+  });
+
+  test('flag off keeps the plan step', () => {
+    setRoutingRulesEnabled(false);
+    const { stepRow } = startSession(true);
+    expect(stepRow.kind).toBe('plan');
+  });
+
+  test('a finished session step lands in review without a separate verify step', () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    H.s.db
+      .update(todo)
+      .set({
+        assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
+      })
+      .where(eq(todo.id, todoId))
+      .run();
+    setTodoPhase(deps(), todoId, 'review');
+    expect(
+      H.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .map((r) => r.kind),
+    ).toEqual(['session']);
+    expect(stepRow.kind).toBe('session');
+  });
+
+  test('rework at review continues the same session as a session step, not a plan', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db
+      .update(step)
+      .set({ status: 'done', sessionId: 'sess-1' })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, todoId)).run();
+    const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'Also cover the empty board',
+      clientMessageId: 'c-1',
+    });
+    expect(sent.delivered).toBe('revision');
+    const next = H.s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((r) => r.status === 'pending')!;
+    expect(next.kind).toBe('session');
+    expect(next.prompt).toContain('Also cover the empty board');
+    expect(getTodo(deps(), todoId)!.phase).toBe('queued');
+  });
+});
+
+describe('worker ask_user on a session step', () => {
+  function claim(stepId: string) {
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepId)).run();
+    return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+  }
+
+  test('the question parks the thread: awaitingReply is set and a needs-you report is written', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    const settled = await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    expect(settled.status).toBe('pending');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    expect(reports().map((r) => r.phase)).toEqual(['review']);
+    const rows = H.s.db.select().from(message).where(eq(message.id, REQUEST)).all();
+    expect(rows).toHaveLength(1);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    expect(H.s.db.select().from(message).where(eq(message.id, REQUEST)).all()).toHaveLength(1);
+    expect(reports()).toHaveLength(1);
+  });
+
+  test('the answer delivered through the thread message clears awaitingReply and settles the held ask', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    const held = askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 5_000 },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'JSON please',
+      clientMessageId: 'c-2',
+    });
+    const settled = await held;
+    expect(settled.status).toBe('answered');
+    expect(settled.answers).toEqual([{ header: 'Format', text: 'JSON please' }]);
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+  });
+
+  test('a parked step keeps awaitingReply through the move to review and clears it when the thread moves on', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    setTodoPhase(deps(), todoId, 'review');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBe(true);
+    setTodoPhase(deps(), todoId, 'queued');
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('cancelled');
+  });
+
+  test('a non-session worker step still cannot ask', async () => {
+    const { stepRow } = startSession(false);
+    H.s.db
+      .update(step)
+      .set({ kind: 'verify', status: 'claimed' })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    const { machineAsk } = await import('../src/services/machine-relay.js');
+    await expect(
+      machineAsk(
+        { ...deps(), vapidKeys: null } as never,
+        'no-machine',
+        stepRow.id,
+        { requestId: REQUEST, questions: QUESTIONS },
+        { holdMs: 0 },
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('D65 report line on every thread', () => {
+  test.each(['review', 'done', 'failed'] as const)(
+    'an unwatched thread reaching %s writes a report with the session own line',
+    (phase) => {
+      const { todoId, buildId, stepRow } = startSession(false);
+      H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+      H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+      recordThreadReportLine(
+        deps(),
+        stepRow,
+        'Export added; 12 tests pass, CSV and JSON verified.',
+      );
+      expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.reportLine).toContain(
+        'Export added',
+      );
+      if (phase === 'done') setTodoPhase(deps(), todoId, 'review');
+      setTodoPhase(deps(), todoId, phase);
+      const last = reports().at(-1)!;
+      expect(last.phase).toBe(phase);
+      expect(last.line).toBe('Export added; 12 tests pass, CSV and JSON verified.');
+      expect(last.line!.length).toBeLessThanOrEqual(200);
+    },
+  );
+
+  test('a line over 200 characters or an empty line is rejected', () => {
+    const { stepRow } = startSession(false);
+    expect(() => recordThreadReportLine(deps(), stepRow, 'x'.repeat(201))).toThrow(/200/);
+    expect(() => recordThreadReportLine(deps(), stepRow, '   ')).toThrow();
+  });
+
+  test('flag off writes no report for an unwatched thread', () => {
+    const { todoId } = startSession(false);
+    setRoutingRulesEnabled(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    setTodoPhase(deps(), todoId, 'review');
+    expect(reports()).toHaveLength(0);
+  });
+});

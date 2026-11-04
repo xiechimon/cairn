@@ -138,6 +138,7 @@ export const todo = sqliteTable(
     sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
     sourceRef: text('sourceRef'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
+    awaitingReply: bool('awaitingReply').notNull().default(false),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
@@ -188,6 +189,7 @@ export const build = sqliteTable('build', {
   baseSha: text('baseSha'),
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
+  reportLine: text('reportLine'),
   createdAt: epochMs('createdAt').notNull(),
 });
 

@@ -185,6 +185,7 @@ export const threadReportContentSchema = z.object({
   title: z.string(),
   wakeStepId: recordId.optional(),
   verified: z.boolean().optional(),
+  line: z.string().max(200).optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 

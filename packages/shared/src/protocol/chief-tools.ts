@@ -983,6 +983,33 @@ const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
+const CHIEF_ASK_USER_PARAMS = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'ask_user')
+  ?.parameters as { properties: { questions: unknown } } | undefined;
+
+if (CHIEF_ASK_USER_PARAMS === undefined) throw new Error('ask_user tool definition missing');
+
+export const WORKER_ASK_USER_TOOL: RemoteToolDef = {
+  name: 'ask_user',
+  description:
+    'Ask the user structured questions when the answer would change what you do next. The question parks this session; if the user does not answer in time the tool returns a cancelled result, you end the turn, and the answer arrives as the next message on the same session. Batch up to 4 questions per call.',
+  parameters: obj({ questions: CHIEF_ASK_USER_PARAMS.properties.questions }, ['questions']),
+};
+
+export const THREAD_REPORT_LINE_MAX = 200;
+
+export const WORKER_THREAD_REPORT_TOOL: RemoteToolDef = {
+  name: 'thread_report',
+  description: `Write the one-line report the Coordinator conversation shows for this thread (at most ${THREAD_REPORT_LINE_MAX} characters, your own words, plain text). Call it before you finish, ask the user a question, or give up.`,
+  parameters: obj({ line: str(`The report line, at most ${THREAD_REPORT_LINE_MAX} characters.`) }, [
+    'line',
+  ]),
+};
+
+export const SESSION_REMOTE_TOOLS: readonly RemoteToolDef[] = [
+  WORKER_ASK_USER_TOOL,
+  WORKER_THREAD_REPORT_TOOL,
+];
+
 export const WORKER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   ...WORKER_MEMORY_REMOTE_TOOLS,
   WORKER_ATTACHMENT_TOOL,

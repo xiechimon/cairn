@@ -359,6 +359,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "enum": [
             "plan",
             "build",
+            "session",
             "merge",
             "chief",
             "review",
@@ -1016,6 +1017,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                   "enum": [
                     "plan",
                     "build",
+                    "session",
                     "merge",
                     "chief",
                     "review",
@@ -2083,6 +2085,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "enum": [
               "plan",
               "build",
+              "session",
               "merge",
               "chief",
               "review",
@@ -3963,6 +3966,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "enum": [
                 "plan",
                 "build",
+                "session",
                 "merge",
                 "chief",
                 "review",
@@ -5375,6 +5379,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "enum": [
         "plan",
         "build",
+        "session",
         "merge",
         "chief",
         "review",
@@ -5783,6 +5788,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                   "type": "null",
                 },
               ],
+            },
+            "awaitingReply": {
+              "type": "boolean",
             },
             "blockedBy": {
               "anyOf": [
@@ -9550,6 +9558,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > ste
       "enum": [
         "plan",
         "build",
+        "session",
         "merge",
         "chief",
         "review",
@@ -9858,6 +9867,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "type": "null",
         },
       ],
+    },
+    "awaitingReply": {
+      "type": "boolean",
     },
     "blockedBy": {
       "anyOf": [

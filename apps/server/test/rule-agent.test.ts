@@ -132,12 +132,12 @@ describe('D71 a step with no assigned agent runs from the routing rule', () => {
     });
   });
 
-  test('rules on: the machine claims that build with the rule model', async () => {
+  test('rules on: the machine claims that session with the rule model', async () => {
     const w = await world();
     rule(w, 'session');
     await startWithoutAgent(w);
     const claimed = await claim(w);
-    expect(claimed?.step.kind).toBe('build');
+    expect(claimed?.step.kind).toBe('session');
     expect(claimed?.agent?.modelId).toBe('session-model');
   });
 
