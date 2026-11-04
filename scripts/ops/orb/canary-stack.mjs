@@ -1,8 +1,29 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { connect, createServer } from 'node:net';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
+import { isContainerConfig } from './canary-attacker.mjs';
 import { poll, runCommand, spawnRecordedChild, stopChild } from './canary-process.mjs';
+
+export function containerStackEnv({ hostHome, env = process.env }) {
+  const image = env.CAIRN_ORB_IMAGE ?? '';
+  if (!/^cairn-orb-base:(?!latest$)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(image))
+    throw new Error('CAIRN_ORB_IMAGE must name the pinned image (cairn-orb-base:<recipe hash>)');
+  const socket = env.CAIRN_ORB_EGRESS_SOCKET ?? '';
+  if (!isAbsolute(socket))
+    throw new Error('CAIRN_ORB_EGRESS_SOCKET must be the absolute path of the live relay socket');
+  const runtimeDirectory = env.XDG_RUNTIME_DIR ?? '';
+  if (!isAbsolute(runtimeDirectory))
+    throw new Error('XDG_RUNTIME_DIR must be set for rootless podman');
+  return {
+    CAIRN_ORB_RUNTIME: 'podman',
+    CAIRN_ORB_IMAGE: image,
+    CAIRN_ORB_EGRESS_SOCKET: socket,
+    XDG_RUNTIME_DIR: runtimeDirectory,
+    XDG_DATA_HOME: join(hostHome, '.local/share'),
+    XDG_CONFIG_HOME: join(hostHome, '.config'),
+  };
+}
 
 export function freePort() {
   return new Promise((resolvePort, reject) => {
@@ -84,13 +105,15 @@ export async function startStack({
   record,
 }) {
   const checkout = resolve(import.meta.dirname, '../../..');
+  const container = isContainerConfig(config);
+  const orbEnv = container ? containerStackEnv({ hostHome: config.hostHome }) : {};
   if (typeof record !== 'function')
     throw new Error('Scratch stack requires a run manifest recorder');
   if (requireOrbBuild && !existsSync(join(checkout, 'apps/daemon/dist/cli.mjs')))
     throw new Error(
       'Matching daemon dist/cli.mjs is required; use the normally built Linux checkout',
     );
-  if (requireOrbBuild) await requireMatchingRelease({ checkout });
+  if (requireOrbBuild && !container) await requireMatchingRelease({ checkout });
   const port = await freePort();
   const modelPort = await freePort();
   const base = `http://127.0.0.1:${port}`;
@@ -232,6 +255,7 @@ export async function startStack({
           CAIRN_TEAM: team.id,
           CAIRN_EXECUTOR: executor,
           CAIRN_HOOK_TIMEOUT_MS: '180000',
+          ...(executor === 'orb' ? orbEnv : {}),
         },
       );
       const registration = await poll(
@@ -267,7 +291,7 @@ export async function startStack({
         }
       }
       if (!project) throw new Error('Scratch Project ID did not satisfy the Orb provider contract');
-      if (executor === 'orb') {
+      if (executor === 'orb' && !container) {
         const seed = join('/var/lib/cairn-orb/seed', project.id);
         if (lstatSync(seed, { throwIfNoEntry: false }))
           throw new Error('Scratch Project seed already exists; refusing to adopt it');
@@ -294,7 +318,29 @@ export async function startStack({
       }
       if (!buildId) throw new Error('Scratch step ID did not satisfy the Orb runner contract');
       const orbName = `cairn-orb-${buildId}`;
-      if (executor === 'orb') {
+      const runtimeNamespace = createHash('sha256')
+        .update(resolve(daemonHome))
+        .digest('hex')
+        .slice(0, 16);
+      if (executor === 'orb' && container) {
+        const exists = await runCommand('podman', ['container', 'exists', orbName], {
+          signal,
+        }).then(
+          () => true,
+          () => false,
+        );
+        if (
+          exists ||
+          existsSync(join(orbEnv.XDG_RUNTIME_DIR, 'cairn-orb', runtimeNamespace, orbName))
+        )
+          throw new Error('Scratch Orb container already exists; refusing to adopt it');
+        record({
+          kind: 'container',
+          name: orbName,
+          ownerId: registration.machineId,
+          runtimeNamespace,
+        });
+      } else if (executor === 'orb') {
         const images = await runCommand(
           'machinectl',
           ['--no-ask-password', 'list-images', '--no-legend', '--no-pager'],
@@ -306,13 +352,18 @@ export async function startStack({
         )
           throw new Error('Scratch Orb machine already exists; refusing to adopt it');
       }
-      if (executor === 'orb') record({ kind: 'machine', name: orbName });
+      if (executor === 'orb' && !container) record({ kind: 'machine', name: orbName });
       const branch = `cairn/conv-${buildId}`;
       const runnerDaemon = start(
         join(checkout, 'apps/daemon'),
         'src/cli.ts',
         ['start', '--foreground', '--server', base, '--name', `canary-${executor}`],
-        { CAIRN_HOME: daemonHome, CAIRN_EXECUTOR: executor, CAIRN_HOOK_TIMEOUT_MS: '180000' },
+        {
+          CAIRN_HOME: daemonHome,
+          CAIRN_EXECUTOR: executor,
+          CAIRN_HOOK_TIMEOUT_MS: '180000',
+          ...(executor === 'orb' ? orbEnv : {}),
+        },
       );
       await poll(
         async () => {

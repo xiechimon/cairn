@@ -764,3 +764,49 @@ test('unix mode still rejects invalid destination port allowlists before listeni
   assert.match(result.stderr, /Invalid destination port allowlist/);
   assert.equal(existsSync(socketPath), false);
 });
+
+for (const [name, activation] of [
+  ['missing descriptor metadata', {}],
+  [
+    'foreign listener pid',
+    { LISTEN_PID: '1', LISTEN_FDS: '1', LISTEN_FDNAMES: 'cairn-orb-egress' },
+  ],
+  [
+    'extra listener descriptors',
+    { LISTEN_PID: 'self', LISTEN_FDS: '2', LISTEN_FDNAMES: 'cairn-orb-egress:extra' },
+  ],
+  ['wrong named descriptor', { LISTEN_PID: 'self', LISTEN_FDS: '1', LISTEN_FDNAMES: 'foreign' }],
+]) {
+  test(`socket activation refuses ${name} before creating a listener`, (t) => {
+    const socketPath = join(privateDirectory(t), 'egress.sock');
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+      import { pathToFileURL } from 'node:url';
+      if (process.env.LISTEN_PID === 'self') process.env.LISTEN_PID = String(process.pid);
+      process.argv[1] = ${JSON.stringify(relayScript)};
+      await import(pathToFileURL(process.argv[1]));
+    `,
+      ],
+      {
+        env: {
+          ...process.env,
+          LISTEN_PID: '',
+          LISTEN_FDS: '',
+          LISTEN_FDNAMES: '',
+          ...activation,
+          CAIRN_ORB_SOCKET_ACTIVATION: '1',
+          CAIRN_ORB_EGRESS_SOCKET: socketPath,
+        },
+        encoding: 'utf8',
+        timeout: 1500,
+      },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /activation/i);
+    assert.equal(existsSync(socketPath), false);
+  });
+}
