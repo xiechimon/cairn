@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "6c49583052d36f33b59893d7386f316f92401710",
-    "date": "2026-11-02"
+    "sha": "98d7dc6b2d1b142fe214fb5c874a54b77ff669dc",
+    "date": "2026-11-04"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -45,8 +45,8 @@
       "kind": "registry",
       "upstreamItem": "button",
       "status": "deviated",
-      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer.",
-      "hash": "0af5025d00123562d10d93c086363ff61968a948a1a66ba09f33b191b6425112"
+      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries.",
+      "hash": "15a939b54f1e0c65f6650e72a40bcfb00fd15892badafb0db6d05b43cb8912d6"
     },
     "card.tsx": {
       "kind": "registry",
