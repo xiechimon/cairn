@@ -1,0 +1,203 @@
+<div align="center">
+  <img src="site/logo.svg" alt="Cairn" width="64" height="64">
+  <h1>Cairn</h1>
+
+  <p>
+    <b>English</b> ·
+    <a href="./README.zh.md">Simplified Chinese</a> ·
+    <a href="https://cairn.xmon.me">Website</a> ·
+    <a href="#quickstart">Quickstart</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/xiechimon/cairn/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xiechimon/cairn/ci.yml?branch=main&style=flat-square&label=CI"></a>
+    <a href="https://www.npmjs.com/package/@xiechimon/cairn"><img alt="npm version" src="https://img.shields.io/npm/v/@xiechimon/cairn?style=flat-square&color=173a2f&label=npm"></a>
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-173a2f?style=flat-square">
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
+    <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
+  </p>
+
+  <p><b>Tell one Coordinator what you want. Agents build it in isolated threads on your machines, and nothing merges without evidence.</b></p>
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
+    <img alt="Cairn on desktop: the Coordinator conversation with the decisions waiting on you pinned, and a thread open on a phone" src="site/img/hero-light.webp" width="100%">
+  </picture>
+
+  <img alt="Cairn on a phone: decisions waiting on you, a thread, a project home and all work" src="site/img/phones.webp" width="100%">
+</div>
+
+- **Coordinator.** You talk to a single Coordinator from any device. It listens, opens a thread for each piece of work and reports back in one conversation that never ends.
+- **Threads.** One unit of work, one agent session: Claude Code or Gemini CLI on your subscription, or the built-in pi runtime on any provider. A thread carries the work from plan to pull request, and you can open it in a side chat to steer it.
+- **Only what needs you.** The home page pins the decisions waiting on you and shows what is in progress. A push notification goes out only when a person must act.
+- **Evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you, and the AI reviewer can block a merge, not just comment on it.
+- **Eval-gated harness.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the Coordinator's dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
+- **Your machines.** Register any host by running the daemon on it. A thread runs on any machine that meets its runtime, model and tool constraints, in its own git worktree, or in a throwaway per-task Orb container where the host supports it (`CAIRN_EXECUTOR=orb`, opt-in for now). Plans, diffs and tool calls stream back live.
+- **Projects.** A project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue. Repos are hosted by the server itself or connected from GitHub.
+- **Bootstrap loop.** Cairn takes its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
+
+## Showcase
+
+Real work that agents shipped inside Cairn, each with a recording, the pull request and numbers you can check. Cairn is still taking shape, so these slots are placeholders for now.
+
+| | Work | What it will show |
+|---|---|---|
+| 1 | Bootstrap loop | An agent inside Cairn takes one of Cairn's own tickets from claim through build and review to merge. *Coming soon.* |
+| 2 | An app from scratch | One sentence in, and the agent team builds a complete app on your machine. *Coming soon.* |
+| 3 | Harness before and after | The same task set, scored before and after a prompt, skill and routing change. *Coming soon.* |
+
+## Features
+
+- **Coordinator** — one conversation that never ends: it opens threads and reports back. Context is compacted for you, and memory is kept per project.
+- **Threads** — one unit of work, one agent session, from plan through tests and implementation to a pull request. Open any thread in a side chat to steer it directly.
+- **Projects** — a project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue.
+- **Scheduled tasks** — re-run a thread on a cycle.
+- **Machines and routing** — register hosts with the daemon; routing rules pick the runtime, model, tools and machine for each step.
+- **Providers** — Claude Code and Gemini CLI subscriptions, API keys, OAuth (GitHub Copilot, OpenAI Codex) or a custom endpoint.
+- **Repos** — git repositories hosted by the server itself (push/pull with an API key) or connected from GitHub.
+- **Live everything** — SSE streams for conversations and threads, Web Push, token-usage accounting per build and model.
+
+## Quickstart
+
+Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
+
+```sh
+npx @xiechimon/cairn
+```
+
+One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team.
+
+Use a different port with `PORT=9000 npx @xiechimon/cairn`.
+
+### Run builds on your own machines
+
+The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
+
+```sh
+npm i -g @xiechimon/cairn-cli
+# One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
+cairn start --api-key <cairn_...> --team <teamId>
+# Daily use (credentials persisted in ~/.cairn/machine.json):
+cairn start        # also: stop / restart / logs -f / status
+```
+
+Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
+
+### Run the server in Docker
+
+Only the server (with the web UI) is containerized; agents run through a daemon on your own machines. The image binds `0.0.0.0` and keeps all state under `/data`:
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+The image sets `CAIRN_REQUIRE_TOKEN=1`: without a non-empty `CAIRN_TOKEN` the container logs the reason and exits with code 1 instead of serving an open API on a public address. Back up by copying the whole `/data` volume (database and `secretbox.key` together). Terminate TLS in front of the container (a reverse proxy, or the platform's HTTPS domain), since the bearer token travels in a header.
+
+### Deploy on Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
+
+`railway.json` makes Railway build the `Dockerfile` and health-check `/app`. The button opens Railway's new-project page; choose Deploy from GitHub repo and this repository, then:
+
+1. Attach a volume mounted at `/data`.
+2. Set `CAIRN_TOKEN` to `${{secret(64, "abcdef0123456789")}}` (Railway generates a random value once) and `RAILWAY_RUN_UID=0` (Railway volumes are root-owned; the image otherwise runs as the `node` user).
+3. Generate a public domain. `PORT` is supplied by Railway.
+
+Point a daemon at the public server. Create an API key in the web UI (`/app/api-keys`), then on the machine that runs builds:
+
+```sh
+cairn start --server https://<your-app>.up.railway.app --api-key <cairn_...> --team <teamId>
+```
+
+### Develop from source
+
+Requires Node.js >= 22.19 and pnpm (e.g. via `corepack enable`).
+
+```sh
+pnpm install
+pnpm start        # builds the web UI and starts the server hosting it on the same origin
+```
+
+The watch-mode dev stack, one process each: `pnpm dev:web`, `pnpm dev:server`, `pnpm dev:daemon` (`pnpm dev` runs all three together).
+
+## Deployment
+
+Self-host the server on an always-on machine, then reach it from your phone over a private tailnet. Bind the server to `127.0.0.1`, proxy `tailscale serve` to `http://127.0.0.1:<port>`, and set `CAIRN_TAILSCALE_USERS` to let allowlisted Tailscale identities sign in without entering the access token. Full walkthrough: [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md). For a public-internet deployment instead, see the Railway template above.
+
+## Configuration
+
+Server environment variables (all optional):
+
+| Variable | Default | Description |
+|---|---|---|
+| `CAIRN_TOKEN` | unset | Bearer token guarding `/api/*`. Set to enable authentication — the web UI asks for the token on first visit; unset means auth off (default). The two SSE stream endpoints additionally accept `?token=` (EventSource cannot set headers). Always set this when binding the server to a non-localhost interface. An allowlisted Tailscale Serve identity from a loopback peer is also accepted. |
+| `CAIRN_TAILSCALE_USERS` | unset | Comma-separated Tailscale user logins allowed through without `CAIRN_TOKEN` when `Tailscale-User-Login` arrives from a loopback peer. For same-host `tailscale serve`, set `HOST=127.0.0.1` and proxy to `http://127.0.0.1:<port>`; direct non-loopback requests, tagged devices, and Funnel traffic still need the token. A non-loopback bind with this allowlist logs a startup warning. |
+| `CAIRN_REQUIRE_TOKEN` | unset (the Docker image sets `1`) | `1`, `true` or `yes`: refuse to start (log the reason, exit 1) when `CAIRN_TOKEN` is unset or empty. |
+| `PORT` | `8787` | HTTP listen port. |
+| `HOST` | unset (all interfaces) | HTTP bind address. For split deployment (server on an always-on host, daemon on another machine pointing `CAIRN_SERVER` at it), set this to that host's LAN address and set `CAIRN_TOKEN` alongside. Explicit `0.0.0.0`/`::` with `CAIRN_TOKEN` unset logs a startup warning. |
+| `CAIRN_HOME` | `~/.cairn` | Data root. Server state lives under `<CAIRN_HOME>/server/` (`server.db`, `secretbox.key`, `vapid.json`, hosted bare repos); the daemon keeps `machine.json`, `daemon.log`, and `workspaces/` at the root. **Backup = copy the whole directory** — the db alone is useless without the keyfile, since secrets are stored encrypted. |
+| `CAIRN_VAPID_SUBJECT` | `mailto:push@cairn.dev` | Contact subject used for Web Push VAPID authentication. Set an HTTPS contact URL or a `mailto:` address for your deployment; the VAPID key pair is generated on first server start and stored in `<CAIRN_HOME>/server/vapid.json`. |
+| `CAIRN_WEB_ORIGIN` | `https://cairn.local` | Public HTTPS origin used for push navigation, for example `https://cairn.example`. Set this to the address used by your phone; paths, credentials, queries and fragments are rejected. |
+| `CAIRN_PUSH_DIGEST_TIMES` | `09:00,18:00` | Exactly two distinct server-local times for the twice-daily Web Push digest (comma-separated `HH:MM`). Everything that does not need a human decision — merged, failed, done, plan-ready, build-review — is batched into this digest instead of an immediate push; only decisions (chief questions) push immediately. |
+| `CAIRN_GITHUB_OAUTH_CLIENT_ID`<br>`CAIRN_GITHUB_OAUTH_CLIENT_SECRET` | unset | Credentials of a self-registered GitHub OAuth App, enabling OAuth provider sign-in. Set both or neither — the server refuses to start on a half-configured pair. |
+| `CAIRN_WEB_DIR` | `apps/web/dist` if present | Override for the SPA static-hosting root; unset with no build output = API-only mode. |
+| `CAIRN_SKILLS_DIR` | `~/.agents/skills` | Skills root. Each immediate subdirectory containing a `SKILL.md` is one skill (id = its frontmatter `name`, falling back to the directory name). Scanned live on every request — skills are never stored in the database; add a skill by dropping a folder in, remove one by deleting the folder. |
+| `CAIRN_ISSUE_INTAKE` | unset (off) | GitHub issue intake. `1`, `true` or `yes` turns it on; anything else leaves it off, and it is off by default. When on, every 5 minutes the server takes open issues labeled `ready-for-agent` from each GitHub project of a team that has a GitHub connection and a chief bound to an agent with a model, imports them as tasks and starts orchestration. An issue is taken only if the newest `labeled` event for that label was made by a user with triage, write, maintain or admin on the repository, and not through a GitHub App. A label applied through a GitHub App does not count, even when the app acts with that user's authorization. This check recognizes GitHub Apps only: a label applied with an OAuth App token or a personal access token looks the same as the user labeling by hand, and is taken. OAuth App tokens include the one `gh auth login` obtains and the team's GitHub connection token. cairn passes the connection token to the steps' git commands (git's own hooks run with it) and to the repository's `.agents/setup` and `.agents/resume` hooks, so agent code that can change those hooks can read it; cairn's agent steps can also run the machine's logged-in `gh` directly. Either way an agent can label issues as that account and feed the intake. Labels applied by anyone else, or removed again, are ignored too. Each project has at most 3 imported issue tasks outside done and closed at a time (failed ones count). Issues already labeled when you turn it on are taken too, oldest first, up to that limit (the server reads up to 300 labeled issues per project per sweep), so check what is labeled before enabling it. Tasks the intake imports list the chief's bound agent as their creator, and reconciliation closes only those existing Cairn tasks: a task imported by hand or by the webhook is never closed by it, no existing Cairn task is closed for a team whose chief has no bound agent, and after the chief is bound to another agent, tasks taken before are no longer closed by it. Such a task is closed when the server saw its issue open and then saw it closed by a user with triage or above; a task whose issue the server first sees already closed (for example after a restart), an issue closed by its outside author, or a task someone reopened is left alone, and so is a task in review or one with a build that opened a pull request, and a split task whose subtasks are not all done or closed. The intake never closes those review and pull-request tasks. For a task in review whose build opened a pull request, the pull-request reconcile can finish it as done after a merge into the default branch, or as failed after the pull request is closed without merge (it checks more than that and may only leave a hint); a building task keeps going through the CI loop; a task in review without a pull request, or a failed one, stays where it is until a person moves it. If starting orchestration fails after an import, later sweeps try again, up to 3 tries in all (a restart forgets pending retries); after that the task stays in to-do for a person. After the labeler check and the in-flight cap check, the poller reads the issue timeline and GraphQL `closedByPullRequestsReferences`. An open same-repository linked pull request is skipped and the log names the PR number; when link evidence shows exactly one same-repository closing reference in GraphQL `closedByPullRequestsReferences` and that pull request is merged (`state: "MERGED"`, `merged: true`), the poller closes the unclaimed GitHub issue with `state_reason: completed` and does not import it (distinct from transitioning an already-imported Cairn task to `closed` during reconcile); other merged or ambiguous link combinations are deferred without a GitHub write; incomplete, conflicting, or unreadable link evidence skips that candidate. Foreign-repository pulls and ordinary issue cross-references do not block import. A failed issue-close PATCH, including a rate limit, skips only that candidate and retries on later sweeps; later candidates and projects continue. Link state is re-read on later sweeps even when the issue list answers 304. When GitHub answers one of the intake's own reads (issue list, issue events, collaborator permission, issue state) with a rate limit, that team's sweep stops until the next one, and the log gives the reset time when GitHub sends one; a rate limit on the reads of an import, or on the linked-pull timeline/GraphQL reads for one candidate, fails or skips just that candidate, and the sweep goes on to the next issue. The startup log says whether intake is on. The `cairn` label webhook (`POST /api/webhook/github/<token>`, active whether or not intake is on) applies the same permission check and the same limit: it imports an issue only when the user who applied the label (the event's `sender`) has triage, write, maintain or admin on the repository and the project is below the limit of 3, so an issue an outside author opens from a template that carries the label is not imported. When the sender is not a GitHub login name, that user's permission cannot be read (the read fails, or GitHub answers it with a rate limit), the team has no usable GitHub token, the project is at the limit, the project's stored repository name is not `owner/repo`, or GitHub does not find the issue, nothing is imported, the reason is logged, and the delivery is answered 202. When the refusal is about the sender's permission (below triage, unreadable, rate limited), the answer only says the sender was not confirmed, not which case or what permission; the log has the details. That keeps the verdict out of the answer text only: whether the import then goes ahead still shows whether a sender qualified, so a leaked webhook URL is still handled by revoking its token. |
+| `CAIRN_INTAKE_AGENT_ALLOWLIST` | unset (deny all agent labels) | Comma-separated agent display names allowed for `agent:<name>` intake routing. Names are trimmed and matched exactly, including case; empty entries are ignored. Only opt in agents whose machine and tools are safe for untrusted issues. Agents with secrets or MCP servers are refused at intake and checked again before dispatch; removing a name blocks dispatch of existing presets too. |
+| `CAIRN_TRAJ_OUTCOME_BACKFILL` | unset (off) | Trajectory outcome backfill. `1`, `true` or `yes` turns it on; anything else leaves it off. When on, the server sweeps once at start and then every 24 hours: for each build whose pull request was merged at least 7 days ago, it reads the project's local repository and records `revertedWithin7d` (a revert commit naming the pull request or merge commit landed on the default branch within the window) and `fixedByLaterPr` (a later pull request removed lines the build added), once per build. `pnpm traj:backfill` runs one sweep by hand. Exported trajectory packs use the recorded values in place of the open-window `null`. |
+
+Web Push requires HTTPS and notification permission. On iOS, install the site on the home screen before enabling device push in account settings. Back up `vapid.json` with the database. To rotate VAPID keys, stop the server, remove `vapid.json`, restart, and disable then re-enable device push in every subscribed browser; subscriptions are bound to the original public key.
+
+Daemon environment variables (alternatives to the CLI flags above): `CAIRN_SERVER` (default `http://127.0.0.1:8787`), `CAIRN_API_KEY`, `CAIRN_TEAM`, `CAIRN_WORKSPACES_DIR` (default `<CAIRN_HOME>/workspaces`).
+
+## Development
+
+```sh
+pnpm dev:server   # API server with hot reload on http://127.0.0.1:8787 (first boot: db + migrations + seed)
+pnpm dev:web      # vite dev server on http://localhost:5173, proxying /api and /git to 8787
+```
+
+The vite dev server runs with `strictPort`: a taken port fails startup instead of silently
+shifting to the next free one. The shift is the dangerous case, not the clash — the proxy
+target stays fixed, so a shifted UI would drive whichever stack owns the port, not yours.
+Override with `CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`.
+
+Quality gates before committing:
+
+```sh
+pnpm lint         # biome ci
+pnpm typecheck    # tsc across all packages
+pnpm test         # vitest
+```
+
+### Repository layout
+
+| Path | Contents |
+|---|---|
+| `CONTEXT.md` | Domain model & glossary — canonical terminology (Chinese interface terms ↔ English ↔ internal names) |
+| `apps/web` | Web UI, React + vite (`@cairn/web`) |
+| `apps/server` | Server: Hono REST + SSE + SQLite (package `@xiechimon/cairn` — directory name differs from package name) |
+| `apps/daemon` | Executor daemon (package `@xiechimon/cairn-cli` — directory name differs from package name) |
+| `packages/shared` | Protocol vocabulary, record shapes, brand-slot single source (`@cairn/shared`) |
+| `docs/spec/` | Implementation canon, volumes 00–29 (Chinese) |
+| `docs/research/` | r1–r15 site inventories and later product research (historical archive) |
+| `scripts/` | Build-time tools (incl. `generate-icons.mjs`) |
+
+## Community
+
+Questions, setup help and "how do I do X with cairn" go to [GitHub Discussions](https://github.com/xiechimon/cairn/discussions): the **Q&A** category for questions and **Show and tell** for what you built. Bugs and feature work go to the [issue tracker](https://github.com/xiechimon/cairn/issues), where a maintainer labels them before an agent picks them up. Security reports go to neither place; see [SECURITY.md](./SECURITY.md).
+
+After your team's first pull request merges, Cairn can show a dismissible card linking to a prefilled discussion post. The card is off by default, Cairn opens nothing on its own, and nothing is sent anywhere: you choose whether to submit the post. [docs/privacy.md](./docs/privacy.md) lists the exact fields the prefilled text carries.
+
+## Third-party credits
+
+- Avatar font [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
+- Fonts Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
+- Icons [lucide](https://lucide.dev) — ISC License
+- Emoji curation data [gitmoji](https://gitmoji.dev) — MIT License
+- Execution engine [pi SDK](https://github.com/badlogic/pi-mono) — MIT License
+
+## License
+
+Apache-2.0 — see [LICENSE](./LICENSE).

@@ -1,0 +1,53 @@
+# #1403 round 6 mutations: each one applied alone, then pr-reconcile.test.ts and ci-loop.test.ts.
+# Run on the tree that became the round 6 commit.
+# Definitions (name, file, text replaced, replacement) below.
+
+merged outcome settled twice                  4 failed | 69 passed (73)
+manual done not counted as settled            1 failed | 72 passed (73)
+closed outcome settled twice                  1 failed | 72 passed (73)
+closed before review entry failed anyway      1 failed | 72 passed (73)
+settled not re-read after compare             1 failed | 72 passed (73)
+missing head sha finishes the card            1 failed | 72 passed (73)
+missing base taken as the default branch      1 failed | 72 passed (73)
+non-default base accepted                     1 failed | 72 passed (73)
+gate step waiting for quota holds the reconcile 1 failed | 72 passed (73)
+gate step waiting for quota not stopped       2 failed | 71 passed (73)
+no in-flight recheck after the pulls read     1 failed | 72 passed (73)
+no in-flight recheck after compare            1 failed | 72 passed (73)
+compare cache off                             2 failed | 71 passed (73)
+compare 404 re-read every sweep               1 failed | 72 passed (73)
+compare 404 never re-read                     1 failed | 72 passed (73)
+compare unreadable treated as read            3 failed | 70 passed (73)
+caches never pruned                           1 failed | 72 passed (73)
+oldest checkpoint used                        1 failed | 72 passed (73)
+hint written every sweep                      3 failed | 70 passed (73)
+gate steps left on merge                      3 failed | 70 passed (73)
+gate steps left on close                      1 failed | 72 passed (73)
+any sha put into the compare URL              1 failed | 72 passed (73)
+requestMerge does not re-read the phase       1 failed | 72 passed (73)
+review action does not re-read the phase      1 failed | 72 passed (73)
+
+["merged outcome settled twice", "apps/server/src/services/ci-loop.ts", "      ? hasRow(buildId, 'system', DONE_ROW) || hasRow(buildId, 'user', DONE_ANNOUNCEMENT)\n", "      ? false\n"]
+["manual done not counted as settled", "apps/server/src/services/ci-loop.ts", " || hasRow(buildId, 'user', DONE_ANNOUNCEMENT)", ""]
+["closed outcome settled twice", "apps/server/src/services/ci-loop.ts", "      : hasRow(buildId, 'system', closedText);", "      : false;"]
+["closed before review entry failed anyway", "apps/server/src/services/ci-loop.ts", "      !pull.merged &&\n      (pull.closedAt === null", "      false &&\n      (pull.closedAt === null"]
+["settled not re-read after compare", "apps/server/src/services/ci-loop.ts", " ||\n          settled(cand.buildId, true, closedText)\n", "\n"]
+["missing head sha finishes the card", "apps/server/src/services/ci-loop.ts", "      if (checkpoint !== null && pull.headSha === null) {", "      if (false) {"]
+["missing base taken as the default branch", "apps/server/src/services/ci-loop.ts", "if (pull.baseRef === null || pull.defaultBranch === null) {", "if (false) {"]
+["non-default base accepted", "apps/server/src/services/ci-loop.ts", "if (pull.baseRef !== pull.defaultBranch) {", "if (false) {"]
+["gate step waiting for quota holds the reconcile", "apps/server/src/services/ci-loop.ts", "inArray(step.status, ['pending', 'waiting_quota']),\n                notInArray", "eq(step.status, 'pending'),\n                notInArray"]
+["gate step waiting for quota not stopped", "apps/server/src/services/builds.ts", "inArray(step.status, ['pending', 'waiting_quota']),\n        inArray(step.kind", "eq(step.status, 'pending'),\n        inArray(step.kind"]
+["no in-flight recheck after the pulls read", "apps/server/src/services/ci-loop.ts", "if (fresh === null || hasActiveStep(cand.buildId)) {", "if (fresh === null) {"]
+["no in-flight recheck after compare", "apps/server/src/services/ci-loop.ts", "          hasActiveStep(cand.buildId) ||\n          settled", "          settled"]
+["compare cache off", "apps/server/src/services/ci-loop.ts", "          cached === undefined ||\n", "          true ||\n"]
+["compare 404 re-read every sweep", "apps/server/src/services/ci-loop.ts", "now - cached.at >= CI_MISSING_COMPARE_RECHECK_MS", "true"]
+["compare 404 never re-read", "apps/server/src/services/ci-loop.ts", "now - cached.at >= CI_MISSING_COMPARE_RECHECK_MS", "false"]
+["compare unreadable treated as read", "apps/server/src/services/ci-loop.ts", "          if (status === null) {\n            tally.unreadable += 1;\n            return;\n          }\n", ""]
+["caches never pruned", "apps/server/src/services/ci-loop.ts", "    for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);\n", ""]
+["oldest checkpoint used", "apps/server/src/services/ci-loop.ts", ".orderBy(desc(step.createdAt))", ".orderBy(step.createdAt)"]
+["hint written every sweep", "apps/server/src/services/ci-loop.ts", "    if (hasRow(buildId, 'system', content)) return;\n", ""]
+["gate steps left on merge", "apps/server/src/services/ci-loop.ts", "      stopUnclaimedGateSteps(deps, cand.buildId);\n      finishTodoDone", "      finishTodoDone"]
+["gate steps left on close", "apps/server/src/services/ci-loop.ts", "    stopUnclaimedGateSteps(deps, cand.buildId);\n    failWithMessage", "    failWithMessage"]
+["any sha put into the compare URL", "apps/server/src/lib/github.ts", "  if (!FULL_SHA.test(base) || !FULL_SHA.test(head)) return 'invalid';\n", ""]
+["requestMerge does not re-read the phase", "apps/server/src/services/builds.ts", "    assertPhaseTransition(after.phase, 'done');\n", ""]
+["review action does not re-read the phase", "apps/server/src/services/builds.ts", "    if (after?.phase !== todoRecord.phase) {", "    if (false) {"]

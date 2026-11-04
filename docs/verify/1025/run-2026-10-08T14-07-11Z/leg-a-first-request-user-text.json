@@ -1,0 +1,4 @@
+{
+  "expected": "1025 首轮契约探针 · hosted 腿\n\n首轮规划：按提示词契约把方案写进 plan.md（#1025 探针任务）。\n\n本步的交接物是 plan.md：结束本步前，将方案写入工作区根目录的 plan.md（覆盖 Context/Changes/Edge cases/Verification 四段）。",
+  "actual": "1025 首轮契约探针 · hosted 腿\n\n首轮规划：按提示词契约把方案写进 plan.md（#1025 探针任务）。\n\n本步的交接物是 plan.md：结束本步前，将方案写入工作区根目录的 plan.md（覆盖 Context/Changes/Edge cases/Verification 四段）。"
+}

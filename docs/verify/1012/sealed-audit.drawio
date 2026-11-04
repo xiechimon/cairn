@@ -1,0 +1,72 @@
+<mxfile host="claude-agent" modified="2026-10-09T00:00:00.000Z" agent="drawio-skill" version="24.7.17" type="device">
+  <diagram id="sealed-1012" name="1012 sealed audit">
+    <mxGraphModel dx="1400" dy="860" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1540" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="#1012 sealed - terminal audit of map #980: annotations + evidence, zero runtime surface" style="text;html=1;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="16" width="1460" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="inputs" value="1 - audit inputs (tree e87186d3 = origin/main)" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=13;fontStyle=1;whiteSpace=wrap;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="440" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="inE2e" value="full local e2e&#10;862 / 862 green (5.3m, port 8399)" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="inputs">
+          <mxGeometry x="16" y="40" width="408" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="inProbe" value="probe sealing, run-4 = the new negative&#10;894 visual rows: KEPT 894 / DRIFT 0 /&#10;VIOLATION 0 / NOT-RUN 0&#10;(4-run attribution account archived:&#10;run-2 contention-invalid, run-3 tracer race)" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="inputs">
+          <mxGeometry x="16" y="112" width="408" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="inLedger" value="hash ledger final audit (reconcile, no refresh)&#10;33 files = 26 registry (19 pristine /&#10;7 deviated) + 7 adapters, zero drift&#10;snapshot shadcn@4.21.3, frozen a0659279" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="inputs">
+          <mxGeometry x="16" y="248" width="408" height="104" as="geometry" />
+        </mxCell>
+        <mxCell id="inMap" value="#980 map close-out audit&#10;Decisions rows per closed ticket /&#10;Out-of-scope scan over 14 wave PRs /&#10;sub-ticket states / Not-yet-specified empty" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="inputs">
+          <mxGeometry x="16" y="368" width="408" height="104" as="geometry" />
+        </mxCell>
+        <mxCell id="inCanon" value="historical canon audit&#10;#909 abdication note / spec-22 + ADR 0009&#10;superseded headers / ADR 0012 revision /&#10;spec 06-11-18 (#1013) / #851 gate ruling" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="inputs">
+          <mxGeometry x="16" y="488" width="408" height="104" as="geometry" />
+        </mxCell>
+        <mxCell id="treeDelta" value="2 - tree delta (annotations + evidence only)" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=13;fontStyle=1;whiteSpace=wrap;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="550" y="70" width="450" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="tdCi" value="ci.yml: two comment blocks&#10;#851 debt + drift gates ruled PERMANENT&#10;regression gates - coverage orthogonal to&#10;the #989-era gates, baselines at the floor&#10;(0 per-face css / 3 deliberate-native)" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="treeDelta">
+          <mxGeometry x="16" y="40" width="418" height="112" as="geometry" />
+        </mxCell>
+        <mxCell id="tdGate" value="ui-debt-gate.mjs header&#10;construction-period brake -&gt; standing ratchet" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="treeDelta">
+          <mxGeometry x="16" y="168" width="418" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="tdEv" value="docs/verify/1012/**&#10;audit-sealed.sh (rerunnable, ALL PASS) +&#10;e2e log + probe-sealed negative +&#10;flake-attribution + gates.txt sweep" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="treeDelta">
+          <mxGeometry x="16" y="240" width="418" height="96" as="geometry" />
+        </mxCell>
+        <mxCell id="trackerDelta" value="3 - tracker delta" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#9673a6;fillColor=#e1d5e7;fontSize=13;fontStyle=1;whiteSpace=wrap;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="70" width="430" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="tkMap" value="#980 body: +7 Decisions rows&#10;(#1004-#1008, #1010, #1013)&#10;PATCH readback byte-MATCH;&#10;21 closed sub-tickets now all carry a row" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="trackerDelta">
+          <mxGeometry x="16" y="40" width="398" height="104" as="geometry" />
+        </mxCell>
+        <mxCell id="tkGate" value="MERGE GATE: #1011 still open (t-0261)&#10;this PR does not merge before it closes;&#10;the probe baseline stays provisional&#10;until that verdict lands" style="rounded=1;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;fontStyle=1;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="trackerDelta">
+          <mxGeometry x="16" y="160" width="398" height="96" as="geometry" />
+        </mxCell>
+        <mxCell id="tkClose" value="closes #1012 only&#10;#980 is closed by the user after merge&#10;(map closure = destination reached)" style="rounded=1;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=12;align=left;spacing=6;whiteSpace=wrap;" vertex="1" parent="trackerDelta">
+          <mxGeometry x="16" y="272" width="398" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="verdict" value="#851 ruling: KEEP both gates - retire = per-face-css regrowth and content-level drift go ungated (no second carrier); keep = zero cost, floor ratchets block regrowth" style="rounded=1;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;align=center;spacing=6;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="550" y="520" width="950" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="eInTree" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;strokeWidth=2;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="inputs" target="treeDelta">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eInTracker" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#6c8ebf;strokeWidth=2;exitX=1;exitY=0.12;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="inputs" target="trackerDelta">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="510" y="40" />
+              <mxPoint x="1285" y="40" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="eCanonVerdict" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="inputs" target="verdict">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

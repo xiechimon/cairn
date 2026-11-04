@@ -1,0 +1,43 @@
+# #1404 S1 mutations, round 3 (ADR 0021 D4 amended): each new rule undone alone, then the three S1 test files
+# (pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts), source restored after each.
+# Every mutation turns at least one test red. Definitions (name, file, text replaced, replacement) below.
+
+count: evidence files left out                3 failed | 74 passed (77)
+count: rename as one file                     1 failed | 76 passed (77)
+count: evidence lines left out                2 failed | 75 passed (77)
+parse: hasPatch always true                   2 failed | 75 passed (77)
+parse: empty patch counts                     1 failed | 76 passed (77)
+parse: non-string patch counts                1 failed | 76 passed (77)
+parse: negative additions accepted            1 failed | 76 passed (77)
+parse: negative deletions accepted            1 failed | 76 passed (77)
+parse: changes unchecked                      1 failed | 76 passed (77)
+parse: negative changes accepted              1 failed | 76 passed (77)
+parse: isCount without >= 0                   1 failed | 76 passed (77)
+paths: opaque list off                        2 failed | 75 passed (77)
+paths: opaque includes evidence               2 failed | 75 passed (77)
+paths: opaque evidence prefix case-sensitive  1 failed | 76 passed (77)
+paths: opaque new name only                   1 failed | 76 passed (77)
+link: query and fragment kept in path         2 failed | 75 passed (77)
+link: fragment kept                           2 failed | 75 passed (77)
+link: query kept                              2 failed | 75 passed (77)
+link: dedupe on the full url                  1 failed | 76 passed (77)
+
+["count: evidence files left out", "apps/server/src/services/merge-gate/digest.ts", "const countedFiles = files.reduce(", "const countedFiles = kept.reduce("]
+["count: rename as one file", "apps/server/src/services/merge-gate/digest.ts", "n + (f.previousFilename === null ? 1 : 2)", "n + 1"]
+["count: evidence lines left out", "apps/server/src/services/merge-gate/digest.ts", "const countedLines = files.reduce(", "const countedLines = kept.reduce("]
+["parse: hasPatch always true", "apps/server/src/services/merge-gate/digest.ts", "hasPatch: typeof f.patch === 'string' && f.patch !== '',", "hasPatch: true,"]
+["parse: empty patch counts", "apps/server/src/services/merge-gate/digest.ts", "typeof f.patch === 'string' && f.patch !== ''", "typeof f.patch === 'string'"]
+["parse: non-string patch counts", "apps/server/src/services/merge-gate/digest.ts", "typeof f.patch === 'string' && f.patch !== ''", "f.patch !== undefined && f.patch !== ''"]
+["parse: negative additions accepted", "apps/server/src/services/merge-gate/digest.ts", "!isCount(f.additions) || !isCount(f.deletions)", "!Number.isInteger(f.additions) || !isCount(f.deletions)"]
+["parse: negative deletions accepted", "apps/server/src/services/merge-gate/digest.ts", "!isCount(f.additions) || !isCount(f.deletions)", "!isCount(f.additions) || !Number.isInteger(f.deletions)"]
+["parse: changes unchecked", "apps/server/src/services/merge-gate/digest.ts", "    if (!(f.changes === undefined || isCount(f.changes))) return null;\n", ""]
+["parse: negative changes accepted", "apps/server/src/services/merge-gate/digest.ts", "isCount(f.changes)", "Number.isInteger(f.changes)"]
+["parse: isCount without >= 0", "apps/server/src/services/merge-gate/digest.ts", "Number.isInteger(n) && (n as number) >= 0", "Number.isInteger(n)"]
+["paths: opaque list off", "apps/server/src/services/merge-gate/paths.ts", "      if (!f.hasPatch && !isEvidence(name)) push(out.opaque, name);\n", ""]
+["paths: opaque includes evidence", "apps/server/src/services/merge-gate/paths.ts", "if (!f.hasPatch && !isEvidence(name))", "if (!f.hasPatch)"]
+["paths: opaque evidence prefix case-sensitive", "apps/server/src/services/merge-gate/paths.ts", "!isEvidence(name)) push(out.opaque", "!name.startsWith(EVIDENCE_PREFIX)) push(out.opaque"]
+["paths: opaque new name only", "apps/server/src/services/merge-gate/paths.ts", "if (!f.hasPatch && !isEvidence(name))", "if (!f.hasPatch && !isEvidence(name) && name === f.filename)"]
+["link: query and fragment kept in path", "apps/server/src/services/merge-gate/evidence-link.ts", "const parts = bare.slice(", "const parts = url.slice("]
+["link: fragment kept", "apps/server/src/services/merge-gate/evidence-link.ts", "const QUERY_OR_FRAGMENT_RE = /[?#].*$/;", "const QUERY_OR_FRAGMENT_RE = /\\?.*$/;"]
+["link: query kept", "apps/server/src/services/merge-gate/evidence-link.ts", "const QUERY_OR_FRAGMENT_RE = /[?#].*$/;", "const QUERY_OR_FRAGMENT_RE = /#.*$/;"]
+["link: dedupe on the full url", "apps/server/src/services/merge-gate/evidence-link.ts", "if (seen.has(bare)) continue;\n    seen.add(bare);", "if (seen.has(url)) continue;\n    seen.add(url);"]

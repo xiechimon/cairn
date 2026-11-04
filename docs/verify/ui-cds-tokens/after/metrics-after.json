@@ -1,0 +1,13 @@
+{
+  "radiusComposer": "20px",
+  "radiusBubble": "18px",
+  "sidebarW": "288px",
+  "easeOutExpo": "cubic-bezier(0.16, 1, 0.3, 1)",
+  "surface1": "color-mix(in oklab, #f6f1ec, #f0ebe6 50%)",
+  "hover1": "color-mix(in oklab, #120f0b 5%, transparent)",
+  "borderSoft": "color-mix(in oklab, #120f0b 9%, transparent)",
+  "ringInset": "color-mix(in oklab, #120f0b 10%, transparent)",
+  "background": "#f6f1ec",
+  "card": "#f0ebe6",
+  "composerRadius": "20px"
+}

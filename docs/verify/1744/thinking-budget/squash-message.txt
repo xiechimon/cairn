@@ -1,0 +1,18 @@
+daemon(1744): preserve thinking budgets during summary recovery (#1933)
+
+Retry message-shaped compaction summaries that exceed provider context limits.
+Preserve enabled thinking budgets and reserve at least one additional output
+token; shorten conversation input when output cannot fit that constraint.
+Keep ordinary requests and non-ceiling errors unchanged, and retain bounded
+retry logs and explicit terminal errors.
+
+Verified with 22 compaction cases, including test-first failures for both
+reported-input and generic ceiling errors, plus captured retry parameters.
+Port the original lessons to main's per-file ledger without restoring its
+obsolete table.
+
+Part of #1744. Live production step survival and Responses-shaped requests
+remain outside this delivery's verified scope.
+
+Co-authored-by: Cairnwright <348051526+cairnwright@users.noreply.github.com>
+Co-authored-by: XMON <xmon345@gmail.com>

@@ -1,0 +1,75 @@
+# Pre-change transcript: every docs/verify/939 fixture plus the PR
+# template run through scripts/pr-evidence-gate.py as it stood on
+# origin/main (da84ed9c, before #939/#940). Recorded 2026-10-07T16:41:06Z.
+# Format per case: '$ <command>' then stdout then exit=N.
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-codeblock-bare.md
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://raw.githubusercontent.com/xiechimon/pacman/da84ed9c9da81ea1ff716416b2562d4b342d22b8/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png (bare URL, line 17)
+pr-evidence: RED (1 problem(s))
+exit=1
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-ext-anyhost-bare.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-ext-anyhost-embedded.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-img-tag-dragdrop.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-raw-refs-green.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-raw-svg-embedded.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-sections-both.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-sections-empty.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-sections-fenced.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-sections-missing.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-sections-one.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-user-attachments-bare.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/939/fixture-user-images-link.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0
+
+$ python3 scripts/pr-evidence-gate.py .github/PULL_REQUEST_TEMPLATE.md
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+exit=0

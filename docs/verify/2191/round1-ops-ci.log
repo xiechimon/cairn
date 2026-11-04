@@ -1,0 +1,52 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: GNU rsync 3.x must come first on PATH (found /usr/bin/rsync: openrsync: protocol version 29)
+    at file://<worktree>/scripts/ops/backup-server-db.test.mjs:30:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'openrsync: protocol version 29\nrsync version 2.6.9 compatible\n',
+  expected: /^rsync\s+version 3\./,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v26.8.1
+✖ scripts/ops/backup-server-db.test.mjs (1134.953833ms)
+✔ sends one authenticated alert for the given user and prints receipt outcome (346.53425ms)
+✔ rejects unauthorized instances and never reports fallback as a phone receipt (1.612583ms)
+✖ pending status is polled until receipt and deadline bounds unsettled requests (172.080291ms)
+✔ required alert displays before posting its authenticated id even with a focused page (665.6015ms)
+✔ failed display never posts a receipt (2.298875ms)
+✔ ordinary foreground pushes still display (2.584625ms)
+✔ receipt works without a stored token and refuses external receipt URLs (1.598667ms)
+✔ ops tests run in prepush and the backup CI job and journal ends with a newline (1.511166ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 7
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2030.976625
+
+✖ failing tests:
+
+test at scripts/ops/backup-server-db.test.mjs:1:1
+✖ scripts/ops/backup-server-db.test.mjs (1134.953833ms)
+  'test failed'
+
+test at scripts/ops/push-test.test.mjs:66:1
+✖ pending status is polled until receipt and deadline bounds unsettled requests (172.080291ms)
+  Error: Push test deadline exceeded
+      at request (file://<worktree>/scripts/ops/push-test.mjs:19:31)
+      at runPushTest (file://<worktree>/scripts/ops/push-test.mjs:32:27)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processTimers (node:internal/timers:615:9)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/ops/push-test.test.mjs:79:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

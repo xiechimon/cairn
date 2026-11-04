@@ -1,0 +1,21 @@
+{
+  "create": {
+    "id": "vRKH_Rj6dAOWdhyxOs_SA"
+  },
+  "get": {
+    "id": "vRKH_Rj6dAOWdhyxOs_SA",
+    "displayName": "XMON-74 权限闭环验证",
+    "description": null,
+    "status": "active",
+    "avatarUrl": null,
+    "provider": "xmon74-gw",
+    "modelId": "stub-model",
+    "thinkingLevel": null,
+    "tools": [
+      "推送分支"
+    ],
+    "secrets": [],
+    "skills": [],
+    "mcpServers": []
+  }
+}

@@ -1,0 +1,30 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1948
+
+ ❯ |@cairn/integration| test/harbor-submission.test.ts (15 tests | 1 failed) 480ms
+   × serializing the submission boundary cannot collect credentials 29ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/harbor-submission.test.ts > serializing the submission boundary cannot collect credentials
+AssertionError: expected '{"outcomes":[],"base":"http://harbor.…' not to contain '[REDACTED]'
+
+Expected: "[REDACTED]"
+Received: "{"outcomes":[],"base":"http://harbor.test","serverToken":"[REDACTED]","machineToken":"[REDACTED]","projectId":"second","teamId":"yAfn50YBT2HaLzbChjhiN","machineId":"harbor-machine","agentId":"harbor-agent"}"
+
+ ❯ test/harbor-submission.test.ts:172:24
+    170|   const { env, fetcher, serverToken, machineToken } = world();
+    171|   const artifact = JSON.stringify(new HarborSubmission(env, fetcher));
+    172|   expect(artifact).not.toContain(serverToken);
+       |                        ^
+    173|   expect(artifact).not.toContain(machineToken);
+    174| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  17:54:57
+   Duration  1.89s (transform 48%, tests 26%, import 25%)
+

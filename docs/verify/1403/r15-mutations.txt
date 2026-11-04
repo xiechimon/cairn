@@ -1,0 +1,213 @@
+# #1403 round 15 mutations (pr-gate run 7 on #1414): each one applied alone to the head sources
+# at c6cf10b (no /simplify commit this round, so these are the final sources), then
+# pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+# (125 tests). The runner copied each touched file aside, applied the edit (the old text must occur
+# exactly once), ran the tests, copied the file back and checked 'git diff --quiet HEAD -- <file>'.
+# 22 of 22 mutations turn at least one test red; every source was restored.
+# M1-M10d cover this round's fixes and pins; R14-M1..R14-M4 are the round 14 mutations re-run at
+# these head sources (R14-M1 and R14-M2 adapted to the repo-id comparison that replaced the name one).
+# M1 has to add a head repo name to githubPull's result to compare by name, so the whole-object pins
+# [66a] and [66b] go red with it; [62c] is the case that pins the behavior.
+
+M1 fix 1: head repo compared with the project's stored name again (head.repo.full_name vs target, without case)
+    Tests  4 failed | 121 passed (125)   (restored)
+    × pr-reconcile: [62c] the repo was renamed on GitHub (head and base both octo/demo2, the project still says octo/demo) → done
+    × pr-reconcile: [62c] the repo was transferred on GitHub (head and base both neworg/demo, the project still says octo/demo) → done
+    × pr-reconcile: [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+    × pr-reconcile: [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+M2a fix 2: a null head repo is unreadable again (cache dropped, no hint)
+    Tests  2 failed | 123 passed (125)   (restored)
+    × pr-reconcile: [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    × pr-reconcile: [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+M2b fix 2: the foreign result is dropped from the cache
+    Tests  2 failed | 123 passed (125)   (restored)
+    × pr-reconcile: [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    × pr-reconcile: [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+M2c fix 2: the foreign result is not counted
+    Tests  4 failed | 121 passed (125)   (restored)
+    × pr-reconcile: [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+    × pr-reconcile: [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+    × pr-reconcile: [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    × pr-reconcile: [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+M2d fix 2: a missing base repo id is not unreadable (only head.ref is checked)
+    Tests  3 failed | 122 passed (125)   (restored)
+    × pr-reconcile: ㉗ a merged response without base or default_branch is not taken as a merge into the default branch
+    × pr-reconcile: [61] a merged response without base is read again on a later sweep; the complete one finishes the card
+    × pr-reconcile: [61] a merged response without the base repo id is read again on a later sweep; the complete one finishes the card
+M5a fix 5: mergeCommitSha taken without the merged gate (the live open PR carries a test-merge sha)
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+M5b fix 5: base repo id read from a field the live body does not carry as a number (node_id)
+    Tests  58 failed | 67 passed (125)   (restored)
+    × pr-reconcile: [62c] the repo was renamed on GitHub (head and base both octo/demo2, the project still says octo/demo) → done
+    × pr-reconcile: [62c] the repo was transferred on GitHub (head and base both neworg/demo, the project still says octo/demo) → done
+    × pr-reconcile: [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+    × pr-reconcile: [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+    ... and 54 more: every case that reaches the ownership check reads as unreadable
+M5c fix 5: compare without per_page=1
+    Tests  3 failed | 122 passed (125)   (restored)
+    × pr-reconcile: ㊼ compare asks for one page
+    × pr-reconcile: [66c] compare between two commits on main reads ahead
+    × pr-reconcile: [66c] compare between two commits on main reads behind
+M6a fix 6 (the r6 mutation): a missing head sha finishes the card
+    Tests  2 failed | 123 passed (125)   (restored)
+    × pr-reconcile: ㉚ merged, the response has no head sha, the build has a checkpoint → not finished
+    × pr-reconcile: [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+M6b fix 6 (the r13 mutation): the head-sha guard keeps the incomplete response in the cache
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+M7 fix 7: compare 'behind' counted as contained
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: ⑭a merged, but compare says behind: the checkpoint is not in the merged head → stays in review with a hint
+M8 fix 8: finishTodoDone without advanceSplitWaves
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [64] the reconcile finishing a split child advances the waves: the unblocked sibling starts
+M9a fix 9: finishTodoDone throws some other error before it stops anything
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [59] the merge step finishing a card a person closed meanwhile throws before it stops anything
+M9b fix 9: finishTodoDone without its early transition check (setTodoPhase throws after the steps were stopped)
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [59] the merge step finishing a card a person closed meanwhile throws before it stops anything
+M10a fix 10: base and default branch quoted raw
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [65a] an over-long base branch name with control characters is cut to 100 characters in the hint
+M10b fix 10: merger login and merge commit quoted raw
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [65b] the merger login and the merge commit in the merge row lose control characters and are bounded
+M10c fix 10: githubText keeps control characters
+    Tests  2 failed | 123 passed (125)   (restored)
+    × pr-reconcile: [65a] an over-long base branch name with control characters is cut to 100 characters in the hint
+    × pr-reconcile: [65b] the merger login and the merge commit in the merge row lose control characters and are bounded
+M10d fix 10: githubText does not bound the length
+    Tests  2 failed | 123 passed (125)   (restored)
+    × pr-reconcile: [65a] an over-long base branch name with control characters is cut to 100 characters in the hint
+    × pr-reconcile: [65b] the merger login and the merge commit in the merge row lose control characters and are bounded
+R14-M1 round 14 M1 at head: the head repo check out (branch only)
+    Tests  4 failed | 121 passed (125)   (restored)
+    × pr-reconcile: [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+    × pr-reconcile: [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+    × pr-reconcile: [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    × pr-reconcile: [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+R14-M2 round 14 M2 at head: the head branch check out (repo only)
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [62b] a PR from another branch of the target repo → not finished
+R14-M3 round 14 M3 at head: the merge step's tail without finishTodoDone (no stopUnclaimedGateSteps)
+    Tests  1 failed | 124 passed (125)   (restored)
+    × pr-reconcile: [63] a merge step completing through completeStep stops an unclaimed verify step
+R14-M4 round 14 M4 at head: waiting_quota out of the in-flight query
+    Tests  3 failed | 122 passed (125)   (restored)
+    × ci-loop: #1403 等额度挂起的修复步算在飞：不读 checks、不追加第二条 [ci-fix]
+    × ci-loop: #1403 等额度挂起的执行步（无 marker，如 #931 返工轮）同样算在飞：不派修复步
+    × pr-reconcile: ⑮a a merge step waiting for quota counts as in flight
+
+# Definitions (file, text replaced -> replacement)
+## M1 fix 1: head repo compared with the project's stored name again (head.repo.full_name vs target, without case)
+## apps/server/src/lib/github.ts
+-      headRepoId: typeof raw.head?.repo?.id === 'number' ? raw.head.repo.id : null,
++      headRepoId: typeof raw.head?.repo?.id === 'number' ? raw.head.repo.id : null,
++      headRepoName: (raw.head?.repo as { full_name?: string } | null | undefined)?.full_name ?? null,
+## apps/server/src/services/ci-loop.ts
+-    if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
++    if (String((pull as unknown as { headRepoName: string | null }).headRepoName).toLowerCase() !== target.fullName.toLowerCase() || pull.headRef !== branch) {
+## M2a fix 2: a null head repo is unreadable again (cache dropped, no hint)
+## apps/server/src/services/ci-loop.ts
+-    if (pull.headRef === null || pull.baseRepoId === null) {
++    if (pull.headRef === null || pull.baseRepoId === null || pull.headRepoId === null) {
+## M2b fix 2: the foreign result is dropped from the cache
+## apps/server/src/services/ci-loop.ts
+-      tally.reviewForeign += 1;
++      tally.reviewForeign += 1;
++      pullCache.delete(key);
+## M2c fix 2: the foreign result is not counted
+## apps/server/src/services/ci-loop.ts
+-      tally.reviewForeign += 1;
+## M2d fix 2: a missing base repo id is not unreadable (only head.ref is checked)
+## apps/server/src/services/ci-loop.ts
+-    if (pull.headRef === null || pull.baseRepoId === null) {
++    if (pull.headRef === null) {
+## M5a fix 5: mergeCommitSha taken without the merged gate (the live open PR carries a test-merge sha)
+## apps/server/src/lib/github.ts
+-        merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
++        typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
+## M5b fix 5: base repo id read from a field the live body does not carry as a number (node_id)
+## apps/server/src/lib/github.ts
+-      baseRepoId: typeof raw.base?.repo?.id === 'number' ? raw.base.repo.id : null,
++      baseRepoId: typeof (raw.base?.repo as { node_id?: unknown } | null | undefined)?.node_id === 'number' ? 1 : null,
+## M5c fix 5: compare without per_page=1
+## apps/server/src/lib/github.ts
+-/compare/${base}...${head}?per_page=1`;
++/compare/${base}...${head}`;
+## M6a fix 6 (the r6 mutation): a missing head sha finishes the card
+## apps/server/src/services/ci-loop.ts
+-      if (checkpoint !== null && pull.headSha === null) {
++      if (false) {
+## M6b fix 6 (the r13 mutation): the head-sha guard keeps the incomplete response in the cache
+## apps/server/src/services/ci-loop.ts
+-        pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
+## M7 fix 7: compare 'behind' counted as contained
+## apps/server/src/services/ci-loop.ts
+-        if (status !== 'ahead' && status !== 'identical') {
++        if (status !== 'ahead' && status !== 'identical' && status !== 'behind') {
+## M8 fix 8: finishTodoDone without advanceSplitWaves
+## apps/server/src/services/builds.ts
+-  advanceSplitWaves(deps, todoId);
+-}
+-
+-export class NotFoundError
++}
++
++export class NotFoundError
+## M9a fix 9: finishTodoDone throws some other error before it stops anything
+## apps/server/src/services/builds.ts
+-  if (current !== undefined && current !== 'done') assertPhaseTransition(current, 'done');
++  if (current !== undefined && current !== 'done' && current !== 'review') throw new TypeError('boom');
+## M9b fix 9: finishTodoDone without its early transition check (setTodoPhase throws after the steps were stopped)
+## apps/server/src/services/builds.ts
+-  if (current !== undefined && current !== 'done') assertPhaseTransition(current, 'done');
+## M10a fix 10: base and default branch quoted raw
+## apps/server/src/services/ci-loop.ts
+-合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(pull.defaultBranch)}」
++合并进了分支「${pull.baseRef}」，不是默认分支「${pull.defaultBranch}」
+## M10b fix 10: merger login and merge commit quoted raw
+## apps/server/src/services/ci-loop.ts
+-          : `合并提交 ${githubText(pull.mergeCommitSha).slice(0, 7)}`,
+-        pull.mergedBy === null ? null : `由 ${githubText(pull.mergedBy)} 合并`,
++          : `合并提交 ${pull.mergeCommitSha.slice(0, 7)}`,
++        pull.mergedBy === null ? null : `由 ${pull.mergedBy} 合并`,
+## M10c fix 10: githubText keeps control characters
+## apps/server/src/services/ci-loop.ts
+-  const chars = Array.from(text.replace(/\p{Cc}/gu, ''));
++  const chars = Array.from(text);
+## M10d fix 10: githubText does not bound the length
+## apps/server/src/services/ci-loop.ts
+-  return chars.length > GITHUB_TEXT_MAX
++  return chars.length > Number.POSITIVE_INFINITY
+## R14-M1 round 14 M1 at head: the head repo check out (branch only)
+## apps/server/src/services/ci-loop.ts
+-    if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
++    if (pull.headRef !== branch) {
+## R14-M2 round 14 M2 at head: the head branch check out (repo only)
+## apps/server/src/services/ci-loop.ts
+-    if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
++    if (pull.headRepoId !== pull.baseRepoId) {
+## R14-M3 round 14 M3 at head: the merge step's tail without finishTodoDone (no stopUnclaimedGateSteps)
+## apps/server/src/services/builds.ts
+-  finishTodoDone(deps, todoRow.id, buildRow.id);
+-}
+-
+-/** done 收尾漏斗写的完成行
++  setTodoPhase(deps, todoRow.id, 'done');
++  insertMessageRow(deps, buildRow.id, {
++    id: newRecordId(),
++    role: 'system',
++    content: DONE_ROW,
++    createdAt: nowMs(),
++  });
++  advanceSplitWaves(deps, todoRow.id);
++}
++
++/** done 收尾漏斗写的完成行
+## R14-M4 round 14 M4 at head: waiting_quota out of the in-flight query
+## apps/server/src/services/ci-loop.ts
+-                inArray(step.status, ['pending', 'waiting_quota']),
++                inArray(step.status, ['pending']),

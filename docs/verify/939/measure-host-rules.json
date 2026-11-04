@@ -1,0 +1,1173 @@
+{
+ "fetched": "2026-10-07T17:06:24Z",
+ "pin": "da84ed9c9da81ea1ff716416b2562d4b342d22b8",
+ "merged": [
+  1001,
+  1000,
+  999,
+  998,
+  996,
+  995,
+  993,
+  992,
+  979,
+  978,
+  977,
+  976,
+  975,
+  974,
+  973,
+  972,
+  971,
+  970,
+  969,
+  968,
+  967,
+  965,
+  964,
+  963,
+  962
+ ],
+ "open": [],
+ "per_pr": [
+  {
+   "pr": 1001,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 1000,
+   "state": "merged",
+   "old": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 999,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 998,
+   "state": "merged",
+   "old": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 996,
+   "state": "merged",
+   "old": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 11,
+    "not_embedded": 7
+   },
+   "final": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 995,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 12,
+    "not_embedded": 12
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 993,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 5,
+    "not_embedded": 5
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 992,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 8,
+    "not_embedded": 8
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 979,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 6,
+    "not_embedded": 6
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 978,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 977,
+   "state": "merged",
+   "old": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 11,
+    "not_embedded": 7
+   },
+   "final": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 976,
+   "state": "merged",
+   "old": {
+    "scanned": 5,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 5,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 5,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 975,
+   "state": "merged",
+   "old": {
+    "scanned": 7,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 7,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 7,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 974,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 973,
+   "state": "merged",
+   "old": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 0,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 972,
+   "state": "merged",
+   "old": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 10,
+    "not_embedded": 8
+   },
+   "final": {
+    "scanned": 2,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 971,
+   "state": "merged",
+   "old": {
+    "scanned": 11,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 18,
+    "not_embedded": 7
+   },
+   "final": {
+    "scanned": 11,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 970,
+   "state": "merged",
+   "old": {
+    "scanned": 7,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 16,
+    "not_embedded": 9
+   },
+   "final": {
+    "scanned": 7,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 969,
+   "state": "merged",
+   "old": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 968,
+   "state": "merged",
+   "old": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 967,
+   "state": "merged",
+   "old": {
+    "scanned": 8,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 13,
+    "not_embedded": 5
+   },
+   "final": {
+    "scanned": 8,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 965,
+   "state": "merged",
+   "old": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 9,
+    "not_embedded": 5
+   },
+   "final": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 964,
+   "state": "merged",
+   "old": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 4,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 963,
+   "state": "merged",
+   "old": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  },
+  {
+   "pr": 962,
+   "state": "merged",
+   "old": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "literal": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "final": {
+    "scanned": 6,
+    "not_embedded": 0
+   },
+   "sections_answered": 0
+  }
+ ],
+ "literal_new": [
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 23,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/before/activity-wire.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 23,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/before/result.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 27,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/activity-wire.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 28,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/activity-wire-control.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 29,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/messages-918a.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 30,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/result.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 996,
+   "state": "merged",
+   "form": "link",
+   "line": 31,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/3e2db1bb3992e3d8ef197143a09eb1b8457854a8/docs/verify/918/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 38,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/run-scenarios.sh",
+   "class": ".sh-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 38,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 40,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/14-ci-red-on-runner.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 46,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/02-s1-unregistered-file.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 46,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/04-s4-pristine-drift-refrozen.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 46,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/05-s5-downgrade.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 46,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/12-g5-raw-color.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 47,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/01-clean-pass.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 52,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/07-s6-corrupt.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 52,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/08-base-not-fetched.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 52,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/09-bootstrap-pass.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 995,
+   "state": "merged",
+   "form": "link",
+   "line": 52,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/10c3c332e1bfcd405e4d3b59ab0a311522153219/docs/verify/989/13-refresh-deterministic.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 993,
+   "state": "merged",
+   "form": "link",
+   "line": 29,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c176eadce83484fab4db4de95ce2d41de7041d34/docs/verify/917/NOTES.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 993,
+   "state": "merged",
+   "form": "link",
+   "line": 37,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c176eadce83484fab4db4de95ce2d41de7041d34/docs/verify/917/probe-results-run1-skills-option-inert.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 993,
+   "state": "merged",
+   "form": "link",
+   "line": 41,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c176eadce83484fab4db4de95ce2d41de7041d34/docs/verify/917/before-deny-integration-red.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 993,
+   "state": "merged",
+   "form": "link",
+   "line": 41,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c176eadce83484fab4db4de95ce2d41de7041d34/docs/verify/917/before-noskills-integration-red.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 993,
+   "state": "merged",
+   "form": "link",
+   "line": 42,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c176eadce83484fab4db4de95ce2d41de7041d34/docs/verify/917/after-integration-green.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 44,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/wire-old-before/manifest-old-400.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 45,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/wire-new/manifest-new.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 45,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/wire-new/files-verify-new.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 45,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/wire-new/negatives-new.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "bare",
+   "line": 46,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/daemon-success/daemon-success-log.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 46,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/daemon-success/daemon-success-files.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 47,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/daemon-incremental/daemon-incremental-log.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 992,
+   "state": "merged",
+   "form": "link",
+   "line": 48,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/cc7bf8ece5a2b0930f1884065802aca7dc75b09e/docs/verify/920/daemon-fail-old-server/daemon-fail-step-row.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 979,
+   "state": "merged",
+   "form": "link",
+   "line": 34,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c7744266cf16098e4ca430044a9725e107847614/docs/verify/923/catalog-diff.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 979,
+   "state": "merged",
+   "form": "link",
+   "line": 34,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c7744266cf16098e4ca430044a9725e107847614/docs/verify/923/before-catalog.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 979,
+   "state": "merged",
+   "form": "link",
+   "line": 34,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c7744266cf16098e4ca430044a9725e107847614/docs/verify/923/after-catalog.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 979,
+   "state": "merged",
+   "form": "link",
+   "line": 36,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c7744266cf16098e4ca430044a9725e107847614/docs/verify/923/before-crash-recover-daemon-log.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 979,
+   "state": "merged",
+   "form": "link",
+   "line": 36,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c7744266cf16098e4ca430044a9725e107847614/docs/verify/923/after-crash-recover-daemon-log.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 979,
+   "state": "merged",
+   "form": "link",
+   "line": 37,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/c7744266cf16098e4ca430044a9725e107847614/docs/verify/923/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 30,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/audit-terminal-state.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 40,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 42,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/probe-sealed/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 44,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 47,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/live/row-selected-ruling.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 49,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/measure-sealed/token-scale-912-tables.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 977,
+   "state": "merged",
+   "form": "link",
+   "line": 58,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/9dff0afa9c626acd8f679f4f8f344e924e4fb055/docs/verify/953/908-destination-check.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "bare",
+   "line": 30,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/`",
+   "class": "extensionless"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 33,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/measure/diff-report.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 39,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/probe-dump/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 40,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/contrast-945.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 41,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/live/result.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 42,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/local-full-e2e.log",
+   "class": ".log-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 43,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/build-artifact-grep.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 972,
+   "state": "merged",
+   "form": "link",
+   "line": 44,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/7240bafecd6a08ab0e9aced458b8c6ec4f96c6b2/docs/verify/945/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 71,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/probe-dump/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 73,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/contrast.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 98,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/build-artifact-grep.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 127,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/probe-dump/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 128,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/contrast.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 129,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/live/result.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 971,
+   "state": "merged",
+   "form": "link",
+   "line": 132,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/152ed14bb1f1887952df26d7b97d9e2924205d27/docs/verify/950/build-artifact-grep.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 28,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/local-full-e2e.log",
+   "class": ".log-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 29,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/probe-dump/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 30,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/contrast-946.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 34,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/build-artifact-grep.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 42,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/live/drive-946-result.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 68,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/live/schedules-api.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 68,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/live/schedule-sqlite-rows.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 68,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/scripts/drive-946-pages-live.mjs",
+   "class": ".mjs-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 970,
+   "state": "merged",
+   "form": "link",
+   "line": 68,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/1a6d6b156fe6bbadb973b653951d821822cfaeca/docs/verify/946/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 967,
+   "state": "merged",
+   "form": "link",
+   "line": 31,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/5815269c18c5050adf66973713a60756d4de742e/docs/verify/947/local-full-e2e.log",
+   "class": ".log-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 967,
+   "state": "merged",
+   "form": "link",
+   "line": 32,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/5815269c18c5050adf66973713a60756d4de742e/docs/verify/947/probe-dump/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 967,
+   "state": "merged",
+   "form": "link",
+   "line": 33,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/5815269c18c5050adf66973713a60756d4de742e/docs/verify/947/contrast-947.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 967,
+   "state": "merged",
+   "form": "link",
+   "line": 34,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/5815269c18c5050adf66973713a60756d4de742e/docs/verify/947/live-stack/drive-947-secondary/result.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 967,
+   "state": "merged",
+   "form": "link",
+   "line": 35,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/5815269c18c5050adf66973713a60756d4de742e/docs/verify/947/build-artifact-grep.txt",
+   "class": ".txt-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 965,
+   "state": "merged",
+   "form": "link",
+   "line": 49,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/71c99a90/docs/verify/944/README.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 965,
+   "state": "merged",
+   "form": "link",
+   "line": 49,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/71c99a90/docs/verify/944/probe-dump/probe-comparison.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 965,
+   "state": "merged",
+   "form": "link",
+   "line": 50,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/71c99a90/docs/verify/944/contrast.md",
+   "class": ".md-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 965,
+   "state": "merged",
+   "form": "link",
+   "line": 50,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/71c99a90/docs/verify/944/contrast-live.json",
+   "class": ".json-reference"
+  },
+  {
+   "variant": "literal",
+   "pr": 965,
+   "state": "merged",
+   "form": "link",
+   "line": 54,
+   "url": "https://raw.githubusercontent.com/xiechimon/pacman/71c99a90/docs/verify/944/live/",
+   "class": "directory-permalink"
+  }
+ ],
+ "final_new": []
+}

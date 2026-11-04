@@ -1,0 +1,74 @@
+{
+  "probe": "drive-1138-agent-concurrency",
+  "server": "http://127.0.0.1:8791",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0305-1138-agent-concurrency-gate/.claude/verify-run/home/server/server.db",
+  "passed": 12,
+  "total": 12,
+  "checks": [
+    {
+      "name": "D1: PATCH maxConcurrentTasks 0 / 51 → 400（值域 1..50）",
+      "ok": true,
+      "detail": "400/400"
+    },
+    {
+      "name": "D2: PATCH {maxConcurrentTasks:1} → 200 + 记录回读 1 + SQLite 行 1",
+      "ok": true,
+      "detail": "body=1 db=1"
+    },
+    {
+      "name": "D3: 未设置的 Agent 记录 maxConcurrentTasks = null（缺省不限）",
+      "ok": true,
+      "detail": "got null"
+    },
+    {
+      "name": "G1: A 首步可领（闸只挡第二步起）",
+      "ok": true,
+      "detail": "got fzLSL_rcKVIHKojaMXTKR（期望 fzLSL_rcKVIHKojaMXTKR）"
+    },
+    {
+      "name": "G2: A 满载时同批 B 候选照领（候选级闸、无队头阻塞）",
+      "ok": true,
+      "detail": "got KgwUkxgzIAIBwJjsyVPV6（期望 KgwUkxgzIAIBwJjsyVPV6）"
+    },
+    {
+      "name": "G3: A 二步留 pending 未被领（agent 闸挡、步不进失败漏斗）",
+      "ok": true,
+      "detail": "{\"status\":\"pending\",\"machineId\":null}"
+    },
+    {
+      "name": "G4: 他机 claim 同被 agent 闸挡（跨机归账；机器闸开着仍不发 = 两闸各自 gate）",
+      "ok": true,
+      "detail": "{\"hung\":true}"
+    },
+    {
+      "name": "G5: 挂起中的 claim 无步可发（A 唯一候选被闸挡，长轮询真形态）",
+      "ok": true,
+      "detail": "claim 仍挂起（未返回）"
+    },
+    {
+      "name": "C1: A1 done → 空位释放 + wake → 挂起 claim 即刻领走 A2（DB 归属 = 本机）",
+      "ok": true,
+      "detail": "done=200 woken={\"hung\":false,\"status\":200,\"body\":{\"step\":{\"step\":{\"id\":\"LNmTRah3fEUxzn6YZeLTm\",\"buildId\":\"01a12b5c-e464-71d4-aef4-31094 db={\"status\":\"claimed\",\"machineId\":\"uWVEZobuzwYxmpQ3ZkOQn\"}"
+    },
+    {
+      "name": "C2: A1 步收尾落终态（释放 agent 计数位）",
+      "ok": true,
+      "detail": "{\"status\":\"done\"}"
+    },
+    {
+      "name": "R1: PATCH {maxConcurrentTasks:null} → 200 + 记录回 null（清回不限）",
+      "ok": true,
+      "detail": "body=null"
+    },
+    {
+      "name": "R2: 清回不限后 A 新步照领（A2 在跑不挡——不设上限行为完全不变）",
+      "ok": true,
+      "detail": "got hMVIDxJ5yavvR0FMW30zY（期望 hMVIDxJ5yavvR0FMW30zY）"
+    }
+  ],
+  "teamId": "fa6Fk8JQBg8o4CfyEM1rR",
+  "agentA": "xbrhoqRxt1xD_6YQVyupN",
+  "agentB": "znHwcJD9ubRJyqtmEZOwv",
+  "machineMain": "uWVEZobuzwYxmpQ3ZkOQn",
+  "machineOther": "WlcYTQVaR24XtHRucNaog"
+}

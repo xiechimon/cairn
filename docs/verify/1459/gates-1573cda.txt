@@ -1,0 +1,44 @@
+# #1459 gates at 1573cda (the head of #1477 that pr-gate run 1 judged)
+# Run by the coordinator session in worktree p5e on 2026-10-21; copied here on 2026-10-21 (round 2) from its
+# scratchpad output with terminal escape sequences (colors, hyperlinks) removed; the text is otherwise unchanged.
+# Answers pr-gate run 1 suggestion 13 (no gate evidence at the merged head 1573cda).
+
+HEAD 1573cda751eaeec95a7986a907153bfa22f151f0 (clean tree)
+$ pnpm lint
+apps/web/src/resources/machines-page.tsx:317:15 lint/complexity/noUselessFragments  FIXABLE  ━━━━━━━━━━
+Checked 808 files in 2s. No fixes applied.
+Found 1 info.
+exit 0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit 0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit 0
+
+$ pnpm exec vitest run --changed origin/main
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[diag] todo phase: failed
+2026-10-21 15:50:29 [step] step failed: git commit failed (1): apps/daemon/test/1262-ansi-probe.ts:1:7 lint/correctness/noUnusedVariables  FIXABLE  ━━━━━━━━━━━━━━━
+Checked 1 file in 64ms. No fixes applied.
+Found 1 error.
+Found 1 warning.
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[step] shell done step=izkC0dbGbXWgBNUd5ma3v run=c2hmHiw_-w6WDKTXbLO3P exit=0 chars=21 ms=17
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+ Test Files  253 passed (253)
+      Tests  3107 passed | 1 skipped (3108)
+exit 0
+
+$ env E2E_AFFECTED_PORT=8411 pnpm --filter @pacman/web e2e:affected
+  8 passed (16.5s)
+exit 0
+
+DONE

@@ -1,0 +1,23 @@
+Downloading pygments (1.2MiB)
+ Downloaded pygments
+Installed 5 packages in 7ms
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/fast/lanes/cairn-1517
+collected 0 items / 1 error
+
+==================================== ERRORS ====================================
+_________ ERROR collecting integration/eval/harbor/test_pr_to_task.py __________
+integration/eval/harbor/test_pr_to_task.py:10: in <module>
+    SPEC.loader.exec_module(converter)
+<frozen importlib._bootstrap_external>:995: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:1132: in get_code
+    ???
+<frozen importlib._bootstrap_external>:1190: in get_data
+    ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/mnt/fast/lanes/cairn-1517/integration/eval/harbor/pr-to-task.py'
+=========================== short test summary info ============================
+ERROR integration/eval/harbor/test_pr_to_task.py - FileNotFoundError: [Errno ...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+=============================== 1 error in 0.11s ===============================

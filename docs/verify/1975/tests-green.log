@@ -1,0 +1,36 @@
+$ node --import ./integration/node_modules/tsx/dist/loader.mjs --test scripts/harness-eval-worker.test.mjs
+✔ valid publication creates exactly one result-only commit (117.075617ms)
+✔ rejects modified harness before publication (65.937201ms)
+✔ rejects untracked file before publication (66.599579ms)
+✔ rejects ignored untracked file before publication (67.119951ms)
+✔ rejects rename before publication (68.470913ms)
+✔ rejects deletion before publication (63.872833ms)
+✔ rejects second evidence file before publication (65.360145ms)
+✔ rejects wrong ticket path before publication (64.962846ms)
+✔ rejects invalid JSON before publication (66.183765ms)
+✔ rejects schema failure before publication (65.443578ms)
+✔ rejects result digest mismatch before publication (67.75344ms)
+✔ rejects additional committed file before publication (72.969171ms)
+✔ rejects requested digest mismatch before evaluation (35.441031ms)
+✔ remote movement after evaluation prevents push (107.712072ms)
+✔ push failure propagates and leaves remote unchanged (102.115619ms)
+✔ rejects unsafe ticket paths before evaluation (35.28682ms)
+✔ updates an existing result with one result-only commit (123.079391ms)
+✔ failed evaluation does not publish an otherwise valid result (53.903503ms)
+✔ missing evidence is rejected (62.444099ms)
+✔ billing verification uses the explicit relay without revealing credentials (1.018012ms)
+✔ unverified billing route is rejected (401, text/plain;charset=UTF-8) (0.155491ms)
+✔ unverified billing route is rejected (200, text/plain;charset=UTF-8) (0.170506ms)
+✔ unverified billing route is rejected (200, text/plain;charset=UTF-8) (0.106681ms)
+✔ workspace package links keep their evaluated source after dependency copies (48.032879ms)
+✔ workspace links removed by a full dependency copy are restored before evaluation (69.179119ms)
+✔ isolated evaluation cannot read stored credentials or reach publication remotes (438.653558ms)
+✔ a preloaded module cannot be used to reach the publication credential store (20.711588ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2090.529024

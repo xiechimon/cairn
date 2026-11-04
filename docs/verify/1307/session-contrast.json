@@ -1,0 +1,41 @@
+{
+  "model": "glm-5.3",
+  "arms": [
+    {
+      "arm": "control-inherit",
+      "sessionId": "a562c705-ffaa-4fdd-be8a-12c67a6d4d47",
+      "cwd": "/tmp/pacman-1307-s7jgrK",
+      "transcript": "/Users/xmon/.claude/projects/-private-tmp-pacman-1307-s7jgrK/a562c705-ffaa-4fdd-be8a-12c67a6d4d47.jsonl",
+      "reply": "PROBE-OK-1307",
+      "error": null,
+      "toolCount": 56,
+      "promptSnapshotBytes": 148947,
+      "histogram": {
+        "builtin": 31,
+        "mcp__playwright": 25
+      }
+    },
+    {
+      "arm": "managed-strict",
+      "sessionId": "260be71e-de9b-4a1a-bcb3-87ca0b851f92",
+      "cwd": "/tmp/pacman-1307-i4LAbf",
+      "transcript": "/Users/xmon/.claude/projects/-private-tmp-pacman-1307-i4LAbf/260be71e-de9b-4a1a-bcb3-87ca0b851f92.jsonl",
+      "reply": "PROBE-OK-1307",
+      "error": null,
+      "toolCount": 28,
+      "promptSnapshotBytes": 122030,
+      "histogram": {
+        "builtin": 27,
+        "mcp__pacman": 1
+      }
+    }
+  ],
+  "aManaged": {
+    "hasStrict": true,
+    "hasMcpConfig": false
+  },
+  "aInherit": {
+    "hasStrict": false,
+    "hasMcpConfig": false
+  }
+}

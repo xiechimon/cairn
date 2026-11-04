@@ -1,0 +1,19 @@
+# #1403 round 13 mutations (seventh /code-review pass on #1414): each one applied alone to
+# apps/server/src/services/ci-loop.ts at f9f5a2f, then
+# pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+an incomplete merged pull cached again (both deletes out)  2 failed | 103 passed (105)
+    × [61] a merged response without base is read again on a later sweep; the complete one finishes the card
+    × [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+only the missing-base delete out                           1 failed | 104 passed (105)
+    × [61] a merged response without base is read again on a later sweep; the complete one finishes the card
+only the missing-head-sha delete out                       1 failed | 104 passed (105)
+    × [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+
+# Definitions (name, text removed; nothing replaces it):
+## an incomplete merged pull cached again (both deletes out)
+-        pullCache.delete(key);
+-        pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
+## only the missing-base delete out (the branch on pull.baseRef === null || pull.defaultBranch === null)
+-        pullCache.delete(key);
+## only the missing-head-sha delete out (the branch on checkpoint !== null && pull.headSha === null)
+-        pullCache.delete(key); // 同上：缺字段的响应不当终态缓存

@@ -1,0 +1,176 @@
+# #1404 S3 mutations, on 2662c3b0. Each mutation is applied alone to apps/server/src/db/schema.ts, then the
+# migration is regenerated from the mutated schema the way the repo makes it (0044 and its snapshot removed,
+# the journal reset to origin/main's, `drizzle-kit generate --name merge_gate_tables`), then
+# `pnpm exec vitest run apps/server/test/merge-gate-tables.test.ts`, then every touched file is restored from
+# HEAD and the worktree checked clean. The last one edits only the journal (no regeneration).
+# Every mutation turns at least one test red. The driver script is reproduced at the end.
+#
+# Why 'gate_verdict.buildId FK without cascade' leaves the three REST delete paths green: all three delete the
+# build's steps first, and the stepId FK cascade removes the verdict before the build goes; the direct build
+# delete (F6) and the chief decision verdict, whose step is on the chief thread and is never deleted (F9), go red.
+
+gate_round: UNIQUE (buildId, patchDigest) dropped    1 failed | 19 passed (20)
+gate_round: UNIQUE (buildId, round) dropped          1 failed | 19 passed (20)
+gate_verdict: patchDigest NOT NULL                   1 failed | 19 passed (20)
+delete: gate_verdict.buildId FK without cascade      2 failed | 18 passed (20)
+delete: gate_state.buildId with no FK                4 failed | 16 passed (20)
+delete: gate_verdict.stepId FK without cascade       3 failed | 17 passed (20)
+gate_verdict: stepId FK dropped                      1 failed | 19 passed (20)
+journal: 0044 when below 0043                        2 failed | 18 passed (20)
+
+## gate_round: UNIQUE (buildId, patchDigest) dropped
+migration change:
+-CREATE UNIQUE INDEX `gate_round_build_digest_unique` ON `gate_round` (`buildId`,`patchDigest`);--> statement-breakpoint
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F2 同一构建同一摘要的第二轮被 UNIQUE 拒绝；别的构建同摘要、同构建别的摘要照常
+
+## gate_round: UNIQUE (buildId, round) dropped
+migration change:
+-CREATE UNIQUE INDEX `gate_round_build_round_unique` ON `gate_round` (`buildId`,`round`);--> statement-breakpoint
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F3 同一构建两轮同号被 UNIQUE 拒绝（roundsMax 按轮号数）
+
+## gate_verdict: patchDigest NOT NULL
+migration change:
+-	`patchDigest` text,
++	`patchDigest` text NOT NULL,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F8 head 对不上的判定（patchDigest null）、没报 head、没有视角：照存，读回 null
+
+## delete: gate_verdict.buildId FK without cascade
+migration change:
+-	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
++	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE no action
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F6 删构建：本构建四表的行随之删除，别的构建不动 > DELETE build 级联
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F9 chief 小合并步（step.buildId = chief 线程，无 build 行）的判定挂被审构建；删构建带走判定、不动 chief 步
+
+## delete: gate_state.buildId with no FK
+migration change:
+-	`evaluatedAt` integer NOT NULL,
+-	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
++	`evaluatedAt` integer NOT NULL
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F6 删构建：本构建四表的行随之删除，别的构建不动 > DELETE build 级联
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+
+## delete: gate_verdict.stepId FK without cascade
+migration change:
+-	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE cascade,
++	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE no action,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+
+## gate_verdict: stepId FK dropped
+migration change:
+-	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE cascade,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F5 不存在的步、不存在的构建：外键拒绝
+
+## journal: 0044 when below 0043
+migration change:
+apps/server/drizzle/meta/_journal.json: 0044 when -> 1792002303067 (0043 when - 1)
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 本迁移的 when 大于此前每一条（否则 migrator 对旧库静默跳过）
+
+== s3-mutate.py
+# Applies each mutation alone, regenerates the migration from the mutated schema.ts the way the
+# repo does (drizzle-kit generate --name merge_gate_tables, after dropping 0044 and restoring the
+# journal to origin/main's), runs the S3 test file, then restores every touched file from HEAD.
+import json, os, re, subprocess, sys
+
+WT = '/home/user/pacman/.claude/worktrees/p3c'
+SCHEMA = 'apps/server/src/db/schema.ts'
+JOURNAL = 'apps/server/drizzle/meta/_journal.json'
+SQL = 'apps/server/drizzle/0044_merge_gate_tables.sql'
+SNAP = 'apps/server/drizzle/meta/0044_snapshot.json'
+TEST = 'apps/server/test/merge-gate-tables.test.ts'
+TOUCHED = [SCHEMA, JOURNAL, SQL, SNAP]
+
+MUTATIONS = [
+    ('gate_round: UNIQUE (buildId, patchDigest) dropped', SCHEMA,
+     "    uniqueIndex('gate_round_build_digest_unique').on(t.buildId, t.patchDigest),\n", ''),
+    ('gate_round: UNIQUE (buildId, round) dropped', SCHEMA,
+     "    uniqueIndex('gate_round_build_round_unique').on(t.buildId, t.round),\n", ''),
+    ('gate_verdict: patchDigest NOT NULL', SCHEMA,
+     "    patchDigest: text('patchDigest'),\n    /** 判定自报的 head",
+     "    patchDigest: text('patchDigest').notNull(),\n    /** 判定自报的 head"),
+    ('delete: gate_verdict.buildId FK without cascade', SCHEMA,
+     "    buildId: text('buildId')\n      .notNull()\n      .references(() => build.id, { onDelete: 'cascade' }),\n    kind:",
+     "    buildId: text('buildId')\n      .notNull()\n      .references(() => build.id),\n    kind:"),
+    ('delete: gate_state.buildId with no FK', SCHEMA,
+     "  buildId: text('buildId')\n    .primaryKey()\n    .references(() => build.id, { onDelete: 'cascade' }),\n  /** MergeReadiness.ready",
+     "  buildId: text('buildId').primaryKey(),\n  /** MergeReadiness.ready"),
+    ('delete: gate_verdict.stepId FK without cascade', SCHEMA,
+     "      .references(() => step.id, { onDelete: 'cascade' }),",
+     "      .references(() => step.id),"),
+    ('gate_verdict: stepId FK dropped', SCHEMA,
+     "    stepId: text('stepId')\n      .primaryKey()\n      .references(() => step.id, { onDelete: 'cascade' }),",
+     "    stepId: text('stepId').primaryKey(),"),
+    ('journal: 0044 when below 0043', JOURNAL, None, None),
+]
+
+def sh(cmd, check=True):
+    r = subprocess.run(cmd, cwd=WT, shell=True, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        sys.exit(f'command failed: {cmd}\n{r.stdout}\n{r.stderr}')
+    return r
+
+def restore():
+    for f in TOUCHED:
+        data = sh(f'git show HEAD:{f}').stdout
+        open(os.path.join(WT, f), 'w', encoding='utf8').write(data)
+    sh('git diff --exit-code HEAD -- apps/server')
+    if sh('git status --porcelain -- apps/server').stdout.strip():
+        sys.exit('worktree not clean after restore')
+
+def regenerate():
+    os.remove(os.path.join(WT, SQL))
+    os.remove(os.path.join(WT, SNAP))
+    open(os.path.join(WT, JOURNAL), 'w', encoding='utf8').write(sh(f'git show origin/main:{JOURNAL}').stdout)
+    sh('cd apps/server && ./node_modules/.bin/drizzle-kit generate --name merge_gate_tables')
+
+def run_tests():
+    r = sh(f'pnpm exec vitest run {TEST} --reporter=verbose', check=False)
+    out = r.stdout + r.stderr
+    summary = re.search(r'Tests\s+(.*?)\n', out)
+    failed = sorted(set(m.group(1).strip() for m in re.finditer(r'^\s*×\s+(.*?)(?:\s+\d+ms)?$', out, re.M)))
+    return (summary.group(1).strip() if summary else 'no summary'), failed
+
+rows = []
+for name, path, old, new in MUTATIONS:
+    if path == JOURNAL:
+        j = json.load(open(os.path.join(WT, JOURNAL), encoding='utf8'))
+        prev = next(e for e in j['entries'] if e['tag'].startswith('0043'))
+        mine = next(e for e in j['entries'] if e['tag'].startswith('0044'))
+        mine['when'] = prev['when'] - 1
+        open(os.path.join(WT, JOURNAL), 'w', encoding='utf8').write(json.dumps(j, indent=2) + '\n')
+        diff_desc = f'{JOURNAL}: 0044 when -> {prev["when"] - 1} (0043 when - 1)'
+    else:
+        src = open(os.path.join(WT, path), encoding='utf8').read()
+        if src.count(old) != 1:
+            sys.exit(f'{name}: anchor found {src.count(old)} times')
+        open(os.path.join(WT, path), 'w', encoding='utf8').write(src.replace(old, new))
+        regenerate()
+        diff_desc = sh(f'git diff --no-color -U0 HEAD -- {SQL}', check=False).stdout
+        diff_desc = '\n'.join(l for l in diff_desc.splitlines() if l[:1] in '+-' and not l.startswith(('+++', '---')))
+    summary, failed = run_tests()
+    rows.append((name, summary, failed, diff_desc))
+    restore()
+
+for name, summary, failed, diff_desc in rows:
+    print(f'{name:<52} {summary}')
+print()
+for name, summary, failed, diff_desc in rows:
+    print(f'## {name}')
+    print('migration change:')
+    print(diff_desc)
+    print('red tests:')
+    for t in failed:
+        print(f'  {t}')
+    print()

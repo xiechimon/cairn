@@ -1,0 +1,145 @@
+{
+  "results": [
+    {
+      "theme": "dark",
+      "name": "window body ink on card",
+      "selector": ".chief-drawer",
+      "color": "rgb(238, 232, 228)",
+      "bg": "rgb(38, 34, 31)",
+      "ratio": 13,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "dark",
+      "name": "minimize/header icon ink on card",
+      "selector": ".chief-drawer button[aria-label=\"最小化\"]",
+      "color": "rgb(179, 174, 170)",
+      "bg": "rgb(38, 34, 31)",
+      "ratio": 7.18,
+      "floor": 3,
+      "pass": true
+    },
+    {
+      "theme": "dark",
+      "name": "model row ink on card",
+      "selector": ".chief-drawer button[aria-label=\"总管主模型\"]",
+      "color": "rgb(179, 174, 170)",
+      "bg": "rgb(38, 34, 31)",
+      "ratio": 7.18,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "dark",
+      "name": "thread chip title ink on card",
+      "selector": ".chief-drawer button[aria-label=\"主题\"] span",
+      "color": "rgb(238, 232, 228)",
+      "bg": "rgb(38, 34, 31)",
+      "ratio": 13,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "dark",
+      "name": "unread badge ink on card-button",
+      "selector": ".fab-badge",
+      "color": "rgb(31, 27, 24)",
+      "bg": "rgb(242, 148, 216)",
+      "ratio": 8.14,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "dark",
+      "name": "FAB glyph ink on card",
+      "selector": ".chief-fab",
+      "color": "rgb(238, 232, 228)",
+      "bg": "rgb(38, 34, 31)",
+      "ratio": 13,
+      "floor": 3,
+      "pass": true
+    },
+    {
+      "theme": "dark",
+      "name": "FAB kbd-hint chip ink",
+      "selector": ".chief-fab .kbd-hint",
+      "color": "rgb(179, 174, 170)",
+      "bg": "rgb(38, 34, 31)",
+      "ratio": 7.18,
+      "floor": 3,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "window body ink on card",
+      "selector": ".chief-drawer",
+      "color": "rgb(18, 15, 11)",
+      "bg": "rgb(240, 235, 230)",
+      "ratio": 16.14,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "minimize/header icon ink on card",
+      "selector": ".chief-drawer button[aria-label=\"最小化\"]",
+      "color": "rgb(89, 84, 80)",
+      "bg": "rgb(240, 235, 230)",
+      "ratio": 6.31,
+      "floor": 3,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "model row ink on card",
+      "selector": ".chief-drawer button[aria-label=\"总管主模型\"]",
+      "color": "rgb(89, 84, 80)",
+      "bg": "rgb(240, 235, 230)",
+      "ratio": 6.31,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "thread chip title ink on card",
+      "selector": ".chief-drawer button[aria-label=\"主题\"] span",
+      "color": "rgb(18, 15, 11)",
+      "bg": "rgb(240, 235, 230)",
+      "ratio": 16.14,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "unread badge ink on card-button",
+      "selector": ".fab-badge",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(151, 34, 126)",
+      "ratio": 7.38,
+      "floor": 4.5,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "FAB glyph ink on card",
+      "selector": ".chief-fab",
+      "color": "rgb(18, 15, 11)",
+      "bg": "rgb(240, 235, 230)",
+      "ratio": 16.14,
+      "floor": 3,
+      "pass": true
+    },
+    {
+      "theme": "light",
+      "name": "FAB kbd-hint chip ink",
+      "selector": ".chief-fab .kbd-hint",
+      "color": "rgb(54, 50, 46)",
+      "bg": "rgb(240, 235, 230)",
+      "ratio": 10.73,
+      "floor": 3,
+      "pass": true
+    }
+  ],
+  "failed": 0
+}

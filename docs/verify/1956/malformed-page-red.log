@@ -1,0 +1,44 @@
+✔ CLI fetches original PR reviews through every page and retains evidence (112.427388ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (289.963461ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (149.474071ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (443.53546ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (115.384195ms)
+✔ the CLI suite runs in local and CI prepush plans (0.444463ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (327.642801ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (170.586816ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (88.773058ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (90.424441ms)
+✖ malformed review and gate pages disclose unavailable data without crashing the CLI (94.937952ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1929.901583
+
+✖ failing tests:
+
+test at scripts/review-escapes.test.mjs:370:1
+✖ malformed review and gate pages disclose unavailable data without crashing the CLI (94.937952ms)
+  AssertionError [ERR_ASSERTION]: Cannot read properties of null (reading 'state')
+  
+  
+  1 !== 0
+  
+      at run (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:91:12)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:377:24)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

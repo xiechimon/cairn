@@ -1,0 +1,4 @@
+$ node scripts/ui-debt-gate.mjs --base 81bc4d37d3b41fcab104ca2e2b3a691caaf8af7e
+[ui-debt-gate] D5 arbitrary text sizes (text-[<len>]): 181 total > baseline 180 (grew at: board/todo-card.tsx 8->9) — use the DESIGN.md scale (text-page/heading/card-title/ui/meta/caption, 4px-grid spacing) instead of an arbitrary value
+[ui-debt-gate] FAIL: 1 violation(s). Build with components/ui/* + Tailwind theme keys; per-face css, bare controls and arbitrary values may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write
+exit=1

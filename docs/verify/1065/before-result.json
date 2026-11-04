@@ -1,0 +1,40 @@
+{
+  "probe": "drive-1065-zombie-claim",
+  "server": "http://127.0.0.1:8793",
+  "db": "/tmp/pacman-before-1065/.claude/verify-run/home/server/server.db",
+  "passed": 1,
+  "total": 4,
+  "checks": [
+    {
+      "name": "B（活机）claim 走 wake 路径领到新步",
+      "ok": false,
+      "detail": "machineId=null（期望 Rpy2yfw_duQmROC8-cgru）"
+    },
+    {
+      "name": "新步落到活机 B（DB 行 machineId = B，状态 claimed）",
+      "ok": false,
+      "detail": "{\"id\":\"6_QWLaMUVdssBDWjPlegz\",\"kind\":\"plan\",\"status\":\"claimed\",\"machineId\":\"uVlJaK2K13H_vmAKrG5m8\"}"
+    },
+    {
+      "name": "死机 A 零认领（本 build 无任何步落 A）",
+      "ok": false,
+      "detail": "[{\"id\":\"6_QWLaMUVdssBDWjPlegz\",\"kind\":\"plan\",\"status\":\"claimed\",\"machineId\":\"uVlJaK2K13H_vmAKrG5m8\"}]"
+    },
+    {
+      "name": "A 的认领进程确实被 SIGKILL（非自然返回）",
+      "ok": true,
+      "detail": "{\"code\":null,\"signal\":\"SIGKILL\"}"
+    }
+  ],
+  "task": {
+    "buildId": "01a11e76-1701-79b8-818d-5c7769b11a98",
+    "todoId": "mDJA-R-ojsttGPwwFegWh"
+  },
+  "machines": {
+    "dead": "uVlJaK2K13H_vmAKrG5m8",
+    "live": "Rpy2yfw_duQmROC8-cgru"
+  },
+  "killAt": 1791512417019,
+  "bClaimStatus": 200,
+  "deadStdout": null
+}

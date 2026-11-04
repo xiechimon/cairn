@@ -1,0 +1,13 @@
+biome ci . summary after #1192 commits (this branch's HEAD = lint-warning-cap)
+
+Checked 767 files in ~600ms. No fixes applied.
+Found 0 warnings.
+Found 0 errors.
+
+Rule breakdown: empty — no diagnostics to attribute. The one
+noUselessConstructor info that was on origin/main is unchanged on the
+branch; info diagnostics are not part of the cap (#1192 scope: warnings
+only).
+
+Diff vs origin/main: 53 -> 0 warnings, 1 info unchanged. Net debt
+removed: 53.

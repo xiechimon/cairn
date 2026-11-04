@@ -1,0 +1,91 @@
+
+ RUN  v5.0.1 /home/ian/lanes/cairn-1753
+
+ ❯ |@cairn/shared| test/review-prompt.test.ts (10 tests | 2 failed) 12ms
+   ❯ ADR 0026 review questions (2)
+     × review output retains both answers and rejects non-boolean answers 5ms
+     × the review prompt requires explicit answers to both protected-change questions 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/review-prompt.test.ts > ADR 0026 review questions > review output retains both answers and rejects non-boolean answers
+AssertionError: expected { Object (conclusion, findings) } to deeply equal { conclusion: 'Reviewed', …(3) }
+
+- Expected
++ Received
+
+  {
+    "conclusion": "Reviewed",
+-   "evalRulerChange": false,
+    "findings": [],
+-   "gateLoosening": true,
+  }
+
+ ❯ test/review-prompt.test.ts:149:48
+    147|       evalRulerChange: false,
+    148|     };
+    149|     expect(reviewVerdictSchema.parse(verdict)).toEqual(verdict);
+       |                                                ^
+    150|     expect(reviewVerdictSchema.safeParse({ ...verdict, gateLoosening: …
+    151|       false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@cairn/shared| test/review-prompt.test.ts > ADR 0026 review questions > the review prompt requires explicit answers to both protected-change questions
+AssertionError: expected '{"kind":"review","agentId":"reviewer"…' to contain 'gateLoosening'
+
+- Expected
++ Received
+
+- gateLoosening
++ {"kind":"review","agentId":"reviewer","gate":"review"}
++ 请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。
++
++ ## 输出契约
++ 本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列
++ 形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：
++ ```json
++ {
++   "conclusion": "<一句话结论：方案是否通过、关键风险概览>",
++   "findings": [
++     {
++       "id": "1",
++       "severity": "blocking | suggestion | info",
++       "summary": "<finding 标题>",
++       "description": "<finding 解释>",
++       "file": "<可选：受影响文件相对路径>",
++       "line": 42,
++       "suggestion": "<可选：修复建议>"
++     }
++   ]
++ }
++ ```
++ 注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。
++
++ ## 待审核方案
++ # plan
++
++ ## Changes
++ - 加一个 parseInput
++
++
++ ## 本轮变更
++ 变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。
++
+
+ ❯ test/review-prompt.test.ts:160:20
+    158|   test('the review prompt requires explicit answers to both protected-…
+    159|     const prompt = buildReviewStepPrompt({ agentId: 'reviewer', gate: …
+    160|     expect(prompt).toContain('gateLoosening');
+       |                    ^
+    161|     expect(prompt).toContain('evalRulerChange');
+    162|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  17:21:13
+   Duration  142ms (import 50%, transform 30%, tests 17%, worker 3%)
+

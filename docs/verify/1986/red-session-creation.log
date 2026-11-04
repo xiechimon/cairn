@@ -1,0 +1,33 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+ ❯ test/routing-sessions.test.ts (2 tests | 1 failed) 448ms
+   × session creation errors produce attributable failed rows 30ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/routing-sessions.test.ts > session creation errors produce attributable failed rows
+Error: model cairn-bench/missing-model not found
+ ❯ PiBackend.open ../apps/daemon/src/backend/pi.ts:837:13
+    835|     const model = runtime.getModel(opts.provider.providerId, opts.mode…
+    836|     if (!model) {
+    837|       throw new Error(`model ${opts.provider.providerId}/${opts.modelI…
+       |             ^
+    838|     }
+    839|     const providerResponses: ProviderResponseSink = { current: null };
+ ❯ runRoleSession eval/routing/driver.mts:134:38
+ ❯ runRoutingRun eval/routing/driver.mts:374:20
+ ❯ test/routing-sessions.test.ts:80:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  16:06:17
+   Duration  1.23s (import 39%, tests 39%, transform 22%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-1986/integration
+

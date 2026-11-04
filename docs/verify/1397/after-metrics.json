@@ -1,0 +1,466 @@
+{
+  "light-tasks-list": {
+    "taskList": {
+      "w": 768,
+      "h": 104,
+      "radius": "10px",
+      "bg": "rgb(255, 255, 255)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "taskRow": {
+      "w": 768,
+      "h": 52,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "taskRowTitle": {
+      "w": 643,
+      "h": 20,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "13.5px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "taskCard": null,
+    "toolbarFilter": {
+      "w": 94,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(251, 249, 245)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "light-tasks-grid": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": {
+      "w": 250.7,
+      "h": 118,
+      "radius": "10px",
+      "bg": "rgb(255, 255, 255)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "toolbarFilter": {
+      "w": 94,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(251, 249, 245)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "light-tasks-empty": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": {
+      "w": 94,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(251, 249, 245)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "emptyIconTile": {
+      "w": 24,
+      "h": 24,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(116, 106, 95)"
+    },
+    "emptyTitle": {
+      "w": 56,
+      "h": 21,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "light-files-viewer": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": null,
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": {
+      "w": 276,
+      "h": 824,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "fileRowName": {
+      "w": 64.8,
+      "h": 16,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "color": "rgb(94, 86, 77)"
+    },
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": {
+      "w": 874,
+      "h": 54,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "18px",
+      "color": "rgb(43, 38, 32)"
+    }
+  },
+  "light-history-detail": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": null,
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": {
+      "w": 276,
+      "h": 824,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "fileRowName": null,
+    "historyMessage": {
+      "w": 88.1,
+      "h": 20,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "13.5px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "historyMeta": {
+      "w": 174.8,
+      "h": 16,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "color": "rgb(116, 106, 95)"
+    },
+    "commitMessage": {
+      "w": 88.1,
+      "h": 20,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "13.5px",
+      "lineHeight": "20px",
+      "color": "rgb(43, 38, 32)"
+    },
+    "commitMeta": {
+      "w": 174.8,
+      "h": 16,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "color": "rgb(116, 106, 95)"
+    },
+    "viewerPre": null
+  },
+  "light-files-github": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": null,
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "dark-tasks-list": {
+    "taskList": {
+      "w": 768,
+      "h": 104,
+      "radius": "10px",
+      "bg": "rgb(38, 34, 31)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "taskRow": {
+      "w": 768,
+      "h": 52,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "taskRowTitle": {
+      "w": 643,
+      "h": 20,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "13.5px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "taskCard": null,
+    "toolbarFilter": {
+      "w": 94,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.359139 0.00385454 0.00650603 / 0.3)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "dark-tasks-grid": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": {
+      "w": 250.7,
+      "h": 118,
+      "radius": "10px",
+      "bg": "rgb(38, 34, 31)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "toolbarFilter": {
+      "w": 94,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.359139 0.00385454 0.00650603 / 0.3)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "dark-tasks-empty": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": {
+      "w": 94,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.359139 0.00385454 0.00650603 / 0.3)",
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "emptyIconTile": {
+      "w": 24,
+      "h": 24,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(179, 174, 170)"
+    },
+    "emptyTitle": {
+      "w": 56,
+      "h": 21,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  },
+  "dark-files-viewer": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": null,
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": {
+      "w": 276,
+      "h": 824,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "fileRowName": {
+      "w": 64.8,
+      "h": 16,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "color": "rgb(179, 174, 170)"
+    },
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": {
+      "w": 874,
+      "h": 54,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "18px",
+      "color": "rgb(238, 232, 228)"
+    }
+  },
+  "dark-history-detail": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": null,
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": {
+      "w": 276,
+      "h": 824,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "14px",
+      "lineHeight": "21px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "fileRowName": null,
+    "historyMessage": {
+      "w": 88.1,
+      "h": 20,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "13.5px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "historyMeta": {
+      "w": 174.8,
+      "h": 16,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "color": "rgb(179, 174, 170)"
+    },
+    "commitMessage": {
+      "w": 88.1,
+      "h": 20,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "13.5px",
+      "lineHeight": "20px",
+      "color": "rgb(238, 232, 228)"
+    },
+    "commitMeta": {
+      "w": 174.8,
+      "h": 16,
+      "radius": "0px",
+      "bg": "rgba(0, 0, 0, 0)",
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "color": "rgb(179, 174, 170)"
+    },
+    "viewerPre": null
+  },
+  "dark-files-github": {
+    "taskList": null,
+    "taskRow": null,
+    "taskRowTitle": null,
+    "taskCard": null,
+    "toolbarFilter": null,
+    "emptyIconTile": null,
+    "emptyTitle": null,
+    "treePane": null,
+    "fileRowName": null,
+    "historyMessage": null,
+    "historyMeta": null,
+    "commitMessage": null,
+    "commitMeta": null,
+    "viewerPre": null
+  }
+}

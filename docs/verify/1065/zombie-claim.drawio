@@ -1,0 +1,61 @@
+<mxfile host="app.diagrams.net" agent="pacman #1065">
+  <diagram id="zombie-claim-1065" name="#1065 僵尸认领">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="640">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t1" value="修前：僵尸认领（#1065 票面现象）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="380" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="daemon A 发 claim 长轮询：首试领空手 → waitWake 注册 waiter（hold ≤75s，插入序在前）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="40" y="84" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="daemon A 被杀：连接断，但服务端 waitWake 仍挂着 —— 僵尸 waiter 不感知请求已死" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="40" y="188" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="新步入队 → wake()：waiter Set 按插入序，僵尸 waiter 先醒、先续跑" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="40" y="292" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="第二次 tryClaim 替死机领步：步落死机 A、响应无处投递 → 卡到 sweep 失败收尾" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450" vertex="1" parent="1">
+          <mxGeometry x="40" y="396" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450" edge="1" parent="1" source="a1" target="a2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450" edge="1" parent="1" source="a2" target="a3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450" edge="1" parent="1" source="a3" target="a4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="修后：claim 绑请求存活态（waitWake + 出口复查双闸）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="480" y="24" width="380" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="claim 路由透传 c.req.raw.signal 进 claimStep / waitWake（其余行为不变）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="480" y="84" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="daemon A 被杀：连接断 → node-server 对 Request signal abort（客户端断连即触发）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="480" y="188" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="waitWake 即刻 settle(false) 并摘除 waiter；claimStep 出口再复查 signal（兜 wake/abort 竞序）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="480" y="292" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="新步留 pending → wake() 只剩活机 waiter，活机 B 领走（认领失败即天然可重试）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="480" y="396" width="380" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366" edge="1" parent="1" source="b1" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366" edge="1" parent="1" source="b2" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366" edge="1" parent="1" source="b3" target="b4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="foot" value="落点：apps/server/src/services/machines.ts（waitWake / claimStep）+ apps/server/src/routes-machine.ts（claim 路由）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="820" height="32" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

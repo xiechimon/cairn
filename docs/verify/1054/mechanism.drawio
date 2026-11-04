@@ -1,0 +1,85 @@
+<mxfile host="Electron" agent="drawio-skill">
+  <diagram id="consumer-gates-1054-1055" name="consumer gates">
+    <mxGraphModel grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="a" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;" value="Shape gate — scripts/ui-consumer-shape-gate.mjs (CI check job, pre-install slot, #1054)" vertex="1">
+          <mxGeometry height="50" width="440" x="40" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="b" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="every source line of apps/web/src minus components/ui (comments stripped via ui-normalize.mjs)" vertex="1">
+          <mxGeometry height="55" width="440" x="40" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="c" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="R1: bare rounded-none + unconditional paint (bg / structural border / shadow / ring)?&#xa;R2: no rounded-* at all + structural border + bg fill?" vertex="1">
+          <mxGeometry height="70" width="440" x="40" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="d" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="not a box — pass&#xa;(state tints, neutralizations, full-bleed bands, bg-only layout)" vertex="1">
+          <mxGeometry height="70" width="200" x="40" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="e" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="flagged: visible square box" vertex="1">
+          <mxGeometry height="70" width="200" x="280" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="f" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="scripts/ui-consumer-registry.json entry matches (file + anchor substring)?" vertex="1">
+          <mxGeometry height="70" width="200" x="280" y="415" as="geometry" />
+        </mxCell>
+        <mxCell id="g" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" value="RED exit 1&#xa;unregistered square box" vertex="1">
+          <mxGeometry height="60" width="200" x="40" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="h" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" value="GREEN: rides-primitive + basis / deviation + reason / state-surface" vertex="1">
+          <mxGeometry height="60" width="200" x="280" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="i" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="entry matching no flagged line → STALE RED (the ledger must shrink in the same PR as the fix)" vertex="1">
+          <mxGeometry height="50" width="440" x="40" y="625" as="geometry" />
+        </mxCell>
+        <mxCell id="j" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;" value="G6 in scripts/ui-drift-gate.mjs — brand-ink text roles (#1055, #987 spot-only canon)" vertex="1">
+          <mxGeometry height="50" width="460" x="560" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="k" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="consumer text-role brand ink: text-/fill-/stroke-(--card-button | --focus-ring), text-[var(…)], [color:var(…)], CSS color: var(…)" vertex="1">
+          <mxGeometry height="70" width="460" x="560" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="l" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="brandInkText ledger entry with role ∈ selection-mark / indicator / badge-glyph + reason + measured contrast?" vertex="1">
+          <mxGeometry height="70" width="460" x="560" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="m" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" value="RED exit 1&#xa;body/label/link/button-text ink must move to the text tiers, --primary or the registry link tier (#1006 R4)" vertex="1">
+          <mxGeometry height="90" width="220" x="560" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="n" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" value="GREEN&#xa;spot role registered (9 lines / 7 entries: check marks, spinner, bell + crown glyphs)" vertex="1">
+          <mxGeometry height="90" width="220" x="800" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="o" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="solid fills bg-(--card-button) = the slot&#39;s canonical role — not policed; malformed ledger = operational failure exit 2 (fail closed)" vertex="1">
+          <mxGeometry height="60" width="460" x="560" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="p" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacing=8;fontSize=12;" value="Recon dispositions (docs/spec/27 tables) — #1054 (73 sites): ~40 fixed by wave-1 lanes with per-PR attribution · 18 fixed here to registry bases (Card xl / popover lg / bordered-box lg / Tabs lg+md / Input lg / Panel 12px) · 12 dead SEG_*/RES_* constants deleted · 4 registered deviations (2 composers #991 Q7, chat bubble #1009 A2, sidebar tint L1 ruling 2) · rest reclassified neutralizations.  #1055 (25 sites): 13 wave-1 link-tier · 2 fixed here (insert → default-variant primary action, account hover → ghost affordance) · 7 entries registered · 1 deleted with dead recipe." vertex="1">
+          <mxGeometry height="110" width="980" x="40" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" target="c">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="c" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" target="d" value="no">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="c" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="e" value="yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="e" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" target="f">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="f" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" target="g" value="no">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="f" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="h" value="yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="k" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="l">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="l" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" target="m" value="no">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="l" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="n" value="yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

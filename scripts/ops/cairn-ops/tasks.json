@@ -1,0 +1,25 @@
+{
+  "source": {
+    "url": "https://github.com/xiechimon/cairn.git",
+    "branch": "main",
+    "proxy": "http://127.0.0.1:7890"
+  },
+  "tasks": {
+    "orb-install-host": {
+      "directory": "scripts/ops/orb",
+      "interpreter": "/usr/bin/bash",
+      "entry": "install-host.sh",
+      "args": [],
+      "env": {
+        "CAIRN_ORB_NODE_MAJOR": "[1-9][0-9]"
+      }
+    },
+    "secret-reach-setup": {
+      "directory": "scripts/ops/secret-reach",
+      "interpreter": "/usr/bin/sh",
+      "entry": "setup-runner-user.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}

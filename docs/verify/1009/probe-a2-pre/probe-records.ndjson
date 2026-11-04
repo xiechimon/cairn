@@ -1,0 +1,133 @@
+{"k":"p","p":"style","cls":"Page","f":"detail-3pane.spec.ts","l":36,"v":{"sidebar":{"left":0,"right":240,"width":240},"center":{"left":240,"right":952,"width":712},"right":{"left":952,"right":1440,"width":488}},"tt":"three abutting panes: 240 sidebar | fluid center | 488 right"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":47,"v":240,"e":[240],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":48,"v":488,"e":[488],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":50,"v":240,"e":[240],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":51,"v":952,"e":[952],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":53,"v":712,"e":[712],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-3pane.spec.ts","l":55,"v":{"borderLeft":"1px","shadow":"none"},"tt":"three abutting panes: 240 sidebar | fluid center | 488 right"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":59,"v":"1px","e":["1px"],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":60,"v":"none","e":["none"],"tt":"three abutting panes: 240 sidebar | fluid center | 488 right","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"chat-type-measure.spec.ts","l":34,"loc":"internal:testid=[data-testid=\"agent-text\"s] >> nth=0","v":{"fontSize":"15px","lineHeight":"24px"},"tt":"chat body reads at 15px on a unitless 1.6 — the 24px pitch survives"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":38,"v":"15px","e":["15px"],"tt":"chat body reads at 15px on a unitless 1.6 — the 24px pitch survives","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":40,"v":"24px","e":["24px"],"tt":"chat body reads at 15px on a unitless 1.6 — the 24px pitch survives","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":72,"v":"1.6","e":["1.6"],"tt":"chat body reads at 15px on a unitless 1.6 — the 24px pitch survives","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":27,"v":{"docScroll":320,"docClient":320,"colScroll":320,"colClient":320,"centerWidth":320,"sidebarVisible":false,"rightVisible":false},"tt":"N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":57,"v":320,"e":[320],"tt":"N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":60,"v":320,"e":[321],"tt":"N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":61,"v":320,"e":[320],"tt":"N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":63,"v":false,"e":[false],"tt":"N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":64,"v":false,"e":[false],"tt":"N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"chat-type-measure.spec.ts","l":78,"v":{"text":67.95796699669967,"note":67.92986391752576},"tt":"68ch measure cap binds the body text and the centered note"}
+{"k":"a","m":"toBeGreaterThan","n":false,"f":"chat-type-measure.spec.ts","l":106,"v":67.95796699669967,"e":[67.5],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":107,"v":67.95796699669967,"e":[68.5],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"a","m":"toBeGreaterThan","n":false,"f":"chat-type-measure.spec.ts","l":106,"v":67.92986391752576,"e":[67.5],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":107,"v":67.92986391752576,"e":[68.5],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":27,"v":{"docScroll":360,"docClient":360,"colScroll":360,"colClient":360,"centerWidth":360,"sidebarVisible":false,"rightVisible":false},"tt":"N2: 360 and 390 keep the same law"}
+{"k":"p","p":"style","cls":"Locator","f":"chat-type-measure.spec.ts","l":110,"loc":"internal:testid=[data-testid=\"transcript-note\"s] >> nth=0","v":{"left":"321.109px","right":"321.109px","align":"center"},"tt":"68ch measure cap binds the body text and the centered note"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":114,"v":"center","e":["center"],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":73,"v":360,"e":[360],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBeGreaterThan","n":false,"f":"chat-type-measure.spec.ts","l":115,"v":321.109,"e":[0],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":74,"v":360,"e":[361],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":75,"v":360,"e":[360],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":116,"v":"321.109px","e":["321.109px"],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":76,"v":false,"e":[false],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":77,"v":false,"e":[false],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":122,"v":1192,"e":[1193],"tt":"68ch measure cap binds the body text and the centered note","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":27,"v":{"docScroll":390,"docClient":390,"colScroll":390,"colClient":390,"centerWidth":390,"sidebarVisible":false,"rightVisible":false},"tt":"N2: 360 and 390 keep the same law"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":73,"v":390,"e":[390],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":74,"v":390,"e":[391],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":75,"v":390,"e":[390],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":76,"v":false,"e":[false],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":77,"v":false,"e":[false],"tt":"N2: 360 and 390 keep the same law","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"chat-type-measure.spec.ts","l":127,"v":{"placeholder":"14px","body":"15px"},"tt":"composer placeholder steps to 14px — one notch under the 15px body"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":135,"v":"14px","e":["14px"],"tt":"composer placeholder steps to 14px — one notch under the 15px body","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":136,"v":"15px","e":["15px"],"tt":"composer placeholder steps to 14px — one notch under the 15px body","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":27,"v":{"docScroll":767,"docClient":767,"colScroll":767,"colClient":767,"centerWidth":767,"sidebarVisible":false,"rightVisible":false},"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":87,"v":false,"e":[false],"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":27,"v":{"docScroll":768,"docClient":768,"colScroll":133,"colClient":40,"centerWidth":40,"sidebarVisible":true,"rightVisible":true},"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":92,"v":true,"e":[true],"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":93,"v":true,"e":[true],"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":94,"v":{"sidebar":240,"right":488},"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":102,"v":240,"e":[240],"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-narrow.spec.ts","l":103,"v":488,"e":[488],"tt":"N3: the degradation stops at 768px — the 3-pane shell survives above it","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"chat-type-measure.spec.ts","l":141,"v":{"bubbleH":24,"bubbleFont":"15px","avatarBox":{"w":20,"h":20},"footerPad":"31px"},"tt":"bubble / avatar / footer keep their own geometry (#470 scope fence)"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":154,"v":24,"e":[24],"tt":"bubble / avatar / footer keep their own geometry (#470 scope fence)","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":155,"v":"15px","e":["15px"],"tt":"bubble / avatar / footer keep their own geometry (#470 scope fence)","r":"pass"}
+{"k":"a","m":"toEqual","n":false,"f":"chat-type-measure.spec.ts","l":156,"v":{"w":20,"h":20},"e":[{"w":20,"h":20}],"tt":"bubble / avatar / footer keep their own geometry (#470 scope fence)","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":157,"v":"31px","e":["31px"],"tt":"bubble / avatar / footer keep their own geometry (#470 scope fence)","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"chat-type-measure.spec.ts","l":170,"v":{"ruled":[],"turns":[{"borderTop":"0px","paddingTop":"0px","gap":21},{"borderTop":"0px","paddingTop":"0px","gap":21}]},"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row"}
+{"k":"a","m":"toEqual","n":false,"f":"chat-type-measure.spec.ts","l":199,"v":[],"e":[[]],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":203,"v":"0px","e":["0px"],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":204,"v":"0px","e":["0px"],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBeGreaterThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":207,"v":21,"e":[16],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":208,"v":21,"e":[32],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":203,"v":"0px","e":["0px"],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"chat-type-measure.spec.ts","l":204,"v":"0px","e":["0px"],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBeGreaterThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":207,"v":21,"e":[16],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"chat-type-measure.spec.ts","l":208,"v":21,"e":[32],"tt":"turn boundary is air, not a rule: no divider between a user turn and the agent row","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":112,"v":{"docScroll":320,"docClient":320,"panelRight":312,"panelWidth":304},"tt":"N4: the docked chief panel cannot re-overflow the 320px shell"}
+{"k":"a","m":"toBe","n":false,"f":"dead-buttons.spec.ts","l":124,"v":"SPAN","e":["SPAN"],"tt":"project files pane: no export button, static branch chip, wired 文件|历史 segment","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":122,"v":320,"e":[320],"tt":"N4: the docked chief panel cannot re-overflow the 320px shell","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":123,"v":304,"e":[320],"tt":"N4: the docked chief panel cannot re-overflow the 320px shell","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":124,"v":312,"e":[320],"tt":"N4: the docked chief panel cannot re-overflow the 320px shell","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-3pane.spec.ts","l":87,"v":{"centerLeft":240,"centerRight":952,"mainBottom":732,"colBottom":632,"compLeft":256,"compRight":936,"compTop":632,"compBottom":716,"radius":"0px","border":"1px","position":"relative","colPadBottom":16},"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":115,"v":"0px","e":["0px"],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":116,"v":"1px","e":["1px"],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":120,"v":"relative","e":["relative"],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":122,"v":256,"e":[256,0],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":123,"v":936,"e":[936,0],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":125,"v":16,"e":[16,0],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":128,"v":632,"e":[632,0],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"a","m":"toBeGreaterThanOrEqual","n":false,"f":"detail-3pane.spec.ts","l":130,"v":16,"e":[16],"tt":"composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-narrow.spec.ts","l":131,"v":{"actionsRight":320,"compLeft":16,"compRight":304,"backLeft":12},"tt":"N5: head actions and the composer stay inside the 320px viewport"}
+{"k":"a","m":"toBeGreaterThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":145,"v":12,"e":[0],"tt":"N5: head actions and the composer stay inside the 320px viewport","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":146,"v":320,"e":[320],"tt":"N5: head actions and the composer stay inside the 320px viewport","r":"pass"}
+{"k":"a","m":"toBeGreaterThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":147,"v":16,"e":[0],"tt":"N5: head actions and the composer stay inside the 320px viewport","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-narrow.spec.ts","l":148,"v":304,"e":[320],"tt":"N5: head actions and the composer stay inside the 320px viewport","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-3pane.spec.ts","l":142,"v":{"stop":{"l":850,"r":882,"w":32,"h":32,"cy":687},"send":{"l":890,"r":922,"w":32,"h":32,"cy":687},"toolCy":688,"toolGlyphL":274,"phTextL":272,"stopFill":"rgb(64, 60, 57)","sendFill":"rgb(64, 60, 57)","stopGlyph":1},"tt":"composer controls share one bottom row: stop is the send button's sibling"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":168,"v":32,"e":[32],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":169,"v":32,"e":[32],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":173,"v":687,"e":[687,0],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-3pane.spec.ts","l":174,"v":1,"e":[1],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":176,"v":8,"e":[8,0],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":178,"v":"rgb(64, 60, 57)","e":["rgb(64, 60, 57)"],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":179,"v":1,"e":[1],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"detail-3pane.spec.ts","l":181,"v":2,"e":[2],"tt":"composer controls share one bottom row: stop is the send button's sibling","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"thinking-row-truncate.spec.ts","l":173,"loc":"div.chat-row--agent >> internal:has-text=\"用户这句\"i","v":{"display":"flex","gap":11,"avatarW":20},"tt":"T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":180,"v":"flex","e":["flex"],"tt":"T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":182,"v":11,"e":[11],"tt":"T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":184,"v":20,"e":[20],"tt":"T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-3pane.spec.ts","l":192,"v":{"center":712,"comp":680},"tt":"composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":198,"v":712,"e":[712],"tt":"composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":199,"v":680,"e":[680,0],"tt":"composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)","r":"pass"}
+{"k":"p","p":"box","cls":"Locator","f":"spec-flow.spec.ts","l":121,"loc":".chat-col","v":{"x":240,"y":44,"width":712,"height":588},"tt":"2. 简报卡随流滚走：滚到底出视口，滚到顶回列首"}
+{"k":"p","p":"style","cls":"Locator","f":"thinking-row-truncate.spec.ts","l":191,"loc":"div.chat-row--agent >> internal:has-text=\"用户这句\"i >> .chat-text","v":{"maxWidth":"643.477px","minWidth":"0px"},"tt":"T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类"}
+{"k":"a","m":"toBe","n":true,"c":["not"],"f":"thinking-row-truncate.spec.ts","l":196,"v":"643.477px","e":["none"],"tt":"T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":197,"v":"0px","e":["0px"],"tt":"T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"spec-flow.spec.ts","l":124,"loc":".chat-col .spec-block","v":-797.296875,"tt":"2. 简报卡随流滚走：滚到底出视口，滚到顶回列首"}
+{"k":"a","m":"toBeLessThan","n":false,"f":"spec-flow.spec.ts","l":125,"v":-797.296875,"e":[44],"tt":"2. 简报卡随流滚走：滚到底出视口，滚到顶回列首","r":"pass"}
+{"k":"p","p":"style","cls":"Page","f":"detail-3pane.spec.ts","l":192,"v":{"center":712,"comp":680},"tt":"composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":207,"v":712,"e":[712,0],"tt":"composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"detail-3pane.spec.ts","l":208,"v":680,"e":[680,0],"tt":"composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"spec-flow.spec.ts","l":128,"loc":".chat-col .spec-block","v":78.703125,"tt":"2. 简报卡随流滚走：滚到底出视口，滚到顶回列首"}
+{"k":"a","m":"toBeGreaterThanOrEqual","n":false,"f":"spec-flow.spec.ts","l":129,"v":78.703125,"e":[43],"tt":"2. 简报卡随流滚走：滚到底出视口，滚到顶回列首","r":"pass"}
+{"k":"a","m":"toBeGreaterThan","n":false,"f":"spec-flow.spec.ts","l":130,"v":876,"e":[200],"tt":"2. 简报卡随流滚走：滚到底出视口，滚到顶回列首","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"thinking-row-truncate.spec.ts","l":204,"loc":"div.chat-row--agent >> internal:has-text=\"用户这句\"i >> internal:role=button[name=\"展开思考\"i]","v":{"textOverflow":"ellipsis","overflowX":"hidden","labelClient":625,"labelScroll":1810,"labelText":"用户这句「你好」是纯招呼，没有任务实体：先不路由看板，也不建卡。接下来要做的事分三步——第一步核对会话历史里有没有未收口的执行步，第二步看定时器有没有到点要唤起的复盘，第三步再判断这句招呼背后是不是藏着一个新需求的开头；如果三步都空，就只回一句招呼，等用户把真实意图说出来再动手。另外留意中英混排时省…","btnW":643,"colW":643},"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":219,"v":true,"e":[true],"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽","r":"pass"}
+{"k":"a","m":"toBeLessThan","n":false,"f":"thinking-row-truncate.spec.ts","l":220,"v":151,"e":[187],"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":222,"v":"ellipsis","e":["ellipsis"],"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"thinking-row-truncate.spec.ts","l":223,"v":"hidden","e":["hidden"],"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽","r":"pass"}
+{"k":"a","m":"toBeGreaterThan","n":false,"f":"thinking-row-truncate.spec.ts","l":224,"v":1810,"e":[625],"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"thinking-row-truncate.spec.ts","l":225,"v":643,"e":[643],"tt":"T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"spec-flow.spec.ts","l":140,"v":712,"e":[712],"tt":"3. 超长无断点行包进中栏：chat 横向 scrollWidth 等于 clientWidth","r":"pass"}
+{"k":"a","m":"toBeLessThanOrEqual","n":false,"f":"thinking-row-truncate.spec.ts","l":234,"v":0,"e":[0],"tt":"T4: 页面级零横向溢出；展开交互不被截断修法砸掉","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"detail-3pane.spec.ts","l":289,"loc":"internal:testid=[data-testid=\"detail-center\"s]","v":1200,"tt":"fresh phase: the brief owns the whole center column, right pane collapses"}
+{"k":"a","m":"toBe","n":false,"f":"detail-3pane.spec.ts","l":290,"v":1200,"e":[1200],"tt":"fresh phase: the brief owns the whole center column, right pane collapses","r":"pass"}
+{"k":"p","p":"style","cls":"Locator","f":"transcript-user-words.spec.ts","l":231,"loc":"internal:testid=[data-testid=\"user-bubble\"s] >> internal:has-text=\"收到，谢谢\"i","v":{"h":24,"font":"15px"},"tt":"5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）"}
+{"k":"a","m":"toBe","n":false,"f":"transcript-user-words.spec.ts","l":235,"v":24,"e":[24],"tt":"5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）","r":"pass"}
+{"k":"a","m":"toBe","n":false,"f":"transcript-user-words.spec.ts","l":236,"v":"15px","e":["15px"],"tt":"5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）","r":"pass"}
+{"k":"p","p":"box","cls":"Locator","f":"dead-buttons.spec.ts","l":550,"loc":"internal:role=dialog[name=\"新建任务\"i] >> internal:testid=[data-testid=\"new-task-head\"s]","v":{"x":384,"y":146.5,"width":672,"height":44},"tt":"new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"}
+{"k":"p","p":"box","cls":"Locator","f":"dead-buttons.spec.ts","l":551,"loc":"internal:role=dialog[name=\"新建任务\"i] >> internal:role=button[name=\"关闭\"i]","v":{"x":1024,"y":154,"width":28,"height":28},"tt":"new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"}
+{"k":"a","m":"toBeLessThan","n":false,"f":"dead-buttons.spec.ts","l":557,"v":0,"e":[1.5],"tt":"new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"dead-buttons.spec.ts","l":558,"v":28,"e":[28,0],"tt":"new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)","r":"pass"}
+{"k":"a","m":"toBeCloseTo","n":false,"f":"dead-buttons.spec.ts","l":559,"v":28,"e":[28,0],"tt":"new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)","r":"pass"}

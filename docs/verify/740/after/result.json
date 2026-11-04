@@ -1,0 +1,68 @@
+{
+  "probe": "chief-catchup",
+  "mode": "expect-new",
+  "ticket": "#740",
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "repo": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0104-740-delta-hub"
+  },
+  "threadId": "chief-01a1034b-6c3e-7e23-b9ea-a1fcfcc88bc6",
+  "machineStepId": "AH19n45AlD7tup-6y0yEg",
+  "prefix": "第一步：读取仓库结构。第二步：核对补发语义。",
+  "gifFrames": [
+    "gif-00-catchup.png",
+    "gif-01-delta-live.png",
+    "gif-02-stream.png",
+    "gif-03-stream.png",
+    "gif-04-stream.png",
+    "gif-05-converged.png"
+  ],
+  "checks": [
+    {
+      "name": "A1 中场进场补发：首个 text_delta = 已流出前缀的精确拼接",
+      "ok": true,
+      "detail": "deltas=[\"第一步：读取仓库结构。第二步：核对补发语义。\"]"
+    },
+    {
+      "name": "A2 接缝不重不断：补发 + 实时增量 = 精确拼接",
+      "ok": true,
+      "detail": "[\"第一步：读取仓库结构。第二步：核对补发语义。\",\"第三步：结论如下。\"]"
+    },
+    {
+      "name": "A3 断线重连：新流收到的快照 = 整段前缀（不重不丢）",
+      "ok": true,
+      "detail": "deltas=[\"第一步：读取仓库结构。第二步：核对补发语义。第三步：结论如下。\"]"
+    },
+    {
+      "name": "B1 中途进场：抽屉打字行即刻显示已流出前缀（一个刷新窗口内补齐）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "B2 继续实时打字：进场后增量照常落在打字行",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C1 终局收敛：终稿行接管呈现",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C2 不双份：已落库文本在抽屉里只出现一次",
+      "ok": true,
+      "detail": "occurrences=1"
+    },
+    {
+      "name": "D1 终局后缓冲清空：新流零 text_delta（下一回合从空开始）",
+      "ok": true,
+      "detail": "deltas=[]"
+    }
+  ],
+  "artifacts": [
+    "01-midturn-drawer-prefix.png",
+    "02-midturn-live-delta.png",
+    "03-converged-final.png"
+  ]
+}

@@ -1,0 +1,3 @@
+cmp old.json new.json: identical
+767292bcf43a18b9ef4ad4b6d87ab520bf73a071  old.json
+767292bcf43a18b9ef4ad4b6d87ab520bf73a071  new.json

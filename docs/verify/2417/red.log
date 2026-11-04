@@ -1,0 +1,37 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2417
+
+ ❯ |@cairn/web| test/i18n-coverage.test.ts (6 tests | 1 failed) 174ms
+   ❯ translation call coverage (1)
+     × every literal t() key contains CJK or is an own EN key 62ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/web| test/i18n-coverage.test.ts > translation call coverage > every literal t() key contains CJK or is an own EN key
+AssertionError: expected [ …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "board/sidebar.tsx: \"Projects\"",
++   "board/sidebar.tsx: \"Scheduled\"",
++ ]
+
+ ❯ test/i18n-coverage.test.ts:140:35
+    138|       .filter((item) => !/[一-鿿]/.test(item.text) && !Object.hasOwn(EN,…
+    139|       .map((item) => `${item.rel}: ${JSON.stringify(item.text)}`);
+    140|     expect([...new Set(missing)]).toEqual([]);
+       |                                   ^
+    141|   });
+    142| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  20:43:25
+   Duration  825ms (transform 49%, import 28%, tests 23%)
+

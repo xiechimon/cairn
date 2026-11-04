@@ -1,0 +1,197 @@
+<div align="center">
+  <img src="site/logo.svg" alt="Cairn" width="64" height="64">
+  <h1>Cairn</h1>
+
+  <p>
+    <a href="./README.md">English</a> ·
+    <b>简体中文</b> ·
+    <a href="https://cairn.xmon.me">官网</a> ·
+    <a href="#快速开始">快速开始</a>
+  </p>
+
+  <p>
+    <a href="https://github.com/xiechimon/cairn/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xiechimon/cairn/ci.yml?branch=main&style=flat-square&label=CI"></a>
+    <a href="https://www.npmjs.com/package/@xiechimon/cairn"><img alt="npm version" src="https://img.shields.io/npm/v/@xiechimon/cairn?style=flat-square&color=173a2f&label=npm"></a>
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-173a2f?style=flat-square">
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
+    <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
+  </p>
+
+  <p><b>你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活，没有证据就不合并。</b></p>
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
+    <img alt="桌面端的 Cairn：Coordinator 对话，等你拍板的决定置顶，手机上打开着一个 thread" src="site/img/hero-light.webp" width="100%">
+  </picture>
+
+  <img alt="手机端的 Cairn：等你拍板的决定、一个 thread、项目主页和全部工作" src="site/img/phones.webp" width="100%">
+</div>
+
+- **Coordinator。** 你在任何设备上只跟一个 Coordinator 对话。它负责听、为每件活开一个 thread，并在同一个永不结束的对话里回报。
+- **Thread。** 一件活对应一个 agent 会话：用你订阅的 Claude Code 或 Gemini CLI，或内置的 pi 运行时接任意模型服务。thread 从计划一路做到 PR，也可以在侧边对话里打开它直接插话。
+- **只给你看需要你的事。** 首页置顶等你拍板的决定，并显示进行中的工作。只有需要人动手时才推送。
+- **合并闸绑定证据。** agent 合并前，闸只认绑定到当前补丁摘要的审核结论，head 在结论之后变了就拒绝；这些规则用 TLA+ 做过模型检查。手动合并按钮目前只核对钉住的提交（见 spec 18 的 F1）。受保护路径仍然停下等你；AI 审核者能直接拦下合并，不只是留评论。
+- **harness 经评测把关。** 每次构建记录基线提交和 harness 哈希，驳回写成结构化记录，改 Coordinator 调度 harness 的提交必须先过评测回归下限才能合入；提示词、技能、路由改动的配对试验采纳机制还在计划中。这里的「训练」指优化 harness，不微调模型。
+- **跑在你自己的机器上。** 在任意主机上跑 daemon 就能登记成执行机。thread 会派到满足运行时、模型和工具要求的任意机器上，在独立的 git worktree 里干活；主机支持时也可以每个任务一个用完即弃的 Orb 容器（`CAIRN_EXECUTOR=orb`，目前需手动开启）。计划、diff、工具调用实时推回来。
+- **项目。** 项目主页含项目说明、项目记忆、项目密钥和并发上限；人的消息永远插队。仓库可以由服务器自己托管，也可以接 GitHub。
+- **自举闭环。** Cairn 自己领票、实现、审核、开 PR，正在用它自己开发它自己。
+
+## 作品
+
+这里只放 agent 在 Cairn 里真实做出来的东西，每个都配录屏、PR 链接和能查到出处的数字。项目还在成型，下面先占位。
+
+| | 作品 | 会展示什么 |
+|---|---|---|
+| 1 | 自举闭环 | Cairn 里的 agent 从领票、实现、审核到合并，自己完成一张 Cairn 的票。*筹备中。* |
+| 2 | 从零做一个应用 | 给一句需求，agent 团队在你的机器上把一个完整应用做出来。*筹备中。* |
+| 3 | harness 优化前后 | 同一组任务，改了提示词、技能和路由前后的评测对比。*筹备中。* |
+
+## 功能
+
+- **Coordinator** — 一个永不结束的对话：开 thread、回报结果。上下文自动压缩，记忆按项目分开。
+- **Thread** — 一件活对应一个 agent 会话，从计划、测试、实现走到 PR。任何 thread 都能在侧边对话里打开，直接插话。
+- **项目** — 项目主页，含项目说明、项目记忆、项目密钥和并发上限；人的消息永远插队。
+- **定时任务** — 按周期重跑一个 thread。
+- **机器与路由** — 用 daemon 登记执行机；路由规则为每一步选运行时、模型、工具和机器。
+- **模型服务** — Claude Code 与 Gemini CLI 订阅、API key、OAuth（GitHub Copilot、OpenAI Codex）或自定义端点。
+- **仓库** — server 自托管 git 仓（API key 走 push/pull），或从 GitHub 接入。
+- **全实时** — 对话与 thread 走 SSE 流、Web Push、按 build × 模型记账 token 用量。
+
+## 快速开始
+
+环境要求：Node.js 22 或 24（LTS 线自带 better-sqlite3 预编译产物；其它版本可能回退源码编译，需要构建工具链）。
+
+```sh
+npx @xiechimon/cairn
+```
+
+一条命令：下载、启动、托管在 **http://127.0.0.1:8787/app**。首启在 `~/.cairn` 下自动建库 + 迁移 + seed 默认团队。
+
+换端口：`PORT=9000 npx @xiechimon/cairn`。
+
+### 让自己的机器跑 build
+
+不起 daemon 也能用全部界面功能；要让 agent 真在某台机器上跑 build 时再登记。在执行机上：
+
+```sh
+npm i -g @xiechimon/cairn-cli
+# 首次注册：网页 /app/api-keys 建 key（明文只显示一次），然后
+cairn start --api-key <cairn_...> --team <teamId>
+# 日常（凭据已存 ~/.cairn/machine.json）：
+cairn start        # stop / restart / logs -f / status 同面
+```
+
+两个包都装 `cairn` 这个 bin：同机全局双装时后装的占名。干净的分工是——浏览机跑 server，执行机装 cairn-cli。
+
+### 用 Docker 跑 server
+
+只容器化 server（含 web UI）；agent 仍由你自己机器上的 daemon 执行。镜像监听 `0.0.0.0`，状态全放在 `/data`：
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+镜像内置 `CAIRN_REQUIRE_TOKEN=1`：`CAIRN_TOKEN` 未设或为空时，容器打印原因后以退出码 1 退出，不会在公网地址上裸奔。备份 = 整个拷走 `/data` 卷（数据库和 `secretbox.key` 要一起）。token 走请求头，请在容器前面加 TLS（反向代理或平台的 HTTPS 域名）。
+
+### 部署到 Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
+
+`railway.json` 让 Railway 用 `Dockerfile` 构建并以 `/app` 做健康检查。按钮打开 Railway 的新建项目页；选 Deploy from GitHub repo 和本仓库，然后：
+
+1. 挂一个卷到 `/data`。
+2. 设 `CAIRN_TOKEN` 为 `${{secret(64, "abcdef0123456789")}}`（Railway 生成一次随机值），并设 `RAILWAY_RUN_UID=0`（Railway 的卷归 root，镜像默认以 `node` 用户运行）。
+3. 生成公网域名。`PORT` 由 Railway 提供。
+
+让 daemon 指向公网 server：先在 web UI（`/app/api-keys`）建 API key，然后在跑 build 的机器上：
+
+```sh
+cairn start --server https://<你的应用>.up.railway.app --api-key <cairn_...> --team <teamId>
+```
+
+### 从源码开发
+
+要求 Node.js >= 22.19、pnpm（可 `corepack enable`）。
+
+```sh
+pnpm install
+pnpm start        # 构建 web UI 并由 server 同源托管
+```
+
+watch 模式开发栈，每进程一条：`pnpm dev:web`、`pnpm dev:server`、`pnpm dev:daemon`（`pnpm dev` 三进程一起跑）。
+
+## 部署
+
+把 server 自托管在常开机上，手机经私有 tailnet 随时连回 Cairn。将 server 绑到 `127.0.0.1`，用 `tailscale serve` 反代到 `http://127.0.0.1:<端口>`，并设 `CAIRN_TAILSCALE_USERS` 让白名单内的 Tailscale 身份免输入访问令牌直接登录。完整 walkthrough 见 [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md)。要走公网路线，见上文 Railway 模板。
+
+## 配置
+
+server 环境变量（全部可选）：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `CAIRN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。来自环回对端的白名单 Tailscale Serve 身份同样放行。 |
+| `CAIRN_TAILSCALE_USERS` | 未设 | 逗号分隔的 Tailscale 用户登录名；环回对端的 `Tailscale-User-Login` 命中名单时免 `CAIRN_TOKEN` 放行。同机 `tailscale serve` 部署请设 `HOST=127.0.0.1` 并反代到 `http://127.0.0.1:<端口>`；非环回直连、打标签设备与 Funnel 流量仍需 token。设了名单但绑定地址非环回时启动日志 WARN。 |
+| `CAIRN_REQUIRE_TOKEN` | 未设（Docker 镜像内为 `1`） | `1` / `true` / `yes`：`CAIRN_TOKEN` 未设或为空时拒绝启动（打印原因，退出码 1）。 |
+| `PORT` | `8787` | HTTP 监听端口。 |
+| `HOST` | 未设（全部接口） | HTTP 绑定地址。分体部署（server 在常开主机、daemon 在另一台机器用 `CAIRN_SERVER` 指过来）时设为该主机的局域网/内网地址，并同设 `CAIRN_TOKEN`。显式 `0.0.0.0`/`::` 且 `CAIRN_TOKEN` 未设 → 启动日志 WARN。 |
+| `CAIRN_HOME` | `~/.cairn` | 数据根。server 状态在 `<CAIRN_HOME>/server/`（`server.db`、`secretbox.key`、托管裸仓）；daemon 的 `machine.json`、`daemon.log`、`workspaces/` 在根下。**备份 = 整目录拷走**——密文离了 keyfile 永久不可解，只拷 db 没用。 |
+| `CAIRN_GITHUB_OAUTH_CLIENT_ID`<br>`CAIRN_GITHUB_OAUTH_CLIENT_SECRET` | 未设 | 自注册 GitHub OAuth App 的凭证对，开启 provider OAuth 登录。两件同设或同缺——只配一件 server 启动即报错，不静默。 |
+| `CAIRN_WEB_DIR` | `apps/web/dist`（存在即托管） | SPA 静态托管根覆写；未设且无构建产物 = 纯 API 形态。 |
+| `CAIRN_SKILLS_DIR` | `~/.agents/skills` | 技能根目录。每个含 `SKILL.md` 的一级子目录 = 一个技能（id = frontmatter `name`，缺省回落目录名）。每次请求现扫，不入库——加技能 = 往目录放文件夹，删技能 = 删文件夹。 |
+| `CAIRN_ISSUE_INTAKE` | 未设（关） | GitHub issue 进料。`1`、`true` 或 `yes` 开，其余值一律关，默认关。开了之后 server 每 5 分钟从已连接 GitHub、且总管已绑定带模型 Agent 的团队的每个 GitHub 项目里，领带 `ready-for-agent` 标签的 open issue，导入成任务并开始编排。只领该标签最新一条 `labeled` 事件由仓库 triage、write、maintain 或 admin 权限用户打上、且不经 GitHub App 的 issue。经 GitHub App 打的标不算，即使 app 持有该用户的授权；但这一条只认得出 GitHub App：用 OAuth App 令牌或个人访问令牌（PAT）打的标，看上去与该用户亲手打的一样，照领。OAuth App 令牌包括 `gh auth login` 拿到的令牌，也包括团队的 GitHub 连接令牌。cairn 把连接令牌随步下发给 git 命令（git 自己的钩子也在这个环境里跑），也交给仓库里的 `.agents/setup` 与 `.agents/resume` 钩子，能改这些钩子的 agent 代码就读得到它；cairn 的 agent 步还能直接用机器上已登录的 `gh`。两条路都能让 agent 以对应账号的身份打标、给进料喂票。别人打的、或打了又摘的也不领。每个项目同时至多 3 张不在已完成 / 已关闭的导入任务（失败的也算）。开启时已经打着标签的存量 issue 也会被领，按最旧先、受同一上限约束（每个项目每轮至多读 300 条带标签的 issue）——开之前先看清哪些 issue 打着标签。进料导入的任务以总管绑定的 Agent 为创建者，进料也只关这些任务：手工导入或 webhook 导入的任务从不被它关闭，总管没绑 Agent 的团队不关任何任务，总管换绑别的 Agent 之后，换绑前领的任务也不再由它关闭。这样的任务，server 见过它的 issue 处于 open、之后又看到它被 triage 及以上权限的用户关闭，才把任务关闭；server 第一次看到 issue 时它已关闭（例如重启后）、外部作者自己关掉的 issue、被人重新打开的任务都不动，审核中的任务、有 build 开出过 PR 的任务也不动，拆分后子任务还没全部完成或关闭的任务也不动。这些审核中、开出过 PR 的任务进料从不关闭。build 开出过 PR 的审核中任务，PR 合并进默认分支后 PR 对账可以把它收尾为已完成，PR 未合并就关闭的可以收尾为失败（对账还核别的条件，不满足时只留提示）；施工中的任务继续走 CI 循环；没有 PR 的审核中任务、失败的任务留在原处，等人手动处理。导入后开始编排失败的，后面几轮重试，连同第一次至多 3 次（重启后不再重试），之后任务留在待开始等人处理。进料自己的 GitHub 读（issue 列表、issue 事件、协作者权限、issue 状态）遇到限流时，该团队这一轮停读，等下一轮，GitHub 给了限流解除的时刻就写进日志；导入时的读遇到限流，只算这一次导入失败，本轮接着看下一条 issue。启动日志写明进料开没开。`cairn` 标签的 webhook（`POST /api/webhook/github/<token>`，进料开没开都生效）守同一条权限判据、同一上限：打标人（事件的 `sender`）在仓库上有 triage、write、maintain 或 admin 权限、且项目未到上限 3，才导入；外部作者从带该标签的模板开的 issue 不导入。sender 不是 GitHub 账号名、打标人权限读不到（读失败，或 GitHub 以限流作答）、团队没有可用的 GitHub token、项目已到上限、项目存的仓库名不是 `owner/repo`、或 GitHub 上找不到该 issue，都不导入，记一行日志写明原因，投递以 202 作答。拒收若关于打标人的权限（不到 triage、读不到、遇限流），作答只说打标人未获确认，不说是哪一种、什么权限，细节在日志里。这只让作答文字不带权限结论：之后导入是否继续，仍会显出打标人够不够格，所以 webhook URL 泄漏了仍要吊销它的 token。 |
+| `CAIRN_INTAKE_AGENT_ALLOWLIST` | unset (deny all agent labels) | Comma-separated agent display names allowed for `agent:<name>` intake routing. Names are trimmed and matched exactly, including case; empty entries are ignored. Only opt in agents whose machine and tools are safe for untrusted issues. Agents with secrets or MCP servers are refused at intake and checked again before dispatch; removing a name blocks dispatch of existing presets too. |
+| `CAIRN_TRAJ_OUTCOME_BACKFILL` | 未设（关） | 轨迹结果回填。`1`、`true` 或 `yes` 开，其余值一律关。开了之后 server 启动时扫一次，之后每 24 小时扫一次：对每个 PR 合并满 7 天的 build，读项目的本地仓库，记下 `revertedWithin7d`（窗口内默认分支上有指向该 PR 或合并提交的 revert 提交）与 `fixedByLaterPr`（后续 PR 删掉了该 build 新增的行），每个 build 只记一次。`pnpm traj:backfill` 手动扫一次。导出的轨迹包用记下的值取代窗口未满时的 `null`。 |
+
+daemon 环境变量（上述 CLI flag 的等价覆写）：`CAIRN_SERVER`（默认 `http://127.0.0.1:8787`）、`CAIRN_API_KEY`、`CAIRN_TEAM`、`CAIRN_WORKSPACES_DIR`（默认 `<CAIRN_HOME>/workspaces`）。
+
+## 开发
+
+```sh
+pnpm dev:server   # API server 热重载，http://127.0.0.1:8787（首启建库 + 迁移 + seed）
+pnpm dev:web      # vite dev server，http://localhost:5173，/api 与 /git proxy 到 8787
+```
+
+vite dev server 带 `strictPort`：撞端口即启动失败，不静默顺延到下一个空闲口。危险的是
+顺延而不是撞端口本身——proxy 目标不变，顺延后的界面会去驱动持有该端口的别的栈。
+覆写走 `CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`。
+
+提交前三闸：
+
+```sh
+pnpm lint         # biome ci
+pnpm typecheck    # 全包 tsc
+pnpm test         # vitest
+```
+
+### 仓库结构
+
+| 路径 | 内容 |
+|---|---|
+| `CONTEXT.md` | 领域模型与术语表（中文界面词 ↔ 英文原词 ↔ 内部名，canonical） |
+| `apps/web` | Web UI，React + vite（`@cairn/web`） |
+| `apps/server` | server：Hono REST + SSE + SQLite（包名 `@xiechimon/cairn`，目录名 ≠ 包名） |
+| `apps/daemon` | 执行机 daemon（包名 `@xiechimon/cairn-cli`，目录名 ≠ 包名） |
+| `packages/shared` | 协议词表 / 记录形状 / 品牌槽单源（`@cairn/shared`） |
+| `docs/spec/` | 实现正典 00–29 册（中文） |
+| `docs/research/` | r1–r15 原站盘点与后续产品调研（历史档案） |
+| `scripts/` | 构建期工具（含 `generate-icons.mjs`） |
+
+## 社区
+
+提问、部署求助、"cairn 里怎么做 X" 请走 [GitHub Discussions](https://github.com/xiechimon/cairn/discussions)：**Q&A** 分类问问题，**Show and tell** 分类晒你搭出来的东西。缺陷和功能需求走 [issue 追踪](https://github.com/xiechimon/cairn/issues)，维护者打上标签后才有 agent 接手。安全报告两边都不走，见 [SECURITY.md](./SECURITY.md)。
+
+团队第一支 PR 合并后，cairn 可以显示一张可关闭的卡片，指向一条预填好的讨论帖。卡片默认关闭，cairn 自己不会打开任何页面，也不会向任何地方发送内容：是否发帖由你决定。预填内容包含哪些字段写在 [docs/privacy.md](./docs/privacy.md)。
+
+## 第三方署名
+
+- 头像字体 [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
+- 字体 Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
+- 图标 [lucide](https://lucide.dev) — ISC License
+- emoji 策展数据 [gitmoji](https://gitmoji.dev) — MIT License
+- 执行引擎 [pi SDK](https://github.com/badlogic/pi-mono) — MIT License
+
+## 许可
+
+Apache-2.0 — 见 [LICENSE](./LICENSE)。

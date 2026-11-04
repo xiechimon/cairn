@@ -1,0 +1,169 @@
+## integration: done-dialog-e2e, g2t2-local-lifecycle, m4b-watch-wake-e2e, m3b-demo (real server + daemon; merge requests and moves to todo), this branch
+
+ RUN  v5.0.1 /home/user/pacman/integration
+
+
+[diag] stub requests consumed: 8
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a16394-96b9-79db-9f41-4cd0f1601828
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-F4uZiv/workspaces/01a16394-96b9-79db-9f41-4cd0f1601828/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-F4uZiv/workspaces/01a16394-96b9-79db-9f41-4cd0f1601828/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a16394-96b9-79db-9f41-4cd0f1601828
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a16394-96b9-79db-9f41-4cd0f1601828
+finished (0 running)
+claim step=nJi013S8dcT0vADlTAcwP
+step nJi013S8dcT0vADlTAcwP for conv 01a16394-9d6e-7865-b510-83f87fd7e977 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Cloning 6KLWcyjG3fcxjXZEW3Nwn/m3b-failure (branch: main)
+[workspace] Worktree added (pacman/conv-01a16394-9d6e-7865-b510-83f87fd7e977 from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: pacman-m3b-home-
+[skills] unknown-dispatch: plans
+[skills] unknown-dispatch: plan
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-F4uZiv/workspaces/01a16394-9d6e-7865-b510-83f87fd7e977/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-F4uZiv/workspaces/01a16394-9d6e-7865-b510-83f87fd7e977/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a16394-9d6e-7865-b510-83f87fd7e977
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:36189/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:36189/v1"; machine "m3b-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:36189/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:36189/v1"; machine "m3b-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (0 running)
+claim step=atST7xpYLvV6HT_t1N9bW
+step atST7xpYLvV6HT_t1N9bW for conv 01a16394-a80c-724b-8fb0-f6a481edd051 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree added (pacman/conv-01a16394-a80c-724b-8fb0-f6a481edd051 from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: pacman-m3b-home-
+[skills] unknown-dispatch: plans
+[skills] unknown-dispatch: plan
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-F4uZiv/workspaces/01a16394-a80c-724b-8fb0-f6a481edd051/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-F4uZiv/workspaces/01a16394-a80c-724b-8fb0-f6a481edd051/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a16394-a80c-724b-8fb0-f6a481edd051
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a16394-a80c-724b-8fb0-f6a481edd051
+finished (0 running)
+[machine] Shutting down…
+
+
+[diag] stub requests consumed: 13
+[diag] daemon.log tail:
+[step] brief written: AGENTS.md (create)
+continue session chief-01a16394-b3f0-7a88-a4dc-14300d550d55
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+claim step=geBYt1G-v4_CTEuxrj9pZ
+step geBYt1G-v4_CTEuxrj9pZ for conv 01a16394-b9a1-73fd-acbd-aece8beb4433 (2 running)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[workspace] Worktree added (pacman/conv-01a16394-b9a1-73fd-acbd-aece8beb4433 from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a16394-b9a1-73fd-acbd-aece8beb4433
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m4b-wake-home-9wcHHu/workspaces/01a16394-b9a1-73fd-acbd-aece8beb4433/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m4b-wake-home-9wcHHu/workspaces/01a16394-b9a1-73fd-acbd-aece8beb4433/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a16394-b9a1-73fd-acbd-aece8beb4433
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:37639/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:37639/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:37639/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:37639/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (1 running)
+claim step=Yugwlyiz_lBEBr4zbFjAh
+step Yugwlyiz_lBEBr4zbFjAh for conv chief-01a16394-b3f0-7a88-a4dc-14300d550d55 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: v1
+[skills] unknown-dispatch: chat
+[skills] unknown-dispatch: completions
+[skills] unknown-dispatch: json
+[skills] unknown-dispatch: v1
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m4b-wake-home-9wcHHu/workspaces/chief-01a16394-b3f0-7a88-a4dc-14300d550d55/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m4b-wake-home-9wcHHu/workspaces/chief-01a16394-b3f0-7a88-a4dc-14300d550d55/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session chief-01a16394-b3f0-7a88-a4dc-14300d550d55
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+finished (0 running)
+claim step=2M_qZBpnaqWUJzIJ3nT1M
+step 2M_qZBpnaqWUJzIJ3nT1M for conv 01a16394-cb43-74cd-82f2-824f40b18b27 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree reused
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a16394-cb43-74cd-82f2-824f40b18b27
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-3Qumlg/workspaces/01a16394-cb43-74cd-82f2-824f40b18b27/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-3Qumlg/workspaces/01a16394-cb43-74cd-82f2-824f40b18b27/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a16394-cb43-74cd-82f2-824f40b18b27
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a16394-cb43-74cd-82f2-824f40b18b27
+finished (0 running)
+claim step=fFSyvINzdbxpRf8e1jUJx
+step fFSyvINzdbxpRf8e1jUJx for conv 01a16394-cb43-74cd-82f2-824f40b18b27 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree reused
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a16394-cb43-74cd-82f2-824f40b18b27
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-3Qumlg/workspaces/01a16394-cb43-74cd-82f2-824f40b18b27/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-3Qumlg/workspaces/01a16394-cb43-74cd-82f2-824f40b18b27/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a16394-cb43-74cd-82f2-824f40b18b27
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a16394-cb43-74cd-82f2-824f40b18b27
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  4 passed (4)
+      Tests  14 passed (14)
+   Start at  12:27:06
+   Duration  33.16s (tests 74%, import 19%, transform 7%)
+

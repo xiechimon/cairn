@@ -1,0 +1,67 @@
+{
+  "probe": "new-task",
+  "ok": true,
+  "at": "2026-10-20T20:37:24.272Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home",
+    "root": "/home/user/pacman/.claude/worktrees/p1/"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "新建任务 dialog 打开"
+    },
+    {
+      "ok": true,
+      "label": "卡片落「待开始」列,序号 #1"
+    },
+    {
+      "ok": true,
+      "label": "GET /api/todos 含新任务(phase=todo)"
+    },
+    {
+      "ok": true,
+      "label": "SQLite todo 表有行(seqNum=1)"
+    }
+  ],
+  "artifacts": [
+    "01-board-before.png",
+    "02-new-task-card.png"
+  ],
+  "apiTodo": {
+    "id": "-z4-amys2jkxc46qZI59j",
+    "teamId": "7lW3yhm9-8VN3M7pcOWpl",
+    "projectId": "nxLdT6aXwdang4ZAaWhOJ",
+    "title": "验证任务 44432",
+    "spec": "验证任务 44432",
+    "phase": "todo",
+    "phaseAt": 1792528646451,
+    "seqNum": 1,
+    "orderIndex": 0,
+    "tagIds": [],
+    "assignment": null,
+    "agent": null,
+    "latestBuildId": null,
+    "lastRunAt": null,
+    "hasChanges": false,
+    "hasPlan": false,
+    "buildHistory": [],
+    "sourceTodo": null,
+    "blockedBy": null,
+    "v": 1,
+    "createdBy": "AaKFcTUARk8MFJs_sdHW9",
+    "ownerId": "AaKFcTUARk8MFJs_sdHW9",
+    "sourceBuildId": null,
+    "sourceKind": null,
+    "sourceRef": null,
+    "quotaWait": null
+  },
+  "dbTodo": {
+    "id": "-z4-amys2jkxc46qZI59j",
+    "title": "验证任务 44432",
+    "phase": "todo",
+    "seqNum": 1
+  }
+}

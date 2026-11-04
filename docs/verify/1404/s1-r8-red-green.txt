@@ -1,0 +1,375 @@
+# #1404 S1 round 8 (pr-gate run 5 on #1420 at 1892662, go with suggestions; #1410 merged to main at 1f61c79 and merged
+# into this branch in 3724619): the D4 list parity test against .claude/workflows/pr-gate.js, the line-start rule for
+# unclosed `<!--`, executable evidence extensions in four new families, and pins for two parser guards.
+# New tests first, red, then green after the fix.
+
+== after the main merge (3724619), before any round 8 change: the round 7 suite on the merged tree
+ Test Files  3 passed (3)
+      Tests  122 passed (122)
+
+== red: the three test files as committed in 56573f8, against the S1 sources at 3724619 (only the test files changed).
+# 12 new tests (122 -> 134) and one extended list. Which fail and why:
+#  - evidence-link: "The parser skips `<!--` comments." before the Verified section loses its link: every unclosed
+#    `<!--` hides the rest of the body, also one quoted in a code span mid-line. The indent test fails on its
+#    four-space half for the same reason (the three-space half already hides).
+#  - paths: the per-extension loop (extended with .bash .zsh .fish .ps1 .psm1 .bat .cmd .html .htm) and the four
+#    family tests: those extensions are not in EVIDENCE_EXECUTABLE_EXTENSIONS.
+#  - the pins pass on the old sources, as pins should: the three parity tests (AUTO_MERGE, PROTECTED + the gate's own
+#    source globs, and the parser's own failure cases), a `.` path segment going to others, an empty filename refused,
+#    and a 65,536-character line of unclosed `<!--` parsed within 200 ms (the old code stops at the first one).
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3a
+
+ ❯ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts (24 tests | 2 failed) 46ms
+   ❯ parseRawEvidenceLinks (24)
+     × 行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文 11ms
+     × 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞 2ms
+ ❯ |@xiechimon/pacman| test/merge-gate-paths.test.ts (75 tests | 5 failed) 70ms
+   ❯ 证据目录 (10)
+     × 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出 14ms
+   ❯ 可执行扩展名的新四族（第八轮） (4)
+     × shell：.bash .zsh .fish 新增即列出，扩展名换大小写也算 2ms
+     × PowerShell：.ps1 .psm1 新增即列出，扩展名换大小写也算 1ms
+     × Windows 批处理：.bat .cmd 新增即列出，扩展名换大小写也算 1ms
+     × HTML（浏览器打开即跑脚本）：.html .htm 新增即列出，扩展名换大小写也算 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文
+AssertionError: expected { links: [], others: [] } to deeply equal { links: [ { …(2) } ], others: [] }
+
+- Expected
++ Received
+
+  {
+-   "links": [
+-     {
+-       "path": "docs/verify/1404/a.txt",
+-       "sha": "f44b920639de983be1e050899e5217509204b43f",
+-     },
+-   ],
++   "links": [],
+    "others": [],
+  }
+
+ ❯ test/merge-gate-evidence-link.test.ts:148:25
+    146|   test('行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文', () => {
+    147|     const body = `The parser skips \`<!--\` comments.\n\n## Verified\n…
+    148|     expect(parse(body)).toEqual({
+       |                         ^
+    149|       links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
+    150|       others: [],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞
+AssertionError: expected { links: [], others: [] } to deeply equal { links: [ { …(2) } ], others: [] }
+
+- Expected
++ Received
+
+  {
+-   "links": [
+-     {
+-       "path": "docs/verify/1404/a.txt",
+-       "sha": "f44b920639de983be1e050899e5217509204b43f",
+-     },
+-   ],
++   "links": [],
+    "others": [],
+  }
+
+ ❯ test/merge-gate-evidence-link.test.ts:157:51
+    155|     const a = raw('docs/verify/1404/a.txt');
+    156|     expect(parse(`ok\n   <!-- draft\n${a}`)).toEqual({ links: [], othe…
+    157|     expect(parse(`ok\n\n    <!-- draft\n\n${a}`)).toEqual({
+       |                                                   ^
+    158|       links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
+    159|       others: [],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出
+AssertionError: .bash: expected [] to deeply equal [ 'docs/verify/1404/new.bash', …(2) ]
+
+- Expected
++ Received
+
+- [
+-   "docs/verify/1404/new.bash",
+-   "docs/verify/1404/edit.bash",
+-   "docs/verify/1404/notes.bash",
+- ]
++ []
+
+ ❯ test/merge-gate-paths.test.ts:504:55
+    502|         }),
+    503|       ];
+    504|       expect(classify(files).executableEvidence, ext).toEqual(files.ma…
+       |                                                       ^
+    505|     }
+    506|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > shell：.bash .zsh .fish 新增即列出，扩展名换大小写也算
+AssertionError: expected [] to deeply equal [ 'docs/verify/1404/run.bash', …(5) ]
+
+- Expected
++ Received
+
+- [
+-   "docs/verify/1404/run.bash",
+-   "docs/verify/1404/RUN.BASH",
+-   "docs/verify/1404/run.zsh",
+-   "docs/verify/1404/RUN.ZSH",
+-   "docs/verify/1404/run.fish",
+-   "docs/verify/1404/RUN.FISH",
+- ]
++ []
+
+ ❯ test/merge-gate-paths.test.ts:629:36
+    627|       ]);
+    628|       const r = classify(files.map((p) => f(p, { status: 'added' })));
+    629|       expect(r.executableEvidence).toEqual(files);
+       |                                    ^
+    630|     });
+    631|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > PowerShell：.ps1 .psm1 新增即列出，扩展名换大小写也算
+AssertionError: expected [] to deeply equal [ 'docs/verify/1404/run.ps1', …(3) ]
+
+- Expected
++ Received
+
+- [
+-   "docs/verify/1404/run.ps1",
+-   "docs/verify/1404/RUN.PS1",
+-   "docs/verify/1404/run.psm1",
+-   "docs/verify/1404/RUN.PSM1",
+- ]
++ []
+
+ ❯ test/merge-gate-paths.test.ts:629:36
+    627|       ]);
+    628|       const r = classify(files.map((p) => f(p, { status: 'added' })));
+    629|       expect(r.executableEvidence).toEqual(files);
+       |                                    ^
+    630|     });
+    631|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > Windows 批处理：.bat .cmd 新增即列出，扩展名换大小写也算
+AssertionError: expected [] to deeply equal [ 'docs/verify/1404/run.bat', …(3) ]
+
+- Expected
++ Received
+
+- [
+-   "docs/verify/1404/run.bat",
+-   "docs/verify/1404/RUN.BAT",
+-   "docs/verify/1404/run.cmd",
+-   "docs/verify/1404/RUN.CMD",
+- ]
++ []
+
+ ❯ test/merge-gate-paths.test.ts:629:36
+    627|       ]);
+    628|       const r = classify(files.map((p) => f(p, { status: 'added' })));
+    629|       expect(r.executableEvidence).toEqual(files);
+       |                                    ^
+    630|     });
+    631|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > HTML（浏览器打开即跑脚本）：.html .htm 新增即列出，扩展名换大小写也算
+AssertionError: expected [] to deeply equal [ 'docs/verify/1404/run.html', …(3) ]
+
+- Expected
++ Received
+
+- [
+-   "docs/verify/1404/run.html",
+-   "docs/verify/1404/RUN.HTML",
+-   "docs/verify/1404/run.htm",
+-   "docs/verify/1404/RUN.HTM",
+- ]
++ []
+
+ ❯ test/merge-gate-paths.test.ts:629:36
+    627|       ]);
+    628|       const r = classify(files.map((p) => f(p, { status: 'added' })));
+    629|       expect(r.executableEvidence).toEqual(files);
+       |                                    ^
+    630|     });
+    631|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  7 failed | 127 passed (134)
+   Start at  10:07:52
+   Duration  1.43s (transform 78%, import 18%, tests 4%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.76s · 78% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+== green: the same three files at 56573f8
+# Per file: digest 35 (34 + 1), paths 75 (68 + 7), evidence-link 24 (20 + 4). apps/server/test/merge-gate-readiness.test.ts
+# does not exist on this branch (S2 is #1421).
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts --reporter=verbose
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3a
+
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > markdown 链接与 <img src> 都认，路径按 URL 解码 9ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 别的仓、别的票、短 SHA、大写 SHA、分支名都不算，列进 others 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 票号是另一票号的前缀：docs/verify/14040/ 不是 1404 的证据 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 仓名不分大小写 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > HTML 注释里的链接不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一链接出现两次只记一次 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一文件按解码后的 sha 与路径只记一次：仓主大小写不同、路径写成 %61 也是同一份 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一路径钉在两个 SHA 上是两条 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 坏的百分号转义（%E0%A4%A）列进 others，不抛 6ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 链接后面紧跟的标点与反引号不算进路径 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 闭合的注释之后的链接照常算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 两段闭合注释之间的链接照常算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 空注释 <!--> 与 <!---> 在自身的 --> 处结束（HTML 与 cmark-gfm 同样），其后的链接照常算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 目录穿越与仓外路径不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 路径里有 . 段的不算，列进 others 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 查询串与片段不算进路径：?raw=true、#L3 照样认，同一文件只记一次 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 去掉查询串与片段后不指向文件的不算：目录本身不是证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内 5ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一行里成串没闭合的 <!--，65,536 个字符在 200 ms 内 6ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 带版本前缀，同一组文件任意顺序算出同一个摘要 4ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 改一个 blob sha，摘要就变 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > status、filename、blob sha 都不变、只有 patchSha 变：摘要就变 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 只改 docs/verify/ 下的证据，摘要不变 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 改名跨过 docs/verify/ 边界（进或出）都计入摘要 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > previous_filename 进摘要：同名同 sha 的改名来源不同，摘要不同 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 只有仓根的 docs/verify/ 算证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 文件名含制表符或换行不会与别的元组撞车 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 补充平面字符挨着 U+E000–U+FFFF 的字符：按 UTF-16 码元排，不按码点 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 非删除条目的 sha 为空：摘要不可得 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 删除条目的 sha 为空也照常计算（真实响应里删除条目带旧 blob sha） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 299 个文件照常；300 个即视为截断，摘要不可得 5ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 300 的上限按整张列表算，证据条目也计入：299 个代码文件加 1 个 docs/verify 条目即视为截断 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 与 PR 的 changed_files 对不上即视为截断 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > compare 给的条目比 changed_files 多：同样对不上，摘要不可得 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 空文件列表：摘要不可得（没有可绑定的补丁） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 只有证据的补丁：证据之外没有文件，摘要不可得 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 行数与文件数按整张补丁算，docs/verify/ 的证据也计入；摘要照旧不计证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 改名（带 previous_filename 的条目）记两个文件，纯改名行数为 0，证据里的改名也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 复制（copied，带 previous_filename）同改名一样记两个文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 解析出 58 个文件，删除条目带旧 blob sha，证据目录里有可执行文件 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 解析出的每个条目都合 @pacman/shared 的 compareFileSchema，且没有词表之外的字段 8ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 响应形状不对（缺 files、files 非数组、条目缺字段）返回 null 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > previous_filename 映射到 previousFilename；缺省为 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > sha 缺失、previous_filename 为空串或非字符串：形状不对，返回 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 改名或复制条目缺 previous_filename（缺省或 null）：形状不对，返回 null，原名不能悄悄丢掉 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > status 不在 COMPARE_FILE_STATUSES 里、filename 不是字符串：形状不对，返回 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > filename 为空串：形状不对，返回 null（compareFileSchema 要求至少一个字符） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > additions、deletions 或 changes 为负：形状不对，返回 null（与 compareFileSchema 的非负一致） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > globToRegExp > **/ 含仓根，* 不跨目录，不分大小写 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > globToRegExp > protect：末尾的 /** 也认目录项本身，不认同名前缀；不带时不认 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > globToRegExp > protect 按 Unicode 折叠，不带时只折 ASCII 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > CI 5ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 钩子 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > agent 设置 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > pi 技能 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > cursor 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > MCP 配置 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > scout 放行表 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > CLAUDE 变体 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > AGENTS 变体 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 评审口径 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ADR 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸脚本 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 配置 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > biome 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > biome.json 嵌套在源码里 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > tsconfig 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > gitignore 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > gitattributes 嵌套 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 迁移 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 依赖清单 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 锁文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 工作区 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > npmrc 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸源码 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸词表 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > daemon 的合并决定 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 大小写变体照样命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 名字里有换行、回车、空格或其它白名单外字符：一律算保护（与 pr-gate SAFE_PATH 同一白名单） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 只多一个空格就算保护：集内源码路径本身不命中任何保护 glob 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k 6ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 protect 一致） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 安全敏感面与跑迁移的 DB 引导：清单里每个文件都算保护，不进 gateSource 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 与其它保护 glob 同样不分大小写 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 的 machine*.ts：machines.ts、machine-relay.ts 命中；* 不跨目录，machine/x.ts 不命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 锚定在原路径：近邻与别处的同名文件仍可自动合并 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 复制条目的原名也判类：从保护文件复制出来算命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 改名把保护文件移走：按原路径命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸源码另列一份（D4 ④） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 普通的保护路径不进 gateSource 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 产品源码、测试、e2e 与本票证据在集内 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 集外路径（文档、根文件、public、eval）各自列出 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 可自动合并集的 glob 不认目录项本身：docs/verify、apps/web/src 单独出现算集外 4ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 可自动合并集只折 ASCII 大小写：只靠 Unicode 折叠才像集内的名字（ſrc、pacKages）落在集外 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 保护路径不重复记进集外 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 改名从集外移进集内：按原路径记集外 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 删除测试目录下的文件，或删除 .test / .spec 文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > e2e/、tests/、__tests__/ 目录下删掉的文件都算，不必带 .test 后缀 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > .test.mts / .spec.cts 与仓根 test/、e2e/ 目录下删掉的文件都算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试目录与后缀按 Unicode 折叠（收紧的一侧）：teſt/ 是测试目录，.teſt.ts 是测试文件 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试目录与 .test / .spec 后缀不分大小写（ADR 0021 D4，与 pr-gate 的 /i 一致） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 把测试改名成非测试路径也算删测试 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 改测试、加测试都不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试的任何改名都算删了原测试（与 pr-gate 的 --no-renames 一致），含测试目录里改成不被收集的名字 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 写本票目录可以，写别的票的目录列出（含删除） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 本 PR 新增或改动的可执行证据列出，删除的不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 改名把别票的证据移进本票目录：按原名列出 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外 4ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 单独的 docs/verify 条目（顶替证据目录的符号链接）列进别票：票号段为空 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 可执行扩展名同样按 Unicode 折叠：.ſh、.jſ 算可执行 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 票号是另一票号的前缀：14040 不是 1404 的目录 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 票号段大小写敏感匹配之外不做猜测：XMON-104 与 xmon-104 是两个目录 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > compare 不给 patch 的条目（二进制、diff 过大、纯改名） > 证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀大小写敏感（与摘要同一条） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > compare 不给 patch 的条目（二进制、diff 过大、纯改名） > 改名没有 patch：两头里落在证据目录之外的名字都列出 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > shell：.bash .zsh .fish 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > PowerShell：.ps1 .psm1 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > Windows 批处理：.bat .cmd 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名的新四族（第八轮） > HTML（浏览器打开即跑脚本）：.html .htm 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 与 .claude/workflows/pr-gate.js 同一份清单 > AUTO_MERGE 与 AUTO_MERGE_PATH_GLOBS 逐项同序 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 与 .claude/workflows/pr-gate.js 同一份清单 > PROTECTED 与 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS 逐项同序 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 与 .claude/workflows/pr-gate.js 同一份清单 > 解析器找不到数组、找不到收尾的 ]、遇到不认识的行都报错 2ms
+
+ Test Files  3 passed (3)
+      Tests  134 passed (134)
+   Start at  10:10:51
+   Duration  1.43s (transform 78%, import 17%, tests 4%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.78s · 78% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

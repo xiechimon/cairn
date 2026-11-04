@@ -1,0 +1,75 @@
+Fresh Claude Code cloud session created on branch claude/practical-fermi-ocaen6
+(HEAD 8686ca7), read-only prompt: observe, do not install or run the hook by hand.
+
+Hook events from the session transcript:
+2026-10-20T18:30:45.982Z  hook_started   SessionStart:startup
+2026-10-20T18:31:02.059Z  hook_response  SessionStart:startup  exit=0 outcome=success
+                          (last stdout line: "Done in 9.7s using pnpm v12.5.1")
+2026-10-20T18:31:02.332Z  session init   (after the hook, so the hook is synchronous)
+
+Commands the session ran as its first actions, output verbatim (ANSI codes stripped):
+
+$ cd "$CLAUDE_PROJECT_DIR" 2>/dev/null || cd "$(git rev-parse --show-toplevel)"; pwd; git rev-parse HEAD; git log -1 --format=%s
+/home/user/pacman
+8686ca7426103a8fd583c41241e1f2f1bcb7cd5d
+chore: SessionStart hook for Claude Code cloud sessions
+
+$ echo "CLAUDE_CODE_REMOTE=$CLAUDE_CODE_REMOTE"; echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH"
+CLAUDE_CODE_REMOTE=true
+PLAYWRIGHT_BROWSERS_PATH=/root/.cache/pacman-pw-browsers
+
+$ ls -ld node_modules node_modules/.modules.yaml; stat -c '%y %n' node_modules/.modules.yaml
+drwxr-xr-x 7 root root  4096 Oct 20 18:31 node_modules
+-rw-r--r-- 1 root root 34528 Oct 20 18:31 node_modules/.modules.yaml
+2026-10-20 18:31:01.227973220 +0000 node_modules/.modules.yaml
+
+$ ls -l "$PLAYWRIGHT_BROWSERS_PATH" 2>&1 | head -10
+total 8
+lrwxrwxrwx 1 root root   25 Oct 20 18:31 chromium -> /opt/pw-browsers/chromium
+lrwxrwxrwx 1 root root   30 Oct 20 18:31 chromium-1194 -> /opt/pw-browsers/chromium-1194
+drwxr-xr-x 2 root root 4096 Oct 20 18:31 chromium-1243
+lrwxrwxrwx 1 root root   45 Oct 20 18:31 chromium_headless_shell-1194 -> /opt/pw-browsers/chromium_headless_shell-1194
+drwxr-xr-x 3 root root 4096 Oct 20 18:31 chromium_headless_shell-1243
+lrwxrwxrwx 1 root root   28 Oct 20 18:31 ffmpeg-1011 -> /opt/pw-browsers/ffmpeg-1011
+
+$ ls -d node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build/Release/better_sqlite3.node
+ls: cannot access 'node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build/Release/better_sqlite3.node': No such file or directory
+(exit code 2)
+
+$ git status --short
+(no output)
+
+$ pnpm lint 2>&1 | tail -3; echo "exit=${PIPESTATUS[0]}"
+Checked 781 files in 1347ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ pnpm typecheck 2>&1 | tail -3; echo "exit=${PIPESTATUS[0]}"
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse 2>&1 | tail -3; echo "exit=${PIPESTATUS[0]}"
+[spec-parse-gate] apps/web/e2e: 1071 tests in 155 files collected, disk count matches (4.3s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.0s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run apps/server/test/machine-concurrency-backfill.test.ts 2>&1 | grep -E "Test Files|Tests "
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+
+$ cd apps/web && node -e "import('@playwright/test').then(async({chromium})=>{const b=await chromium.launch();console.log('chromium launch ok', b.version());await b.close()})..."
+chromium launch ok 141.0.7390.37
+
+Note on the build/Release check: that path was the wrong expectation in the
+verification prompt. better-sqlite3 13.0.3 loads its bundled prebuilt binary
+(lib/binding.js joins __dirname/../prebuilds/<target>.node). The implicit
+`node-gyp rebuild` only writes stamp files, so build/Release/*.node never
+exists. The hook puts node-gyp on PATH so that implicit step exits 0 and
+pnpm install completes. Runtime check, from apps/server, of which .node file
+is mapped after opening a database:
+
+$ node -e "const D=require('better-sqlite3'); new D(':memory:'); <print .node entries of /proc/self/maps>"
+/home/user/pacman/node_modules/.pnpm/better-sqlite3@13.0.3/node_modules/better-sqlite3/prebuilds/linux-x64.node

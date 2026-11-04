@@ -1,0 +1,37 @@
+✔ valid publication creates exactly one result-only commit (97.382833ms)
+✔ rejects modified harness before publication (60.075954ms)
+✔ rejects untracked file before publication (57.622386ms)
+✔ rejects ignored untracked file before publication (58.484888ms)
+✔ rejects rename before publication (57.80263ms)
+✔ rejects deletion before publication (57.030191ms)
+✔ rejects second evidence file before publication (56.952344ms)
+✔ rejects wrong ticket path before publication (57.700093ms)
+✔ rejects invalid JSON before publication (59.193932ms)
+✔ rejects schema failure before publication (58.928366ms)
+✔ rejects result digest mismatch before publication (58.92553ms)
+✔ rejects additional committed file before publication (62.528017ms)
+✔ rejects requested digest mismatch before evaluation (29.050836ms)
+✔ remote movement after evaluation prevents push (101.785871ms)
+✔ push failure propagates and leaves remote unchanged (93.495356ms)
+✔ rejects unsafe ticket paths before evaluation (30.770997ms)
+✔ updates an existing result with one result-only commit (110.689539ms)
+✔ failed evaluation does not publish an otherwise valid result (53.567906ms)
+✔ missing evidence is rejected (56.281938ms)
+✔ billing verification uses the explicit relay without revealing credentials (1.009601ms)
+✔ unverified billing route is rejected (401, text/plain;charset=UTF-8) (0.174922ms)
+✔ unverified billing route is rejected (200, text/plain;charset=UTF-8) (0.124931ms)
+✔ unverified billing route is rejected (200, text/plain;charset=UTF-8) (0.089224ms)
+✔ workspace package links keep their evaluated source after dependency copies (48.375813ms)
+✔ workspace links removed by a full dependency copy are restored before evaluation (75.167942ms)
+✔ evaluation environment removes inherited tokens and credential configuration (584.914839ms)
+✔ a preloaded module cannot be used to reach the publication credential store (23.151818ms)
+✔ filesystem boundary denies absolute publication credentials and parent processes (24.848018ms)
+✔ actual evaluator starts inside the boundary with checkout workspace sources (6184.759764ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8299.988562

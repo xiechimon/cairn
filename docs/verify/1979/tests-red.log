@@ -1,0 +1,112 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/merge-gate-harness-eval.test.ts (8 tests | 4 failed) 450ms
+   ❯ merge-gate harness eval routing (#1979) (8)
+     × missing evidence with dispatch authorized: one worker dispatched; readiness shows harness-regression-evaluating (transient) 57ms
+     × stale evidence: same, bound to the new digest 39ms
+     × after a passing result is published, reconcile clears the regression blocker and every unrelated blocker in the fixture is still present 34ms
+     × #1865's reclassification (missing and stale as transient, no dispatch) fails this suite 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/merge-gate-harness-eval.test.ts > merge-gate harness eval routing (#1979) > missing evidence with dispatch authorized: one worker dispatched; readiness shows harness-regression-evaluating (transient)
+AssertionError: expected [ [ …(2) ] ] to deeply equal [ [ …(2) ] ]
+
+- Expected
++ Received
+
+  [
+    [
+-     "harness-regression-evaluating",
+-     "transient",
++     "harness-regression-missing",
++     "human",
+    ],
+  ]
+
+ ❯ test/merge-gate-harness-eval.test.ts:213:62
+    211|     expect(dispatches).toHaveLength(1);
+    212|     expect(dispatches[0]?.patchDigest).toBe(DIGEST);
+    213|     expect(readiness.blockers.map((b) => [b.code, b.class])).toEqual([
+       |                                                              ^
+    214|       ['harness-regression-evaluating', 'transient'],
+    215|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/merge-gate-harness-eval.test.ts > merge-gate harness eval routing (#1979) > stale evidence: same, bound to the new digest
+AssertionError: expected [ 'harness-regression-stale' ] to deeply equal [ 'harness-regression-evaluating' ]
+
+- Expected
++ Received
+
+  [
+-   "harness-regression-evaluating",
++   "harness-regression-stale",
+  ]
+
+ ❯ test/merge-gate-harness-eval.test.ts:228:51
+    226|     expect(dispatches).toHaveLength(1);
+    227|     expect(dispatches[0]?.patchDigest).toBe(DIGEST);
+    228|     expect(readiness.blockers.map((b) => b.code)).toEqual(['harness-re…
+       |                                                   ^
+    229|   });
+    230|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/merge-gate-harness-eval.test.ts > merge-gate harness eval routing (#1979) > after a passing result is published, reconcile clears the regression blocker and every unrelated blocker in the fixture is still present
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/merge-gate-harness-eval.test.ts:234:94
+    232|     const { coordinator, dispatches } = openWorld();
+    233|     const first = await routeAndRead(coordinator, harnessInputs(), 'mi…
+    234|     expect(first.readiness.blockers.some((b) => b.code === 'harness-re…
+       |                                                                                              ^
+    235|       true,
+    236|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/merge-gate-harness-eval.test.ts > merge-gate harness eval routing (#1979) > #1865's reclassification (missing and stale as transient, no dispatch) fails this suite
+AssertionError: expected [ [ …(2) ] ] to deeply equal [ [ …(2) ] ]
+
+- Expected
++ Received
+
+  [
+    [
+-     "harness-regression-evaluating",
+-     "transient",
++     "harness-regression-missing",
++     "human",
+    ],
+  ]
+
+ ❯ test/merge-gate-harness-eval.test.ts:414:67
+    412|     const real = await routeAndRead(coordinator, harnessInputs(), 'mis…
+    413|     expect(dispatches).toHaveLength(1);
+    414|     expect(real.readiness.blockers.map((b) => [b.code, b.class])).toEq…
+       |                                                                   ^
+    415|       ['harness-regression-evaluating', 'transient'],
+    416|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 passed (8)
+   Start at  17:46:15
+   Duration  1.22s (tests 40%, transform 32%, import 28%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/apps/server
+

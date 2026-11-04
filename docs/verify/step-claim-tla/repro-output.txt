@@ -1,0 +1,28 @@
+# pnpm exec vitest run apps/server/test/zz-fv-repro.test.ts apps/daemon/test/zz-fv-repro.test.ts --silent=false --reporter=verbose
+# code at 41b0aa4f (product code unchanged from 23a39da9); test sources: repro-server.test.ts.txt, repro-daemon.test.ts.txt
+stdout | test/zz-fv-repro.test.ts > P1/P2 server half: same machine reclaims a released step and both runs report done
+after claim #1 claimed machine-m1
+after sweep (machine online, no heartbeat yet) pending null
+stdout | test/zz-fv-repro.test.ts > P1/P2 server half: same machine reclaims a released step and both runs report done
+claim #2 returned step step-fv status claimed
+heartbeat from run #1 accepted after reclaim; lastHeartbeatAt > claimedAt: true
+stdout | test/zz-fv-repro.test.ts > P1/P2 server half: same machine reclaims a released step and both runs report done
+run #1 done(success) accepted while run #2 holds the claim: done todo phase review
+stdout | test/zz-fv-repro.test.ts > P1/P2 server half: same machine reclaims a released step and both runs report done
+run #2 done(failed) accepted on a step already done: failed todo phase failed
+ ✓ |@xiechimon/pacman| test/zz-fv-repro.test.ts > P1/P2 server half: same machine reclaims a released step and both runs report done 82ms
+stdout | test/zz-fv-repro.test.ts > P4 daemon half: a stop fetched before the session handle registers is dropped and the step runs to success
+stop fetched from server: true
+session stop() calls: 0
+done status reported: success
+stdout | test/zz-fv-repro.test.ts > P1 daemon half: the claim loop starts a second runStep for a step id already in flight
+createSession calls for step s1 while run #1 still open: 2
+claim lines: 2
+stdout | test/zz-fv-repro.test.ts > P1 daemon half: the claim loop starts a second runStep for a step id already in flight
+done reports for s1: s1:success, s1:success
+ ✓ |@xiechimon/pacman-cli| test/zz-fv-repro.test.ts > P4 daemon half: a stop fetched before the session handle registers is dropped and the step runs to success 187ms
+ ✓ |@xiechimon/pacman-cli| test/zz-fv-repro.test.ts > P1 daemon half: the claim loop starts a second runStep for a step id already in flight 53ms
+ Test Files  2 passed (2)
+      Tests  3 passed (3)
+   Start at  18:06:12
+   Duration  2.33s (import 53%, transform 39%, tests 8%)

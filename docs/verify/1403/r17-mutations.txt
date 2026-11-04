@@ -1,0 +1,70 @@
+# #1403 round 17 mutations (pr-gate run 9 on #1414): each one applied alone to ci-loop.ts at 81d5ef1, then
+#   pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+# (142 tests). The runner kept the exact bytes of ci-loop.ts, replaced the old text (it must occur exactly once),
+# ran the tests, wrote the bytes back and checked 'git diff --quiet HEAD -- <file>' (exit 0 = restored).
+# 9 of 9 mutations turn at least one test red; the file was restored every time. NO_COLOR=1; durations dropped.
+#   item 1 (closed PR base check)  M1a is the mutation the brief names (drop the base check): [70a] goes red.
+#                                  M1b compares with a literal 'main' ([70b] guard), M1c hints before the
+#                                  confirming read, M1d resets closedSeenAt on the hint path, M1e drops the
+#                                  base.ref / default_branch fields from the hoisted guard ([70c], ㉗, [61]; the
+#                                  hint then calls githubText(null) and the candidate lands in errors)
+#   item 2 (checkpoint order)      M2 is the brief's mutation (back to createdAt): ㉔b goes red
+#   item 3 (format characters)     M3a is the 9ef2a0c regex: [65c] goes red; M3b (Cf only) is caught by [65a]/[65b]
+#   item 4 (⑨b)                    M4 drops the head-ref half of the ownership check: ⑨b and [62b] go red, so ⑨b
+#                                  pins live behaviour
+
+M1a item 1: the closed path has no base check again (its condition replaced by false)
+    run 1: exit=1 Tests  1 failed | 141 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [70a] a PR from the work branch into another branch (a backport) closed without merge → after the confirming read, one hint and nothing else
+      AssertionError: expected 'failed' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1b item 1: the closed path compares base.ref with the literal 'main', not default_branch
+    run 1: exit=1 Tests  1 failed | 141 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [70b] closed without merge into the default branch, whatever it is called → failed as before
+      AssertionError: expected 'review' to be 'failed' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1c item 1: the base check runs before the close confirmation (a hint at the first sighting)
+    run 1: exit=1 Tests  1 failed | 141 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [70a] a PR from the work branch into another branch (a backport) closed without merge → after the confirming read, one hint and nothing else
+      AssertionError: expected [ Array(1) ] to deeply equal []
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1d item 1: the hint path clears closedSeenAt (later reads fall back to pending)
+    run 1: exit=1 Tests  1 failed | 141 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [70a] a PR from the work branch into another branch (a backport) closed without merge → after the confirming read, one hint and nothing else
+      AssertionError: expected { candidates: +0, pending: +0, …(15) } to match object { hinted: 1, closedUnmerged: +0 }
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1e item 1: base.ref / default_branch dropped from the field guard (back to head ref and base repo id only)
+    run 1: exit=1 Tests  6 failed | 136 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base.ref is not taken as a merge into the default branch
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without default_branch is not taken as a merge into the default branch
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without base.ref is read again on a later sweep; the complete one finishes the card
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without default_branch is read again on a later sweep; the complete one finishes the card
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [70c] a closed response without base.ref is unreadable: not failed; the close counts again from the next complete read
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [70c] a closed response without default_branch is unreadable: not failed; the close counts again from the next complete read
+      AssertionError: expected +0 to be 1 // Object.is equality
+      AssertionError: expected [ Array(1) ] to have a length of 2 but got 1
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M2 item 2: the checkpoint is chosen by step creation time again
+    run 1: exit=1 Tests  1 failed | 141 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉔b a verify step created in an earlier round finishes after this round's build step → its pushed commit is the one checked
+      AssertionError: expected 'done' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M3a item 3: githubText strips control characters only (\p{Cc}, the 9ef2a0c regex)
+    run 1: exit=1 Tests  1 failed | 141 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65c] format characters in a branch name (a bidi override, zero-width characters) are stripped from the hint
+      AssertionError: expected 'PR #201 合并进了分支「rel\u202eease​-x」，不是默认…' to contain '「release-x」'
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M3b item 3 (guard): githubText strips format characters only (\p{Cf})
+    run 1: exit=1 Tests  2 failed | 140 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65a] an over-long base branch name with control characters is cut to 100 characters in the hint
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65b] the merger login and the merge commit in the merge row lose control characters and are bounded
+      AssertionError: expected 'PR #201 合并进了分支「release-xxxxxxxxxxxxxx…' to contain '「main」'
+      AssertionError: expected 'PR #201 已在 GitHub 合并（合并提交 \u001babc12…' to contain '合并提交 abc1234，'
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M4 item 4: the ownership check ignores the head ref (same repo is enough)
+    run 1: exit=1 Tests  2 failed | 140 passed (142)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑨b a second build records the PR the older build opened (its head is the older build's branch, #1217 / #1195) → foreign: stays in review, one hint, no merged row
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62b] a PR from another branch of the target repo → not finished
+      AssertionError: expected 'done' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+# 9 of 9 mutations turn at least one test red

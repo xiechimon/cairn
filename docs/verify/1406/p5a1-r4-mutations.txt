@@ -1,0 +1,134 @@
+# P5a-1 round 4 mutations on 5cf6e92e (the fix commit)
+# Each mutation: one string replacement in the named source file (scratchpad p5r4-mutate.py), then
+#   pnpm exec vitest run apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts apps/server/test/webhook.test.ts
+#   (189 tests), then the file is written back from its saved content. After the last one: git status shows no source change.
+# Unmutated baseline at 5cf6e92e: 189 passed (p5a1-r4-red-green.txt, green leg).
+
+## M1: item 2: reconcile query without the open-children condition
+file: apps/server/src/services/issue-intake.ts
+replace: "            noDeliveredPr(),\n            noOpenChildren(),\n"
+   with: "            noDeliveredPr(),\n"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 轮询器领的卡被 chief 拆开、子卡在跑，issue 被仓主关闭 → 父卡不关、不读状态，子卡不动；最后一张子卡 done → 父卡 done
+## M2: item 2: re-read before the close without the open-children condition
+file: apps/server/src/services/issue-intake.ts
+replace: ".where(and(eq(todo.id, t.id), noDeliveredPr(), noOpenChildren()))"
+   with: ".where(and(eq(todo.id, t.id), noDeliveredPr()))"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 读期间有人重开一张关掉的子卡 → 写前重读看到未收完的子卡，跳过
+## M3: item 3: claimedSourceRefs compares sourceRef exactly (no lower())
+file: apps/server/src/services/github-issues.ts
+replace: "sql`lower(${todoTable.sourceRef})`"
+   with: "todoTable.sourceRef"
+result: exit 1, Test Files  2 failed | 1 passed (3) ; Tests  2 failed | 187 passed (189)  -> RED
+  FAIL  test/github-issues.test.ts > #1406 并发导入占位 > 引用大小写不同也是同一条 issue：已有 github:Octo/Alpha#7 的卡 → 列表滤除 7、直接导入 409
+  FAIL  test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > 轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后以 github:xiechimon/pacman#1406 投递 → 一张卡，webhook 记 duplicate
+## M4: item 3: in-process claim key not lowercased
+file: apps/server/src/services/github-issues.ts
+replace: "const claim = `${row.teamId}\\u0000${ref.toLowerCase()}`;"
+   with: "const claim = `${row.teamId}\\u0000${ref}`;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > webhook 导入在飞（握着占位等 GitHub）时轮询器以另一种大小写导入同一 issue → 一张卡，轮询器记 claimed
+## M5: item 4: intakeGet returns rate-limited answers as plain non-2xx (no throw)
+file: apps/server/src/lib/github.ts
+replace: "    if (await isRateLimitedResponse(res)) {\n      const reset"
+   with: "    if (false && (await isRateLimitedResponse(res))) {\n      const reset"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  12 failed | 177 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 429（retry-after 60）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（x-ratelimit-remaining 0，带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 429（retry-after 60）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（x-ratelimit-remaining 0，带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 429（retry-after 60）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（x-ratelimit-remaining 0，带 reset）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，只有 message）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 429（retry-after 60）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（x-ratelimit-remaining 0，带 reset）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+## M6: item 4: per-card reconcile catch swallows the rate limit
+file: apps/server/src/services/issue-intake.ts
+replace: "        if (err instanceof GithubRateLimitedError) throw err;\n        tally.errors += 1;\n        log({ todoId: t.id"
+   with: "        tally.errors += 1;\n        log({ todoId: t.id"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  3 failed | 186 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 429（retry-after 60）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（x-ratelimit-remaining 0，带 reset）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+## M7: item 4: per-project catch swallows the rate limit
+file: apps/server/src/services/issue-intake.ts
+replace: "        if (err instanceof GithubRateLimitedError) throw err;\n        tally.errors += 1;\n        log({ projectId: row.id"
+   with: "        tally.errors += 1;\n        log({ projectId: row.id"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  9 failed | 180 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 429（retry-after 60）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（x-ratelimit-remaining 0，带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 429（retry-after 60）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（x-ratelimit-remaining 0，带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 429（retry-after 60）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（x-ratelimit-remaining 0，带 reset）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，只有 message）：本队别的项目这一轮也不读
+## M8: item 4: no secondary-limit message check
+file: apps/server/src/lib/github.ts
+replace: "  return res.status === 403 && /rate limit/i.test(await res.text().catch(() => ''));"
+   with: "  return false;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 185 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，只有 message）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+## M9: item 5: newestLabeler ignores performed_via_github_app
+file: apps/server/src/services/issue-intake.ts
+replace: "  if (labeled.viaApp !== null) {\n    return"
+   with: "  if (false && labeled.viaApp !== null) {\n    return"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 185 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主授权的 app（claude）替仓主打的标（#1406 的真实事件）→ 不领、不读 permission，记一行
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > app 安装令牌打的标（actor = claude[bot]）→ 同样不领，记一行
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 早先仓主本人打过、最新一条 labeled 经 app → 不领（只看最新一条）
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、app 对象缺 slug → 同样不领
+## M10: item 5: app object without a slug projects as null
+file: apps/server/src/lib/github.ts
+replace: "            ? app.slug\n            : 'unknown',"
+   with: "            ? app.slug\n            : null,"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  2 failed | 187 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug > githubIssueEvents 投影 performed_via_github_app.slug；不经 app = null，经 app 却缺 slug = unknown
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、app 对象缺 slug → 同样不领
+## M11: item 6: a non-409 import failure ends the project sweep (returns full)
+file: apps/server/src/services/issue-intake.ts
+replace: "        'issue intake import failed',\n      );\n      return 'not-taken';"
+   with: "        'issue intake import failed',\n      );\n      return 'full';"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 非 409 的导入失败（详情读 502）→ 记一行、本项目这一轮照领下一条，失败的那条不记「见过 open」
+## M12: item 6: seenOpen marked before the import succeeds
+file: apps/server/src/services/issue-intake.ts
+replace: "    let todoId: string;\n    try {\n      const record = await importGithubIssue("
+   with: "    seenOpen.add(refKey(row.teamId, githubIssueSourceRef(owner, repo, issueNumber)));\n    let todoId: string;\n    try {\n      const record = await importGithubIssue("
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 非 409 的导入失败（详情读 502）→ 记一行、本项目这一轮照领下一条，失败的那条不记「见过 open」
+## M13: item 6: unreadable later list page continues the loop instead of stopping
+file: apps/server/src/services/issue-intake.ts
+replace: "        log({ projectId: row.id, page: pageNo }, 'issue intake list page unreadable');\n        break;"
+   with: "        log({ projectId: row.id, page: pageNo }, 'issue intake list page unreadable');\n        continue;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 3 页列表的第 2 页读不到 → 只领第 1 页里的，不读第 3 页，记一行
+## M14: item 6: no log line for an unreadable later list page
+file: apps/server/src/services/issue-intake.ts
+replace: "        log({ projectId: row.id, page: pageNo }, 'issue intake list page unreadable');\n        break;"
+   with: "        break;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 3 页列表的第 2 页读不到 → 只领第 1 页里的，不读第 3 页，记一行
+## M15: item 6: unreadable later list page skips the whole project like page 1
+file: apps/server/src/services/issue-intake.ts
+replace: "        if (pageNo === 1) {"
+   with: "        if (pageNo >= 1) {"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 188 passed (189)  -> RED
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 3 页列表的第 2 页读不到 → 只领第 1 页里的，不读第 3 页，记一行
+
+git status after restore: '?? docs/verify/1406/pr-gate-1461-run3-69722cc.json\n'
+
+Summary: 15 of 15 mutations red. Item 2: M1 (query) and M2 (re-read) each caught by a different test. Item 3: M3
+(persistent D4 check) caught by the sequential and the github-issues tests, M4 (in-process claim) by the concurrent
+test. Item 4: M5 (no throw), M6 / M7 (an inner catch swallows it) and M8 (secondary-limit text) red. Item 5: M9
+(app ignored) and M10 (slugless app = human) red. Item 6 coverage pins: M11 (502 ends the project sweep), M12
+(seen-open before the import), M13 (continue past an unreadable page), M14 (no log), M15 (later page skips the
+project) red.

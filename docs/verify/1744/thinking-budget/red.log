@@ -1,0 +1,35 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1933-thinking-budget/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/pi-compaction-thinking-budget.test.ts (3 tests | 2 failed) 16ms
+   × summary recovery preserves enabled thinking with reported-input ceiling errors 14ms
+   × summary recovery preserves enabled thinking with generic ceiling errors 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/pi-compaction-thinking-budget.test.ts > summary recovery preserves enabled thinking with reported-input ceiling errors
+ FAIL  |@xiechimon/cairn-cli| test/pi-compaction-thinking-budget.test.ts > summary recovery preserves enabled thinking with generic ceiling errors
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ❯ test/pi-compaction-thinking-budget.test.ts:37:29
+     35|       }),
+     36|     });
+     37|     expect(response.status).toBe(200);
+       |                             ^
+     38|     expect(await response.text()).toBe('summary');
+     39|     expect(seen.length).toBeGreaterThan(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  05:24:41
+   Duration  131ms (transform 44%, tests 38%, import 13%, worker 5%)
+

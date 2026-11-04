@@ -1,0 +1,10 @@
+# green leg: this branch
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  30 passed (30)
+
+$ pnpm exec vitest run --project @xiechimon/pacman
+ Test Files  110 passed (110)
+      Tests  1140 passed | 1 skipped (1141)
+   Duration  64.66s (import 49%, tests 46%, transform 4%)
+server tests exit=0

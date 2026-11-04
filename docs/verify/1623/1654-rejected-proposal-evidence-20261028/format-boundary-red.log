@@ -1,0 +1,105 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (41 tests | 4 failed) 4890ms
+   × shadow keeps malformed blank-title payloads out of persisted proposals 155ms
+   × shadow keeps malformed single-child payloads out of persisted proposals 87ms
+   × auto keeps malformed blank-title payloads out of persisted proposals 114ms
+   × auto keeps malformed single-child payloads out of persisted proposals 130ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow keeps malformed blank-title payloads out of persisted proposals
+AssertionError: promise resolved "'{"parentId":"tC6QaEZN4KhP9XMP5NACF","…'" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+"{\"parentId\":\"tC6QaEZN4KhP9XMP5NACF\",\"parentBuildId\":\"01a18251-b3c1-7795-83a6-2aa98b3773b9\",\"children\":[],\"autoStart\":false}"
+
+ ❯ test/split-rejected-proposal.test.ts:350:10
+    348|         await expect(
+    349|           w.tool('split_todo', { todoId: w.parentId, subtodos: payload…
+    350|         ).rejects.toMatchObject({ status: 400 });
+       |          ^
+    351|         expect(w.s.db.select().from(build).all()).toEqual([]);
+    352|         expect(w.s.db.select().from(plan).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow keeps malformed single-child payloads out of persisted proposals
+AssertionError: promise resolved "'{"parentId":"YtbRS2nqfQs-AadrBvHMr","…'" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+"{\"parentId\":\"YtbRS2nqfQs-AadrBvHMr\",\"parentBuildId\":\"01a18251-b427-77b0-b1ff-0ffd11d2e765\",\"children\":[],\"autoStart\":false}"
+
+ ❯ test/split-rejected-proposal.test.ts:350:10
+    348|         await expect(
+    349|           w.tool('split_todo', { todoId: w.parentId, subtodos: payload…
+    350|         ).rejects.toMatchObject({ status: 400 });
+       |          ^
+    351|         expect(w.s.db.select().from(build).all()).toEqual([]);
+    352|         expect(w.s.db.select().from(plan).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto keeps malformed blank-title payloads out of persisted proposals
+AssertionError: promise resolved "'{"parentId":"rpTdhreX6jqWd62QG1fLj","…'" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+"{\"parentId\":\"rpTdhreX6jqWd62QG1fLj\",\"parentBuildId\":\"01a18251-b60f-7471-89d0-674c5e75420f\",\"children\":[],\"autoStart\":false}"
+
+ ❯ test/split-rejected-proposal.test.ts:350:10
+    348|         await expect(
+    349|           w.tool('split_todo', { todoId: w.parentId, subtodos: payload…
+    350|         ).rejects.toMatchObject({ status: 400 });
+       |          ^
+    351|         expect(w.s.db.select().from(build).all()).toEqual([]);
+    352|         expect(w.s.db.select().from(plan).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto keeps malformed single-child payloads out of persisted proposals
+AssertionError: promise resolved "'{"parentId":"08f43yydidTgIPvEWrvvN","…'" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+"{\"parentId\":\"08f43yydidTgIPvEWrvvN\",\"parentBuildId\":\"01a18251-b692-7f8c-b0dd-09546500a519\",\"children\":[],\"autoStart\":false}"
+
+ ❯ test/split-rejected-proposal.test.ts:350:10
+    348|         await expect(
+    349|           w.tool('split_todo', { todoId: w.parentId, subtodos: payload…
+    350|         ).rejects.toMatchObject({ status: 400 });
+       |          ^
+    351|         expect(w.s.db.select().from(build).all()).toEqual([]);
+    352|         expect(w.s.db.select().from(plan).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 37 passed (41)
+   Start at  19:42:25
+   Duration  10.18s (tests 49%, transform 37%, import 14%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 3.62s · 37% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

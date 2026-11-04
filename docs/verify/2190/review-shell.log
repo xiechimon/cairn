@@ -1,0 +1,2 @@
+bash -n scripts/ops/restore-drill-service.sh scripts/ops/restore-drill.sh
+exit=0

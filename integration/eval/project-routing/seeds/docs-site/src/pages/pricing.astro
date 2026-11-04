@@ -1,0 +1,12 @@
+---
+const plans = [
+  { name: '自托管', price: '免费' },
+  { name: '演示站', price: '只读' },
+];
+---
+<html lang="zh">
+  <body>
+    <h1>定价</h1>
+    <ul>{plans.map((p) => <li>{p.name}：{p.price}</li>)}</ul>
+  </body>
+</html>

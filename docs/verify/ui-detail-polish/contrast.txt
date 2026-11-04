@@ -1,0 +1,13 @@
+WCAG 2.x contrast for the toned-down diff tokens (apps/web/src/styles/shadcn.css)
+fg = --text-secondary (light #5e564d, dark #c5c0b9)
+
+light  add row  #e2eed8  fg 5.99   add-fg #3d6a35 on row 5.27
+light  del row  #f7e2da  fg 5.78
+light  add word #bcd9a9  fg 4.68   word vs row 1.28
+light  del word #f0c6b5  fg 4.62   word vs row 1.25
+dark   add row  #26321f  fg 7.45   add-fg #99ce9a on row 7.48
+dark   del row  #3d2a24  fg 7.47
+dark   add word #3a5230  fg 4.78   word vs row 1.56
+dark   del word #6a3d30  fg 5.00   word vs row 1.49
+
+The first draft of the light del word (#eebda9) measured 4.28 and failed AA; it was lightened to #f0c6b5.

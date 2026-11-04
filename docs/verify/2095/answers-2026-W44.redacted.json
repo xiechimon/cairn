@@ -1,0 +1,16 @@
+{
+  "week": "2026-W44",
+  "seed": "demo",
+  "items": {
+    "pack:build-beta": {
+      "where": "[redacted]",
+      "why": "[redacted]",
+      "labeler": "[redacted]"
+    },
+    "pack:build-alpha": {
+      "where": "[redacted]",
+      "why": "[redacted]",
+      "labeler": "[redacted]"
+    }
+  }
+}

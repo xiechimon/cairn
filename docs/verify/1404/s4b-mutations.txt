@@ -1,0 +1,138 @@
+# #1404 S4b: mutation run on the gate's GitHub shell, the status planner, the evidence-presence rule, the path
+# safety item and the adapter, against the six merge-gate test files (s4b-red-green.txt lists them).
+# Each mutation replaces text that occurs exactly once in its file, runs the six files, and counts the mutation
+# caught when the run exits non-zero; the file is restored from a copy after each run and at the end.
+# Reproduce: copy s4b-mutations-list.py.txt to mutations.py and s4b-mutations-runner.py.txt to
+# run_mutations.py in one directory outside the repository, then
+#   python3 -I run_mutations.py <worktree> <out.tsv> [ids...]
+# (kept as .txt: an executable file under docs/verify/ is itself a merge-gate blocker).
+#
+# Run 1 (code at 011c246, 102 mutations): 95 caught, 7 survived.
+#   N16, N18, N26, N35: pins added in f4f4d89 (cache entry cleared, base-tip note, parents without a sha,
+#     other rule types).
+#   N46: the "pages disagree" flag in the paged reads was implied by the count check; removed in f4f4d89, and
+#     N46 now removes the break that stops at a page whose total_count differs.
+#   N14 (a not-modified answer with no etag sent uses the cached body): equivalent and dropped. With no etag
+#     sent the cached body is absent or a partial first page, and either way the read ends unreadable (F4 pins
+#     the partial-page case).
+#   N95 (status written to checksHeadSha ?? headSha): equivalent and dropped; the planner already refuses when
+#     the two differ.
+# Run 2 (code at f4f4d89; N45 retargeted at the simplified count check, N14 found equivalent as above):
+#   100 of 100 caught.
+# Run 3 (final code at 1ed5aa0, after the /code-review fixes; N59 retargeted at the new ownStatus text, N103 to
+#   N105 added for the fixes; the readCompare failure reset has no mutation because GateGithubFacts carries no
+#   compare failure and readCompareAt starts from a fresh reader): table below.
+
+N01	B-1	PR number not checked	caught	Tests  2 failed | 225 passed (227)
+N02	B-1	base repository not compared	caught	Tests  1 failed | 226 passed (227)
+N03	B-1	base repository compared with case	caught	Tests  1 failed | 226 passed (227)
+N04	B-2	state not checked	caught	Tests  1 failed | 226 passed (227)
+N05	B-2	draft defaulted to false	caught	Tests  1 failed | 226 passed (227)
+N06	B-2	merged not checked	caught	Tests  1 failed | 226 passed (227)
+N07	B-2	changed_files not checked	caught	Tests  1 failed | 226 passed (227)
+N08	B-2	head ref not checked	caught	Tests  1 failed | 226 passed (227)
+N09	B-2	head repository shape not checked	caught	Tests  1 failed | 226 passed (227)
+N10	B-2	base ref not checked	caught	Tests  1 failed | 226 passed (227)
+N11	B-2	body type not checked	caught	Tests  1 failed | 226 passed (227)
+N12	B-3	null body kept as null	caught	Tests  1 failed | 226 passed (227)
+N13	B-4	mergeable_state defaulted to clean	caught	Tests  1 failed | 226 passed (227)
+N15	B-5	etag never sent	caught	Tests  1 failed | 226 passed (227)
+N16	B-5	response without etag leaves the old cache entry	caught	Tests  1 failed | 226 passed (227)
+N17	B-6	reads at a malformed head	caught	Tests  1 failed | 226 passed (227)
+N18	B-7	base tip not checked as a SHA	caught	Tests  1 failed | 226 passed (227)
+N19	B-8	compare base and head swapped	caught	Tests  3 failed | 224 passed (227)
+N20	B-10	total_commits not checked	caught	Tests  1 failed | 226 passed (227)
+N21	B-10	page total_commits drift accepted	caught	Tests  1 failed | 226 passed (227)
+N22	B-11	compare read stops at page 1	caught	Tests  5 failed | 222 passed (227)
+N23	B-11	compare page cap 11	caught	Tests  1 failed | 226 passed (227)
+N24	B-11	empty page does not stop	caught	Tests  1 failed | 226 passed (227)
+N25	B-12	commits deduped	caught	Tests  1 failed | 226 passed (227)
+N26	B-13	parents not checked	caught	Tests  1 failed | 226 passed (227)
+N27	B-13	commit sha not checked	caught	Tests  1 failed | 226 passed (227)
+N28	B-14	failed later page keeps the partial read	caught	Tests  1 failed | 226 passed (227)
+N29	B-16	behind_by passed unchecked	caught	Tests  1 failed | 226 passed (227)
+N30	B-17	protected false read as unreadable	caught	Tests  1 failed | 226 passed (227)
+N31	B-17	missing protection read as none	caught	Tests  1 failed | 226 passed (227)
+N32	B-17	malformed classic check dropped instead of null	caught	Tests  1 failed | 226 passed (227)
+N33	B-17	contexts fallback dropped	caught	Tests  1 failed | 226 passed (227)
+N34	B-17	rules failure read as none	caught	Tests  1 failed | 226 passed (227)
+N35	B-17	other rule types counted	caught	Tests  1 failed | 226 passed (227)
+N36	B-17	rules cap returns the partial list	caught	Tests  1 failed | 226 passed (227)
+N37	B-17	rules not unioned	caught	Tests  2 failed | 225 passed (227)
+N38	B-17	required not deduped	caught	Tests  1 failed | 226 passed (227)
+N39	B-17	malformed rule context accepted	caught	Tests  1 failed | 226 passed (227)
+N40	B-17	malformed integration id accepted	caught	Tests  1 failed | 226 passed (227)
+N41	B-18	statusSha copied from the request	caught	Tests  1 failed | 226 passed (227)
+N42	B-18	run headSha copied from the request	caught	Tests  2 failed | 225 passed (227)
+N43	B-19	run pages stop at page 1	caught	Tests  1 failed | 226 passed (227)
+N44	B-19	status page cap 6	caught	Tests  1 failed | 226 passed (227)
+N45	B-19	count shortfall still complete	caught	Tests  2 failed | 225 passed (227)
+N46	B-19	total_count drift does not stop the read	caught	Tests  1 failed | 226 passed (227)
+N47	B-19	status sha drift accepted	caught	Tests  1 failed | 226 passed (227)
+N48	B-20	runs deduped by name only	caught	Tests  1 failed | 226 passed (227)
+N49	B-21	oldest run kept	caught	Tests  1 failed | 226 passed (227)
+N50	B-21	first run kept	caught	Tests  1 failed | 226 passed (227)
+N51	B-22	bound runs not listed first	caught	Tests  1 failed | 226 passed (227)
+N52	B-23	malformed run skipped	caught	Tests  1 failed | 226 passed (227)
+N53	B-23	run app id not checked	caught	Tests  1 failed | 226 passed (227)
+N54	B-23	status updated_at not checked	caught	Tests  1 failed | 226 passed (227)
+N55	B-24	status contexts compared with case	caught	Tests  1 failed | 226 passed (227)
+N56	B-24	status tie keeps success	caught	Tests  1 failed | 226 passed (227)
+N57	B-24	older status wins	caught	Tests  1 failed | 226 passed (227)
+N58	B-25	own status dropped from statuses	caught	Tests  1 failed | 226 passed (227)
+N59	B-25	own status not copied	caught	Tests  1 failed | 226 passed (227)
+N60	B-26	absent file read as present	caught	Tests  2 failed | 225 passed (227)
+N61	B-27	probing continues after a present file	caught	Tests  1 failed | 226 passed (227)
+N62	B-27	probe cap 6	caught	Tests  1 failed | 226 passed (227)
+N63	B-27	unqualified links probed	caught	Tests  5 failed | 222 passed (227)
+N64	B-28	404 read as unknown	caught	Tests  1 failed | 226 passed (227)
+N65	B-28	any failure read as absent	caught	Tests  2 failed | 225 passed (227)
+N66	B-28	full listing read as absent	caught	Tests  1 failed | 226 passed (227)
+N67	B-29	non-file entry counts	caught	Tests  1 failed | 226 passed (227)
+N68	B-29	entry path not compared	caught	Tests  1 failed | 226 passed (227)
+N69	B-17	present not remembered	caught	Tests  1 failed | 226 passed (227)
+N70	B-30	decoded "/" accepted	caught	Tests  1 failed | 226 passed (227)
+N71	B-30	decoded "?" accepted	caught	Tests  1 failed | 226 passed (227)
+N72	B-30	decoded "#" accepted	caught	Tests  1 failed | 226 passed (227)
+N73	B-30	decoded control characters accepted	caught	Tests  3 failed | 224 passed (227)
+N74	B-30	decoded backslash accepted	caught	Tests  1 failed | 226 passed (227)
+N75	B-31	removed files qualify	caught	Tests  1 failed | 226 passed (227)
+N76	B-31	readiness ignores presence	caught	Tests  1 failed | 226 passed (227)
+N77	B-31	missing evidence entry counts as present	caught	Tests  1 failed | 226 passed (227)
+N78	B-31	unreadable presence counts	caught	Tests  1 failed | 226 passed (227)
+N79	B-31	unreadable detail lost	caught	Tests  1 failed | 226 passed (227)
+N80	B-32	project policy human not checked	caught	Tests  1 failed | 226 passed (227)
+N81	B-32	readiness policy human not checked	caught	Tests  1 failed | 226 passed (227)
+N82	B-33	no-head write	caught	Tests  1 failed | 226 passed (227)
+N83	B-33	checks read elsewhere accepted	caught	Tests  1 failed | 226 passed (227)
+N84	B-33	blind write when current unreadable	caught	Tests  1 failed | 226 passed (227)
+N85	B-34	unchanged value rewritten	caught	Tests  1 failed | 226 passed (227)
+N86	B-34	description change ignored	caught	Tests  1 failed | 226 passed (227)
+N87	B-35	human blocker pending	caught	Tests  2 failed | 225 passed (227)
+N88	B-35	error state	caught	Tests  2 failed | 225 passed (227)
+N89	B-35	ready flag trusted over blockers	caught	Tests  1 failed | 226 passed (227)
+N90	B-36	description not capped	caught	Tests  1 failed | 226 passed (227)
+N91	B-36	cap counted in UTF-16 units	caught	Tests  1 failed | 226 passed (227)
+N92	B-36	detail in the description	caught	Tests  2 failed | 225 passed (227)
+N93	B-36	count of other blockers dropped	caught	Tests  1 failed | 226 passed (227)
+N94	B-37	context spelled differently	caught	Tests  1 failed | 226 passed (227)
+N96	B-38	writer throws	caught	Tests  1 failed | 226 passed (227)
+N97	B-39	rate limit does not stop reads	caught	Tests  1 failed | 226 passed (227)
+N98	B-39	retry-after ignored	caught	Tests  1 failed | 226 passed (227)
+N99	B-42	port throw escapes	caught	Tests  1 failed | 226 passed (227)
+N100	B-44	adapter drops the etag	caught	Tests  1 failed | 226 passed (227)
+N101	B-44	adapter fixed timeout	caught	Tests  1 failed | 226 passed (227)
+N102	B-44	adapter swaps compare SHAs	caught	Tests  2 failed | 225 passed (227)
+N103	B-17	enforcement off still required (review 7)	caught	Tests  1 failed | 226 passed (227)
+N104	B-25	incomplete status read trusted for ownStatus (review 2)	caught	Tests  1 failed | 226 passed (227)
+N105	B-27	links past the probe cap dropped (review 4)	caught	Tests  1 failed | 226 passed (227)
+
+103 mutations, 103 caught, 0 survived.
+
+== Added 2026-10-22, after pr-gate run 1 on #1525 ==
+Three mutations added for fd1e888 (the head-SHA cache keys and the end-to-end truncation pin), run on fd1e888:
+N106	B-5	check-runs ETag cached per PR, not per head SHA (#1525 pr-gate suggestion 2)	caught	Tests  1 failed | 228 passed (229)
+N107	B-5	status ETag cached per PR, not per head SHA (#1525 pr-gate suggestion 2)	caught	Tests  1 failed | 228 passed (229)
+N108	B-9	shell drops a file from page 1 (end-to-end truncation pin, #1525 pr-gate suggestion 3)	caught	Tests  6 failed | 223 passed (229)
+3 of 3 caught. The fd1e888 change touches only the two cache-key lines, which no earlier mutation targets;
+the earlier 103 were not rerun. Total: 106 mutations, 106 caught.

@@ -1,0 +1,6 @@
+$ node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+$ node scripts/single-use-helper-gate.mjs
+single-use-helper-gate: 0 single-use helper(s)
+$ node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)

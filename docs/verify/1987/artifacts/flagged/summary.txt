@@ -1,0 +1,1 @@
+status=fail violations=read tool: outside workspace: /etc/hostname

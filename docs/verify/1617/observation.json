@@ -1,0 +1,15 @@
+{
+  "mainHead": "68c09db2b8ccc368c1a4ac59fe040924d1c76f2a",
+  "originalPrHead": "eb54a7582f57dd4a54ec2249b0d4d919798eb111",
+  "sourceFiles": {
+    "scripts/doc-drift.mjs": "3be700d6b12969d6f05d688f04024721d0206734ef171dc0150794ab5565e151",
+    "scripts/doc-drift.test.mjs": "1750b431f3ef28d9ffb112871621defad303e6a4e87c609c3485cf8522f05b83",
+    "scripts/gardener-weekly.mjs": "7abc617ce1c2cf68375ec0e46c08da76964db62bbc9bc92a83da224603507224",
+    "scripts/gardener-weekly.test.mjs": "e457c2b57cae080e7764ae76b7aedff4af799188be7678fa505ec56d7c9ec79e",
+    ".github/workflows/ci.yml": "feb7c16a7f11ed83fda2e0a1e74d9943149baf16824fc3267258a0a05d517abe",
+    ".github/workflows/gardener-weekly.yml": "bb696c665f0770e67cb3b338661e514bd6bc42f736197417b3c2163e9f4e5409"
+  },
+  "reportedDriftRows": 121,
+  "falsePositivesInFirstTen": 0,
+  "tests": 48
+}

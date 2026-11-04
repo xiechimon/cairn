@@ -1,0 +1,130 @@
+# #1459 round 3 mutations: one per new rule, run at f9a22b21; at the gated head 905e4f78 webhook.ts and the three
+# test files are byte-identical (the merge of main #1498 in between touches none of them).
+# Driver: docs/verify/1459/r3-mutate.mjs with docs/verify/1459/r3-mutations.json. Each mutation edits
+# apps/server/src/services/webhook.ts, runs
+#   pnpm exec vitest run --reporter=verbose apps/server/test/webhook.test.ts apps/server/test/issue-intake.test.ts
+#     apps/server/test/github-issues.test.ts   (265 tests)
+# and writes the saved content back; `git status --short` is printed at the end.
+#
+# rule                                                  mutation  result        watched tests that fail
+# EMU logins (handle_shortcode) accepted                S1        RED 4/265     W21 alice_acme, mona-cat_octo, octo_admin, 39-char EMU
+# nothing after the underscore is refused               S2        RED 1/265     W20 "alice_"
+# underscore only as the one trailing segment           S3        RED 1/265     W20 "alice_"
+# W2 / W12b pin the reason (swap to unreadable)         S4        RED 4/265     W1, W2, W12b, W20b
+# W2 / W12b pin the reason (swap to rate-limited)       S5        RED 4/265     W1, W2, W12b, W20b
+# at most 39 characters                                 S6 (40)   RED 3/265     W20 40-char plain, EMU, [bot]
+#                                                       S7 (none) RED 3/265     same
+# [bot] suffix stripped before the shape check          S8        RED 2/265     W20b, W21 octo-builder[bot]
+# malformed sender logged truncated                     S9        RED 1/265     W22
+
+## Before: S4 against the origin/main tests (the #1496 test file): W2 and W12b stayed green
+# test file swapped for `git show origin/main:apps/server/test/webhook.test.ts` (93b9ce21), written back afterwards
+# (cmp-checked); the source was this branch's webhook.ts at the time (7fefb28d), same refusal line.
+## S4: a below-triage answer is logged as permission-unreadable (swap between sender refusals)
+file: apps/server/src/services/webhook.ts
+  replace: "return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);"
+     with: "return refuseSender('permission-unreadable', `${sender} is below triage on ${fullName}`);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  2 failed | 250 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20b bot 账号（login 带 [bot]）照常读权限
+  watched: FAIL  W1 
+  watched: pass  W2 
+  watched: pass  W12b 
+  watched: FAIL  W20b 
+git status --short after the last mutation (source files restored):
+   M apps/server/test/webhook.test.ts
+
+## After: every mutation against the round 3 tests
+## S1: login shape without the EMU underscore segment (the #1496 shape)
+file: apps/server/src/services/webhook.ts
+  replace: "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;"
+     with: "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*$/;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 261 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（alice_acme：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（mona-cat_octo：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（octo_admin：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  watched: FAIL  W21 GitHub 认的账号名（alice_acme
+  watched: FAIL  W21 GitHub 认的账号名（mona-cat_octo
+  watched: FAIL  W21 GitHub 认的账号名（octo_admin
+  watched: FAIL  W21 GitHub 认的账号名（aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh
+## S2: underscore segment may be empty (a trailing underscore passes)
+file: apps/server/src/services/webhook.ts
+  replace: "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;"
+     with: "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]*)?$/;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 264 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"alice_"）→ 202 ignored，零出站，记日志
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"alice_"）
+## S3: underscore allowed anywhere after the first character
+file: apps/server/src/services/webhook.ts
+  replace: "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;"
+     with: "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 264 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"alice_"）→ 202 ignored，零出站，记日志
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"alice_"）
+## S4: a below-triage answer is logged as permission-unreadable (swap between sender refusals)
+file: apps/server/src/services/webhook.ts
+  replace: "return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);"
+     with: "return refuseSender('permission-unreadable', `${sender} is below triage on ${fullName}`);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 261 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20b bot 账号（login 带 [bot]）照常读权限
+  watched: FAIL  W1 
+  watched: FAIL  W2 
+  watched: FAIL  W12b 
+  watched: FAIL  W20b 
+## S5: a below-triage answer is logged as rate-limited (swap between sender refusals)
+file: apps/server/src/services/webhook.ts
+  replace: "return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);"
+     with: "return refuseSender('rate-limited', `${sender} is below triage on ${fullName}`);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 261 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20b bot 账号（login 带 [bot]）照常读权限
+  watched: FAIL  W1 
+  watched: FAIL  W2 
+  watched: FAIL  W12b 
+  watched: FAIL  W20b 
+## S6: length limit 40 instead of 39
+file: apps/server/src/services/webhook.ts
+  replace: "  return base.length <= 39 && GITHUB_LOGIN_BASE.test(base);"
+     with: "  return base.length <= 40 && GITHUB_LOGIN_BASE.test(base);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  3 failed | 262 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"）→ 202 ignored，零出站，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh"）→ 202 ignored，零出站，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]"）→ 202 ignored，零出站，记日志
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"）
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh"）
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]"）
+## S7: no length limit
+file: apps/server/src/services/webhook.ts
+  replace: "  return base.length <= 39 && GITHUB_LOGIN_BASE.test(base);"
+     with: "  return GITHUB_LOGIN_BASE.test(base);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  3 failed | 262 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"）→ 202 ignored，零出站，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh"）→ 202 ignored，零出站，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]"）→ 202 ignored，零出站，记日志
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"）
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh"）
+  watched: FAIL  W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]"）
+## S8: the [bot] suffix is not stripped (bot logins refused as malformed)
+file: apps/server/src/services/webhook.ts
+  replace: "  const base = login.endsWith('[bot]') ? login.slice(0, -'[bot]'.length) : login;"
+     with: "  const base = login;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  2 failed | 263 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20b bot 账号（login 带 [bot]）照常读权限
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（octo-builder[bot]：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  watched: FAIL  W20b 
+  watched: FAIL  W21 GitHub 认的账号名（octo-builder[bot]
+## S9: a malformed sender is logged in full (no truncation)
+file: apps/server/src/services/webhook.ts
+  replace: "    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login', {\n      sender: sender.slice(0, 64),\n      senderLength: sender.length,\n    });"
+     with: "    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login');"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 264 passed (265)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 3 W 日志里的 sender > W22 sender-malformed 的 sender 很长（载荷里没有长度上限）→ 日志行只记前 64 个字符与总长
+  watched: FAIL  W22 
+git status --short after the last mutation (source files restored):
+  (clean)

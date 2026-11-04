@@ -1,0 +1,97 @@
+{
+  "probe": "mentions",
+  "ok": true,
+  "at": "2026-10-02T15:10:27.792Z",
+  "stack": {
+    "api": "http://127.0.0.1:8793",
+    "web": "http://127.0.0.1:5275",
+    "homeDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0040-625-composer-wire-usecomposerwire/.claude/verify-run/home"
+  },
+  "checks": [
+    {
+      "name": "dialog-open",
+      "ok": true,
+      "detail": "新建任务 dialog 打开"
+    },
+    {
+      "name": "picker-five-groups",
+      "ok": true,
+      "detail": "picker 五分组行(5 行)"
+    },
+    {
+      "name": "picker-zero-count-disabled-not-hidden",
+      "ok": true,
+      "detail": "0 计数组行是 disabled 而非消失(任务:1 技能:0 Agents:1 项目:1 机器:2)"
+    },
+    {
+      "name": "agents-group-nonempty",
+      "ok": true,
+      "detail": "Agents 组非空（前置:有 agent）"
+    },
+    {
+      "name": "insert-button-count",
+      "ok": true,
+      "detail": "底条按钮计数随选中数(插入 (1))"
+    },
+    {
+      "name": "spec-agent-token",
+      "ok": true,
+      "detail": "spec 出现 agent token([verify-builder](agent:SzeZwcYnqVsS3_mWUSDuU))"
+    },
+    {
+      "name": "api-spec-token",
+      "ok": true,
+      "detail": "GET /api/todos 的 spec 携 token(命中任务)"
+    },
+    {
+      "name": "composer-picker-token",
+      "ok": true,
+      "detail": "composer draft 出 agent token([verify-builder](agent:SzeZwcYnqVsS3_mWUSDuU))"
+    },
+    {
+      "name": "inline-opens",
+      "ok": true,
+      "detail": "键入 @ 触发内联 agents 补全"
+    },
+    {
+      "name": "inline-inserts-token",
+      "ok": true,
+      "detail": "内联选行后落 token(1 行候选；[verify-builder](agent:SzeZwcYnqVsS3_mWUSDuU))"
+    }
+  ],
+  "artifacts": [
+    "01-dialog-spec-token.png",
+    "02-composer-picker-token.png",
+    "03-composer-inline-token.png"
+  ],
+  "pickerRows": [
+    {
+      "label": "任务",
+      "count": 1,
+      "disabled": false
+    },
+    {
+      "label": "技能",
+      "count": 0,
+      "disabled": true
+    },
+    {
+      "label": "Agents",
+      "count": 1,
+      "disabled": false
+    },
+    {
+      "label": "项目",
+      "count": 1,
+      "disabled": false
+    },
+    {
+      "label": "机器",
+      "count": 2,
+      "disabled": false
+    }
+  ],
+  "specToken": "[verify-builder](agent:SzeZwcYnqVsS3_mWUSDuU)",
+  "todoId": "Cfzzo5M32SjpX8_aZZZVf",
+  "composerToken": "[verify-builder](agent:SzeZwcYnqVsS3_mWUSDuU)"
+}

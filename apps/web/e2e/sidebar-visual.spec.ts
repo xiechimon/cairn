@@ -1,0 +1,93 @@
+import { mkdir } from 'node:fs/promises';
+import { resolve as resolvePath } from 'node:path';
+import { expect, type Page, test } from '@playwright/test';
+import { keyboardFocus, readRing, settleTransitions } from './helpers.js';
+
+const parse = (c: string) => {
+  const m = c.match(/[\d.]+/g)?.map(Number);
+  if (m == null || m.length < 3) throw new Error(`unparsable color ${c}`);
+  return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 };
+};
+
+const over = (fg: string, bg: string) => {
+  const f = parse(fg);
+  const b = parse(bg);
+  return {
+    r: f.a * f.r + (1 - f.a) * b.r,
+    g: f.a * f.g + (1 - f.a) * b.g,
+    b: f.a * f.b + (1 - f.a) * b.b,
+  };
+};
+
+const dist = (x: { r: number; g: number; b: number }, y: { r: number; g: number; b: number }) =>
+  Math.abs(x.r - y.r) + Math.abs(x.g - y.g) + Math.abs(x.b - y.b);
+
+const resolve = (page: Page, token: string) =>
+  page.evaluate((v) => {
+    const el = document.createElement('div');
+    el.style.backgroundColor = `var(${v})`;
+    document.body.append(el);
+    const out = getComputedStyle(el).backgroundColor;
+    el.remove();
+    return out;
+  }, token);
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`⌘K hint shows on the search icon's tooltip (${theme})`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
+    await page.goto('/app?scenario=01');
+    await page.getByRole('complementary').getByRole('button', { name: '搜索' }).hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('⌘K');
+  });
+
+  test(`hover and selected rows share one geometry (${theme})`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
+    await page.goto('/app?scenario=01');
+
+    const geo = await page.evaluate(() => {
+      const box = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x, w: r.width, h: r.height, radius: getComputedStyle(el).borderRadius };
+      };
+      const selected = document.querySelector(
+        'aside [data-slot="sidebar-nav-row"][aria-current="page"]',
+      );
+      const plain = document.querySelector(
+        'aside [data-slot="sidebar-project-row"]:not([aria-current="page"])',
+      );
+      if (!selected || !plain) throw new Error('sidebar rows missing');
+      return { selected: box(selected), plain: box(plain) };
+    });
+    expect(geo.plain).toEqual(geo.selected);
+    expect(geo.selected).toEqual({ x: 12, w: 224, h: 32, radius: '8px' });
+  });
+
+  test(`selected row = sheet fill + hairline, distinct from hover (${theme})`, async ({
+    page,
+  }) => {
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
+    await page.goto('/app?scenario=01');
+
+    const sidebarBg = await page.evaluate(
+      () => getComputedStyle(document.querySelector('aside')!).backgroundColor,
+    );
+    const schedules = page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first();
+    await schedules.hover();
+    await page.waitForTimeout(300);
+    const hoverBg = await schedules.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const selected = await page.evaluate(() => {
+      const cs = getComputedStyle(
+        document.querySelector('aside [data-slot="sidebar-nav-row"][aria-current="page"]')!,
+      );
+      return { bg: cs.backgroundColor, ring: cs.boxShadow };
+    });
+
+    expect(hoverBg).toBe(await resolve(page, '--sidebar-hover'));
+    const bg = parse(sidebarBg);
+    expect(dist(over(hoverBg, sidebarBg), bg)).toBeGreaterThan(3);
+    expect(selected.bg).toBe(await resolve(page, '--sidebar-active'));
+    expect(selected.ring).toBe('none');
+    expect(selected.bg).not.toBe(hoverBg);
+  });
+}
+

@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: rejects unowned changes to scripts/prepush-known-red.json
+ok 1 - rejects unowned changes to scripts/prepush-known-red.json
+  ---
+  duration_ms: 1.172624
+  type: 'test'
+  ...
+# Subtest: accepts curated main-red ownership of scripts/prepush-known-red.json
+ok 2 - accepts curated main-red ownership of scripts/prepush-known-red.json
+  ---
+  duration_ms: 0.19739
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/lint-warning-baseline.json
+ok 3 - rejects unowned changes to scripts/lint-warning-baseline.json
+  ---
+  duration_ms: 0.104465
+  type: 'test'
+  ...
+# Subtest: accepts curated main-red ownership of scripts/lint-warning-baseline.json
+ok 4 - accepts curated main-red ownership of scripts/lint-warning-baseline.json
+  ---
+  duration_ms: 0.104207
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/comment-discipline-allowlist.json
+ok 5 - rejects unowned changes to scripts/comment-discipline-allowlist.json
+  ---
+  duration_ms: 0.075173
+  type: 'test'
+  ...
+# Subtest: accepts curated main-red ownership of scripts/comment-discipline-allowlist.json
+ok 6 - accepts curated main-red ownership of scripts/comment-discipline-allowlist.json
+  ---
+  duration_ms: 0.064986
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/single-use-helper-allowlist.json
+ok 7 - rejects unowned changes to scripts/single-use-helper-allowlist.json
+  ---
+  duration_ms: 0.060585
+  type: 'test'
+  ...
+# Subtest: accepts curated main-red ownership of scripts/single-use-helper-allowlist.json
+ok 8 - accepts curated main-red ownership of scripts/single-use-helper-allowlist.json
+  ---
+  duration_ms: 0.054454
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/ui-debt-baseline.json
+ok 9 - rejects unowned changes to scripts/ui-debt-baseline.json
+  ---
+  duration_ms: 0.219131
+  type: 'test'
+  ...
+# Subtest: accepts curated main-red ownership of scripts/ui-debt-baseline.json
+ok 10 - accepts curated main-red ownership of scripts/ui-debt-baseline.json
+  ---
+  duration_ms: 0.229203
+  type: 'test'
+  ...
+# Subtest: rejects unowned changes to scripts/feature-map-staleness-baseline.json
+ok 11 - rejects unowned changes to scripts/feature-map-staleness-baseline.json
+  ---
+  duration_ms: 0.095327
+  type: 'test'
+  ...
+# Subtest: accepts curated main-red ownership of scripts/feature-map-staleness-baseline.json
+ok 12 - accepts curated main-red ownership of scripts/feature-map-staleness-baseline.json
+  ---
+  duration_ms: 0.047337
+  type: 'test'
+  ...
+# Subtest: ordinary files need no issue ownership
+ok 13 - ordinary files need no issue ownership
+  ---
+  duration_ms: 0.063699
+  type: 'test'
+  ...
+# Subtest: filename patterns match new baseline and allowlist files without a ledger entry
+ok 14 - filename patterns match new baseline and allowlist files without a ledger entry
+  ---
+  duration_ms: 0.089789
+  type: 'test'
+  ...
+# Subtest: the CI job structure pin is not a debt baseline
+ok 15 - the CI job structure pin is not a debt baseline
+  ---
+  duration_ms: 0.054468
+  type: 'test'
+  ...
+# Subtest: registering a new CI job needs no main-red ownership
+ok 16 - registering a new CI job needs no main-red ownership
+  ---
+  duration_ms: 0.043841
+  type: 'test'
+  ...
+# Subtest: protected changes require at least one closing issue
+ok 17 - protected changes require at least one closing issue
+  ---
+  duration_ms: 0.043726
+  type: 'test'
+  ...
+# Subtest: every closing issue must carry curated main-red ownership
+ok 18 - every closing issue must carry curated main-red ownership
+  ---
+  duration_ms: 0.796556
+  type: 'test'
+  ...
+# Subtest: gardener main-watch alerts do not count as curated main-red ownership
+ok 19 - gardener main-watch alerts do not count as curated main-red ownership
+  ---
+  duration_ms: 0.106691
+  type: 'test'
+  ...
+# Subtest: collects distinct closing issue lines including comma-separated declarations
+ok 20 - collects distinct closing issue lines including comma-separated declarations
+  ---
+  duration_ms: 0.280382
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 58.545958

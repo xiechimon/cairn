@@ -1,0 +1,17 @@
+{
+  "kind": "skill_injection_check",
+  "level": "yellow",
+  "reds": [],
+  "yellows": [
+    {
+      "code": "injected-unread",
+      "skill": "demo-skill",
+      "detail": "skill was injected and no skill fact names it"
+    }
+  ],
+  "injected": [
+    "demo-skill"
+  ],
+  "omitted": [],
+  "unrendered": []
+}

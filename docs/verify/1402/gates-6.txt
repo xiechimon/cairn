@@ -1,0 +1,49 @@
+# Gates at d5f0111 (merge of origin/main d01373d plus the search/project-line registration).
+
+$ pnpm lint
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 782 files in 1214ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ pnpm typecheck
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1127 tests in 165 files collected, disk count matches (1.8s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (2.9s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+# the branch changes no file a vitest project covers (.claude/skills scripts, docs), so no test file is selected and vitest exits 0
+|@xiechimon/pacman-cli| 
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+|@pacman/shared| 
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+exit=0
+
+$ pnpm --filter @pacman/web e2e:affected
+  docs/verify/1402/vp-selftest-ci.txt → none
+  docs/verify/1402/vp-selftest-node24.txt → none
+  docs/verify/1402/vp-selftest-r5.txt → none
+  docs/verify/1402/vp-selftest-r6-mutations.txt → none
+  docs/verify/1402/vp-selftest-r6.txt → none
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+34/34 passed
+exit=0

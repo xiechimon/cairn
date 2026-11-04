@@ -1,0 +1,46 @@
+---
+title: "GitHub merge gate (MergeGate.tla)"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: open
+    lg1: ready
+    lg2: merged
+    lg3: Breaks MergeBoundToJudgedPatch
+    lg4: Path to the MergeBoundToJudgedPatch bug
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  class lg3 breaks
+  class lg4 bugPath
+  s0: No evaluation: 0 of 3 verdict kinds pass on the current patch
+  s1: No evaluation: 1 of 3 verdict kinds pass on the current patch
+  s2: No evaluation: 2 of 3 verdict kinds pass on the current patch
+  s3: No evaluation: 3 of 3 verdict kinds pass on the current patch
+  s4: Gate ready on the current patch
+  s5: Gate ready, but the patch digest moved since
+  s6: Merged on an unjudged patch
+  [*] --> s0
+  s0 --> s1: a verdict is recorded
+  s1 --> s2: a verdict is recorded
+  s2 --> s3: a verdict is recorded
+  s3 --> s4: mergeReadiness evaluates
+  s4 --> s5: default branch moves, digest changes
+  s5 --> s6: mergeThroughGithub merges
+  classDef breaks fill:#ffecee,stroke:#e72e3b,stroke-width:2.5px,color:#cd2834
+  class s0 blue
+  class s0 bugPath
+  class s1 blue
+  class s1 bugPath
+  class s2 blue
+  class s2 bugPath
+  class s3 blue
+  class s3 bugPath
+  class s4 orange
+  class s4 bugPath
+  class s5 orange
+  class s5 bugPath
+  class s6 teal
+  class s6 breaks
+  class s6 bugPath

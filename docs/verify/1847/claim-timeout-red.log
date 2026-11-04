@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1847
+
+ ❯ |@xiechimon/cairn| test/step-claim-report.test.ts (4 tests | 1 failed) 5303ms
+   ❯ #1473 a report counts only for the current claim (4)
+     × released and re-claimed by the same machine: the in-flight claim report is booked, later reports change nothing 5017ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/step-claim-report.test.ts > #1473 a report counts only for the current claim > released and re-claimed by the same machine: the in-flight claim report is booked, later reports change nothing
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/step-claim-report.test.ts:140:3
+    138|
+    139| describe('#1473 a report counts only for the current claim', () => {
+    140|   test('released and re-claimed by the same machine: the in-flight cla…
+       |   ^
+    141|     const w = makeWorld();
+    142|     expect((await w.claim())?.step.id).toBe(STEP);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  09:24:14
+   Duration  8.50s (tests 64%, transform 25%, import 12%)

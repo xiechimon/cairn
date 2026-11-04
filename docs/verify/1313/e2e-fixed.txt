@@ -1,0 +1,11 @@
+Command (this change):
+pnpm exec playwright test e2e/empty-review-closeout.spec.ts --reporter=line
+
+8399 free
+Running 4 tests using 1 worker
+
+[1/4] e2e/empty-review-closeout.spec.ts:163:1 › 看板：已上报空 diff 的 review 卡完成不合并、不拦授权
+[2/4] e2e/empty-review-closeout.spec.ts:189:1 › 详情：已上报空 diff 的 review 卡同样不展示合并行且完成可点
+[3/4] e2e/empty-review-closeout.spec.ts:198:1 › 有文件改动的卡仍展示合并行，缺授权时完成禁用
+[4/4] e2e/empty-review-closeout.spec.ts:209:1 › changes 未上报（无 reported）不当成空提交，合并行与授权闸保留
+  4 passed (5.2s)

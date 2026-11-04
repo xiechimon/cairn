@@ -1,0 +1,84 @@
+# Gates at bc9c833 (round 16 of #1414; tracked tree clean, only the untracked docs/verify/1403 file(s) of this
+# round present). NO_COLOR=1; ANSI codes stripped.
+# E2E_AFFECTED_PORT=8391: lsof -iTCP:8391 -sTCP:LISTEN showed nothing listening (exit 1) before the run.
+# The known root-only failure (apps/daemon runner-brief.test.ts "擦除失败") did not appear in this run.
+# vitest --changed: test-internal log lines are omitted; only the summary is kept.
+# e2e:affected: the changed-path list (every path of the branch vs origin/main, mapped to "server surface" or
+# "none") is omitted; the selection and results are kept.
+
+$ pnpm lint
+$ biome ci .
+(one info-level note on apps/web/src/resources/machines-page.tsx:317, noUselessFragments; not in this diff)
+Checked 785 files in 1518ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.4s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+ Test Files  132 passed (132)
+      Tests  1304 passed | 1 skipped (1305)
+   Start at  11:38:03
+   Duration  287.00s (tests 65%, import 34%)
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+$ lsof -iTCP:8391 -sTCP:LISTEN
+exit=1
+
+$ E2E_AFFECTED_PORT=8391 pnpm --filter @pacman/web e2e:affected
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8391
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Running 8 tests using 2 workers
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (3.8s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.1s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (4.4s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (721ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (744ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (771ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (1.3s)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (714ms)
+  8 passed (18.8s)
+exit=0
+
+# /code-review low on deff4b9..03d0b20 (named by sha; the reviewed diff is these 5 files, 305+/94-, the same
+# 'git diff --stat' in /home/user/pacman and in this worktree): one finding, builds.ts finishTodoDone. It read
+# the comment "同一轮里第二个合并步再落一行" as a second merge step reaching finishTodoDone on a card that is
+# already done, which now throws. Not a defect: completeStep returns before the merge tail when the card is
+# done (builds.ts hasLeftExecution, #1453), and ㉟ drives that path; the second row is written after a person
+# drags the card back to review ([54]). bc9c833 rewrites the comment to say so (comment only). The gates
+# above, and the green run, the mutations and the 20-run loop in r16-red-green.txt / r16-mutations.txt, all
+# ran at bc9c833.

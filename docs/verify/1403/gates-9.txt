@@ -1,0 +1,26 @@
+# gates at 862bd69 (git status clean before the run)
+
+$ pnpm lint
+Checked 782 files in 1536ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+
+$ pnpm typecheck
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+ Test Files  131 passed (131)
+      Tests  1229 passed | 1 skipped (1230)
+
+$ pnpm --filter @pacman/web e2e:affected
+
+  6 passed (10.6s)
+exit=0

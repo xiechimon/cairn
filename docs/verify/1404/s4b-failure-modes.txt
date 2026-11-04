@@ -1,0 +1,96 @@
+# #1404 S4b: failure modes for the merge gate's GitHub shell (merge-gate/github-port.ts, github-facts.ts,
+# gate-status.ts), the evidence-presence input with its readiness rule, the path-safety item from #1404 comment
+# 6314008085, and the adapter that binds S4a's transport into the port (services/merge-gate-github.ts).
+# Numbers in brackets are the failure modes of docs/verify/1404/s4-plan.md section 6; the last column names
+# the test that pins each one:
+#   F = apps/server/test/merge-gate-github-facts.test.ts
+#   S = apps/server/test/merge-gate-status.test.ts
+#   R = apps/server/test/merge-gate-readiness.test.ts
+#   E = apps/server/test/merge-gate-evidence-link.test.ts
+#   A = apps/server/test/merge-gate-github-adapter.test.ts
+
+PR read
+B-1  [11] A response for another PR number, or whose base.repo.full_name is not the project's repository
+     (renamed, transferred, a response for another resource), is used. -> pr null with a note.            F1
+B-2  [12] A missing or wrongly typed state, merged, draft, changed_files, head.sha, head.ref, base.ref or
+     base.repo.full_name is defaulted instead of giving pr null; a missing draft must not become false.     F2
+B-3  [13] body null is unreadable instead of ''; head.repo null throws instead of headRepoFullName null.    F3
+B-4  [14] A missing or non-string mergeable_state becomes anything but null.                              F3
+B-5  [15] A 304 reuses a stored projection instead of re-projecting the cached raw body; a 304 with no
+     cache entry is used (the transport only says not-modified when an etag was sent, so the shell must
+     never send an etag it has no body for).                                                               F4
+B-6  [16] With a malformed head SHA (or no PR), compare, check runs or the combined status are requested at
+     all, or with a branch name.                                                                           F5
+
+Base branch, required checks, compare
+B-7  [18] An unreadable base branch, or a base tip that is not 40 lowercase hex, falls back to a compare by
+     branch name instead of compare 'unreadable'.                                                          F6
+B-8  [17] A compare page is requested by branch name, with a different base or head than page 1, with an
+     etag, or served from a cache.                                                                         F7
+B-9  [19] files taken from a page other than 1, or concatenated across pages.                             F7
+B-10 [20] total_commits that is not a non-negative integer (1.5, -1, "3", missing) passes: it must give
+     'malformed' (pr-gate run 3 on #1479, suggestion 4; readiness also fails closed on such a value, R pin).
+     A page whose total_commits differs from page 1's must make the compare 'unreadable'.                  F8, R1
+B-11 [21] Only page 1 is read when total_commits is over 100; the loop does not stop at an empty page or at
+     the 10-page cap.                                                                                      F9
+B-12 [22] Commits are deduped, sorted or repaired before being passed.                                    F9
+B-13 [23] A commit without sha or parents[].sha, or a body compareFilesFromResponse rejects, gives anything
+     but 'malformed'.                                                                                      F8
+B-14 [24] One failed page leaves partial files or commits instead of 'unreadable'.                        F9
+B-15 [25] A push between page reads is hidden by the shell (pages passed as read; readiness then reports
+     patch-unavailable).                                                                                   F10
+B-16 [26] behind_by is not passed as baseBehindBy, or a non-integer is passed as a number.                F8
+B-17 [35] Required list: a failed branch read gives [] instead of null; protected false gives null instead
+     of []; protected true without a protection object gives []; a failed, malformed or capped rules read
+     gives []; rule types other than required_status_checks add names; classic and ruleset lists are not
+     unioned (duplicates removed).                                                                         F11
+
+Checks at the head
+B-18 [27] Check runs or the combined status are read by branch name; checks.headSha is not the requested
+     SHA; runs[].headSha or statusSha is copied from the request instead of the response.                  F12
+B-19 [28] Only page 1 is read with more than 100 runs or contexts; a short count, a page whose total_count
+     differs, or the page cap does not set complete false; a combined-status page with another sha is
+     accepted.                                                                                             F13
+B-20 [29] Runs with the same name from different apps are collapsed.                                     F14
+B-21 [30] Runs with the same app and name from different suites are both passed, or the older wins.       F14
+B-22 [31] A required context bound to an app (classic app_id, ruleset integration_id) is judged on a
+     same-named run from another app because that run is listed first.                                     F14
+B-23 [32] A malformed run or status entry is skipped instead of making checks null.                       F15
+B-24 [33] Status contexts differing only in case stay two; on equal updated_at the success is kept.       F15
+B-25 [34] The own pacman/merge-gate status is dropped from statuses, or not copied to ownStatus; an
+     unreadable combined status does not make ownStatus 'unreadable'.                                       F15
+
+Evidence presence (readiness input) and path safety
+B-26 [36] A link pinned at an earlier PR commit where the file did not exist yet (raw 404) counts.        F16, R2
+B-27 [37] Links that do not qualify are probed; probing continues after a present file; more than 5
+     (sha, directory) probes per evaluation.                                                               F16
+B-28 [38] contents 404 gives null instead of false; 5xx or timeout gives false instead of null; a 1,000-entry
+     listing without the file gives false instead of null.                                                F17
+B-29 [39] An entry with the right name but type dir, symlink or submodule counts as present.              F17
+B-30 [40] A decoded link path with "..", "%2e%2e", "%2F", "?", "#", a newline or NUL qualifies (carried item,
+     comment 6314008085).                                                                                  E1
+B-31 [41] readiness passes evidence-link-missing with qualifying links whose presence is false, null or
+     missing; readiness and the shell disagree on which links qualify (one helper serves both).            R2, E2
+
+Status planner
+B-32 [42] A status is planned under policy human, in any environment.                                     S1
+B-33 [43] A status is planned when readiness.headSha is null, when the checks were read at another SHA, or
+     when the current own status is unreadable.                                                            S1
+B-34 [44] A status is planned when the current one already has the same state and description; a different
+     value written by someone else is not overwritten.                                                     S2
+B-35 [45] Wrong state: success when not ready, error ever, pending with a human- or policy-class blocker.  S3
+B-36 [46] A description over 140 characters, or one carrying blocker detail (author-controlled names).    S3
+B-37 [47] A context other than the exact constant is written.                                            S3
+B-38 [48] The writer retries or throws on a transport failure instead of returning it.                    S4
+
+General
+B-39 [49] Any rate-limited read lets the shell keep reading; retryAt ignores retry-after.                  F18
+B-40 [50] Reads run concurrently (at most one request in flight).                                         F18
+B-41 [51] A new gate file fails merge-gate-imports (an import of lib/github.ts, globalThis.fetch, process,
+     a class with a constructor).                                                                          merge-gate-imports
+B-42 [52] A port that throws escapes readGateGithubFacts.                                                 F18
+B-43 [53] A response naming another resource is used (PR number and base repo: B-1; compare's own head:
+     readiness; run head_sha and status sha: B-18).                                                        F1, F12
+B-44 The adapter binds the S4a functions with another owner, repo, token or timeout than given, or a
+     parameter the gate passes (page, per_page, filter, etag) is dropped on the way.                       A1
+B-45 S5a needs the compare at a verdict's own head: readCompareAt is exported and reads by the given SHAs. F7

@@ -1,0 +1,27 @@
+$ E2E_PORT=8409 pnpm --filter @pacman/web exec playwright test e2e/storage-unavailable.spec.ts
+# run against a throwaway worktree at origin/main (49c4c4f7), spec copied in unchanged
+
+  1) e2e/storage-unavailable.spec.ts:76:1 › sandboxed iframe without allow-same-origin renders /app (no white screen) 
+
+    Error: expect(locator).not.toBeEmpty() failed
+
+    Locator:  locator('#sbx').contentFrame().locator('#root')
+    Expected: not empty
+    Received: empty
+
+      - Expect "not toBeEmpty" locator('#sbx').contentFrame().locator('#root') with timeout 20000ms
+      - waiting for locator('#sbx').contentFrame().locator('#root')
+        44 × locator resolved to <div id="root"></div>
+           - unexpected value "empty"
+
+
+      81 |
+      82 |   // F1/F2/F4-F7: the boot survived — the React tree rendered into #root.
+    > 83 |   await expect(frame.locator('#root')).not.toBeEmpty({ timeout: 20_000 });
+--
+      - Expect "not toBeEmpty" locator('#sbx').contentFrame().locator('#root') with timeout 20000ms
+      - waiting for locator('#sbx').contentFrame().locator('#root')
+        44 × locator resolved to <div id="root"></div>
+           - unexpected value "empty"
+
+  2 failed

@@ -1,0 +1,14 @@
+{
+  "kind": "skill_injection_check",
+  "level": "red",
+  "reds": [
+    {
+      "code": "allowlist-closed",
+      "detail": "skillsAllowlist is []: the skill surface is closed"
+    }
+  ],
+  "yellows": [],
+  "injected": [],
+  "omitted": [],
+  "unrendered": []
+}

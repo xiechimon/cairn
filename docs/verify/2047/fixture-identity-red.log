@@ -1,0 +1,34 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts (6 tests | 1 failed) 1982ms
+   ❯ #2006 closing push of a work branch the remote already contains (2)
+     × failure mode 1: Update-branch merge commit on top of the local commit -> closing push returns normally and logs one line naming both short SHAs 451ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts > #2006 closing push of a work branch the remote already contains > failure mode 1: Update-branch merge commit on top of the local commit -> closing push returns normally and logs one line naming both short SHAs
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/workspace-cred-fallback.test.ts:206:19
+    204|
+    205|     const lines = logger.lines.filter((l) => l.includes('already conta…
+    206|     expect(lines).toHaveLength(1);
+       |                   ^
+    207|     expect(lines[0]).toContain(short(local));
+    208|     expect(lines[0]).toContain(short(remote));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  13:59:11
+   Duration  2.36s (tests 86%, transform 8%, import 6%)
+

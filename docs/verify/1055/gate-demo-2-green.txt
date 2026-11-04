@@ -1,0 +1,3 @@
+=== demo 2b: same offending line, now REGISTERED in the ledger (expect GREEN, exit 0) ===
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 33 components/ui file(s); 10 brand-ink text-role line(s), all registered (8 ledger entries).
+gate exit code: 0

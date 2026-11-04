@@ -1,0 +1,21 @@
+{
+  "arm": "managed",
+  "hasStrictMcpConfig": true,
+  "hasMcpConfigFlag": false,
+  "mcpConfigValue": null,
+  "argv": [
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--input-format",
+    "stream-json",
+    "--model",
+    "glm-5.3",
+    "--setting-sources=user,project,local",
+    "--strict-mcp-config",
+    "--permission-mode",
+    "bypassPermissions",
+    "--include-partial-messages",
+    "--session-id=c6d525c2-178e-4e90-a258-fac96f10262d"
+  ]
+}

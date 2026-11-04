@@ -1,0 +1,22 @@
+# #1403 round 12 (sixth /code-review pass on #1414): red against the sources of 8326d29, green at 17ca579.
+# The 4 failing cases are the ones this round adds ([57] to [60]); the helper change is held by the [53] pair (r12-mutations.txt).
+
+== red ==
+# round 12 tests against the sources of 8326d29 (only the test file changed)
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+     × [57] a close counts when the two reads happened 50 s apart, not the two sweep starts 35ms
+     × [58] a merged PR is not read again while its card stays in review 32ms
+     × [59] the merge step finishing a card a person closed meanwhile throws before it stops anything 30ms
+     × [60] anonymous: a compare that sends no request (checkpoint not a sha) takes no budget 29ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+AssertionError: expected [ …(3) ] to have a length of 1 but got 3
+AssertionError: expected 'stopped' to be 'pending' // Object.is equality
+AssertionError: expected [] to have a length of 1 but got +0
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 99 passed (103)
+
+== green at 17ca579 ==
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  103 passed (103)

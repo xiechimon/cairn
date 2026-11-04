@@ -1,0 +1,4 @@
+slot 1 with E2E_AFFECTED_PORT=28778 (a real listener on that port):
+[heavy-slots] slot 1's port 28778 is held by pid 3007861, cwd /mnt/fast/lanes/cairn-1908, command node -e  require('node:net').createServer(() => {}).listen(28778, '127.0.0.1'); setTimeout(() => {}, 20000);; anything on a leased slot's port is an orphan — kill the pid or free the port, then rerun
+slot 2 with E2E_AFFECTED_PORT=28778 (nothing listening):
+null

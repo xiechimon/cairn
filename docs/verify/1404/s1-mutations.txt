@@ -1,0 +1,34 @@
+# #1404 S1 mutations: each one applied alone to the source, then the three S1 test files.
+# Every mutation turns at least one test red. Definitions (name, file, text replaced, replacement) below.
+
+digest: rename into evidence excluded         1 failed | 57 passed (58)
+digest: tab-joined tuples                     1 failed | 57 passed (58)
+digest: unsorted                              2 failed | 56 passed (58)
+digest: previous_filename left out            2 failed | 56 passed (58)
+digest: truncation at > cap                   1 failed | 57 passed (58)
+digest: null sha accepted                     1 failed | 57 passed (58)
+digest: evidence not root-anchored            1 failed | 57 passed (58)
+paths: case-sensitive                         2 failed | 56 passed (58)
+paths: previous name ignored                  2 failed | 56 passed (58)
+paths: rename-away test not counted           1 failed | 57 passed (58)
+paths: removed executables counted            1 failed | 57 passed (58)
+paths: other-ticket check off                 2 failed | 56 passed (58)
+link: uppercase sha accepted                  1 failed | 57 passed (58)
+link: comments scanned                        1 failed | 57 passed (58)
+link: dot segments allowed                    1 failed | 57 passed (58)
+
+["digest: rename into evidence excluded", "apps/server/src/services/merge-gate/digest.ts", "isEvidencePath(f.filename) && (f.previousFilename === null || isEvidencePath(f.previousFilename))", "isEvidencePath(f.filename)"]
+["digest: tab-joined tuples", "apps/server/src/services/merge-gate/digest.ts", "JSON.stringify([f.status, f.filename, f.previousFilename, f.sha])", "[f.status, f.filename, f.previousFilename, f.sha].join('\\t')"]
+["digest: unsorted", "apps/server/src/services/merge-gate/digest.ts", "f.sha])).sort();", "f.sha]));"]
+["digest: previous_filename left out", "apps/server/src/services/merge-gate/digest.ts", "JSON.stringify([f.status, f.filename, f.previousFilename, f.sha])", "JSON.stringify([f.status, f.filename, f.sha])"]
+["digest: truncation at > cap", "apps/server/src/services/merge-gate/digest.ts", "files.length >= GATE_LIMITS.compareFileCap", "files.length > GATE_LIMITS.compareFileCap"]
+["digest: null sha accepted", "apps/server/src/services/merge-gate/digest.ts", "if (kept.some((f) => f.sha === null && f.status !== 'removed')) return result(null, 'null-sha');", ""]
+["digest: evidence not root-anchored", "apps/server/src/services/merge-gate/digest.ts", "return path.startsWith(EVIDENCE_PREFIX);", "return path.includes(EVIDENCE_PREFIX);"]
+["paths: case-sensitive", "apps/server/src/services/merge-gate/paths.ts", "return new RegExp(`^${re}$`, 'i');", "return new RegExp(`^${re}$`);"]
+["paths: previous name ignored", "apps/server/src/services/merge-gate/paths.ts", "    ? [f.filename, f.previousFilename]", "    ? [f.filename]"]
+["paths: rename-away test not counted", "apps/server/src/services/merge-gate/paths.ts", "      push(out.deletedTests, f.previousFilename);", ""]
+["paths: removed executables counted", "apps/server/src/services/merge-gate/paths.ts", "      f.status !== 'removed' &&\n      f.filename.startsWith(EVIDENCE_PREFIX)", "      f.filename.startsWith(EVIDENCE_PREFIX)"]
+["paths: other-ticket check off", "apps/server/src/services/merge-gate/paths.ts", "if (name.startsWith(EVIDENCE_PREFIX) && !name.startsWith(ownEvidence)) push(out.otherTicketEvidence, name);", ""]
+["link: uppercase sha accepted", "apps/server/src/services/merge-gate/evidence-link.ts", "/^[0-9a-f]{40}$/.test(sha)", "/^[0-9a-fA-F]{40}$/.test(sha)"]
+["link: comments scanned", "apps/server/src/services/merge-gate/evidence-link.ts", "body.replace(HTML_COMMENT_RE, '')", "body"]
+["link: dot segments allowed", "apps/server/src/services/merge-gate/evidence-link.ts", " &&\n      !path.split('/').some((seg) => seg === '..' || seg === '.' || seg === '')", ""]

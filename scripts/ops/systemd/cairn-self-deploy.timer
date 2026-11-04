@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Cairn self-deploy every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=cairn-self-deploy.service
+
+[Install]
+WantedBy=timers.target

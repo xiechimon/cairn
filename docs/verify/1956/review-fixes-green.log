@@ -1,0 +1,57 @@
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ documentation skips code checks, unknown paths fail closed (1.445203ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.833874ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (0.206955ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.220061ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.187998ms)
+✔ local code checks include both UI gates and affected e2e (0.103579ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.241714ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.114149ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (0.699792ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (2.853886ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (68.767785ms)
+✔ a board card source change selects the spec that reads its title (22.656123ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.60294ms)
+✔ CLI skips real document changes and rejects a missing base (430.647295ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (153.592042ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (100.408372ms)
+✔ prepush vitest only forgives files listed as known local red (1.420562ms)
+✔ plan children do not inherit the git hook repository binding (10.682496ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.221796ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (15.118359ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (19.566811ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (44.69208ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (38.404889ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (0.416054ms)
+✔ logging is opt-in and never projects counters into the checkout (2.121769ms)
+✔ CLI fetches original PR reviews through every page and retains evidence (123.015904ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (302.722288ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (156.715767ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (478.790213ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (113.661725ms)
+✔ the CLI suite runs in local and CI prepush plans (0.514191ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (329.674912ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (173.180904ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (91.804987ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (85.845421ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (175.58954ms)
+✔ non-approving formal AI reviews do not establish AI coverage (183.991227ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (190.19924ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2460.753984

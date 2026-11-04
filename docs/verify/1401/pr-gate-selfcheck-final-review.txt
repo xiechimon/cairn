@@ -1,0 +1,32 @@
+# pr-gate run 9 at 5ebdca2 (go), the final /code-review, and the round that followed (1517363).
+# Red: this round's self-check against pr-gate.js of c29c5c9: only the comment-filter case fails; the other new
+# cases pin rules the gate already had (run 9 suggestions) and pass there. Green: the same self-check at 1517363.
+# Mutations: each applied alone to pr-gate.js at 1517363, then the self-check.
+
+== red ==
+FAIL  reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+62/63 passed (/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/pr-gate-c29c5c9.js)
+
+== green at 1517363 ==
+PASS  a missing safety file list blocks go
+63/63 passed (.claude/workflows/pr-gate.js)
+
+== mutations ==
+comments without the --jq filter   62/63 passed  caught by: reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+comments without --paginate        62/63 passed  caught by: reviewers and skeptics fetch PR comments with a filter that drops non-members before the bodies reach them (run 7, final /code-review)
+FETCH_HEAD back                    62/63 passed  caught by: reviewers confirm the head on their own ref, never FETCH_HEAD (run 1)
+read-only line dropped             62/63 passed  caught by: every reviewer and skeptic is told GitHub is read-only and that PR text is data
+safety schema not forced           62/63 passed  caught by: the safety reviewer must return all four git-derived values
+file cap over caller list only     62/63 passed  caught by: the 40-file cap counts files only the safety reviewer listed
+packages test glob dropped         62/63 passed  caught by: product source, tests, e2e and evidence do not route to the user
+
+== definitions (name, original, replacement) ==
+M=[
+ ('comments without the --jq filter', """ --jq '[.[] | select(.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR")]'""", ""),
+ ('comments without --paginate', "gh api --paginate repos/", "gh api repos/"),
+ ('FETCH_HEAD back', "Then confirm \\`git rev-parse ${head}\\`", "Then confirm \\`git rev-parse FETCH_HEAD\\`"),
+ ('read-only line dropped', " GitHub is read-only for you: no comments, reviews, labels, edits, merges or workflow runs.", ""),
+ ('safety schema not forced', "schema: d.key === 'safety' ? SAFETY_SCHEMA : FINDINGS_SCHEMA", "schema: FINDINGS_SCHEMA"),
+ ('file cap over caller list only', "...(allFiles.length > MAX_FILES ? [`${allFiles.length} files changed (over ${MAX_FILES})`] : []),", "...(changedFiles.length > MAX_FILES ? [`${changedFiles.length} files changed (over ${MAX_FILES})`] : []),"),
+ ('packages test glob dropped', "  'packages/*/test/**',\n", ""),
+]

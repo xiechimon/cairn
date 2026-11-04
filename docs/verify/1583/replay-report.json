@@ -1,0 +1,733 @@
+{
+  "generatedAt": 1792752960000,
+  "mainSha": "1442c6af5701640f07f71fa506342ff193c3dab1",
+  "groups": {
+    "now": [],
+    "next": [
+      1510,
+      1569,
+      1432,
+      1517,
+      1403,
+      1512,
+      1574,
+      1394,
+      1406,
+      1408,
+      1409,
+      1462,
+      1471,
+      1472,
+      1478,
+      1481,
+      1521,
+      1522,
+      1528,
+      1534,
+      1549,
+      1555,
+      1556,
+      1557,
+      1575,
+      1577,
+      1578,
+      1579,
+      1404,
+      1405,
+      1407,
+      1429,
+      1431,
+      1535,
+      1576,
+      1514,
+      1515,
+      1518,
+      1519,
+      1532,
+      1572,
+      1570,
+      1571,
+      1516,
+      1573
+    ],
+    "later": [],
+    "close": []
+  },
+  "items": [
+    {
+      "issue": 1394,
+      "title": "web: agent 预合并判定票——ready-for-agent PR 由 pacman 自己的 agent 判定「简单可合」并执行合并（吃自己狗粮）",
+      "group": "next",
+      "reason": "验收还差 4 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792752953000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1403,
+      "title": "server: 自举闭环 P2 GitHub PR 面 + 合并对账（merged 回推 done、BEHIND/DIRTY、按 head SHA 读 checks）",
+      "group": "next",
+      "reason": "验收还差 6 项没勾（已有 #1537 / #1531 / #1509 / #1489 / #1414 / | P2 GitHub PR 面 + 合并对账 | #1403 | #1414（段 1：review 期 PR 合并 / 关闭对账，已合并，b616110）；#1489（段 2：PR 身份、G9、测试钉，已合并，9296b8b）；#1509（段 2b：API 合并按设计 D，2026-10-22 用户裁决：GitHub 形态、build 记着 PR 时 server 在点合并时经 REST 带 sha 合并，不再派 merge 步，已合并，d4fd908）；#1531（段 3：按 head SHA 读 checks、只认必需检查、BEHIND 提示、DIRTY 同分支解冲突步、步收尾时刻，已合并，c2cb96f）| `docs/verify/1403/`；「GitHub 网页合并后 1 分钟内卡变 done」「pacman 里点合并经 REST 合并真实 PR」待宿主 | 用户（改 `docs/spec/02`、`docs/spec/28`） | 段 1、段 2、段 2b、段 3 已合并；#1403 留开，等宿主实测腿 | / - **仓规内化**：在 daemon worktree 里实测一次——`AGENTS.md` / `CLAUDE.md` 被引擎原生读到（spec 24）、`.claude/skills/pr-pacman` 与 `verify-pacman` 可用、`pnpm lint` / `typecheck` / `spec:parse` 能跑、body 过 `pr-evidence`。哪条不成立就补到 run brief（spec 24）或 Implementer persona 文案里。daemon `commitAll` 的分支内提交形态是 `<kind>: <title>`，与仓规 `<scope>(<票号>): <subject>` 不同。squash 进 main 的 message 取决于谁发起合并：自治路径取 D2 由 server 拼的 message；在 pacman 里点合并也由 server 经 REST 合并（#1403），未传 message 时 GitHub 按仓库设置取（单提交取该提交 message，多提交取 PR 标题加各提交 message），单提交 PR 会把 `<kind>: <title>` 带进 main。故对齐放在 server 侧：REST 合并统一传 `commit_title`（PR 标题）与 D2 的正文末行，分支内提交不改；PR 标题本身由 P5 对齐仓规。），需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792752957000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1404,
+      "title": "server,shared,daemon: 自举闭环 P3 合并就绪闸（判定绑 patchDigest、自动审核与验证、chief go/no-go、pacman/merge-gate）",
+      "group": "next",
+      "reason": "验收还差 6 项没勾（已有 #1525 / #1503 / #1479 / #1469 / #1421 / #1420 / #1410 / | P3 合并就绪闸 | #1404 | #1420（S1：摘要、D4 路径类、证据链，已合并，9eefe88）、#1421（S2：`mergeReadiness`，已合并，24db1c4）、#1469（S3：闸表迁移，已合并，cd84a98）、#1479（S2 续：compare 与检查绑定 PR 的 head，SHA 判定在闸自己的源码里，已合并，4eac63d）、#1503（S4a：`lib/github.ts` 里闸用的 GitHub 传输，已合并，c99de10；只改非保护路径，按仓规由施工会话合并）；#1525（S4b：闸的 GitHub 外壳、证据链文件存在性、`pacman/merge-gate` status 规划，已合并，f8483f7；2026-10-22 用户授权施工会话合并）；S5 起未开 | `docs/verify/1404/` | 用户（闸源码属 D4 ④）；S4a 由施工会话合并 | S1–S3、S2 续、S4a、S4b 已合并；S5 起交给 pacman 自身施工 |），需人工判断，不自动关",
+      "deps": [
+        1403
+      ],
+      "executor": null,
+      "updatedAt": 1792940772000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1405,
+      "title": "server: 自举闭环 P4 自治合并执行器（mergePolicy、sha 绑定合并、急停、熔断、日上限）",
+      "group": "next",
+      "reason": "验收还差 6 项没勾（已有 #1550 / #1537 / #1504 / #1525 / #1503 / #1410 / | P4 自治合并执行器 | #1405 | 无施工 PR（2026-10-22 用户裁决：本会话不施工，交给 pacman 自身施工）；交接由 [#1537](https://github.com/xiechimon/pacman/pull/1537) 记入本表 | [交接说明](https://github.com/xiechimon/pacman/issues/1405#issuecomment-6348438292)；设计面板计划见 [#1405 评论](https://github.com/xiechimon/pacman/issues/1405#issuecomment-6311471448) | 用户 | 交给 pacman |），需人工判断，不自动关",
+      "deps": [
+        1404
+      ],
+      "executor": null,
+      "updatedAt": 1793110478000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1406,
+      "title": "server,daemon: 自举闭环 P5 自主进料与仓规内化（issue 轮询、chief GitHub 读工具、PR 评论回灌）",
+      "group": "next",
+      "reason": "验收还差 7 项没勾（已有 #1502 / #1496 / #1480 / #1461 / #1475 / #1468 / #1467 / | P5 进料 + 仓规内化 | #1406 | #1461（段 1：issue 轮询，默认关闭，已合并，e410e82）；#1467（段 2：chief / MCP 读工具，已合并，49af6f2）；#1475（段 3：issue 文本围栏 + 仓规，已合并，61e6cb2）；#1480（段 3 的 pr-gate 跟进修复，已合并，50a5500）；#1477（#1459：webhook 的 `pacman` 触发走 D5 与在飞上限，已合并，bc1d99f）；#1496（段 1 第 5 轮 + #1459 第 2 轮：#1461、#1477 的 pr-gate 发现，已合并，f45a36b）；#1502（#1496 的 pr-gate 建议跟进：EMU 账号名、契约注释、探针 changelog、W2 / W12b 原因码，已合并，d4f5f18） | `docs/verify/1406/`、`docs/verify/1459/`（webhook 的 D5 与上限）；「演练仓打标 → 无人介入出 PR」待宿主 | 用户（超 800 行） | 段 1、2、3 与 #1477、#1480、#1496、#1502 已合并；P5b（自治模式下评审意见进同分支修复轮）待 P4，2026-10-22 用户裁决交给 pacman 自身施工 |），需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1793110480000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1407,
+      "title": "skills,server: 自举闭环 P6 纠错回路与园丁（correct skill、纠错票触发、每周园丁定时任务）",
+      "group": "next",
+      "reason": "验收还差 5 项没勾（已有 #1550 / #1504 / #1507 / | P6 纠错回路 + 园丁 | #1407 | 无施工 PR（2026-10-22 用户裁决：本会话不施工，交给 pacman 自身施工；依赖 P4）；交接由 [#1537](https://github.com/xiechimon/pacman/pull/1537) 记入本表 | [交接说明](https://github.com/xiechimon/pacman/issues/1407#issuecomment-6348439075) | 按 D4（pr-gate 的 mergedBy） | 交给 pacman |），需人工判断，不自动关",
+      "deps": [
+        1405
+      ],
+      "executor": null,
+      "updatedAt": 1793110482000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1408,
+      "title": "ops: 自举闭环 P7 长期宿主自部署与回滚（待宿主）",
+      "group": "next",
+      "reason": "验收还差 3 项没勾（已有 | P7 宿主自部署与回滚 | #1408 | | | 用户（`scripts/**` 属 D4） | 待宿主 |），需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1793128042000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1409,
+      "title": "ops: 自举闭环 P8 毕业（shadow 十张零误放 → 演练仓五条负对照 → 本仓 autonomous）（待宿主）",
+      "group": "next",
+      "reason": "验收还差 3 项没勾（已有 #1410 / | P8-1 shadow 报告（≥10 PR，零误放） | #1409 | | | 不适用 | 待宿主 | / | P8-2 演练仓 autonomous + 五条负对照 | #1409 | | | pacman | 待宿主 | / | P8-3 本仓 autonomous 毕业 | #1409 | | | pacman | 待宿主 | / > 状态：**施工中**（2026-10-20 起草，基于 main `af161e3`）。同日用户以 §7.4 的 goal 提示词在会话中确认 §3 的 D1–D7；产品部分（D1–D6）落为 ADR 0021。施工票 #1401–#1409，进度见 §8。），需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1793111701000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1429,
+      "title": "web: 用 logo.svg 的 16 格像素语汇生成本地确定性头像，替换 api.dicebear.com（先 mockup）",
+      "group": "next",
+      "reason": "等依赖 #1432 合入后才能排期",
+      "deps": [
+        1432
+      ],
+      "executor": null,
+      "updatedAt": 1792900809000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1431,
+      "title": "web: 像素标记家族——列状态 / 运行指示 / 空态 / chief FAB 走 logo 的 16 格语汇（先 mockup）",
+      "group": "next",
+      "reason": "等依赖 #1432 合入后才能排期",
+      "deps": [
+        1432
+      ],
+      "executor": null,
+      "updatedAt": 1792752951000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1432,
+      "title": "决议：品牌——产品名候选 + 标记重设计 + 改名迁移清单（#1429 / #1431 前置）",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792752948000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1462,
+      "title": "docs,chore: ADR 0021 D4 与 pr-gate 的后续收紧（#1410 pr-gate 第 12 轮建议）",
+      "group": "next",
+      "reason": "验收还差 3 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792996103000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1471,
+      "title": "web: hotkeys are live before a test can press them, so e2e needs no retry loop",
+      "group": "next",
+      "reason": "验收还差 3 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792870127000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1472,
+      "title": "web: SettingsRow labels name their control, so settings selects need no hand-written aria-label",
+      "group": "next",
+      "reason": "验收还差 3 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792948350000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1478,
+      "title": "verify-pacman registry gate follow-ups from pr-gate on #1476",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792842347000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1481,
+      "title": "Scope machine attachment downloads and the worker attachment tool to attachments the task's team-authored text references",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792964517000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1510,
+      "title": "spec 29 评测与数据闭环 + ADR 0022 评测面入保护路径",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792952627000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1512,
+      "title": "E0-2 保留 stopReason 与原始会话 JSONL",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792771551000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1514,
+      "title": "E0-4 pnpm traj:export 只读导出 + 脱敏",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1512 合入后才能排期",
+      "deps": [
+        1510,
+        1512
+      ],
+      "executor": null,
+      "updatedAt": 1792877218000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1516,
+      "title": "E1-2 打回与回滚自动生成「失败回放」候选评测题",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1515 / #1569 / #1570 合入后才能排期",
+      "deps": [
+        1510,
+        1515,
+        1569,
+        1570
+      ],
+      "executor": null,
+      "updatedAt": 1793213574000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1515,
+      "title": "E1-1 合并后第 7 天回填结果标签",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1514 合入后才能排期",
+      "deps": [
+        1510,
+        1514
+      ],
+      "executor": null,
+      "updatedAt": 1792952622000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1518,
+      "title": "E2-2 pacman-bench 隔离跑分器",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1517 合入后才能排期",
+      "deps": [
+        1510,
+        1517
+      ],
+      "executor": null,
+      "updatedAt": 1793103399000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1517,
+      "title": "E2-1 pacman-bench v0：从已合并 PR 选 30 题",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1793197521000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1519,
+      "title": "E2-3 回归评测接入 CI",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1518 合入后才能排期",
+      "deps": [
+        1510,
+        1518
+      ],
+      "executor": null,
+      "updatedAt": 1793110487000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1521,
+      "title": "web: Agent 详情页加备用模型（fallbackModels）编辑控件",
+      "group": "next",
+      "reason": "验收还差 3 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792875813000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1522,
+      "title": "server: 拆分 services/machines.ts，减少并行改动冲突",
+      "group": "next",
+      "reason": "验收还差 3 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792988399000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1528,
+      "title": "评审里反复出现的问题逐类变成机器检查",
+      "group": "next",
+      "reason": "验收还差 2 项没勾（已有 #1548 / #1547 / #1546），需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792752959000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1532,
+      "title": "E2 附：同模型不同 harness 的页面生成对比评测（题库、打分细则、基线）",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1514 合入后才能排期",
+      "deps": [
+        1510,
+        1514
+      ],
+      "executor": null,
+      "updatedAt": 1793103427000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1534,
+      "title": "错误台账 L3：防护拦截计数、复发自动升级、每周汇总",
+      "group": "next",
+      "reason": "验收还差 3 项没勾（已有 #2032 / #1536），需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1793150071000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1535,
+      "title": "错误台账 L2：从轨迹里检测「出错又修好」并生成候选防护",
+      "group": "next",
+      "reason": "验收还差 3 项没勾（已有 #2032 / #1536），需人工判断，不自动关",
+      "deps": [
+        1514
+      ],
+      "executor": null,
+      "updatedAt": 1793052879000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1549,
+      "title": "错误台账：按「codebase→静态检查→规则→技能→人审」五级阶梯定级与升级（poteto 纠错阶梯）",
+      "group": "next",
+      "reason": "验收还差 3 项没勾，需人工判断，不自动关",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792752955000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1555,
+      "title": "retro 升级：web PR 推送前一键跑全部本地闸（pnpm prepush）",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792752961000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1556,
+      "title": "retro 升级：后台长任务启动后自动核对进程",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792767681000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1557,
+      "title": "retro 升级：CI 工作流结构检查（步骤落在正确的 job）",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792839524000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1569,
+      "title": "观测-1 本机自托管 Langfuse：compose 与运维说明",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792843058000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1570,
+      "title": "观测-2 pnpm traj:push：轨迹包转 OTLP 推 Langfuse",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1514 / #1569 合入后才能排期",
+      "deps": [
+        1510,
+        1514,
+        1569
+      ],
+      "executor": null,
+      "updatedAt": 1793121421000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1571,
+      "title": "观测-3 人审判定与结果标签同步为 Langfuse score",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1515 / #1570 合入后才能排期",
+      "deps": [
+        1510,
+        1515,
+        1570
+      ],
+      "executor": null,
+      "updatedAt": 1793111477000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1572,
+      "title": "观测-4 运行时 OTel span（默认关）：server、Claude Code 子进程、pi",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1569 合入后才能排期",
+      "deps": [
+        1510,
+        1569
+      ],
+      "executor": null,
+      "updatedAt": 1792952648000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1573,
+      "title": "观测-5 pacman-bench 镜像为 Langfuse dataset 与实验",
+      "group": "next",
+      "reason": "等依赖 #1510 / #1517 / #1518 / #1519 / #1569 合入后才能排期",
+      "deps": [
+        1510,
+        1517,
+        1518,
+        1519,
+        1569
+      ],
+      "executor": null,
+      "updatedAt": 1793110488000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1574,
+      "title": "记忆-1 save_memory 写前查同类，冲突走更新（借 Mem0 的 ADD/UPDATE/DELETE/NOOP 判定）",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792885673000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1575,
+      "title": "记忆-2 记忆加失效时间与取代关系（借 Graphiti 的双时间做法），被取代的条目不再注入",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792984484000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1576,
+      "title": "记忆-3 记忆回归评测：冲突、跨项目泄漏、过期三类用例",
+      "group": "next",
+      "reason": "等依赖 #1574 合入后才能排期",
+      "deps": [
+        1574
+      ],
+      "executor": null,
+      "updatedAt": 1792984486000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1577,
+      "title": "记忆-4 跨任务经验沉淀：从轨迹包按 ACE「反思→整理」产出候选记忆与技能条目",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792984488000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1578,
+      "title": "RSI-1 改 harness 的 PR 必须附回归评测结果，否则不能自动合并",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1792898124000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    },
+    {
+      "issue": 1579,
+      "title": "RSI-2 用现成 GEPA 跑一轮提示词自动优化，变体与分数（含失败）全部存档",
+      "group": "next",
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "deps": [],
+      "executor": null,
+      "updatedAt": 1793153962000,
+      "evidence": [],
+      "closeReason": null,
+      "labelChange": null
+    }
+  ],
+  "unparsedDeps": [
+    {
+      "issue": 1394,
+      "text": "红线（任一命中即留人批，绝不静默放行）：恶意/越权 diff、改闸脚本自身、依赖文件变更、与开放 lane 冲突的文件面。"
+    },
+    {
+      "issue": 1394,
+      "text": "- 用第三方 bot（mergify 等）：判据黑盒 + 第三方依赖，与本仓「第三方 action 钉 SHA」的缝纪律相悖"
+    },
+    {
+      "issue": 1408,
+      "text": "- 部署砸坏 daemon：回滚由脚本自己做，不依赖 pacman。"
+    },
+    {
+      "issue": 1514,
+      "text": "状态：等依赖三张合并后改 `ready-for-agent`。"
+    },
+    {
+      "issue": 1534,
+      "text": "依据：ian 2026-10-22 确认的方案「过程错误复盘机制」。依赖 L2；状态：L2 合并后改 `ready-for-agent`。"
+    },
+    {
+      "issue": 1569,
+      "text": "- Cairn 本体不新增任何依赖，未配置时行为不变。"
+    },
+    {
+      "issue": 1572,
+      "text": "- OTel 依赖经 `apps/daemon/src/backend/` 下的薄桥模块消费，按缝纪律在 `biome.json` 加 `noRestrictedImports` 条目。"
+    },
+    {
+      "issue": 1575,
+      "text": "## 依赖"
+    },
+    {
+      "issue": 1576,
+      "text": "## 依赖"
+    }
+  ],
+  "focus": [
+    {
+      "issue": 1394,
+      "group": "next",
+      "closeReason": null,
+      "reason": "验收还差 4 项没勾，需人工判断，不自动关",
+      "evidence": [],
+      "acceptance": {
+        "checked": 0,
+        "unchecked": 4
+      }
+    },
+    {
+      "issue": 1403,
+      "group": "next",
+      "closeReason": null,
+      "reason": "验收还差 6 项没勾（已有 #1537 / #1531 / #1509 / #1489 / #1414 / | P2 GitHub PR 面 + 合并对账 | #1403 | #1414（段 1：review 期 PR 合并 / 关闭对账，已合并，b616110）；#1489（段 2：PR 身份、G9、测试钉，已合并，9296b8b）；#1509（段 2b：API 合并按设计 D，2026-10-22 用户裁决：GitHub 形态、build 记着 PR 时 server 在点合并时经 REST 带 sha 合并，不再派 merge 步，已合并，d4fd908）；#1531（段 3：按 head SHA 读 checks、只认必需检查、BEHIND 提示、DIRTY 同分支解冲突步、步收尾时刻，已合并，c2cb96f）| `docs/verify/1403/`；「GitHub 网页合并后 1 分钟内卡变 done」「pacman 里点合并经 REST 合并真实 PR」待宿主 | 用户（改 `docs/spec/02`、`docs/spec/28`） | 段 1、段 2、段 2b、段 3 已合并；#1403 留开，等宿主实测腿 | / - **仓规内化**：在 daemon worktree 里实测一次——`AGENTS.md` / `CLAUDE.md` 被引擎原生读到（spec 24）、`.claude/skills/pr-pacman` 与 `verify-pacman` 可用、`pnpm lint` / `typecheck` / `spec:parse` 能跑、body 过 `pr-evidence`。哪条不成立就补到 run brief（spec 24）或 Implementer persona 文案里。daemon `commitAll` 的分支内提交形态是 `<kind>: <title>`，与仓规 `<scope>(<票号>): <subject>` 不同。squash 进 main 的 message 取决于谁发起合并：自治路径取 D2 由 server 拼的 message；在 pacman 里点合并也由 server 经 REST 合并（#1403），未传 message 时 GitHub 按仓库设置取（单提交取该提交 message，多提交取 PR 标题加各提交 message），单提交 PR 会把 `<kind>: <title>` 带进 main。故对齐放在 server 侧：REST 合并统一传 `commit_title`（PR 标题）与 D2 的正文末行，分支内提交不改；PR 标题本身由 P5 对齐仓规。），需人工判断，不自动关",
+      "evidence": [],
+      "acceptance": {
+        "checked": 0,
+        "unchecked": 6
+      }
+    },
+    {
+      "issue": 1528,
+      "group": "next",
+      "closeReason": null,
+      "reason": "验收还差 2 项没勾（已有 #1548 / #1547 / #1546），需人工判断，不自动关",
+      "evidence": [],
+      "acceptance": {
+        "checked": 0,
+        "unchecked": 2
+      }
+    },
+    {
+      "issue": 1555,
+      "group": "next",
+      "closeReason": null,
+      "reason": "无在飞构建也未被标 ready，排在本轮之后",
+      "evidence": [],
+      "acceptance": {
+        "checked": 0,
+        "unchecked": 0
+      }
+    }
+  ]
+}

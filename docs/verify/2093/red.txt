@@ -1,0 +1,29 @@
+Command: node --test scripts/commit-author.test.mjs scripts/commit-author-policy.test.mjs
+Captured test summary before documentation changes (assertion dumps omitted):
+
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (1.254557ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.140793ms)
+✖ commit preparation keeps App authentication separate from Git authorship (0.971603ms)
+✖ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.620572ms)
+✖ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.297507ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (38.50534ms)
+✔ PR validation reads the explicit head without executing PR code (0.887717ms)
+✔ a bot-authored commit beneath a human tip is rejected (20.974099ms)
+✔ a squash commit authored by the bot is rejected (16.674638ms)
+✔ main push checks bot squash (15.63842ms)
+✔ main push checks bot beneath human tip (19.607186ms)
+✔ main push checks historical bot (17.785916ms)
+✔ main push checks missing before (15.11731ms)
+✔ main push checks zero before (15.678758ms)
+✔ every commit in a clean human range passes (20.850819ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (11.304743ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.698946ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (9.752688ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (11.151949ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (11.896973ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 17
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0

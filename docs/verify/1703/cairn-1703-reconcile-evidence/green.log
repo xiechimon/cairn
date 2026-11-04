@@ -1,0 +1,10 @@
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (658.54875ms)
+✔ prepush-vitest reuses the lease inherited from pnpm prepush without queueing (297.265334ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1003.184625

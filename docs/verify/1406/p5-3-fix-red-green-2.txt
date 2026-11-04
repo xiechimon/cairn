@@ -1,0 +1,108 @@
+#1406 P5-3 follow-up, round 2 (#1480, pr-gate run 1 at ff385a4, suggestions 4 and 7, then this
+round's /code-review): red / green legs. Each round's tests were committed on their own before the
+fix, so git history shows the order: test commit 1243a468 -> fix 9ff61880; test commit cf8d41ae
+-> fix 1c8f1981. Branch merged with origin/main (e410e826) first, in 82d91e30.
+
+Each leg replaces apps/daemon/src/step-attachments.ts and apps/daemon/test/step-attachments.test.ts
+with their content at the named commit (git show <rev>:<path>), runs the command, copies the saved
+files back and checks them with sha256sum -c (OK for both, every leg; git status clean after).
+Script: <scratchpad>/p53fix2-rerun.sh <worktree> <scratch> <rev> <files...> (body at the end of this file)
+Command: NO_COLOR=1 FORCE_COLOR=0 pnpm exec vitest run --reporter=verbose apps/daemon/test/step-attachments.test.ts
+
+Failure modes, listed before the tests were written:
+  F1 A server-valid file name strips to "..": "\u200b..\u200b", ".\u00ad.", "\x85..". join(stepDir, "..")
+     is the materialize root, writeFileSync throws EISDIR, resolveStepImages rejects and the runner
+     delivers the raw prompt: every image of the step is lost (suggestion 7).
+  F2 Names that strip to "" or "." ("\u2028.", "\u200b", "\u2029") keep falling back to "attachment".
+  F3 Names that are unusual but valid single segments (" .", " ..", "...") are kept as they are.
+  F4 A stepId that is "", "." or "..", or that holds a separator ("../escape", "a/../..", "a/b"),
+     puts the file somewhere other than <root>/<stepId>/<name>, for ".." and "../escape" outside
+     the root. The path is refused before any directory is created or file written.
+  F5 A regression that stops stripping U+0085 or U+2029 alone fails a test (suggestion 4: at
+     ff385a4 A3c used U+200B and U+2028 only, and such a mutation passed 37/37).
+  From /code-review of 82d91e30..9ff61880 (docs/verify/1406/p5-3-fix-reviews-2.txt):
+  F6 A materialize failure (the F4 guard, ENOTDIR, ENOSPC, ENAMETOOLONG) fails only that token:
+     token kept, a "不可用" note, an "attachment materialize failed" log line; a png token in the
+     same text is still delivered inline, inside and outside the issue fence.
+  F7 The guard's error message stays on one line when the stepId holds a line break, since it
+     reaches the step log and, after F6, the prompt note.
+
+== round 2a: suggestions 4 and 7 ==
+Tests: A3c file name extended with U+0085 and U+2029 (F5); new A3d tests (F1-F4):
+  materializeAttachmentFile > A3d：剥字符后为空、. 或 .. 的文件名 → attachment；其余名照落，都在 <materializeDir>/<stepId>/ 下
+  materializeAttachmentFile > A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘
+  #1406 … > A3d：剥字符后只剩 .. 的文件名 → 落盘名回落 attachment，路径不出步目录（围栏内外同律）
+
+red: 1243a468 (tests committed; step-attachments.ts identical to ff385a44), vitest exit 1
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：剥字符后为空、. 或 .. 的文件名 → attachment；其余名照落，都在 <materializeDir>/<stepId>/ 下
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3d：剥字符后只剩 .. 的文件名 → 落盘名回落 attachment，路径不出步目录（围栏内外同律）
+ Test Files  1 failed (1)
+      Tests  3 failed | 23 passed (26)
+Error: EISDIR: illegal operation on a directory, open '/tmp/pacman-step-att-rHvgr3/step-attachments'
+AssertionError: "..": expected [Function] to throw an error
+Error: EISDIR: illegal operation on a directory, open '/tmp/pacman-step-att-5gntCR/step-attachments'
+A3c passes on this leg: the sources already strip all four characters. F5 is shown red by
+mutations M12 and M13 in docs/verify/1406/p5-3-fix-mutations-2.txt.
+
+green: 9ff61880 (fix), vitest exit 0
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：剥字符后为空、. 或 .. 的文件名 → attachment；其余名照落，都在 <materializeDir>/<stepId>/ 下
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3d：剥字符后只剩 .. 的文件名 → 落盘名回落 attachment，路径不出步目录（围栏内外同律）
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+
+== round 2b: /code-review fixes (F6, F7) ==
+Tests: new A3d end-to-end test (F6); the stepId guard test gains "../\nforged" and requires a
+one-line message (F7):
+  #1406 … > A3d：素材化落盘失败（stepId 带出根、写盘报错）→ 只这个 token 不可用，同一文本的 png 照常内联
+
+red: cf8d41ae (tests committed; step-attachments.ts identical to 9ff61880), vitest exit 1
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3d：素材化落盘失败（stepId 带出根、写盘报错）→ 只这个 token 不可用，同一文本的 png 照常内联
+ Test Files  1 failed (1)
+      Tests  2 failed | 25 passed (27)
+AssertionError: "../\nforged": expected [Function] to throw error matching /^materialize[^\n]*$/ but got 'materialize path outside /tmp/pacman-…'
+Error: materialize path outside /tmp/pacman-step-att-sY5VNM/step-attachments/<stepId>/: /tmp/pacman-step-att-sY5VNM/diagram.svg
+
+green: 1c8f1981 (fix), vitest exit 0
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：剥字符后为空、. 或 .. 的文件名 → attachment；其余名照落，都在 <materializeDir>/<stepId>/ 下
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > materializeAttachmentFile > A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3d：剥字符后只剩 .. 的文件名 → 落盘名回落 attachment，路径不出步目录（围栏内外同律）
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3d：素材化落盘失败（stepId 带出根、写盘报错）→ 只这个 token 不可用，同一文本的 png 照常内联
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+
+== final: e3e4a0dc (1c8f1981 plus a comment re-wrap), the four issue-fence test files ==
+Command: NO_COLOR=1 FORCE_COLOR=0 pnpm exec vitest run --reporter=verbose
+  packages/shared/test/issue-fence.test.ts apps/daemon/test/step-attachments.test.ts
+  apps/daemon/test/runner-issue-fence.test.ts apps/server/test/issue-fence.test.ts
+vitest exit: 0
+ Test Files  4 passed (4)
+      Tests  70 passed (70)
+
+== the leg script (<scratchpad>/p53fix2-rerun.sh), also used for the re-runs appended to p5-3-fix-red-green.txt ==
+  #!/usr/bin/env bash
+  # Re-run the head step-attachments tests against the sources before a fix.
+  # usage: p53fix2-rerun.sh <worktree> <scratch> <commit> <file>...
+  set -u
+  WT=$1; SC=$2; REV=$3; shift 3
+  cd "$WT" || exit 2
+  : > "$SC/sums-$REV.txt"
+  for f in "$@"; do
+    cp "$f" "$SC/$REV-$(basename "$f")"
+    sha256sum "$f" >> "$SC/sums-$REV.txt"
+  done
+  restore() {
+    for f in "$@"; do cp "$SC/$REV-$(basename "$f")" "$f"; done
+  }
+  trap 'restore "$@"' EXIT
+  for f in "$@"; do git show "$REV:$f" > "$f"; done
+  echo "sources replaced with $REV: $*"
+  NO_COLOR=1 FORCE_COLOR=0 pnpm exec vitest run --reporter=verbose apps/daemon/test/step-attachments.test.ts > "$SC/log-$REV.txt" 2>&1
+  echo "vitest exit: $?"
+  restore "$@"
+  trap - EXIT
+  sha256sum -c "$SC/sums-$REV.txt"

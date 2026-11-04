@@ -1,0 +1,93 @@
+#1406 P5a-2 round 2 mutations: openTarget's catch (pr-gate run 1 suggestion 1) and the GitHub fetch timeout (suggestion 6)
+head: a5bf7ed3 (branch claude/bootstrap-p5b; round 2 code commits 6b6fcc0d, a5bf7ed3)
+runner: python3 -I mutate-2.py (scratchpad script; the p5a2-mutations.txt mutate.py with a round 2 table): apply the edit, run
+  pnpm exec vitest run apps/server/test/github-reads.test.ts apps/server/test/mcp-face.test.ts packages/shared/test/chief-tools.test.ts apps/daemon/test/claude-t4-tools.test.ts
+  then write the original file back (no git restore / checkout); md5sum -c of github-reads.ts and lib/github.ts before and after: OK
+result at head: 4 mutations, 4 killed, 0 survived
+result at the 1089821 test file: R3 and R4 both survived (the gap pr-gate run 1 reported)
+
+== green at head
+date: 2026-10-21T11:18:33Z
+ Test Files  4 passed (4)
+      Tests  83 passed (83)
+exit=0
+the 4 tests added this round (verbose reporter):
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 5 box.open 抛 SecretBoxError → 409 reconnect GitHub，不出站 50ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 5 不是 SecretBoxError 的错误（读连接行的 SQLite 错误、box 的别的错误）原样抛出，不变成 409 112ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 timeout while reading the body → 504「no answer within」，三个工具同律，不带 token / URL 38ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 12 fetch 拿到的 signal 的超时值至多 REMOTE_TOOL_TIMEOUT_MS - 3s（三个工具，chief 面） 35ms
+
+== red on the old code: the a5bf7ed3 test file against the 1089821 github-reads.ts
+method: write `git show 10898214:apps/server/src/services/github-reads.ts` over the file, run the four test files, write
+  `git show HEAD:apps/server/src/services/github-reads.ts` back (md5sum -c OK). Only openTarget differs between the two.
+date: 2026-10-21T11:07:16Z
+     × 5 不是 SecretBoxError 的错误（读连接行的 SQLite 错误、box 的别的错误）原样抛出，不变成 409 110ms
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 82 passed (83)
+exit=1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 5 不是 SecretBoxError 的错误（读连接行的 SQLite 错误、box 的别的错误）原样抛出，不变成 409
+AssertionError: issues: expected HttpError: github connection cannot be re… { …(2) } to not be an instance of HttpError
+ ❯ test/github-reads.test.ts:494:29
+    492|       const err = await chiefText(w, name, { projectId: w.projectId })…
+    493|       expect(err, name).toBeInstanceOf(Error);
+    494|       expect(err, name).not.toBeInstanceOf(HttpError);
+       |                             ^
+    495|       expect((err as Error).message, name).toContain('no such table: g…
+    496|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+The SecretBoxError -> 409 test passes on the old code too: it is a guard that the narrowing keeps the 409 (R2 below).
+The two timeout tests pass on the old code: the code was already right, and the gap was in the tests; R3 and R4 show them red.
+
+== mutations at head (a5bf7ed3 test set)
+== R1 SecretBoxError narrowing removed (bare catch again)
+rule: only SecretBoxError becomes the 409 reconnect error; other errors propagate unchanged
+edit: apps/server/src/services/github-reads.ts
+  - if (!(err instanceof SecretBoxError)) throw err;
+  + 
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 82 passed (83)
+  red: 5 不是 SecretBoxError 的错误（读连接行的 SQLite 错误、box 的别的错误）原样抛出，不变成 409
+
+== R2 409 mapping dropped (every token error propagates)
+rule: a token that does not decrypt (SecretBoxError) is a 409 reconnect error, not a crash
+edit: apps/server/src/services/github-reads.ts
+  - if (!(err instanceof SecretBoxError)) throw err;
+  + throw err;
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  2 failed | 81 passed (83)
+  red: 5 box.open 抛 SecretBoxError → 409 reconnect GitHub，不出站
+  red: 5 token 密文解不开（keyfile 换了）→ 错误结果（非 500、非 SecretBoxError），不出站
+
+== R3 use-site timeout times 10
+rule: the timeout handed to the GitHub fetch is at most REMOTE_TOOL_TIMEOUT_MS - 3000 ms
+edit: apps/server/src/services/github-reads.ts
+  - const timeoutMs = GITHUB_READ_TIMEOUT_MS;
+  + const timeoutMs = GITHUB_READ_TIMEOUT_MS * 10;
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 82 passed (83)
+  red: 12 fetch 拿到的 signal 的超时值至多 REMOTE_TOOL_TIMEOUT_MS - 3s（三个工具，chief 面）
+
+== R4 body-read timeout reported as malformed
+rule: a TimeoutError while reading the response body is a timeout (504), not malformed (502)
+edit: apps/server/src/lib/github.ts
+  - return { ok: false, failure: { kind: isAbort(err) ? 'timeout' : 'malformed' } };
+  + return { ok: false, failure: { kind: 'malformed' } };
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 82 passed (83)
+  red: 6 timeout while reading the body → 504「no answer within」，三个工具同律，不带 token / URL
+
+== before: R3 and R4 against the 1089821 test file
+method: write `git show 10898214:apps/server/test/github-reads.test.ts` over the test file, run mutate-2.py R3 R4,
+  write `git show HEAD:apps/server/test/github-reads.test.ts` back (md5sum -c OK)
+== R3 use-site timeout times 10
+rule: the timeout handed to the GitHub fetch is at most REMOTE_TOOL_TIMEOUT_MS - 3000 ms
+edit: apps/server/src/services/github-reads.ts
+  - const timeoutMs = GITHUB_READ_TIMEOUT_MS;
+  + const timeoutMs = GITHUB_READ_TIMEOUT_MS * 10;
+result: SURVIVED; Test Files  4 passed (4) / Tests  79 passed (79)
+
+== R4 body-read timeout reported as malformed
+rule: a TimeoutError while reading the response body is a timeout (504), not malformed (502)
+edit: apps/server/src/lib/github.ts
+  - return { ok: false, failure: { kind: isAbort(err) ? 'timeout' : 'malformed' } };
+  + return { ok: false, failure: { kind: 'malformed' } };
+result: SURVIVED; Test Files  4 passed (4) / Tests  79 passed (79)

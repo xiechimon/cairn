@@ -1,0 +1,6 @@
+Claude Code
+已安装在 xmonsMac-3574.local
+
+claude 9.9.9-probe · /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude
+
+执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。

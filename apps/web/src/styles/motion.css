@@ -1,0 +1,313 @@
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    /* biome-ignore lint/complexity/noImportantStyles: see the reset note above. */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: iteration cap stops any
+       infinite keyframe (caret-blink family) under reduced motion. */
+    animation-iteration-count: 1 !important;
+  }
+}
+
+button:active,
+[role="button"]:active,
+a:active {
+  opacity: 0.85;
+}
+
+@media (pointer: coarse) {
+  button:active,
+  [role="button"]:active,
+  a:active {
+    transition-duration: 0s;
+  }
+}
+
+.theme-suppress,
+.theme-suppress *,
+.theme-suppress *::before,
+.theme-suppress *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: must outrank every
+     component transition for the single frame the flip paints in. */
+  transition: none !important;
+}
+
+.sidebar-team-collapse:active,
+.rail-toggle:active {
+  opacity: 1;
+}
+
+@keyframes spinner-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes message-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes saved-check-decay {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes grapheme-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.anim-message-fade-up {
+  animation: message-fade-up var(--spring-snappy-dur) var(--spring-snappy) both;
+}
+
+.anim-saved-check {
+  animation: saved-check-decay 2.5s var(--ease-out-expo) both;
+}
+
+.anim-grapheme-reveal {
+  animation: grapheme-reveal 350ms var(--ease-out-expo) both;
+}
+
+.scroll-fade {
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: 0px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-top),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-top),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+    transparent
+  );
+}
+
+.scroll-fade-h {
+  --scroll-fade-left: 0px;
+  --scroll-fade-right: 0px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-left),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-left),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+    transparent
+  );
+}
+
+.scroll-fade-both {
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: 0px;
+  --scroll-fade-left: 0px;
+  --scroll-fade-right: 0px;
+  -webkit-mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-top),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+      transparent
+    ),
+    linear-gradient(
+      to right,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-left),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+      transparent
+    );
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-top),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+      transparent
+    ),
+    linear-gradient(
+      to right,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-left),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+      transparent
+    );
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-message-fade-up,
+  .anim-saved-check,
+  .anim-grapheme-reveal {
+    animation: none;
+  }
+}
+
+@keyframes task-panel-flash {
+  from {
+    background-color: var(--accent-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.task-panel-row[data-flash="true"] {
+  animation: task-panel-flash 1.4s var(--ease-standard);
+}
+
+@keyframes side-panel-in {
+  from {
+    opacity: 0;
+    translate: 12px 0;
+  }
+}
+
+.side-panel {
+  animation: side-panel-in 220ms var(--ease-standard);
+}
+
+@keyframes side-panel-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.side-panel-scrim {
+  animation: side-panel-scrim-in 200ms var(--ease-standard);
+}

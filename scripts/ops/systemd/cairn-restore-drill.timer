@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Cairn restore drill
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+Unit=cairn-restore-drill.service
+
+[Install]
+WantedBy=timers.target

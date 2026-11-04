@@ -1,0 +1,71 @@
+TAP version 13
+# fatal: Needed a single revision
+# Subtest: CLI uses origin/main, preserves full records, and recognizes only candidate syntax
+ok 1 - CLI uses origin/main, preserves full records, and recognizes only candidate syntax
+  ---
+  duration_ms: 24031.635103
+  type: 'test'
+  ...
+# Subtest: CLI does not truncate more than 200 qualifying commits
+ok 2 - CLI does not truncate more than 200 qualifying commits
+  ---
+  duration_ms: 361002.146773
+  type: 'test'
+  ...
+# Subtest: CLI rejects missing refs and invalid or ambiguous UTC intervals
+ok 3 - CLI rejects missing refs and invalid or ambiguous UTC intervals
+  ---
+  duration_ms: 173.414038
+  type: 'test'
+  ...
+# Subtest: local and CI plans execute behavior assertions and propagate deliberate failures
+ok 4 - local and CI plans execute behavior assertions and propagate deliberate failures
+  ---
+  duration_ms: 177.05452
+  type: 'test'
+  ...
+# Subtest: a controlled introduce/fix history exports one case that validates and replays
+ok 5 - a controlled introduce/fix history exports one case that validates and replays
+  ---
+  duration_ms: 3539.134471
+  type: 'test'
+  ...
+# Subtest: unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank
+ok 6 - unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank
+  ---
+  duration_ms: 1389.823831
+  type: 'test'
+  ...
+# Subtest: missing provenance, an invalid line range, or a replay base not in history fails validation
+ok 7 - missing provenance, an invalid line range, or a replay base not in history fails validation
+  ---
+  duration_ms: 23855.986452
+  type: 'test'
+  ...
+# Subtest: exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location
+ok 8 - exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location
+  ---
+  duration_ms: 149.069358
+  type: 'test'
+  ...
+# Subtest: the reviewer-input object contains no defect label, location or correction
+ok 9 - the reviewer-input object contains no defect label, location or correction
+  ---
+  duration_ms: 81.653402
+  type: 'test'
+  ...
+# Subtest: validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case
+ok 10 - validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case
+  ---
+  duration_ms: 1053.677959
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 415502.805582

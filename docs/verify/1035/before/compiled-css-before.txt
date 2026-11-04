@@ -1,0 +1,3 @@
+# compiled CSS artifact — BEFORE (origin/main @ /tmp/pacman-before-1035, same build cmd)
+# grep -o -- '--board-col-min[a-z-]*:[^;}]*' apps/web/dist/assets/*.css | sort -u
+--board-col-min:280px

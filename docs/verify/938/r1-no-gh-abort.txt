@@ -1,0 +1,2 @@
+error: gh CLI not found; the merged-PR list is the only criterion
+exit=2

@@ -1,0 +1,122 @@
+{
+  "probe": "drive-943-board-sidebar",
+  "checks": [
+    {
+      "ok": true,
+      "label": "A1 看板 4 列在场"
+    },
+    {
+      "ok": true,
+      "label": "A2 轨道 4 段 ≥280（实测 281px 281px 281px 281px）"
+    },
+    {
+      "ok": true,
+      "label": "A5 卡面项目徽标带皮（bg=rgb(255, 155, 120) w=16；前置=drive new-task 已落卡）"
+    },
+    {
+      "ok": true,
+      "label": "A3 seam 与顶栏分隔线同色（rgb(45, 42, 36)）"
+    },
+    {
+      "ok": true,
+      "label": "A4 侧栏 240px（实测 240）"
+    },
+    {
+      "ok": true,
+      "label": "B1 侧栏按钮全数带 data-slot 件槽（6/6，裸 0）"
+    },
+    {
+      "ok": true,
+      "label": "C1 行 hover pill 染色（rgba(0, 0, 0, 0) → rgba(255, 252, 248, 0.05)）"
+    },
+    {
+      "ok": true,
+      "label": "C2 折叠成 40px rail（实测 40）"
+    },
+    {
+      "ok": true,
+      "label": "C3 展开回 240px（实测 240）"
+    },
+    {
+      "ok": true,
+      "label": "C4 项目组收起（aria-label 翻到 展开项目）"
+    },
+    {
+      "ok": true,
+      "label": "C4b 收起后 新建项目 行不可见"
+    },
+    {
+      "ok": true,
+      "label": "C4c 展开后行回场"
+    },
+    {
+      "ok": true,
+      "label": "C5 用户 chip 开出菜单（dialog/用户菜单）"
+    },
+    {
+      "ok": true,
+      "label": "C5b Esc 关菜单"
+    },
+    {
+      "ok": true,
+      "label": "D1 退役选择器零规则（命中 0：）"
+    },
+    {
+      "ok": true,
+      "label": "D2 body[data-board-dragging] 手势律在场（motion.css）"
+    },
+    {
+      "ok": true,
+      "label": "C6 筛选钮开出面板（dialog/筛选）"
+    },
+    {
+      "ok": true,
+      "label": "C6b repo 维度全选 checkbox 在场（role=checkbox）"
+    },
+    {
+      "ok": true,
+      "label": "C6c 空选 = aria-checked false"
+    },
+    {
+      "ok": true,
+      "label": "C7 单选后全选行 aria-checked=mixed（选项 2，≥2 时必须 mixed）"
+    },
+    {
+      "ok": true,
+      "label": "C8 顶栏生效筛选条现身（header 内 data-dimension chip）"
+    },
+    {
+      "ok": true,
+      "label": "C8b 触发钮计数徽章 = 1"
+    },
+    {
+      "ok": true,
+      "label": "C9 非满选点全选 = 全选（mixed → true）"
+    },
+    {
+      "ok": true,
+      "label": "C9b 满选再点 = 清本维（aria-checked false）"
+    },
+    {
+      "ok": true,
+      "label": "C10 生效筛选条清空"
+    },
+    {
+      "ok": true,
+      "label": "E-dark 对比度 16 对全过（未过 0：）"
+    },
+    {
+      "ok": true,
+      "label": "E-light 对比度 16 对全过（未过 0：）"
+    }
+  ],
+  "artifacts": [
+    "03-rail-dark.png",
+    "05-user-menu-dark.png",
+    "04-filter-popover-dark.png",
+    "02-board-dark.png",
+    "06-board-light.png",
+    "07-filter-popover-light.png"
+  ],
+  "failures": 0
+}

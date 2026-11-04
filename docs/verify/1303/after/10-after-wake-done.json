@@ -1,0 +1,13 @@
+{
+  "row": {
+    "id": "w0zroHeZvD0GzMiXfD3Im:chief-01a13b2f-83d2-705d-8ffe-7fa27d515fbf",
+    "type": "chief_message",
+    "entityId": "chief-01a13b2f-83d2-705d-8ffe-7fa27d515fbf",
+    "snippet": "机器回头：任务仍在跑，无需处理。",
+    "readAt": 1791994337604,
+    "createdAt": 1791994337604
+  },
+  "unread": {
+    "unreadThreadIds": []
+  }
+}

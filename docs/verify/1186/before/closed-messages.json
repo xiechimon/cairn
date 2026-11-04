@@ -1,0 +1,62 @@
+[
+  {
+    "id": "call-1186-before-3",
+    "role": "assistant",
+    "content": {
+      "kind": "toolcall",
+      "call": {
+        "id": "call-1186-before-3",
+        "name": "bash",
+        "arguments": {
+          "command": "printf \"1186-before-3\\n\" >> README.md"
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "(no output)"
+            }
+          ],
+          "structuredContent": {
+            "output": "",
+            "truncated": false,
+            "exit_code": 0,
+            "wall_time_seconds": 0
+          }
+        },
+        "isError": false,
+        "endedAt": 1791994420621
+      }
+    }
+  },
+  {
+    "id": "msg-YjhKJ-hl6sBRhIVGKpKAM-3",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "done"
+      }
+    ]
+  },
+  {
+    "id": "user-YjhKJ-hl6sBRhIVGKpKAM",
+    "role": "user",
+    "content": "Please use demo-skill and write a note\n\nWrite a one-line note. The task text names demo-skill."
+  },
+  {
+    "id": "msg-YjhKJ-hl6sBRhIVGKpKAM-1",
+    "role": "system",
+    "content": ""
+  },
+  {
+    "id": "msg-YjhKJ-hl6sBRhIVGKpKAM-2",
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "(no output)"
+      }
+    ]
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "phase": "preparing",
+    "stepId": "RXSEi635m5r_VsF3klRe7",
+    "at": 1791369290319
+  },
+  {
+    "phase": "starting",
+    "stepId": "RXSEi635m5r_VsF3klRe7",
+    "at": 1791369290336
+  },
+  {
+    "phase": "tool",
+    "tool": "bash",
+    "stepId": "RXSEi635m5r_VsF3klRe7",
+    "at": 1791369293368
+  },
+  {
+    "phase": "awaiting_model",
+    "stepId": "RXSEi635m5r_VsF3klRe7",
+    "at": 1791369293379
+  },
+  {
+    "phase": "responding",
+    "stepId": "RXSEi635m5r_VsF3klRe7",
+    "at": 1791369293384
+  }
+]

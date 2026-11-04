@@ -1,0 +1,124 @@
+# #1402 round 6, after /code-review on #1411 (AGENTS.md, #1422): vp.mjs on live stacks.
+# Logs copied from the session's terminal output. The first part ran on the tree before /simplify,
+# the part headed "after /simplify" on the tree committed as 405194a; the self-test reads 34/34 on both.
+# Archived runs: 20261021-041337-search-search/ (drive search plus two captures into the same run:
+# capture-board/ and capture-board-2/), 20261021-041352-glass-journeys-create-task/ (the --out that
+# vp.mjs passed), 20261021-glass-create-task-out/ (the --out given after --; no directory of vp's own).
+# The capture result.json records one console error from the board page (a Base UI nativeButton
+# warning at board.tsx:263); capture records errors and does not judge them.
+
+$ vp.mjs launch
+verify stack ready
+  web(驱动入口)  http://127.0.0.1:5273/app
+  api(server)     http://127.0.0.1:8791
+  PACMAN_HOME     /home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home(全新库,seed 用户 Owner)
+  技能目录        /home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home/skills(scratch,空集起步;放技能见 features/skills-page.md)
+  运行态          /home/user/pacman/.claude/worktrees/p1/.claude/verify-run
+next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>
+exit=0
+
+$ vp.mjs drive search --dry-run
+vp: dry-run search/search (doctor first)
+    runner node  cwd /home/user/pacman/.claude/worktrees/p1
+    script .claude/skills/verify-pacman/scripts/drive.mjs  args search
+    VERIFY_EVIDENCE_DIR=/home/user/pacman/.claude/verify-evidence/20261021-035135-search-search
+    VERIFY_PORT=8791
+    VERIFY_WEB_PORT=5273
+    VERIFY_RUN_DIR=
+exit=0
+
+$ vp.mjs drive search
+doctor:all PASS
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-035136-search-search
+vp: search/search -> node .claude/skills/verify-pacman/scripts/drive.mjs search
+PASS  搜索面板打开(⌘K)
+PASS  结果行命中「搜索目标 97289」
+shot  02-search-results.png
+drive search:PASS
+evidence:/home/user/pacman/.claude/verify-evidence/20261021-035136-search-search
+exit=0
+
+$ VERIFY_EVIDENCE_DIR=<the search run> vp.mjs capture /app --name board   (twice)
+vp: captured http://127.0.0.1:5273/app
+    navigation ok, 1 console error(s), 0 failed request(s)
+    evidence /home/user/pacman/.claude/verify-evidence/20261021-035136-search-search/capture-board
+exit=0
+vp: captured http://127.0.0.1:5273/app
+    navigation ok, 1 console error(s), 0 failed request(s)
+    evidence /home/user/pacman/.claude/verify-evidence/20261021-035136-search-search/capture-board-2
+exit=0
+$ ls <the search run>
+02-search-results.png
+capture-board
+capture-board-2
+result.json
+
+$ vp.mjs drive failed-send restart-with-feedback
+failed-send/restart-with-feedback needs arguments: <todoId> <failedBuildId>. Pass them after --.
+exit=2
+
+$ vp.mjs drive machine-concurrency zombie-claim
+machine-concurrency/zombie-claim is stale: Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentB
+exit=2
+
+$ VERIFY_PORT=8792 vp.mjs drive search
+VERIFY_PORT=8792, but the stack in /home/user/pacman/.claude/worktrees/p1/.claude/verify-run runs on 8791; unset VERIFY_PORT or point VERIFY_RUN_DIR at that stack.
+exit=2
+
+$ vp.mjs cleanup
+  - 20261021-012658-api-keys-create
+  - 20261021-012705-glass-journeys-board
+  - 20261021-012751-glass
+exit=0
+
+$ vp.mjs drive glass-journeys create-task -- --out <scratch>/p1-r6-glass/20261021-glass-create-task-out
+vp: evidence /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/p1-r6-glass/20261021-glass-create-task-out
+vp: glass-journeys/create-task -> node .cursor/skills/verify-pacman/scripts/glass.mjs create-task --out /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/p1-r6-glass/20261021-glass-create-task-out
+launch
+shot  02-create-task-dialog.png
+shot  03-create-task-card.png
+PASS  create-task: card is in 待开始
+PASS  create-task: GET /api/todos phase=todo
+PASS  create-task: sqlite phase=todo
+evidence  /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/p1-r6-glass/20261021-glass-create-task-out
+cleanup
+PASS
+exit=0
+$ ls <the --out directory>
+02-create-task-dialog.png
+03-create-task-card.png
+result.json
+$ new directories in the evidence root during this drive
+(end of list)
+
+== after /simplify: the same vp.mjs commands on the final tree, a fresh stack ==
+$ vp.mjs launch
+verify stack ready
+exit=0
+$ vp.mjs drive search
+vp: search/search -> node .claude/skills/verify-pacman/scripts/drive.mjs search
+PASS  搜索面板打开(⌘K)
+PASS  结果行命中「搜索目标 18782」
+shot  02-search-results.png
+drive search:PASS
+evidence:/home/user/pacman/.claude/verify-evidence/20261021-041337-search-search
+exit=0
+$ VERIFY_EVIDENCE_DIR=<that run> vp.mjs capture /app --name board   (twice)
+    evidence /home/user/pacman/.claude/verify-evidence/20261021-041337-search-search/capture-board
+    evidence /home/user/pacman/.claude/verify-evidence/20261021-041337-search-search/capture-board-2
+$ ls <that run>
+02-search-results.png
+capture-board
+capture-board-2
+result.json
+$ vp.mjs cleanup
+exit=0
+$ vp.mjs drive glass-journeys create-task
+vp: glass-journeys/create-task usage: starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-041352-glass-journeys-create-task
+vp: glass-journeys/create-task -> node .cursor/skills/verify-pacman/scripts/glass.mjs create-task --out /home/user/pacman/.claude/verify-evidence/20261021-041352-glass-journeys-create-task
+PASS  create-task: card is in 待开始
+PASS  create-task: GET /api/todos phase=todo
+PASS  create-task: sqlite phase=todo
+PASS
+exit=0

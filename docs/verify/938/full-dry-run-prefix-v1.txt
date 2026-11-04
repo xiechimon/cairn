@@ -1,0 +1,298 @@
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        dry
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+WOULD-CLEAN a6/01-doc-spacing (PR #337 merged) -> remote-branch
+WOULD-CLEAN a6/02-popover-radius (PR #339 merged) -> remote-branch
+WOULD-CLEAN a6/03-btn-merge (PR #340 merged) -> remote-branch
+KEEP        agent/mea-builder/19676cbec368 (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/mea-builder/1c680800d193 (PR #528 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/267fb6a1ff72 (PR #537 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/2f5cd2530d35 (PR #530 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/542baf8f779b (PR #522 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/66d72d626833 (PR #539 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/6df3c3c60b9e (PR #529 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/70c64d76b2e8 (PR #536 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/772ba36cd1e0 (PR #532 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/7f231f9f20d6 (PR #546 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/865babb59a50 (PR #527 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/c3c4583eae57 (PR #535 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/caa98b401059 (PR #525 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/cbff1b9ea47c (PR #538 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/d7b67395c5fa (PR #534 merged) -> remote-branch
+WOULD-CLEAN agent/mea-builder/d917954de1ec (PR #531 merged) -> remote-branch
+KEEP        agent/mea-builder/fcaa3bb22cfc (not in the GitHub merged-PR list)
+KEEP        agent/pacman-deepseek-v4-pro/d441ddd1f115 (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/pacman-deepseek-v4-pro/xmon-22-v2 (PR #574 merged) -> remote-branch
+WOULD-CLEAN agent/pacman-kimi-k3/a30af1c4b7c4 (PR #596 merged) -> remote-branch
+WOULD-CLEAN agent/pacman-kimi-k3/c4591715965b (PR #588 merged) -> remote-branch
+WOULD-CLEAN agent/pacman-qwen3-8-max-0902/0ae61761086b (PR #584 merged) -> remote-branch
+WOULD-CLEAN agent/pacman-qwen3-8-max-0902/9ac89583b42e (PR #593 merged) -> remote-branch
+WOULD-CLEAN agent/pacman-qwen3-8-max-0902/e73eff7fc153 (PR #591 merged) -> remote-branch
+WOULD-CLEAN agent/pacman-qwen3-8-max-0902/f2ded78e7968 (PR #585 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/038a7695ac25 (PR #579 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/0c91ac45676d (PR #568 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/0d83439cb3ee (PR #551 merged) -> remote-branch
+KEEP        agent/pacman/135e0834b1f7 (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/pacman/1546e4bfd37e (PR #558 merged) -> remote-branch
+KEEP        agent/pacman/171b1695b2b3 (not in the GitHub merged-PR list)
+KEEP        agent/pacman/2c2e688854c2 (not in the GitHub merged-PR list)
+KEEP        agent/pacman/35d47241871e (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/pacman/45b363131d42 (PR #589 merged) -> remote-branch
+KEEP        agent/pacman/4603247eeb4c (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/pacman/52ac5fb0154e (PR #570 merged) -> remote-branch
+KEEP        agent/pacman/5a01319ddb88 (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/pacman/5fb57b15fe5a (PR #565 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/6119a511d9ed (PR #571 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/780d00d25e07 (PR #550 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/7b6612b6f335 (PR #590 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/8951658784a8 (PR #548 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/8bbc933a49ea (PR #566 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/92ec51a64c01 (PR #592 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/93392270b246 (PR #586 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/94aa1d79fce1 (PR #554 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/994dc12e8830 (PR #580 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/9bf76eb3dfc7 (PR #576 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/a3e6d570d90f (PR #567 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/a62632fc92fe (PR #577 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/a9a51a527106 (PR #587 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/c26776788817 (PR #597 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/ccc95f34c7fd (PR #582 merged) -> remote-branch
+KEEP        agent/pacman/cfa900d68eba (not in the GitHub merged-PR list)
+WOULD-CLEAN agent/pacman/d3a48383c9f0 (PR #572 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/daa02a288880 (PR #553 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/dc2a2b1e1b38 (PR #560 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/dfeea7a95af6 (PR #595 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/e00bf5bae6c4 (PR #564 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/e401ccf86547 (PR #598 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/ebc2065b27f9 (PR #563 merged) -> remote-branch
+WOULD-CLEAN agent/pacman/f0fc7ab469ea (PR #599 merged) -> remote-branch
+KEEP        backup-66-rebased (not in the GitHub merged-PR list)
+WOULD-CLEAN brief-alert (PR #978 merged) -> remote-branch
+WOULD-CLEAN brief-cache-split (PR #959 merged) -> remote-branch
+WOULD-CLEAN brief-file (PR #960 merged) -> remote-branch
+WOULD-CLEAN brief-wire (PR #973 merged) -> remote-branch
+WOULD-CLEAN chief-live-split (PR #961 merged) -> local-branch
+WOULD-CLEAN chief-session-durability (PR #954 merged) -> remote-branch
+WOULD-CLEAN chore/232-m6-acceptance (PR #242 merged) -> remote-branch
+WOULD-CLEAN chore/248-license-apache (PR #255 merged) -> remote-branch
+WOULD-CLEAN chore/249-asset-audit (PR #258 merged) -> remote-branch
+WOULD-CLEAN chore/250-community-templates (PR #254 merged) -> remote-branch
+WOULD-CLEAN chore/262-cli-rename (PR #267 merged) -> remote-branch
+WOULD-CLEAN chore/263-publish-wizard (PR #268 merged) -> remote-branch
+WOULD-CLEAN chore/264-pack-smoke (PR #274 merged) -> remote-branch
+KEEP        chore/270-cli-bundle-bare-run (not in the GitHub merged-PR list)
+WOULD-CLEAN chore/remove-parity (PR #342 merged) -> remote-branch
+WOULD-CLEAN ci-spine-diagnostics (PR #523 merged) -> remote-branch
+WOULD-CLEAN ci/e2e-merge-gate-762 (PR #764 merged) -> worktree:/Users/xmon/.herdr/worktrees/pacman/ci-e2e-merge-gate-762 local-branch remote-branch
+WOULD-CLEAN ci/e2e-shard-forwarding (PR #766 merged) -> local-branch remote-branch
+WOULD-CLEAN cmd-j-toggle-kbd-hints (PR #475 merged) -> remote-branch
+WOULD-CLEAN daemon/270-cli-bundle-bare-run (PR #273 merged) -> remote-branch
+WOULD-CLEAN daemon/279-steer-wiring (PR #282 merged) -> remote-branch
+WOULD-CLEAN docs/252-readme-bilingual (PR #256 merged) -> remote-branch
+WOULD-CLEAN docs/265-quickstart-npx (PR #275 merged) -> remote-branch
+WOULD-CLEAN docs/290-streamdown-eval (PR #296 merged) -> remote-branch
+WOULD-CLEAN docs/446-adr-0005-truth-split (PR #451 merged) -> local-branch
+WOULD-CLEAN docs/801-spec18-519-debts-cleared (PR #806 merged) -> remote-branch
+WOULD-CLEAN docs/a6-adr (PR #343 merged) -> remote-branch
+WOULD-CLEAN docs/adr-0004-chief-panel (PR #450 merged) -> local-branch
+WOULD-CLEAN docs/batch-ledger-raw-buttons (PR #544 merged) -> remote-branch
+KEEP        docs/xmon-100-svg-inventory (not in the GitHub merged-PR list)
+WOULD-CLEAN evidence/xmon-68-model-menu (PR #575 merged) -> remote-branch
+KEEP        fix/new-task-close-anchor (PR #604 merged, but worktree /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0004-multica-pr-587-589-599-586-580-577 has uncommitted changes; pass --force-dirty to discard)
+KEEP        fs-pick-440 (PR #455 merged, but worktree /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/fs-pick-440 has uncommitted changes; pass --force-dirty to discard)
+WOULD-CLEAN hp-pacman-t-0115-772-picker (PR #780 merged) -> remote-branch
+WOULD-CLEAN hp-pacman-t-0133-790-v2-p3 (PR #805 merged) -> remote-branch
+KEEP        hp/pacman/t-0053-b-656-catb (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0053-b-656-pr2 (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0123-spec-base-ui-v2-herdr (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0185-883-picker (not in the GitHub merged-PR list)
+WOULD-CLEAN hp/pacman/t-0195-gate-bare-url (PR #934 merged) -> worktree:/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0195-gate-bare-url local-branch remote-branch
+WOULD-CLEAN hp/pacman/t-0198-agent (PR #941 merged) -> remote-branch
+KEEP        hp/pacman/t-0206-947-followup (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0219-902-900-901-actor (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0220-926 (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0221-925-927-pi (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0222-938-github-merged (current branch of this worktree: /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged)
+KEEP        hp/pacman/t-0222-938-negfixture (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0223-903-chief-plan (not in the GitHub merged-PR list)
+KEEP        hp/pacman/t-0224-939-940-ci-pr (not in the GitHub merged-PR list)
+WOULD-CLEAN impl/104-ts-upgrade (PR #117 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/105-react-router-8 (PR #118 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/106-tailwind-4 (PR #119 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/107-pi-upgrade (PR #115 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/109-brand-switch (PR #110 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/111-dx-daemon (PR #112 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/113-plan-handoff (PR #116 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/114-notify-banner (PR #120 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/121-sidebar-nav (PR #125 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/122-theme-toggle (PR #124 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/123-visual-polish (PR #126 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/127-usermenu-trigger (PR #130 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/128-sidebar-visual (PR #131 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/129-shell-consistency (PR #132 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/133-title-pointer-events (PR #140 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/134-sidebar-search-e2e (PR #141 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/135-sidebar-seam (PR #143 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/137-search-focus (PR #142 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/138-segmented-controls (PR #145 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/139-border-system (PR #144 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/146-chief-panel (PR #158 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/147-collapse-family (PR #156 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/148-account-team-cleanse (PR #157 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/149-dead-buttons (PR #162 merged) -> remote-branch
+WOULD-CLEAN impl/159-search-result-rows (PR #164 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/160-kanban-dnd (PR #166 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/161-card-shadows (PR #167 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/64-r8-capture (PR #86 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/65-m1-shared (PR #84 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/66-overlay-a (PR #93 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/67-overlay-b (PR #90 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/68-overlay-c (PR #91 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/69-routes-a (PR #87 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/70-routes-b (PR #85 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/71-routes-c (PR #88 merged) -> local-branch remote-branch
+KEEP        impl/72-chief-panel (not in the GitHub merged-PR list)
+WOULD-CLEAN impl/72-chief-panel-r2 (PR #92 merged) -> remote-branch
+WOULD-CLEAN impl/73-motion-dnd (PR #100 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/74-i18n-pwa (PR #98 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/75-dynamic-states (PR #97 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/76-m2a-server (PR #94 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/77-m2b-server (PR #95 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/78-m2c-server (PR #96 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/79-m3a-daemon (PR #99 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/80-m3b-daemon (PR #101 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/81-m4a-chief (PR #102 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/82-m4b-chief-deep (PR #103 merged) -> local-branch remote-branch
+WOULD-CLEAN impl/83-m5-e2e (PR #108 merged) -> local-branch remote-branch
+WOULD-CLEAN integration/434-typecheck-eval (PR #437 merged) -> remote-branch
+WOULD-CLEAN lane/363-board-guide (PR #369 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/366-detail-3pane (PR #374 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/367-skills-local (PR #376 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/368-mcp-local (PR #375 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/370-skills-inject (PR #373 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/372-skills-filter (PR #383 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/423-resources-slice (PR #481 merged) -> local-branch
+WOULD-CLEAN lane/426-b2-warmup (PR #474 merged) -> local-branch
+WOULD-CLEAN lane/435-token-rewrite (PR #449 merged) -> local-branch
+WOULD-CLEAN lane/438-mjs-to-mts (PR #439 merged) -> local-branch remote-branch
+WOULD-CLEAN lane/446-issue-source (PR #460 merged) -> local-branch
+WOULD-CLEAN lane/452-issue-writeback (PR #464 merged) -> local-branch
+WOULD-CLEAN lane/453-vr-shell (PR #467 merged) -> local-branch
+WOULD-CLEAN lane/462-escape-race (PR #465 merged) -> local-branch
+WOULD-CLEAN lane/462-m5-flake (PR #484 merged) -> local-branch
+WOULD-CLEAN lane/fix-overlay-focus (PR #396 merged) -> local-branch
+KEEP        lane/repro-overlay-clicks (not in the GitHub merged-PR list)
+KEEP        lane/s1-providers-tabs (not in the GitHub merged-PR list)
+WOULD-CLEAN lane/s2-picker-dialog (PR #380 merged) -> local-branch
+WOULD-CLEAN m7/303-ledger (PR #321 merged) -> remote-branch
+WOULD-CLEAN m7/304-voice-remove (PR #313 merged) -> remote-branch
+WOULD-CLEAN m7/305-empty-new-repo (PR #317 merged) -> remote-branch
+WOULD-CLEAN m7/306-menu-stubs (PR #316 merged) -> remote-branch
+WOULD-CLEAN m7/307-doc-links (PR #314 merged) -> remote-branch
+WOULD-CLEAN m7/308-steer (PR #325 merged) -> remote-branch
+WOULD-CLEAN m7/309-tags (PR #323 merged) -> remote-branch
+WOULD-CLEAN m7/310-attachments (PR #331 merged) -> remote-branch
+WOULD-CLEAN m7/311-mentions (PR #327 merged) -> remote-branch
+WOULD-CLEAN m7/312-ai-review (PR #329 merged) -> remote-branch
+WOULD-CLEAN m7/318-w2-stubs (PR #324 merged) -> remote-branch
+WOULD-CLEAN m7/319-branch-sync (PR #328 merged) -> remote-branch
+WOULD-CLEAN m7/320-failed-send (PR #322 merged) -> remote-branch
+WOULD-CLEAN m7/330-ai-review-2 (PR #332 merged) -> remote-branch
+KEEP        main (default branch)
+KEEP        merge-69-tmp (not in the GitHub merged-PR list)
+KEEP        oss-survey (not in the GitHub merged-PR list)
+KEEP        pacman/conv-01a0f057-8f42-7987-9378-5e9a7c8a3ff4 (not in the GitHub merged-PR list)
+WOULD-CLEAN pacman/conv-01a0f8f3-5fbb-74e8-bf58-629602b727ed (PR #606 merged) -> remote-branch
+KEEP        pacman/conv-01a10036-40c1-7b0d-b8e7-4a1aedb6ebd0 (not in the GitHub merged-PR list)
+KEEP        pacman/conv-01a10511-255b-7d98-be74-c008e8b6050b (not in the GitHub merged-PR list)
+KEEP        pacman/conv-01a1058d-e5e3-79ea-866c-2b765b5bfb4a (not in the GitHub merged-PR list)
+KEEP        pacman/conv-01a1079e-cf5c-7746-a229-787b12f6184d (not in the GitHub merged-PR list)
+KEEP        pacman/conv-01a10af8-a373-746a-a706-05bfa61ad2f6 (not in the GitHub merged-PR list)
+WOULD-CLEAN pacman/conv-01a10c27-a34f-7ccc-9d12-d08df09704de (PR #928 merged) -> local-branch
+KEEP        probe/762-gate-failure-path (not in the GitHub merged-PR list)
+KEEP        proto/453-shell-variants (not in the GitHub merged-PR list)
+KEEP        prototype/42-pixel-replica (not in the GitHub merged-PR list)
+KEEP        prototype/shadcn-visual-tokens (not in the GitHub merged-PR list)
+KEEP        research/baseui-dialog-contract-2 (not in the GitHub merged-PR list)
+KEEP        research/dialog-contract (not in the GitHub merged-PR list)
+KEEP        research/migration-surface (not in the GitHub merged-PR list)
+WOULD-CLEAN research/multica-runtime (PR #524 merged) -> local-branch remote-branch
+KEEP        research/r5-icons (not in the GitHub merged-PR list)
+KEEP        research/r5b-lifecycle-states (not in the GitHub merged-PR list)
+KEEP        research/r6-rebaseline (not in the GitHub merged-PR list)
+KEEP        research/r7-rebaseline (not in the GitHub merged-PR list)
+WOULD-CLEAN research/runtime-gap (PR #526 merged) -> remote-branch
+KEEP        research/shadcn-form (not in the GitHub merged-PR list)
+WOULD-CLEAN revert-834 (PR #838 merged) -> local-branch remote-branch
+WOULD-CLEAN server-511-review-sees-changes (PR #513 merged) -> remote-branch
+WOULD-CLEAN server/189-delete-project (PR #206 merged) -> remote-branch
+WOULD-CLEAN server/203-chief-model-slot (PR #210 merged) -> remote-branch
+WOULD-CLEAN server/208-todo-assignment-slot (PR #214 merged) -> remote-branch
+WOULD-CLEAN server/216-epipe-flake (PR #220 merged) -> remote-branch
+WOULD-CLEAN server/223-github-scan-fetch (PR #233 merged) -> remote-branch
+WOULD-CLEAN server/224-diff-fulltext (PR #227 merged) -> remote-branch
+WOULD-CLEAN server/230-schemas-shared (PR #236 merged) -> remote-branch
+WOULD-CLEAN server/231-oauth-handshake (PR #240 merged) -> remote-branch
+WOULD-CLEAN server/243-oauth-state-ttl (PR #245 merged) -> remote-branch
+WOULD-CLEAN server/251-token-auth (PR #257 merged) -> remote-branch
+KEEP        server/261-bundle-pipeline (not in the GitHub merged-PR list)
+WOULD-CLEAN server/261-npm-bundle (PR #269 merged) -> remote-branch
+KEEP        server/264-pack-smoke (not in the GitHub merged-PR list)
+WOULD-CLEAN server/278-steer-rest (PR #281 merged) -> remote-branch
+WOULD-CLEAN spec/43-stack-v2 (PR #47 merged) -> local-branch
+KEEP        trigger/723-retrigger-e2e-gate (not in the GitHub merged-PR list)
+WOULD-CLEAN ui-reuse (PR #514 merged) -> local-branch remote-branch
+KEEP        ui/1002-palette-land (not in the GitHub merged-PR list)
+KEEP        ui/988-palette-reselect (not in the GitHub merged-PR list)
+WOULD-CLEAN web-chief-tool-command (PR #974 merged) -> remote-branch
+WOULD-CLEAN web/168-rerun-close (PR #169 merged) -> remote-branch
+WOULD-CLEAN web/170-create-agent (PR #171 merged) -> remote-branch
+WOULD-CLEAN web/173-secret-dialog (PR #183 merged) -> remote-branch
+KEEP        web/174-mcp-dialog (not in the GitHub merged-PR list)
+WOULD-CLEAN web/174-mcp-dialog-rb (PR #187 merged) -> remote-branch
+WOULD-CLEAN web/175-provider-dialog (PR #190 merged) -> remote-branch
+WOULD-CLEAN web/176-newtask-project (PR #184 merged) -> remote-branch
+WOULD-CLEAN web/177-project-settings (PR #188 merged) -> remote-branch
+WOULD-CLEAN web/178-tasks-toolbar (PR #185 merged) -> remote-branch
+WOULD-CLEAN web/181-machine-add (PR #191 merged) -> remote-branch
+WOULD-CLEAN web/182-chief-settings (PR #192 merged) -> remote-branch
+WOULD-CLEAN web/193-dlg-viewport (PR #211 merged) -> remote-branch
+WOULD-CLEAN web/194-e2e-inline-imports (PR #205 merged) -> remote-branch
+WOULD-CLEAN web/202-file-viewer (PR #212 merged) -> remote-branch
+WOULD-CLEAN web/204-chief-model-enable (PR #215 merged) -> remote-branch
+WOULD-CLEAN web/207-delete-revival (PR #213 merged) -> remote-branch
+WOULD-CLEAN web/209-assign-wiring (PR #217 merged) -> remote-branch
+WOULD-CLEAN web/221-dialog-css-family (PR #228 merged) -> remote-branch
+WOULD-CLEAN web/222-machine-row-icons (PR #226 merged) -> remote-branch
+WOULD-CLEAN web/225-diff-expand (PR #237 merged) -> remote-branch
+WOULD-CLEAN web/229-parity-dialog-rows (PR #239 merged) -> remote-branch
+WOULD-CLEAN web/235-skills-scan-btn (PR #241 merged) -> remote-branch
+WOULD-CLEAN web/244-plan-diff-fulltext (PR #246 merged) -> remote-branch
+WOULD-CLEAN web/253-token-gate (PR #259 merged) -> remote-branch
+WOULD-CLEAN web/280-steer-face (PR #283 merged) -> remote-branch
+WOULD-CLEAN web/285-authorize-page (PR #291 merged) -> remote-branch
+WOULD-CLEAN web/286-server-search (PR #292 merged) -> remote-branch
+WOULD-CLEAN web/287-apikey-grants (PR #293 merged) -> remote-branch
+WOULD-CLEAN web/288-run-history-tokens (PR #294 merged) -> remote-branch
+WOULD-CLEAN web/289-bundle-fixture-split (PR #295 merged) -> remote-branch
+KEEP        web/425-lane-a (not in the GitHub merged-PR list)
+KEEP        web/425-lane-b (not in the GitHub merged-PR list)
+WOULD-CLEAN web/425-overlay-family (PR #454 merged) -> local-branch
+WOULD-CLEAN web/441-dir-browser (PR #461 merged) -> local-branch
+WOULD-CLEAN web/442-chief-hotkey-cmdj (PR #456 merged) -> local-branch
+WOULD-CLEAN web/443-444-chief-fab (PR #458 merged) -> local-branch
+WOULD-CLEAN web/445-board-topbar (PR #459 merged) -> local-branch
+WOULD-CLEAN web/447-chief-panel (PR #463 merged) -> local-branch
+WOULD-CLEAN web/448-mention-center (PR #457 merged) -> local-branch
+KEEP        web/499-agent-secrets-toggle (not in the GitHub merged-PR list)
+WOULD-CLEAN web/53-skeleton (PR #61 merged) -> remote-branch
+WOULD-CLEAN web/58-wrapup (PR #63 merged) -> remote-branch
+WOULD-CLEAN worktree-team-agent-surface (PR #497 merged) -> local-branch
+KEEP        xmon-18-agent-detail-trim (not in the GitHub merged-PR list)
+WOULD-CLEAN xmon-18-status-row (PR #545 merged) -> remote-branch
+WOULD-CLEAN xmon-533-doc (PR #540 merged) -> remote-branch
+
+---
+plan: would-clean=229 kept=61 — re-run with --yes to execute
+exit=0 (attempts=5)

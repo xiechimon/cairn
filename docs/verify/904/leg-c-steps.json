@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ctVcN34b-mEdRl8cYZucS",
+    "kind": "plan",
+    "status": "done",
+    "prompt": null,
+    "machineId": "_59a1k0MbuXV7Gq_P3tjh",
+    "sessionId": "01a11789-a497-73a0-aa8e-f92c93afc7c6"
+  },
+  {
+    "id": "n5cL9STi9hZtPkfDpf3fv",
+    "kind": "plan",
+    "status": "failed",
+    "prompt": "规划步未产出 plan.md 交接文件。请将方案写入工作区根目录的 plan.md（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，plan.md 如实记录改动内容与验证方式即可。",
+    "machineId": "_59a1k0MbuXV7Gq_P3tjh",
+    "sessionId": "01a11789-a497-73a0-aa8e-f92c93afc7c6"
+  }
+]

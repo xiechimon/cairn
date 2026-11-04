@@ -1,0 +1,47 @@
+[
+  {
+    "id": "call-stub-muxyzz05-1",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muxyzz05-1\",\"name\":\"read\",\"arguments\":{\"path\":\"/tmp/pacman-918-skills/extra-skill/SKILL.md\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"read denied: skill 'extra-skill' is not in the agent allowlist\"}],\"details\":{}},\"isError\":true,\"endedAt\":1791369256003}}"
+  },
+  {
+    "id": "call-stub-muxyzz05-2",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muxyzz05-2\",\"name\":\"read\",\"arguments\":{\"path\":\"/tmp/pacman-918-skills/demo-skill/SKILL.md\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"---\\nname: demo-skill\\ndescription: 演示技能（#918 探针，读到正文即证路径可达）。\\n---\\n\\n# demo-skill\\n\\n正文 marker：SKILL-FACTS-MARKER-918\\n\"}],\"structuredContent\":\"---\\nname: demo-skill\\ndescription: 演示技能（#918 探针，读到正文即证路径可达）。\\n---\\n\\n# demo-skill\\n\\n正文 marker：SKILL-FACTS-MARKER-918\\n\"},\"isError\":false,\"endedAt\":1791369260021}}"
+  },
+  {
+    "id": "call-stub-muxyzz05-3",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muxyzz05-3\",\"name\":\"bash\",\"arguments\":{\"command\":\"printf \\\"918 probe\\\\n\\\" >> README.md\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"(no output)\"}],\"structuredContent\":{\"output\":\"\",\"truncated\":false,\"exit_code\":0,\"wall_time_seconds\":0}},\"isError\":false,\"endedAt\":1791369285052}}"
+  },
+  {
+    "id": "msg-vHJGOptjB0NGbNEVx497m-5",
+    "role": "assistant",
+    "content": "[{\"type\":\"text\",\"text\":\"已读取演示技能。\"}]"
+  },
+  {
+    "id": "user-vHJGOptjB0NGbNEVx497m",
+    "role": "user",
+    "content": "\"918 技能事实探针\\n\\n按 stub 脚本跑一步（#918 探针任务）\""
+  },
+  {
+    "id": "msg-vHJGOptjB0NGbNEVx497m-1",
+    "role": "system",
+    "content": "\"\""
+  },
+  {
+    "id": "msg-vHJGOptjB0NGbNEVx497m-2",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"read denied: skill 'extra-skill' is not in the agent allowlist\"}]"
+  },
+  {
+    "id": "msg-vHJGOptjB0NGbNEVx497m-3",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"---\\nname: demo-skill\\ndescription: 演示技能（#918 探针，读到正文即证路径可达）。\\n---\\n\\n# demo-skill\\n\\n正文 marker：SKILL-FACTS-MARKER-918\\n\"}]"
+  },
+  {
+    "id": "msg-vHJGOptjB0NGbNEVx497m-4",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"(no output)\"}]"
+  }
+]

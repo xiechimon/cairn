@@ -1,0 +1,5 @@
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://raw.githubusercontent.com/xiechimon/pacman/da84ed9c9da81ea1ff716416b2562d4b342d22b8/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png (bare URL, line 17)
+pr-evidence: RED (1 problem(s))
+exit=1

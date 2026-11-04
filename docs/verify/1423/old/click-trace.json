@@ -1,0 +1,15 @@
+{
+  "build": "base e658294 (origin/main)",
+  "buttonEnabled": true,
+  "before": {
+    "url": "http://127.0.0.1:8398/app/todo/todo-queued",
+    "head": "排队探针\n#11\n排队中\n开始",
+    "dialogs": 0
+  },
+  "after": {
+    "url": "http://127.0.0.1:8398/app/todo/todo-queued",
+    "head": "排队探针\n#11\n排队中\n开始",
+    "dialogs": 0
+  },
+  "nonGetRequestsAfterClick": []
+}

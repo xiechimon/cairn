@@ -1,0 +1,291 @@
+#1459 mutations: one rule broken at a time on 3524b15a, tests re-run, source restored
+Runner: scratch script w1459-mutate.py (python, outside the repo). For each mutation it
+replaces one exact snippet in one source file, runs
+  pnpm exec vitest run apps/server/test/webhook.test.ts apps/server/test/issue-intake.test.ts --reporter=verbose
+and writes the original file back. Unmutated baseline: 163 passed, exit 0 (red-green.txt).
+Result: 20 of 20 mutations red, 0 survived.
+
+== M1 D5 verdict ignored: a sender below triage is imported  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if (!trusted) {
+  -     return refuse('sender-below-triage', 'ignored', `${sender} is below triage on ${fullName}`);
+  -   }
+with:
+  + (nothing)
+result: exit 1, Tests  4 failed | 159 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  x test/webhook.test.ts > #1459 W 并发与重投 > W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入
+
+== M2 fail open: an unreadable permission is treated as trusted  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if (trusted === null) {
+  -     return refuse(
+  -       'permission-unreadable',
+  -       'ignored',
+  -       `permission of ${sender} on ${fullName} unreadable`,
+  -     );
+  -   }
+  -   if (!trusted) {
+with:
+  +   if (trusted === false) {
+result: exit 1, Tests  6 failed | 157 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+
+== M2b unreadable folded into below-triage (no separate reason)  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if (trusted === null) {
+  -     return refuse(
+with:
+  +   if (trusted === null && Date.now() < 0) {
+  +     return refuse(
+result: exit 1, Tests  6 failed | 157 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+
+== M3 first cap check dropped (cap only re-checked after the GitHub read)  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   // 先数上限（只读库）：满了不必读 GitHub。
+  -   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
+with:
+  + (nothing)
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+
+== M4 cap re-check before the import dropped  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   // 权限读的 await 期间别路可能已占位：导入前再数一次。这次现数与
+  -   // importGithubIssue 落占位之间不隔 await，同时到的几条投递合起来不超上限。
+  -   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
+with:
+  + (nothing)
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限
+
+== M5 cap count ignores imports still waiting on GitHub  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  -   return inFlight + importsInFlightFor(projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
+with:
+  +   return inFlight + 0 * importsInFlightFor(projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限
+
+== M6 webhook ignores the cap entirely  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
+  -   const access
+with:
+  +   const access
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+
+== M7 permission cache off (every read goes to GitHub)  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  -     permissionCache.set(key, { at: now, permission: p });
+with:
+  +     void key;
+result: exit 1, Tests  5 failed | 158 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14a 同一 sender 两次投递（不同 issue）：permission 只读一次（与轮询器同一缓存）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14b webhook 读到的答案轮询器直接用：轮询器领同一打标人的 issue 不再读 permission
+  x test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > permission 按 (仓, login) 缓存：TTL 内不重读（含 404 的否定答案），过期重读
+  x test/issue-intake.test.ts > 13b permission 否定答案（404）同样缓存 > 非协作者打标：TTL 内第二轮仍是候选，但不再读 permission
+
+== M8 webhook keeps its own cache (keys apart from the poller)  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -     githubFetch,
+  -     tokenRow.teamId,
+  -     access.token,
+with:
+  +     githubFetch,
+  +     `webhook:${tokenRow.teamId}`,
+  +     access.token,
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14b webhook 读到的答案轮询器直接用：轮询器领同一打标人的 issue 不再读 permission
+
+== M9 failed permission reads are cached as a definite no  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  -     if (p === null) return null;
+  -     permissionCache.set(key, { at: now, permission: p });
+with:
+  +     if (p === null) {
+  +       permissionCache.set(key, { at: now, permission: { permission: 'none', roleName: null, triage: false } });
+  +       return null;
+  +     }
+  +     permissionCache.set(key, { at: now, permission: p });
+result: exit 1, Tests  11 failed | 152 passed (163)
+  x test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 5xx → 不领，失败不进缓存；恢复后下一轮领
+  x test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 429 → 不领，失败不进缓存；恢复后下一轮领
+  x test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 超时 → 不领，失败不进缓存；恢复后下一轮领
+  x test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 形坏（permission 缺失） → 不领，失败不进缓存；恢复后下一轮领
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  x test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：permission 5xx → 本轮不关，计 closeSkipped
+
+== M10 no connection: read GitHub anonymously instead of refusing  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if ('reason' in access) {
+  -     return refuse(
+with:
+  +   if ('reason' in access && access.reason !== 'no-github-connection') {
+  +     return refuse(
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志
+
+== M11 cipher error escapes as an exception (HTTP 500)  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  -   } catch {
+  -     return { reason: 'token-unreadable' };
+  -   }
+with:
+  +   } catch (err) {
+  +     throw err;
+  +   }
+result: exit 1, Tests  2 failed | 161 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志
+  x test/issue-intake.test.ts > 9 无 token / 密文坏 / token 无权 > 密文坏（keyfile 换过）→ sweep 不抛、零出站
+
+== M12 payload without sender is not refused  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if (sender === '') return refuse('no-sender', 'ignored', 'event has no sender');
+with:
+  + (nothing)
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12a 载荷不带 sender → 202 ignored，零出站，记日志
+
+== M13 refusals not logged  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -     logger?.info(
+  -       {
+  -         deliveryId,
+  -         projectId: repoRow.id,
+with:
+  +     ((..._args: unknown[]) => {})(
+  +       {
+  +         deliveryId,
+  +         projectId: repoRow.id,
+result: exit 1, Tests  12 failed | 151 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12a 载荷不带 sender → 202 ignored，零出站，记日志
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限
+
+== M14 refusal answered non-2xx (403) instead of 202  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -     return respond(logger, { result, deliveryId, detail });
+  -   };
+with:
+  +     throw new HttpError(403, detail);
+  +   };
+result: exit 1, Tests  16 failed | 147 passed (163)
+  x test/webhook.test.ts > D misconfigured / 上游瞬时失败 > D2 GitHub 未连接 → 202 misconfigured
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12a 载荷不带 sender → 202 ignored，零出站，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限
+  x test/webhook.test.ts > #1459 W 并发与重投 > W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入
+
+== M15 webhook import records the chief agent as creator  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -     const record = await importGithubIssue({ ...deps, githubFetch }, repoRow, issueNumber);
+with:
+  +     const record = await importGithubIssue({ ...deps, githubFetch }, repoRow, issueNumber, {
+  +       createdBy: 'webhook-mutant',
+  +     });
+result: exit 1, Tests  2 failed | 161 passed (163)
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W13 webhook 导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）
+  x test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户
+
+== M16 D5 predicate ignores role_name (triage role not recognised)  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  -     (p.roleName !== null && LABELER_ROLES.has(p.roleName)) ||
+  -     p.triage === true
+with:
+  +     p.triage === true
+result: exit 1, Tests  2 failed | 161 passed (163)
+  x test/issue-intake.test.ts > 1 打标人权限（D5） > read 权限 / 非协作者（404）不领；role_name triage（legacy permission=read）与 maintain（permission=write）领
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 triage → 202 created（先读 permission 再导入）
+
+== M17 D5 predicate accepts read  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  - const LABELER_BASE_PERMISSIONS = new Set(['write', 'admin']);
+with:
+  + const LABELER_BASE_PERMISSIONS = new Set(['write', 'admin', 'read']);
+result: exit 1, Tests  6 failed | 157 passed (163)
+  x test/issue-intake.test.ts > 1 打标人权限（D5） > read 权限 / 非协作者（404）不领；role_name triage（legacy permission=read）与 maintain（permission=write）领
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  x test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 外部作者自己关（read 权限） → 不关，计 closeSkipped
+  x test/issue-intake.test.ts > 1b 打标人权限：自定义角色的另外两条判据 > legacy permission=write（role_name 是自定义角色）领；user.permissions.triage=true 领；两者都不满足不领
+  x test/issue-intake.test.ts > 13c 候选列表翻页 > 最旧 100 条都已占用或不认，第 101 条照样被领（跟 Link rel="next" 读第 2 页）
+  x test/issue-intake.test.ts > 18 既有判据的钉子 > 关闭人只看最新一条 closed：早先仓主关过又重开，这次外人关 → 不关
+
+== M18 cap counts failed tasks as out of flight (poller count changed)  -> RED
+file: apps/server/src/services/issue-intake.ts
+replace:
+  - const NOT_IN_FLIGHT: Phase[] = ['done', 'closed'];
+with:
+  + const NOT_IN_FLIGHT: Phase[] = ['done', 'closed', 'failed'];
+result: exit 1, Tests  2 failed | 161 passed (163)
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+  x test/issue-intake.test.ts > 7 项目在飞上限 > 3 张 github-issue 卡（todo / building / failed）不在 done/closed → 不导入、不读列表
+
+== M19 label filter dropped (any labeled event goes on to the gate)  -> RED
+file: apps/server/src/services/webhook.ts
+replace:
+  -   if (payload.action !== 'labeled' || payload.label?.name !== WEBHOOK_TRIGGER_LABEL) {
+with:
+  +   if (payload.action !== 'labeled') {
+result: exit 1, Tests  1 failed | 162 passed (163)
+  x test/webhook.test.ts > C ignored / noop（GitHub 重试风暴防御） > C3 非 labeled / 非触发 label → 202 ignored，零出站
+
+git status --short -- apps packages after the run: '' (all sources restored)

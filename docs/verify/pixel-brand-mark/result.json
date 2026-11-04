@@ -1,0 +1,35 @@
+{
+  "before-light": {
+    "text": "P",
+    "w": 24,
+    "h": 24,
+    "mask": "none",
+    "paint": "rgb(180, 83, 42)",
+    "pageErrors": 0
+  },
+  "before-dark": {
+    "text": "P",
+    "w": 24,
+    "h": 24,
+    "mask": "none",
+    "paint": "rgb(242, 148, 216)",
+    "pageErrors": 0
+  },
+  "after-light": {
+    "text": "",
+    "w": 16,
+    "h": 16,
+    "mask": "url(\"http://127.0.0.1:28410/logo.svg\")",
+    "paint": "rgb(43, 38, 32)",
+    "afterClickUrl": "/app/team",
+    "pageErrors": 0
+  },
+  "after-dark": {
+    "text": "",
+    "w": 16,
+    "h": 16,
+    "mask": "url(\"http://127.0.0.1:28410/logo.svg\")",
+    "paint": "rgb(238, 232, 228)",
+    "pageErrors": 0
+  }
+}

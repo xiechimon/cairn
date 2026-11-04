@@ -1,0 +1,31 @@
+[
+  {
+    "number": 1414,
+    "state": "open",
+    "title": "server(1403): reconcile review-phase PRs merged or closed on GitHub",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1414",
+    "created_at": "2026-10-20T21:01:14Z",
+    "closed_at": null,
+    "merged_at": null,
+    "head": {
+      "label": "xiechimon:claude/bootstrap-p2",
+      "ref": "claude/bootstrap-p2",
+      "sha": "cefad171a3e1cd5f4074ff3d9cb6df360e0eb9cf",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "dcf839e377cd96355d147986e132e5f5b2c77037",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  }
+]

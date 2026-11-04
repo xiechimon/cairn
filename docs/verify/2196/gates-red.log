@@ -1,0 +1,829 @@
+$ python3 scripts/pr-evidence-gate.test.py
+.F..FFFFFFFFFFF
+======================================================================
+FAIL: test_comments_embedding_media_hosts_and_http_failures (__main__.EvidenceGateTests.test_comments_embedding_media_hosts_and_http_failures)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 69, in test_comments_embedding_media_hosts_and_http_failures
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream
+FAIL missing-section: Verified
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (2 problem(s))
+
+
+======================================================================
+FAIL: test_references_are_not_images (__main__.EvidenceGateTests.test_references_are_not_images)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 63, in test_references_are_not_images
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream
+FAIL missing-section: Verified
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (2 problem(s))
+
+
+======================================================================
+FAIL: test_each_missing_section_fails_and_names_it (__main__.SectionContractTests.test_each_missing_section_fails_and_names_it) (name='What')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 116, in test_each_missing_section_fails_and_names_it
+    self.assertIn(f'FAIL missing-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL missing-section: What' not found in 'pr-evidence: sections: 0/2 answered\nFAIL missing-section: Upstream\nFAIL missing-section: Verified\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (2 problem(s))\n'
+
+======================================================================
+FAIL: test_each_missing_section_fails_and_names_it (__main__.SectionContractTests.test_each_missing_section_fails_and_names_it) (name='Proof')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 116, in test_each_missing_section_fails_and_names_it
+    self.assertIn(f'FAIL missing-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL missing-section: Proof' not found in 'pr-evidence: sections: 0/2 answered\nFAIL missing-section: Upstream\nFAIL missing-section: Verified\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (2 problem(s))\n'
+
+======================================================================
+FAIL: test_each_missing_section_fails_and_names_it (__main__.SectionContractTests.test_each_missing_section_fails_and_names_it) (name='Review')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 116, in test_each_missing_section_fails_and_names_it
+    self.assertIn(f'FAIL missing-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL missing-section: Review' not found in 'pr-evidence: sections: 0/2 answered\nFAIL missing-section: Upstream\nFAIL missing-section: Verified\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (2 problem(s))\n'
+
+======================================================================
+FAIL: test_each_missing_section_fails_and_names_it (__main__.SectionContractTests.test_each_missing_section_fails_and_names_it) (name='Risk')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 116, in test_each_missing_section_fails_and_names_it
+    self.assertIn(f'FAIL missing-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL missing-section: Risk' not found in 'pr-evidence: sections: 0/2 answered\nFAIL missing-section: Upstream\nFAIL missing-section: Verified\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (2 problem(s))\n'
+
+======================================================================
+FAIL: test_fenced_or_commented_answers_do_not_satisfy_sections (__main__.SectionContractTests.test_fenced_or_commented_answers_do_not_satisfy_sections)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 127, in test_fenced_or_commented_answers_do_not_satisfy_sections
+    self.assertIn('FAIL empty-section: Review', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL empty-section: Review' not found in 'pr-evidence: sections: 0/2 answered\nFAIL missing-section: Upstream\nFAIL missing-section: Verified\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (2 problem(s))\n'
+
+======================================================================
+FAIL: test_filled_four_section_body_passes_without_upstream_or_tasks (__main__.SectionContractTests.test_filled_four_section_body_passes_without_upstream_or_tasks)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 107, in test_filled_four_section_body_passes_without_upstream_or_tasks
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream
+FAIL missing-section: Verified
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (2 problem(s))
+
+
+======================================================================
+FAIL: test_optional_upstream_does_not_need_an_answer (__main__.SectionContractTests.test_optional_upstream_does_not_need_an_answer)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 131, in test_optional_upstream_does_not_need_an_answer
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 0/2 answered
+FAIL empty-section: Upstream
+FAIL missing-section: Verified
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (2 problem(s))
+
+
+======================================================================
+FAIL: test_repository_template_is_unanswered (__main__.SectionContractTests.test_repository_template_is_unanswered)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 103, in test_repository_template_is_unanswered
+    self.assertEqual(gate.section_verdicts(body), dict.fromkeys(('What', 'Proof', 'Review', 'Risk'), 'empty'))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'Upstream': 'empty', 'Verified': 'empty'} != {'What': 'empty', 'Proof': 'empty', 'Review': 'empty', 'Risk': 'empty'}
+- {'Upstream': 'empty', 'Verified': 'empty'}
++ {'Proof': 'empty', 'Review': 'empty', 'Risk': 'empty', 'What': 'empty'}
+
+======================================================================
+FAIL: test_untouched_new_template_fails_all_four_sections (__main__.SectionContractTests.test_untouched_new_template_fails_all_four_sections)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 96, in test_untouched_new_template_fails_all_four_sections
+    self.assertIn(f'FAIL empty-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL empty-section: What' not found in 'pr-evidence: sections: 0/2 answered\nFAIL missing-section: Upstream\nFAIL missing-section: Verified\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (2 problem(s))\n'
+
+======================================================================
+FAIL: test_verified_is_a_case_insensitive_proof_alias (__main__.SectionContractTests.test_verified_is_a_case_insensitive_proof_alias)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 120, in test_verified_is_a_case_insensitive_proof_alias
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 1/2 answered
+FAIL missing-section: Upstream
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (1 problem(s))
+
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.477s
+
+FAILED (failures=12)
+
+Exit code: 1
+$ python3 scripts/pr-tasks-gate.test.py
+FFFFFFFFFF
+======================================================================
+FAIL: test_checked_tasks_pass_anywhere (__main__.TasksGateTests.test_checked_tasks_pass_anywhere)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 33, in test_checked_tasks_pass_anywhere
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-cairn/SKILL.md.
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_fenced_and_commented_tasks_are_ignored_without_shifting_lines (__main__.TasksGateTests.test_fenced_and_commented_tasks_are_ignored_without_shifting_lines)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 47, in test_fenced_and_commented_tasks_are_ignored_without_shifting_lines
+    self.assertIn('FAIL unchecked-task: line 13: Live.', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL unchecked-task: line 13: Live.' not found in 'FAIL no-tasks: Acceptance section is missing\npr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.\npr-tasks: see .claude/skills/pr-cairn/SKILL.md.\npr-tasks: RED (1 problem(s))\n'
+
+======================================================================
+FAIL: test_file_and_environment_entry_points_agree (__main__.TasksGateTests.test_file_and_environment_entry_points_agree)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 63, in test_file_and_environment_entry_points_agree
+    self.assertEqual(result.returncode, expected, result.stdout)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-cairn/SKILL.md.
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_no_sections_or_tasks_are_required (__main__.TasksGateTests.test_no_sections_or_tasks_are_required) (body='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 28, in test_no_sections_or_tasks_are_required
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-cairn/SKILL.md.
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_no_sections_or_tasks_are_required (__main__.TasksGateTests.test_no_sections_or_tasks_are_required) (body='No tasks.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 28, in test_no_sections_or_tasks_are_required
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-cairn/SKILL.md.
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_no_sections_or_tasks_are_required (__main__.TasksGateTests.test_no_sections_or_tasks_are_required) (body='## Risk\nReversible change.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 28, in test_no_sections_or_tasks_are_required
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-cairn/SKILL.md.
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_no_sections_or_tasks_are_required (__main__.TasksGateTests.test_no_sections_or_tasks_are_required) (body='## Acceptance\nProse only.')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 28, in test_no_sections_or_tasks_are_required
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_only_examples_pass (__main__.TasksGateTests.test_only_examples_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 55, in test_only_examples_pass
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-cairn/SKILL.md.
+pr-tasks: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_unchecked_tasks_fail_anywhere_with_source_lines (__main__.TasksGateTests.test_unchecked_tasks_fail_anywhere_with_source_lines)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 40, in test_unchecked_tasks_fail_anywhere_with_source_lines
+    self.assertIn(f'FAIL unchecked-task: line {line}: {text}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL unchecked-task: line 1: Before sections.' not found in 'FAIL no-tasks: Acceptance section is missing\npr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.\npr-tasks: see .claude/skills/pr-cairn/SKILL.md.\npr-tasks: RED (1 problem(s))\n'
+
+======================================================================
+FAIL: test_unchecked_tasks_add_decision_label_and_disarm_auto_merge (__main__.WorkflowTaskGuardTests.test_unchecked_tasks_add_decision_label_and_disarm_auto_merge) (task_log='FAIL unchecked-task: line 3: Pending.', pending=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 91, in test_unchecked_tasks_add_decision_label_and_disarm_auto_merge
+    self.assertEqual('--add-label needs-decision' in commands, expected_label, commands)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False != True : 
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.775s
+
+FAILED (failures=10)
+
+Exit code: 1
+.....F.......
+======================================================================
+FAIL: test_complete_legacy_six_section_body_passes_without_review (__main__.SectionContractTests.test_complete_legacy_six_section_body_passes_without_review)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 132, in test_complete_legacy_six_section_body_passes_without_review
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 3/4 answered
+FAIL missing-section: Review
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Proof / Review / Risk).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (1 problem(s))
+
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.364s
+
+FAILED (failures=1)
+
+Supplemental command: python3 scripts/pr-evidence-gate.test.py
+Exit code: 1 (complete legacy body requires compatibility handling)
+
+$ python3 scripts/pr-evidence-gate.test.py
+.....F.........F.....F.
+======================================================================
+FAIL: test_commented_legacy_headings_cannot_waive_review (__main__.SectionContractTests.test_commented_legacy_headings_cannot_waive_review)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 152, in test_commented_legacy_headings_cannot_waive_review
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 3/4 answered
+pr-evidence: legacy six-section body: Review not required
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_comment_delimiters_inside_fences_do_not_hide_live_tasks (task_tests.TasksGateTests.test_comment_delimiters_inside_fences_do_not_hide_live_tasks)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 60, in test_comment_delimiters_inside_fences_do_not_hide_live_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_unclosed_html_comment_is_not_a_live_task (task_tests.TasksGateTests.test_unclosed_html_comment_is_not_a_live_task)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 65, in test_unclosed_html_comment_is_not_a_live_task
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : FAIL unchecked-task: line 2: Hidden.
+pr-tasks: RED (1 problem(s))
+
+
+----------------------------------------------------------------------
+Ran 23 tests in 1.839s
+
+FAILED (failures=3)
+
+Exit code: 1
+
+$ python3 scripts/pr-evidence-gate.test.py
+........F...FF....FFFFFF....F..FFFF..FF
+======================================================================
+FAIL: test_empty_legacy_sections_cannot_waive_review (__main__.SectionContractTests.test_empty_legacy_sections_cannot_waive_review)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 165, in test_empty_legacy_sections_cannot_waive_review
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 3/4 answered
+pr-evidence: legacy six-section body: Review not required
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_inline_code_comment_opener_does_not_hide_sections (__main__.SectionContractTests.test_inline_code_comment_opener_does_not_hide_sections)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 185, in test_inline_code_comment_opener_does_not_hide_sections
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 1/4 answered
+FAIL missing-section: Proof
+FAIL missing-section: Review
+FAIL missing-section: Risk
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Proof / Review / Risk).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (3 problem(s))
+
+
+======================================================================
+FAIL: test_only_real_comments_hide_section_answers (__main__.SectionContractTests.test_only_real_comments_hide_section_answers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 199, in test_only_real_comments_hide_section_answers
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_weekly_workflow_body_with_real_rendered_summary_passes (__main__.SectionContractTests.test_weekly_workflow_body_with_real_rendered_summary_passes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-evidence-gate.test.py", line 218, in test_weekly_workflow_body_with_real_rendered_summary_passes
+    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 3/4 answered
+FAIL empty-section: Proof
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Proof / Review / Risk).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (task_tests.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='> ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (task_tests.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (task_tests.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='> > ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (task_tests.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='>>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (task_tests.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='  >\t> ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_inline_code_comment_opener_does_not_hide_pending_task (task_tests.TasksGateTests.test_inline_code_comment_opener_does_not_hide_pending_task)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 71, in test_inline_code_comment_opener_does_not_hide_pending_task
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (task_tests.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='Text <!--')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (task_tests.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='    <!--')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (task_tests.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='`<!--`')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (task_tests.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='``<!--``')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_existing_decision_labels_disarm_auto_merge (task_tests.WorkflowTaskGuardTests.test_only_existing_decision_labels_disarm_auto_merge) (task_log='FAIL unchecked-task: line 3: Pending.', pending=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 128, in test_only_existing_decision_labels_disarm_auto_merge
+    self.assertEqual('--add-label needs-decision' in commands, expected_label, commands)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True != False : pr edit 2196 --repo xiechimon/cairn --add-label needs-decision
+pr merge 2196 --repo xiechimon/cairn --disable-auto
+
+
+======================================================================
+FAIL: test_only_existing_decision_labels_disarm_auto_merge (task_tests.WorkflowTaskGuardTests.test_only_existing_decision_labels_disarm_auto_merge) (task_log='FAIL unchecked-task: line 3: Pending.', pending=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 128, in test_only_existing_decision_labels_disarm_auto_merge
+    self.assertEqual('--add-label needs-decision' in commands, expected_label, commands)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True != False : pr edit 2196 --repo xiechimon/cairn --add-label needs-decision
+pr merge 2196 --repo xiechimon/cairn --disable-auto
+
+
+----------------------------------------------------------------------
+Ran 31 tests in 1.509s
+
+FAILED (failures=16)
+Exit status: 1
+
+$ python3 scripts/pr-tasks-gate.test.py
+FFFFF....F..FFFF..FF
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (__main__.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='> ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (__main__.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (__main__.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='> > ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (__main__.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='>>')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_blockquoted_tasks_fail_with_source_lines (__main__.TasksGateTests.test_blockquoted_tasks_fail_with_source_lines) (prefix='  >\t> ')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_blockquoted_tasks_fail_with_source_lines
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_inline_code_comment_opener_does_not_hide_pending_task (__main__.TasksGateTests.test_inline_code_comment_opener_does_not_hide_pending_task)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 71, in test_inline_code_comment_opener_does_not_hide_pending_task
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (__main__.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='Text <!--')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (__main__.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='    <!--')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (__main__.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='`<!--`')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_line_start_or_closed_inline_comments_hide_tasks (__main__.TasksGateTests.test_only_line_start_or_closed_inline_comments_hide_tasks) (prefix='``<!--``')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 78, in test_only_line_start_or_closed_inline_comments_hide_tasks
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_only_existing_decision_labels_disarm_auto_merge (__main__.WorkflowTaskGuardTests.test_only_existing_decision_labels_disarm_auto_merge) (task_log='FAIL unchecked-task: line 3: Pending.', pending=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 128, in test_only_existing_decision_labels_disarm_auto_merge
+    self.assertEqual('--add-label needs-decision' in commands, expected_label, commands)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True != False : pr edit 2196 --repo xiechimon/cairn --add-label needs-decision
+pr merge 2196 --repo xiechimon/cairn --disable-auto
+
+
+======================================================================
+FAIL: test_only_existing_decision_labels_disarm_auto_merge (__main__.WorkflowTaskGuardTests.test_only_existing_decision_labels_disarm_auto_merge) (task_log='FAIL unchecked-task: line 3: Pending.', pending=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 128, in test_only_existing_decision_labels_disarm_auto_merge
+    self.assertEqual('--add-label needs-decision' in commands, expected_label, commands)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True != False : pr edit 2196 --repo xiechimon/cairn --add-label needs-decision
+pr merge 2196 --repo xiechimon/cairn --disable-auto
+
+
+----------------------------------------------------------------------
+Ran 12 tests in 1.197s
+
+FAILED (failures=12)
+Exit status: 1
+
+$ node --test scripts/agent-rules.test.mjs
+✖ merge instructions require the pr-gate auto-merge verdict (1.793084ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.70625ms)
+✔ active docs never tell agents to add needs-decision (1.078334ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50.198375
+
+✖ failing tests:
+
+test at scripts/agent-rules.test.mjs:9:1
+✖ merge instructions require the pr-gate auto-merge verdict (1.793084ms)
+  AssertionError [ERR_ASSERTION]: docs/ops/agent-bot-identity.md
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/agent-rules.test.mjs:15:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+Exit status: 1
+
+Extra read-only comparison against the newer origin/main tip; CI and prepush have no working-tree edits.
+$ git diff --exit-code origin/main -- .github/workflows/ci.yml scripts/prepush.mjs
+diff --git a/scripts/prepush.mjs b/scripts/prepush.mjs
+index 5e6416914..607d8090a 100644
+--- a/scripts/prepush.mjs
++++ b/scripts/prepush.mjs
+@@ -1,5 +1,5 @@
+ import { execFileSync, spawnSync } from 'node:child_process';
+-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
++import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+ import { tmpdir } from 'node:os';
+ import { dirname, join, resolve } from 'node:path';
+ import { acquireSlot, leaseEnv, slotPortReport } from './heavy-slots.mjs';
+@@ -26,11 +26,6 @@ export const ciOnlyScripts = {
+     'reads the PR event payload and issue labels through the GitHub token',
+ };
+ 
+-export const ciOnlyTestSteps = {
+-  'scripts/ops/backup-server-db.test.mjs':
+-    'needs GNU rsync 3.x and the rrsync script the ops-backup-test job downloads',
+-};
+-
+ export const selfTests = [
+   'scripts/prepush.test.mjs',
+   'scripts/heavy-slots.test.mjs',
+@@ -61,38 +56,14 @@ export const localOnly = [
+   ['node', 'scripts/lint-warning-cap.mjs'],
+ ];
+ 
+-const SOURCE_TREES = /^(apps|packages|integration)\//;
+-const MARKDOWN = /(?:\.md$|^LICENSE$)/;
+-const DATA =
+-  /\.(?:png|jpe?g|gif|webp|svg|webm|mp4|log|txt|json|jsonl|ndjson|csv|drawio|diff|html)$/;
+-const EXECUTABLE = /\.(?:[cm]?[jt]sx?|sh|bash|zsh|py)$/;
+-
+-function isDocument(path) {
+-  if (SOURCE_TREES.test(path)) return false;
+-  if (MARKDOWN.test(path)) return true;
+-  if (!path.startsWith('docs/') || !DATA.test(path)) return false;
+-  const dir = join(root, dirname(path));
+-  return !existsSync(dir) || !readdirSync(dir).some((name) => EXECUTABLE.test(name));
+-}
++const DOCS = /(?:\.md$|^LICENSE$)/;
+ 
+ export function hasCode(paths) {
+-  return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
+-}
+-
+-export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
+-  if (!existsSync(workflows)) return [];
+-  return readdirSync(workflows)
+-    .filter((name) => name.endsWith('.yml'))
+-    .flatMap((name) =>
+-      [
+-        ...readFileSync(join(workflows, name), 'utf8').matchAll(
+-          /node --test((?: [\w./-]+\.test\.mjs)+)/g,
+-        ),
+-      ].map((match) => ({
+-        workflow: `.github/workflows/${name}`,
+-        tests: match[1].trim().split(' '),
+-      })),
+-    );
++  return paths.some(
++    (path) =>
++      !path.startsWith('.claude/epics/') &&
++      (/^(apps|packages|integration)\//.test(path) || !DOCS.test(path)),
++  );
+ }
+ 
+ export function prepushPlan(paths, mode = 'local', forceFull = false) {
+@@ -101,7 +72,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
+   const language = ['node', 'scripts/english-only-gate.mjs'];
+   const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
+   const codePaths = paths.filter((path) => hasCode([path]));
+-  const docPaths = paths.filter(isDocument);
++  const docPaths = paths.filter((path) => DOCS.test(path));
+   if (codePaths.length === 0 && !forceFull) {
+     const checks = [language];
+     if (paths.some((path) => path === 'docs/lessons.md' || path.startsWith('docs/lessons/')))
+@@ -145,19 +116,6 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
+         )
+           ? [selfTest]
+           : []),
+-        ...workflowTestSteps()
+-          .filter(({ workflow, tests }) =>
+-            paths.some(
+-              (path) =>
+-                path === workflow ||
+-                tests.some(
+-                  (test) => path === test || path === test.replace(/\.test\.mjs$/, '.mjs'),
+-                ),
+-            ),
+-          )
+-          .filter(({ tests }) => !tests.some((test) => test in ciOnlyTestSteps))
+-          .map(({ tests }) => ['node', '--test', ...tests])
+-          .filter((step) => !required.some((args) => args.join(' ') === step.join(' '))),
+         ['node', 'scripts/prepush-vitest.mjs'],
+         ...(paths.some((path) => path.startsWith('apps/web/'))
+           ? [['pnpm', '--filter', '@cairn/web', 'test']]
+Exit status: 1
+
+# round 3: empty line-start comments (<!-->, <!--->) hid later tasks; new test before the fix
+...FFF.........
+======================================================================
+FAIL: test_empty_line_start_comment_closes_on_its_own_line (__main__.TasksGateTests.test_empty_line_start_comment_closes_on_its_own_line) (comment='<!-->')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_empty_line_start_comment_closes_on_its_own_line
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_empty_line_start_comment_closes_on_its_own_line (__main__.TasksGateTests.test_empty_line_start_comment_closes_on_its_own_line) (comment='<!--->')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_empty_line_start_comment_closes_on_its_own_line
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+======================================================================
+FAIL: test_empty_line_start_comment_closes_on_its_own_line (__main__.TasksGateTests.test_empty_line_start_comment_closes_on_its_own_line) (comment='  <!--->')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2196-pr-body-contract/scripts/pr-tasks-gate.test.py", line 88, in test_empty_line_start_comment_closes_on_its_own_line
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-tasks: GREEN
+
+
+----------------------------------------------------------------------
+Ran 13 tests in 7.460s
+
+FAILED (failures=3)

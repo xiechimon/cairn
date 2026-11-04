@@ -1,0 +1,8 @@
+{
+  "status": 400,
+  "body": {
+    "error": "skill file too large: assets/template.html is 727976 bytes (limit 512000)"
+  },
+  "buildId": "01a11575-5ad6-71f3-8517-e40958336d3e",
+  "stepId": "V9G9L1nlcRVwsmZRact3m"
+}

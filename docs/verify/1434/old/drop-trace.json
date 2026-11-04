@@ -1,0 +1,13 @@
+{
+  "build": "base 498517d (origin/main)",
+  "buildingColumnWhileHovering": {
+    "dropValid": "true",
+    "drop": "true"
+  },
+  "orchestratePostsAfterRelease": [
+    "todo-queued-1434"
+  ],
+  "toasts": [
+    "未能开始编排\norchestrate 仅适用于 待开始/失败 相位（当前 queued）"
+  ]
+}

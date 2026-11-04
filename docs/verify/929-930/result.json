@@ -1,0 +1,88 @@
+{
+  "probe": "drive-929-930",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0227-929-930-mcp-pi/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-929-930-daemon-home",
+  "mcpConfig": "/tmp/pacman-929-930-mcp/claude.json",
+  "passed": 14,
+  "total": 14,
+  "checks": [
+    {
+      "name": "MCP 本机 config fixture 落盘（demo=stdio 活端点 + dead=死端点）",
+      "ok": true,
+      "detail": "/tmp/pacman-929-930-mcp/claude.json"
+    },
+    {
+      "name": "真 daemon 上线（--server 指本栈，PACMAN_MCP_CONFIG 指 fixture）",
+      "ok": true,
+      "detail": "/tmp/pacman-929-930-daemon-home"
+    },
+    {
+      "name": "步以 done 收尾（闸拒 + 死端点 + ghost 全不阻断会话；产物闸被放行 bash 满足）",
+      "ok": true,
+      "detail": "{\"id\":\"WepEIKtFDzgmMDWeGCoJ6\",\"kind\":\"build\",\"status\":\"done\",\"buildErrorMessage\":null}"
+    },
+    {
+      "name": "#929 拒绝：[gate] canon 行（rule + command）",
+      "ok": true,
+      "detail": "daemon.log"
+    },
+    {
+      "name": "#929 拒绝：改道文案进 transcript 工具行（模型可见 reason，非空 tool error）",
+      "ok": true,
+      "detail": "messages=11"
+    },
+    {
+      "name": "#929 放行：合法 bash 照跑（printf 改动落 README.md，进 transcript）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "#930 声明面：首轮请求 tools 含 bash + mcp__demo__echo + read_mcp_resource（MCP 工具直报模型）",
+      "ok": true,
+      "detail": "read,bash,edit,write,save_memory,delete_memory,memories,attachment,set_task_meta,create_skill,update_skill,get_secret,mcp__demo__echo,list_mcp_resources,list_mcp_resource_templates,read_mcp_resource"
+    },
+    {
+      "name": "#930 放行：mcp__demo__echo 真调（命名与旧桥逐字节同形；回文 marker 落 transcript）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "#930 新能力：resources 工具可用（read_mcp_resource 读回 note 内容落 transcript）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "#930 拒绝：死端点降级 canon 行（带 reason，单点失败不阻断）",
+      "ok": true,
+      "detail": "daemon.log"
+    },
+    {
+      "name": "#930 拒绝：未命中 slug 扩展行（ghost not in local config）",
+      "ok": true,
+      "detail": "daemon.log"
+    },
+    {
+      "name": "#930 装载行：实际加载集与来源文件（demo, dead）",
+      "ok": true,
+      "detail": "daemon.log"
+    },
+    {
+      "name": "收尾：步终态后 MCP stdio 子进程已关（session_shutdown 缝，无孤儿泄漏）",
+      "ok": true,
+      "detail": "children=0"
+    },
+    {
+      "name": "详情页 transcript 工具行可见（bash + mcp__demo__echo + read_mcp_resource）",
+      "ok": true,
+      "detail": "bash rm -rf /|read_mcp_resource|mcp__demo__echo|bash printf \"verify 929 30\\n\" >> README.md"
+    }
+  ],
+  "task": {
+    "todoId": "2kQBWTzMWq09wXbU-y6ha",
+    "buildId": "01a1179e-3537-7e9f-8677-f28ae60d80e1"
+  },
+  "mcpServerFile": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0227-929-930-mcp-pi/apps/daemon/verify-929-930-mcp-server-muyfvpxm.mjs",
+  "echoMarker": "verify-echo-muyfvpxm"
+}

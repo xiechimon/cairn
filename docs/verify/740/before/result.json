@@ -1,0 +1,68 @@
+{
+  "probe": "chief-catchup",
+  "mode": "expect-old",
+  "ticket": "#740",
+  "stack": {
+    "server": "http://127.0.0.1:8792",
+    "web": "http://127.0.0.1:5274",
+    "repo": "/tmp/740-before-main"
+  },
+  "threadId": "chief-01a1034f-7e8e-7072-9366-e1447c855d6c",
+  "machineStepId": "GH3u-tth6vrPyJB09Pnkl",
+  "prefix": "第一步：读取仓库结构。第二步：核对补发语义。",
+  "gifFrames": [
+    "gif-00-catchup.png",
+    "gif-01-delta-live.png",
+    "gif-02-stream.png",
+    "gif-03-stream.png",
+    "gif-04-stream.png",
+    "gif-05-converged.png"
+  ],
+  "checks": [
+    {
+      "name": "O-A1 旧态零补发：订阅后无任何 text_delta",
+      "ok": true,
+      "detail": "deltas=[]"
+    },
+    {
+      "name": "O-A2 旧态：实时增量照常（仅首帧丢失，非通道坏）",
+      "ok": true,
+      "detail": "[\"第三步：结论如下。\"]"
+    },
+    {
+      "name": "O-A3 旧态：重连同样零补发",
+      "ok": true,
+      "detail": "deltas=[]"
+    },
+    {
+      "name": "O-B1 旧态：中途进场零文本（前缀丢失——发一条什么也没有）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "O-B2 旧态：进场后实时增量照常出现（通道本体健在）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C1 终局收敛：终稿行接管呈现",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C2 不双份：已落库文本在抽屉里只出现一次",
+      "ok": true,
+      "detail": "occurrences=1"
+    },
+    {
+      "name": "D1 终局后缓冲清空：新流零 text_delta（下一回合从空开始）",
+      "ok": true,
+      "detail": "deltas=[]"
+    }
+  ],
+  "artifacts": [
+    "01-before-midturn-no-text.png",
+    "02-midturn-live-delta.png",
+    "03-converged-final.png"
+  ]
+}

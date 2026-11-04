@@ -1,0 +1,68 @@
+TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)
+Warning: Please run the Java VM which executes TLC with a throughput optimized garbage collector by passing the "-XX:+UseParallelGC" property.
+(Use the -nowarning option to disable this warning.)
+Running breadth-first search Model-Checking with fp 33 and seed 4560507467972614140 with 1 worker on 8 cores with 512MB heap and 64MB offheap memory [pid: 25558] (Mac OS X 27.0.1 aarch64, Azul Systems, Inc. 21.0.12.1 x86_64, MSBDiskFPSet, DiskStateQueue).
+Parsing file /private/tmp/cairn-1811-head-causality-lbwsgziv/ReviewHeadCausality.tla
+Parsing file /private/tmp/cairn-1811-head-causality-lbwsgziv/MergeGate.tla
+Parsing file /private/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/Naturals.tla
+Semantic processing of module Naturals
+Semantic processing of module MergeGate
+Semantic processing of module ReviewHeadCausality
+Starting... (2026-10-28 12:08:46)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-10-28 12:08:46.
+Error: Invariant ReviewHeadWasObserved is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ landed = [ v |-> "pass",
+  h |-> "none",
+  d |-> "none",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [h |-> "none", b |-> "none", d |-> "none", ready |-> FALSE]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ verdictRows = {}
+/\ satReviewHead = "none"
+/\ verdicts = 0
+/\ head = "h1"
+
+State 2: <RecordVerdict line 100, col 3 to line 110, col 76 of module MergeGate>
+/\ landed = [ v |-> "pass",
+  h |-> "none",
+  d |-> "none",
+  rv |-> "pass",
+  dv |-> "pass",
+  indep |-> FALSE,
+  rh |-> "none" ]
+/\ lastEval = [h |-> "none", b |-> "none", d |-> "none", ready |-> FALSE]
+/\ codePushes = 0
+/\ benignMoves = 0
+/\ dgst = "d1"
+/\ satDecision = "none"
+/\ satVerify = "none"
+/\ interactingMoves = 0
+/\ base = "b1"
+/\ satReview = "none"
+/\ evidencePushes = 0
+/\ verdictRows = { [ recordedHead |-> "h2",
+    kind |-> "review",
+    digest |-> "d1",
+    outcome |-> "pass",
+    independent |-> FALSE ] }
+/\ satReviewHead = "none"
+/\ verdicts = 1
+/\ head = "h1"
+
+18 states generated, 12 distinct states found, 10 states left on queue.
+The depth of the complete state graph search is 2.
+Finished in 00s at (2026-10-28 12:08:46)

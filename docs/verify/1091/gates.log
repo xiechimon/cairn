@@ -1,0 +1,40 @@
+## gates on this branch
+
+$ pnpm lint            -> rc=0 (biome ci: 638 files, 0 errors; 17 warnings / 29 infos = pre-existing baseline)
+$ pnpm typecheck       -> rc=0 (all packages)
+$ pnpm spec:parse      -> PASS: every spec in apps/web/e2e and integration/test parses
+$ pnpm exec vitest run test/notify-pref.test.ts test/i18n.test.ts -> 2 files / 14 tests passed
+
+## full e2e (e2e:affected fell back to the whole suite: boot files are shared surface)
+$ E2E_PORT=8408 pnpm --filter @pacman/web e2e:affected
+  3 failed
+  5 did not run
+  884 passed (6.1m)
+
+## the 3 failures rerun in isolation (load flakes, not regressions)
+$ E2E_PORT=8408 pnpm --filter @pacman/web exec playwright test e2e/project-new-fs-pick.spec.ts e2e/provider-oauth.spec.ts e2e/token-gate.spec.ts
+  19 passed (13.8s)
+
+## post-merge verification (main merged in first-parent form, tip 4e1c6ffb)
+
+Conflict surface: apps/web/src/pages/project-page.tsx only (#1102 commit-detail
+pane vs this ticket's readStoredLayout hardening); resolved as the union,
+verified per-file: every other file of this ticket byte-identical to the
+pre-merge tip, project-page = origin/main + this ticket's four edits,
+todo-detail-page = origin/main's #1127 changes verbatim (auto-merged).
+
+$ pnpm typecheck       -> rc=0
+$ pnpm lint            -> rc=0 (18 warnings: 17 baseline + 1 carried by origin/main itself, todo-detail-page.tsx:84 unused markClosed import)
+$ pnpm spec:parse      -> PASS
+$ E2E_PORT=8412 pnpm --filter @pacman/web e2e:affected   # merge at 439d9c21
+  899 passed (6.0m), 0 failed
+$ E2E_PORT=8413 pnpm --filter @pacman/web e2e:affected   # merge at 09dfd304
+  892 passed, 2 failed (page-scroll:183, token-gate:133 at 0ms = real-server beforeAll)
+$ E2E_PORT=8413 pnpm --filter @pacman/web exec playwright test e2e/page-scroll.spec.ts e2e/token-gate.spec.ts
+  11 passed (52.0s)   # both green in isolation on the merged tree
+
+Note on an earlier invalid run: a vite preview orphaned from a debug session
+kept holding port 8408; playwright's reuseExistingServer then silently served
+a stale pre-merge dist to two runs on that port (their failures are not
+evidence about any tree). Killed the orphan; every run cited above started
+its own server on a port verified free immediately before (8412/8413).

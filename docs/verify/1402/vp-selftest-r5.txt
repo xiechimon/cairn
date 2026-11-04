@@ -1,0 +1,97 @@
+# vp-selftest.mjs after pr-gate run 4 on #1411 (round 5).
+# Red: this round's vp-selftest.mjs against vp.mjs, vp-registry.json and drive-1136-stale-sweep.mjs of 35fe641
+# (copied in with git show, run, copied back). The six cases this round adds fail; the other 18 pass.
+# Green: the same test file at b653d5c on Node 22 and Node 24.
+
+== red ==
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+sources of vp.mjs, vp-registry.json, drive-1136-stale-sweep.mjs at 35fe641; vp-selftest.mjs of this round
+v22.22.0
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+      broken: agent-detail/identity-chip-link, chief-dispatch-judgment/dispatch-judgment, chief-drawer/drawer-model-select, chief-segments/avatar-geometry, chief-segments/segment-sealing, chief-segments/stream-catchup, chief-segments/threads-scroll, gate-actor/gate-actor, hotkeys/chief-new-thread-key, persona-verify/persona-verify, review-modal/failed-review-restore, thinking-truncate/thinking-truncate, unassigned-build/unassigned-build
+FAIL  no current case creates an agent without machineId (ADR 0019)
+      blind: glass-journeys/all, glass-journeys/board, glass-journeys/create-task, glass-journeys/dispatch, glass-journeys/merge, glass-journeys/request-changes, glass-journeys/view-diff, machine-stale-sweep/stale-sweep, pi-convergence/convergence
+FAIL  every current case writes where drive points it, or the registry says where it writes
+FAIL  a case whose probe takes an output flag gets the evidence directory through it
+FAIL  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+FAIL  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+FAIL  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+18/24 passed
+exit=1
+
+== green, Node 22 ==
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+v22.22.0
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every current case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+24/24 passed
+exit=0
+
+== green, Node 24 ==
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+v24.22.0
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every current case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+24/24 passed
+exit=0

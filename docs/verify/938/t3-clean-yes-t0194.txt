@@ -1,0 +1,20 @@
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        yes
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+CLEANED     hp/pacman/t-0194-932-320px-933 (PR #936) -> worktree:/private/tmp/pacman-938-pos local-branch remote-branch
+
+---
+cleaned=1 kept=0 failed=0
+
+--- session-captured console output, same run (verification commands run
+--- immediately after the CLEANED line above, in the acceptance session):
+===== verify gone:
+$ git worktree list | grep -c pacman-938-pos
+0
+$ git branch --list 'hp/pacman/t-0194*'
+(no output — local branch gone)
+$ git ls-remote --heads origin hp/pacman/t-0194-932-320px-933
+(no output — remote branch gone)
+$ ls -d /tmp/pacman-938-pos
+ls: /tmp/pacman-938-pos: No such file or directory

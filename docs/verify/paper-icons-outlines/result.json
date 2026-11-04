@@ -1,0 +1,26 @@
+{
+  "before": {
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 0.5px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px",
+    "navIcons": [
+      "lucide-chevron-down rgb(116, 106, 95)",
+      "lucide-square-kanban rgb(180, 83, 42)",
+      "lucide-circle-alert rgb(116, 106, 95)"
+    ],
+    "metaIcon": "rgb(143, 137, 133)",
+    "orchestrationFooter": null,
+    "orchestratingOverlay": "编排中",
+    "pageErrors": 0
+  },
+  "after": {
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 0.5px, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+    "navIcons": [
+      "lucide-chevron-down rgb(116, 106, 95)",
+      "lucide-columns-3 rgb(180, 83, 42)",
+      "lucide-circle-alert rgb(154, 144, 134)"
+    ],
+    "metaIcon": "rgb(176, 165, 151)",
+    "orchestrationFooter": "编排中 · 等 mea 上线查看会话",
+    "orchestratingOverlay": null,
+    "pageErrors": 0
+  }
+}

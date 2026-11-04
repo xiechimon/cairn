@@ -1,0 +1,17 @@
+$ biome ci .
+[0m[34mChecked 1033 files in 916[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1301 tests in 185 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 40 test files parsed clean by tsc (3.0s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.

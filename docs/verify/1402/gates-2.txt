@@ -1,0 +1,22 @@
+# gates after the pr-gate run-1 fixes
+$ pnpm lint
+Checked 781 files in 1396ms. No fixes applied.
+Found 1 info.
+
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0
+
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1077 tests in 156 files collected, disk count matches (1.9s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+# biome files.includes and the tsconfigs do not cover .claude/**, so these gates say nothing about vp.mjs or the registry;
+# vp.mjs is checked by the runs in vp-cli-2.txt and by node --check:
+$ node --check .claude/skills/verify-pacman/scripts/vp.mjs
+exit=0

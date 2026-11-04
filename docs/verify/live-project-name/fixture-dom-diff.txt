@@ -1,0 +1,25 @@
+base: origin/main f436dd29, vite build --mode fixture -> /tmp/lpn-dist-base, preview :8418
+new:  eb2abdb1 (this branch, merged with origin/main), vite build --mode fixture -> /tmp/lpn-dist-new, preview :8419
+
+b68f0fe0274a37c90c03885bfe9ca18b9f5520a0  /tmp/lpn-dom-base.json
+b68f0fe0274a37c90c03885bfe9ca18b9f5520a0  /tmp/lpn-dom-new.json
+
+cmp /tmp/lpn-dom-base.json /tmp/lpn-dom-new.json: identical
+
+ 16334 chars  r3-lifecycle x2  /app?scenario=01 :: board
+   769 chars  r3-lifecycle x1  /app?scenario=01 :: drag-overlay
+ 19635 chars  r3-lifecycle x2  /app?scenario=board-repos :: board
+   755 chars  r3-lifecycle x1  /app?scenario=board-repos :: drag-overlay
+ 16362 chars  r3-lifecycle x2  /app?scenario=newtask-projects :: board
+   769 chars  r3-lifecycle x1  /app?scenario=newtask-projects :: drag-overlay
+  4644 chars  r3-lifecycle x1  /app/todo/r3-legacy-1?scenario=01 :: chip-popover
+  4645 chars  r3-lifecycle x1  /app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19 :: chip-popover
+  4645 chars  r3-lifecycle x1  /app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=29 :: chip-popover
+  3011 chars  r3-lifecycle x1  /app?scenario=01 :: new-task-head
+  1549 chars  r3-lifecycle x1  /app?scenario=01 :: new-task-projects
+  3011 chars  r3-lifecycle x1  /app?scenario=board-repos :: new-task-head
+  4123 chars  r3-lifecycle x1  /app?scenario=board-repos :: new-task-projects
+  3011 chars  r3-lifecycle x1  /app?scenario=newtask-projects :: new-task-head
+  2838 chars  r3-lifecycle x1  /app?scenario=newtask-projects :: new-task-projects
+  3011 chars  r3-lifecycle x1  /app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24c :: new-task-head
+  1549 chars  r3-lifecycle x1  /app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24c :: new-task-projects

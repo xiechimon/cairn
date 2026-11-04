@@ -1,0 +1,85 @@
+✖ PR validation reads the explicit head without executing PR code (1.540531ms)
+✖ a bot-authored commit beneath a human tip is rejected (25.225865ms)
+✔ a squash commit authored by the bot is rejected (23.625691ms)
+✔ every commit in a clean human range passes (23.594363ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (12.445815ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (12.326131ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (11.938087ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (9.992005ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (10.350066ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 7
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 179.364102
+
+✖ failing tests:
+
+test at scripts/commit-author.test.mjs:40:1
+✖ PR validation reads the explicit head without executing PR code (1.540531ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression / {2}pull_request:/. Input:
+  
+  'name: commit-author\n' +
+    '\n' +
+    'on:\n' +
+    '  push:\n' +
+    '    branches: [main]\n' +
+    '\n' +
+    'permissions:\n' +
+    '  contents: read\n' +
+    '\n' +
+    'jobs:\n' +
+    '  commit-author:\n' +
+    '    runs-on: ubuntu-latest\n' +
+    '    steps:\n' +
+    '      - uses: actions/checkout@v4\n' +
+    '        with:\n' +
+    '          fetch-depth: 2\n' +
+    '      - name: Commits on main are never authored by the bot account\n' +
+    '        run: |\n' +
+    "          author=$(git log -1 --format='%an <%ae>')\n" +
+    '          echo "author: $author"\n' +
+    '          case "$author" in\n' +
+    '            *"cairnwright[bot]"*)\n' +
+    '              echo "::error::main commit $(git rev-parse --short HEAD) is authored by cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh); human PRs use the default squash."\n' +
+    '              exit 1\n' +
+    '              ;;\n' +
+    '          esac\n'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2028/scripts/commit-author.test.mjs:41:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `name: commit-author\n\non:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  commit-author:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - name: Commits on main are never authored by the bot account\n        run: |\n          author=$(git log -1 --format='%an <%ae>')\n          echo "author: $author"\n          case "$author" in\n            *"cairnwright[bot]"*)\n              echo "::error::main commit $(git rev-parse --short HEAD) is authored by cairnwright[bot]. Bot-opened PRs must merge by rebase from one commit authored by Cairnwright (~/.cairn/tools/merge-pr.sh); human PRs use the default squash."\n              exit 1\n              ;;\n          esac\n`,
+    expected: / {2}pull_request:/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/commit-author.test.mjs:53:1
+✖ a bot-authored commit beneath a human tip is rejected (25.225865ms)
+  AssertionError [ERR_ASSERTION]: author: Human <human@example.com>
+  
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2028/scripts/commit-author.test.mjs:65:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

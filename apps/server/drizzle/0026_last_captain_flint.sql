@@ -1,0 +1,1 @@
+ALTER TABLE `step` ADD `freshSession` integer DEFAULT false NOT NULL;

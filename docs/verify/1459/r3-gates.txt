@@ -1,0 +1,74 @@
+# #1459 round 3 gates
+# head: 905e4f78c8ff9c69e4a33474a2ebea33c5b6db97 (Merge origin/main (6cceda8) into claude/bootstrap-p5-r6)
+# origin/main at the run: 6cceda81bfa5e673e4db1890dc73a19ec07494f6 (#1498), contained in the head.
+# Worktree /home/user/pacman/.claude/worktrees/p5, branch claude/bootstrap-p5-r6, user root, 2026-10-22.
+# The evidence commit after this head adds only files under docs/verify/1459/.
+
+## pnpm lint  (biome ci .)
+exit=0
+Checked 812 files in 4s. No fixes applied.
+Found 1 info.
+(the info is apps/web/src/resources/machines-page.tsx noUselessFragments; this branch does not touch that file)
+
+## pnpm typecheck
+exit=0
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+## pnpm spec:parse
+exit=0
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.0s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.5s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+## pnpm exec vitest run --changed origin/main
+exit=0
+ Test Files  256 passed (256)
+      Tests  3270 passed | 1 skipped (3271)
+   Start at  11:45:56
+   Duration  392.90s (tests 56%, import 43%, transform 1%)
+
+## E2E_AFFECTED_PORT=8405 pnpm --filter @pacman/web e2e:affected
+port check before the run: lsof -iTCP:8405 -sTCP:LISTEN printed nothing (rc 1)
+exit=0
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  .claude/skills/verify-pacman/changelog/2026-10-22-1459.md → none
+  .claude/skills/verify-pacman/scripts/drive-1137-webhook-tracer.mjs → none
+  apps/server/src/services/webhook.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/webhook.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  "docs/spec/28-\350\207\252\344\270\276\351\227\255\347\216\257-\350\207\252\345\206\231\350\207\252\345\220\210.md" → none
+  packages/shared/src/webhook.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8405
+  live-server-reap.spec.ts token-gate.spec.ts
+Running 8 tests using 2 workers
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.5s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (3.2s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.1s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (757ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (631ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (817ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (539ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (547ms)
+  8 passed (16.7s)
+
+## verify-pacman self-test and registry gate (the probe and its changelog changed)
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+exit=0
+66/66 passed
+$ node .claude/skills/verify-pacman/scripts/vp-registry-gate.mjs
+exit=0
+vp-registry-gate: OK (106 scripts, 106 cases, 37 feature maps)
+
+## Not run: the registered probe against a live stack
+Same reason as gates-r2.txt: no GitHub token a local stack can use in this session. The J1 change was checked with
+`node --check` and the registry gate.

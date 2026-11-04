@@ -1,0 +1,30 @@
+[
+  {
+    "role": "tool_call",
+    "name": "projects",
+    "content": "{}"
+  },
+  {
+    "role": "tool_result",
+    "name": "projects",
+    "content": "(ok)"
+  },
+  {
+    "role": "tool_call",
+    "name": "create_todo",
+    "content": "{\n  \"projectId\": \"VxV9tCk6f2Lrv4NXdOlTE\",\n  \"title\": \"Plan card 1\",\n  \"spec\": \"Fix the download attribute on the Safari blob url export path and add a regression test.\"\n}"
+  },
+  {
+    "role": "tool_result",
+    "name": "create_todo",
+    "content": "(ok)"
+  },
+  {
+    "role": "assistant",
+    "content": "I will fix the download attribute on the blob url and add a test."
+  },
+  {
+    "role": "assistant",
+    "content": "[end state] step=done · todos=1 · builds=0 · 模型=glm-5.3 · 60in/90out · 0.2s"
+  }
+]

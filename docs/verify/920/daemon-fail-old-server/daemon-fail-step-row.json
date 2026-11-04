@@ -1,0 +1,10 @@
+{
+  "step": {
+    "id": "99LwWOP9z_BeN4ARw5-U6",
+    "status": "failed"
+  },
+  "build": {
+    "id": "01a11576-348a-7a54-8c13-ae5bc91c0e9f",
+    "errorMessage": "team skills distribution failed: machine api 400: {\"error\":\"skill file too large: assets/template.html is 727976 bytes (limit 512000)\"}"
+  }
+}

@@ -1,0 +1,55 @@
+work dir: /private/tmp/verify-step-claim.3BP7u5
+P1_SingleExecutorPerMachine: PASS in 11s, 685236 distinct states - matches expected
+  full log: /private/tmp/verify-step-claim.3BP7u5/P1_SingleExecutorPerMachine/tlc.log
+P2_OnlyHolderResultApplied: PASS in 15s, 685236 distinct states - matches expected
+  full log: /private/tmp/verify-step-claim.3BP7u5/P2_OnlyHolderResultApplied/tlc.log
+P3_NoClaimAfterClose: PASS in 10s, 685236 distinct states - matches expected
+  full log: /private/tmp/verify-step-claim.3BP7u5/P3_NoClaimAfterClose/tlc.log
+P4_AcceptedStopReachesWorkers: PASS in 10s, 685236 distinct states - matches expected
+  full log: /private/tmp/verify-step-claim.3BP7u5/P4_AcceptedStopReachesWorkers/tlc.log
+covered code changed since sync-commit 93b9ce21; re-read these against the model:
+  commit 529efdc6d web+server(1939): summarize long chief chats in the background (#1993)
+  commit bae182d9f community(2001): first-PR discussion prompt with no network call
+  commit 93270f3b9 daemon(1744): recover message-shaped compaction summaries (#1933)
+  commit 422cf83c9 shared(1838): require cited prior art with reviewed decision scoring (#2030)
+  commit 51cab1f04 web(1828): show agent work step by step (#1828)
+  commit 101877c8d daemon+server(1786): retry provider network failures before model fallback
+  commit 2ea423e9d server+web(1938): keep the chief reachable when its model is down or busy (#1988)
+  commit 1fd226127 daemon: CAIRN_STREAM_IDLE_MS / CAIRN_STREAM_FIRST_EVENT_MS widen stream watchdogs for slow providers
+  commit 1f9e03d2c server(1791): plans that pass the contract check confirm themselves on non-human projects
+  commit 8822ffb83 chore(1796): remove what's-new, GitHub webhooks, and remote shell
+  commit 9822ae0e2 server(1745): keep a delivered confirm gate when a residual plan step fails
+  commit 510e41465 daemon+server(1829): a hook-rejected closing push becomes a ci-fix round, and agent-opened PRs are recorded
+  commit 2ca0e7cd1 server(1798): export trajectories daily from the server process
+  commit 260b8a4c9 server(1800): retry a failed task once and fold stale items out of needs you
+  commit 8006651ef server(1731): refresh expiring GitHub OAuth user tokens instead of letting the connection die (#1760)
+  commit c78753580 server(1522): split services/machines.ts by responsibility (#1761)
+  commit 83abad59d daemon+server(1739): preserve failed build commits and resume their branch (#1742)
+  commit 695d3f1dc server(1481): authorize attachment fetches only from human-written task text (#1746)
+  commit 0099f952a server(1732): confirm-gate wake carries the plan and the conversation tool has a budget (#1735)
+  commit 05b24b0b3 observability(1572): opt-in runtime OTel spans for server steps, Claude Code, and pi (#1740)
+  commit ae640ff0e server(1515): backfill revertedWithin7d and fixedByLaterPr 7 days after merge (#1515) (#1737)
+  commit 72cc825ee server(1404): merge gate S5a, bind review and verify verdicts to the expected head (#1644)
+  commit bc47f356b server(1696): attachment GC reads the message corpus in batches off the scheduler tick; index scheduler-tick queries (#1719)
+  commit 2245f041e chore: delete legacy comments and make apps/daemon English-only (#1715)
+  commit a8a70e15c chore: delete legacy comments and make apps/server/src English-only (#1709)
+  commit 3ae71858d server(1481): neutralize attachment tokens in imported issues and bind machine downloads to the token team (#1637)
+  commit 38992ea57 server(1575): memories carry invalidAt, supersededBy and lastInjectedAt; superseded entries are no longer injected (#1663)
+  commit e9fc9c7aa server(1626): info-output todos run in a read-only export and hand their report to downstream cards (#1655)
+  commit 1df25eac6 server(1659): traj:export fills merged, reverted-within-7d and fixed-by-later-PR from local records (#1661)
+  commit 7e843f972 daemon(1611): Gemini CLI as a third execution surface over a stdio ACP bridge (#1652)
+  commit 8822810ff server(1624): sub-cards start with a handoff section from their blockers (#1648)
+  commit f08e730e0 daemon(1591): a running tool execution keeps the idle and body timers from firing (#1613)
+  commit 0f8098593 server(1615): a restarted build's prompt carries the last round's CI failures, rejections and failure reason (#1649)
+  commit 82d4f9989 feat(daemon): 保留 rawStopReason/responseModel 并上传会话 JSONL (#1512) (#1590)
+  commit 0b6489955 feat: 全量改名 Pacman → Cairn（产品名、包名、环境变量、数据目录） (#1565)
+  commit 407fb06a6 feat(server): build 记 baseSha/harnessHash，驳回写结构化记录 (#1560)
+  commit 6cc663494 feat(detail): agent 实时 todo 清单以 TaskCard 显示在任务详情 (#1553)
+  commit c2cb96ff4 server(1403): CI grind reads checks by head SHA, only required checks decide, BEHIND and DIRTY handled (#1531)
+  commit d4fd908cb server(1403): pressing merge on a GitHub task merges its PR through the API (#1509)
+  commit 2ff0b937f server,shared(1492): plan 结构契约、verify 按清单判定、build 兜底报告、票去重键 (#1507)
+  commit 463732b39 server,daemon(#1493): model fallback chain + provider circuit breaker
+  commit b57b4a0db server, daemon: reset is the only way back to todo, a cancelled card's merge does not land, a deleted step stops (#1505)
+  commit 92d34d4ec server(1497): startBuilds, claim, change reads, CI and memory tools check the todo's team through projectOfTodo (#1500)
+  commit 29e60bb7a daemon(1484): the per-step git credential answers only for its own host, and its values never pass through the shell (#1499)
+  commit 6cceda81b server(1494): worker 步只注入本项目与全局的 agent 记忆 (#1498)

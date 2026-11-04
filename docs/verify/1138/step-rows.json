@@ -1,0 +1,26 @@
+[
+  {
+    "id": "fzLSL_rcKVIHKojaMXTKR",
+    "kind": "build",
+    "status": "done",
+    "machineId": "uWVEZobuzwYxmpQ3ZkOQn"
+  },
+  {
+    "id": "LNmTRah3fEUxzn6YZeLTm",
+    "kind": "build",
+    "status": "claimed",
+    "machineId": "uWVEZobuzwYxmpQ3ZkOQn"
+  },
+  {
+    "id": "KgwUkxgzIAIBwJjsyVPV6",
+    "kind": "build",
+    "status": "claimed",
+    "machineId": "uWVEZobuzwYxmpQ3ZkOQn"
+  },
+  {
+    "id": "hMVIDxJ5yavvR0FMW30zY",
+    "kind": "build",
+    "status": "claimed",
+    "machineId": "uWVEZobuzwYxmpQ3ZkOQn"
+  }
+]

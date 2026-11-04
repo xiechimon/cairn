@@ -1,0 +1,31 @@
+{
+  "id": "Jy9rabg8mLtaLYgwLIcCh",
+  "teamId": "iTu91WA8dPd3kKyGRWgKc",
+  "projectId": "b8JSehYm6-z_TVAKFg-Ze",
+  "title": "README 图标探针",
+  "spec": "在 README.md 追加一行 rework probe line。",
+  "phase": "confirm",
+  "phaseAt": 1791210579632,
+  "seqNum": 1,
+  "orderIndex": 0,
+  "assignment": {
+    "plan": {
+      "agentId": "agent-it-1"
+    },
+    "build": {
+      "agentId": "agent-it-1"
+    }
+  },
+  "latestBuildId": "01a10c78-5b8b-7c39-8711-3aeb304b7288",
+  "lastRunAt": 1791210578219,
+  "hasChanges": true,
+  "hasPlan": true,
+  "sourceTodo": null,
+  "v": 14,
+  "createdBy": "aJ-V_7TcbQKO7wkGTxh07",
+  "ownerId": "aJ-V_7TcbQKO7wkGTxh07",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "machineId": null
+}

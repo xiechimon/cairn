@@ -1,0 +1,7 @@
+tok ConstKeyword             [0,5) "const"
+tok Identifier               [6,9) "seq"
+tok EqualsToken              [10,11) "="
+tok SlashToken               [12,13) "/"
+tok CaretToken               [13,14) "^"
+{"iter":6,"tok":80,"tokName":"PrivateIdentifier","start":14,"end":14,"line":1,"col":15,"charAtStart":"#","context":"const seq = /^#(\\d+)$/.exec("}
+WEDGE CONFIRMED: 5 consecutive zero-advance tokens at pos 14 (PrivateIdentifier); elapsed 2ms over 10 iterations — scanner.scan() never moves past this position

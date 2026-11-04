@@ -1,0 +1,23 @@
+## /proc/1/comm = process_api
+## node zombie-probe.mjs: spawn sh -c 'sleep 5 & echo $!; wait' detached, SIGKILL the group after 200 ms, then poll the grandchild
+t+250ms grandchild 7436: /proc state=Z, kill(0) says alive=true
+t+500ms grandchild 7436: /proc state=Z, kill(0) says alive=true
+t+750ms grandchild 7436: /proc state=Z, kill(0) says alive=true
+t+1000ms grandchild 7436: /proc state=gone, kill(0) says alive=false
+
+## probe source
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+const child = spawn('/bin/sh', ['-c', 'sleep 5 & echo $!; wait'], { detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
+let pid = 0;
+child.stdout.on('data', (d) => { pid = Number(String(d).trim()); });
+await new Promise((r) => setTimeout(r, 200));
+process.kill(-child.pid, 'SIGKILL');
+for (let i = 0; i < 12; i++) {
+  await new Promise((r) => setTimeout(r, 250));
+  let state = 'gone';
+  try { state = readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ')[1].split(' ')[0]; } catch {}
+  let alive = true; try { process.kill(pid, 0); } catch { alive = false; }
+  console.log(`t+${(i + 1) * 250}ms grandchild ${pid}: /proc state=${state}, kill(0) says alive=${alive}`);
+  if (!alive) break;
+}

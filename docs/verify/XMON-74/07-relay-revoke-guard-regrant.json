@@ -1,0 +1,16 @@
+{
+  "revoke": {
+    "status": 200,
+    "text": "{\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":false,\"tools\":[\"推送分支\"]}"
+  },
+  "missingAgent": {
+    "status": 404,
+    "body": {
+      "error": "agent no-such-agent（不在本团队，或 id 抄错了）"
+    }
+  },
+  "regrant": {
+    "status": 200,
+    "text": "{\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":true,\"tools\":[\"推送分支\",\"远程 shell\"]}"
+  }
+}

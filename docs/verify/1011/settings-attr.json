@@ -1,0 +1,44 @@
+{
+  "key": "settings",
+  "geo": {
+    "row": {
+      "x": 839,
+      "y": 233,
+      "width": 367,
+      "height": 32,
+      "top": 233,
+      "right": 1206,
+      "bottom": 265,
+      "left": 839
+    },
+    "listbox": {
+      "x": 839,
+      "y": 233,
+      "width": 367,
+      "height": 64,
+      "top": 233,
+      "right": 1206,
+      "bottom": 297,
+      "left": 839
+    },
+    "lbOverflow": "auto"
+  },
+  "diffShadowRemoved": {
+    "changed": 18623,
+    "bbox": {
+      "minX": 36,
+      "maxX": 1503,
+      "minY": 84,
+      "maxY": 223
+    }
+  },
+  "diffOverflowVisible": {
+    "changed": 19503,
+    "bbox": {
+      "minX": 24,
+      "maxX": 1515,
+      "minY": 72,
+      "maxY": 205
+    }
+  }
+}

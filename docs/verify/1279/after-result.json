@@ -1,0 +1,47 @@
+{
+  "probe": "1279-restart-combo",
+  "expect": "new",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "todoId": "efUwp-02BtqHkjEDbnDXv",
+  "buildId": "01a13b23-2d56-7853-afe9-f93248cc8ebe",
+  "classified": {
+    "feedback": "user",
+    "bare": "synthetic",
+    "matching": "synthetic",
+    "drifted": "synthetic",
+    "staleTask": "user"
+  },
+  "checks": [
+    {
+      "name": "feedback row stays a user bubble",
+      "ok": true,
+      "detail": "bubbles=2"
+    },
+    {
+      "name": "bare restart line is not a bubble",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "matching combo (current title) is not a bubble",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "stale task text without an instruction stays a bubble",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "drifted restart combo is not a user bubble",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "assistant row still renders",
+      "ok": true,
+      "detail": null
+    }
+  ]
+}

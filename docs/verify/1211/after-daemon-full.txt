@@ -1,0 +1,12 @@
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0308-1211-no-main-checkout-mutation/apps/daemon
+
+
+ Test Files  71 passed (71)
+      Tests  713 passed (713)
+   Start at  23:54:33
+   Duration  14.01s (tests 56%, import 40%, transform 4%)
+
+    Isolate  71 workers spawned · ~93ms startup each (spawn + environment, per file)
+             at least ~848ms faster with isolate: false — reuses workers across files instead of one per file
+

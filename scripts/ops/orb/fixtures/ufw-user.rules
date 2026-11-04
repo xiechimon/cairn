@@ -1,0 +1,5 @@
+*filter
+:ufw-user-input - [0:0]
+-A ufw-user-input -i vz-cairn -p udp --sport 68 --dport 67 -j ACCEPT
+-A ufw-user-input -i vz-cairn -s 10.203.0.0/24 -d 10.203.0.1/32 -p tcp --dport 7890 -j ACCEPT
+COMMIT

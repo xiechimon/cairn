@@ -1,0 +1,29 @@
+# #1403 round 7 (second /code-review pass on #1414): the round 7 test file, red against the sources of 82c6b50, green at 6cf9e76.
+# Red leg: apps/server/src/{services/ci-loop.ts,services/builds.ts,lib/github.ts} taken from 82c6b50 with git show,
+# the round 7 test files as committed in 6cf9e76; the three files were put back afterwards.
+
+== red, sources at 82c6b50 ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+     × ⑱e dragged to done by hand before the reconcile saw the merge, then back to review → the merge is reported once
+     × ㉝ a #931 rework round on the same build: the last round's close does not hide this round's
+     × ㉞ marked done by hand while the PR was open, reopened, then merged → finished
+     × ㉟ the merge step completes after a manual done: completion row written, once
+     × ㊱ a sweep that starts while the last one runs does nothing
+     × ㊲ a PR that leaves the grind drops its check-runs cache row
+     × ㊳ a githubRepo that is not owner/repo → no request
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  7 failed | 72 passed (79)
+
+first assertion of each failure:
+  ⑱e dragged to done by hand before the reconcile saw the merge, then back   AssertionError: expected 'review' to be 'done' // Object.is equality
+  ㉝ a #931 rework round on the same build: the last round's close does not   AssertionError: expected 'review' to be 'failed' // Object.is equality
+  ㉞ marked done by hand while the PR was open, reopened, then merged → fin   AssertionError: expected 'review' to be 'done' // Object.is equality
+  ㉟ the merge step completes after a manual done: completion row written,    AssertionError: expected [] to have a length of 1 but got +0
+  ㊱ a sweep that starts while the last one runs does nothing                 AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+  ㊲ a PR that leaves the grind drops its check-runs cache row                AssertionError: expected '"x"' to be undefined
+  ㊳ a githubRepo that is not owner/repo → no request                         AssertionError: expected [ Array(1) ] to deeply equal []
+
+== green at 6cf9e76 ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  79 passed (79)

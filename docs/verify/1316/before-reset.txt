@@ -1,0 +1,9 @@
+git version: git version 2.43.0
+git binary: /usr/bin/git
+repo: throwaway (git init -b main, one commit, README.md overwritten)
+sha: 1fb975d98013143a12c1742e25a01e0dc4bcc7ec
+command: git reset --hard --end-of-options 1fb975d98013143a12c1742e25a01e0dc4bcc7ec
+----- stdout/stderr -----
+fatal: option '--end-of-options' must come before non-option arguments
+exit:128
+README.md after: corrupted

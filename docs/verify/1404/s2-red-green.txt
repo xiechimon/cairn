@@ -1,0 +1,29 @@
+# #1404 S2: test file written first; red before readiness.ts existed, green after.
+
+== red: apps/server/test/merge-gate-readiness.test.ts before apps/server/src/services/merge-gate/readiness.ts existed ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts
+ RUN  v5.0.1 <worktree>
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (0 test)
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts [ apps/server/test/merge-gate-readiness.test.ts ]
+Error: Cannot find module '../src/services/merge-gate/readiness.js' imported from <worktree>/apps/server/test/merge-gate-readiness.test.ts
+ ❯ test/merge-gate-readiness.test.ts:14:1
+     12| import { describe, expect, test } from 'vitest';
+     13| import { computePatchDigest } from '../src/services/merge-gate/digest.…
+     14| import { type GateInputs, type GateVerdictView, mergeReadiness } from …
+       | ^
+     15|
+     16| const HEAD = 'a'.repeat(40);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+ Test Files  1 failed (1)
+      Tests  no tests
+
+== green: first run after readiness.ts was written ==
+ RUN  v5.0.1 <worktree>
+ Test Files  1 passed (1)
+      Tests  65 passed (65)
+
+== green at the commit (68 tests: cases were added after the first green run, the last one after mutation round 1, see s2-mutations-1.txt) ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts
+ Test Files  1 passed (1)
+      Tests  68 passed (68)

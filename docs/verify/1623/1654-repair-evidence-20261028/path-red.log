@@ -1,0 +1,48 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/todo-split-checker.test.ts (16 tests | 8 failed) 11ms
+   ❯ split_todo checker (16)
+     × falls back for protected or unclear path AGENTS.md 3ms
+     × falls back for protected or unclear path CLAUDE.md 0ms
+     × falls back for protected or unclear path package.json 0ms
+     × falls back for protected or unclear path pnpm-lock.yaml 0ms
+     × falls back for protected or unclear path biome.json 0ms
+     × falls back for protected or unclear path .github/ 0ms
+     × falls back for protected or unclear path apps/web/src/unsafe:name.ts 2ms
+     × falls back for protected or unclear path docs/ſpec/plan.md 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path AGENTS.md
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path CLAUDE.md
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path package.json
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path pnpm-lock.yaml
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path biome.json
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path .github/
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path apps/web/src/unsafe:name.ts
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > split_todo checker > falls back for protected or unclear path docs/ſpec/plan.md
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/todo-split-checker.test.ts:110:23
+    108|       { title: 'B', spec: 'ordinary implementation', agentId: 'agent-a…
+    109|     ] }));
+    110|     expect(result.ok).toBe(false);
+       |                       ^
+    111|     expect(result.reasons).toEqual(expect.arrayContaining([expect.stri…
+    112|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 8 passed (16)
+   Start at  18:53:27
+   Duration  616ms (import 57%, transform 41%, tests 2%)
+

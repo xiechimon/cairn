@@ -1,0 +1,10 @@
+[Unit]
+Description=One real Claude Code step in an isolated sandbox repository
+ConditionEnvironment=!CI
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/cairn/real-smoke.env
+ExecStart=/usr/bin/bash -c 'exec node "$${CAIRN_REPO:?Set CAIRN_REPO in real-smoke.env}/scripts/ops/real-smoke.mjs"'
+TimeoutStartSec=5min
+UMask=0077

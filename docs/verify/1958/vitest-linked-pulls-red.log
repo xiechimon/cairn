@@ -1,0 +1,120 @@
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > githubIssueClosingPulls > graphql: state MERGED normalizes to {state:'closed', merged:true}
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:307:18
+    305|       ),
+    306|     );
+    307|     await expect(githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO…
+       |                  ^
+    308|       complete: true,
+    309|       pulls: [{ number: 10, state: 'closed', merged: true, repo: `${OW…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > githubIssueClosingPulls > graphql: OPEN and CLOSED map to open/closed with merged:false
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:323:18
+    321|       ),
+    322|     );
+    323|     await expect(githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO…
+       |                  ^
+    324|       complete: true,
+    325|       pulls: [
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > githubIssueClosingPulls > graphql: pageInfo.hasNextPage true returns complete:false
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:342:18
+    340|       ),
+    341|     );
+    342|     await expect(githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO…
+       |                  ^
+    343|       complete: false,
+    344|       pulls: [{ number: 3, state: 'open', merged: false, repo: `${OWNE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > githubIssueClosingPulls > graphql: errors array returns unreadable
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:352:18
+    350|       jsonResponse(200, { errors: [{ message: 'Something went wrong' }…
+    351|     );
+    352|     await expect(githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO…
+       |                  ^
+    353|   });
+    354|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > githubIssueClosingPulls > graphql: missing data.repository.issue returns unreadable
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:359:18
+    357|       jsonResponse(200, { data: { repository: { issue: null } } }),
+    358|     );
+    359|     await expect(githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO…
+       |                  ^
+    360|   });
+    361|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > githubIssueClosingPulls > graphql: non-object body returns unreadable
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:364:18
+    362|   test('graphql: non-object body returns unreadable', async () => {
+    363|     const { fetchImpl } = fakeFetch(() => jsonResponse(200, 'not-json-…
+    364|     await expect(githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO…
+       |                  ^
+    365|   });
+    366| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > linked pull rate limits > rate limit: REST 403 with x-ratelimit-remaining 0 and REST 429 throw GithubRateLimitedError
+TypeError: githubIssueTimeline is not a function
+ ❯ test/github-linked-pulls.test.ts:374:7
+    372|     );
+    373|     await expect(
+    374|       githubIssueTimeline(forbidden.fetchImpl, TOKEN, OWNER, REPO, ISS…
+       |       ^
+    375|     ).rejects.toBeInstanceOf(GithubRateLimitedError);
+    376|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > linked pull rate limits > graphql: 200 with errors[].type RATE_LIMITED throws GithubRateLimitedError
+TypeError: githubIssueClosingPulls is not a function
+ ❯ test/github-linked-pulls.test.ts:394:7
+    392|     );
+    393|     await expect(
+    394|       githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO, ISSUE),
+       |       ^
+    395|     ).rejects.toBeInstanceOf(GithubRateLimitedError);
+    396|     await expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/15]⎯
+
+ FAIL  test/github-linked-pulls.test.ts > acceptance command surface: timeline URL and GraphQL endpoint are requested
+TypeError: githubIssueTimeline is not a function
+ ❯ test/github-linked-pulls.test.ts:408:9
+    406|     return jsonResponse(404, { message: 'nope' });
+    407|   });
+    408|   await githubIssueTimeline(fetchImpl, TOKEN, OWNER, REPO, ISSUE);
+       |         ^
+    409|   await githubIssueClosingPulls(fetchImpl, TOKEN, OWNER, REPO, ISSUE);
+    410|   expect(calls[0]?.url).toBe(TIMELINE);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/15]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  15 failed (15)
+   Start at  16:34:46
+   Duration  273ms (transform 77%, import 12%, tests 9%, worker 2%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/apps/server
+

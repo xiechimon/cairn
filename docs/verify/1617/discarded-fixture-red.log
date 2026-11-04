@@ -1,0 +1,133 @@
+✔ a spec naming an existing path and an existing exported function reports nothing (170.915625ms)
+✔ a spec naming a deleted path reports it once with its line number (167.996ms)
+✔ a renamed function is reported as a missing identifier (176.174292ms)
+✔ names inside fenced code blocks and URLs are ignored (158.61125ms)
+✔ a table row marked superseded is ignored (205.577875ms)
+✔ short or common words in backticks are not treated as identifiers (208.703542ms)
+✔ a path that never existed in the repo is not reported (212.852375ms)
+✔ a relative path resolving under a tracked file is not reported (132.684959ms)
+✔ a path with a line-range suffix is checked without the range (142.774667ms)
+✔ a directory reference is not reported as a missing path (118.117291ms)
+✖ a deleted relative path is reported through its historical repository path (170.099ms)
+✔ historical suffix matching respects directory boundaries (161.578625ms)
+✖ uncommitted file restoration does not hide drift at HEAD (115.190625ms)
+✔ ranks growth by the 7-day delta and stock by current count (0.769083ms)
+✔ report lists every category with its 7-day change, sorted, and writes the summary file (251.458ms)
+✔ a baseline file born inside the window reports its whole count as growth (238.873208ms)
+✔ refuses a shallow clone, whose history would fake every delta as growth (181.618417ms)
+✔ a write pattern added 3+ times in the window with no gate becomes a candidate ticket (355.122708ms)
+✔ two new sites stay below the threshold and write no candidate (374.815916ms)
+✔ a pattern that a gate already covers never becomes a candidate (237.827ms)
+✔ the watchlist patterns compile and each has a suggested rule when ungated (0.125334ms)
+✔ the weekly report carries the lessons ledger summary and tolerates a missing ledger (1.590875ms)
+✖ with --drift the report appends the spec/ADR drift section and writes the JSON (270.143583ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 20
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2185.340625
+
+✖ failing tests:
+
+test at scripts/doc-drift.test.mjs:225:1
+✖ a deleted relative path is reported through its historical repository path (170.099ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     doc: 'docs/spec/01-test.md',
+  -     kind: 'path',
+  -     line: 2,
+  -     name: 'api/mode.ts'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/scripts/doc-drift.test.mjs:236:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { doc: 'docs/spec/01-test.md', name: 'api/mode.ts', kind: 'path', line: 2 } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/doc-drift.test.mjs:263:1
+✖ uncommitted file restoration does not hide drift at HEAD (115.190625ms)
+  Error: ENOENT: no such file or directory, open '/private/tmp/doc-drift-2sMXPo/apps/web/src/api/mode.ts'
+      at writeFileSync (node:fs:2413:20)
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/scripts/doc-drift.test.mjs:271:5)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/private/tmp/doc-drift-2sMXPo/apps/web/src/api/mode.ts'
+  }
+
+test at scripts/gardener-weekly.test.mjs:230:1
+✖ with --drift the report appends the spec/ADR drift section and writes the JSON (270.143583ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /## Spec\/ADR drift at HEAD/. Input:
+  
+  '# Gardener weekly sweep 2026-10-24\n' +
+    '\n' +
+    'Window: 7 days since 2026-10-17T12:00:00.000Z. Format: rank. category | count | 7d change.\n' +
+    '\n' +
+    '## By growth\n' +
+    '1. ui-debt/per-face-css-lines | 10 | 0\n' +
+    '2. ui-debt/arbitrary-text | 5 | 0\n' +
+    '3. feature-map-staleness/entries | 4 | 0\n' +
+    '4. ui-debt/bare-controls | 3 | 0\n' +
+    '5. comment-discipline-allowlist/entries | 2 | 0\n' +
+    '6. ui-debt/arbitrary-spacing | 1 | 0\n' +
+    '7. single-use-helper-allowlist/entries | 1 | 0\n' +
+    '8. lint-warning/warnings | 0 | 0\n' +
+    '\n' +
+    '## By stock\n' +
+    '1. ui-debt/per-face-css-lines | 10 | 0\n' +
+    '2. ui-debt/arbitrary-text | 5 | 0\n' +
+    '3. feature-map-staleness/entries | 4 | 0\n' +
+    '4. ui-debt/bare-controls | 3 | 0\n' +
+    '5. comment-discipline-allowlist/entries | 2 | 0\n' +
+    '6. ui-debt/arbitrary-spacing | 1 | 0\n' +
+    '7. single-use-helper-allowlist/entries | 1 | 0\n' +
+    '8. lint-warning/warnings | 0 | 0\n' +
+    '\n' +
+    'Next target: ui-debt/per-face-css-lines (10, 0)\n' +
+    'Cleanup PR dispatch: not run; it waits on the autonomous merge loop (#1405 P4).\n' +
+    '\n' +
+    '## Lessons ledger\n' +
+    '\n' +
+    'none: docs/lessons/ is missing\n' +
+    '\n' +
+    '## Candidate tickets\n' +
+    'none: no ungated pattern was added 3+ times in the window\n'
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/scripts/gardener-weekly.test.mjs:249:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# Gardener weekly sweep 2026-10-24\n\nWindow: 7 days since 2026-10-17T12:00:00.000Z. Format: rank. category | count | 7d change.\n\n## By growth\n1. ui-debt/per-face-css-lines | 10 | 0\n2. ui-debt/arbitrary-text | 5 | 0\n3. feature-map-staleness/entries | 4 | 0\n4. ui-debt/bare-controls | 3 | 0\n5. comment-discipline-allowlist/entries | 2 | 0\n6. ui-debt/arbitrary-spacing | 1 | 0\n7. single-use-helper-allowlist/entries | 1 | 0\n8. lint-warning/warnings | 0 | 0\n\n## By stock\n1. ui-debt/per-face-css-lines | 10 | 0\n2. ui-debt/arbitrary-text | 5 | 0\n3. feature-map-staleness/entries | 4 | 0\n4. ui-debt/bare-controls | 3 | 0\n5. comment-discipline-allowlist/entries | 2 | 0\n6. ui-debt/arbitrary-spacing | 1 | 0\n7. single-use-helper-allowlist/entries | 1 | 0\n8. lint-warning/warnings | 0 | 0\n\nNext target: ui-debt/per-face-css-lines (10, 0)\nCleanup PR dispatch: not run; it waits on the autonomous merge loop (#1405 P4).\n\n## Lessons ledger\n\nnone: docs/lessons/ is missing\n\n## Candidate tickets\nnone: no ungated pattern was added 3+ times in the window\n',
+    expected: /## Spec\/ADR drift at HEAD/,
+    operator: 'match',
+    diff: 'simple'
+  }

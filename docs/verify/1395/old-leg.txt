@@ -1,0 +1,13 @@
+$ command -v node-gyp
+(not found)
+
+$ pnpm lint
+.../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+Error: ERR_PNPM_EXECUTOR_LIFECYCLE_SCRIPT_FAILED
+
+  × installing dependencies
+  ╰─▶ better-sqlite3@13.0.3 install: `node-gyp rebuild` exited with exit
+      status: 127
+
+exit=1

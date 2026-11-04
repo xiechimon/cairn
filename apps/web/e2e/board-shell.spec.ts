@@ -1,0 +1,57 @@
+import { expect, test } from '@playwright/test';
+
+test('a project filter keeps home and marks the project; an unknown project leaves the home unfiltered', async ({
+  page,
+}) => {
+  const workbench = page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
+  await page.goto('/app?scenario=home-c');
+  const unfiltered = await page.getByTestId('home-c-since').textContent();
+
+  await page.goto('/app?scenario=home-c&project=ZAQczKCu0MOAzC1ZqcFlX');
+  await expect(page.getByTestId('project-home')).toBeVisible();
+  await expect(workbench).not.toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.locator('[data-slot="sidebar-project-row"][aria-current="page"]'),
+  ).toContainText('cairn');
+
+  await page.goto('/app?scenario=home-c&project=no-such-project');
+  await expect(page.getByTestId('home-c-since')).toHaveText(unfiltered ?? '');
+  await expect(workbench).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('[data-slot="sidebar-project-row"][aria-current="page"]')).toHaveCount(0);
+});
+
+for (const viewport of [{ width: 1440, height: 732 }, { width: 390, height: 844 }]) {
+  for (const theme of ['light', 'dark']) {
+    test(`home and detail share a 24px composer gap to the sheet bottom at ${viewport.width}px in ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+      const gaps: number[] = [];
+      for (const route of [
+        { name: 'home', url: '/app?scenario=board-inbox', selector: '[data-testid="home-c"] .chief-composer' },
+        { name: 'detail', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', selector: '[data-testid="composer-card"]' },
+      ]) {
+        await page.goto(route.url);
+        const composer = page.locator(route.selector);
+        await expect(composer).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        const gap = await composer.evaluate((element) => {
+          const sheet = element.closest('.board-sheet, .group\\/detail-main');
+          const floor = sheet?.getBoundingClientRect().bottom ?? window.innerHeight;
+          return floor - element.getBoundingClientRect().bottom;
+        });
+        gaps.push(gap);
+        console.log(`${viewport.width}px ${theme} ${route.name}: ${gap}px`);
+        const screenshot = testInfo.outputPath(`${route.name}-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: screenshot });
+        await testInfo.attach(route.name, { path: screenshot, contentType: 'image/png' });
+      }
+      for (const gap of gaps) {
+        expect.soft(gap).toBeGreaterThanOrEqual(20);
+        expect.soft(gap).toBeCloseTo(24, 0);
+      }
+      expect(Math.abs(gaps[0] - gaps[1])).toBeLessThanOrEqual(1);
+    });
+  }
+}

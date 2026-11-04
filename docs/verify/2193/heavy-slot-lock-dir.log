@@ -1,0 +1,6 @@
+# old lock dir formula with an overridden TMPDIR (origin/main heavy-slots.mjs: join(tmpdir(), 'cairn-heavy-slots')):
+/private/tmp/sandbox-override/cairn-heavy-slots
+# slotLockDir on this branch with the same override:
+/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-heavy-slots
+# lock dir other lanes use (default TMPDIR):
+/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/cairn-heavy-slots

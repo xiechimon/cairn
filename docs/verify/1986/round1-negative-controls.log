@@ -1,0 +1,317 @@
+# Round 1 review-gate findings: negative controls
+
+Working tree starts from 8cdcc936. Each control breaks one invariant, runs the
+test that pins it, and is then reverted before the green run.
+
+## Finding 1 (docs/lessons/1986-relay-wire-assumptions.md): ledger records a correction the diff lacks
+
+$ node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+
+Format was never the defect: docs/lessons/ is the active ledger on origin/main (226 entries),
+docs/lessons.md does not exist there, and this gate passes the entry. The real defect was the
+entry asserting a wrong-request-index correction and a trailing-newline mismatch that the diff
+does not contain. A probe measured the request layout of a handoff run:
+
+$ probe of stub requests in a handoff run
+status pass requests 3
+0 nmsg 2 lastRole user roles system,user
+1 nmsg 2 lastRole user roles system,user
+2 nmsg 4 lastRole tool roles system,user,assistant,tool
+
+The executor request is index 2, not 1, and no trailing-newline assertion exists in the
+branch. The entry is rewritten to claim only what the branch supports.
+
+## Finding 2 (driver.mts:390 / apps/daemon/src/backend/pi.ts): read-only planner guarantee assumed, not asserted
+
+Control: add write to PI_READONLY_TOOLS in apps/daemon/src/backend/pi.ts.
+$ pnpm exec vitest run test/routing-driver.test.ts -t 'planner read-only role invariants'
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+ ❯ test/routing-driver.test.ts (16 tests | 1 failed | 14 skipped) 8ms
+   ❯ #1986 planner read-only role invariants outside the runner (2)
+     × the backend read-only tool set carries no mutating builtin 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/routing-driver.test.ts > #1986 planner read-only role invariants outside the runner > the backend read-only tool set carries no mutating builtin
+AssertionError: expected [ 'read', 'bash', 'write' ] to not include 'write'
+ ❯ test/routing-driver.test.ts:68:40
+     66| describe('#1986 planner read-only role invariants outside the runner',…
+     67|   test('the backend read-only tool set carries no mutating builtin', (…
+     68|     expect(builtinToolNames(true)).not.toContain('write');
+       |                                        ^
+     69|     expect(builtinToolNames(true)).not.toContain('edit');
+     70|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 14 skipped (16)
+   Start at  18:09:45
+   Duration  796ms (import 63%, transform 35%, tests 1%)
+
+
+Restored PI_READONLY_TOOLS to ['read', 'bash']:
+$ pnpm exec vitest run test/routing-driver.test.ts -t 'planner read-only role invariants'
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 14 skipped (16)
+   Start at  18:09:51
+   Duration  781ms (import 63%, transform 36%, tests 1%)
+
+
+## Finding 6 (driver.mts:321,424-429): planner_violations was a live alias of planner_boundary.violations
+
+Control: assign plannerBoundary.violations directly instead of copying it.
+$ pnpm exec vitest run test/routing-driver.test.ts -t 'a planner write tool attempt fails the run'
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+ ❯ test/routing-driver.test.ts (16 tests | 1 failed | 15 skipped) 432ms
+   ❯ #1986 programmatic routing runner through the real backend and oracle (9)
+     × a planner write tool attempt fails the run even when the executor passes 431ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/routing-driver.test.ts > #1986 programmatic routing runner through the real backend and oracle > a planner write tool attempt fails the run even when the executor passes
+AssertionError: expected [ 'write tool attempt' ] not to be [ 'write tool attempt' ] // Object.is equality
+
+Compared values have no visual difference.
+
+ ❯ test/routing-driver.test.ts:219:42
+    217|         true,
+    218|       );
+    219|       expect(row.planner_violations).not.toBe(row.planner_boundary.vio…
+       |                                          ^
+    220|       expect(row.planner_violations).toEqual(row.planner_boundary.viol…
+    221|       const slugSeed = slugify()?.seedFiles['lib/slug.mjs'];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 skipped (16)
+   Start at  18:09:53
+   Duration  1.22s (import 40%, tests 38%, transform 22%)
+
+
+Restored the copy:
+$ pnpm exec vitest run test/routing-driver.test.ts -t 'a planner write tool attempt fails the run'
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 15 skipped (16)
+   Start at  18:10:02
+   Duration  1.20s (import 40%, tests 38%, transform 22%)
+
+
+## Finding 5 (routing-sessions.test.ts:58-63,147-149): pass-requiring cases assumed a native toolchain
+
+Control: make executeBounded report enforcement unavailable, then run the session suite
+unguarded, as it was at 8cdcc936, to reproduce the reported red.
+$ PROBE_NO_ENFORCE=1 pnpm exec vitest run test/routing-sessions.test.ts # unguarded
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+ ❯ test/routing-sessions.test.ts (19 tests | 10 failed) 1538ms
+   × planner programmatic shell writes are denied before execution 131ms
+   × single arm: a stub-relay session edits the workspace and the real oracle passes 22ms
+   × handoff arm: a fresh executor receives the original task, only plan text, and seeded files 36ms
+   × planner forbidden reads never reach the relay and fail despite a passing oracle 28ms
+   × executor forbidden reads never reach the relay and fail despite a passing oracle 26ms
+   × planner executor-directory reads are denied before returning task data 27ms
+   × executor symlinks cannot bypass the live read boundary 17ms
+   × explicit file reads cannot use runtime resource allowances as task data 15ms
+   × planner explicit runtime-resource read /etc/passwd is blocked and graded 27ms
+   × planner explicit runtime-resource read /dev/null is blocked and graded 25ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/routing-sessions.test.ts > planner programmatic shell writes are denied before execution
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-sessions.test.ts:58:29
+     56|       task.seedFiles['lib/slug.mjs'],
+     57|     );
+     58|     expect(row.oracle_pass).toBe(true);
+       |                             ^
+     59|     expect(row.status).toBe('fail');
+     60|     expect(row.planner_violations.join('\n')).toContain(command);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > single arm: a stub-relay session edits the workspace and the real oracle passes
+AssertionError: expected 'fail' to be 'pass' // Object.is equality
+
+Expected: "pass"
+Received: "fail"
+
+ ❯ test/routing-sessions.test.ts:120:24
+    118|   async () => {
+    119|     const row = await runSessionCase({ executor: [solution, { content:…
+    120|     expect(row.status).toBe('pass');
+       |                        ^
+    121|     expect(row.oracle_pass).toBe(true);
+    122|     expect(row.planner_usage).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > handoff arm: a fresh executor receives the original task, only plan text, and seeded files
+AssertionError: expected 'fail' to be 'pass' // Object.is equality
+
+Expected: "pass"
+Received: "fail"
+
+ ❯ test/routing-sessions.test.ts:147:24
+    145|       ],
+    146|     });
+    147|     expect(row.status).toBe('pass');
+       |                        ^
+    148|     const task = CAIRN_BENCH_TASKS.find((entry) => entry.id === 'slugi…
+    149|     if (!task) throw new Error('Missing slugify task');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > planner forbidden reads never reach the relay and fail despite a passing oracle
+ FAIL  test/routing-sessions.test.ts > executor forbidden reads never reach the relay and fail despite a passing oracle
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-sessions.test.ts:235:29
+    233|           : [solution, { content: 'done' }],
+    234|     });
+    235|     expect(row.oracle_pass).toBe(true);
+       |                             ^
+    236|     expect(row.status).toBe('fail');
+    237|     expect((role === 'planner' ? row.planner_violations : row.violatio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > planner executor-directory reads are denied before returning task data
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-sessions.test.ts:263:29
+    261|       executor: [solution, { content: 'done' }],
+    262|     });
+    263|     expect(row.oracle_pass).toBe(true);
+       |                             ^
+    264|     expect(row.status).toBe('fail');
+    265|     expect(row.planner_violations.join('\n')).toContain('executor/lib/…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > executor symlinks cannot bypass the live read boundary
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-sessions.test.ts:337:29
+    335|       ],
+    336|     });
+    337|     expect(row.oracle_pass).toBe(true);
+       |                             ^
+    338|     expect(row.status).toBe('fail');
+    339|     expect(row.violations.join('\n')).toContain('linked');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > explicit file reads cannot use runtime resource allowances as task data
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-sessions.test.ts:356:29
+    354|       ],
+    355|     });
+    356|     expect(row.oracle_pass).toBe(true);
+       |                             ^
+    357|     expect(row.status).toBe('fail');
+    358|     expect(row.violations.join('\n')).toContain('/etc/passwd');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  test/routing-sessions.test.ts > planner explicit runtime-resource read /etc/passwd is blocked and graded
+ FAIL  test/routing-sessions.test.ts > planner explicit runtime-resource read /dev/null is blocked and graded
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/routing-sessions.test.ts:370:29
+    368|       executor: [solution, { content: 'done' }],
+    369|     });
+    370|     expect(row.oracle_pass).toBe(true);
+       |                             ^
+    371|     expect(row.status).toBe('fail');
+    372|     expect(stub?.requests[1]?.messages.filter((message) => message.rol…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 9 passed (19)
+   Start at  18:10:04
+   Duration  2.33s (tests 68%, import 20%, transform 12%)
+
+
+Guarded, with the toolchain reported absent: the ten sandbox-dependent cases skip, the nine
+sandbox-free cases still run, and nothing fails. The guard reads the same toolchain probe the
+enforcement helper needs, so an unavailable boundary becomes a skip rather than a red.
+$ PROBE_NO_ENFORCE=1 PROBE_NO_TOOLCHAIN=1 pnpm exec vitest run test/routing-sessions.test.ts # guarded
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed | 10 skipped (19)
+   Start at  18:10:23
+   Duration  2.56s (tests 70%, import 18%, transform 11%)
+
+
+## Green run after every control was reverted
+$ pnpm exec vitest run test/routing-sessions.test.ts test/routing-driver.test.ts
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1986/integration
+
+
+ Test Files  2 passed (2)
+      Tests  35 passed (35)
+   Start at  18:10:39
+   Duration  12.97s (tests 90%, import 7%, transform 2%)
+

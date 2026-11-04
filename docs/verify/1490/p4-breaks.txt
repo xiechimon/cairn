@@ -1,0 +1,4 @@
+# P4 with one part of the F3 fix undone in a copy of the model (single worker, StepClaim.tla at 996daa64)
+# variant: result | counterexample actions
+a_open_sessions_only: Invariant AcceptedStopReachesWorkers is violated | TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRun
+b_recover_ignores_jstop: Invariant AcceptedStopReachesWorkers is violated | TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRun,DaemonCrash,DaemonStartRecover

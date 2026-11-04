@@ -1,0 +1,420 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+======================================================================
+FAIL: test_comments_embedding_media_hosts_and_http_failures (__main__.EvidenceGateTests.test_comments_embedding_media_hosts_and_http_failures)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 55, in test_comments_embedding_media_hosts_and_http_failures
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 1/2 answered
+FAIL empty-section: Verified
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (1 problem(s))
+
+
+======================================================================
+FAIL: test_extensionless_embeds_keep_their_form_and_full_url (__main__.EvidenceGateTests.test_extensionless_embeds_keep_their_form_and_full_url) (body='![proof](https://example.org/view?theme=dark&size=2#proof)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 38, in test_extensionless_embeds_keep_their_form_and_full_url
+    self.assertEqual(len(links), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_extensionless_embeds_keep_their_form_and_full_url (__main__.EvidenceGateTests.test_extensionless_embeds_keep_their_form_and_full_url) (body='<img src="https://example.org/view?theme=dark&amp;size=2#proof">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 38, in test_extensionless_embeds_keep_their_form_and_full_url
+    self.assertEqual(len(links), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_extensionless_embeds_keep_their_form_and_full_url (__main__.EvidenceGateTests.test_extensionless_embeds_keep_their_form_and_full_url) (body='<source srcset="https://example.org/view?theme=dark&size=2#proof 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 38, in test_extensionless_embeds_keep_their_form_and_full_url
+    self.assertEqual(len(links), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view.png?scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view.png?scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view.png?scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view.png?scenario=)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view.png?scenario=">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view.png?scenario= 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view.png?theme=dark&scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view.png?theme=dark&scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view.png?theme=dark&scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view.png?theme=dark&amp;scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view.png?theme=dark&amp;scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view.png?theme=dark&amp;scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view.png?theme=dark&#38;scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view.png?theme=dark&#38;scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view.png?theme=dark&#38;scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view?scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view?scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view?scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view?scenario=)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view?scenario=">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view?scenario= 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view?theme=dark&scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view?theme=dark&scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view?theme=dark&scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view?theme=dark&amp;scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view?theme=dark&amp;scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view?theme=dark&amp;scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='![proof](https://example.org/view?theme=dark&#38;scenario=board)')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<img src="https://example.org/view?theme=dark&#38;scenario=board">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) (body='<source srcset="https://example.org/clean 1x, https://example.org/view?theme=dark&#38;scenario=board 2x">')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 28, in test_fixture_embeds_fail_for_the_fixture_reason
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_references_are_not_images (__main__.EvidenceGateTests.test_references_are_not_images)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/fast/lanes/cairn-1982/scripts/pr-evidence-gate.test.py", line 49, in test_references_are_not_images
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: [issue](https://example.org/file.png.txt)
+pr-evidence: RED (1 problem(s))
+
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.015s
+
+FAILED (failures=35)

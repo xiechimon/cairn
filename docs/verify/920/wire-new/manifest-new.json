@@ -1,0 +1,101 @@
+{
+  "stepId": "GDlsVOoyr0XdShdzeO7XS",
+  "buildId": "01a1156b-4182-79c8-bd9c-4cbaab109873",
+  "manifest": {
+    "selection": "whitelist",
+    "skills": [
+      {
+        "id": "alpha",
+        "name": "alpha",
+        "description": "基础技能（#920 探针）",
+        "dirName": "alpha",
+        "files": [
+          {
+            "path": "notes.md",
+            "sizeBytes": 1024,
+            "sha256": "4e5c5b81de326ffad84f95cecf5b9c1372968a892015645dd29ee61b002f3f9f"
+          },
+          {
+            "path": "SKILL.md",
+            "sizeBytes": 118,
+            "sha256": "53ddd46c59fc3e389082d7c294a7c4000a2069dd5857ce575783efd824f7fc7b"
+          }
+        ]
+      },
+      {
+        "id": "bin",
+        "name": "bin",
+        "description": "二进制资产技能（#920 探针）",
+        "dirName": "bin",
+        "files": [
+          {
+            "path": "assets/logo.png",
+            "sizeBytes": 15,
+            "sha256": "87d445ae9dceb62dc79e6a30a892eb38feba25c7607493b5a29e453384f0eda1"
+          },
+          {
+            "path": "SKILL.md",
+            "sizeBytes": 121,
+            "sha256": "dd62d137aa9a84ec03a92ad957f151b6bee9e74a07e0ea08c71a2ecf9e35a790"
+          }
+        ]
+      },
+      {
+        "id": "fat",
+        "name": "fat",
+        "description": "超限资产技能（#920 根因形态）",
+        "dirName": "fat",
+        "files": [
+          {
+            "path": "assets/template.html",
+            "sizeBytes": 727976,
+            "sha256": "9f8a3c0a4b000a98b6b2047b4f648bdddfa8b3fee39d06cebef19b92c7775f44"
+          },
+          {
+            "path": "SKILL.md",
+            "sizeBytes": 124,
+            "sha256": "168da9ed8c71d2849cad906e2879d7b7dc79ee4f53a1b3b20b238d3ec448af44"
+          }
+        ]
+      },
+      {
+        "id": "heavy",
+        "name": "heavy",
+        "description": "超总量技能（#920 根因形态）",
+        "dirName": "heavy",
+        "files": [
+          {
+            "path": "p0.txt",
+            "sizeBytes": 450000,
+            "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244"
+          },
+          {
+            "path": "p1.txt",
+            "sizeBytes": 450000,
+            "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244"
+          },
+          {
+            "path": "p2.txt",
+            "sizeBytes": 450000,
+            "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244"
+          },
+          {
+            "path": "p3.txt",
+            "sizeBytes": 450000,
+            "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244"
+          },
+          {
+            "path": "p4.txt",
+            "sizeBytes": 450000,
+            "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244"
+          },
+          {
+            "path": "SKILL.md",
+            "sizeBytes": 127,
+            "sha256": "bdcca8d4cd940917dc5b9473920d13d5f1ebbe210832b4ac0559b8ae5ad9477c"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+ ❯ test/write-verify.test.ts (6 tests | 3 failed) 18579ms
+   ❯ write-verify evidence (#2078) (5)
+     × a failed --write-verify run exits nonzero and leaves an existing result untouched 3760ms
+     × --write-verify ignores matching cached rows and runs every case fresh into a new per-run directory 3441ms
+     × a successful complete run publishes schema-valid evidence with digests and no temp file 3437ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/write-verify.test.ts > write-verify evidence (#2078) > a failed --write-verify run exits nonzero and leaves an existing result untouched
+AssertionError: expected 3 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 3
+
+ ❯ test/write-verify.test.ts:347:30
+    346|     expect(relay.requests()).toBe(1);
+    347|     noTmpBeside(out);
+    348|   }, 90_000);
+       |        ^
+    349|
+    350|   test('an interrupted --write-verify run never publishes and never da…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/write-verify.test.ts > write-verify evidence (#2078) > --write-verify ignores matching cached rows and runs every case fresh into a new per-run directory
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectVariantByteIdentical test/write-verify.test.ts:184:45
+    182| ) {
+    183|   const now = snapshotVariant(variant);
+    184|   expect(now.results.equals(prior.results)).toBe(true);
+       |                                             ^
+    185|   expect([...now.traces.keys()]).toEqual([...prior.traces.keys()]);
+    186|   for (const [name, body] of prior.traces) {
+ ❯ test/write-verify.test.ts:424:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/write-verify.test.ts > write-verify evidence (#2078) > a successful complete run publishes schema-valid evidence with digests and no temp file
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ expectVariantByteIdentical test/write-verify.test.ts:184:45
+    182| ) {
+    183|   const now = snapshotVariant(variant);
+    184|   expect(now.results.equals(prior.results)).toBe(true);
+       |                                             ^
+    185|   expect([...now.traces.keys()]).toEqual([...prior.traces.keys()]);
+    186|   for (const [name, body] of prior.traces) {
+ ❯ test/write-verify.test.ts:456:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  17:47:55
+   Duration  19.14s (tests 98%, transform 2%, import 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

@@ -1,0 +1,23 @@
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/harness-eval-coordinator.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/harness-eval-coordinator.test.ts [ test/harness-eval-coordinator.test.ts ]
+Error: Cannot find module '../src/services/harness-eval-coordinator.js' imported from /workspace/apps/server/test/harness-eval-coordinator.test.ts
+ ❯ test/harness-eval-coordinator.test.ts:7:1
+      5| import { openDbWithHandle } from '../src/db/client.js';
+      6| import { harnessEvalAttempt } from '../src/db/schema.js';
+      7| import {
+       | ^
+      8|   type HarnessEvalDispatchPort,
+      9|   type HarnessEvalDispatchRequest,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  17:31:12
+   Duration  436ms (worker 96%, environment 4%)

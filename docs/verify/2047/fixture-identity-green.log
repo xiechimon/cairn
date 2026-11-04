@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  13:59:36
+   Duration  2.54s (tests 87%, transform 8%, import 5%)
+

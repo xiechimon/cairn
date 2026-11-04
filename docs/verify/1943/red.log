@@ -1,0 +1,119 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+ ❯ test/prompt-set-resume.test.ts (9 tests | 5 failed) 21170ms
+   ❯ prompt-set resume provenance (8)
+     × rows written with --prompt-set current, rerun with --prompt-set cut into the same variant: exit 2 with a message naming a fresh --variant 2318ms
+     × --approve-harness on a new harness does not make old rows reusable 2322ms
+     × compatible resume with --reps 3 over 2 completed reps runs exactly rep 2 2283ms
+     × cut prompts are shorter than current prompts, and current prompts equal the production prompt bytes 2357ms
+     × learn cases receive the selected prompt set 2518ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > rows written with --prompt-set current, rerun with --prompt-set cut into the same variant: exit 2 with a message naming a fresh --variant
+AssertionError: unknown argument: --prompt-set
+usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]
+: expected 2 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 2
+
+ ❯ test/prompt-set-resume.test.ts:297:40
+    295|       writeFlow(home, [HOLD_CASE]);
+    296|       const first = await runEval(home, ['--approve-harness', '--promp…
+    297|       expect(first.code, first.output).toBe(0);
+       |                                        ^
+    298|       expect(relay.requests.length).toBeGreaterThan(0);
+    299|       const afterCurrent = relay.requests.length;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > --approve-harness on a new harness does not make old rows reusable
+AssertionError: expected 'ddddddddddddddddddddddddddddddddddddd…' not to be 'ddddddddddddddddddddddddddddddddddddd…' // Object.is equality
+ ❯ test/prompt-set-resume.test.ts:361:37
+    359|       };
+    360|       expect(state.harness_sha).toBeTruthy();
+    361|       expect(state.harness_sha).not.toBe(oldSha);
+       |                                     ^
+    362|     } finally {
+    363|       await relay.close();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > compatible resume with --reps 3 over 2 completed reps runs exactly rep 2
+AssertionError: unknown argument: --prompt-set
+usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]
+: expected 2 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 2
+
+ ❯ test/prompt-set-resume.test.ts:378:44
+    376|         relay,
+    377|       );
+    378|       expect(seedRun.code, seedRun.output).toBe(0);
+       |                                            ^
+    379|       expect(relay.requests.length).toBeGreaterThanOrEqual(2);
+    380|       const afterSeed = relay.requests.length;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > cut prompts are shorter than current prompts, and current prompts equal the production prompt bytes
+AssertionError: unknown argument: --prompt-set
+usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]
+: expected 2 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 2
+
+ ❯ test/prompt-set-resume.test.ts:415:44
+    413|         relay,
+    414|       );
+    415|       expect(current.code, current.output).toBe(0);
+       |                                            ^
+    416|       const currentTexts = systemTexts(relay.requests);
+    417|       expect(currentTexts.length).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > learn cases receive the selected prompt set
+AssertionError: unknown argument: --prompt-set
+usage: run-eval.mts --flow DIR --variant ID [--model ID] [--context-window N] [--arm all|no-memory|correction|oracle|reflect] [--case ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]
+: expected 2 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 2
+
+ ❯ test/prompt-set-resume.test.ts:450:42
+    448|         relay,
+    449|       );
+    450|       expect(result.code, result.output).toBe(0);
+       |                                          ^
+    451|       const texts = systemTexts(relay.requests);
+    452|       expect(texts.length).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 4 passed (9)
+   Start at  17:10:15
+   Duration  22.31s (tests 95%, transform 3%, import 2%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

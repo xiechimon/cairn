@@ -1,0 +1,5 @@
+[project]
+name = "digest-bot"
+version = "0.3.0"
+requires-python = ">=3.11"
+dependencies = ["feedparser>=6.0", "httpx>=0.27"]

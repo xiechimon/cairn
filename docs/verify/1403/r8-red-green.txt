@@ -1,0 +1,25 @@
+# #1403 round 8 (third /code-review pass on #1414): the round 8 test file, red against the sources of 6cf9e76, green at 668dc7c.
+# Red leg: apps/server/src/{services/ci-loop.ts,services/builds.ts,lib/github.ts} taken from 6cf9e76 with git show,
+# the round 8 test files as committed in 668dc7c; the three files were put back afterwards.
+
+== red, sources at 6cf9e76 ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+     × ㊴ anonymous: reads across all PRs stay under a per-hour budget
+     × ㊵ the newest done build step reported no checkpoint → the last reported one is checked
+     × ㊶ a grind candidate skipped for an in-flight step keeps its check-runs cache row
+     × ㊷ a #931 rework round gets the same hint again
+     × ㊸ compare unreadable: not read again within ten minutes, one hint
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  5 failed | 79 passed (84)
+
+first assertion of each failure:
+  ㊴ anonymous: reads across all PRs stay under a per-hour budget             AssertionError: expected [ …(3) ] to have a length of 2 but got 3
+  ㊵ the newest done build step reported no checkpoint → the last reported    AssertionError: expected 'done' to be 'review' // Object.is equality
+  ㊶ a grind candidate skipped for an in-flight step keeps its check-runs c   AssertionError: expected undefined to be '"x"' // Object.is equality
+  ㊷ a #931 rework round gets the same hint again                             AssertionError: expected [ Array(1) ] to have a length of 2 but got 1
+  ㊸ compare unreadable: not read again within ten minutes, one hint          AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+
+== green at 668dc7c ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  84 passed (84)

@@ -1,0 +1,113 @@
+vite v8.3.0 building client environment for fixture...
+transforming...
+✓ 2806 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     1.73 kB │ gzip:   0.78 kB
+dist/assets/index-DX3xEFsW.css    142.70 kB │ gzip:  24.43 kB
+dist/assets/index-BYy24a9G.js   1,351.86 kB │ gzip: 410.48 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 973ms
+  ➜  Local:   http://127.0.0.1:8397/
+
+Running 93 tests using 4 workers
+
+[1/93] e2e/chief-drawer-model.spec.ts:31:3 › chief drawer model row (#615) › the model row is a control that opens the anchored model popover
+[2/93] e2e/chief-drawer-slash.spec.ts:126:1 › trigger: `/` opens builtins plus skills, review/stop hidden (F2)
+[3/93] e2e/chief-fab.spec.ts:27:3 › detail FAB renders only with unread (#443) › unread 0: the detail route renders no FAB
+[4/93] e2e/chief-composer-tools.spec.ts:264:1 › trigger: @ opens the inline listbox inside the drawer; arrows + Enter insert the token (FM1)
+[5/93] e2e/chief-fab.spec.ts:34:3 › detail FAB renders only with unread (#443) › unread > 0: the FAB renders with the badge value
+[6/93] e2e/chief-drawer-slash.spec.ts:148:1 › `/clear` runs without sending and toasts confirmation (F1)
+[7/93] e2e/chief-composer-tools.spec.ts:293:1 › mouse: hover highlights and the row click inserts without stealing focus (FM2)
+[8/93] e2e/chief-fab.spec.ts:41:3 › detail FAB renders only with unread (#443) › the FAB keeps the A0 corner geometry (40x40 @ 8px inset, fixed)
+[9/93] e2e/chief-drawer-model.spec.ts:70:3 › chief drawer model row (#615) › the selected model row is readable in both themes (#751 A)
+[10/93] e2e/chief-fab.spec.ts:88:3 › FAB icon follows the bound agent (#444) › bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay
+[11/93] e2e/chief-drawer-slash.spec.ts:167:1 › Tab completes without running; Enter without highlight sends (F4)
+[12/93] e2e/chief-composer-tools.spec.ts:311:1 › geometry: the listbox anchors above the composer wrap inside the drawer (FM2)
+[13/93] e2e/chief-fab.spec.ts:111:3 › FAB icon follows the bound agent (#444) › bound: a non-board route swaps at the same single consumption point
+[14/93] e2e/chief-drawer-slash.spec.ts:182:1 › mid-prompt accept inserts literal text, never runs (F3)
+[15/93] e2e/chief-fab.spec.ts:122:3 › FAB icon follows the bound agent (#444) › avatarUrl override wins over the generated face
+[16/93] e2e/chief-fab.spec.ts:130:3 › FAB icon follows the bound agent (#444) › unbound: the static glyph stays, no avatar face
+[17/93] e2e/chief-composer-tools.spec.ts:339:1 › Esc closes the listbox and the drawer survives (#146 ladder, FM9)
+[18/93] e2e/chief-drawer-slash.spec.ts:194:1 › /help opens the command panel with the drawer builtins
+[19/93] e2e/chief-drawer-model.spec.ts:124:3 › chief drawer model row (#615) › the selected row fill bleeds to the popover edges (#872)
+[20/93] e2e/chief-panel.spec.ts:57:3 › chief panel floating form (ADR 0013) › Esc never closes the panel on the board route (D3)
+[21/93] e2e/chief-composer-tools.spec.ts:352:1 › the mention button opens the popover with live group counts and inserts a token (FM1)
+[22/93] e2e/chief-drawer-slash.spec.ts:215:1 › Esc closes the menu and the drawer survives (F5)
+[23/93] e2e/chief-panel.spec.ts:65:3 › chief panel floating form (ADR 0013) › Esc never closes the panel on a wake surface
+[24/93] e2e/chief-drawer-model.spec.ts:173:3 › chief drawer model row (#615) › the picker search is typeahead-only: absent until a key, retracted on clear (#756)
+[25/93] e2e/chief-send-fallback.spec.ts:136:1 › stale slot: send goes out, fallback toast names it, row heals to 默认
+[26/93] e2e/chief-panel.spec.ts:79:3 › chief panel floating form (ADR 0013) › Esc layers: the open thread switcher closes first, the panel survives both
+[27/93] e2e/chief-composer-tools.spec.ts:379:1 › Esc with the popover open closes the popover, not the drawer (FM9)
+[28/93] e2e/chief-panel.spec.ts:95:3 › chief panel floating form (ADR 0013) › composer bar carries the attach + mention tools and the send button
+[29/93] e2e/chief-drawer-model.spec.ts:232:3 › chief drawer model row (#615) › the model row carries the runtime mark, not an agent avatar
+[30/93] e2e/chief-send-fallback.spec.ts:168:1 › fresh slot: send goes out with no fallback toast
+[31/93] e2e/chief-panel.spec.ts:109:3 › chief panel floating form (ADR 0013) › the panel floats as a 380x600 window anchored 8px off the corner (board)
+[32/93] e2e/chief-settings.spec.ts:29:1 › 返回按钮可用：点击回到总管抽屉 (#811)
+[33/93] e2e/chief-drawer-model.spec.ts:253:3 › chief drawer model row (#615) › message copy glyphs are clipboard buttons; no bare inert glyphs remain
+[34/93] e2e/chief-composer-tools.spec.ts:392:1 › a mid-line image paste lands the token whole-line at the caret (FM6)
+[35/93] e2e/chief-panel.spec.ts:154:3 › chief panel floating form (ADR 0013) › board content never yields to the window (D1 overlay, no yield)
+[36/93] e2e/chief-settings.spec.ts:48:1 › agent row opens the 选择总管 Agent dialog with search + canon default row
+[37/93] e2e/chief-drawer-model.spec.ts:280:3 › chief drawer model row (#615) › restore button opens the rewind confirm; the foot chevron discloses tool rows
+[38/93] e2e/chief-settings.spec.ts:64:1 › agent dialog search keeps its own 16px inset (#872 blast radius)
+[39/93] e2e/chief-panel.spec.ts:173:3 › chief panel floating form (ADR 0013) › minimizing leaves the board grid at the same geometry (nothing to restore)
+[40/93] e2e/chief-composer-tools.spec.ts:418:1 › Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)
+[41/93] e2e/chief-settings.spec.ts:82:1 › agent dialog family law: X, Escape and backdrop dismiss; panel clicks do not
+[42/93] e2e/chief-composer-tools.spec.ts:535:1 › transcript: mention and attachment tokens in a user row render as chips, never literal (FM7)
+[43/93] e2e/chief-panel.spec.ts:204:5 › chief panel floating form (ADR 0013) › pages: the main column never narrows while the window is open
+[44/93] e2e/chief-drawer-model.spec.ts:316:3 › chief drawer model row (#615) › the gear reaches board settings from a wake surface
+[45/93] e2e/chief-composer-tools.spec.ts:557:3 › fixture face stays inert (#732 FM3) › the composer is read-only: no listbox, attach inert, picker at zero counts
+[46/93] e2e/chief-panel.spec.ts:204:5 › chief panel floating form (ADR 0013) › resources: the main column never narrows while the window is open
+[47/93] e2e/chief-drawer-model.spec.ts:329:3 › chief drawer model row (#615) › closing the drawer (⌘J) recycles the model popover with it (#773)
+[48/93] e2e/chief-stream-markdown.spec.ts:249:3 › chief drawer markdown 面（fixture，#650） › F-R1/R2/R3: robot markdown 行走共用块解析——bold/标题/列表/栅栏/chip 全渲染，星号零漏出
+[49/93] e2e/chief-stream-markdown.spec.ts:284:3 › chief drawer markdown 面（fixture，#650） › F-R13: todo 提及渲成 chip，锚点指任务详情并可点击导航；字面 #seq/伪 scheme 不出 chip（#675）
+[50/93] e2e/chief-settings.spec.ts:100:1 › agent dialog search filters the list; no match shows the empty row
+[51/93] e2e/chief-panel.spec.ts:204:5 › chief panel floating form (ADR 0013) › secondary: the main column never narrows while the window is open
+[52/93] e2e/chief-stream-markdown.spec.ts:305:3 › chief drawer markdown 面（fixture，#650） › F-R4/R5: typing 打字行无 foot；定稿行 foot（复制 + 完成 44s）保留
+[53/93] e2e/chief-stream-markdown.spec.ts:321:3 › chief drawer markdown 面（fixture，#650） › F-R6/R8: 用户行头像 = 真人身份 img（XMON-105 单源），抽屉体可滚动
+[54/93] e2e/chief-settings.spec.ts:109:1 › fixture agent pick closes the dialog (accept 律)
+[55/93] e2e/chief-stream-markdown.spec.ts:338:3 › chief drawer markdown 面（fixture，#650） › F-R9: r5 114 冻结捕获面不漂移——段数组行走原 .chief-para/.chief-bullet 路径
+[56/93] e2e/chief-panel.spec.ts:230:3 › chief panel floating form (ADR 0013) › detail: the right pane coexists with the floating window (D7 reversed)
+[57/93] e2e/chief-stream-markdown.spec.ts:356:3 › chief drawer markdown 面（fixture，#650） › F-R15: fixture 面（r5 113 running 捕获）不长存在行——ChiefStreamItem 新 kind 零污染
+[58/93] e2e/chief-settings.spec.ts:123:1 › charter 编辑 opens the DialogShell editor with the r5 captured fields
+[59/93] e2e/chief-stream-markdown.spec.ts:373:3 › chief drawer 流式面（live mock，#651） › F-R7/R10/R11: text_delta 增量上屏，message 终稿收敛不重复不残留
+[60/93] e2e/chief-settings.spec.ts:135:1 › charter dialog family law: X, Escape, 取消 and backdrop dismiss
+[61/93] e2e/chief-panel.spec.ts:259:3 › chief panel floating form (ADR 0013) › hero examples: the four canon prompt cards, inert on the fixture face
+[62/93] e2e/chief-stream-markdown.spec.ts:423:3 › chief drawer 流式面（live mock，#651） › F-R12: 双行去重（#667）——同文 POST + user-<stepId> 回声恰一个用户气泡；连发不同文各一条
+[63/93] e2e/chief-panel.spec.ts:280:3 › chief panel floating form (ADR 0013) › composer keeps one fixed size whether or not a draft is restored (XMON-102)
+[64/93] e2e/chief-stream-markdown.spec.ts:457:3 › chief drawer 流式面（live mock，#651） › F-R14: 在飞存在行（#739）——静默窗口挂 streaming 行，首 delta 收敛为 typing，终稿两行皆退场
+[65/93] e2e/chief-stream-markdown.spec.ts:506:3 › chief drawer 流式面（live mock，#651） › F-R16: 轮中事件不闪清（#857）——工具行/文本行事件后重取在飞时打字面保留，收敛后落库行接管
+[66/93] e2e/chief-panel.spec.ts:313:3 › chief panel floating form (ADR 0013) › composer placeholder switches to the steer canon while a turn runs (#624)
+[67/93] e2e/chief-stream-markdown.spec.ts:558:3 › chief drawer 流式面（live mock，#651） › F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏
+[68/93] e2e/chief-panel.spec.ts:336:3 › chief panel floating form (ADR 0013) › the open state persists across a reload (D5, reversing 0004 D9)
+[69/93] e2e/chief-stream-markdown.spec.ts:638:3 › chief drawer 流式面（live mock，#651） › F-R15: robot 行身份 chip（live 面，#741）——头像+名字 anchor，点击全链进 Agent 设置页
+[70/93] e2e/chief-stream-markdown.spec.ts:694:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R14: 用户气泡走同源解析——todo chip 成锚可点导航、bold 成 strong、负例保持字面
+[71/93] e2e/chief-settings.spec.ts:155:1 › fixture charter save closes the dialog (accept 律)
+[72/93] e2e/chief-stream-markdown.spec.ts:721:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R15: 复制载荷 = markdown 原文（不是渲染结果）；两钮行（复制/恢复）不受影响
+[73/93] e2e/chief-settings.spec.ts:179:1 › 压缩模型 interactive (#204): button opens the anchored model menu
+[74/93] e2e/chief-stream-markdown.spec.ts:736:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效
+[75/93] e2e/chief-settings.spec.ts:197:1 › 压缩模型 selected row fill bleeds to the menu edges (#872)
+[76/93] e2e/chief-stream-markdown.spec.ts:761:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R17: fixture 捕获面用户气泡零漂移——无槽走字面路径（无 --md 类、无 chat-md 块）
+[77/93] e2e/chief-settings.spec.ts:271:1 › 压缩模型 search is typeahead-only, same contract as the drawer picker (#756 续)
+[78/93] e2e/chief-stream-markdown.spec.ts:775:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数
+[79/93] e2e/chief-settings.spec.ts:300:1 › 压缩模型 menu family law (#204): Escape and outside click dismiss
+[80/93] e2e/chief-stream-markdown.spec.ts:871:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R20: 在飞工具行带出具体命令（不是裸工具名）
+[81/93] e2e/chief-settings.spec.ts:310:1 › 压缩模型 fixture pick = accept 律:选择即关 (#204)
+[82/93] e2e/chief-stream-markdown.spec.ts:904:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R21: 段序契约（#1003 / ADR 0011 premortem）——文本段在前、其工具行在后、各恰一次；收口后工具折进后随段
+[83/93] e2e/chief-settings.spec.ts:321:3 › 压缩模型 long value truncates, full name on title (dark, #772)
+[84/93] e2e/chief-stream-markdown.spec.ts:1012:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）
+[85/93] e2e/chief-settings.spec.ts:321:3 › 压缩模型 long value truncates, full name on title (light, #772)
+[86/93] e2e/chief-settings.spec.ts:341:1 › 空态卡 centered and growth-proof: memo matches watches (#772)
+[87/93] e2e/chief-settings.spec.ts:373:1 › 压缩模型 stale preset value (#358): 裸串兜底回显 + 菜单无选中行
+[88/93] e2e/chief-settings.spec.ts:415:1 › 机器槽在位:Agent tab 有「机器」标题 + 描述 + chip(值 null = 自动)
+[89/93] e2e/chief-settings.spec.ts:428:1 › 机器 chip 开 popover:「自动」行 + 机器行 + listbox 语义 + 选中态
+[90/93] e2e/chief-settings.spec.ts:446:1 › 机器 popover family law: Escape / outside click dismiss
+[91/93] e2e/chief-settings.spec.ts:456:1 › 机器 chip fixture pick = accept 律:选择即关 + 回显不变(无 mutation)
+[92/93] e2e/chief-settings.spec.ts:464:1 › 机器槽默认面(101):无 resources → 清单仅「自动」行且选中
+[93/93] e2e/chief-settings.spec.ts:478:1 › Agent tab 无「派发方式」行:设置槽已删,邻座决策行健在(#903)
+  93 passed (21.8s)

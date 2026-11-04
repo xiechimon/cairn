@@ -1,0 +1,33 @@
+$ vitest run test/schema.test.ts
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686/apps/server
+
+ ❯ test/schema.test.ts (5 tests | 1 failed) 94ms
+   ❯ the 37-table migration (the 01 §6 list) (4)
+     × upgrades a database already migrated through the previous main migration 34ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/schema.test.ts > the 37-table migration (the 01 §6 list) > upgrades a database already migrated through the previous main migration
+Error: push migration missing
+ ❯ test/schema.test.ts:46:44
+     44|     ) as { entries: { tag: string; when: number }[] };
+     45|     const pushMigration = journal.entries.find((entry) => entry.tag ==…
+     46|     if (pushMigration === undefined) throw new Error('push migration m…
+       |                                            ^
+     47|     db.run(sql`DROP TABLE push_subscription`);
+     48|     db.run(sql`DROP TABLE push_digest_item`);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  17:44:23
+   Duration  931ms (transform 49%, import 40%, tests 11%)
+
+[ELIFECYCLE] Test failed. See above for more details.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  × "pnpm recursive run" failed in /mnt/fast/lanes/cairn-1686/apps/server
+

@@ -1,0 +1,31 @@
+
+ RUN  v5.0.1 /home/ian/lanes/cairn-1753
+
+ ❯ |@xiechimon/cairn| test/project-local.test.ts (31 tests | 1 failed) 302ms
+   ❯ POST /api/projects kind=local -- the localPath three-state validation (#359 AC) (9)
+     × a local project defaults to mergePolicy autonomous and accepts configurable local check commands 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/project-local.test.ts > POST /api/projects kind=local -- the localPath three-state validation (#359 AC) > a local project defaults to mergePolicy autonomous and accepts configurable local check commands
+AssertionError: expected 'human' to be 'autonomous' // Object.is equality
+
+Expected: "autonomous"
+Received: "human"
+
+ ❯ test/project-local.test.ts:56:38
+     54|     const created = await postCreate({ name: 'p-merge-policy', kind: '…
+     55|     expect(created.status).toBe(201);
+     56|     expect(created.body.mergePolicy).toBe('autonomous');
+       |                                      ^
+     57|
+     58|     const configured = await req(s.app, 'PATCH', `/api/projects/${crea…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 30 passed (31)
+   Start at  17:10:26
+   Duration  1.39s (transform 42%, import 35%, tests 23%)
+

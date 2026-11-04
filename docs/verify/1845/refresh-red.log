@@ -1,0 +1,54 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+ ❯ |@xiechimon/cairn-cli| test/claude-code-login.test.ts (4 tests | 2 failed) 19ms
+   ❯ parseClaudeOauthExpiresAt (3)
+     × reads only claudeAiOauth.expiresAt and never returns token material 16ms
+     × uses the access clock only when no refresh token is available 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/claude-code-login.test.ts > parseClaudeOauthExpiresAt > reads only claudeAiOauth.expiresAt and never returns token material
+AssertionError: expected 1793033004890 to be 1795033004890 // Object.is equality
+
+- Expected
++ Received
+
+- 1795033004890
++ 1793033004890
+
+ ❯ test/claude-code-login.test.ts:22:23
+     20|     });
+     21|     const expiresAt = parseClaudeOauthExpiresAt(raw);
+     22|     expect(expiresAt).toBe(1_795_033_004_890);
+       |                       ^
+     23|     expect(JSON.stringify(expiresAt)).not.toContain('should-not-leak');
+     24|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/claude-code-login.test.ts > parseClaudeOauthExpiresAt > uses the access clock only when no refresh token is available
+AssertionError: expected 100 to be null
+
+- Expected:
+null
+
++ Received:
+100
+
+ ❯ test/claude-code-login.test.ts:34:7
+     32|         JSON.stringify({ claudeAiOauth: { expiresAt: 100, refreshToken…
+     33|       ),
+     34|     ).toBeNull();
+       |       ^
+     35|     expect(
+     36|       parseClaudeOauthExpiresAt(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  10:30:54
+   Duration  458ms (transform 82%, tests 9%, import 8%, worker 1%)
+

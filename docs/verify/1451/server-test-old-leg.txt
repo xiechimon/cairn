@@ -1,0 +1,308 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ❯ test/close-stops-active-steps.test.ts (14 tests | 3 failed) 864ms
+   ❯ #1451 把执行中的卡标完成也停活动步 (4)
+     × raw PATCH queued → done：步 stopped，机器领不到 47ms
+     × raw PATCH planning → done：委托停 claimed 步，回报后卡仍是 done 50ms
+     × complete_todos 标 building 卡完成：委托停 claimed 步，回报后卡仍是 done 54ms
+ ❯ test/persona-split-verify.test.ts (17 tests | 1 failed) 1239ms
+   ❯ #1250 split_todo（层 2） (8)
+     × manual done stops the pending step (#1247, #1451) 45ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > raw PATCH queued → done：步 stopped，机器领不到
+AssertionError: expected { step: { …(5) }, …(7) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "agent": {
+    "defaultSkill": null,
+    "description": null,
+    "displayName": "close-agent",
+    "id": "agent-ay0mvriisy6",
+    "injectedSkills": [],
+    "memories": [],
+    "modelId": "stub-model",
+    "provider": "stub-gw",
+    "skillsAllowlist": null,
+    "thinkingLevel": null,
+    "tools": [],
+  },
+  "conversationId": "build-ay0mvriisy6",
+  "localTools": [],
+  "project": {
+    "id": "proj-ay0mvriisy6",
+    "name": "close",
+    "repo": null,
+  },
+  "remoteTools": [
+    {
+      "description": "Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent.",
+      "name": "save_memory",
+      "parameters": {
+        "properties": {
+          "content": {
+            "description": "Memory body.",
+            "type": "string",
+          },
+          "projectId": {
+            "description": "Optional project id for provenance.",
+            "type": "string",
+          },
+          "sourceTodoId": {
+            "description": "Optional source todo id; defaults to the running task.",
+            "type": "string",
+          },
+          "title": {
+            "description": "Short memory title.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+          "content",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Delete one of your memory entries by id.",
+      "name": "delete_memory",
+      "parameters": {
+        "properties": {
+          "memoryId": {
+            "description": "Memory id.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "memoryId",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "List your own memory entries.",
+      "name": "memories",
+      "parameters": {
+        "properties": {},
+        "type": "object",
+      },
+      "replaySafe": true,
+    },
+    {
+      "description": "Fetch an attachment referenced by a task spec or message. Spec tokens of the form ![name](attachment:<teamId>/<id>.<ext>) embed an attachment; call with the bare <id> (the part before the extension). Returns the file content (utf8 for text/* / json / xml, base64 for images / pdf).",
+      "name": "attachment",
+      "parameters": {
+        "properties": {
+          "attachmentId": {
+            "description": "Attachment id.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "attachmentId",
+        ],
+        "type": "object",
+      },
+      "replaySafe": true,
+    },
+    {
+      "description": "Set the title and category tag of the task you are currently working on. Call exactly once before starting work: title = a concise summary of the task spec (50 chars max, plain text, no markdown); tag = one name from the fixed tag vocabulary listed in your instructions (omit it when none fits).",
+      "name": "set_task_meta",
+      "parameters": {
+        "properties": {
+          "tag": {
+            "description": "Optional tag name from the fixed vocabulary.",
+            "type": "string",
+          },
+          "title": {
+            "description": "Task title, 50 chars max.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Create a team skill as a folder in the team skills directory. Requires the 「创建技能」permission switch on your agent row. The SKILL.md frontmatter name and description must match the declared values.",
+      "name": "create_skill",
+      "parameters": {
+        "properties": {
+          "description": {
+            "description": "One-line skill description; must match the SKILL.md frontmatter.",
+            "type": "string",
+          },
+          "files": {
+            "description": "Skill files; must include SKILL.md.",
+            "items": {
+              "properties": {
+                "content": [Object],
+                "path": [Object],
+              },
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "name": {
+            "description": "Skill name; also the folder name and the SKILL.md frontmatter name.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "description",
+          "files",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Update an existing team skill by id. Requires the「更新技能」permission switch on your agent row. Listed files are overwritten, unlisted files are kept; include a new SKILL.md to change the frontmatter (including renaming).",
+      "name": "update_skill",
+      "parameters": {
+        "properties": {
+          "description": {
+            "description": "Declared description; must match the SKILL.md frontmatter.",
+            "type": "string",
+          },
+          "files": {
+            "description": "Files to overwrite; include SKILL.md to change frontmatter.",
+            "items": {
+              "properties": {
+                "content": [Object],
+                "path": [Object],
+              },
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "name": {
+            "description": "Declared skill name; must match the SKILL.md frontmatter.",
+            "type": "string",
+          },
+          "skillId": {
+            "description": "Skill id to update.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "skillId",
+          "name",
+          "description",
+          "files",
+        ],
+        "type": "object",
+      },
+    },
+  ],
+  "session": {
+    "action": "new",
+    "sessionId": null,
+  },
+  "step": {
+    "buildId": "build-ay0mvriisy6",
+    "createdAt": 1792564757296,
+    "id": "step-ay0mvriisy6",
+    "kind": "plan",
+    "machineId": "machine-ay0mvriisy6",
+  },
+  "todo": {
+    "id": "todo-ay0mvriisy6",
+    "seqNum": 1,
+    "spec": "",
+    "title": "close target",
+  },
+}
+
+ ❯ test/close-stops-active-steps.test.ts:315:28
+    313|     expect(res.status).toBe(200);
+    314|     expect(todoPhase(w)).toBe('done');
+    315|     expect(await claim(w)).toBeNull();
+       |                            ^
+    316|     expect(stepStatus(w)).toBe('stopped');
+    317|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > raw PATCH planning → done：委托停 claimed 步，回报后卡仍是 done
+AssertionError: expected [] to deeply equal [ 'step-mfzl91fa87' ]
+
+- Expected
++ Received
+
+- [
+-   "step-mfzl91fa87",
+- ]
++ []
+
+ ❯ test/close-stops-active-steps.test.ts:330:7
+    328|         .all()
+    329|         .map((p) => p.stepId),
+    330|     ).toEqual([w.stepId]);
+       |       ^
+    331|     expect(events.some((e) => e.type === 'stop')).toBe(true);
+    332|     applyStoppedStep(w.s.svc, w.stepId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > complete_todos 标 building 卡完成：委托停 claimed 步，回报后卡仍是 done
+AssertionError: expected [] to deeply equal [ 'step-21sjg64gn8q' ]
+
+- Expected
++ Received
+
+- [
+-   "step-21sjg64gn8q",
+- ]
++ []
+
+ ❯ test/close-stops-active-steps.test.ts:347:7
+    345|         .all()
+    346|         .map((p) => p.stepId),
+    347|     ).toEqual([w.stepId]);
+       |       ^
+    348|     expect(events.some((e) => e.type === 'stop')).toBe(true);
+    349|     applyStoppedStep(w.s.svc, w.stepId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/persona-split-verify.test.ts > #1250 split_todo（层 2） > manual done stops the pending step (#1247, #1451)
+AssertionError: expected [ 'pending' ] to deeply equal [ 'stopped' ]
+
+- Expected
++ Received
+
+  [
+-   "stopped",
++   "pending",
+  ]
+
+ ❯ test/persona-split-verify.test.ts:787:40
+    785|     expect(w.todoRow().phase).toBe('done');
+    786|     const build = w.stepsOf(buildId).filter((s) => s.kind === 'build');
+    787|     expect(build.map((s) => s.status)).toEqual(['stopped']);
+       |                                        ^
+    788|   });
+    789| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 27 passed (31)
+   Start at  06:40:12
+   Duration  5.12s (transform 47%, import 31%, tests 23%)
+
+  Transform  transforming modules took 4.35s · 47% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

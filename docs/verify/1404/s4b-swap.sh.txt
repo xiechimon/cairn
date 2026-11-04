@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# swap.sh <worktree> <dir-with-files>: copy the five S4b implementation files from <dir> into the worktree.
+W=$1; D=$2; G=$W/apps/server/src/services/merge-gate
+cp $D/github-facts.ts $G/github-facts.ts; cp $D/gate-status.ts $G/gate-status.ts
+cp $D/readiness.ts $G/readiness.ts; cp $D/evidence-link.ts $G/evidence-link.ts
+cp $D/merge-gate-github.ts $W/apps/server/src/services/merge-gate-github.ts

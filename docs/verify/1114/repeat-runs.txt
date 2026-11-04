@@ -1,0 +1,6 @@
+  ✓  147 e2e/board-dnd.spec.ts:909:1 › overlay unmounts with the pointerup frame — no glide (688ms)
+  ✓  148 e2e/board-dnd.spec.ts:909:1 › overlay unmounts with the pointerup frame — no glide (697ms)
+  ✓  149 e2e/board-dnd.spec.ts:909:1 › overlay unmounts with the pointerup frame — no glide (699ms)
+  ✓  150 e2e/board-dnd.spec.ts:909:1 › overlay unmounts with the pointerup frame — no glide (670ms)
+
+  150 passed (33.1s)

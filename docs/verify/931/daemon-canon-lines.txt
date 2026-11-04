@@ -1,0 +1,39 @@
+step n0vKO2aZpR1tdDwK5zrJO for conv 01a10c78-5b8b-7c39-8711-3aeb304b7288 (1 running)
+using model stub-gw/stub-model
+[workspace] Worktree added (pacman/conv-01a10c78-5b8b-7c39-8711-3aeb304b7288 from origin/main)
+new session 01a10c78-5b8b-7c39-8711-3aeb304b7288
+pushed pacman/conv-01a10c78-5b8b-7c39-8711-3aeb304b7288
+finished (0 running)
+step cHvzdpvXskJLPFJy50DrR for conv 01a10c78-5b8b-7c39-8711-3aeb304b7288 (1 running)
+using model stub-gw/stub-model
+[workspace] Worktree reused
+continue session 01a10c78-5b8b-7c39-8711-3aeb304b7288
+pushed pacman/conv-01a10c78-5b8b-7c39-8711-3aeb304b7288
+finished (0 running)
+step 7bmZIaLiQOv_9ABIjXsWF for conv 01a10c78-5b8b-7c39-8711-3aeb304b7288 (1 running)
+using model stub-gw/stub-model
+[workspace] Worktree reused
+new session 01a10c78-5b8b-7c39-8711-3aeb304b7288
+[workspace] Worktree restored
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+finished (0 running)
+step a9rRdy00SICp_OHPfK-kj for conv 01a10c78-5b8b-7c39-8711-3aeb304b7288 (1 running)
+using model stub-gw/stub-model
+[workspace] Worktree reused
+[workspace] Worktree restored
+[workspace] 返工新会话：工作区回退到分支头
+new session 01a10c78-5b8b-7c39-8711-3aeb304b7288
+pushed pacman/conv-01a10c78-5b8b-7c39-8711-3aeb304b7288
+finished (0 running)
+step V1fpWJLxd93c9GQBhe6Ly for conv 01a10c78-5b8b-7c39-8711-3aeb304b7288 (1 running)
+using model stub-gw/stub-model
+[workspace] Worktree reused
+continue session 01a10c78-5b8b-7c39-8711-3aeb304b7288
+pushed pacman/conv-01a10c78-5b8b-7c39-8711-3aeb304b7288
+finished (0 running)
+step -NSjm2BfpLbaiWykD4D-8 for conv 01a10c78-5b8b-7c39-8711-3aeb304b7288 (1 running)
+using model stub-gw/stub-model
+[workspace] Worktree reused
+continue session 01a10c78-5b8b-7c39-8711-3aeb304b7288
+pushed pacman/conv-01a10c78-5b8b-7c39-8711-3aeb304b7288
+finished (0 running)

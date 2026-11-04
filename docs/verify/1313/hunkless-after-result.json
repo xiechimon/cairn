@@ -1,0 +1,47 @@
+{
+  "probe": "1313-hunkless-rename",
+  "expect": "after",
+  "ok": true,
+  "checks": [
+    {
+      "name": "session Owner",
+      "ok": true,
+      "detail": "Owner"
+    },
+    {
+      "name": "agent 缺合并分支",
+      "ok": true,
+      "detail": "[\"推送分支\"]"
+    },
+    {
+      "name": "rename hasChanges",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "rename parsed files 为空",
+      "ok": true,
+      "detail": "{\"files\":[],\"reported\":true,\"changed\":true}"
+    },
+    {
+      "name": "after rename changes.changed",
+      "ok": true,
+      "detail": "{\"files\":[],\"reported\":true,\"changed\":true}"
+    },
+    {
+      "name": "after rename 展示合并行",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "name": "after rename 无空提交说明",
+      "ok": true,
+      "detail": "note=0"
+    },
+    {
+      "name": "after rename 缺授权时完成禁用",
+      "ok": true,
+      "detail": "disabled=true"
+    }
+  ]
+}

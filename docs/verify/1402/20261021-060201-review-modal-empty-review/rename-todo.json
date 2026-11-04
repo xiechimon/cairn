@@ -1,0 +1,43 @@
+{
+  "id": "GGVamTsorOLt7O34LBN7m",
+  "teamId": "GEyv_W_0R-wG0E2V-MQmK",
+  "projectId": "c9ABEEIkgT-4Y59_6o1q-",
+  "title": "纯重命名",
+  "spec": "纯重命名：review 收口探针",
+  "phase": "review",
+  "phaseAt": 1792562522195,
+  "seqNum": 1,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": {
+      "agentId": "BwvTA2NX0XqAe4OL5OirB"
+    },
+    "build": {
+      "agentId": "BwvTA2NX0XqAe4OL5OirB"
+    }
+  },
+  "agent": {
+    "id": "BwvTA2NX0XqAe4OL5OirB",
+    "displayName": "empty-review-builder"
+  },
+  "latestBuildId": "01a15d0d-6838-751c-804c-10ce2d7afbb7",
+  "lastRunAt": 1792562522168,
+  "hasChanges": true,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a15d0d-6838-751c-804c-10ce2d7afbb7",
+      "createdAt": 1792562522168
+    }
+  ],
+  "sourceTodo": null,
+  "blockedBy": null,
+  "v": 4,
+  "createdBy": "OK13YGkXUOso5w4RimFhE",
+  "ownerId": "OK13YGkXUOso5w4RimFhE",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "quotaWait": null
+}

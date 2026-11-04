@@ -1,0 +1,12 @@
+ RUN  v5.0.1 /private/tmp/pacman-1195-before/apps/daemon
+ ❯ test/workspace.test.ts (24 tests | 6 failed | 18 skipped) 8736ms
+     × 事故形：自建分支留有窗口内新提交、HEAD 已切回 → 扫出该分支 1400ms
+     × 窗口外分支不中：tip 提交早于 sinceMs（用户既有分支不误认） 1614ms
+     × base 之外无提交的分支不中（同 tip 空分支） 1280ms
+     × 邻座 conv 分支照实上报（排除是 runner 侧策略，原语不做归属裁决） 1505ms
+     × base 不可解析 → 空集（fail-open，不抛错不阻断收尾） 1388ms
+     × WorkspaceManager 透传同语义（WorktreeOps 缝消费面） 1546ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 事故形：自建分支留有窗口内新提交、HEAD 已切回 → 扫出该分支
+TypeError: gitPrim.branchesWithNewCommits is not a function
+ FAIL  test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 窗口外分支不中：tip 提交早于 sinceMs（用户既有分支不误认）

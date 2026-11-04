@@ -1,0 +1,220 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 8 tests using 1 worker
+
+(node:7675) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/8] e2e/registry-focus-ring.spec.ts:96:3 › #1244 registry focus outline › input, select, and button use the global outline
+  1) e2e/registry-focus-ring.spec.ts:96:3 › #1244 registry focus outline › input, select, and button use the global outline 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      80 | function expectGlobalOutline(info: FocusInfo) {
+      81 |   expect(info.focusVisible).toBe(true);
+    > 82 |   expect(info.outlineStyle).toBe('solid');
+         |                             ^
+      83 |   expect(info.outlineWidth).toBe('2px');
+      84 |   expect(info.outlineOffset).toBe('2px');
+      85 |   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+        at expectGlobalOutline (/workspace/apps/web/e2e/registry-focus-ring.spec.ts:82:29)
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:105:5
+
+    Error Context: test-results/registry-focus-ring--1244--ffdd9-tton-use-the-global-outline/error-context.md
+
+
+(node:7750) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[2/8] e2e/registry-focus-ring.spec.ts:116:3 › #1244 registry focus outline › the same three controls use the global outline in light
+  2) e2e/registry-focus-ring.spec.ts:116:3 › #1244 registry focus outline › the same three controls use the global outline in light 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      80 | function expectGlobalOutline(info: FocusInfo) {
+      81 |   expect(info.focusVisible).toBe(true);
+    > 82 |   expect(info.outlineStyle).toBe('solid');
+         |                             ^
+      83 |   expect(info.outlineWidth).toBe('2px');
+      84 |   expect(info.outlineOffset).toBe('2px');
+      85 |   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+        at expectGlobalOutline (/workspace/apps/web/e2e/registry-focus-ring.spec.ts:82:29)
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:123:5
+
+    Error Context: test-results/registry-focus-ring--1244--a8bbf-the-global-outline-in-light/error-context.md
+
+
+(node:7826) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[3/8] e2e/registry-focus-ring.spec.ts:130:3 › #1244 registry focus outline › a default textarea uses the global outline in both themes
+  3) e2e/registry-focus-ring.spec.ts:130:3 › #1244 registry focus outline › a default textarea uses the global outline in both themes 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      80 | function expectGlobalOutline(info: FocusInfo) {
+      81 |   expect(info.focusVisible).toBe(true);
+    > 82 |   expect(info.outlineStyle).toBe('solid');
+         |                             ^
+      83 |   expect(info.outlineWidth).toBe('2px');
+      84 |   expect(info.outlineOffset).toBe('2px');
+      85 |   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+        at expectGlobalOutline (/workspace/apps/web/e2e/registry-focus-ring.spec.ts:82:29)
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:138:7
+
+    Error Context: test-results/registry-focus-ring--1244--a9394-obal-outline-in-both-themes/error-context.md
+
+
+(node:7896) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[4/8] e2e/registry-focus-ring.spec.ts:142:3 › #1244 registry focus outline › clicking the name input shows the global outline, not the gray ring
+  4) e2e/registry-focus-ring.spec.ts:142:3 › #1244 registry focus outline › clicking the name input shows the global outline, not the gray ring 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      80 | function expectGlobalOutline(info: FocusInfo) {
+      81 |   expect(info.focusVisible).toBe(true);
+    > 82 |   expect(info.outlineStyle).toBe('solid');
+         |                             ^
+      83 |   expect(info.outlineWidth).toBe('2px');
+      84 |   expect(info.outlineOffset).toBe('2px');
+      85 |   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+        at expectGlobalOutline (/workspace/apps/web/e2e/registry-focus-ring.spec.ts:82:29)
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:148:5
+
+    Error Context: test-results/registry-focus-ring--1244--c275d-l-outline-not-the-gray-ring/error-context.md
+
+
+(node:7966) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[5/8] e2e/registry-focus-ring.spec.ts:151:3 › #1244 registry focus outline › aria-invalid keeps a 3px destructive shadow and the global outline
+  5) e2e/registry-focus-ring.spec.ts:151:3 › #1244 registry focus outline › aria-invalid keeps a 3px destructive shadow and the global outline 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      157 |     await page.waitForTimeout(350);
+      158 |     const info = await readFocus(input);
+    > 159 |     expect(info.outlineStyle).toBe('solid');
+          |                               ^
+      160 |     expect(info.outlineWidth).toBe('2px');
+      161 |     expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+      162 |     expect(info.boxShadow).toContain('0px 0px 0px 3px');
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:159:31
+
+    Error Context: test-results/registry-focus-ring--1244--dd684-adow-and-the-global-outline/error-context.md
+
+
+(node:8036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[6/8] e2e/registry-focus-ring.spec.ts:165:3 › #1244 registry focus outline › checkbox, switch, and badge use the global outline
+  6) e2e/registry-focus-ring.spec.ts:165:3 › #1244 registry focus outline › checkbox, switch, and badge use the global outline 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      80 | function expectGlobalOutline(info: FocusInfo) {
+      81 |   expect(info.focusVisible).toBe(true);
+    > 82 |   expect(info.outlineStyle).toBe('solid');
+         |                             ^
+      83 |   expect(info.outlineWidth).toBe('2px');
+      84 |   expect(info.outlineOffset).toBe('2px');
+      85 |   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+        at expectGlobalOutline (/workspace/apps/web/e2e/registry-focus-ring.spec.ts:82:29)
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:170:5
+
+    Error Context: test-results/registry-focus-ring--1244--bbfc3-adge-use-the-global-outline/error-context.md
+
+
+(node:8106) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[7/8] e2e/registry-focus-ring.spec.ts:188:3 › #1244 registry focus outline › input-group draws the outline on the shell, not the control
+  7) e2e/registry-focus-ring.spec.ts:188:3 › #1244 registry focus outline › input-group draws the outline on the shell, not the control 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "solid"
+    Received: "none"
+
+      197 |     const shell = page.locator('[data-slot="input-group"]').first();
+      198 |     const shellInfo = await readFocus(shell);
+    > 199 |     expect(shellInfo.outlineStyle).toBe('solid');
+          |                                    ^
+      200 |     expect(shellInfo.outlineWidth).toBe('2px');
+      201 |     expect(shellInfo.outlineOffset).toBe('2px');
+      202 |     expect(shellInfo.outlineColor).toBe(hexToRgb(shellInfo.focusRing));
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:199:36
+
+    Error Context: test-results/registry-focus-ring--1244--6e6fe-n-the-shell-not-the-control/error-context.md
+
+
+(node:8177) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[8/8] e2e/registry-focus-ring.spec.ts:206:3 › #1244 registry focus outline › a tab trigger uses the global outline
+  8) e2e/registry-focus-ring.spec.ts:206:3 › #1244 registry focus outline › a tab trigger uses the global outline 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "2px"
+    Received: "1px"
+
+      81 |   expect(info.focusVisible).toBe(true);
+      82 |   expect(info.outlineStyle).toBe('solid');
+    > 83 |   expect(info.outlineWidth).toBe('2px');
+         |                             ^
+      84 |   expect(info.outlineOffset).toBe('2px');
+      85 |   expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+      86 |   expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
+        at expectGlobalOutline (/workspace/apps/web/e2e/registry-focus-ring.spec.ts:83:29)
+        at /workspace/apps/web/e2e/registry-focus-ring.spec.ts:211:5
+
+    Error Context: test-results/registry-focus-ring--1244--7e578-ger-uses-the-global-outline/error-context.md
+
+
+  8 failed
+    e2e/registry-focus-ring.spec.ts:96:3 › #1244 registry focus outline › input, select, and button use the global outline 
+    e2e/registry-focus-ring.spec.ts:116:3 › #1244 registry focus outline › the same three controls use the global outline in light 
+    e2e/registry-focus-ring.spec.ts:130:3 › #1244 registry focus outline › a default textarea uses the global outline in both themes 
+    e2e/registry-focus-ring.spec.ts:142:3 › #1244 registry focus outline › clicking the name input shows the global outline, not the gray ring 
+    e2e/registry-focus-ring.spec.ts:151:3 › #1244 registry focus outline › aria-invalid keeps a 3px destructive shadow and the global outline 
+    e2e/registry-focus-ring.spec.ts:165:3 › #1244 registry focus outline › checkbox, switch, and badge use the global outline 
+    e2e/registry-focus-ring.spec.ts:188:3 › #1244 registry focus outline › input-group draws the outline on the shell, not the control 
+    e2e/registry-focus-ring.spec.ts:206:3 › #1244 registry focus outline › a tab trigger uses the global outline 
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/apps/web
+

@@ -1,0 +1,136 @@
+P1_MergeBoundToJudgedPatch: PASS, 155443 distinct states - matches expected
+P2_StaleVerdictNeverSatisfies: PASS, 155443 distinct states - matches expected
+P1N_UnboundVerdicts: FAIL, 85755 distinct states - matches expected
+  1. Initial
+       head = "h1"
+       base = "b1"
+       dgst = "d1"
+       landed = [ h |-> "none", d |-> "none", v |-> "pass", rv |-> "pass", dv |-> "pass", indep |-> FALSE, rh |-> "none" ]
+  2. RecordVerdict
+       verdicts = 1
+  3. PushCode
+       head = "h2"
+       dgst = "d2"
+  4. RecordVerdict
+       verdicts = 2
+  5. RecordVerdict
+       verdicts = 3
+  6. Evaluate
+       lastEval = [h |-> "h2", b |-> "b1", d |-> "d2", ready |-> TRUE]
+  7. ExecuteMergeGithub
+       landed = [ h |-> "h2", d |-> "d2", v |-> "none", rv |-> "pass", dv |-> "pass", indep |-> FALSE, rh |-> "none" ]
+P2N_UnboundVerdicts: FAIL, 19941 distinct states - matches expected
+  1. Initial
+       head = "h1"
+       base = "b1"
+       dgst = "d1"
+       landed = [ h |-> "none", d |-> "none", v |-> "pass", rv |-> "pass", dv |-> "pass", indep |-> FALSE, rh |-> "none" ]
+  2. RecordVerdict
+       verdicts = 1
+  3. PushCode
+       head = "h2"
+       dgst = "d2"
+  4. RecordVerdict
+       verdicts = 2
+  5. RecordVerdict
+       verdicts = 3
+  6. Evaluate
+       lastEval = [h |-> "h2", b |-> "b1", d |-> "d2", ready |-> TRUE]
+P1H_UnboundReviewHead: FAIL, 24218 distinct states - matches expected
+  1. Initial
+       head = "h1"
+       base = "b1"
+       dgst = "d1"
+       landed = [ h |-> "none", d |-> "none", v |-> "pass", rv |-> "pass", dv |-> "pass", indep |-> FALSE, rh |-> "none" ]
+  2. RecordVerdict
+       verdicts = 1
+  3. RecordVerdict
+       verdicts = 2
+  4. RecordVerdict
+       verdicts = 3
+  5. Evaluate
+       lastEval = [h |-> "h1", b |-> "b1", d |-> "d1", ready |-> TRUE]
+  6. ExecuteMergeGithub
+       landed = [ h |-> "h1", d |-> "d1", v |-> "pass", rv |-> "pass", dv |-> "pass", indep |-> TRUE, rh |-> "h2" ]
+P4_MergeRechecksDigest: FAIL, 88651 distinct states - matches expected
+  1. Initial
+       head = "h1"
+       base = "b1"
+       dgst = "d1"
+       landed = [ h |-> "none", d |-> "none", v |-> "pass", rv |-> "pass", dv |-> "pass", indep |-> FALSE, rh |-> "none" ]
+  2. RecordVerdict
+       verdicts = 1
+  3. RecordVerdict
+       verdicts = 2
+  4. RecordVerdict
+       verdicts = 3
+  5. Evaluate
+       lastEval = [h |-> "h1", b |-> "b1", d |-> "d1", ready |-> TRUE]
+  6. BaseMoveInteracting
+       base = "b2"
+       dgst = "d2"
+  7. ExecuteMergeGithub
+       landed = [ h |-> "h1", d |-> "d2", v |-> "none", rv |-> "none", dv |-> "none", indep |-> FALSE, rh |-> "none" ]
+P3_LocalLandingBindsJudgedPatch: PASS, 47 distinct states - matches expected
+P3A_NoLandingRecheck: FAIL, 46 distinct states - matches expected
+  1. Initial
+       base = "b1"
+       landed = [b |-> "none", d |-> "none"]
+       patch = "d1"
+       judged = [b |-> "none", d |-> "none"]
+       decided = [b |-> "none", d |-> "none"]
+       commitReady = FALSE
+       commitBase = "none"
+  2. JudgeLocalPatch
+       judged = [b |-> "b1", d |-> "d1"]
+  3. LocalPatchChange
+       patch = "d2"
+  4. CreateCommit
+       commitReady = TRUE
+       commitBase = "b1"
+  5. DecideLocalMerge
+       decided = [b |-> "b1", d |-> "d2"]
+  6. LandLocal
+       landed = [b |-> "b1", d |-> "d2"]
+P3B_NoFfCheck: FAIL, 40 distinct states - matches expected
+  1. Initial
+       base = "b1"
+       landed = [b |-> "none", d |-> "none"]
+       patch = "d1"
+       judged = [b |-> "none", d |-> "none"]
+       decided = [b |-> "none", d |-> "none"]
+       commitReady = FALSE
+       commitBase = "none"
+  2. JudgeLocalPatch
+       judged = [b |-> "b1", d |-> "d1"]
+  3. CreateCommit
+       commitReady = TRUE
+       commitBase = "b1"
+  4. DecideLocalMerge
+       decided = [b |-> "b1", d |-> "d1"]
+  5. LocalBaseMove
+       base = "b2"
+  6. LandLocal
+       landed = [b |-> "b2", d |-> "d1"]
+P3C_NoBaseRecheck: FAIL, 42 distinct states - matches expected
+  1. Initial
+       base = "b1"
+       landed = [b |-> "none", d |-> "none"]
+       patch = "d1"
+       judged = [b |-> "none", d |-> "none"]
+       decided = [b |-> "none", d |-> "none"]
+       commitReady = FALSE
+       commitBase = "none"
+  2. JudgeLocalPatch
+       judged = [b |-> "b1", d |-> "d1"]
+  3. LocalBaseMove
+       base = "b2"
+  4. CreateCommit
+       commitReady = TRUE
+       commitBase = "b2"
+  5. DecideLocalMerge
+       decided = [b |-> "b2", d |-> "d1"]
+  6. LandLocal
+       landed = [b |-> "b2", d |-> "d1"]
+P5_RepeatedVerdictRemainsBlocked: PASS, 15 distinct states - matches expected
+covered code unchanged since sync-commit cbfbd566acd375fd924b00ba02e8075435fbe9df

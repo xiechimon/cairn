@@ -1,0 +1,18 @@
+FAIL Codex incorporates shared checklist
+FAIL Grok incorporates shared checklist
+FAIL pi incorporates shared checklist
+FAIL fixture scope in dispatch
+FAIL fixture scope in skill
+FAIL stub scope in dispatch
+FAIL stub scope in skill
+FAIL delivery scope in dispatch
+FAIL delivery scope in skill
+FAIL mechanism artifact in dispatch
+FAIL mechanism artifact in skill
+FAIL review boundary in dispatch
+FAIL review boundary in skill
+FAIL parent scope in dispatch
+FAIL parent scope in skill
+PASS stub workflow preserved
+PASS fixture workflow preserved
+2/17 checks passed

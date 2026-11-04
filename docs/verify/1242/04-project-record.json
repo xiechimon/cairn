@@ -1,0 +1,9 @@
+{
+  "id": "twm7rXuxATEnyif8ERTuh",
+  "name": "probe-1242-renamed",
+  "teamId": "NgPXJ1mMMQBBRybfL25H5",
+  "repoKind": "github",
+  "githubRepo": "octocat/Hello-World",
+  "localPath": "/home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a/.claude/verify-run/local-repo",
+  "cloneUrl": "https://github.com/octocat/Hello-World.git"
+}

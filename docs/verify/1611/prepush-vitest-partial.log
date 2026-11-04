@@ -1,0 +1,20 @@
+
+ RUN  v5.0.1 /home/ian/lanes/cairn-1611
+
+ ✓ |@xiechimon/cairn-cli| test/acp.test.ts (10 tests) 21ms
+ ✓ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (10 tests) 248ms
+ ✓ |@xiechimon/cairn| test/gemini-runtime.test.ts (2 tests) 8ms
+ ✓ |@xiechimon/cairn-cli| test/step-reclaim.test.ts (3 tests) 447ms
+ ✓ |@xiechimon/cairn-cli| test/machine-boot.test.ts (5 tests) 240ms
+ ✓ |@xiechimon/cairn-cli| test/runner-blocker-handoff.test.ts (4 tests) 41ms
+ ✓ |@xiechimon/cairn-cli| test/machine-backends.test.ts (4 tests) 574ms
+ ✓ |@xiechimon/cairn-cli| test/machine-steer.test.ts (6 tests) 665ms
+ ✓ |@xiechimon/cairn-cli| test/machine-recover.test.ts (7 tests) 762ms
+ ✓ |@xiechimon/cairn-cli| test/machine-claim.test.ts (3 tests) 269ms
+ ✓ |@xiechimon/cairn-cli| test/runner-issue-fence.test.ts (14 tests) 51ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel.test.ts (2 tests) 963ms
+   ✓ #1108 parallel execution loop (localCap concurrency + free-slot handoff + graceful stop) (2)
+     ✓ P1+P2+P3: cap=2 runs two steps concurrently, no claim while in-flight is full, slot freed on close and re-claimed 819ms
+ ✓ |@xiechimon/cairn-cli| test/machine-stop.test.ts (8 tests) 838ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel-chief.test.ts (7 tests) 858ms
+ ✓ |@xiechimon/cairn-cli| test/machine-step-exec.test.ts (4 tests) 628ms

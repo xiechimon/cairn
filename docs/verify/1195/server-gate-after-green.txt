@@ -1,0 +1,16 @@
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0335-1195/apps/server
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 补写轮仍无 plan.md → 失败收尾：step failed + todo failed + errorMessage「规划未产出方案」 69ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 首轮无 plan.md 仍走 #113 补写轮（重试一次，不是直接失败） 21ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 负例：补写轮写出 plan.md → 照常过闸进 confirm（hasPlan 置位） 26ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 失败重启轮（新 build 首个 plan 步、prompt 带 restart 指令）→ 同样享一次补写重试 31ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > done success + hasChanges=false → 失败收尾「构建零改动」 21ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 负例：hasChanges=true → 照常进 review（有物过闸） 22ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 版本墙负例：老 daemon 不携带 hasChanges → fail-open 照常 review 20ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 3（B-C14 假完成形状）：done success 零产出零 errorMessage → 按失败收尾 20ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 4（不误伤）：review 步 hasChanges=false 照常收 verdict，不落 failed 24ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 5（真值源）：无 repo 项目 hasChanges=true 照常 review——闸不读恒空投影 19ms
+ ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 6：hasChanges=false + workBranchDrift → 失败原因点名分支偏离 18ms
+ ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 7：hasChanges=true + workBranchDrift → 照常过闸进 review 18ms
+ ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 9：老 daemon 载荷（无 drift 字段）→「构建零改动」不变 17ms
+ Test Files  1 passed (1)
+      Tests  13 passed (13)

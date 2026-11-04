@@ -1,0 +1,15 @@
+[Exec]
+Boot=yes
+PrivateUsers=pick
+Environment=COREPACK_HOME=/usr/local/lib/corepack
+Environment=HTTP_PROXY=http://10.203.0.1:7890
+Environment=HTTPS_PROXY=http://10.203.0.1:7890
+Environment=http_proxy=http://10.203.0.1:7890
+Environment=https_proxy=http://10.203.0.1:7890
+
+Environment=NO_PROXY=localhost,127.0.0.1,::1
+Environment=no_proxy=localhost,127.0.0.1,::1
+
+[Network]
+VirtualEthernet=yes
+Zone=cairn

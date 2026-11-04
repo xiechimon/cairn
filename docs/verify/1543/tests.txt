@@ -1,0 +1,23 @@
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Rejected: apps/demo/code.ts:3: single-use non-exported function once; inline it or add an exact allowlist entry
+Accepted: function twice() {} twice(); twice();
+Accepted: export function once() {} once();
+Accepted: export const once = () => 1; once();
+Accepted: function once() {} export { once as publicName }; once();
+Accepted: const once = () => 1; export default once;
+Accepted: function unused() {}
+Accepted: const text = "function once() {} once()";
+✔ checks added helpers with symbol references and exact exemptions (2768.56925ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2817.487667

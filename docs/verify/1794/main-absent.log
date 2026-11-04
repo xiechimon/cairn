@@ -1,0 +1,2 @@
+origin/main has no apps/server/src/services/merge-gate-run.ts
+origin/main has no product caller of mergeReadiness outside tests (rg evaluateMergeGate / maybeEnqueueIndependentReview empty on main services).

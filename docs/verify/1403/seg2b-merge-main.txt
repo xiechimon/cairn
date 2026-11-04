@@ -1,0 +1,37 @@
+#1403 segment 2b: merge of origin/main b57b4a0d (2026-10-22)
+=============================================================
+
+Merge commit 0f8ad77a on claude/bootstrap-p2-seg2b. origin/main gained:
+- #1500 (92d34d4e): startBuilds, claim, change reads, CI and memory tools check the todo's
+  team through projectOfTodo (git.ts);
+- #1505 (b57b4a0d): reset is the only way back to todo; a cancelled card's merge does not
+  land (finishStep / applyMergeLanding skip on a closed or todo card, #1487 a); a deleted
+  step stops; requestMerge refuses when the build already has a merge step pending,
+  claimed or waiting for quota (#1487).
+
+Conflicts and how each was resolved (both sides kept):
+1. apps/server/src/services/builds.ts imports: projectOfTodo from git.js (main) with this
+   branch's githubTokenOrNull / teamGithubToken and githubText. main's openGithubToken import
+   is dropped: probePullState uses githubTokenOrNull (same ladder).
+2. requestMerge: main's #1487 in-flight merge-step check runs first (before any phase write
+   or GitHub probe), then this branch's routing to the API merge.
+3. completeStep's #1150 grind entry: main resolved the project through projectOfTodo; this
+   branch had githubPrOf. githubPrOf now takes the todo row and calls projectOfTodo, so the
+   API merge routing, the merge-step tail and the grind entry share the team check.
+4. apps/server/src/services/ci-loop.ts imports: projectOfTodo (main) with githubTokenOrNull
+   and githubText (this branch). The rest of main's ci-loop change (githubTarget takes the
+   todo row) merged without conflict.
+
+Interactions checked, tests in apps/server/test/pr-merge-api.test.ts:
+- [2b-M1] #1505: a card that is closed (cancelled) or todo (reset) gets no API merge: the
+  gate throws the illegal phase transition before any request. Passes on 2b before the merge
+  too (pin; the gate already refused).
+- [2b-M2] #1505: the card is closed or reset while the PR read is in flight: the re-read
+  refuses, no PUT, nothing written. Also a pin. A close during the PUT cannot be undone on
+  GitHub; that case keeps D17b (rows only, no done).
+- [2b-M3] #1500: a todo pointing at another team's GitHub project is not GitHub form: the
+  merge-step path, no GitHub request. New with the merge (fails on 2b before the merge,
+  where githubPrOf read the project without the team check).
+- D31's merge-step case now expects main's #1487 refusal text, which runs first.
+
+Full server suite on the merge: 128 files, 2116 passed, 1 skipped. Gates: gates-seg2b.txt.

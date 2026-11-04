@@ -1,0 +1,14 @@
+$ vitest run
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686/apps/server
+
+(node:170) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+web push delivery failed
+web push delivery failed
+
+ Test Files  177 passed (177)
+      Tests  2949 passed (2949)
+   Start at  17:44:51
+   Duration  44.45s (tests 62%, import 34%, transform 4%)
+

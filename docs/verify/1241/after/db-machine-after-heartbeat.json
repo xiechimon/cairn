@@ -1,0 +1,65 @@
+[
+  {
+    "id": "KrtWCnBqj1CIXAO-rCSJA",
+    "teamId": "I5QLzc32BokHQeGKofH9Z",
+    "name": "grok-bot-vm-481311088",
+    "online": 0,
+    "tokenHash": null,
+    "latestCliVersion": null,
+    "apiKeyId": null,
+    "kind": "local",
+    "enabledRuntimes": "[\"pi\"]",
+    "shellEnabled": 0,
+    "claudeCodeReport": null,
+    "maxConcurrent": 3,
+    "lastSeenAt": null,
+    "capabilities": null,
+    "maxConcurrentOverridden": 0
+  },
+  {
+    "id": "r7DKKlj1C2BZgLFwj18F6",
+    "teamId": "I5QLzc32BokHQeGKofH9Z",
+    "name": "verify-1241-estimate",
+    "online": 1,
+    "tokenHash": "ef0cc25a55937c8a82ac851d910b8a3a0f750b0a5b9a9c91241375e7bcc0d8c8",
+    "latestCliVersion": "0.1.0",
+    "apiKeyId": "JiZBpUUTIUWP-2eaZ2jax",
+    "kind": "remote",
+    "enabledRuntimes": "[\"pi\"]",
+    "shellEnabled": 0,
+    "claudeCodeReport": null,
+    "maxConcurrent": 3,
+    "lastSeenAt": 1792009548100,
+    "capabilities": null,
+    "maxConcurrentOverridden": 0
+  },
+  {
+    "id": "xB0HQo6g2SO3uJ0sRX0Zx",
+    "teamId": "I5QLzc32BokHQeGKofH9Z",
+    "name": "verify-1241-real",
+    "online": 1,
+    "tokenHash": "60c6c1882f001f5736dbcad5e4b5ffd080a2d67d2949931b55f02363332e4746",
+    "latestCliVersion": "0.2.0",
+    "apiKeyId": "RyEEMYSos2hov7QtvWv4M",
+    "kind": "remote",
+    "enabledRuntimes": "[\"pi\"]",
+    "shellEnabled": 0,
+    "claudeCodeReport": "{\"installed\":true,\"hostname\":\"grok-bot-vm-481311088\",\"models\":[{\"id\":\"deepseek-v4-pro[1M]\",\"name\":\"deepseek-v4-pro[1M]\",\"slot\":\"default-fable\"},{\"id\":\"qwen3.8-max-0902[1M]\",\"name\":\"qwen3.8-max-0902[1M]\",\"slot\":\"default-haiku\"},{\"id\":\"glm-5.3[1M]\",\"name\":\"glm-5.3[1M]\",\"slot\":\"default-opus\"},{\"id\":\"MiniMax-M3[1M]\",\"name\":\"MiniMax-M3[1M]\",\"slot\":\"default-sonnet\"}],\"bin\":{\"path\":\"/home/box/.local/bin/claude\",\"version\":\"2.1.299\"},\"auth\":{\"state\":\"logged-in\",\"method\":\"oauth_token\",\"provider\":\"firstParty\"}}",
+    "maxConcurrent": 4,
+    "lastSeenAt": 1792009577894,
+    "capabilities": {
+      "mcpServers": [
+        "rea"
+      ],
+      "skills": [],
+      "hardware": {
+        "cpuCores": 8,
+        "memoryTotalMb": 16002,
+        "memoryAvailableMb": 4397,
+        "loadAvg1": 0.99,
+        "diskFreeMb": 113392
+      }
+    },
+    "maxConcurrentOverridden": 1
+  }
+]

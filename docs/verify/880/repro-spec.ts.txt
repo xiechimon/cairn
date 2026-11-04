@@ -1,0 +1,235 @@
+// THROWAWAY repro for #880 (not committed): deterministically reproduces the
+// CI flake `waitChip(/规划中/)` 150s timeout by injecting the exact mechanism
+// the 2vCPU runner produces — the UI's sampling round trip (SSE → invalidate →
+// refetch of GET /api/todos/<id>) landing AFTER the server-side planning
+// window has closed.
+//
+// Mechanism facts (three CI dumps on 2026-10-05, docs/verify/880):
+//   revision step created → plan v2 landed = 175ms / 208ms / 219ms
+//   at 150s timeout: UI chip = 确认, server phase = confirm, DB plans = 2 rows
+// The chip is a pure sample of the todo query (dhead.tsx: PHASE_UI[todo.phase],
+// S8 canon: SSE events are invalidation hints only). If every /api/todos/<id>
+// response is BUILT after the phase flipped back to confirm, the DOM never
+// renders 规划中 — no amount of polling can see it.
+//
+// Injection: page.route on **/api/todos/* delaying each request 600ms before
+// it reaches the server (> the 175–375ms window, < every 30s budget).
+//
+// ORACLE_880=old → asserts waitChip(/规划中/) → expect RED (flake reproduced)
+// ORACLE_880=new → asserts durable evidence only → expect GREEN (fix works
+//                  under the same injection)
+
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
+import { createDaemonLogger } from '../../apps/daemon/src/log.js';
+import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
+import { plan as planTable, step as stepTable } from '../../apps/server/src/db/schema.js';
+import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import { type StubLlm, startStubLlm } from './stub-llm.js';
+
+const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
+const WEB_DIST = join(ROOT, 'apps/web/dist');
+const ORACLE = process.env.ORACLE_880 === 'new' ? 'new' : 'old';
+/** Must exceed the server-side planning window (175–375ms measured in CI). */
+const SAMPLE_DELAY_MS = 600;
+
+const PLAN_MD = (marker: string) =>
+  [
+    '# 方案',
+    '',
+    `Context: ${marker} 探针任务。`,
+    'Changes: 在 README.md 追加一行探针。',
+    'Edge cases: 无。',
+    'Verification: 读回确认。',
+  ].join('\n');
+
+let stub: StubLlm;
+let server: RealServer;
+let handle: MachineHandle;
+let paths: StatePaths;
+let home: string;
+let browser: Browser;
+let page: Page;
+
+beforeAll(async () => {
+  if (!existsSync(join(WEB_DIST, 'index.html'))) {
+    const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    if (build.status !== 0) throw new Error(`web build failed:\n${build.stdout}\n${build.stderr}`);
+  }
+  stub = await startStubLlm([
+    // reject flow only: plan v1 → revise v2 → build
+    {
+      toolCall: {
+        name: 'bash',
+        arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD('reject-v1')}\nEOF` },
+      },
+    },
+    { content: '方案 v1 已就绪。' },
+    {
+      toolCall: {
+        name: 'bash',
+        arguments: {
+          command: `cat > plan.md <<'EOF'\n${PLAN_MD('标题去掉项目名后缀-adjusted')}\nEOF`,
+        },
+      },
+    },
+    { content: '已按驳回反馈调整方案：标题去掉项目名后缀。' },
+    {
+      toolCall: {
+        name: 'bash',
+        arguments: { command: 'printf "m5 reject probe\\n" >> README.md' },
+      },
+    },
+    { content: '驳回轮修改已完成。' },
+  ]);
+  server = await bootRealServer({
+    providerBaseUrl: stub.url,
+    claimHoldMs: 1_000,
+    agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
+    webDir: WEB_DIST,
+    scheduler: true,
+  });
+  home = mkdtempSync(join(tmpdir(), 'pacman-880repro-home-'));
+  const config = loadDaemonConfig(
+    { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'r880' },
+    {},
+  );
+  paths = statePaths(config.home, config.workspacesDir);
+  const logger = createDaemonLogger({ logFile: paths.daemonLog });
+  handle = await runMachine({
+    config,
+    paths,
+    logger,
+    idleSleepPrevention: false,
+    proxyEnv: {},
+    claimBackoffBaseMs: 50,
+    heartbeatIntervalMs: 500,
+  });
+  await waitFor(() => {
+    try {
+      return readFileSync(paths.daemonLog, 'utf8').includes('[wake] push channel connected');
+    } catch {
+      return false;
+    }
+  }, 30_000);
+  browser = await chromium.launch();
+  page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
+}, 300_000);
+
+afterAll(async () => {
+  await browser?.close();
+  await handle?.stop();
+  await handle?.done;
+  await server?.close();
+  await stub?.close();
+  if (home) rmSync(home, { recursive: true, force: true });
+});
+
+describe('#880 repro：采样延迟 > 规划窗口时瞬态不可观察', () => {
+  test(`驳回支线（oracle=${ORACLE}，todos 采样延迟 ${SAMPLE_DELAY_MS}ms）`, async () => {
+    await page.goto(`${server.url}/app`);
+    await pexpect(page.locator('.sidebar-new-task')).toBeVisible({ timeout: 30_000 });
+    await page.locator('.sidebar-new-task').click();
+    await pexpect(page.locator('.new-task-spec')).toBeVisible();
+    await page.locator('.new-task-spec').fill('880 复现探针');
+    await page.locator('.new-task-dialog').getByRole('button', { name: '保存', exact: true }).click();
+    await pexpect(page.locator('.todo-card-title', { hasText: '880 复现探针' })).toBeVisible({
+      timeout: 30_000,
+    });
+    const todos = (await api(server.url, 'GET', '/api/todos')).body as {
+      id: string;
+      title: string;
+      projectId: string;
+      latestBuildId?: string | null;
+    }[];
+    const created = todos.find((t) => t.title === '880 复现探针');
+    if (!created) throw new Error('todo 未落库');
+    const started = await api(server.url, 'POST', `/api/projects/${created.projectId}/builds`, {
+      todoIds: [created.id],
+      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
+      withPlan: true,
+    });
+    if (started.status !== 201) throw new Error(`startBuilds ${started.status}`);
+
+    await page.locator('.todo-card', { hasText: '880 复现探针' }).locator('.todo-card-link').click();
+    await pexpect(page.locator('.detail-shell')).toBeVisible({ timeout: 15_000 });
+    await pexpect(page.locator('.detail-chip')).toHaveText(/确认/, { timeout: 120_000 });
+
+    // Injection: every todo-row sample takes 600ms to reach the server, so any
+    // refetch triggered by the revision-round events is built after the
+    // ~200ms planning window has closed — the chip never renders 规划中.
+    await page.route('**/api/todos/*', async (route) => {
+      await new Promise((r) => setTimeout(r, SAMPLE_DELAY_MS));
+      await route.continue();
+    });
+
+    await page.locator('.composer-input').fill('标题去掉项目名后缀');
+    await page.locator('.composer-send').click();
+
+    if (ORACLE === 'old') {
+      // The unsound oracle: demands sampling a sub-window transient.
+      await pexpect(page.locator('.detail-chip')).toHaveText(/规划中/, { timeout: 30_000 });
+    }
+
+    // Durable evidence (the fix): reject bubble + plan card v2 + version chip.
+    await pexpect(page.locator('.chat-bubble', { hasText: '标题去掉项目名后缀' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v2', {
+      timeout: 30_000,
+    });
+    await pexpect(page.locator('.doc-pane-select').nth(1)).toHaveText(/v2/, { timeout: 30_000 });
+
+    // Server truth: two plan rows, and two plan steps (initial + revision) —
+    // the revision step is the durable proof the phase re-entered planning.
+    const rejectBuildId = created.latestBuildId ?? (await waitForBuildId(created.id));
+    const plans = server.db
+      .select()
+      .from(planTable)
+      .where(eq(planTable.buildId, rejectBuildId))
+      .all();
+    expect(plans).toHaveLength(2);
+    expect(plans[1]!.version).toBe(2);
+    expect(plans[1]!.content).toContain('标题去掉项目名后缀-adjusted');
+    const steps = server.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, rejectBuildId))
+      .all();
+    const planSteps = steps.filter((s) => s.kind === 'plan');
+    expect(planSteps).toHaveLength(2);
+
+    // Confirm the v2 plan and walk to the review gate (end of reject branch).
+    await page.locator('.detail-head-action').click();
+    await pexpect(page.locator('.detail-chip')).toHaveText(/审核/, { timeout: 120_000 });
+    expect(server.todoPhase(created.id)).toBe('review');
+
+    async function waitForBuildId(todoId: string): Promise<string> {
+      await waitFor(async () => {
+        const list = (await api(server.url, 'GET', '/api/todos')).body as {
+          id: string;
+          latestBuildId: string | null;
+        }[];
+        return list.find((t) => t.id === todoId)?.latestBuildId != null;
+      }, 30_000);
+      const list = (await api(server.url, 'GET', '/api/todos')).body as {
+        id: string;
+        latestBuildId: string | null;
+      }[];
+      const id = list.find((t) => t.id === todoId)?.latestBuildId;
+      if (!id) throw new Error('buildId 未出现');
+      return id;
+    }
+  }, 300_000);
+});

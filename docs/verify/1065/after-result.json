@@ -1,0 +1,40 @@
+{
+  "probe": "drive-1065-zombie-claim",
+  "server": "http://127.0.0.1:8791",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0256-1065/.claude/verify-run/home/server/server.db",
+  "passed": 4,
+  "total": 4,
+  "checks": [
+    {
+      "name": "B（活机）claim 走 wake 路径领到新步",
+      "ok": true,
+      "detail": "machineId=3f6NEuB_0KMa2hbA9cHmG（期望 3f6NEuB_0KMa2hbA9cHmG）"
+    },
+    {
+      "name": "新步落到活机 B（DB 行 machineId = B，状态 claimed）",
+      "ok": true,
+      "detail": "{\"id\":\"Qc2vW7sl_NN943QQLoI4J\",\"kind\":\"plan\",\"status\":\"claimed\",\"machineId\":\"3f6NEuB_0KMa2hbA9cHmG\"}"
+    },
+    {
+      "name": "死机 A 零认领（本 build 无任何步落 A）",
+      "ok": true,
+      "detail": "A=ipTnmsinYMy0xy1AC390w"
+    },
+    {
+      "name": "A 的认领进程确实被 SIGKILL（非自然返回）",
+      "ok": true,
+      "detail": "{\"code\":null,\"signal\":\"SIGKILL\"}"
+    }
+  ],
+  "task": {
+    "buildId": "01a11e73-1095-707e-a79b-762dcd82b521",
+    "todoId": "0Rvk60XC8ROePNeVql7iO"
+  },
+  "machines": {
+    "dead": "ipTnmsinYMy0xy1AC390w",
+    "live": "3f6NEuB_0KMa2hbA9cHmG"
+  },
+  "killAt": 1791512218774,
+  "bClaimStatus": 200,
+  "deadStdout": null
+}

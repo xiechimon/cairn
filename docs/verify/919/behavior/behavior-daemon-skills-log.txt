@@ -1,0 +1,6 @@
+2026-10-07 20:24:15 [skills] team: 1 skill(s), 1 file(s) materialized → /tmp/pacman-919-daemon-home2/team-skills/views/cf0c79ea34c4d8fcda01869b3d7e2a21597c6d7724e08d1ac63b367994c1bf22 (fetched 1 file(s) / 386 byte(s), reused 0)
+2026-10-07 20:24:15 [skills] filtered: haiku-local not in agent allowlist
+2026-10-07 20:24:15 [skills] filtered: secret-local not in agent allowlist
+2026-10-07 20:24:15 [skills] loaded: 1 skills from /tmp/pacman-919-daemon-home2/team-skills/views/cf0c79ea34c4d8fcda01869b3d7e2a21597c6d7724e08d1ac63b367994c1bf22 + /tmp/pacman-919-local-skills
+2026-10-07 20:24:15 [skills] catalog: entries=1 chars=699
+2026-10-07 20:24:15 [skills] deny: 2 skill dir(s) hard-blocked

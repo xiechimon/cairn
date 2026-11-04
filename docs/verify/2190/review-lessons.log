@@ -1,0 +1,7 @@
+lessons counters written
+
+exit=0
+docs/lessons/baselines.json: "verification-command-context" freezes Recurrences 0, which is below the entry's own Recurrences 1 in docs/lessons/1686-verification-command-context.md with no recurrence event to explain the difference, so the baseline would erase recorded history; raise it to 1
+docs/lessons/1686-verification-command-context.md: Intercepts/Recurrences are written from the recorded events, do not edit them by hand (the file says Intercepts 1, Recurrences 1; the events give Intercepts 1, Recurrences 0); run `node scripts/lessons-ledger-gate.mjs write`
+lessons ledger ok
+lessons ledger ok

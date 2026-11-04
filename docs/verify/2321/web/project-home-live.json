@@ -1,0 +1,25 @@
+{
+  "beforeSend": {
+    "thread": null
+  },
+  "afterSend": {
+    "threadId": "chief-01a19739-7004-75f3-963a-7aa277657d77",
+    "projectId": "AiT6KY7g6VNHhmRTKxu-C"
+  },
+  "archived": {
+    "id": "AiT6KY7g6VNHhmRTKxu-C",
+    "name": "api-latency",
+    "archivedAt": 1793538488379
+  },
+  "sendWhileArchived": {
+    "status": 409,
+    "body": {
+      "error": "project AiT6KY7g6VNHhmRTKxu-C is archived"
+    }
+  },
+  "unarchived": {
+    "id": "AiT6KY7g6VNHhmRTKxu-C",
+    "name": "api-latency",
+    "archivedAt": null
+  }
+}

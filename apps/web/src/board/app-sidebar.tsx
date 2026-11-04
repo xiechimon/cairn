@@ -1,0 +1,174 @@
+import { PanelLeft } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router';
+import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
+import { toDisplayTodo } from '../api/mappers.js';
+import { useLiveData } from '../api/provider.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
+import { Button } from '../components/ui/button.js';
+import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
+import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
+import { useI18n } from '../i18n/provider.js';
+import { useTypeToCompose } from '../overlay/hotkeys.js';
+import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
+import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
+import { recordOutsideLocation } from '../settings/settings-href.js';
+import { needsYouCount } from './needs-you.js';
+import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
+
+export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
+
+function readCollapsed(storage: Storage | null): boolean {
+  try {
+    return storage?.getItem(SIDEBAR_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+const NARROW_QUERY = '(max-width: 640px)';
+
+export interface AppSidebarProps {
+  fixture: FixtureSet;
+  selected?: SidebarSelected;
+  todos?: TodoRecord[];
+  searchPanel?: boolean;
+  onSearch?: () => void;
+}
+
+export function AppSidebar({
+  fixture,
+  selected = 'board',
+  todos,
+  searchPanel = true,
+  onSearch,
+}: AppSidebarProps) {
+  const { t } = useI18n();
+  const { live, teamId } = useLiveData();
+  const todosQ = useTodos(teamId, live);
+  const machinesQ = useMachines(teamId, live);
+  const projectsQ = useProjects(teamId, live);
+  const projects: SidebarProject[] | undefined = useMemo(() => {
+    if (live) {
+      return (projectsQ.data ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        icon: p.icon,
+        color: p.color,
+      }));
+    }
+    if (fixture.projectNames == null) return undefined;
+    return Object.entries(fixture.projectNames).map(([id, name]) => ({
+      id,
+      name,
+      ...fixture.projectAvatars?.[id],
+    }));
+  }, [live, projectsQ.data, fixture.projectNames, fixture.projectAvatars]);
+  const search = useSearchState(false, '');
+  const searchResults = useSearchResults(search.query, live && search.open);
+  const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
+  const narrow = useSyncExternalStore(
+    (onStoreChange) => {
+      const mql = window.matchMedia(NARROW_QUERY);
+      mql.addEventListener('change', onStoreChange);
+      return () => mql.removeEventListener('change', onStoreChange);
+    },
+    () => window.matchMedia(NARROW_QUERY).matches,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const location = useLocation();
+  const { key: locationKey } = location;
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [locationKey]);
+  const toggle = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      safeSetItem(SIDEBAR_STORAGE_KEY, next ? '1' : '0');
+      return next;
+    });
+  }, []);
+  const resolvedTodos = useMemo(
+    () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
+    [todos, live, todosQ.data, fixture.todos],
+  );
+  const fixtureMachines = fixture.resources?.machines;
+  const machinesOnline = live
+    ? (machinesQ.data ?? []).filter((m) => m.online).length
+    : fixtureMachines != null
+      ? fixtureMachines.filter((m) => m.online === true).length
+      : fixture.chief != null
+        ? 1
+        : 0;
+  const machinesOffline = live
+    ? (machinesQ.data ?? []).filter((m) => !m.online).length
+    : (fixtureMachines ?? []).filter((m) => m.online === false).length;
+  const { pathname, search: locationSearch } = location;
+  useEffect(
+    () => recordOutsideLocation(`${pathname}${locationSearch}`),
+    [pathname, locationSearch],
+  );
+  useTypeToCompose();
+  const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
+  const sidebarProps = {
+    attention: needsYouCount(resolvedTodos, chiefStream),
+    machinesOnline,
+    machinesOffline,
+    todos: resolvedTodos,
+    onSearch: onSearch ?? (() => search.setOpen(true)),
+    usageNav: fixture.usageNav === true,
+    selected,
+    projects,
+  };
+  return (
+    <>
+      {narrow ? (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
+            aria-label={t('展开侧边栏')}
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <PanelLeft className="size-4.5" strokeWidth={1.75} />
+          </Button>
+          <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <DialogContent
+              showCloseButton={false}
+              onClickCapture={(event) => {
+                if ((event.target as Element).closest('a[href]') != null) closeDrawer();
+              }}
+              className="top-0 left-0 flex h-full w-72 max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 shadow-xl ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
+            >
+              <DialogTitle className="sr-only">{t('侧边栏')}</DialogTitle>
+              <BoardSidebar
+                {...sidebarProps}
+                collapsed={false}
+                onToggle={closeDrawer}
+                onSearch={() => {
+                  closeDrawer();
+                  sidebarProps.onSearch();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <BoardSidebar collapsed={collapsed} onToggle={toggle} {...sidebarProps} />
+      )}
+      {searchPanel && (
+        <SearchPanel
+          open={search.open}
+          fixture={live ? { ...fixture, todos: resolvedTodos, now: Date.now() } : fixture}
+          query={search.query}
+          onQuery={search.setQuery}
+          onClose={() => search.setOpen(false)}
+          server={live ? searchResults.data : undefined}
+        />
+      )}
+    </>
+  );
+}

@@ -1,0 +1,33 @@
+
+ RUN  v5.0.1 <home>/.codex/worktrees/pr-1839-prior-art/cairn
+
+ ❯ |@cairn/integration| test/plan-prior-art-grade.test.ts (19 tests | 1 failed) 8ms
+   × a prior-art heading inside a fenced example cannot satisfy the feature contract 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > a prior-art heading inside a fenced example cannot satisfy the feature contract
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/plan-prior-art-grade.test.ts:95:44
+     93|     '- Run pnpm lint.',
+     94|   ].join('\n');
+     95|   expect(gradePlanPriorArt(example).score).toBe(0);
+       |                                            ^
+     96| });
+     97|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 passed (19)
+   Start at  03:27:17
+   Duration  301ms (transform 67%, import 28%, tests 4%, worker 1%)
+

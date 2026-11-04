@@ -1,0 +1,48 @@
+{
+  "light": {
+    "border": "rgb(236, 229, 218)",
+    "rows": [
+      {
+        "tag": "BUTTON",
+        "top": "1px",
+        "bottom": "1px",
+        "bottomColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "BUTTON",
+        "top": "1px",
+        "bottom": "1px",
+        "bottomColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "BUTTON",
+        "top": "1px",
+        "bottom": "1px",
+        "bottomColor": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "dark": {
+    "border": "rgb(45, 41, 38)",
+    "rows": [
+      {
+        "tag": "BUTTON",
+        "top": "1px",
+        "bottom": "1px",
+        "bottomColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "BUTTON",
+        "top": "1px",
+        "bottom": "1px",
+        "bottomColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "BUTTON",
+        "top": "1px",
+        "bottom": "1px",
+        "bottomColor": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  }
+}

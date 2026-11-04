@@ -1,0 +1,26 @@
+{
+  "probe": "theme",
+  "ok": true,
+  "at": "2026-10-20T20:37:35.260Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home",
+    "root": "/home/user/pacman/.claude/worktrees/p1/"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "light 生效({\"theme\":\"light\",\"light\":true})"
+    },
+    {
+      "ok": true,
+      "label": "dark 生效({\"theme\":\"dark\",\"light\":false})"
+    }
+  ],
+  "artifacts": [
+    "01-theme-default-dark.png",
+    "02-theme-light.png",
+    "03-theme-dark.png"
+  ]
+}

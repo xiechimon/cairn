@@ -1,0 +1,12 @@
+burners started: 16082 16083 16084 16085 16086 16087
+RESULT round=1 rc=0 22s verdict=pass reject=n/a
+RESULT round=2 rc=0 24s verdict=pass reject=n/a
+RESULT round=3 rc=0 21s verdict=pass reject=n/a
+RESULT round=4 rc=0 19s verdict=pass reject=n/a
+RESULT round=5 rc=0 20s verdict=pass reject=n/a
+RESULT round=6 rc=0 20s verdict=pass reject=n/a
+RESULT round=7 rc=0 20s verdict=pass reject=n/a
+RESULT round=8 rc=0 25s verdict=pass reject=n/a
+RESULT round=9 rc=0 24s verdict=pass reject=n/a
+RESULT round=10 rc=0 24s verdict=pass reject=n/a
+burners killed; leftover=0

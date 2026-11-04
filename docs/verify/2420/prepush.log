@@ -1,0 +1,213 @@
+$ node scripts/prepush.mjs
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 5 text + 11 spacing in 8 file(s); 4 css + 291 tsx + 349 ts/tsx (arbitrary scope) scanned. Baseline: base 5632f9de1447, frozen from c005d70a8fed.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (4 css files scanned); 2 bare <input> site(s), 2 deliberate-native; no raw color in 36 components/ui file(s); 21 brand-ink text-role line(s), all registered (21 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.098s
+
+OK
+[prepush] pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+scripts/ops/host/tools/schedule/issue-schedule.mjs:166:15 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  ℹ Template literals are preferred over string concatenation.
+  
+    164 │ if (!apply) {
+    165 │   console.log(body);
+  > 166 │   console.log('\n--- summary ---\n' + summary.join('\n'));
+        │               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    167 │   process.exit(0);
+    168 │ }
+  
+  ℹ Unsafe fix: Use a template literal.
+  
+    164 164 │   if (!apply) {
+    165 165 │     console.log(body);
+    166     │ - ··console.log('\n---·summary·---\n'·+·summary.join('\n'));
+        166 │ + ··console.log(`\n---·summary·---\n${summary.join('\n')}`);
+    167 167 │     process.exit(0);
+    168 168 │   }
+  
+
+Checked 1474 files in 721ms. No fixes applied.
+Found 2 infos.
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1448 tests in 211 files collected, disk count matches (1.1s)
+[spec-parse-gate] integration/test: 67 test files parsed clean by tsc (1.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (23.073663ms)
+✔ apps/web/e2e/board-reach.spec.ts (25.10383ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (23.081238ms)
+✔ registry reach: scripts/drive-unregistered.mjs (21.710922ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (26.220156ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (20.293787ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (50.414612ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (45.624215ms)
+✔ discovers committed, staged and untracked additions from the base (996.271766ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1278.654862
+[prepush] node --test scripts/escape-trace.test.mjs
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (198.531802ms)
+✔ CLI does not truncate more than 200 qualifying commits (1051.299112ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (160.566928ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (182.784896ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (199.853844ms)
+✔ a revert body resolves to the reverted commit and its PR (36.850975ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (36.097636ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (35.565232ms)
+✔ blame split across two commits yields multiple-origin, not a guess (40.146089ms)
+✔ shallow history yields unresolved with a reason (91.07199ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (69.012977ms)
+✔ an introducing merge before --since is still resolvable (31.004477ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (34.458607ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (89.280696ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (38.071234ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (44.799218ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (32.989681ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.228633ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.093431ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.065515ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (35.952847ms)
+✔ blame resolves an unquoted path that contains spaces (39.143253ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (968.301692ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (28.134993ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (73.438832ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (150.696376ms)
+✔ the reviewer-input object contains no defect label, location or correction (49.578367ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (95.637225ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (56.444731ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (53.714617ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (71.983103ms)
+✔ successive exports preserve existing cases and only upsert matching identities (90.138226ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (34.472657ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (74.40834ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4246.469066
+[prepush] node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
+{
+  "ok": true,
+  "caseCount": 0
+}
+[prepush] node --test scripts/review-escapes.test.mjs
+✔ CLI fetches original PR reviews through every page and retains evidence (116.699963ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (293.142227ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (150.520588ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (457.567161ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (113.639376ms)
+✔ the CLI suite runs in local and CI prepush plans (0.967593ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (327.537345ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (176.514973ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (88.191017ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (88.305461ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (173.071089ms)
+✔ non-approving formal AI reviews do not establish AI coverage (184.569845ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (184.798169ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2403.012828
+[prepush] node --test scripts/escape-eval-loop.test.mjs
+✔ escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case (179.482872ms)
+✔ scoped Cairn fix subjects enter the loop; incidental revert wording does not (183.053547ms)
+✔ local and CI prepush plans execute escape-eval-loop tests (1.279623ms)
+✔ CLI rejects missing bounds and unknown arguments (97.819835ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 504.002215
+[prepush] python3 scripts/pr-evidence-gate.test.py
+............................................
+----------------------------------------------------------------------
+Ran 44 tests in 0.095s
+
+OK
+[prepush] node scripts/doc-reader-tests.mjs docs/verify/2420/README.md docs/verify/2420/after-home-1440-dark.png docs/verify/2420/after-home-1440-light.png docs/verify/2420/after-home-390-dark.png docs/verify/2420/after-home-390-light.png docs/verify/2420/after-team-1440-dark.png docs/verify/2420/after-team-1440-light.png docs/verify/2420/after-team-390-dark.png docs/verify/2420/after-team-390-light.png docs/verify/2420/audit-base-red.log docs/verify/2420/before-home-1440-dark.png docs/verify/2420/before-home-1440-light.png docs/verify/2420/before-home-390-dark.png docs/verify/2420/before-home-390-light.png docs/verify/2420/before-team-1440-dark.png docs/verify/2420/before-team-1440-light.png docs/verify/2420/before-team-390-dark.png docs/verify/2420/before-team-390-light.png docs/verify/2420/green.log docs/verify/2420/red.log
+[doc-reader-tests] no test reads the changed docs
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 37 file(s) in apps/web/src/components/ui = 30 registry (23 pristine vs pinned snapshot / 7 registered deviations) + 7 adapters; snapshot shadcn@4.21.3 fetched 2026-10-30; ledger frozen from ac9fc7c8ed14; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 4 flagged line(s) across 349 consumer file(s), all registered (4 entries = 4 deviation).
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node scripts/ui-dead-class-gate.mjs --compile
+ui-dead-class-gate: selector universe from postcss compile (apps/web/src/styles/app.css) + apps/web/src/**/*.css
+scanned 363 files (23 pristine registry files skipped), 10620 class-token occurrences, 2053 living selectors
+zero-rule names: 228 — selector-exempt 225, manual-exempt 3, DEAD 0
+OK — every rendered class token matches a living rule or carries a disposition.
+[prepush] PASS (20 checks)

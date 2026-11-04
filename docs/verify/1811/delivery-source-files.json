@@ -1,0 +1,24 @@
+{
+  "baseCommit": "13e751c1b72b7012e6d4a940bc1cbe6a279b9d3c",
+  "files": {
+    ".claude/skills/verify-merge-gate/SKILL.md": "dfe6ebf2f7dc75dc39a7e68a2bedcb5fcf39012be648ce3c08483fc62480b11e",
+    ".claude/skills/verify-merge-gate/expected.txt": "a66f5c5c8445cde4a05c7d6df88cbecdfc4ff5e538d5db36c88a6205fc9ecd53",
+    ".claude/skills/verify-merge-gate/model/LocalLanding.tla": "c16c7e9650ae4b8261f8e1cd38b4cb1fea0c09e1b853901de0dbf3756e3d4c76",
+    ".claude/skills/verify-merge-gate/model/MergeGate.tla": "a5798d839017e0f738a3d3ce038dbd1981111ba440ca7206274e9af629ee6e29",
+    ".claude/skills/verify-merge-gate/model/P1H_UnboundReviewHead.cfg": "ce7946cb6542fe100c1bc1d90b63d8970f6507d2077b7a7c1a60c0503dbb270a",
+    ".claude/skills/verify-merge-gate/model/P1N_UnboundVerdicts.cfg": "4eacdb80d577826c5fbcd881a2d3a2d6dd6c38728431d2c229d53bb7666070e8",
+    ".claude/skills/verify-merge-gate/model/P1_MergeBoundToJudgedPatch.cfg": "763855d0ecc586ec6a058963bc571ee26efe6eeabdfcf2c7f62050ef6963e749",
+    ".claude/skills/verify-merge-gate/model/P2N_UnboundVerdicts.cfg": "26861bbff0c91d65e2a0b9747e76a758524b76510a4ae7f07bc3b6803dcd3142",
+    ".claude/skills/verify-merge-gate/model/P2_StaleVerdictNeverSatisfies.cfg": "17adb5bbb1d19b64deef9a85e9d34b413f29a5e162afd74eb6ea0d5028f25c78",
+    ".claude/skills/verify-merge-gate/model/P3A_NoLandingRecheck.cfg": "bf9c9f75d9ba35c0055e80483cc66a1bbf46b0043ac7c2724dbd621f8daa7e3b",
+    ".claude/skills/verify-merge-gate/model/P3B_NoFfCheck.cfg": "3dca62c6df6d9f099fde4beb5fd34b7945641d0135458741940607410be6e98e",
+    ".claude/skills/verify-merge-gate/model/P3C_NoBaseRecheck.cfg": "71fa3bb31a659ddfcbf539c443a889a44d04558dde9762134080b3568a1a86a2",
+    ".claude/skills/verify-merge-gate/model/P3_LocalLandingBindsJudgedPatch.cfg": "c11874810e171ef3b0846b4e613a9b07e5fe6abf4ae75af332fd4481596cd342",
+    ".claude/skills/verify-merge-gate/model/P4_MergeRechecksDigest.cfg": "af1b979b35b45bc3890d3cb9eef4e2abff06c23749dd3f24fd37f146d31d9c77",
+    ".claude/skills/verify-merge-gate/model/P5_RepeatedVerdictRemainsBlocked.cfg": "50c15684fabae43c440b398047caa3c820c3451dfd9cb4483d0addbc0c1d222c",
+    ".claude/skills/verify-merge-gate/model/P6_ReviewHeadWasObserved.cfg": "d2f7fc887a84d38811886857051404367b8d7b8a5cbdfa8f9cd201783c1abc89",
+    ".claude/skills/verify-merge-gate/model/RepeatedVerdict.tla": "9a0f1dbdf45174f1b4591ae0335024cdd7ddda79556734d4da5dae197e218b9f",
+    ".claude/skills/verify-merge-gate/model/ReviewHeadCausality.tla": "3714aa374bde140a624279be8d45b74f769166a42374b8bc19df72efa9a83f8d",
+    ".claude/skills/verify-merge-gate/scripts/run.sh": "1f19e175a61e12fecbb6b1a7fb8fa7aa149fceb38a37e9cd0daa7be83277ba48"
+  }
+}

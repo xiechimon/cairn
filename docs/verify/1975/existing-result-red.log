@@ -1,0 +1,37 @@
+✔ valid publication creates exactly one result-only commit (107.983443ms)
+✔ rejects modified harness before publication (59.288159ms)
+✔ rejects untracked file before publication (57.487268ms)
+✔ rejects ignored untracked file before publication (57.83566ms)
+✔ rejects rename before publication (60.864489ms)
+✔ rejects deletion before publication (58.915359ms)
+✔ rejects second evidence file before publication (59.797444ms)
+✔ rejects wrong ticket path before publication (62.582586ms)
+✔ rejects invalid JSON before publication (61.974321ms)
+✔ rejects schema failure before publication (58.248553ms)
+✔ rejects result digest mismatch before publication (57.527025ms)
+✔ rejects additional committed file before publication (63.476658ms)
+✔ rejects requested digest mismatch before evaluation (30.099124ms)
+✔ remote movement after evaluation prevents push (102.214105ms)
+✔ push failure propagates and leaves remote unchanged (87.220647ms)
+✔ rejects unsafe ticket paths before evaluation (30.680218ms)
+✖ updates an existing result with one result-only commit (73.18403ms)
+✔ failed evaluation does not publish an otherwise valid result (52.997739ms)
+✔ missing evidence is rejected (54.840097ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1311.163144
+
+✖ failing tests:
+
+test at scripts/harness-eval-worker.test.mjs:118:1
+✖ updates an existing result with one result-only commit (73.18403ms)
+  Error: Evaluation must modify only the requested result
+      at publishEvaluation (file:///mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.mjs:40:13)
+      at async TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.test.mjs:127:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

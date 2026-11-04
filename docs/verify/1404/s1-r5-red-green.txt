@@ -1,0 +1,117 @@
+# #1404 S1 round 5 (pr-gate run 3 on #1420, go false): the digest binds each file's patch text (ADR 0021 D3 as amended
+# on #1410: tuple [status, filename, previous_filename, blobSha, patchSha]), a linear evidence-link parser, and pins.
+# New tests first, red, then green after the fix.
+
+== red: against the S1 sources at 767eb5a, only tests changed (the fixture file needs no change: its patch placeholders
+== stay; only the expected digest in the test changes). Which fail and why:
+#  - digest, blocking: the review scenario (A->B before merging main, C->B after, same status/filename/blob) gives the
+#    same digest; a patchSha-only change gives the same digest; the patchSha parse test gets undefined (no such field).
+#  - digest, expected values: the pd2 values computed by the independent Python (digest-crosscheck-2.txt) for the
+#    fixture, the code-unit sort set and the null-patchSha set do not match the 4-tuple pd1 output; the four
+#    /^pd2:/ prefix checks fail because the sources still emit pd1 (PATCH_DIGEST_VERSION, see the green section).
+#  - shape: CompareFile.hasPatch becomes patchSha (null = no patch). The test helpers now give patchSha, so the old
+#    sources read hasPatch as undefined: every entry looks patchless (the two opaque tests in paths, the 20-PNG test).
+#  - evidence-link: a URL cut by a comment joins into a link (comment deleted, not blanked); the two adversarial
+#    65,536-character bodies take 3681 ms (link + run of '.' + one letter: TRAILING_PUNCT_RE backtracks) and 406 ms
+#    (16,384 unclosed '<!--': the lazy comment regex rescans to the end from every one).
+#  - the pins pass on the old sources, as pins should: count-mismatch with more entries than changed_files, status
+#    outside COMPARE_FILE_STATUSES / non-string filename, a space alone makes a name protected, gateSource leaves out
+#    ordinary protected paths, a link between two closed comments, every parsed entry matches compareFileSchema.
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+     × 证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀不分大小写 13ms
+     × 改名没有 patch：两头里落在证据目录之外的名字都列出 2ms
+     × 带版本前缀，同一组文件任意顺序算出同一个摘要 19ms
+     × status、filename、blob sha 都不变、只有 patchSha 变：摘要就变 1ms
+     × 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要 5ms
+     × 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要 3ms
+     × 删除条目的 sha 为空也照常计算（真实响应里删除条目带旧 blob sha） 1ms
+     × 299 个文件照常；300 个即视为截断，摘要不可得 2ms
+     × 与 PR 的 changed_files 对不上即视为截断 1ms
+     × compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256 1ms
+     × 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数 6ms
+     × 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同 9ms
+     × patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null 1ms
+     × 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截 12ms
+     × 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内 3681ms
+     × 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内 406ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 带版本前缀，同一组文件任意顺序算出同一个摘要
+AssertionError: expected 'pd1:d41194dea9acd92ff8a5072a9c2d4ad28…' to match /^pd2:[0-9a-f]{64}$/
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > status、filename、blob sha 都不变、只有 patchSha 变：摘要就变
+AssertionError: expected 'pd1:d41194dea9acd92ff8a5072a9c2d4ad28…' not to be 'pd1:d41194dea9acd92ff8a5072a9c2d4ad28…' // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要
+AssertionError: expected 'pd1:c1ce72c53dee6736e02393a91e052967b…' to be 'pd2:ca814f29974582368d2d5afa5202827ed…' // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要
+AssertionError: expected 'pd1:705a58e14af8f2aac1703c4e4dbd299a6…' to be 'pd2:8a58b36d470b028c799fa04cf16468b3b…' // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 删除条目的 sha 为空也照常计算（真实响应里删除条目带旧 blob sha）
+AssertionError: expected 'pd1:33c7d6e128350f4999dd2e64fe3582e89…' to match /^pd2:/
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 299 个文件照常；300 个即视为截断，摘要不可得
+AssertionError: expected 'pd1:0837ab29a4f0dbd1e2a9fd4559f6df113…' to match /^pd2:/
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 与 PR 的 changed_files 对不上即视为截断
+AssertionError: expected 'pd1:d41194dea9acd92ff8a5072a9c2d4ad28…' to match /^pd2:/
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256
+AssertionError: expected +0 to be 20 // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数
+AssertionError: expected 'pd1:ddf04cd2406d952eec621a1d4f0b466d7…' to be 'pd2:b8fc25a097b7a43e1929cee82b6ec03f0…' // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同
+AssertionError: expected 'pd1:d10851ab752f88ef2b8a0a4df26aee338…' not to be 'pd1:d10851ab752f88ef2b8a0a4df26aee338…' // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null
+AssertionError: expected undefined to be 'f66a89464b010b341f1aff020e1ce988a94fa…' // Object.is equality
+ FAIL  |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截
+AssertionError: expected { links: [ { …(2) } ], others: [] } to deeply equal { links: [], …(1) }
+ FAIL  |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内
+AssertionError: expected 3679.023821 to be less than 200
+ FAIL  |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内
+AssertionError: expected 404.7859189999999 to be less than 200
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > compare 不给 patch 的条目（二进制、diff 过大、纯改名） > 证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀不分大小写
+AssertionError: expected [ 'apps/web/public/logo.png', …(3) ] to deeply equal [ 'apps/web/public/logo.png', …(2) ]
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts > compare 不给 patch 的条目（二进制、diff 过大、纯改名） > 改名没有 patch：两头里落在证据目录之外的名字都列出
+AssertionError: expected [ 'apps/server/src/new.ts', …(4) ] to deeply equal [ 'apps/server/src/new.ts', …(2) ]
+ Test Files  3 failed (3)
+      Tests  16 failed | 83 passed (99)
+exit=1
+
+the new and pinned tests in this round (--reporter=verbose, same sources):
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 只多一个空格就算保护：集内源码路径本身不命中任何保护 glob
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 普通的保护路径不进 gateSource
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > status、filename、blob sha 都不变、只有 patchSha 变：摘要就变
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > compare 给的条目比 changed_files 多：同样对不上，摘要不可得
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 解析出的每个条目都合 @pacman/shared 的 compareFileSchema，且没有词表之外的字段
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > status 不在 COMPARE_FILE_STATUSES 里、filename 不是字符串：形状不对，返回 null
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 两段闭合注释之间的链接照常算
+ × |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截
+ × |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内
+ × |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内
+
+== green: round 5 sources ==
+#  - packages/shared merge-gate.ts: CompareFile.hasPatch -> patchSha (64 lowercase hex or null; zod regex), and
+#    PATCH_DIGEST_VERSION pd1 -> pd2. The constant's own comment says the prefix changes whenever the algorithm changes
+#    ("算法一改就换前缀"); pd1 (the 4-tuple) was never stored, so pd2 is the first stored version.
+#  - digest.ts: compareFilesFromResponse keeps patchSha = sha256(patch, UTF-8) hex when patch is a non-empty string,
+#    else null; computePatchDigest hashes [status, filename, previousFilename, sha, patchSha].
+#  - paths.ts: opaque reads patchSha === null (was !hasPatch); no other change.
+#  - evidence-link.ts: closed comments become one space via a forward indexOf scan (first unclosed `<!--` drops the
+#    rest, as before); trailing punctuation stripped by a backward character loop; the query/fragment cut is a
+#    single-character search. RAW_URL_RE is unchanged (one quantifier, at the end).
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts --reporter=verbose
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内 1ms
+ Test Files  3 passed (3)
+      Tests  99 passed (99)   (digest 31, paths 52, evidence-link 16)
+exit=0
+(the two adversarial bodies: 3681 ms and 406 ms per the test's own performance.now() at 767eb5a; 1 ms each now,
+ vitest's per-test duration, which includes building the body and the parse)
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0

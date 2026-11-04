@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "additions": 1,
+      "deletions": 1,
+      "hunks": [
+        {
+          "header": "@@ -1 +1 @@",
+          "lines": [
+            "-old",
+            "+new"
+          ]
+        }
+      ]
+    }
+  ],
+  "reported": true
+}

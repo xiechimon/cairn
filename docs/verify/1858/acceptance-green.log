@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1864-eval-recovery/cairn
+
+
+ Test Files  5 passed (5)
+      Tests  109 passed (109)
+   Start at  06:21:53
+   Duration  1.34s (transform 45%, tests 36%, import 18%, worker 1%)
+

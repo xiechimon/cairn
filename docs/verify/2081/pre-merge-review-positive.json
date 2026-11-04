@@ -1,0 +1,59 @@
+{
+  "timing": "pre_merge",
+  "completedAtUtc": "2026-10-28T11:23:06.851075+00:00",
+  "binding": {
+    "headSha": "500969a9d1afc6bf948108163ad1fa0cce36a3fb",
+    "baseSha": "90a7e74c654c323eb9fef58e0b4fc40ba31152c3",
+    "patchDigest": "pd2:161b5f19b862ecf99a5cbbb21c6f19b58ed3f8667ae906139584f35f17f375c6",
+    "binaryDiffSha256": "4c223ed35a9a89de75742876dd5d87224da4b53790a338b62a53f7bc4cb1d459",
+    "writerModelFamily": "GPT",
+    "timing": "pre_merge",
+    "bundleSha256": "b6a6ad6a20698e2c8033d338881ddff3313b3cee07db75a2f4431e70e4f28569"
+  },
+  "execution": {
+    "rc": 0,
+    "seconds": 29,
+    "timing": "pre_merge",
+    "configuredContextWindow": 1000000
+  },
+  "completion": {
+    "model": "deepseek-v4.1-flash",
+    "stopReason": "stop",
+    "usage": {
+      "input": 435836,
+      "output": 376,
+      "cacheRead": 256,
+      "cacheWrite": 0,
+      "reasoning": 0,
+      "totalTokens": 436468,
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      }
+    }
+  },
+  "review": {
+    "headSha": "500969a9d1afc6bf948108163ad1fa0cce36a3fb",
+    "patchDigest": "pd2:161b5f19b862ecf99a5cbbb21c6f19b58ed3f8667ae906139584f35f17f375c6",
+    "reviewerModel": "deepseek-v4.1-flash",
+    "verdict": "pass",
+    "gateWeakening": {
+      "answer": "no",
+      "reason": "Verified from source: no gate definition, required check, or protected-path list is modified. packages/shared/src/records/provider.ts only widens the optional providerModelSchema with an optional input enum; packages/shared/src/agent-backend.ts adds two optional methods; packages/shared/src/task-failure.ts adds a new pure predicate. No test is deleted, no CI or merge gate changes."
+    },
+    "evalRulerChange": {
+      "answer": "no",
+      "reason": "Verified from source: the diff adds no eval cases, thresholds, baselines, or scoring code. ADR 0025 ruler category files are untouched."
+    },
+    "findings": [],
+    "limitations": [
+      "No tools are available; no tests were run for this review; the logs in docs/verify/1671 are treated as claims.",
+      "External runtime context not inspected: ModelRuntime.create/getModel behavior and how materialized models.json input metadata interacts with Pi's runtime (author cites provider-composer.d.ts and pi-ai types.d.ts; not verified here).",
+      "MachineApi.transcriptRow/steerAck semantics in apps/daemon/src/machine-client.ts are present in the bundle and were checked for call shape only.",
+      "Whether the reviewed-related-green.log 409-case run covers the full affected suite cannot be confirmed from the supplied log."
+    ]
+  }
+}

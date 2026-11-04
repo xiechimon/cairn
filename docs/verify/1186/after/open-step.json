@@ -1,0 +1,16 @@
+[
+  {
+    "id": "0n38LTJX-do2zJWHmtP59",
+    "kind": "build",
+    "status": "done",
+    "skillInjection": {
+      "hits": [
+        {
+          "id": "demo-skill",
+          "rule": "explicit-mention",
+          "reason": "任务文本显式点名「demo-skill」"
+        }
+      ]
+    }
+  }
+]

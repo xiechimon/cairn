@@ -1,0 +1,3 @@
+=== demo 2: same offending lines, now REGISTERED in the ledger (expect GREEN, exit 0) ===
+[ui-consumer-shape-gate] PASS: 8 flagged line(s) across 213 consumer file(s), all registered (8 entries = 5 deviation / 3 rides-primitive).
+gate exit code: 0

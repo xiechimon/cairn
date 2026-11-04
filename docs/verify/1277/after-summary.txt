@@ -1,0 +1,11 @@
+expect=new
+phase=failed
+errorMessage=agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「dogfood/tracer-1153-verification-note」，契约工作分支是「pacman/conv-0198f6c0-0000-7000-8000-000000000000」
+prUrl=null
+prNumber=null
+stepStatus=[{"id":"1ijdqHKcBSGrZN9E7PYY-","kind":"build","status":"failed"}]
+sqlitePhase=failed
+sqliteHasChanges=0
+server=http://127.0.0.1:8791
+web=http://127.0.0.1:5273
+head=654537013303ae880025b83781e1d7e8bd47b0ce

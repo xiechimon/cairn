@@ -1,0 +1,109 @@
+{
+  "probe": "mea-1225-cred-fallback",
+  "server": "http://127.0.0.1:8791",
+  "ghRepo": "xiechimon/pacman",
+  "passed": 19,
+  "total": 19,
+  "checks": [
+    {
+      "name": "端口预检",
+      "ok": true,
+      "detail": "port 8791 free"
+    },
+    {
+      "name": "mea 机器凭据在位（git credential fill → username）",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "name": "server 起在隔离 PACMAN_HOME",
+      "ok": true,
+      "detail": "http://127.0.0.1:8791 home=/tmp/pacman-1225-server-home-1791739597311"
+    },
+    {
+      "name": "github 项目创建（repo=xiechimon/pacman）",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "name": "基座预物化（daemon workspaces 落位）",
+      "ok": true,
+      "detail": "Updating files:  89% (5226/5842)\rUpdating files:  90% (5258/5842)\rUpdating files:  91% (5317/5842)\rUpdating files:  92% (5375/5842)\rUpdating files:  93% (5434/5842)\rUpdating files:  94% (5492/5842)\rUpdating files:  95% (5550/5842)\rUpdating files:  96% (5609/5842)\rUpdating files:  97% (5667/5842)\rUpdating files:  98% (5726/5842)\rUpdating files:  99% (5784/5842)\rUpdating files: 100% (5842/5842)\rUpdating files: 100% (5842/5842), done."
+    },
+    {
+      "name": "github_connection 置坏 token（login=probe-1225-bad）",
+      "ok": true,
+      "detail": "{\"connected\":true,\"login\":\"probe-1225-bad\",\"scope\":\"repo\"}"
+    },
+    {
+      "name": "腿 1：步 success（坏 token 下 clone+push 全链走通）",
+      "ok": true,
+      "detail": "{\"id\":\"-H6zGg9lc8HDYUzoWWlkw\",\"kind\":\"build\",\"status\":\"done\"}"
+    },
+    {
+      "name": "腿 1：daemon.log push 降级行（per-step token → machine credentials）",
+      "ok": true,
+      "detail": "2026-10-12 01:27:09 [step] git push auth failed (per-step token), retrying with machine credentials: git push failed (128): remote: Invalid username or token. Password authentication is not supported for Git operations."
+    },
+    {
+      "name": "腿 1：pushed 行在（conv 分支已推）",
+      "ok": true,
+      "detail": "2026-10-12 01:27:11 pushed pacman/conv-01a12c00-e25d-71a2-a5d1-6e96fcf3a439"
+    },
+    {
+      "name": "腿 1：transcript 凭据来源行 = machine（build 记录面）",
+      "ok": true,
+      "detail": "{\"id\":\"git-credential--H6zGg9lc8HDYUzoWWlkw\",\"role\":\"system\",\"content\":\"\\\"git 凭据来源：machine（执行机本机 git 凭据）\\\"\"}"
+    },
+    {
+      "name": "腿 1：origin 上 conv 分支真值存在",
+      "ok": true,
+      "detail": "sha=f05cda15098f778fa5dc7d4048be5b00d3459964"
+    },
+    {
+      "name": "腿 1：daemon.log 不含坏 token 值（凭据值零回显）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "github_connection 换真 token（login=xiechimon）",
+      "ok": true,
+      "detail": "{\"connected\":true,\"login\":\"xiechimon\",\"scope\":\"repo\"}"
+    },
+    {
+      "name": "腿 2：步 success（真 token 下全链不变）",
+      "ok": true,
+      "detail": "{\"id\":\"mWlwM9dpBFKKtd_BIZ-Jd\",\"kind\":\"build\",\"status\":\"done\"}"
+    },
+    {
+      "name": "腿 2：无新增降级行（集成有效 = 单发即成）",
+      "ok": true,
+      "detail": "leg1=1 leg2=1"
+    },
+    {
+      "name": "腿 2：transcript 凭据来源行 = integration（行为不变）",
+      "ok": true,
+      "detail": "{\"id\":\"git-credential-mWlwM9dpBFKKtd_BIZ-Jd\",\"role\":\"system\",\"content\":\"\\\"git 凭据来源：integration（per-step 下发 token）\\\"\"}"
+    },
+    {
+      "name": "腿 2：origin 上 conv 分支真值存在",
+      "ok": true,
+      "detail": "sha=880ef631c997eaa4981fee5257e97667fc82d271"
+    },
+    {
+      "name": "腿 2：daemon/server 日志不含真 token（gho_/github_pat_ 零命中）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "收尾端口释放（无旧栈残留）",
+      "ok": true,
+      "detail": "port 8791 released"
+    }
+  ],
+  "stubRequests": 4,
+  "remoteBranchCleanup": [
+    "pacman/conv-01a12c00-e25d-71a2-a5d1-6e96fcf3a439: deleted",
+    "pacman/conv-01a12c01-27d5-77ac-83f3-e4008bc250a6: deleted"
+  ]
+}

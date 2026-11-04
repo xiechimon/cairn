@@ -1,0 +1,76 @@
+#1406 P5-3 gates at c60ae648 (branch claude/bootstrap-p5-3, base 2294b087), run as uid 0 in a cloud container.
+
+== pnpm lint (biome ci .) ==
+Checked 789 files in 1831ms. No fixes applied.
+Found 1 info.
+exit=0
+
+== pnpm typecheck (pnpm -r typecheck) ==
+packages/shared typecheck: Done
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0
+
+== pnpm spec:parse ==
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (6.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (7.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+== node scripts/test-spawn-gate.mjs ==
+[test-spawn-gate] PASS: 517 test sources, no package-manager spawns.
+exit=0
+
+== pnpm exec vitest run --changed origin/main (origin/main = 2294b087 when run) ==
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 35ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 249 passed (250)
+      Tests  1 failed | 2516 passed | 1 skipped (2518)
+exit=1
+The one failure is the known root-only case: runner-brief.test.ts injects the erase failure with
+chmod 0500, which uid 0 ignores (AssertionError: expected [ 'commitAll', 'push', ... ] to not include
+'commitAll'). main has since made that test container-safe (#1456, dabef481); on the merge check below
+it passes.
+
+== E2E_AFFECTED_PORT=8394 pnpm --filter @pacman/web e2e:affected (lsof -iTCP:8394 empty before the run) ==
+  apps/web/src/api/mappers.ts → FULL
+  apps/web/src/fixtures/records.ts → FULL
+  apps/web/test/transcript-issue-fence.test.ts → FULL
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8394
+  1 failed
+    e2e/composer-inline-mention.spec.ts:671:1 › chips: Tab and click render the identical chip (accept 路径一致） 
+  1180 passed (16.7m)
+exit=1
+apps/web/src/api/mappers.ts and apps/web/src/fixtures/records.ts send e2e:affected to the full suite.
+The one failure, composer-inline-mention.spec.ts:671 (chips: Tab and click render the identical chip),
+waits 5 s for a [data-fresh] pop attribute; the full run took 16.7 min on this host. The spec does not
+touch the changed code. Rerun of that whole spec file three times on the same port:
+  E2E_PORT=8394 pnpm exec playwright test e2e/composer-inline-mention.spec.ts --repeat-each=3 (in apps/web)
+  96 passed (2.5m)
+exit=0
+
+== code-review skill, low effort, origin/main..claude/bootstrap-p5-3 ==
+First call (args 'low origin/main..claude/bootstrap-p5-3') returned '(none)' with no file list, so it
+was run again naming the worktree and the branch. Second result: nothing that qualifies at this
+level; one pass, tests and fixtures skipped. Files reviewed: apps/daemon/src/runner.ts,
+apps/server/src/services/{builds,chief-tools,chief,machines,orchestrate}.ts, apps/web/src/api/mappers.ts,
+packages/shared/src/protocol/machine-wire.ts, packages/shared/src/records/{persona,prompts}.ts,
+docs/verify/1406/p5-3-failure-modes.txt.
+
+== security-review skill (machines.ts is on the AGENTS.md list) ==
+No findings; see p5-3-security-review.txt.
+
+== merge check against the moved origin/main (dabef481, 5 commits past 2294b087: #1465 #1420 #1411 #1467 #1456) ==
+Scratch worktree detached at origin/main, git merge --no-commit claude/bootstrap-p5-3: no conflicts
+(git merge-tree also clean). Then, in that worktree:
+  pnpm typecheck exit=0
+  pnpm lint exit=0
+  pnpm exec vitest run (the six P5-3 files + snapshot, runner-brief, webhook, orchestration-source,
+  chief-tools, mcp-face, transcript-user-words):
+   Test Files  13 passed (13)
+        Tests  202 passed (202)
+  exit=0
+The scratch worktree was removed (git worktree remove --force).

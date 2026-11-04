@@ -1,0 +1,63 @@
+import { expect, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
+
+test('visible: a key that opens nothing throws', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  await expect(page.getByRole('complementary')).toBeVisible();
+  const err = await pressUntil(page, 'F9', page.getByRole('dialog', { name: '搜索' })).catch((e) => e);
+  console.log('visible ->', String(err));
+  expect(String(err)).toContain('never made');
+});
+
+test('hidden: a key that closes nothing throws while the target stays up', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  await pressUntil(page, 'Meta+k', page.getByRole('dialog', { name: '搜索' }));
+  const err = await pressUntil(page, 'F9', page.getByRole('dialog', { name: '搜索' }), 'hidden').catch((e) => e);
+  console.log('hidden ->', String(err));
+  expect(String(err)).toContain('hidden');
+});
+
+test('hidden: Escape closes the panel and returns', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  const panel = page.getByRole('dialog', { name: '搜索' });
+  await pressUntil(page, 'Meta+k', panel);
+  await pressUntil(page, 'Escape', panel, 'hidden');
+  await expect(panel).toBeHidden();
+});
+
+test('a non-timeout wait error (strict mode) is rethrown before any press', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  await expect(page.getByRole('complementary')).toBeVisible();
+  let presses = 0;
+  await page.exposeFunction('countKey', () => {
+    presses += 1;
+  });
+  await page.evaluate(() =>
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F9') (window as unknown as { countKey: () => void }).countKey();
+    }),
+  );
+  const err = await pressUntil(page, 'F9', page.locator('[data-testid]')).catch((e) => e);
+  console.log('strict ->', String(err).split('\n')[0], '| presses:', presses);
+  expect(String(err)).toContain('strict mode violation');
+  expect(presses).toBe(0);
+});
+
+test('hidden on a target that has not rendered waits for it, then closes it', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  await page.locator('.sidebar-new-task').click();
+  // no visible wait here on purpose: pressUntil's own precondition owns it
+  const dialog = page.getByRole('dialog', { name: '新建任务' });
+  await pressUntil(page, 'Escape', dialog, 'hidden');
+  await expect(dialog).toBeHidden();
+  console.log('hidden-after-click -> closed');
+});
+
+test('visible on a panel that is already open fails before pressing', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  const panel = page.getByRole('dialog', { name: '搜索' });
+  await pressUntil(page, 'Meta+k', panel);
+  const err = await pressUntil(page, 'Meta+k', panel).catch((e) => e);
+  console.log('already-open ->', String(err).split('\n')[0]);
+  await expect(panel).toBeVisible();
+});

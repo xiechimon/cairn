@@ -1,0 +1,30 @@
+# #1403 round 4 mutations: each one applied alone, then pr-reconcile.test.ts and ci-loop.test.ts.
+# Definitions (name, file, text replaced, replacement) below.
+
+time rule off                                 3 failed | 60 passed (63)
+phaseAt not floored to the second             1 failed | 62 passed (63)
+non-default base accepted                     1 failed | 62 passed (63)
+compare cache off                             1 failed | 62 passed (63)
+compare unreadable treated as read            3 failed | 60 passed (63)
+no recheck after compare                      1 failed | 62 passed (63)
+oldest checkpoint used                        1 failed | 62 passed (63)
+hint written every sweep                      2 failed | 61 passed (63)
+gate steps left on merge                      1 failed | 62 passed (63)
+gate steps left on close                      2 failed | 61 passed (63)
+any sha put into the compare URL              1 failed | 62 passed (63)
+requestMerge does not re-read the phase       1 failed | 62 passed (63)
+review action does not re-read the phase      1 failed | 62 passed (63)
+
+["time rule off", "apps/server/src/services/ci-loop.ts", "outcomeAt === null || outcomeAt < Math.floor(fresh.phaseAt / 1000) * 1000", "outcomeAt === null"]
+["phaseAt not floored to the second", "apps/server/src/services/ci-loop.ts", "Math.floor(fresh.phaseAt / 1000) * 1000", "fresh.phaseAt"]
+["non-default base accepted", "apps/server/src/services/ci-loop.ts", "if (pull.baseRef !== pull.defaultBranch) {", "if (false) {"]
+["compare cache off", "apps/server/src/services/ci-loop.ts", "let status = compareCache.get(cmpKey) ?? null;", "let status: string | null = null;"]
+["compare unreadable treated as read", "apps/server/src/services/ci-loop.ts", "          if (status === null) {\n            tally.unreadable += 1;\n            return;\n          }\n", ""]
+["no recheck after compare", "apps/server/src/services/ci-loop.ts", "        if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {\n          tally.skipped += 1;\n          return;\n        }\n        if (status !== 'ahead'", "        if (status !== 'ahead'"]
+["oldest checkpoint used", "apps/server/src/services/ci-loop.ts", ".orderBy(desc(step.createdAt))", ".orderBy(step.createdAt)"]
+["hint written every sweep", "apps/server/src/services/ci-loop.ts", "    if (seen) return;\n", ""]
+["gate steps left on merge", "apps/server/src/services/ci-loop.ts", "      stopUnclaimedGateSteps(deps, cand.buildId);\n      finishTodoDone", "      finishTodoDone"]
+["gate steps left on close", "apps/server/src/services/ci-loop.ts", "    stopUnclaimedGateSteps(deps, cand.buildId);\n    setTodoPhase(deps, cand.todoId, 'failed');", "    setTodoPhase(deps, cand.todoId, 'failed');"]
+["any sha put into the compare URL", "apps/server/src/lib/github.ts", "  if (!FULL_SHA.test(base) || !FULL_SHA.test(head)) return 'invalid';\n", ""]
+["requestMerge does not re-read the phase", "apps/server/src/services/builds.ts", "    assertPhaseTransition(after.phase, 'done');\n", ""]
+["review action does not re-read the phase", "apps/server/src/services/builds.ts", "    if (after?.phase !== todoRecord.phase) {", "    if (false) {"]

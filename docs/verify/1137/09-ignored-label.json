@@ -1,0 +1,9 @@
+{
+  "deliveryId": "805627ec-5cad-4ed1-95d7-5f72c3726d05",
+  "status": 202,
+  "body": {
+    "result": "ignored",
+    "deliveryId": "805627ec-5cad-4ed1-95d7-5f72c3726d05",
+    "detail": "action labeled / label not pacman"
+  }
+}

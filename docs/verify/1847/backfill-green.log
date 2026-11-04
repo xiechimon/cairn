@@ -1,0 +1,8 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1847
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  09:18:55
+   Duration  1.92s (transform 56%, import 26%, tests 19%)

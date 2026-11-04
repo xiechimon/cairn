@@ -1,0 +1,39 @@
+# #1403 round 14 mutations (pr-gate run 6 on #1414): each one applied alone to the round 14
+# sources (after the fix, before the commit), then
+# pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+# (113 tests). Every mutation turns at least one test red; the sources were restored byte for byte
+# after each run (cmp against a scratch copy).
+
+M1 head repo check out (item 1)                 2 failed | 111 passed (113)
+    × [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+    × [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+M2 head branch check out (item 1)               1 failed | 112 passed (113)
+    × [62b] a PR from another branch of the target repo → not finished
+M3 merge step tail without finishTodoDone (3a)  1 failed | 112 passed (113)
+    × [63] a merge step completing through completeStep stops an unclaimed verify step
+M4 waiting_quota out of the in-flight query (3b) 3 failed | 110 passed (113)
+    × ci-loop: #1403 等额度挂起的修复步算在飞：不读 checks、不追加第二条 [ci-fix]
+    × ci-loop: #1403 等额度挂起的执行步（无 marker，如 #931 返工轮）同样算在飞：不派修复步
+    × pr-reconcile: ⑮a a merge step waiting for quota counts as in flight
+
+# Definitions
+## M1 apps/server/src/services/ci-loop.ts, reconcileOne
+-    if (pull.headRepo.toLowerCase() !== target.fullName.toLowerCase() || pull.headRef !== branch) {
++    if (pull.headRef !== branch) {
+## M2 apps/server/src/services/ci-loop.ts, reconcileOne
+-    if (pull.headRepo.toLowerCase() !== target.fullName.toLowerCase() || pull.headRef !== branch) {
++    if (pull.headRepo.toLowerCase() !== target.fullName.toLowerCase()) {
+## M3 apps/server/src/services/builds.ts, end of completeStep (the merge step's done path):
+## the tail as it was before finishTodoDone existed, without stopUnclaimedGateSteps
+-  finishTodoDone(deps, todoRow.id, buildRow.id);
++  setTodoPhase(deps, todoRow.id, 'done');
++  insertMessageRow(deps, buildRow.id, {
++    id: newRecordId(),
++    role: 'system',
++    content: DONE_ROW,
++    createdAt: nowMs(),
++  });
++  advanceSplitWaves(deps, todoRow.id);
+## M4 apps/server/src/services/ci-loop.ts, hasActiveStep (shared by the grind and the reconcile)
+-                inArray(step.status, ['pending', 'waiting_quota']),
++                inArray(step.status, ['pending']),

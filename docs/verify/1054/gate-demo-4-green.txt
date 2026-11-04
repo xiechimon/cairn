@@ -1,0 +1,3 @@
+=== demo 4: site fixed AND entry dropped (expect GREEN, exit 0) ===
+[ui-consumer-shape-gate] PASS: 7 flagged line(s) across 213 consumer file(s), all registered (7 entries = 4 deviation / 3 rides-primitive).
+gate exit code: 0

@@ -1,0 +1,15 @@
+2026-10-14 16:13:39 [skills] team: 1 skill(s), 1 file(s) materialized → /tmp/pacman-1186-daemon-home/team-skills/views/62fe86981eb09fc16dd2a207858108fda22dbf819d136dc029cb9a1bf724ca53 (fetched 1 file(s) / 106 byte(s), reused 0)
+2026-10-14 16:13:39 [skills] missing-skill-md: skill path does not exist (/tmp/pacman-1186-daemon-home/workspaces/01a13b30-da2a-760f-aeee-8db8cc409d55/.claude/skills)
+2026-10-14 16:13:39 [skills] missing-skill-md: skill path does not exist (/tmp/pacman-1186-daemon-home/workspaces/01a13b30-da2a-760f-aeee-8db8cc409d55/.pi/skills)
+2026-10-14 16:13:39 [skills] collision: 1 identical mirror(s) deduped (team view wins; budget counts the merged set once)
+2026-10-14 16:13:39 [skills] filtered: extra-skill not in agent allowlist
+2026-10-14 16:13:39 [skills] loaded: 1 skills from /tmp/pacman-1186-daemon-home/team-skills/views/62fe86981eb09fc16dd2a207858108fda22dbf819d136dc029cb9a1bf724ca53 + /tmp/pacman-1186-skills
+2026-10-14 16:13:39 [skills] catalog: entries=1 chars=641 bytes=641
+2026-10-14 16:13:39 [skills] deny: 1 skill dir(s) hard-blocked
+2026-10-14 16:13:40 [skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+2026-10-14 16:13:40 [skills] missing-skill-md: skill path does not exist (/tmp/pacman-1186-daemon-home/workspaces/01a13b30-dd69-78ea-80fe-e12ab9c58814/.claude/skills)
+2026-10-14 16:13:40 [skills] missing-skill-md: skill path does not exist (/tmp/pacman-1186-daemon-home/workspaces/01a13b30-dd69-78ea-80fe-e12ab9c58814/.pi/skills)
+2026-10-14 16:13:40 [skills] filtered: demo-skill not in agent allowlist
+2026-10-14 16:13:40 [skills] filtered: extra-skill not in agent allowlist
+2026-10-14 16:13:40 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-14 16:13:40 [skills] deny: 2 skill dir(s) hard-blocked

@@ -1,0 +1,14 @@
+$ uname -sr
+Linux 7.2.8-9-omarchy
+
+$ gcc -std=c11 -O2 harness that includes read-boundary.c and calls
+  is_runtime_denial on /usr/share/coreutils/locales/uucore/en-US.ftl
+pushed head a45b3776: exit=1 VIOLATION
+branch head (integration/eval/routing/read-boundary.c): exit=0 RUNTIME_DENIED
+
+$ grep -n 'strncmp|strlen' integration/eval/routing/read-boundary.c   (branch head)
+126:    if (strncmp(path, runtime_data_prefixes[index], strlen(runtime_data_prefixes[index])) == 0)
+
+Literal lengths that the pushed head duplicated:
+  '/usr/share/coreutils/locales/' -> 29 characters, compared with a fixed length of 30
+  '/usr/share/locale/'            -> 18 characters, compared with a fixed length of 18

@@ -1,0 +1,68 @@
+# #1404 S1 round 3 (ADR 0021 D4 amended: caps count the whole patch, binary outside docs/verify/ goes to a person): new tests first, red, then green after the fix.
+
+== red: against the S1 sources at 35eae4f, only test files and fixture changed ==
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+     × 查询串与片段不算进路径：?raw=true、#L3 照样认，同一文件只记一次 11ms
+     × 去掉查询串与片段后不指向文件的不算：目录本身不是证据 1ms
+     × 证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀不分大小写 19ms
+     × 改名没有 patch：两头里落在证据目录之外的名字都列出 1ms
+     × 行数与文件数按整张补丁算，docs/verify/ 的证据也计入；摘要照旧不计证据 7ms
+     × 改名（带 previous_filename 的条目）记两个文件，纯改名行数为 0，证据里的改名也算 1ms
+     × compare 不给 patch 的正是 20 张 PNG（二进制），其余 38 个条目都带 patch 1ms
+     × 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数 1ms
+     × patch 是非空字符串时 hasPatch 为真；缺省、空串、null 都为假 1ms
+     × additions、deletions 或 changes 为负：形状不对，返回 null（与 compareFileSchema 的非负一致） 2ms
+  AssertionError: expected 2 to be 3 // Object.is equality
+  AssertionError: expected 2 to be 5 // Object.is equality
+  AssertionError: expected 58 to be 20 // Object.is equality
+  AssertionError: expected 36 to be 58 // Object.is equality
+  AssertionError: expected undefined to be true // Object.is equality
+  AssertionError: expected [ { status: 'renamed', …(5) } ] to be null
+  AssertionError: expected { links: [ { …(2) }, …(3) ], …(1) } to deeply equal { links: [ { …(2) }, { …(2) } ], …(1) }
+  AssertionError: expected [ { …(2) }, { …(2) } ] to deeply equal []
+  AssertionError: expected undefined to deeply equal [ 'apps/web/public/logo.png', …(2) ]
+  AssertionError: expected undefined to deeply equal [ 'apps/server/src/new.ts', …(2) ]
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  3 failed (3)
+      Tests  10 failed | 67 passed (77)
+exit=1
+(assertion lines above follow the Failed Tests order: digest, evidence-link, paths)
+
+== green: round 3 sources (digest.ts, paths.ts, evidence-link.ts, shared merge-gate.ts), committed as 0c447e2 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ Test Files  3 passed (3)
+      Tests  77 passed (77)
+exit=0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0
+
+== fixture: independent recount (Python, written from ADR 0021 D3/D4, not from the TypeScript) ==
+# Fixture re-captured 2026-10-21T06:30:11Z read-only: curl -sS 'https://api.github.com/repos/xiechimon/pacman/compare/52d2cdca5ab286021d3514e4a6c6d91d95ccb03f...b4b1f96338aee1c2f69bf39d3a6736fbe31b6cd6?per_page=1'
+# (no token passed by curl; HTTP 200, ETag "e94571e44f02a79dab144a0ae86af6f8d969d303a7b98db72ebb5caac013a14f").
+# Same 58 entries as the 2026-10-20 capture once patch is dropped; 38 carry a patch, the 20 PNG files under
+# docs/verify/paper-shell-merge/ do not.
+#
+#   import json, hashlib, sys
+#   d = json.load(open(sys.argv[1]))
+#   fs = d['files']
+#   files = sum(2 if f.get('previous_filename') else 1 for f in fs)
+#   lines = sum(f['additions'] + f['deletions'] for f in fs)
+#   no_patch = [f['filename'] for f in fs if not f.get('patch')]
+#   opaque = [f['filename'] for f in fs if not f.get('patch') and not f['filename'].lower().startswith('docs/verify/')]
+#   kept = [f for f in fs if not (f['filename'].startswith('docs/verify/')
+#           and (f.get('previous_filename') is None or f['previous_filename'].startswith('docs/verify/')))]
+#   tuples = sorted(json.dumps([f['status'], f['filename'], f.get('previous_filename'), f.get('sha')],
+#                              separators=(',', ':'), ensure_ascii=False) for f in kept)
+#   print('files', files, 'lines', lines, 'no-patch', len(no_patch), 'opaque', opaque)
+#   print(len(kept), 'pd1:' + hashlib.sha256('\n'.join(tuples).encode()).hexdigest())
+#
+$ python3 -I recount.py apps/server/test/fixtures/merge-gate-compare-sample.json
+files 58 lines 932 no-patch 20 opaque []
+36 pd1:ddf04cd2406d952eec621a1d4f0b466d77b5084bb555f2e737e6ea1679b7655f
+# The digest and the 36 digested entries equal digest-crosscheck.txt: patch is not in the tuple.

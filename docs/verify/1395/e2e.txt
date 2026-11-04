@@ -1,0 +1,13 @@
+$ PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers pnpm exec playwright test e2e/accent-typo.spec.ts --reporter=line   # container default
+Error: browserType.launch: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell
+  20 failed
+
+$ PLAYWRIGHT_BROWSERS_PATH=/root/.cache/pacman-pw-browsers pnpm exec playwright test e2e/accent-typo.spec.ts --reporter=line   # from hook CLAUDE_ENV_FILE
+  2 failed
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ─────
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ──────
+  18 passed (22.8s)
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask

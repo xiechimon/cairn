@@ -1,0 +1,9 @@
+{
+  "radiusComposer": "20px",
+  "radiusBubble": "18px",
+  "composerRadius": "20px",
+  "sendRadius": "8px",
+  "bubbleRadius": "18px",
+  "bubbleAnim": "message-fade-up",
+  "composerShadowHead": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba"
+}

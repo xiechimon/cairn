@@ -1,0 +1,30 @@
+{
+  "probe": "drive-1241-recommended-concurrency",
+  "expect": "old",
+  "server": "http://127.0.0.1:8796",
+  "web": "http://127.0.0.1:5278",
+  "host": {
+    "cpuCores": 8,
+    "memoryTotalMb": 16002,
+    "expectedRecommended": 7
+  },
+  "passed": 3,
+  "total": 3,
+  "checks": [
+    {
+      "name": "O1 before：真机器控件值为固定默认 3，无推荐/手动/估算标注",
+      "ok": true,
+      "detail": "text=并发3"
+    },
+    {
+      "name": "O2 before：估算机同样固定 3、无标注（无指纹与有指纹不可区分）",
+      "ok": true,
+      "detail": "text=并发3"
+    },
+    {
+      "name": "O3 before：API 无 recommendedConcurrent / concurrencySource 字段",
+      "ok": true,
+      "detail": "keys=maxConcurrent"
+    }
+  ]
+}

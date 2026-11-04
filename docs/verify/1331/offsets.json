@@ -1,0 +1,46 @@
+{
+  "scenario": "board-overflow",
+  "viewport": "1440x732",
+  "preview": "http://127.0.0.1:8399/app?scenario=board-overflow",
+  "miss": {
+    "leftAt": 601,
+    "scrollHeightAtClick": 1225,
+    "clientHeight": 624,
+    "stored": { "todo": 600 },
+    "restoredScrollTop": 600,
+    "restoredScrollHeight": 1224,
+    "cardInList": true
+  },
+  "settledSamples": [
+    {
+      "leftAt": 601,
+      "stored": 600,
+      "top": 600,
+      "stable": 600,
+      "max": 600,
+      "scrollHeight": 1224,
+      "cardInList": true,
+      "ms": 32
+    },
+    {
+      "leftAt": 601,
+      "stored": 600,
+      "top": 600,
+      "stable": 600,
+      "max": 600,
+      "scrollHeight": 1224,
+      "cardInList": true,
+      "ms": 54
+    },
+    {
+      "leftAt": 601,
+      "stored": 600,
+      "top": 600,
+      "stable": 600,
+      "max": 600,
+      "scrollHeight": 1224,
+      "cardInList": true,
+      "ms": 32
+    }
+  ]
+}

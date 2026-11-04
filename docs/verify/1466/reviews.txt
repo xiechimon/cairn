@@ -1,0 +1,65 @@
+# #1466 reviews at HEAD 18ca8072 (diff origin/main..claude/bootstrap-p5c-1466: 2 commits, 13 files)
+
+## /code-review low
+
+First invocation (args "low origin/main..HEAD") reviewed the wrong diff: the forked
+reviewer resolved HEAD in the primary checkout (/home/user/pacman, branch
+claude/nice-faraday-o329b3, 43 files of #1401 work), not this worktree. Its result
+("none" over .claude/workflows/pr-gate.js and .github/workflows/ci.yml) does not apply
+to #1466 and is discarded.
+
+Second invocation, after `cd` into the worktree and with the range named by branch so it
+resolves the same in every worktree of the repo:
+  args: low origin/main..claude/bootstrap-p5c-1466
+  result: (none)
+  reviewer note: "I read the diff once, without the test and fixture hunks, as low effort
+  allows. Nothing was run or verified."
+Findings: 0. Nothing to fix.
+
+## /security-review
+
+The skill's pre-gathered context (git status / files / commits / diff) was again taken
+from the primary checkout (branch claude/nice-faraday-o329b3, the #1401 pr-gate diff),
+not this worktree, so its injected diff was not the #1466 change. Its instructions and
+false-positive rules were applied by hand to the real diff:
+  git diff origin/main..claude/bootstrap-p5c-1466 -- apps/server/src packages/shared/src
+(the sub-task fan-out the skill asks for was not available in this agent; the analysis
+and filtering were done inline).
+
+Surfaces checked:
+1. parseGithubRepoRef / isGithubRepoRef (packages/shared/src/records/project.ts).
+   Anchored /^...$/ without the m flag; character class [A-Za-z0-9._-] excludes `/`,
+   `\` (WHATWG treats it as `/` for special schemes), `%` (no %2e dot-segment
+   variants), `@`, `:`, `?`, `#`, tab and newline (stripped by the URL parser). With
+   `.` and `..` rejected per segment, `repos/${encodeURIComponent(o)}/${...(r)}/...`
+   can no longer be rewritten by URL normalization. `...` stays a literal segment
+   (checked with node: new URL('https://api.github.com/repos/.../x/issues').pathname
+   === '/repos/.../x/issues').
+2. Outbound request builders in apps/server/src/lib/github.ts and their callers:
+   issue list / issue / labels (github-issues.ts via githubRepoOfProject), create
+   issue and retry (todos.ts via githubRepoOfProject), title write-back and source
+   echo (parseGithubIssueSourceRef), check-runs (ci-loop.ts), pulls/{n}
+   (builds.ts probePullState), repos/{o}/{r} reachability (projects.ts, input
+   validated by isGithubRepoRef before the call). No remaining caller splits
+   project.githubRepo by hand for an API request.
+3. requireProjectRow (chief-tools.ts, mcp-face.ts): filters on project.teamId; the
+   404 text echoes the caller's own id, identical for missing and cross-team. Callers:
+   chief docs (then readFile on the same id), create_todo, update_project,
+   connect_repo, run_builds, watch_todos; MCP create_todo. todos tools (chief, MCP)
+   always filter on teamId.
+Findings at confidence >= 8: none.
+
+Residuals noted, not changed (outside this diff or below the bar):
+- Clone URLs (services/git.ts projectRepoRef / toProjectRecord, routes-builds.ts
+  branch-sync) still derive `https://github.com/${githubRepo}.git` from a stored
+  invalid row. The host is fixed to github.com (no `@`, `/`-escape or `\` possible in
+  the stored character class), and `/../user.git` normalizes to `/user.git`, a git
+  smart-HTTP path that is not an api.github.com endpoint; the clone fails. The daemon's
+  REST PR probe derives owner/repo from that clone URL through isGithubRepoRef, so it
+  now skips such rows (apps/daemon/test/github-probe.test.ts). Treating the row as
+  unbound in projectRepoRef would change claim payloads (a step would run without a
+  repo), so it is left as is.
+- Pre-existing chief / MCP surfaces without a team check that do not take a project id
+  and are not in this ticket: `conversation` (reads any conversation id), chief `usage`
+  (token_usage has no teamId column), chief `save_memory` stores an unchecked projectId
+  reference (no read or write of the project). Single-team deployments cannot reach them.

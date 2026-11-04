@@ -1,0 +1,2365 @@
+{
+  "meta": {
+    "tool": "probe-dump",
+    "ticket": 921,
+    "date": "2026-10-09T04:20:16.695Z",
+    "commit": "3f91585a",
+    "port": 8404,
+    "specs": [
+      "detail-3pane",
+      "detail-narrow",
+      "chat-type-measure",
+      "transcript-user-words",
+      "thinking-row-truncate",
+      "spec-flow",
+      "dead-buttons"
+    ],
+    "specCount": 8,
+    "playwrightVersion": "1.63.0",
+    "workers": "4",
+    "testsPassed": 65,
+    "testsFailed": 0
+  },
+  "coverage": {
+    "styleOccurrences": 21,
+    "boxSites": 3,
+    "cssSites": 0,
+    "evaluateProbeSites": 22,
+    "assertionSites": 92,
+    "collectedStyle": 27,
+    "collectedBox": 3,
+    "collectedWait": 0,
+    "collectedCss": 0,
+    "collectedStyleSites": 22,
+    "collectedBoxSites": 3,
+    "collectedCssSites": 0,
+    "assertionRecords": 103,
+    "joinedAssertionSites": 92
+  },
+  "probeSites": [
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 34,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 35,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 78,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 82,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 97,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 110,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 111,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 127,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 131,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 132,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 141,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 149,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 151,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 170,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 174,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 195,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 550,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 551,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 36,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 55,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 56,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 87,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 97,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 98,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 142,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 154,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 162,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 163,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 192,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 289,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 27,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 36,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 94,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 112,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 131,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 123,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 126,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 130,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 173,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 178,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 191,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 192,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 204,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 206,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "transcript-user-words.spec.ts",
+      "line": 231,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "transcript-user-words.spec.ts",
+      "line": 233,
+      "kind": "style",
+      "api": "getComputedStyle"
+    }
+  ],
+  "probeValues": [
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 36,
+      "v": {
+        "sidebar": {
+          "left": 0,
+          "right": 240,
+          "width": 240
+        },
+        "center": {
+          "left": 240,
+          "right": 952,
+          "width": 712
+        },
+        "right": {
+          "left": 952,
+          "right": 1440,
+          "width": 488
+        }
+      },
+      "tt": "three abutting panes: 240 sidebar | fluid center | 488 right"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 27,
+      "v": {
+        "docScroll": 320,
+        "docClient": 320,
+        "colScroll": 320,
+        "colClient": 320,
+        "centerWidth": 320,
+        "sidebarVisible": false,
+        "rightVisible": false
+      },
+      "tt": "N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 55,
+      "v": {
+        "borderLeft": "1px",
+        "shadow": "none"
+      },
+      "tt": "three abutting panes: 240 sidebar | fluid center | 488 right"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chat-type-measure.spec.ts",
+      "l": 34,
+      "loc": "internal:testid=[data-testid=\"agent-text\"s] >> nth=0",
+      "v": {
+        "fontSize": "15px",
+        "lineHeight": "24px"
+      },
+      "tt": "chat body reads at 15px on a unitless 1.6 — the 24px pitch survives"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "chat-type-measure.spec.ts",
+      "l": 78,
+      "v": {
+        "text": 67.95796699669967,
+        "note": 67.92986391752576
+      },
+      "tt": "68ch measure cap binds the body text and the centered note"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 27,
+      "v": {
+        "docScroll": 360,
+        "docClient": 360,
+        "colScroll": 360,
+        "colClient": 360,
+        "centerWidth": 360,
+        "sidebarVisible": false,
+        "rightVisible": false
+      },
+      "tt": "N2: 360 and 390 keep the same law"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chat-type-measure.spec.ts",
+      "l": 110,
+      "loc": "internal:testid=[data-testid=\"transcript-note\"s] >> nth=0",
+      "v": {
+        "left": "321.109px",
+        "right": "321.109px",
+        "align": "center"
+      },
+      "tt": "68ch measure cap binds the body text and the centered note"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 27,
+      "v": {
+        "docScroll": 390,
+        "docClient": 390,
+        "colScroll": 390,
+        "colClient": 390,
+        "centerWidth": 390,
+        "sidebarVisible": false,
+        "rightVisible": false
+      },
+      "tt": "N2: 360 and 390 keep the same law"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "chat-type-measure.spec.ts",
+      "l": 127,
+      "v": {
+        "placeholder": "14px",
+        "body": "15px"
+      },
+      "tt": "composer placeholder steps to 14px — one notch under the 15px body"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 27,
+      "v": {
+        "docScroll": 767,
+        "docClient": 767,
+        "colScroll": 767,
+        "colClient": 767,
+        "centerWidth": 767,
+        "sidebarVisible": false,
+        "rightVisible": false
+      },
+      "tt": "N3: the degradation stops at 768px — the 3-pane shell survives above it"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 27,
+      "v": {
+        "docScroll": 768,
+        "docClient": 768,
+        "colScroll": 133,
+        "colClient": 40,
+        "centerWidth": 40,
+        "sidebarVisible": true,
+        "rightVisible": true
+      },
+      "tt": "N3: the degradation stops at 768px — the 3-pane shell survives above it"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 94,
+      "v": {
+        "sidebar": 240,
+        "right": 488
+      },
+      "tt": "N3: the degradation stops at 768px — the 3-pane shell survives above it"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "chat-type-measure.spec.ts",
+      "l": 141,
+      "v": {
+        "bubbleH": 24,
+        "bubbleFont": "15px",
+        "avatarBox": {
+          "w": 20,
+          "h": 20
+        },
+        "footerPad": "31px"
+      },
+      "tt": "bubble / avatar / footer keep their own geometry (#470 scope fence)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "chat-type-measure.spec.ts",
+      "l": 170,
+      "v": {
+        "ruled": [],
+        "turns": [
+          {
+            "borderTop": "0px",
+            "paddingTop": "0px",
+            "gap": 21
+          },
+          {
+            "borderTop": "0px",
+            "paddingTop": "0px",
+            "gap": 21
+          }
+        ]
+      },
+      "tt": "turn boundary is air, not a rule: no divider between a user turn and the agent row"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 112,
+      "v": {
+        "docScroll": 320,
+        "docClient": 320,
+        "panelRight": 312,
+        "panelWidth": 304
+      },
+      "tt": "N4: the docked chief panel cannot re-overflow the 320px shell"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 87,
+      "v": {
+        "centerLeft": 240,
+        "centerRight": 952,
+        "mainBottom": 732,
+        "colBottom": 632,
+        "compLeft": 256,
+        "compRight": 936,
+        "compTop": 632,
+        "compBottom": 716,
+        "radius": "0px",
+        "border": "1px",
+        "position": "relative",
+        "colPadBottom": 16
+      },
+      "tt": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-narrow.spec.ts",
+      "l": 131,
+      "v": {
+        "actionsRight": 320,
+        "compLeft": 16,
+        "compRight": 304,
+        "backLeft": 12
+      },
+      "tt": "N5: head actions and the composer stay inside the 320px viewport"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 142,
+      "v": {
+        "stop": {
+          "l": 850,
+          "r": 882,
+          "w": 32,
+          "h": 32,
+          "cy": 687
+        },
+        "send": {
+          "l": 890,
+          "r": 922,
+          "w": 32,
+          "h": 32,
+          "cy": 687
+        },
+        "toolCy": 688,
+        "toolGlyphL": 274,
+        "phTextL": 272,
+        "stopFill": "rgb(64, 60, 57)",
+        "sendFill": "rgb(64, 60, 57)",
+        "stopGlyph": 1
+      },
+      "tt": "composer controls share one bottom row: stop is the send button's sibling"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "thinking-row-truncate.spec.ts",
+      "l": 173,
+      "loc": "div.chat-row--agent >> internal:has-text=\"用户这句\"i",
+      "v": {
+        "display": "flex",
+        "gap": 11,
+        "avatarW": 20
+      },
+      "tt": "T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 192,
+      "v": {
+        "center": 712,
+        "comp": 680
+      },
+      "tt": "composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 192,
+      "v": {
+        "center": 712,
+        "comp": 680
+      },
+      "tt": "composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "spec-flow.spec.ts",
+      "l": 123,
+      "loc": ".chat-col",
+      "v": {
+        "x": 240,
+        "y": 44,
+        "width": 712,
+        "height": 588
+      },
+      "tt": "2. 简报卡随流滚走：滚到底出视口，滚到顶回列首"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "spec-flow.spec.ts",
+      "l": 126,
+      "loc": ".chat-col .spec-block",
+      "v": -797,
+      "tt": "2. 简报卡随流滚走：滚到底出视口，滚到顶回列首"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "spec-flow.spec.ts",
+      "l": 130,
+      "loc": ".chat-col .spec-block",
+      "v": 79,
+      "tt": "2. 简报卡随流滚走：滚到底出视口，滚到顶回列首"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "thinking-row-truncate.spec.ts",
+      "l": 191,
+      "loc": "div.chat-row--agent >> internal:has-text=\"用户这句\"i >> .chat-text",
+      "v": {
+        "maxWidth": "643.477px",
+        "minWidth": "0px"
+      },
+      "tt": "T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "thinking-row-truncate.spec.ts",
+      "l": 204,
+      "loc": "div.chat-row--agent >> internal:has-text=\"用户这句\"i >> internal:role=button[name=\"展开思考\"i]",
+      "v": {
+        "textOverflow": "ellipsis",
+        "overflowX": "hidden",
+        "labelClient": 625,
+        "labelScroll": 1810,
+        "labelText": "用户这句「你好」是纯招呼，没有任务实体：先不路由看板，也不建卡。接下来要做的事分三步——第一步核对会话历史里有没有未收口的执行步，第二步看定时器有没有到点要唤起的复盘，第三步再判断这句招呼背后是不是藏着一个新需求的开头；如果三步都空，就只回一句招呼，等用户把真实意图说出来再动手。另外留意中英混排时省…",
+        "btnW": 643,
+        "colW": 643
+      },
+      "tt": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "detail-3pane.spec.ts",
+      "l": 289,
+      "loc": "internal:testid=[data-testid=\"detail-center\"s]",
+      "v": 1200,
+      "tt": "fresh phase: the brief owns the whole center column, right pane collapses"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "transcript-user-words.spec.ts",
+      "l": 231,
+      "loc": "internal:testid=[data-testid=\"user-bubble\"s] >> internal:has-text=\"收到，谢谢\"i",
+      "v": {
+        "h": 24,
+        "font": "15px"
+      },
+      "tt": "5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "dead-buttons.spec.ts",
+      "l": 550,
+      "loc": "internal:role=dialog[name=\"新建任务\"i] >> internal:testid=[data-testid=\"new-task-head\"s]",
+      "v": {
+        "x": 384,
+        "y": 146.5,
+        "width": 672,
+        "height": 44
+      },
+      "tt": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "dead-buttons.spec.ts",
+      "l": 551,
+      "loc": "internal:role=dialog[name=\"新建任务\"i] >> internal:role=button[name=\"关闭\"i]",
+      "v": {
+        "x": 1024,
+        "y": 154,
+        "width": 28,
+        "height": 28
+      },
+      "tt": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"
+    }
+  ],
+  "assertions": [
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 38,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(cs.fontSize).toBe('15px');",
+      "testTitle": "chat body reads at 15px on a unitless 1.6 — the 24px pitch survives",
+      "old": "15px",
+      "new": "15px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "15px"
+      ],
+      "rawNew": "15px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 40,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(cs.lineHeight).toBe('24px');",
+      "testTitle": "chat body reads at 15px on a unitless 1.6 — the 24px pitch survives",
+      "old": "24px",
+      "new": "24px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "24px"
+      ],
+      "rawNew": "24px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 72,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(declared).toBe('1.6');",
+      "testTitle": "chat body reads at 15px on a unitless 1.6 — the 24px pitch survives",
+      "old": "1.6",
+      "new": "1.6",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "1.6"
+      ],
+      "rawNew": "1.6"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 106,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "expect(r).toBeGreaterThan(67.5);",
+      "testTitle": "68ch measure cap binds the body text and the centered note",
+      "old": "> 67.5",
+      "new": "67.95796699669967",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        67.5
+      ],
+      "rawNew": 67.95796699669967
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 107,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(r).toBeLessThanOrEqual(68.5);",
+      "testTitle": "68ch measure cap binds the body text and the centered note",
+      "old": "≤ 68.5",
+      "new": "67.95796699669967",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        68.5
+      ],
+      "rawNew": 67.95796699669967
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 114,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(note.align).toBe('center');",
+      "testTitle": "68ch measure cap binds the body text and the centered note",
+      "old": "center",
+      "new": "center",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "center"
+      ],
+      "rawNew": "center"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 115,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "expect(Number.parseFloat(note.left)).toBeGreaterThan(0);",
+      "testTitle": "68ch measure cap binds the body text and the centered note",
+      "old": "> 0",
+      "new": "321.109",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 321.109
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 116,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(note.left).toBe(note.right);",
+      "testTitle": "68ch measure cap binds the body text and the centered note",
+      "old": "321.109px",
+      "new": "321.109px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "321.109px"
+      ],
+      "rawNew": "321.109px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 122,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);",
+      "testTitle": "68ch measure cap binds the body text and the centered note",
+      "old": "≤ 1193",
+      "new": "1192",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1193
+      ],
+      "rawNew": 1192
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 135,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(sizes.placeholder).toBe('14px');",
+      "testTitle": "composer placeholder steps to 14px — one notch under the 15px body",
+      "old": "14px",
+      "new": "14px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "14px"
+      ],
+      "rawNew": "14px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 136,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(sizes.body).toBe('15px');",
+      "testTitle": "composer placeholder steps to 14px — one notch under the 15px body",
+      "old": "15px",
+      "new": "15px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "15px"
+      ],
+      "rawNew": "15px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 154,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.bubbleH).toBe(24);",
+      "testTitle": "bubble / avatar / footer keep their own geometry (#470 scope fence)",
+      "old": "24",
+      "new": "24",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        24
+      ],
+      "rawNew": 24
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 155,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.bubbleFont).toBe('15px');",
+      "testTitle": "bubble / avatar / footer keep their own geometry (#470 scope fence)",
+      "old": "15px",
+      "new": "15px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "15px"
+      ],
+      "rawNew": "15px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 156,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(geo.avatarBox).toEqual({ w: 20, h: 20 });",
+      "testTitle": "bubble / avatar / footer keep their own geometry (#470 scope fence)",
+      "old": "{\"w\":20,\"h\":20}",
+      "new": "{\"w\":20,\"h\":20}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "w": 20,
+          "h": 20
+        }
+      ],
+      "rawNew": {
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 157,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.footerPad).toBe('31px');",
+      "testTitle": "bubble / avatar / footer keep their own geometry (#470 scope fence)",
+      "old": "31px",
+      "new": "31px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "31px"
+      ],
+      "rawNew": "31px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 206,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(probe.ruled).toEqual([]);",
+      "testTitle": "turn boundary is air, not a rule: no divider between a user turn and the agent row",
+      "old": "[]",
+      "new": "[]",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        []
+      ],
+      "rawNew": []
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 210,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(turn.borderTop).toBe('0px');",
+      "testTitle": "turn boundary is air, not a rule: no divider between a user turn and the agent row",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 211,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(turn.paddingTop).toBe('0px');",
+      "testTitle": "turn boundary is air, not a rule: no divider between a user turn and the agent row",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 214,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(turn.gap).toBeGreaterThanOrEqual(16);",
+      "testTitle": "turn boundary is air, not a rule: no divider between a user turn and the agent row",
+      "old": "≥ 16",
+      "new": "21",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        16
+      ],
+      "rawNew": 21
+    },
+    {
+      "file": "chat-type-measure.spec.ts",
+      "line": 215,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(turn.gap).toBeLessThanOrEqual(32);",
+      "testTitle": "turn boundary is air, not a rule: no divider between a user turn and the agent row",
+      "old": "≤ 32",
+      "new": "21",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        32
+      ],
+      "rawNew": 21
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 124,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');",
+      "testTitle": "project files pane: no export button, static branch chip, wired 文件|历史 segment",
+      "old": "SPAN",
+      "new": "SPAN",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "SPAN"
+      ],
+      "rawNew": "SPAN"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 557,
+      "matcher": "toBeLessThan",
+      "negated": false,
+      "source": "expect(Math.abs(hb.x + hb.width - (cb.x + cb.width) - 4)).toBeLessThan(1.5);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "< 1.5",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1.5
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 558,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(cb.width).toBeCloseTo(28, 0);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "28 ±0.5",
+      "new": "28",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        28,
+        0
+      ],
+      "rawNew": 28
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 559,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(cb.height).toBeCloseTo(28, 0);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "28 ±0.5",
+      "new": "28",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        28,
+        0
+      ],
+      "rawNew": 28
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 47,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.sidebar.width).toBe(240);",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "240",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 48,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.right.width).toBe(488);",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "488",
+      "new": "488",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        488
+      ],
+      "rawNew": 488
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 50,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(Math.round(geo.center.left)).toBe(Math.round(geo.sidebar.right));",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "240",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 51,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(Math.round(geo.right.left)).toBe(Math.round(geo.center.right));",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "952",
+      "new": "952",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        952
+      ],
+      "rawNew": 952
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 53,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.center.width).toBe(1440 - 240 - 488);",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "712",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 59,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(seam.borderLeft).toBe('1px');",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "1px",
+      "new": "1px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "1px"
+      ],
+      "rawNew": "1px"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 60,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(seam.shadow).toBe('none');",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "none",
+      "new": "none",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "none"
+      ],
+      "rawNew": "none"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 115,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.radius).toBe('0px');",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 116,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.border).toBe('1px');",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "1px",
+      "new": "1px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "1px"
+      ],
+      "rawNew": "1px"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 120,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.position).toBe('relative');",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "relative",
+      "new": "relative",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "relative"
+      ],
+      "rawNew": "relative"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 122,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.compLeft).toBeCloseTo(geo.centerLeft + 16, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "256 ±0.5",
+      "new": "256",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        256,
+        0
+      ],
+      "rawNew": 256
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 123,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.compRight).toBeCloseTo(geo.centerRight - 16, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "936 ±0.5",
+      "new": "936",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        936,
+        0
+      ],
+      "rawNew": 936
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 125,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.mainBottom - geo.compBottom).toBeCloseTo(16, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "16 ±0.5",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        16,
+        0
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 128,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.colBottom).toBeCloseTo(geo.compTop, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "632 ±0.5",
+      "new": "632",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        632,
+        0
+      ],
+      "rawNew": 632
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 130,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.colPadBottom).toBeGreaterThanOrEqual(16);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "≥ 16",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        16
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 168,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stop.w).toBe(32);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "32",
+      "new": "32",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        32
+      ],
+      "rawNew": 32
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 169,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stop.h).toBe(32);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "32",
+      "new": "32",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        32
+      ],
+      "rawNew": 32
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 173,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "687 ±0.5",
+      "new": "687",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        687,
+        0
+      ],
+      "rawNew": 687
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 174,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "≤ 1",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 176,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.send.l - geo.stop.r).toBeCloseTo(8, 0);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "8 ±0.5",
+      "new": "8",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        8,
+        0
+      ],
+      "rawNew": 8
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 178,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stopFill).toBe(geo.sendFill);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "rgb(64, 60, 57)",
+      "new": "rgb(64, 60, 57)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(64, 60, 57)"
+      ],
+      "rawNew": "rgb(64, 60, 57)"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 179,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stopGlyph).toBe(1);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "1",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 181,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(geo.toolGlyphL - geo.phTextL)).toBeLessThanOrEqual(2);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "≤ 2",
+      "new": "2",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        2
+      ],
+      "rawNew": 2
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 198,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(pane.center).toBe(1440 - 240 - 488);",
+      "testTitle": "composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)",
+      "old": "712",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 199,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(pane.comp).toBeCloseTo(pane.center - 32, 0);",
+      "testTitle": "composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)",
+      "old": "680 ±0.5",
+      "new": "680",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        680,
+        0
+      ],
+      "rawNew": 680
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 207,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(open.center).toBeCloseTo(pane.center, 0);",
+      "testTitle": "composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)",
+      "old": "712 ±0.5",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712,
+        0
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 208,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(open.comp).toBeCloseTo(pane.comp, 0);",
+      "testTitle": "composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)",
+      "old": "680 ±0.5",
+      "new": "680",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        680,
+        0
+      ],
+      "rawNew": 680
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 290,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(center).toBe(1440 - 240);",
+      "testTitle": "fresh phase: the brief owns the whole center column, right pane collapses",
+      "old": "1200",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 57,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(probe.docScroll).toBeLessThanOrEqual(probe.docClient);",
+      "testTitle": "N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll",
+      "old": "≤ 320",
+      "new": "320",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 320
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 60,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(probe.colScroll).toBeLessThanOrEqual(probe.colClient + 1);",
+      "testTitle": "N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll",
+      "old": "≤ 321",
+      "new": "320",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        321
+      ],
+      "rawNew": 320
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 61,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.centerWidth).toBe(320);",
+      "testTitle": "N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll",
+      "old": "320",
+      "new": "320",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 320
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 63,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.sidebarVisible).toBe(false);",
+      "testTitle": "N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 64,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.rightVisible).toBe(false);",
+      "testTitle": "N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 73,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(probe.docScroll).toBeLessThanOrEqual(probe.docClient);",
+      "testTitle": "N2: 360 and 390 keep the same law",
+      "old": "≤ 360",
+      "new": "360",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        360
+      ],
+      "rawNew": 360
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 74,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(probe.colScroll).toBeLessThanOrEqual(probe.colClient + 1);",
+      "testTitle": "N2: 360 and 390 keep the same law",
+      "old": "≤ 361",
+      "new": "360",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        361
+      ],
+      "rawNew": 360
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 75,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.centerWidth).toBe(width);",
+      "testTitle": "N2: 360 and 390 keep the same law",
+      "old": "360",
+      "new": "360",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        360
+      ],
+      "rawNew": 360
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 76,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.sidebarVisible).toBe(false);",
+      "testTitle": "N2: 360 and 390 keep the same law",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 77,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.rightVisible).toBe(false);",
+      "testTitle": "N2: 360 and 390 keep the same law",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 87,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect((await overflowProbe(page)).sidebarVisible).toBe(false);",
+      "testTitle": "N3: the degradation stops at 768px — the 3-pane shell survives above it",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 92,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.sidebarVisible).toBe(true);",
+      "testTitle": "N3: the degradation stops at 768px — the 3-pane shell survives above it",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 93,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(probe.rightVisible).toBe(true);",
+      "testTitle": "N3: the degradation stops at 768px — the 3-pane shell survives above it",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 102,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(widths.sidebar).toBe(240);",
+      "testTitle": "N3: the degradation stops at 768px — the 3-pane shell survives above it",
+      "old": "240",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 103,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(widths.right).toBe(488);",
+      "testTitle": "N3: the degradation stops at 768px — the 3-pane shell survives above it",
+      "old": "488",
+      "new": "488",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        488
+      ],
+      "rawNew": 488
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 122,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.docScroll).toBeLessThanOrEqual(geo.docClient);",
+      "testTitle": "N4: the docked chief panel cannot re-overflow the 320px shell",
+      "old": "≤ 320",
+      "new": "320",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 320
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 123,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.panelWidth).toBeLessThanOrEqual(320);",
+      "testTitle": "N4: the docked chief panel cannot re-overflow the 320px shell",
+      "old": "≤ 320",
+      "new": "304",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 304
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 124,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.panelRight).toBeLessThanOrEqual(320);",
+      "testTitle": "N4: the docked chief panel cannot re-overflow the 320px shell",
+      "old": "≤ 320",
+      "new": "312",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 312
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 145,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.backLeft).toBeGreaterThanOrEqual(0);",
+      "testTitle": "N5: head actions and the composer stay inside the 320px viewport",
+      "old": "≥ 0",
+      "new": "12",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 12
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 146,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.actionsRight).toBeLessThanOrEqual(320);",
+      "testTitle": "N5: head actions and the composer stay inside the 320px viewport",
+      "old": "≤ 320",
+      "new": "320",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 320
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 147,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.compLeft).toBeGreaterThanOrEqual(0);",
+      "testTitle": "N5: head actions and the composer stay inside the 320px viewport",
+      "old": "≥ 0",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "detail-narrow.spec.ts",
+      "line": 148,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.compRight).toBeLessThanOrEqual(320);",
+      "testTitle": "N5: head actions and the composer stay inside the 320px viewport",
+      "old": "≤ 320",
+      "new": "304",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        320
+      ],
+      "rawNew": 304
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 127,
+      "matcher": "toBeLessThan",
+      "negated": false,
+      "source": "expect(bottomTop).toBeLessThan(chatTop);",
+      "testTitle": "2. 简报卡随流滚走：滚到底出视口，滚到顶回列首",
+      "old": "< 44",
+      "new": "-797",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        44
+      ],
+      "rawNew": -797
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 131,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(topTop).toBeGreaterThanOrEqual(chatTop - 1);",
+      "testTitle": "2. 简报卡随流滚走：滚到底出视口，滚到顶回列首",
+      "old": "≥ 43",
+      "new": "79",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        43
+      ],
+      "rawNew": 79
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 132,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "expect(Math.abs(topTop - bottomTop)).toBeGreaterThan(200);",
+      "testTitle": "2. 简报卡随流滚走：滚到底出视口，滚到顶回列首",
+      "old": "> 200",
+      "new": "876",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        200
+      ],
+      "rawNew": 876
+    },
+    {
+      "file": "spec-flow.spec.ts",
+      "line": 142,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(metrics.scrollWidth).toBe(metrics.clientWidth);",
+      "testTitle": "3. 超长无断点行包进中栏：chat 横向 scrollWidth 等于 clientWidth",
+      "old": "712",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 180,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(layout.display).toBe('flex');",
+      "testTitle": "T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）",
+      "old": "flex",
+      "new": "flex",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "flex"
+      ],
+      "rawNew": "flex"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 182,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(layout.gap).toBe(11);",
+      "testTitle": "T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）",
+      "old": "11",
+      "new": "11",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        11
+      ],
+      "rawNew": 11
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 184,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(layout.avatarW).toBe(20);",
+      "testTitle": "T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）",
+      "old": "20",
+      "new": "20",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        20
+      ],
+      "rawNew": 20
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 196,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(cs.maxWidth).not.toBe('none');",
+      "testTitle": "T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类",
+      "old": "none",
+      "new": "643.477px",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "none"
+      ],
+      "rawNew": "643.477px"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 197,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(cs.minWidth).toBe('0px');",
+      "testTitle": "T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 219,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(m.labelText.endsWith('…')).toBe(true);",
+      "testTitle": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 220,
+      "matcher": "toBeLessThan",
+      "negated": false,
+      "source": "expect(m.labelText.length).toBeLessThan(LONG_THINKING.length);",
+      "testTitle": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽",
+      "old": "< 187",
+      "new": "151",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        187
+      ],
+      "rawNew": 151
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 222,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(m.textOverflow).toBe('ellipsis');",
+      "testTitle": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽",
+      "old": "ellipsis",
+      "new": "ellipsis",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "ellipsis"
+      ],
+      "rawNew": "ellipsis"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 223,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(m.overflowX).toBe('hidden');",
+      "testTitle": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽",
+      "old": "hidden",
+      "new": "hidden",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "hidden"
+      ],
+      "rawNew": "hidden"
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 224,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "expect(m.labelScroll).toBeGreaterThan(m.labelClient);",
+      "testTitle": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽",
+      "old": "> 625",
+      "new": "1810",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        625
+      ],
+      "rawNew": 1810
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 225,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(m.btnW).toBeLessThanOrEqual(m.colW);",
+      "testTitle": "T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽",
+      "old": "≤ 643",
+      "new": "643",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        643
+      ],
+      "rawNew": 643
+    },
+    {
+      "file": "thinking-row-truncate.spec.ts",
+      "line": 234,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(pageOverflow).toBeLessThanOrEqual(0);",
+      "testTitle": "T4: 页面级零横向溢出；展开交互不被截断修法砸掉",
+      "old": "≤ 0",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "transcript-user-words.spec.ts",
+      "line": 235,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(box.h).toBe(24);",
+      "testTitle": "5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）",
+      "old": "24",
+      "new": "24",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        24
+      ],
+      "rawNew": 24
+    },
+    {
+      "file": "transcript-user-words.spec.ts",
+      "line": 236,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(box.font).toBe('15px');",
+      "testTitle": "5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）",
+      "old": "15px",
+      "new": "15px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "15px"
+      ],
+      "rawNew": "15px"
+    }
+  ],
+  "webFirstCss": []
+}

@@ -1,0 +1,39 @@
+{
+  "relayResult": {
+    "builds": [
+      {
+        "id": "01a11a55-74fe-7fcc-bfe6-bcd51d6ff78a",
+        "todoId": "N_22_nGvw2D1odzTNe9bz",
+        "withPlan": false,
+        "prevPhase": "todo",
+        "triggerSource": "chief",
+        "pinnedMachineId": null,
+        "planDocId": null,
+        "errorMessage": null,
+        "prUrl": null,
+        "prNumber": null,
+        "diffHash": null,
+        "createdAt": 1791443170558
+      }
+    ],
+    "withPlan": false,
+    "dispatchReason": "缺陷有可复现步骤（信号一）→ 直接修",
+    "triggerSource": "chief"
+  },
+  "sqlite": {
+    "builds": [
+      {
+        "id": "01a11a55-74fe-7fcc-bfe6-bcd51d6ff78a",
+        "withPlan": 0,
+        "triggerSource": "chief"
+      }
+    ],
+    "steps": [
+      {
+        "buildId": "01a11a55-74fe-7fcc-bfe6-bcd51d6ff78a",
+        "kind": "build",
+        "status": "pending"
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "baseCommit": "b04153b90296fce553027a7291fa78993494da45",
+  "originalPullRequestHead": "9526438e9b17fd3ef5d121b03ab0cd489acb7ae1",
+  "files": {
+    "apps/daemon/src/git.ts": "8a6f242a7d1811f18469ab89e0f35e619ff83987197a948e411301c0a870ec3b",
+    "apps/daemon/src/workspace.ts": "8c31d3c632fbbee5ebfb2a8a4ce038e89121247a4f1d170fe00e01f84d067f0c",
+    "apps/daemon/test/git.test.ts": "0624a028167a18e554fe19ebeb907555c91a15c6ac3def0600f715d9f43f1cca",
+    "apps/daemon/test/workspace-cred-fallback.test.ts": "371e9e39991a72cd63ca761fe443b1cd76349ba639a8d212791d4807a0a2e937",
+    "integration/eval/git-push-proof/observe.mts": "1879be44af45cc355a5c1571668cd7cfd16da37f902fe0e0ba7744f7b03eb07d"
+  }
+}

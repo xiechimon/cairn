@@ -1,0 +1,6 @@
+Claude Code
+未安装
+
+执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。
+
+安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。

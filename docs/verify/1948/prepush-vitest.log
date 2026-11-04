@@ -1,0 +1,11 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1948
+
+ ✓ |@cairn/integration| test/harbor-submission.test.ts (16 tests) 503ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  17:56:49
+   Duration  1.10s (tests 49%, import 42%, transform 9%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-bzstt93s/prepush-vitest-JjdV8V/report.json

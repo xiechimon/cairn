@@ -1,0 +1,450 @@
+{
+  "side": "before",
+  "base": "http://127.0.0.1:8412",
+  "measurements": [
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "board-column",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "todo-card",
+      "prop": "borderTopLeftRadius",
+      "value": "14px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "drag-card",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "user-menu",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "composer (registered deviation, stays)",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "chat-bubble (registered deviation, stays)",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "chief TabsList",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "chief tab indicator",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "chief secondary-bg blocks",
+      "prop": "[{\"cls\":\"group/tabs-list w-fit items-center justify-center text-muted\",\"radius\":\"0px\",\"h\":30},{\"cls\":\"group/button inline-flex shrink-0 items-center border border\",\"radius\":\"0px\",\"h\":44},{\"cls\":\"mt-[17px] flex min-h-[62px] items-center gap-4 bg-(--seconda\",\"radius\":\"0px\",\"h\":62},{\"cls\":\"mt-[17px] flex min-h-[62px] items-center gap-4 bg-(--seconda\",\"radius\":\"0px\",\"h\":62}]",
+      "value": ""
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "chief-composer (registered deviation, stays)",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "mention-picker-insert",
+      "prop": "{\"color\":\"rgb(242, 148, 216)\",\"bg\":\"rgba(0, 0, 0, 0)\",\"radius\":\"10px\"}",
+      "value": ""
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "spec-block",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "account name button (rest)",
+      "prop": "color",
+      "value": "rgb(238, 232, 228)"
+    },
+    {
+      "side": "before",
+      "theme": "dark",
+      "face": "account name button (hover)",
+      "prop": "{\"color\":\"rgb(242, 148, 216)\",\"bg\":\"rgba(0, 0, 0, 0)\"}",
+      "value": ""
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "board-column",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "todo-card",
+      "prop": "borderTopLeftRadius",
+      "value": "14px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "drag-card",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "user-menu",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "composer (registered deviation, stays)",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "chat-bubble (registered deviation, stays)",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "chief TabsList",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "chief tab indicator",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "chief secondary-bg blocks",
+      "prop": "[{\"cls\":\"group/tabs-list w-fit items-center justify-center text-muted\",\"radius\":\"0px\",\"h\":30},{\"cls\":\"group/button inline-flex shrink-0 items-center border border\",\"radius\":\"0px\",\"h\":44},{\"cls\":\"mt-[17px] flex min-h-[62px] items-center gap-4 bg-(--seconda\",\"radius\":\"0px\",\"h\":62},{\"cls\":\"mt-[17px] flex min-h-[62px] items-center gap-4 bg-(--seconda\",\"radius\":\"0px\",\"h\":62}]",
+      "value": ""
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "chief-composer (registered deviation, stays)",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "mention-picker-insert",
+      "prop": "{\"color\":\"rgb(151, 34, 126)\",\"bg\":\"rgba(0, 0, 0, 0)\",\"radius\":\"10px\"}",
+      "value": ""
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "spec-block",
+      "prop": "borderTopLeftRadius",
+      "value": "0px"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "account name button (rest)",
+      "prop": "color",
+      "value": "rgb(18, 15, 11)"
+    },
+    {
+      "side": "before",
+      "theme": "light",
+      "face": "account name button (hover)",
+      "prop": "{\"color\":\"rgb(151, 34, 126)\",\"bg\":\"rgba(0, 0, 0, 0)\"}",
+      "value": ""
+    }
+  ],
+  "contrastRows": [
+    {
+      "theme": "dark",
+      "name": "bell glyph on notify disc (registered badge-glyph)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--notify-icon-bg rgb(64, 60, 57)",
+      "ratio": 5.2,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "check mark on popover plate (registered selection-mark)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--popover rgb(38, 34, 31)",
+      "ratio": 7.52,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "check mark on dialog background (registered selection-mark)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--background rgb(31, 27, 24)",
+      "ratio": 8.14,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "spinner on stream background (registered indicator)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--background rgb(31, 27, 24)",
+      "ratio": 8.14,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "spinner on card surface (registered indicator)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--card rgb(38, 34, 31)",
+      "ratio": 7.52,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "crown on spot-soft disc (registered badge-glyph)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--spot-soft color(srgb 0.26102 0.195922 0.223137)",
+      "ratio": 5.7,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "brand ink AS TEXT on popover (#1055 before-face reference)",
+      "fg": "--card-button rgb(242, 148, 216)",
+      "bg": "--popover rgb(38, 34, 31)",
+      "ratio": 7.52,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "insert button AFTER: label on primary fill",
+      "fg": "--primary-foreground rgb(31, 27, 24)",
+      "bg": "--primary rgb(238, 232, 228)",
+      "ratio": 14.08,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "account hover AFTER: accent-foreground on accent",
+      "fg": "--accent-foreground rgb(238, 232, 228)",
+      "bg": "--accent rgb(45, 41, 38)",
+      "ratio": 11.87,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "dark",
+      "name": "link tier reference (#1006 R4): primary on card",
+      "fg": "--primary rgb(238, 232, 228)",
+      "bg": "--card rgb(38, 34, 31)",
+      "ratio": 13,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "bell glyph on notify disc (registered badge-glyph)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--notify-icon-bg color(srgb 0.892314 0.811216 0.844863)",
+      "ratio": 4.99,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "check mark on popover plate (registered selection-mark)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--popover rgb(240, 235, 230)",
+      "ratio": 6.23,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "check mark on dialog background (registered selection-mark)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--background rgb(246, 241, 236)",
+      "ratio": 6.57,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "spinner on stream background (registered indicator)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--background rgb(246, 241, 236)",
+      "ratio": 6.57,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "spinner on card surface (registered indicator)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--card rgb(240, 235, 230)",
+      "ratio": 6.23,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "crown on spot-soft disc (registered badge-glyph)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--spot-soft color(srgb 0.892314 0.811216 0.844863)",
+      "ratio": 4.99,
+      "threshold": 3,
+      "kind": "ui",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "brand ink AS TEXT on popover (#1055 before-face reference)",
+      "fg": "--card-button rgb(151, 34, 126)",
+      "bg": "--popover rgb(240, 235, 230)",
+      "ratio": 6.23,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "insert button AFTER: label on primary fill",
+      "fg": "--primary-foreground rgb(250, 250, 250)",
+      "bg": "--primary rgb(18, 15, 11)",
+      "ratio": 18.31,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "account hover AFTER: accent-foreground on accent",
+      "fg": "--accent-foreground rgb(18, 15, 11)",
+      "bg": "--accent rgb(234, 228, 224)",
+      "ratio": 15.17,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    },
+    {
+      "theme": "light",
+      "name": "link tier reference (#1006 R4): primary on card",
+      "fg": "--primary rgb(18, 15, 11)",
+      "bg": "--card rgb(240, 235, 230)",
+      "ratio": 16.14,
+      "threshold": 4.5,
+      "kind": "text",
+      "result": "PASS"
+    }
+  ],
+  "tokens": {
+    "dark": {
+      "--card-button": "rgb(242, 148, 216)",
+      "--focus-ring": "rgb(242, 148, 216)",
+      "--popover": "rgb(38, 34, 31)",
+      "--card": "rgb(38, 34, 31)",
+      "--background": "rgb(31, 27, 24)",
+      "--secondary": "rgb(45, 41, 38)",
+      "--spot-soft": "color(srgb 0.26102 0.195922 0.223137)",
+      "--accent-soft": "color(srgb 0.94902 0.580392 0.847059 / 0.14)",
+      "--spot-text-on-tint": "rgb(248, 167, 225)",
+      "--notify-icon-bg": "rgb(64, 60, 57)",
+      "--primary": "rgb(238, 232, 228)",
+      "--primary-foreground": "rgb(31, 27, 24)",
+      "--text-on-accent": "rgb(31, 27, 24)",
+      "--foreground": "rgb(238, 232, 228)",
+      "--text-secondary": "rgb(211, 206, 202)",
+      "--text-tertiary": "rgb(179, 174, 170)",
+      "--accent": "rgb(45, 41, 38)",
+      "--accent-foreground": "rgb(238, 232, 228)",
+      "--border": "rgb(45, 41, 38)",
+      "--muted": "rgb(45, 41, 38)"
+    },
+    "light": {
+      "--card-button": "rgb(151, 34, 126)",
+      "--focus-ring": "rgb(151, 34, 126)",
+      "--popover": "rgb(240, 235, 230)",
+      "--card": "rgb(240, 235, 230)",
+      "--background": "rgb(246, 241, 236)",
+      "--secondary": "rgb(234, 228, 224)",
+      "--spot-soft": "color(srgb 0.892314 0.811216 0.844863)",
+      "--accent-soft": "color(srgb 0.592157 0.133333 0.494118 / 0.14)",
+      "--spot-text-on-tint": "rgb(102, 25, 85)",
+      "--notify-icon-bg": "color(srgb 0.892314 0.811216 0.844863)",
+      "--primary": "rgb(18, 15, 11)",
+      "--primary-foreground": "rgb(250, 250, 250)",
+      "--text-on-accent": "rgb(255, 255, 255)",
+      "--foreground": "rgb(18, 15, 11)",
+      "--text-secondary": "rgb(54, 50, 46)",
+      "--text-tertiary": "rgb(89, 84, 80)",
+      "--accent": "rgb(234, 228, 224)",
+      "--accent-foreground": "rgb(18, 15, 11)",
+      "--border": "rgb(234, 228, 224)",
+      "--muted": "rgb(234, 228, 224)"
+    }
+  }
+}

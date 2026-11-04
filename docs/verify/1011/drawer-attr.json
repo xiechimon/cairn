@@ -1,0 +1,44 @@
+{
+  "key": "drawer",
+  "geo": {
+    "row": {
+      "x": 1066,
+      "y": 196.25,
+      "width": 278,
+      "height": 32.5625,
+      "top": 196.25,
+      "right": 1344,
+      "bottom": 228.8125,
+      "left": 1066
+    },
+    "listbox": {
+      "x": 1066,
+      "y": 196.25,
+      "width": 278,
+      "height": 32.5625,
+      "top": 196.25,
+      "right": 1344,
+      "bottom": 228.8125,
+      "left": 1066
+    },
+    "lbOverflow": "auto"
+  },
+  "diffShadowRemoved": {
+    "changed": 1402,
+    "bbox": {
+      "minX": 36,
+      "maxX": 1147,
+      "minY": 84,
+      "maxY": 215
+    }
+  },
+  "diffOverflowVisible": {
+    "changed": 28278,
+    "bbox": {
+      "minX": 24,
+      "maxX": 1159,
+      "minY": 72,
+      "maxY": 227
+    }
+  }
+}

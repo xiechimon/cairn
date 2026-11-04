@@ -1,0 +1,86 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1996/apps/server
+
+ ❯ test/reliability-replay.test.ts (9 tests | 3 failed) 18ms
+   × replay report redacts and truncates error messages like the database report does 11ms
+   × replay classification ages a build against the report window end, not zero 1ms
+   × replay classification hits stuck-waiting at the six-hour boundary 1ms
+ ❯ test/reliability-report.test.ts (13 tests | 1 failed) 2065ms
+   × a failure recorded only on a failed step gets its cause, not active or stuck 28ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/reliability-replay.test.ts > replay report redacts and truncates error messages like the database report does
+AssertionError: expected 'push failed, credential was ghp_01234…' to be 'push failed, credential was [REDACTED]' // Object.is equality
+
+Expected: "push failed, credential was [REDACTED]"
+Received: "push failed, credential was ghp_0123456789abcdefghijklmnopqrstuv"
+
+ ❯ test/reliability-replay.test.ts:176:30
+    174|   const report = buildReplayReport([leaked, long], window);
+    175|   const leakedRow = report.builds.find((row) => row.id === 'build-1');
+    176|   expect(leakedRow?.message).toBe(
+       |                              ^
+    177|     `push failed, credential was ${redactSecrets('ghp_0123456789abcdef…
+    178|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/reliability-replay.test.ts > replay classification ages a build against the report window end, not zero
+AssertionError: expected 'active' to be 'stuck-waiting' // Object.is equality
+
+Expected: "stuck-waiting"
+Received: "active"
+
+ ❯ test/reliability-replay.test.ts:214:27
+    212|   const oldRow = report.builds.find((row) => row.id === 'build-1');
+    213|   const freshRow = report.builds.find((row) => row.id === 'build-2');
+    214|   expect(oldRow?.outcome).toBe('stuck-waiting');
+       |                           ^
+    215|   expect(oldRow?.ageHours).toBeGreaterThan(160);
+    216|   expect(freshRow?.outcome).toBe('active');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/reliability-replay.test.ts > replay classification hits stuck-waiting at the six-hour boundary
+AssertionError: expected 'active' to be 'stuck-waiting' // Object.is equality
+
+Expected: "stuck-waiting"
+Received: "active"
+
+ ❯ test/reliability-replay.test.ts:251:32
+    249|   const boundaryRow = report.builds.find((row) => row.id === 'build-1'…
+    250|   const justUnderRow = report.builds.find((row) => row.id === 'build-2…
+    251|   expect(boundaryRow?.outcome).toBe('stuck-waiting');
+       |                                ^
+    252|   expect(justUnderRow?.outcome).toBe('active');
+    253| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/reliability-report.test.ts > a failure recorded only on a failed step gets its cause, not active or stuck
+AssertionError: expected 'stuck-waiting' to be 'git' // Object.is equality
+
+Expected: "git"
+Received: "stuck-waiting"
+
+ ❯ test/reliability-report.test.ts:323:24
+    321|   const result = report(db);
+    322|   const row = result.builds.find((b) => b.id === 'step-only');
+    323|   expect(row?.outcome).toBe('git');
+       |                        ^
+    324|   expect(row?.steps.failed).toBe(1);
+    325|   expect(result.causes.git).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 18 passed (22)
+   Start at  12:52:41
+   Duration  2.69s (tests 65%, import 21%, transform 14%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-1996/apps/server
+

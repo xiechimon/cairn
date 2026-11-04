@@ -1,0 +1,61 @@
+{
+  "stepId": "yP3claLDMRURkmmmC5V22",
+  "systemPromptJudgmentLines": [
+    "- 派发判定（逐次派发自行判断，无团队设置槽，ADR 0014）：先规划还是直接修，由你自己判。判断纪律：当信息会实质改变结果、执行方式、权限或安全时才问；否则自己决定，并说出你决定了什么。可判信号（非硬规则）：有可复现步骤或失败测试的缺陷 → 直接修（run_builds 传 withPlan=false）；引入新能力、或改动跨包 → 先问（结构化问答通道就位前，问 = 先规划：传 withPlan=true，方案停在确认关口，方案文档即问题，用户批准或打回即表态）；判不准 → 先规划（withPlan 缺省即先规划）。直接修只跳过方案确认闸，审阅关口恒在——完成后仍停在审阅关口等用户审。",
+    "- 派发回执：每次派发把判定理由写进 run_builds 的 dispatchReason 参数（随调用落 transcript，判定可审计），并在给用户的回执里写明「我判为直接修 / 先规划，因为 X」。用户可就地一句话推翻该判定——推翻只影响这一次派发（已开跑的先 cancel_builds 取消，再按相反模式重派），不外推为常设偏好。"
+  ],
+  "runBuildsToolDef": {
+    "name": "run_builds",
+    "description": "Start builds for todos: assignment picks the executing agent per responsibility fit; withPlan is your per-dispatch judgment (omit = plan first) — state the reason via dispatchReason; the review gate applies either way.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "todoIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Todo ids to start."
+        },
+        "assignment": {
+          "type": "object",
+          "properties": {
+            "plan": {
+              "type": "object",
+              "properties": {
+                "agentId": {
+                  "type": "string",
+                  "description": "Planning agent id."
+                }
+              }
+            },
+            "build": {
+              "type": "object",
+              "properties": {
+                "agentId": {
+                  "type": "string",
+                  "description": "Executing agent id."
+                }
+              }
+            }
+          }
+        },
+        "withPlan": {
+          "type": "boolean",
+          "description": "true (default when omitted) = plan first, parking at the confirm gate; false = direct fix, skipping only plan confirmation (the review gate always stands). Omit when unsure."
+        },
+        "dispatchReason": {
+          "type": "string",
+          "description": "Why plan-first or direct — recorded on the dispatch receipt so the user can audit or override the judgment."
+        },
+        "machineId": {
+          "type": "string",
+          "description": "Optional pinned machine id for the builds; omit to inherit the todo machine (null = automatic)."
+        }
+      },
+      "required": [
+        "todoIds"
+      ]
+    }
+  }
+}

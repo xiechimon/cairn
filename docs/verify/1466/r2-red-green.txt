@@ -1,0 +1,214 @@
+# red leg:   ddb06ca48b834c217aa01cf55a9cb11ee7151b3d  (tests-only commit; its sources are byte-identical to e87699c: git diff --stat e87699c ddb06ca4 -- 'apps/*/src' 'packages/*/src' is empty)
+# green leg: ab18cc3012d25906aa87adc28e565fa3171d8578  (ddb06ca4 + the source fix in chief-tools.ts and builds.ts)
+# #1466 round 2: new and changed tests, red against the e87699c sources, then green after the fix.
+#   T9  chief run_builds: team-A todo pointing at a team-B project -> 404 with no build, phase unchanged, no watch (also when an own-team todo comes first)
+#   T10 chief watch_todos: mixed list [own todo, such a todo] -> 404, nothing watched
+#   R7  PR delivery in a project whose stored githubRepo is invalid -> review (was: asserted the stuck 'building'), CI poller makes no request
+#   R9  builds.ts delivery gate (completeStep) with an invalid stored githubRepo -> review + verify step; valid-repo control stays in building
+# Red reasons on e87699c sources: T9 builds were created (phase queued, 1 build) although the call answered 404;
+# T10 the own-team todo was watched before the 404; R7/R9 the todo stays in 'building'. The R9 valid-repo control passes on both legs by design.
+# Unchanged in this round and green on both legs: the rest of the three files (W1-W4, R1-R6, R8, T1-T8, daemon probe cases).
+# The daemon probe case lost one assertion (github.com/../user.git, which passes without the fix); its two repo-segment assertions stay.
+
+==================== RED (git ddb06ca4) ====================
+# cmd: pnpm exec vitest run --reporter=verbose apps/server/test/github-repo-dot-segments.test.ts apps/server/test/project-team-guard.test.ts apps/daemon/test/github-probe.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p5c
+
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > gh 梯（失败方式 1/2） > gh 命中 → open 优先、多 open 取 number 最大 9ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > gh 梯（失败方式 1/2） > gh 非零退出 → REST 梯接手（无 token = 匿名形态） 5ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > gh 缺席 + token 在位 → Authorization 头携带 token，只取头不进 URL 5ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 404（私仓匿名）→ null 不抛 4ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 网络错 → null（全梯失败 = 未知） 9ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 非数组载荷 → null（不假阳） 4ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > github cloneUrl → owner/repo（.git 剥离） 1ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > hosted / local / 垃圾形状 → null（探测跳过） 0ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > #1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测 1ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 docs：他队项目 404，文案与不存在 id 同形 184ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 create_todo：他队项目 404，文案与不存在 id 同形 35ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 update_project：他队项目 404，文案与不存在 id 同形 37ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W1 POST /api/projects kind=github：字符串面与对象面都 400 163ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W2 PATCH local→github 转换：400，且不出站探可达 48ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W3 chief connect_repo：400，项目行不改 41ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 connect_repo：他队项目 404，文案与不存在 id 同形 36ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T2-T4 越权调用无副作用：他队项目名 / 仓 / 任务集不变 39ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 [] 43ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W4 带点的合法名照过（POST 201 / connect_repo 落值） 44ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（../user） 44ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（owner/..） 51ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch 39ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch 51ms
+   → expected { phase: 'queued', builds: 1 } to deeply equal { phase: 'todo', builds: +0 }
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（../user） 57ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（owner/..） 66ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T10 watch_todos 混合列表：含本队任务指向他队项目 → 404，一个都不 watch 56ms
+   → expected [ 'v-xVoVrl7ufqcRWKtFtcf' ] to deeply equal []
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：docs / create_todo / update_project / connect_repo / todos / watch_todos 45ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T2/T7 create_todo：他队项目 404，不建任务 47ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（../user） 41ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（owner/..） 33ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（../user） 41ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 [] 41ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：create_todo + todos 38ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（owner/..） 35ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user） 40ms
+   → expected 'building' to be 'review' // Object.is equality
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..） 34ms
+   → expected 'building' to be 'review' // Object.is equality
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（../user） 34ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（owner/..） 37ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（../user） 41ms
+   → expected 'building' to be 'review' // Object.is equality
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（owner/..） 37ms
+   → expected 'building' to be 'review' // Object.is equality
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 对照：合法 githubRepo 的 PR 交付照旧停 building 等 CI，不入队验证步 41ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user）
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..）
+AssertionError: expected 'building' to be 'review' // Object.is equality
+
+Expected: "review"
+Received: "building"
+
+ ❯ test/github-repo-dot-segments.test.ts:354:34
+    352|       await poller.sweep();
+    353|       expect(rec.calls).toEqual([]);
+    354|       expect(phaseOf(s, todoId)).toBe('review');
+       |                                  ^
+    355|       expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'd…
+    356|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（../user）
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（owner/..）
+AssertionError: expected 'building' to be 'review' // Object.is equality
+
+Expected: "review"
+Received: "building"
+
+ ❯ test/github-repo-dot-segments.test.ts:409:32
+    407|     const { todoId, buildId, stepId } = insertDeliveringBuild(s, proje…
+    408|     completeStep(s.svc, stepId, { hasChanges: true });
+    409|     expect(phaseOf(s, todoId)).toBe('review');
+       |                                ^
+    410|     expect(stepsOf(s, buildId)).toEqual([
+    411|       { kind: 'build', status: 'done' },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch
+AssertionError: expected { phase: 'queued', builds: 1 } to deeply equal { phase: 'todo', builds: +0 }
+
+- Expected
++ Received
+
+  {
+-   "builds": 0,
+-   "phase": "todo",
++   "builds": 1,
++   "phase": "queued",
+  }
+
+ ❯ test/project-team-guard.test.ts:176:30
+    174|     expect(single.status).toBe(404);
+    175|     expect(single.message).toBe(`project ${PROJ_B}`);
+    176|     expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
+       |                              ^
+    177|     // 混合列表：排在前面的本队任务也不先派出。
+    178|     const mixed = await runBuilds([own, CROSS]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T10 watch_todos 混合列表：含本队任务指向他队项目 → 404，一个都不 watch
+AssertionError: expected [ 'v-xVoVrl7ufqcRWKtFtcf' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "v-xVoVrl7ufqcRWKtFtcf",
++ ]
+
+ ❯ test/project-team-guard.test.ts:191:29
+    189|     expect(err.status).toBe(404);
+    190|     expect(err.message).toBe(`project ${PROJ_B}`);
+    191|     expect(chiefWatchIds()).toEqual([]);
+       |                             ^
+    192|   });
+    193|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  6 failed | 35 passed (41)
+   Start at  11:57:04
+   Duration  3.52s (transform 54%, import 25%, tests 22%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 3.02s · 47% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+# vitest exit: 1
+
+==================== GREEN (git ab18cc30) ====================
+# cmd: pnpm exec vitest run --reporter=verbose apps/server/test/github-repo-dot-segments.test.ts apps/server/test/project-team-guard.test.ts apps/daemon/test/github-probe.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p5c
+
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > gh 梯（失败方式 1/2） > gh 命中 → open 优先、多 open 取 number 最大 13ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > gh 梯（失败方式 1/2） > gh 非零退出 → REST 梯接手（无 token = 匿名形态） 5ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > gh 缺席 + token 在位 → Authorization 头携带 token，只取头不进 URL 5ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 404（私仓匿名）→ null 不抛 5ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 网络错 → null（全梯失败 = 未知） 4ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 非数组载荷 → null（不假阳） 4ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > github cloneUrl → owner/repo（.git 剥离） 1ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > hosted / local / 垃圾形状 → null（探测跳过） 1ms
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > #1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测 1ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W1 POST /api/projects kind=github：字符串面与对象面都 400 114ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W2 PATCH local→github 转换：400，且不出站探可达 61ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 docs：他队项目 404，文案与不存在 id 同形 106ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 create_todo：他队项目 404，文案与不存在 id 同形 37ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 update_project：他队项目 404，文案与不存在 id 同形 47ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W3 chief connect_repo：400，项目行不改 38ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W4 带点的合法名照过（POST 201 / connect_repo 落值） 41ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（../user） 45ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 connect_repo：他队项目 404，文案与不存在 id 同形 42ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T2-T4 越权调用无副作用：他队项目名 / 仓 / 任务集不变 38ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 [] 33ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch 43ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch 56ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T10 watch_todos 混合列表：含本队任务指向他队项目 → 404，一个都不 watch 43ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（owner/..） 40ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（../user） 49ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（owner/..） 39ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：docs / create_todo / update_project / connect_repo / todos / watch_todos 39ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T2/T7 create_todo：他队项目 404，不建任务 33ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 [] 32ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：create_todo + todos 36ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（../user） 41ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（owner/..） 33ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（../user） 52ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（owner/..） 39ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user） 51ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..） 50ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（../user） 41ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（owner/..） 41ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（../user） 46ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（owner/..） 56ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 对照：合法 githubRepo 的 PR 交付照旧停 building 等 CI，不入队验证步 47ms
+
+ Test Files  3 passed (3)
+      Tests  41 passed (41)
+   Start at  11:58:25
+   Duration  3.62s (transform 57%, import 23%, tests 20%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 3.40s · 52% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+# vitest exit: 0

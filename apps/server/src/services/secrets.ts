@@ -1,0 +1,172 @@
+import type { SecretBox, SecretRecord } from '@cairn/shared';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
+import { project, secret } from '../db/schema.js';
+import { conflict, notFound } from '../lib/errors.js';
+import { newRecordId } from '../lib/ids.js';
+
+export interface SecretDeps {
+  db: Db;
+  box: SecretBox;
+}
+
+type SecretRow = typeof secret.$inferSelect;
+
+export function toSecretRecord(row: SecretRow): SecretRecord {
+  return {
+    id: row.id,
+    teamId: row.teamId,
+    projectId: row.projectId,
+    name: row.name,
+    description: row.description,
+  };
+}
+
+function getRow(deps: SecretDeps, teamId: string, id: string): SecretRow | undefined {
+  return deps.db
+    .select()
+    .from(secret)
+    .where(and(eq(secret.id, id), eq(secret.teamId, teamId)))
+    .get();
+}
+
+function assertNameFree(
+  deps: SecretDeps,
+  teamId: string,
+  projectId: string | null,
+  name: string,
+  exceptId?: string,
+): void {
+  const dup = deps.db
+    .select({ id: secret.id })
+    .from(secret)
+    .where(
+      and(
+        eq(secret.teamId, teamId),
+        eq(secret.name, name),
+        projectId === null ? isNull(secret.projectId) : eq(secret.projectId, projectId),
+      ),
+    )
+    .all()
+    .find((r) => r.id !== exceptId);
+  if (dup) throw conflict(`secret ${name} already exists`);
+}
+
+export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
+  return deps.db
+    .select()
+    .from(secret)
+    .where(eq(secret.teamId, teamId))
+    .orderBy(asc(secret.name))
+    .all()
+    .map(toSecretRecord);
+}
+
+export function createSecret(
+  deps: SecretDeps,
+  input: {
+    teamId: string;
+    name: string;
+    description?: string | null;
+    value: string;
+    projectId?: string | null;
+  },
+): SecretRecord {
+  const projectId = input.projectId ?? null;
+  if (projectId !== null) {
+    const owned = deps.db
+      .select({ id: project.id })
+      .from(project)
+      .where(and(eq(project.id, projectId), eq(project.teamId, input.teamId)))
+      .get();
+    if (!owned) throw notFound(`project ${projectId}`);
+  }
+  assertNameFree(deps, input.teamId, projectId, input.name);
+  const id = newRecordId();
+  deps.db
+    .insert(secret)
+    .values({
+      id,
+      teamId: input.teamId,
+      projectId,
+      name: input.name,
+      description: input.description ?? null,
+      valueCipher: deps.box.seal(input.value),
+    })
+    .run();
+  const row = getRow(deps, input.teamId, id);
+  if (!row) throw new Error('secret missing after insert');
+  return toSecretRecord(row);
+}
+
+export function updateSecret(
+  deps: SecretDeps,
+  teamId: string,
+  id: string,
+  patch: { name?: string; description?: string | null; value?: string },
+): SecretRecord {
+  const row = getRow(deps, teamId, id);
+  if (!row) throw notFound(`secret ${id}`);
+  if (patch.name !== undefined && patch.name !== row.name) {
+    assertNameFree(deps, teamId, row.projectId, patch.name, id);
+  }
+  deps.db
+    .update(secret)
+    .set({
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.value !== undefined ? { valueCipher: deps.box.seal(patch.value) } : {}),
+    })
+    .where(eq(secret.id, id))
+    .run();
+  const updated = getRow(deps, teamId, id);
+  if (!updated) throw new Error('secret missing after update');
+  return toSecretRecord(updated);
+}
+
+export function deleteSecret(deps: SecretDeps, teamId: string, id: string): boolean {
+  const row = getRow(deps, teamId, id);
+  if (!row) return false;
+  deps.db.delete(secret).where(eq(secret.id, id)).run();
+  return true;
+}
+
+export function openSecretValues(
+  deps: SecretDeps,
+  teamId: string,
+  ids: readonly string[],
+  projectId: string | null,
+): Record<string, string> {
+  if (ids.length === 0) return {};
+  const granted = deps.db
+    .select()
+    .from(secret)
+    .where(and(eq(secret.teamId, teamId), inArray(secret.id, [...ids])))
+    .all()
+    .filter((row) => row.projectId === null || row.projectId === projectId);
+  const names = [...new Set(granted.map((row) => row.name))];
+  const projectRows =
+    projectId === null || names.length === 0
+      ? []
+      : deps.db
+          .select()
+          .from(secret)
+          .where(
+            and(
+              eq(secret.teamId, teamId),
+              eq(secret.projectId, projectId),
+              inArray(secret.name, names),
+            ),
+          )
+          .all();
+  const values: Record<string, string> = {};
+  for (const row of [
+    ...granted.filter((r) => r.projectId === null),
+    ...projectRows,
+    ...granted.filter((r) => r.projectId !== null),
+  ]) {
+    if (row.valueCipher === null) continue;
+    values[row.name] = deps.box.open(row.valueCipher);
+  }
+  return values;
+}

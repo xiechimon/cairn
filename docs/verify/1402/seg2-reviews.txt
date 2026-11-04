@@ -1,0 +1,43 @@
+# #1402 segment 2: reviews (CLAUDE.md: /code-review before the PR, /simplify after much new code).
+# Diff under review: origin/main...claude/bootstrap-p1-seg2 in the worktree .claude/worktrees/p1c.
+
+== /code-review, run 1 ==
+args:      low origin/main..claude/bootstrap-p1-seg2 (worktree /home/user/pacman/.claude/worktrees/p1c)
+head:      518ec47 (code as of 668e79c; 518ec47 adds only archived evidence)
+shortstat: 64 files changed, 1066 insertions(+), 61 deletions(-)
+           without docs/verify: 50 files changed, 825 insertions(+), 61 deletions(-)
+diff check: the review named vp-registry-gate.mjs ("the gate"), vp.mjs, the comment-only edits in the drive and
+           probe scripts and ci.yml, which are this branch's changes.
+result:    no finding. It read the gate, vp.mjs, the header edits and ci.yml once, skipped the self-test, the
+           evidence and the Markdown, and ran nothing.
+
+== /simplify ==
+args:      the same range in the same worktree; vp-registry-gate.mjs, vp.mjs, vp-selftest.mjs; docs/verify untouched;
+           no inline imports.
+mode:      single pass without the Agent tool (the four cleanup angles in one context, not the 4-agent fan-out).
+fixed:     (commit 2ddff26)
+  - vp-selftest.mjs: the two worktree cases repeated init / commit / worktree add; they share repoWithWorktrees().
+  - vp-selftest.mjs: the registry gate fixture listed its support scripts twice; GATE_SUPPORT derives them from
+    GATE_SCRIPTS.
+  - vp.mjs: committedRoots() ran git worktree list for cwd, VERIFY_REPO_ROOT and vp.mjs's checkout even when two
+    are the same directory; it dedupes them first.
+skipped:
+  - a helper for the three-line ports.json run directory the self-test cases build: most of those cases are
+    segment 1's, outside this diff.
+  - deriving MAIN_ROOT from git worktree list: it would change segment 1's evidence-root rule.
+  - giving glass.mjs its own run directory instead of refusing own-stack cases: it changes the probe, and its
+    ports would still collide with a vp stack on 8791 / 5273.
+after:     self-test 66/66 on Node 22 and Node 24; mutations A1 and A1b red again on the new line (seg2-mutations.txt).
+
+== /code-review, run 2 (after /simplify) ==
+args:      low origin/main..claude/bootstrap-p1-seg2 in the worktree /home/user/pacman/.claude/worktrees/p1c (run git
+           with -C ...; head 2ddff265). Include vp-selftest.mjs and vp-registry-gate.mjs; skip docs/verify/**.
+head:      2ddff26
+shortstat: 64 files changed, 1071 insertions(+), 68 deletions(-) (without docs/verify: 50 files, 830 / 68)
+diff check: the review named vp-registry-gate.mjs, vp.mjs (committedRoots across worktrees, own-stack, the
+           fresh-stack record in vp-drives.txt), vp-selftest.mjs (seedDependents, repoWithWorktrees, runGate) and
+           the header-only probe edits: this branch's code.
+result:    no runtime correctness bug. It said it skipped the test and fixture hunks of the self-test and the
+           Markdown, read the hunks once and ran nothing.
+
+Confirmed findings to fix: none.

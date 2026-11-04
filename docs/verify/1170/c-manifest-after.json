@@ -1,0 +1,28 @@
+{
+  "selection": "whitelist",
+  "skills": [
+    {
+      "id": "my-live-skill",
+      "name": "my-live-skill",
+      "description": "live 栈导入的本地技能 v3",
+      "dirName": "my-live-skill",
+      "files": [
+        {
+          "path": "helper.md",
+          "sizeBytes": 22,
+          "sha256": "cbdb7c7a7ca259cd1a749c9d9dbe6b9e8dd2467f0c22e76753eaf51658cdede5"
+        },
+        {
+          "path": "scripts/run.sh",
+          "sizeBytes": 8,
+          "sha256": "db60627f72a6be073dcd6963b3ae5ebe65f07b1fc4e9886c055bf7023d1f2ec0"
+        },
+        {
+          "path": "SKILL.md",
+          "sizeBytes": 119,
+          "sha256": "fb01a52de829b571635abcb8e4633b750e2165af1a5fbc0505c14ad2441fdc83"
+        }
+      ]
+    }
+  ]
+}

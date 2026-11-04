@@ -1,0 +1,190 @@
+{
+  "light-settings-fixture": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": {
+      "x": 471,
+      "w": 50,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.476334 0.147713 0.0259972 / 0.1)"
+    },
+    "nameInput": null,
+    "repoControl": null,
+    "createButton": null
+  },
+  "light-settings-github": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": {
+      "x": 471,
+      "w": 50,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.476334 0.147713 0.0259972 / 0.1)"
+    },
+    "nameInput": null,
+    "repoControl": null,
+    "createButton": null
+  },
+  "light-settings-local": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": {
+      "x": 471,
+      "w": 50,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.476334 0.147713 0.0259972 / 0.1)"
+    },
+    "nameInput": null,
+    "repoControl": null,
+    "createButton": null
+  },
+  "light-new-fixture": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": null,
+    "nameInput": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "8px",
+      "bg": "rgba(0, 0, 0, 0)"
+    },
+    "repoControl": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(251, 249, 245)"
+    },
+    "createButton": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(43, 38, 32)"
+    }
+  },
+  "light-new-filled": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": null,
+    "nameInput": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "8px",
+      "bg": "rgba(0, 0, 0, 0)"
+    },
+    "repoControl": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(251, 249, 245)"
+    },
+    "createButton": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(43, 38, 32)"
+    }
+  },
+  "dark-settings-fixture": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": {
+      "x": 471,
+      "w": 50,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.825784 0.0981683 0.0175117 / 0.2)"
+    },
+    "nameInput": null,
+    "repoControl": null,
+    "createButton": null
+  },
+  "dark-settings-github": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": {
+      "x": 471,
+      "w": 50,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.825784 0.0981683 0.0175117 / 0.2)"
+    },
+    "nameInput": null,
+    "repoControl": null,
+    "createButton": null
+  },
+  "dark-settings-local": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": {
+      "x": 471,
+      "w": 50,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.825784 0.0981683 0.0175117 / 0.2)"
+    },
+    "nameInput": null,
+    "repoControl": null,
+    "createButton": null
+  },
+  "dark-new-fixture": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": null,
+    "nameInput": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "8px",
+      "bg": "oklab(0.359166 0.00385408 0.00650811 / 0.3)"
+    },
+    "repoControl": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.359166 0.00385408 0.00650811 / 0.3)"
+    },
+    "createButton": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(238, 232, 228)"
+    }
+  },
+  "dark-new-filled": {
+    "settingsCard": null,
+    "rows": null,
+    "deleteButton": null,
+    "nameInput": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "8px",
+      "bg": "oklab(0.359166 0.00385408 0.00650811 / 0.3)"
+    },
+    "repoControl": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "oklab(0.359166 0.00385408 0.00650811 / 0.3)"
+    },
+    "createButton": {
+      "x": 455,
+      "w": 768,
+      "h": 32,
+      "radius": "10px",
+      "bg": "rgb(238, 232, 228)"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/scheduling-sweep.test.ts (7 tests | 2 failed | 5 skipped) 99ms
+   ❯ createScheduling sweep (6)
+     × recovers after a failed run that advanced lastEvaluatedAt past an issue update 62ms
+     × closing every open issue is not dormant and writes a fresh report 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/scheduling-sweep.test.ts > createScheduling sweep > recovers after a failed run that advanced lastEvaluatedAt past an issue update
+AssertionError: expected 'gated' to be 'generated' // Object.is equality
+
+Expected: "generated"
+Received: "gated"
+
+ ❯ test/scheduling-sweep.test.ts:246:32
+    244|     w.mock.routes[`/repos/${REPO}/pulls`] = { body: [] };
+    245|     const recovered = await scheduling.sweep(t0 + 40 * 60 * 1000);
+    246|     expect(recovered[0]?.kind).toBe('generated');
+       |                                ^
+    247|     const report = latestScheduleReport(w.s.db, w.projectId);
+    248|     expect(report?.id).not.toBe(firstId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/scheduling-sweep.test.ts > createScheduling sweep > closing every open issue is not dormant and writes a fresh report
+AssertionError: expected 'gated' to be 'generated' // Object.is equality
+
+Expected: "generated"
+Received: "gated"
+
+ ❯ test/scheduling-sweep.test.ts:263:27
+    261|     w.mock.routes[`/repos/${REPO}/issues`] = { body: [] };
+    262|     const next = await scheduling.sweep(1_700_000_000_000 + 6_000_000);
+    263|     expect(next[0]?.kind).toBe('generated');
+       |                           ^
+    264|     const report = latestScheduleReport(w.s.db, w.projectId);
+    265|     expect(report?.items).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 skipped (7)
+   Start at  05:05:31
+   Duration  1.79s (transform 63%, import 31%, tests 6%)
+

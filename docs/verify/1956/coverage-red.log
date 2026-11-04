@@ -1,0 +1,136 @@
+✔ CLI fetches original PR reviews through every page and retains evidence (121.633231ms)
+✖ recorded production gate evidence and formal AI and human reviews classify separately (291.569892ms)
+✖ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (155.755511ms)
+✖ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (204.363929ms)
+✖ partial pagination failure does not establish a definitive human-only outcome (89.81749ms)
+✖ the CLI suite runs in local and CI prepush plans (2066.041973ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 1
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2975.851036
+
+✖ failing tests:
+
+test at scripts/review-escapes.test.mjs:102:1
+✖ recorded production gate evidence and formal AI and human reviews classify separately (291.569892ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   'unknown',
+      'ai-only',
+  -   'ai-only',
+      'mixed',
+      'unknown'
+    ]
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:115:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'unknown', 'ai-only', 'mixed', 'unknown' ],
+    expected: [ 'ai-only', 'ai-only', 'mixed', 'unknown' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/review-escapes.test.mjs:124:1
+✖ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (155.755511ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unknown'
+  - 'ai-only'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:139:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unknown',
+    expected: 'ai-only',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/review-escapes.test.mjs:142:1
+✖ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (204.363929ms)
+  AssertionError [ERR_ASSERTION]: Command failed: gh api repos/xiechimon/cairn/pulls/12/reviews?per_page=100&page=1
+  HTTP 503
+  
+  
+  1 !== 0
+  
+      at run (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:77:12)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:158:32)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/review-escapes.test.mjs:180:1
+✖ partial pagination failure does not establish a definitive human-only outcome (89.81749ms)
+  AssertionError [ERR_ASSERTION]: Command failed: gh api repos/xiechimon/cairn/pulls/10/reviews?per_page=100&page=2
+  HTTP 403
+  
+  
+  1 !== 0
+  
+      at run (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:77:12)
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:183:22)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/review-escapes.test.mjs:189:1
+✖ the CLI suite runs in local and CI prepush plans (2066.041973ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(prepushPlan(['scripts/review-escapes.mjs'], mode).some((args) => args.includes('scripts/review-escapes.test.mjs')))
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1956/scripts/review-escapes.test.mjs:191:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

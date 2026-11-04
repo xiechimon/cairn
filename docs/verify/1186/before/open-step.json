@@ -1,0 +1,16 @@
+[
+  {
+    "id": "dsaUW7rc8F4_SxA5OKeGf",
+    "kind": "build",
+    "status": "done",
+    "skillInjection": {
+      "hits": [
+        {
+          "id": "demo-skill",
+          "rule": "explicit-mention",
+          "reason": "任务文本显式点名「demo-skill」"
+        }
+      ]
+    }
+  }
+]

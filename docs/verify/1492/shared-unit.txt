@@ -1,0 +1,47 @@
+ ✓ test/ticket-dedupe.test.ts > ticketDedupeKey > 失败方式 1：路径顺序 / 重复 / ./ 前缀 / 类别大小写不影响键 2ms
+ ✓ test/ticket-dedupe.test.ts > ticketDedupeKey > 失败方式 2：同类别不同路径 → 不同键 1ms
+ ✓ test/ticket-dedupe.test.ts > ticketDedupeKey > 不同类别同路径 → 不同键 0ms
+ ✓ test/ticket-dedupe.test.ts > ticketDedupeKey > 类别不能为空 1ms
+ ✓ test/ticket-dedupe.test.ts > findDuplicateTicket > 失败方式 3：标记写进 body 能原样读回 0ms
+ ✓ test/ticket-dedupe.test.ts > findDuplicateTicket > open 票里有同键标记 → 返回那张票；两个不同问题互不命中 0ms
+ ✓ test/ticket-dedupe.test.ts > findDuplicateTicket > 已关闭的同键票不算重复（问题复发要重新开） 0ms
+ ✓ test/ticket-dedupe.test.ts > findDuplicateTicket > 失败方式 4：正文只提到同样的文字、没有标记 → 不算重复 0ms
+ ✓ test/verify-prompt.test.ts > buildVerifyStepPrompt 材料（#1250） > 失败方式 1：证据目录票号段 + 任务文本 + 方案全文都在材料里 2ms
+ ✓ test/verify-prompt.test.ts > buildVerifyStepPrompt 材料（#1250） > 失败方式 2：输出契约（末段 JSON、passed 如实）在材料里 0ms
+ ✓ test/verify-prompt.test.ts > buildVerifyStepPrompt 材料（#1250） > 失败方式 3：工作区纪律（证据可写、交付物不改）在材料里 0ms
+ ✓ test/verify-prompt.test.ts > buildVerifyStepPrompt 材料（#1250） > 失败方式 4：PR 有无分叉——有 PR 指名回贴，无 PR 如实说明跳过 0ms
+ ✓ test/verify-prompt.test.ts > verifyVerdictSchema 形状（#1250） > 失败方式 5：evidence 缺省空数组；note 可缺省；词表外字段剥除 3ms
+ ✓ test/verify-prompt.test.ts > verifyVerdictSchema 形状（#1250） > passed/conclusion 必填；path 必填非空 1ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 失败方式 6：清单编号列进材料，并要求 evidence 带 item 序号 0ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 失败方式 9：无清单时不出清单段 0ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 失败方式 7：evidence 的 item 字段可选，老 verdict 照样解析 1ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 失败方式 8：清单有项没证据 → passed 置 false 并点名 0ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 清单每项都有证据 → verdict 原样不动 0ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 版本墙：证据都不带序号（旧 daemon）→ 不判失败，结论写明未逐项对账 0ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > item 写成字符串 "2" 也认 0ms
+ ✓ test/verify-prompt.test.ts > Verification 清单逐项判定（#1492） > 失败方式 9：无清单 → verdict 原样不动 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 缺节（#1492 失败方式 1） > 没有 Verification 小节 → 拒 2ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 缺节（#1492 失败方式 1） > 有 Verification 标题但下面是空的 → 拒 1ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 空话（#1492 失败方式 2、3） > 某一项只有空话 → 拒，并点名第几项 2ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 空话（#1492 失败方式 2、3） > 带锚点但含 TODO / 待定 → 仍拒 1ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 空话（#1492 失败方式 2、3） > 没有列表时每个非空行各算一项 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 每项都有锚点 → 过，清单按原顺序返回 1ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 仓根单个文件名算锚点（读回 README.md 可核对） 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 行首命令（不带反引号）算锚点 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > `Verification:` 标签写法也认，标签同行内容算一项 1ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 下一个小节开始即结束，后面的空话不算进来 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 代码围栏整体算一项 1ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 小节内的下级标题只是分组，不算空话项 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 合格（#1492 失败方式 4–7） > 小标题大小写与级别不敏感（### verification） 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 不误拦常见写法（#1492 失败方式：校验太严） > 小写 todo 是业务名词；行内代码里的 TODO 是正经检查 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 不误拦常见写法（#1492 失败方式：校验太严） > 加粗标签、带序号标题、全角冒号都认 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 不误拦常见写法（#1492 失败方式：校验太严） > 列表前的引导句不算项，子项并入父项 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 不误拦常见写法（#1492 失败方式：校验太严） > 「#1492 回归」这类行不当标题截断小节 0ms
+ ✓ test/plan-contract.test.ts > checkPlanContract 不误拦常见写法（#1492 失败方式：校验太严） > CRLF 行尾与 LF 同判 0ms
+ ✓ test/plan-contract.test.ts > planVerificationItems（verify 步的清单输入） > 合格方案返回清单；不合格或无小节返回空数组（老方案不回溯） 0ms
+ ✓ test/plan-contract-prompt.test.ts > Verification 硬要求进提示词（失败方式 1、2） > 首轮契约与补写指令都带硬要求句 2ms
+ ✓ test/plan-contract-prompt.test.ts > Verification 硬要求进提示词（失败方式 1、2） > 结构补写指令内嵌问题原文与硬要求句 0ms
+ ✓ test/plan-contract-prompt.test.ts > 呈现层过滤（失败方式 3、4） > 结构补写指令（带交接位置行）判 synthetic 1ms
+ ✓ test/plan-contract-prompt.test.ts > 呈现层过滤（失败方式 3、4） > 旧版首轮契约组合行与旧版补写指令仍判 synthetic 0ms
+ ✓ test/plan-contract-prompt.test.ts > isPlanContractRewritePrompt（失败方式 5） > 只认结构补写指令 0ms
+      Tests  46 passed (46)

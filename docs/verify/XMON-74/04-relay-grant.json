@@ -1,0 +1,7 @@
+{
+  "status": 200,
+  "response": {
+    "text": "{\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":true,\"tools\":[\"推送分支\",\"远程 shell\"]}"
+  },
+  "text": "{\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":true,\"tools\":[\"推送分支\",\"远程 shell\"]}"
+}

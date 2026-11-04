@@ -1,0 +1,8 @@
+{
+  "radius": "20px",
+  "border": "0px",
+  "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.035) 0px 4px 20px 0px, rgb(234, 228, 224) 0px 0px 0px 1px inset",
+  "radiusComposer": "20px",
+  "composerMaxH": "384px",
+  "shadowComposer": "rgba(0, 0, 0, 0.035) 0px 4px 20px 0px, rgb(234, 228, 224) 0px 0px 0px 1px inset"
+}

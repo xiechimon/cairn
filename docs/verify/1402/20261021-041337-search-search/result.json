@@ -1,0 +1,25 @@
+{
+  "probe": "search",
+  "ok": true,
+  "at": "2026-10-21T04:13:38.626Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home",
+    "root": "/home/user/pacman/.claude/worktrees/p1/"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "搜索面板打开(⌘K)"
+    },
+    {
+      "ok": true,
+      "label": "结果行命中「搜索目标 18782」"
+    }
+  ],
+  "artifacts": [
+    "02-search-results.png"
+  ],
+  "searchTarget": "搜索目标 18782"
+}

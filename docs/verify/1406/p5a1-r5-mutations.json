@@ -1,0 +1,133 @@
+[
+ {
+  "id": "MA",
+  "desc": "readHistory: a later events page that cannot be read ends the read as complete (page 1 alone decides)",
+  "file": "apps/server/src/services/issue-intake.ts",
+  "find": "      if (data === null) return null;\n",
+  "replace": "      if (data === null) return pageNo === 1 ? null : { events, complete: true };\n",
+  "watch": [
+   "第 2 页里仓主后来摘了标",
+   "第 2 页里外人后来重打"
+  ]
+ },
+ {
+  "id": "MB",
+  "desc": "githubIssueEvents: a labeled / unlabeled / closed event missing id or created_at is skipped instead of voiding the read",
+  "file": "apps/server/src/lib/github.ts",
+  "find": "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n",
+  "replace": "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) continue;\n",
+  "watch": [
+   "形坏（仓主打标之后的 unlabeled 缺 created_at）",
+   "形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）",
+   "形坏（仓主打标之后的 unlabeled 缺 id）",
+   "形坏（labeled 缺 id）",
+   "形坏（closed 缺 created_at）",
+   "最新一条 closed（外人关的）缺 created_at",
+   "最新一条 closed（外人关的）缺 id"
+  ]
+ },
+ {
+  "id": "MB-id",
+  "desc": "githubIssueEvents: only the missing-id half is skipped (created_at still voids)",
+  "file": "apps/server/src/lib/github.ts",
+  "find": "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n",
+  "replace": "    if (typeof entry.id !== 'number') continue;\n    if (!Number.isFinite(at)) return null;\n",
+  "watch": [
+   "形坏（仓主打标之后的 unlabeled 缺 created_at）",
+   "形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）",
+   "形坏（仓主打标之后的 unlabeled 缺 id）",
+   "形坏（labeled 缺 id）",
+   "形坏（closed 缺 created_at）",
+   "最新一条 closed（外人关的）缺 created_at",
+   "最新一条 closed（外人关的）缺 id"
+  ]
+ },
+ {
+  "id": "MB-at",
+  "desc": "githubIssueEvents: only the missing or unparsable created_at half is skipped (id still voids)",
+  "file": "apps/server/src/lib/github.ts",
+  "find": "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n",
+  "replace": "    if (typeof entry.id !== 'number') return null;\n    if (!Number.isFinite(at)) continue;\n",
+  "watch": [
+   "形坏（仓主打标之后的 unlabeled 缺 created_at）",
+   "形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）",
+   "形坏（仓主打标之后的 unlabeled 缺 id）",
+   "形坏（labeled 缺 id）",
+   "形坏（closed 缺 created_at）",
+   "最新一条 closed（外人关的）缺 created_at",
+   "最新一条 closed（外人关的）缺 id"
+  ]
+ },
+ {
+  "id": "MC",
+  "desc": "githubIssueEvents: an unlabeled event missing label.name is skipped (labeled still voids)",
+  "file": "apps/server/src/lib/github.ts",
+  "find": "    if (event !== 'closed' && labelName === null) return null;\n",
+  "replace": "    if (event === 'labeled' && labelName === null) return null;\n    if (event === 'unlabeled' && labelName === null) continue;\n",
+  "watch": [
+   "形坏（仓主打标之后的 unlabeled 缺 label）",
+   "形坏（labeled 缺 label）"
+  ]
+ },
+ {
+  "id": "MD",
+  "desc": "githubIssueEvents: an array entry that is not an object is skipped instead of voiding the read",
+  "file": "apps/server/src/lib/github.ts",
+  "find": "    if (typeof raw !== 'object' || raw === null) return null;\n",
+  "replace": "    if (typeof raw !== 'object' || raw === null) continue;\n",
+  "watch": [
+   "形坏（仓主打标之后有一项不是对象）"
+  ]
+ },
+ {
+  "id": "ME",
+  "desc": "take(): a rate-limited import read (HttpError 429 from importGithubIssue) stops the team like an intake read",
+  "file": "apps/server/src/services/issue-intake.ts",
+  "find": "      if (err instanceof HttpError && err.status === 409) {\n        tally.claimed += 1;\n        return 'not-taken';\n      }\n      tally.errors += 1;\n",
+  "replace": "      if (err instanceof HttpError && err.status === 409) {\n        tally.claimed += 1;\n        return 'not-taken';\n      }\n      if (err instanceof HttpError && err.status === 429) {\n        throw new GithubRateLimitedError('import', 429, null, null);\n      }\n      tally.errors += 1;\n",
+  "watch": [
+   "导入时的详情读 429（retry-after 60）",
+   "导入时的详情读 403（x-ratelimit-remaining 0，带 reset）",
+   "导入时的详情读 403（二级限流，只有 message）"
+  ]
+ },
+ {
+  "id": "N0",
+  "desc": "no-op sweep: every sweep returns the empty tally and logs it, reading and writing nothing",
+  "file": "apps/server/src/services/issue-intake.ts",
+  "find": "    if (sweeping) return null;\n    sweeping = true;\n    const tally = emptyTally();\n    try {\n",
+  "replace": "    if (sweeping) return null;\n    const tally = emptyTally();\n    log(tally, 'issue intake sweep');\n    if (tally.teams === 0) return tally;\n    sweeping = true;\n    try {\n",
+  "watch": [
+   "issue 作者是仓主也不算数：只看打标人",
+   "打标账号已删除（actor null）→ 不领，不读 permission",
+   "仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领",
+   "别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领",
+   "轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭",
+   "重启（新的轮询器）首见即 closed → 不关"
+  ]
+ },
+ {
+  "id": "N1",
+  "desc": "setup slip on the intake side: the candidate loop visits no candidate (list read, nothing evaluated)",
+  "file": "apps/server/src/services/issue-intake.ts",
+  "find": "      for (const issue of candidates) {\n",
+  "replace": "      for (const issue of candidates.slice(candidates.length)) {\n",
+  "watch": [
+   "issue 作者是仓主也不算数：只看打标人",
+   "打标账号已删除（actor null）→ 不领，不读 permission",
+   "仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领",
+   "别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领"
+  ]
+ },
+ {
+  "id": "N2",
+  "desc": "setup slip on the reconcile side: building tasks drop out of the close-reconcile set",
+  "file": "apps/server/src/services/issue-intake.ts",
+  "find": "            notInArray(todo.phase, CLOSE_RECONCILE_SKIPPED),\n",
+  "replace": "            notInArray(todo.phase, [...CLOSE_RECONCILE_SKIPPED, 'building']),\n",
+  "watch": [
+   "轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭",
+   "重启（新的轮询器）首见即 closed → 不关"
+  ]
+ }
+]

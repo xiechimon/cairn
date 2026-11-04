@@ -1,0 +1,44 @@
+[01:21:46] INFO (14073): attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed
+    pending: 0
+    orphan: 0
+    reclaimedBytes: 0
+[01:21:46] INFO (14073): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    appended: 0
+    advanced: 0
+    failed: 0
+    skipped: 0
+    unreadable: 0
+    errors: 0
+[01:21:46] INFO (14073): pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>
+    port: 8791
+    dataDir: "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home/server"
+    teamId: "fVVOZqcga3d5dw8jut9cl"
+[01:22:46] INFO (14073): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    appended: 0
+    advanced: 0
+    failed: 0
+    skipped: 0
+    unreadable: 0
+    errors: 0
+[01:23:46] INFO (14073): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    appended: 0
+    advanced: 0
+    failed: 0
+    skipped: 0
+    unreadable: 0
+    errors: 0
+[01:24:46] INFO (14073): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    appended: 0
+    advanced: 0
+    failed: 0
+    skipped: 0
+    unreadable: 0
+    errors: 0

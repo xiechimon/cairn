@@ -1,0 +1,58 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/git.test.ts (95 tests | 2 failed | 93 skipped) 3377ms
+   ❯ #2047 configured push mappings cannot change the requested destination branch (2)
+     × a divergent mapped branch cannot turn an unchanged requested branch into a containment notice 1805ms
+     × a writable mapped branch cannot hide rejection from the requested divergent branch 1569ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 configured push mappings cannot change the requested destination branch > a divergent mapped branch cannot turn an unchanged requested branch into a containment notice
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "2b8f073361ea8104ffabff33752b27d00a4800ac 2b8f073361ea8104ffabff33752b27d00a4800ac",
++ ]
+
+ ❯ test/git.test.ts:1179:21
+    1177|     ).resolves.toBeUndefined();
+    1178|
+    1179|     expect(notices).toEqual([]);
+       |                     ^
+    1180|     expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(local…
+    1181|     expect(gitOk(remote, ['rev-parse', 'refs/heads/release'])).toBe(fo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 configured push mappings cannot change the requested destination branch > a writable mapped branch cannot hide rejection from the requested divergent branch
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:1197:6
+    1195|     await expect(
+    1196|       gitPrim.push(dir, 'work', null, (a, b) => notices.push(`${a} ${b…
+    1197|     ).rejects.toThrow(/non-fast-forward|fetch first/);
+       |      ^
+    1198|
+    1199|     expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 93 skipped (95)
+   Start at  15:37:40
+   Duration  4.81s (tests 72%, transform 22%, import 6%)
+

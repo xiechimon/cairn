@@ -1,0 +1,10 @@
+{
+  "colBorder": "0px",
+  "colRadius": "0px",
+  "colShadow": "none",
+  "headerH": 32,
+  "cardRadius": "10px",
+  "radiusPanel": "10px",
+  "panelShadowPresent": true,
+  "cardUsesPanelShadow": true
+}

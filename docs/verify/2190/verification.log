@@ -1,0 +1,19 @@
+Base: 54195adb0806fd11632109cb74e3af423b98c0b8 plus the working tree identified by tested-files.sha256
+node --test scripts/ops/restore-drill.test.mjs (initial 17 cases): exit 1, expected red; red.log
+node --test scripts/ops/restore-drill.test.mjs (final functional run): exit 0, 27 passed; green.log
+CAIRN_RESTORE_DRILL_EVIDENCE="$PWD/docs/verify/2190" node --test --test-name-pattern='clean backup|production shell' scripts/ops/restore-drill.test.mjs: exit 0, 2 passed; artifact-run.log
+pnpm lint: exit 0, one existing informational diagnostic; lint.log
+pnpm typecheck: exit 0; typecheck.log
+pnpm exec vitest run --changed: exit 0, no selected test files; vitest.log
+pnpm spec:parse: exit 0, 1391 web cases collected and 65 integration files parsed; spec-parse.log
+node scripts/lessons-ledger-gate.mjs: exit 0; lessons.log
+bash -n scripts/ops/restore-drill.sh: exit 0
+python3 -m py_compile scripts/ops/restore-drill.py scripts/ops/restore-drill-test-driver.py: exit 0
+pnpm exec husky: exit 0; .husky/_/pre-push exists
+No pnpm build, full e2e, push, PR, other-worktree changes, host installation or host execution.
+HTTP success unverified: production probe returned api listen failed: EPERM. Fixture API uses the real Hono route with in-process transport.
+Provider mode: not exercised in every run.
+Explicit git add of the named delivery paths: failed twice with index.lock Operation not permitted.
+No staging or commit succeeded. Supporting artifacts are uncommitted, so delivered/remote evidence is unverified.
+Intended commit: ops(2190): restore drill compares content, attachments, relationships and decryption
+Hook configuration preparation invoked pnpm exec husky; subsequent read: .husky/_. Pre-run value was not captured.

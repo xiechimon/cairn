@@ -1,0 +1,52 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+
+[diag] stub requests consumed: 7
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team: 3 skill(s), 4 file(s) materialized → /tmp/cairn-it-routing-home-N0Ot8w/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 (fetched 4 file(s) / 396 byte(s), reused 0)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-N0Ot8w/workspaces/01a1835a-2600-73fd-9762-0d2e983b5b4b/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-N0Ot8w/workspaces/01a1835a-2600-73fd-9762-0d2e983b5b4b/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: beta-skill not in injected selection
+[skills] filtered: gamma-skill not in injected selection
+[skills] loaded: 2 skills from /tmp/cairn-it-routing-home-N0Ot8w/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 + /tmp/cairn-it-routing-local-ugaMIc
+[skills] catalog: entries=2 chars=801 bytes=859
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a1835a-2600-73fd-9762-0d2e983b5b4b
+[skills] denied-read: /tmp/cairn-it-routing-local-ugaMIc/local-blocked/SKILL.md (skill local-blocked not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=bIoMwGnvBAqmdd1C2VeaM
+step bIoMwGnvBAqmdd1C2VeaM for conv 01a1835a-270e-7357-a9df-f157c1696d13 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-N0Ot8w/workspaces/01a1835a-270e-7357-a9df-f157c1696d13/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-N0Ot8w/workspaces/01a1835a-270e-7357-a9df-f157c1696d13/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: local-one not in agent allowlist
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+[skills] deny: 2 skill dir(s) hard-blocked
+new session 01a1835a-270e-7357-a9df-f157c1696d13
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  16:31:23
+   Duration  2.95s (transform 41%, import 36%, tests 22%)
+

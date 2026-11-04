@@ -1,0 +1,88 @@
+# #1404 S3 round 2: /simplify and /code-review on the branch (pr-gate run 1 suggestion 4).
+# Both ran from the p3c worktree; every git command was `cd /home/user/pacman/.claude/worktrees/p3c && ...`.
+
+== /simplify
+Skill: simplify. The Agent tool was not available in this context, so the skill ran its single-pass
+inline variant (the four angles reuse / simplification / efficiency / altitude in one pass), not the
+four-agent fan-out.
+Args: "Target: the diff origin/main..HEAD of the git worktree /home/user/pacman/.claude/worktrees/p3c
+(branch claude/bootstrap-p3c). Always `cd /home/user/pacman/.claude/worktrees/p3c &&` in the same Bash
+call before any git command; do not use the primary working directory /home/user/pacman (another
+branch). Review hand-written code only: apps/server/src/db/schema.ts (gate tables),
+apps/server/test/merge-gate-tables.test.ts, apps/server/test/schema.test.ts,
+packages/shared/src/tables.ts, packages/shared/test/vocabulary.test.ts. Skip generated drizzle files
+and docs/verify. Apply only changes that keep behavior."
+Head reviewed: 2136fea5 (branch claude/bootstrap-p3c, checked with git rev-parse in the worktree).
+Diff resolved: git diff origin/main...HEAD
+  14 files changed, 4751 insertions(+), 6 deletions(-)
+  hand-written subset (the five files above): 5 files changed, 967 insertions(+), 6 deletions(-),
+  merge-gate-tables.test.ts read in full.
+Findings and action:
+  1. Simplification, merge-gate-tables.test.ts gateCounts: four copied drizzle select chains, one per
+     gate table. Fixed: one count(*) per GATE_TABLES entry through the drizzle handle (db.get with
+     sql.identifier). The F7 drizzle inserts that pin the S5a/S6a write shape stay.
+  2. Simplification, upgrade test: migrate(drizzle(upgraded, { schema })) passed an unused schema.
+     Fixed: drizzle(upgraded).
+  3. Reuse, skipped (outside the diff): the "copy a cut of the journal into a temp migrations folder"
+     pattern also lives in machine-concurrency-backfill, agent-skills-split-backfill,
+     agent-tool-backfill, legacy-export and machine-pin tests; a shared helper means editing those.
+  4. Efficiency, skipped: findGateEntry re-reads about 45 small SQL files on each of 4 calls; negligible.
+  5. Reuse, false positive: memory() is not openMemoryDb() (the tests need the raw better-sqlite3
+     handle, which openMemoryDb does not return); seedTeam is not seed() on purpose (pre-gate database).
+  6. Altitude: none; the foreign key drop is the fix at the schema, not a guard around it.
+Commit: 0071bef2 (merge-gate-tables.test.ts: 12 insertions, 26 deletions); 25 of 25 tests pass,
+server typecheck exit 0.
+
+== /code-review
+Skill: code-review, effort medium, forked execution.
+Args: "medium Target: the diff origin/main..HEAD of the git worktree
+/home/user/pacman/.claude/worktrees/p3c (branch claude/bootstrap-p3c, head 0071bef2). Always run
+`cd /home/user/pacman/.claude/worktrees/p3c &&` in the same Bash call before any git or file command;
+never use the primary working directory /home/user/pacman (a different branch). Review all
+hand-written files including apps/server/test/merge-gate-tables.test.ts (the 0044 migration SQL too;
+the 0044_snapshot.json is drizzle-generated, check only that it matches the SQL)."
+Head reviewed: 0071bef2.
+Diff resolved: origin/main had moved to 49af6f28 by then (#1465, #1420 S1, #1411, #1467 merged after
+the branch point 2294b087), so the two-dot range named in the args shows those commits reversed:
+  git diff --shortstat origin/main..0071bef2   310 files changed, 4815 insertions(+), 25496 deletions(-)
+The reviewer saw this and reviewed the branch's own three-dot diff instead:
+  git diff --shortstat origin/main...0071bef2  14 files changed, 4737 insertions(+), 6 deletions(-)
+That is this branch's change set, test file included (findings cite merge-gate-tables.test.ts lines
+15, 166, 630, 724, 754). None of main's newer commits touch apps/server/drizzle, apps/server/src/db
+or packages/shared/src/tables.ts (git diff --stat 2294b087 origin/main on those paths is empty), and
+0044 is still the next free number on main.
+Snapshot check by the reviewer: 0044_snapshot.json prevId = 0043's id, non-gate tables identical to
+0043, the four gate tables match the SQL (columns, defaults, keys, indexes, cascades).
+
+Findings and action:
+  1. schema.ts gate_verdict PK stepId alone: a chief step deciding two builds could store one verdict.
+     Not confirmed. Spec 28 P3 defines the chief small-merge step's output as one
+     {go, reasons, headSha, patchDigest}, one head and one digest, so one build per decision step;
+     merge_builds is the chief's merge tool (G1), not the decision step. The #1404 plan keys the
+     table on stepId. No change.
+  2. schema.ts gate_digest key (buildId, headSha) while the digest is a three-dot compare
+     {base}...{head}: a retargeted PR gives the same head a new digest. Confirmed for the comment,
+     which said one head always has one digest. Fixed in 34381bd0 (comment only): the writer
+     overwrites the (buildId, headSha) row and never reads an old row as the result of a new compare.
+     db:generate stays empty. The writer itself is S5a's.
+  3. schema.ts root cause: the migrator runs with foreign keys ON inside one transaction; suggests
+     turning foreign keys off around migrate in openDbWithHandle with a foreign_key_check. Not done
+     here: it changes apps/server/src/db/client.ts (ADR 0021 D4 protected category) and the
+     semantics of every migration, which is outside S3; the brief asked for the per-table fix.
+     Reported to the caller as a follow-up (a drizzle recreate of todo already deletes every build,
+     plan and branch_sync row on main today; see s3-r2-mutations.txt, todo recreate turns F1 red).
+  4. schema.ts says S1 is not on main and copies its vocabulary as $type literals; #1420 has merged.
+     Left by instruction (type-only value lists stay until S5a; main is not merged into this branch).
+     The comment goes stale on the rebase; the rebase that imports MergePolicy is where it changes.
+  5. Test header cites docs/verify/1404/s3-r2-red-green.txt, not on the branch yet. Resolved by the
+     docs commit of this round (that file carries F17-F21).
+  6. F19 is vacuous at this head (no later migration). Known and stated in s3-r2-red-green.txt;
+     s3-r2-mutations.txt shows a drizzle-shaped later build recreate and todo recreate turning it red,
+     and the build recreate with gate rows moved aside and written back staying green.
+  7. F15 is a text check. Left by instruction: the real guard comes with S5a's writer.
+  8. memory() never closes its handle and re-runs 45 migrations per test. Not changed: in-memory
+     handles are released when the vitest worker for the file exits, the test needs the raw handle
+     openDbWithHandle does not return, and the per-test fresh database is the isolation the tests use.
+  9. F7 calls s.dispose() after its assertions, not in finally. Not changed: same pattern as the
+     rest of apps/server/test (432 s.dispose() call sites); each test boots its own in-memory server,
+     so a failed assertion cannot leak state into another test's database.

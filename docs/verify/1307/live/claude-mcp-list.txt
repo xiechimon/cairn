@@ -1,0 +1,12 @@
+$ claude --version
+2.1.299 (Claude Code)
+
+$ file $(readlink -f $(which claude))
+/home/ubuntu/.local/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=e8f68a0473d0cd6287466a52f53c5d64f7cf0a69, not stripped
+
+$ claude mcp list
+Checking MCP server health…
+
+dummy_alpha: node /home/ubuntu/.local/share/mcp-1307/server.mjs dummy_alpha - ✔ Connected
+dummy_beta: node /home/ubuntu/.local/share/mcp-1307/server.mjs dummy_beta - ✔ Connected
+dummy_gamma: node /home/ubuntu/.local/share/mcp-1307/server.mjs dummy_gamma - ✔ Connected

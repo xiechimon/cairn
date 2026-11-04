@@ -1,0 +1,7 @@
+## old: apps/daemon/src/git.ts = origin/main 659d8cb5
+## (cd apps/daemon && node_modules/.bin/tsx ../../docs/verify/1484/repro.mts)
+credential bound to: https://github.com/o/r.git
+origin before: /tmp/repro-1484-PtjNey/real.git
+origin after the agent's set-url: http://127.0.0.1:35231/elsewhere.git
+tagPush failed: Error: git push failed (128): fatal: unable to access 'http://127.0.0.1:35231/elsewhere.git/': The requested URL returned error: 403
+credentials the other host received: ["x-access-token:ghs_FAKE_STEP_TOKEN_0000"]

@@ -1,0 +1,32 @@
+# dist CSS/JS mechanism grep (#949) — vite build --mode fixture @ final source
+# css file: assets/index-Bcd5dooi.css
+# retired per-face selectors: exact-class rule occurrences in compiled CSS (expect 0)
+  .search-panel: 0
+  .search-row: 0
+  .search-row--todo: 0
+  .search-row--selected: 0
+  .search-row-chip: 0
+  .search-scrim: 0
+  .search-input-row: 0
+  .search-group-label: 0
+  .search-empty: 0
+  .chip-popover: 0
+  .chip-popover-row: 0
+  .chip-popover-edit: 0
+  .chip-popover-section--selected: 0
+  .plan-dropdown: 0
+  .plan-dropdown-row: 0
+  .overlay-click-catcher: 0
+  .detail-chipwrap: 0
+  .detail-chip-chevron: 0
+# alias survivors (detail.css faces, #945 account — expected >0 in CSS or JS class strings)
+  .doc-select-wrap: css 1, js-class-string 1
+  .doc-pane-select: css 5, js-class-string 1
+  .sidebar-row--selected: css 0, js-class-string 1
+  .rail-row--selected: css 0, js-class-string 1
+# new carriers present (expect >0)
+  data-row-kind in JS: true
+  data-selected in JS: true
+  chip-chevron testid in JS: true
+  html[data-search-open] utility rule in CSS: true
+  --row-selected hover utility compiled (bg-(--row-selected)): true

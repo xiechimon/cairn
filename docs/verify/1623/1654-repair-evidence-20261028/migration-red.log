@@ -1,0 +1,28 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/split-policy-migration.test.ts (2 tests | 2 failed) 12ms
+   × fresh database adds split policy and team pause while retaining existing data 10ms
+   × upgrade database adds split policy and team pause while retaining existing data 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/split-policy-migration.test.ts > fresh database adds split policy and team pause while retaining existing data
+ FAIL  |@xiechimon/cairn| test/split-policy-migration.test.ts > upgrade database adds split policy and team pause while retaining existing data
+AssertionError: expected -1 to be greater than 0
+ ❯ test/split-policy-migration.test.ts:20:17
+     18|   try {
+     19|     const cut = journal.entries.findIndex((entry) => entry.tag.endsWit…
+     20|     expect(cut).toBeGreaterThan(0);
+       |                 ^
+     21|     expect(journal.entries[cut]!.when).toBeGreaterThan(journal.entries…
+     22|     if (mode === 'upgrade') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  18:53:19
+   Duration  391ms (import 84%, transform 11%, tests 4%, worker 1%)
+

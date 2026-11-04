@@ -1,0 +1,117 @@
+✖ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (98.57351ms)
+✖ CLI does not truncate more than 200 qualifying commits (1426.649639ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (108.877866ms)
+✖ local and CI plans execute behavior assertions and propagate deliberate failures (1.413928ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 1
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1680.788513
+
+✖ failing tests:
+
+test at scripts/escape-trace.test.mjs:32:1
+✖ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (98.57351ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/lanes/cairn-1952/scripts/escape-trace.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1952/scripts/escape-trace.test.mjs:48:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/escape-trace.test.mjs:61:1
+✖ CLI does not truncate more than 200 qualifying commits (1426.649639ms)
+  AssertionError [ERR_ASSERTION]: node:internal/modules/cjs/loader:1573
+    throw err;
+    ^
+  
+  Error: Cannot find module '/mnt/fast/lanes/cairn-1952/scripts/escape-trace.mjs'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1569:15)
+      at wrapResolveFilename (node:internal/modules/cjs/loader:1123:27)
+      at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1147:10)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1174:12)
+      at Module._load (node:internal/modules/cjs/loader:1346:5)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v26.8.2
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1952/scripts/escape-trace.test.mjs:66:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/escape-trace.test.mjs:78:1
+✖ local and CI plans execute behavior assertions and propagate deliberate failures (1.413928ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - [
+  -   'node',
+  -   '--test',
+  -   'scripts/escape-trace.test.mjs'
+  - ]
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1952/scripts/escape-trace.test.mjs:87:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: [ 'node', '--test', 'scripts/escape-trace.test.mjs' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

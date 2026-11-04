@@ -1,0 +1,52 @@
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0308-1211-no-main-checkout-mutation/integration
+
+
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+[skills] filtered: redesign-existing-projects not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: review-animations not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: serve-live not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: terminal-browser not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: variant not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: web-design-guidelines not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: xm not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a12ba5-fe45-7fd7-8be6-2a97d78e18fa
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a12ba5-fe45-7fd7-8be6-2a97d78e18fa
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  23:47:37
+   Duration  5.03s (tests 70%, import 18%, transform 11%)
+

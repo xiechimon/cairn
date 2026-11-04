@@ -1,0 +1,57 @@
+# Replay of the docs/verify/750 fixtures through the widened gate
+# (post #939/#940). Image-link verdicts must match the recordings in
+# docs/verify/750/gate-*.txt; every body additionally fails the two
+# required sections because these fixtures predate the template.
+# Recorded 2026-10-07T17:08:13Z on the lane workstation.
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/750/fixture-bad-sha.md
+pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream equivalent
+FAIL missing-section: Failure-path evidence
+pr-evidence: scanned 1 image link(s)
+FAIL unreachable (HTTP 404): [screenshot](https://raw.githubusercontent.com/xiechimon/pacman/0000000000000000000000000000000000000000/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png)
+pr-evidence: RED (3 problem(s))
+exit=1
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/750/fixture-bare-url.md
+pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream equivalent
+FAIL missing-section: Failure-path evidence
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://raw.githubusercontent.com/xiechimon/pacman/a8ec3fc9f3a0cd5e5c51deb9684e2a96311ba2a0/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png (bare URL, line 5)
+pr-evidence: RED (3 problem(s))
+exit=1
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/750/fixture-empty.md
+pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream equivalent
+FAIL missing-section: Failure-path evidence
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (2 problem(s))
+exit=1
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/750/fixture-good.md
+pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream equivalent
+FAIL missing-section: Failure-path evidence
+pr-evidence: scanned 1 image link(s)
+pr-evidence: RED (2 problem(s))
+exit=1
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/750/fixture-mixed.md
+pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream equivalent
+FAIL missing-section: Failure-path evidence
+pr-evidence: scanned 2 image link(s)
+FAIL not-embedded: https://raw.githubusercontent.com/xiechimon/pacman/a8ec3fc9f3a0cd5e5c51deb9684e2a96311ba2a0/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png (bare URL, line 7)
+pr-evidence: RED (3 problem(s))
+exit=1
+
+$ python3 scripts/pr-evidence-gate.py docs/verify/750/fixture-plain-link.md
+pr-evidence: sections: 0/2 answered
+FAIL missing-section: Upstream equivalent
+FAIL missing-section: Failure-path evidence
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: [screenshot](https://raw.githubusercontent.com/xiechimon/pacman/a8ec3fc9f3a0cd5e5c51deb9684e2a96311ba2a0/docs/verify/308/2026-09-28T08-59-10-880Z-stop-button/00-detail-fresh.png)
+pr-evidence: RED (3 problem(s))
+exit=1

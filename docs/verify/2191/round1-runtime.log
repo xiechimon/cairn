@@ -1,0 +1,218 @@
+
+ RUN  v5.0.1 <worktree>
+
+ ✓ |@cairn/web| test/push-auth.test.ts > worker credentials are written, rotated and removed in request order 82ms
+ ✓ |@cairn/web| test/push-auth.test.ts > unavailable worker storage does not prevent authentication 1ms
+ ✓ |@xiechimon/cairn| test/push-smtp.test.ts > SMTP configuration is absent or rejects unsafe configuration 8ms
+ ✓ |@xiechimon/cairn| test/push-smtp.test.ts > SMTP transport passes secure configuration and encoded mail to a scratch curl executable 1096ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > phase nine values authoritative single source (02 §4.1, locked) > is exactly the nine docs-ordered values 2ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > phase nine values authoritative single source (02 §4.1, locked) > board columns are the four #351 workbench columns 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > phase nine values authoritative single source (02 §4.1, locked) > column mapping is the #351 single-key fold (no hasChanges param) 4ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > phase nine values authoritative single source (02 §4.1, locked) > manual drop targets are the four writable columns (#753) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > phase nine values authoritative single source (02 §4.1, locked) > canBoardDrop → building only for phases orchestrate accepts (#1457) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > phase nine values authoritative single source (02 §4.1, locked) > canBoardDrop is the per-source manual matrix (#753) 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > has the 14 machine-face endpoints 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > pins the observed cadence and retry budgets 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > pi stream event vocabulary is the 17-item bundle extraction (02 §5.6) 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > config kinds and machine custom tools (02 §5.6) 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > CLI command face copied verbatim (02 §5.1) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > step lifecycle log line templates (02 §5.7) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > covers the observed GET list 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > covers the observed POST/PATCH list 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > carries query vocabularies for the parameterized GETs 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > excludes /api/push -- Web Push stays out of spec (R1 final ruling, 02 §9.1/04 §5) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > skills write surface rolled back (XMON-109 spec 13 rollback: POST /api/skills + PUT teams/{id}/skills/{sid}); scan surface still absent 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > SSE channels (02 §1.2, all SSE, no WS) > has exactly the three channels 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > server-face whitelist = 11 read groups + 13 write tools = 24 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > capability groups are the six docs verbatim (02 §7.2) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > tool registry = 24 grant<->name single source, whitelist labels 1:1 (02/A10 shape-preserving) 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design]) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > worker memory tools (02 §4.4/r5 §6: worker-step remoteTools memory trio) > the trio = MEMORY_TOOLS family, shapes pass remoteToolDefSchema 2ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > covers every 02 §5.8 slot row 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > live values are the replacement cairn family (D3 triggered 2026-09-23, #109) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > BRAND live values = BRAND_SLOTS replacement column (single-source discipline, replacement plan §2) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > env vars are the CAIRN_ same-shape replacement (replacement plan §2; r3 §1.1 observed original names TDS_*) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > credential formats match the observed shapes (key prefix follows the BRAND slot) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > API-key list-row mask follows the r3 §6 display rule 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > brand slots (02 §5.8 consolidation + replacement plan §2 canonical replacement values) > SecretBox envelope version word is v1 (01 §4.2) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription) > DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796) 4ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription) > record shapes cover exactly the 21 wire tables (todo_tag join + internal tables have none; skill and mcp_server are projections with no table slot) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > AgentBackend seam (01 §5, 00/D1 seam) > StepEvent types = 02 §5.6 pi vocabulary session-facing 15 items, 1:1 no rename 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > AgentBackend seam (01 §5, 00/D1 seam) > BACKEND_RUNTIME_IDS accepts claude-code and gemini; pi is still not a backend identity 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > AgentBackend seam (01 §5, 00/D1 seam) > isBackendRuntimeId: outside the vocabulary (custom provider id / pi / null / undefined) always false 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > thinking-level capability read surface (XMON-16 / #499 B3 ruling A) > THINKING_LEVELS = pi ThinkingLevel seven tiers verbatim 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > thinking-level capability read surface (XMON-16 / #499 B3 ruling A) > capability read-surface envelope accepts only in-vocabulary tiers (out-of-vocabulary always rejected) 1ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine wire (02 §5 canonical, wire layer enters CI) > MACHINE_WIRE covers exactly the 14 endpoint paths (single source) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > machine wire (02 §5 canonical, wire layer enters CI) > claim/stream verbs match observed evidence (long-poll claim + SSE stream) 0ms
+ ✓ |@cairn/shared| test/vocabulary.test.ts > PUBLISHED_PACKAGES > install command and start command come from the same published package (package name and command name paired) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > user 18ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > team 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > project 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > todo 4ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > tag 19ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > build 3ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > step 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > message 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > plan 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > schedule 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > notification 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > agent 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > agent_memory 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > provider 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > secret 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > api_key 12ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > machine 5ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > token_usage 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > chief 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > chief_thread 21ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > record shapes, 24-table projection -- zod -> JSON Schema snapshot > chief_message 22ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > createTodoBody 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > createScheduleBody 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > createProjectBody 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > githubReposResponse 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > githubConnectionStatus 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > projectTreeResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > projectFileResponse 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > projectBranchesResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > startBuildsBody 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > mergeAcceptedResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > buildStepActionBody 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > patchChiefBody 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > conversationMessagesResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > notificationsResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > searchResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > setSecretBody 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > teamStreamEvent 7ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > conversationStreamEvent 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > planRow 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > stepJournalRow 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > apiKeyRow 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > machineJson 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > deviceJson 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > body/envelope schema snapshots > daemonJson 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > stepEvent = 02 §5.6 pi vocabulary, 15 session events 1:1 (locked by 01 §5) 4ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machine surface 13 endpoint verbs + paths (MACHINE_WIRE, verb [inferred] registry surface) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > claimedStep 21ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineClaimBody 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineClaimResponse 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineDoneBody 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineEnrollBody 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineEnrollResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machinePresenceBody 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineRecoverResponse 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineStreamEvent 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineToolBody 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineThinkingDeltaBody 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineTranscriptDeltaBody 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineTokenResponse 1ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineUploadUrlsBody 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > machineUploadUrlsResponse 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canonical) > transcriptUpload 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint vocabulary (02 §6.1) 6ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > DELETE surface rules ([inferred], 02 §6.1) and divergence registry 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > machine surface 13 endpoints (02 §5/r3 §1.6) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > SSE's three channels (02 §1.2) 2ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design]) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > local state layout and log prefixes (02 §5.3) 32ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > worktree contract (02 §5.5) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > pi stream events / config kinds / stream timeouts / machine tools / proxy probing (02 §5.6) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > step lifecycle line order (02 §5.7) and bring-up sequence canon (02 §5.4) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > MCP server surface: 24-tool whitelist + six capability groups (02 §7.2) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > provider presets 38-item catalog (r3 §2/02 §6.2) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > localStorage key contract (02 §6.4/r2 §1.5) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > phase nine values + board columns + semantics (02 §4.1) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > brand-string naming table (02 §5.8 + replacement plan §2) 33ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > storage table list (01 §6) 0ms
+ ✓ |@cairn/shared| test/snapshot.test.ts > protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocker vocabulary: codes, categories, and copy, in fixed order (#1404; S5-S9 routed by category, first blocker is the status description) 2ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts > the schema and migration journal (the 01 §6 list) > the drizzle schema table-name set = DB_TABLES 15ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts > the schema and migration journal (the 01 §6 list) > the migration SQL is committed and covers every table (accumulated across migrations) 26ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts > the schema and migration journal (the 01 §6 list) > upgrades a database already migrated through the previous main migration 988ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts > the schema and migration journal (the 01 §6 list) > the migrations apply cleanly to an in-memory db 688ms
+ ✓ |@xiechimon/cairn| test/schema.test.ts > seed (02 §2 single user + team shape-kept at one row) > idempotent: a second seed returns the same user/team 876ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > empty subscriptions return no-subscription 3464ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the route surface = the 02 §6.1 vocabulary > M2a the core surface is fully present 137ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the route surface = the 02 §6.1 vocabulary > M2c the secrets/search surface is fully present 34ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the route surface = the 02 §6.1 vocabulary > M5 the merged surface is fully present (vocabulary completed + conversation stream + detail reads) 18ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the route surface = the 02 §6.1 vocabulary > no invented paths outside the vocabulary ([inferred] surfaces explicitly registered) 6ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > seed shape-keeping endpoints (02 §2) > GET /api/auth/session and /api/user/me return the seed user, shape kept 98ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > seed shape-keeping endpoints (02 §2) > GET /api/teams always returns the one seeded row 767ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > all 404 subscriptions are removed and return all-expired 1878ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > seed shape-keeping endpoints (02 §2) > GET /api/teams/{id}/members returns only oneself (the r2 cached sample shape) 16ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > seed shape-keeping endpoints (02 §2) > an unknown team id is always 404 {error} (the team stays one row) 7ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > seed shape-keeping endpoints (02 §2) > GET /api/teams/{id}/notifications → {unreadThreadIds} 7ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > POST /api/projects [inferred] -> 201 ProjectRecord 1675ms
+stdout | test/push-outcomes.test.ts > provider acceptance counts devices and correlates wire id with persistent row
+Push wire/database artifact {"payload":{"web_push":8030,"mutable":true,"id":"receipt-test","receiptUrl":"/api/teams/FdxXGEcTDfIdVwfypY1PX/push/receipts","requireReceipt":true,"notification":{"title":"test: batch paused","body":"Paused","navigate":"https://cairn.local/app","tag":"test"}},"outcome":{"status":"delivered","count":2,"failedCount":0,"id":"receipt-test"},"row":{"message":{"title":"test: batch paused","body":"Paused","href":"/app","tag":"test"},"pushStatus":"unknown","id":"receipt-test","userId":"OXt4PTzf4nAKFWiaz_elL","teamId":"FdxXGEcTDfIdVwfypY1PX","createdAt":1793343755737,"receivedAt":null,"alertStatus":"pending"}}
+
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > all 410 subscriptions are removed and return all-expired 2169ms
+web push delivery failed
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > provider acceptance counts devices and correlates wire id with persistent row 1166ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > create: POST todos {title,spec} (the r3 §3.1 body verbatim) -> 201 TodoRecord 2371ms
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > every non-expired delivery failing returns failed: network 1328ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > read: the project/team list surfaces + a single read 2075ms
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > every non-expired delivery failing returns failed: mixed 1480ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > update: PATCH todos/{id} -> v increments; an illegal phase transition 409s 1969ms
+stdout | test/push-outcomes.test.ts > receipt route authenticates, validates ownership and stores id idempotently
+Receipt database artifact {"message":{"title":"test: batch paused","body":"Paused","href":"/app","tag":"test"},"pushStatus":"unknown","id":"receipt-test","userId":"g3doPl3XjfuzEfSsrmBku","teamId":"fOI8v4lpuzpbz5io55ivo","createdAt":1793343762078,"receivedAt":1793343762382,"alertStatus":"pending"}
+
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > update: PATCH todos/{id} assignment dual slots -- slot-level merge + the derived agent projection follows (#208) 1533ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > one accepted device wins over failures 1359ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > delete: DELETE todos/{id} -> 204; read again 404; delete again 404 1640ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > receipt route authenticates, validates ownership and stores id idempotently 4374ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > todo CRUD (the demo surface: curl create/read/update/delete) > error shapes: unknown id 404 / bad body 400 (the single {error} shape) 818ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the tag surface (#309, the r9 §3.4 wire comparison) > POST /api/projects/{id}/tags {name,color} -> 201 TagRecord (the r9 §3.4 measured shape) 374ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the tag surface (#309, the r9 §3.4 wire comparison) > POST tags with a bad body -> 400; an unknown project -> 404 (the single {error} shape) 871ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach alert receipt timing: timeout 2628ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the tag surface (#309, the r9 §3.4 wire comparison) > POST todos carrying tagIds -> record.tagIds round-trips (the r9 §3.4 carry slot; the join truth) 1262ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach alert receipt timing: receipt 989ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the tag surface (#309, the r9 §3.4 wire comparison) > POST todos carrying a tag of another project / unknown -> 400 (project-boundary defense) 460ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach alert receipt timing: early 870ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the build surface + the nine-value phase transitions (the server-side spine of the 02 §4.2 main timeline) > POST builds body = startBuildsBodySchema (the r5 §3.4 captured shape) 630ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > unavailable fallback is persistently undelivered: missing 622ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the build surface + the nine-value phase transitions (the server-side spine of the 02 §4.2 main timeline) > direct execution queues the execution step (the two branches of the 02 §4.2 start dialog) 1475ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > unavailable fallback is persistently undelivered: rejected 994ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > unavailable fallback is persistently undelivered: disabled 1010ms
+web push delivery failed
+ALERT UNDELIVERED a69jbsqJkqVAuFo4xafV1
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the build surface + the nine-value phase transitions (the server-side spine of the 02 §4.2 main timeline) > the full main timeline: queued->planning->confirm->(the reject v2 loop)->building->review->merge 202->done 2885ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > test route returns an id before provider settlement and status is owner scoped 1664ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: empty 1726ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the build surface + the nine-value phase transitions (the server-side spine of the 02 §4.2 main timeline) > the failed-rerun edge: failed->queued via POST builds (r3 §3.7) 1930ms
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: expired 963ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > the build surface + the nine-value phase transitions (the server-side spine of the 02 §4.2 main timeline) > an unknown build 404; a bad steps body 400 564ms
+ALERT FALLBACK FAILED 7c5gAGZLKJwbST8LDz42L
+ALERT UNDELIVERED 7c5gAGZLKJwbST8LDz42L
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: network 549ms
+ ✓ |@xiechimon/cairn| test/wire.test.ts > every response shape re-verified with zod (fields are the contract, 02/A9) > every response body of the CRUD chain passes the shared schema 396ms
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > must-reach failure invokes fallback immediately: misconfigured 400ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > digest retains queued items when accepted and failed subscriptions are mixed 180ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > receipt arriving after the deadline cannot suppress fallback when the event loop resumes late 156ms
+web push delivery failed
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > a provider promise that never settles cannot prevent fallback 326ms
+ALERT UNDELIVERED orphan
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > ordinary pushes preserve declarative display without allocating receipt rows 161ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > overdue pending rows recover without an active sender, fallback configured: true 98ms
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > overdue pending rows recover without an active sender, fallback configured: false 97ms
+ALERT UNDELIVERED startup
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > pending messages survive closing and reopening the database 284ms
+ALERT UNDELIVERED periodic
+ ✓ |@xiechimon/cairn| test/push-outcomes.test.ts > scheduler recovers overdue alerts at startup and on periodic ticks 130ms
+
+ Test Files  7 passed (7)
+      Tests  181 passed (181)
+   Start at  15:02:03
+   Duration  55.14s (tests 43%, transform 37%, import 20%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 39.51s · 32% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+  Transform  |@cairn/shared| transforming modules took 11.44s · 88% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

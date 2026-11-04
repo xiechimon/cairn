@@ -1,0 +1,15 @@
+work dir: $TMPDIR/verify-step-claim.c21XMB
+P1_SingleExecutorPerMachine: PASS in 14s, 685236 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.c21XMB/P1_SingleExecutorPerMachine/tlc.log
+P2_OnlyHolderResultApplied: PASS in 15s, 685236 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.c21XMB/P2_OnlyHolderResultApplied/tlc.log
+P3_NoClaimAfterClose: PASS in 18s, 685236 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.c21XMB/P3_NoClaimAfterClose/tlc.log
+P4_AcceptedStopReachesWorkers: PASS in 15s, 685236 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.c21XMB/P4_AcceptedStopReachesWorkers/tlc.log
+covered code changed since sync-commit 659d8cb5; re-read these against the model:
+  commit e8c45630 fix(daemon): a stop between retry passes reports stopped
+  commit 996daa64 refactor(daemon): one stop slot per step and one tail for stopped runs
+  commit e73bc0f5 Merge the F3 stop-delivery fix onto main after #1483
+  commit 51ea106e fix(daemon): only journal a stop a run accepted, and upload the transcript
+  commit 7f94ad4a fix(daemon): deliver an accepted stop to every run of the step

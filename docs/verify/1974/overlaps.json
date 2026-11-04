@@ -1,0 +1,94 @@
+{
+ "open": [
+  {
+   "number": 2050,
+   "title": "daemon+server(1625): execute gated local squash merges",
+   "headRefName": "lane/1625",
+   "files": [
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap"
+   ]
+  },
+  {
+   "number": 1940,
+   "title": "daemon(1845): harden login presence and Claude claim gating",
+   "headRefName": "codex/1845-verified-auth",
+   "files": [
+    "apps/web/src/i18n/en.ts",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap"
+   ]
+  },
+  {
+   "number": 1928,
+   "title": "daemon(1671): degrade unsupported image input to annotated text",
+   "headRefName": "codex/1671-followup",
+   "files": [
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap"
+   ]
+  },
+  {
+   "number": 1867,
+   "title": "daemon+server(1852): park claude-code steps while a subscription is rejected",
+   "headRefName": "lane/1852",
+   "files": [
+    "apps/server/drizzle/0060_claude_rate_limits.sql",
+    "apps/server/drizzle/meta/0060_snapshot.json",
+    "apps/server/drizzle/meta/_journal.json",
+    "apps/server/src/db/schema.ts",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+    "packages/shared/test/vocabulary.test.ts"
+   ]
+  },
+  {
+   "number": 1821,
+   "title": "server(#1794): run the merge review gate inside the product",
+   "headRefName": "lane/1794",
+   "files": [
+    "apps/web/src/i18n/en.ts"
+   ]
+  },
+  {
+   "number": 1769,
+   "title": "web(1682): read-only public demo build",
+   "headRefName": "lane/1682",
+   "files": [
+    "apps/web/src/i18n/en.ts",
+    "apps/web/src/routes/account-page.tsx",
+    "scripts/e2e-affected.mjs"
+   ]
+  },
+  {
+   "number": 1727,
+   "title": "server+web(1686): Web Push subscriptions and phase notifications",
+   "headRefName": "lane/1686",
+   "files": [
+    "apps/server/drizzle/0062_push_subscription.sql",
+    "apps/server/drizzle/meta/0062_snapshot.json",
+    "apps/server/drizzle/meta/_journal.json",
+    "apps/server/src/db/schema.ts",
+    "apps/server/src/routes.ts",
+    "apps/server/test/schema.test.ts",
+    "apps/web/src/i18n/en.ts",
+    "apps/web/src/routes/account-page.tsx",
+    "packages/shared/src/protocol/rest.ts",
+    "packages/shared/src/tables.ts",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+    "packages/shared/test/vocabulary.test.ts",
+    "scripts/e2e-affected.mjs"
+   ]
+  },
+  {
+   "number": 1654,
+   "title": "server(1623): split_todo plans that pass the checker start without a confirm gate under splitPolicy auto",
+   "headRefName": "lane/1623-split-autostart",
+   "files": [
+    "apps/server/drizzle/0057_split_policy.sql",
+    "apps/server/drizzle/meta/0057_snapshot.json",
+    "apps/server/drizzle/meta/_journal.json",
+    "apps/server/src/db/schema.ts",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+    "scripts/e2e-affected.mjs"
+   ]
+  }
+ ],
+ "merged": []
+}

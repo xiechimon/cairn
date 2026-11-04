@@ -1,0 +1,156 @@
+# #1466 round 3b: gates after merging origin/main (49af6f28, brings #1467 services/github-reads.ts) and the github-reads follow-up.
+# git: 2d87d017d07b05b08854abf426dacbf296bbb140
+#   2718b630 = merge of origin/main 49af6f28 into the branch at 58fb24fa (merge-tree clean, no conflicts; `git diff-tree --cc -p 2718b630` shows no resolution hunk)
+#   2d87d017 = server(1466): round 3, github-reads uses githubRepoOfProject
+#   origin/main = merge base = 49af6f28; branch diff origin/main...HEAD: 34 files, 3579+/85- (apps + packages: 15 files, 950+/85-)
+#   no package.json / pnpm-lock.yaml change came in with the merge (git diff --name-only 58fb24fa 2718b630 -- '**/package.json' pnpm-lock.yaml is empty)
+# working tree during the runs: clean
+# Summary (exit codes):
+#   right after the merge, before 2d87d017: pnpm spec:parse 0, pnpm typecheck 0
+#   pnpm lint                          0 (the same info-level noUselessFragments note in apps/web/src/resources/machines-page.tsx)
+#   pnpm typecheck                     0
+#   pnpm spec:parse                    0
+#   node scripts/test-spawn-gate.mjs   0 (519 test sources; 515 before the merge)
+#   pnpm exec vitest run --changed origin/main   1: 248 files, 2677 passed, 1 skipped, 1 failed = the known root-only case
+#       apps/daemon/test/runner-brief.test.ts "擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）"
+#       (chmod does not stop root; `id -u` = 0); not touched by this branch; same case as gates.txt / gates-2.txt / gates-3.txt.
+#   lsof -iTCP:8396                    1 (nothing holds the port; the only other playwright run is lane p5d in its own worktree and dist/)
+#   E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected   0: 2/169 specs, 8 passed
+#   wider suite + github-reads.test.ts 0: 10 files, 165 passed
+#   github-reads pin check             parseGithubRepoRef without the . / .. check -> github-reads.test.ts case 3 fails (KILLED); project.ts restored byte-identical
+#   /code-review low 2718b630..2d87d017   (none)
+# ANSI colour codes stripped; e2e output drops Node's repeated "NO_COLOR is ignored due to FORCE_COLOR" lines.
+
+$ pnpm lint
+
+Checked 797 files in 2s. No fixes applied.
+Found 1 info.
+# exit: 0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+# exit: 0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (5.7s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+# exit: 0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 519 test sources, no package-manager spawns.
+# exit: 0
+
+$ pnpm exec vitest run --changed origin/main
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 14ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 247 passed (248)
+      Tests  1 failed | 2677 passed | 1 skipped (2679)
+   Duration  525.38s (tests 54%, import 45%, transform 1%)
+# exit: 1
+
+# failure detail of the one failing case:
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ ❯ test/runner-brief.test.ts:411:23
+    409|     const { client } = await run({ claimed, backend, workspace: ws });
+    410|     chmodSync(cwdForWs, 0o700); // 还原，免得影响后续用例
+    411|     expect(calls).not.toContain('commitAll');
+       |                       ^
+    412|     expect(calls).not.toContain('push');
+    413|     expect(client.doneBodies[0]?.body.status).toBe('failed');
+
+
+$ lsof -iTCP:8396
+# exit: 1 (1 = nothing holds the port)
+
+$ E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  apps/server/src/services/builds.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief-tools.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/ci-loop.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/git.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-issues.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-reads.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/mcp-face.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/todos.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-reads.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-repo-dot-segments.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/project-team-guard.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8396
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 2 workers
+
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (5.2s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.8s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (7.5s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (1.2s)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (910ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (693ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (996ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (977ms)
+
+  8 passed (33.0s)
+# (paths mapped to 'none' omitted)
+# exit: 0
+
+$ pnpm exec vitest run --reporter=verbose apps/server/test/github-repo-dot-segments.test.ts apps/server/test/project-team-guard.test.ts apps/daemon/test/github-probe.test.ts packages/shared/test/github-repo-ref.test.ts apps/server/test/chief-dispatch.test.ts apps/server/test/chief-watch.test.ts apps/server/test/chief-tools.test.ts apps/server/test/ci-loop.test.ts apps/server/test/m4a-chief-loop.test.ts apps/server/test/github-reads.test.ts
+# passed per file:
+#        9 test/chief-dispatch.test.ts
+#       11 test/chief-tools.test.ts
+#        6 test/chief-watch.test.ts
+#       20 test/ci-loop.test.ts
+#        9 test/github-probe.test.ts
+#       39 test/github-reads.test.ts
+#       21 test/github-repo-dot-segments.test.ts
+#       33 test/github-repo-ref.test.ts
+#        4 test/m4a-chief-loop.test.ts
+#       13 test/project-team-guard.test.ts
+ Test Files  10 passed (10)
+      Tests  165 passed (165)
+# exit: 0
+
+# github-reads pin check (transient mutation, restored and sha256-checked):
+$ node docs/verify/1466/r3b-pin-check.mjs "$PWD"
+mutation: parseGithubRepoRef without the . / .. segment check (packages/shared/src/records/project.ts)
+vitest exit: 1 (KILLED)
+× |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 3 githubRepo 形坏 → 错误结果，不出站
+Test Files  1 failed (1)
+Tests  1 failed | 38 passed (39)
+AssertionError: issues ../x: expected 'github: ../x not found, or the team t…' to contain 'githubRepo'
+packages/shared/src/records/project.ts: OK (sha256sum -c)
+
+# /code-review low on the post-merge range
+#   args: low 2718b630..2d87d017
+#   why this range: the merge commit carries no conflict resolution (combined diff empty), so the only
+#   branch-side change after the merge is 2d87d017; reviewing 58fb24fa..2d87d017 would re-review main's
+#   4 commits (265 files) that came in through the merge.
+#   diff it resolved: git diff --shortstat 2718b630..2d87d017
+#     2 files changed, 25 insertions(+), 15 deletions(-)
+#     apps/server/src/services/github-reads.ts (9+/13-, the only non-test file), apps/server/test/github-reads.test.ts
+#   result: (none)
+#   reviewer note: "The diff touches one file, apps/server/src/services/github-reads.ts. It replaces an inline
+#   check, which split the slug and rejected . and .., with a call to githubRepoOfProject from ./git.js. It then
+#   rebuilds the slug as ${owner}/${repo}. Nothing in the hunk shows a runtime bug. githubRepoOfProject itself
+#   is not in the diff, so I couldn't confirm from here that it still rejects . and .. segments."
+#   That open point is covered by the pin check above (github-reads case 3 fails when parseGithubRepoRef stops
+#   rejecting . / ..) and by packages/shared/test/github-repo-ref.test.ts.

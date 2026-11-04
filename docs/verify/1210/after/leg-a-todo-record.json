@@ -1,0 +1,43 @@
+{
+  "id": "ZjbRGVrrOav6iW8SyYFwR",
+  "teamId": "DcEIuk6tDs9h9D99ldfJX",
+  "projectId": "d8d0-ydHfnQNztZE0miVm",
+  "title": "local 不可达探针",
+  "spec": "探针任务：无需改动。",
+  "phase": "failed",
+  "phaseAt": 1791818352911,
+  "seqNum": 1,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": {
+      "agentId": "iICitZr4KcGs851IYdtPN"
+    },
+    "build": {
+      "agentId": "iICitZr4KcGs851IYdtPN"
+    }
+  },
+  "agent": {
+    "id": "iICitZr4KcGs851IYdtPN",
+    "displayName": "probe-1210-builder-1791818350331"
+  },
+  "latestBuildId": "01a130b2-48fa-77b4-baea-c9f97e1b8a8c",
+  "lastRunAt": 1791818352890,
+  "hasChanges": false,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a130b2-48fa-77b4-baea-c9f97e1b8a8c",
+      "createdAt": 1791818352890
+    }
+  ],
+  "sourceTodo": null,
+  "blockedBy": null,
+  "v": 4,
+  "createdBy": "cXv9WUPubybsIjegVAhL1",
+  "ownerId": "cXv9WUPubybsIjegVAhL1",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "machineId": null
+}

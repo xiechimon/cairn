@@ -1,0 +1,7 @@
+a8496e058cdbe04f82f82dd24279fa9900c5b14068cacdb074756ab2d4c72413  scripts/ops/restore-drill-api.mts
+32ebd68bd961a3b9740873535cfad88196212e46bd04a2e2f05f301f0381d339  scripts/ops/restore-drill-fixture.mts
+f0ef380111caabd17c305be7b6bb1a98bfd5c5ffee3bff0d862fef1d5dfb1958  scripts/ops/restore-drill-service.sh
+653e20f5e0c6fdaef99d069ce0d2bad74f11e93aa6400bf97c0c8447beaab263  scripts/ops/restore-drill-service.test.mjs
+afa1b3a4d9917b53bdddc166b055a5832f3430cec9ffcd506233efc4e63966aa  scripts/ops/restore-drill.py
+e1f57d2363b955b86d376d067e02de5352e9db98ef84345392cc19936082ab04  scripts/ops/restore-drill.test.mjs
+4fd165d5090078e122868b87e51c069e5fc2f3b99cd0d9e768d53a10780b4948  scripts/ops/systemd/cairn-restore-drill.service

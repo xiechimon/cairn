@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: weekly CLI stratifies failures, blinds packs, preserves reviews and reports agreement
+ok 1 - weekly CLI stratifies failures, blinds packs, preserves reviews and reports agreement
+  ---
+  duration_ms: 153.077343
+  type: 'test'
+  ...
+# Subtest: reports reject conflicting hand labels for a build across weekly reviews
+ok 2 - reports reject conflicting hand labels for a build across weekly reviews
+  ---
+  duration_ms: 26.937987
+  type: 'test'
+  ...
+# Subtest: same-day re-run exits before flows when the review directory already exists
+ok 3 - same-day re-run exits before flows when the review directory already exists
+  ---
+  duration_ms: 7.011544
+  type: 'test'
+  ...
+# Subtest: labeler environment unset fails before a zero-pack review
+ok 4 - labeler environment unset fails before a zero-pack review
+  ---
+  duration_ms: 6.4664
+  type: 'test'
+  ...
+# Subtest: weekly script exports packs by default and echoes sampler trace hit counts
+ok 5 - weekly script exports packs by default and echoes sampler trace hit counts
+  ---
+  duration_ms: 0.253451
+  type: 'test'
+  ...
+# Subtest: week window uses portable UTC arithmetic without GNU date -d
+ok 6 - week window uses portable UTC arithmetic without GNU date -d
+  ---
+  duration_ms: 43.633156
+  type: 'test'
+  ...
+# Subtest: export success then label failure leaves no stuck artifacts that block retry
+ok 7 - export success then label failure leaves no stuck artifacts that block retry
+  ---
+  duration_ms: 93.213492
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 222.475211

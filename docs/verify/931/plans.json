@@ -1,0 +1,23 @@
+[
+  {
+    "id": "6HbIguumA8IHOHxxTsoGV",
+    "buildId": "01a10c78-5b8b-7c39-8711-3aeb304b7288",
+    "version": 1,
+    "content": "# 方案 v1\n\nContext: 图标探针任务。\nChanges: README.md 追加一行。\nEdge cases: 无。\nVerification: 读回 README.md。\n",
+    "createdAt": 1791210577312
+  },
+  {
+    "id": "f1Vi6Oc8iv5POnBwuegpI",
+    "buildId": "01a10c78-5b8b-7c39-8711-3aeb304b7288",
+    "version": 2,
+    "content": "# 方案 v2\n\nContext: 图标探针任务。\nChanges: README.md 追加一行。\nEdge cases: 无。\nVerification: 读回 README.md。\n",
+    "createdAt": 1791210578659
+  },
+  {
+    "id": "AHfOBcoaN_-2SvOf6JgZO",
+    "buildId": "01a10c78-5b8b-7c39-8711-3aeb304b7288",
+    "version": 3,
+    "content": "# 方案 v3\n\nContext: 图标探针任务。\nChanges: README.md 追加一行。\nEdge cases: 无。\nVerification: 读回 README.md。\n",
+    "createdAt": 1791210579629
+  }
+]

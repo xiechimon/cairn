@@ -1,0 +1,145 @@
+{
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "viewport": {
+    "width": 1440,
+    "height": 732
+  },
+  "seed": {
+    "teamId": "1TbN4n-fkb_YxVCoY8fX4",
+    "agentId": "2BAv73iKmbpUXtyxRgR6U",
+    "threadId": "chief-01a11a3c-8639-7980-b5b8-36fffac80102",
+    "todoId": "WLEPbovXk5DjpRPvpdF_z"
+  },
+  "failed": 0,
+  "checks": [
+    {
+      "name": "L1 window geometry 380x600 @ right/bottom 8",
+      "ok": true,
+      "detail": "{\"w\":380,\"h\":600,\"right\":8,\"bottom\":8,\"position\":\"fixed\",\"radius\":\"12px\",\"z\":\"15\",\"bg\":\"rgb(38, 34, 31)\",\"shadow\":\"rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px\"}"
+    },
+    {
+      "name": "L1 window skin (fixed / 12px / z15 / opaque / dual shadow)",
+      "ok": true,
+      "detail": "{\"position\":\"fixed\",\"radius\":\"12px\",\"z\":\"15\",\"bg\":\"rgb(38, 34, 31)\"}"
+    },
+    {
+      "name": "L1 live thread chip carries the real thread",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L1 live stream carries the seeded user row",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L1 bound chief shows the agent identity face",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L2 minimized window stays in DOM",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L2 FAB returns after minimize",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L2 draft survives minimize",
+      "ok": true,
+      "detail": "expect a0-live-draft"
+    },
+    {
+      "name": "L3 reload restores the open window (localStorage)",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L4 ⌘J minimizes",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L4 ⌘J reopens",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L4 Escape never closes the window (D3)",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L5 window rides the SPA navigation",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L5 draft rides the SPA navigation",
+      "ok": true,
+      "detail": "expect a0-live-draft"
+    },
+    {
+      "name": "L6 window floats over the detail face, center column intact",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L6 detail FAB gated on unread (#443: zero unread = no FAB)",
+      "ok": true,
+      "detail": "expect 0"
+    },
+    {
+      "name": "L7 settings deep link swaps board content",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L7 settings swap keeps the window shut",
+      "ok": true,
+      "detail": "expect closed"
+    },
+    {
+      "name": "L7 deep-link param consumed (stripped from URL)",
+      "ok": true,
+      "detail": "http://127.0.0.1:5273/app"
+    },
+    {
+      "name": "L8 thread deep link opens the window",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L8 thread deep link param consumed",
+      "ok": true,
+      "detail": "http://127.0.0.1:5273/app"
+    },
+    {
+      "name": "L8 window shows the deep-linked thread",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "L9 suppressed route /app/resources/agents/2BAv73iKmbpUXtyxRgR6U: no FAB, no window",
+      "ok": true,
+      "detail": "{\"fab\":0,\"win\":0}"
+    },
+    {
+      "name": "L9 suppressed route /app/machines/authorize: no FAB, no window",
+      "ok": true,
+      "detail": "{\"fab\":0,\"win\":0}"
+    }
+  ],
+  "artifacts": [
+    "live-01-board-window-open.png",
+    "live-03-reload-restored.png",
+    "live-05-schedules-window-open.png",
+    "live-06-detail-window-rightpane.png",
+    "live-07-settings-deeplink.png",
+    "live-09-agent-detail-suppressed.png"
+  ]
+}

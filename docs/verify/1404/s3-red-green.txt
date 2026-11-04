@@ -1,0 +1,79 @@
+# #1404 S3 red/green. Test files: apps/server/test/merge-gate-tables.test.ts (new, 20 tests, F1-F16 of
+# s3-failure-modes.txt), apps/server/test/schema.test.ts and packages/shared/test/vocabulary.test.ts (table
+# registry, 31 -> 35), packages/shared/test/snapshot.test.ts (DB_TABLES snapshot).
+#
+# Red = the final test files against origin/main's schema (2294b087): schema.ts, packages/shared/src/tables.ts
+# and the drizzle journal taken from origin/main, 0044 and its snapshot removed; restored from HEAD afterwards
+# (git diff --exit-code HEAD clean). Green = commit 2662c3b0.
+
+$ pnpm exec vitest run apps/server/test/merge-gate-tables.test.ts apps/server/test/schema.test.ts packages/shared/test/vocabulary.test.ts packages/shared/test/snapshot.test.ts
+
+== red (main's schema)
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 本迁移的 when 大于此前每一条（否则 migrator 对旧库静默跳过）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F2 同一构建同一摘要的第二轮被 UNIQUE 拒绝；别的构建同摘要、同构建别的摘要照常
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F3 同一构建两轮同号被 UNIQUE 拒绝（roundsMax 按轮号数）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > 缺省值：fixRound 0、state open、timedOut []、dispatches {}（drizzle 读回）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F4 同一步的第二条判定被主键拒绝
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F5 不存在的步、不存在的构建：外键拒绝
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F8 head 对不上的判定（patchDigest null）、没报 head、没有视角：照存，读回 null
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > S2 的三种 kind 与七种 outcome 都存得下
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > F9 chief 小合并步（step.buildId = chief 线程，无 build 行）的判定挂被审构建；删构建带走判定、不动 chief 步
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的步与构建 > 判定表按 buildId 有索引（readiness 每轮读本构建全部判定）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_state：每构建一份最新快照 > F10 同一构建第二份快照被主键拒绝；按 buildId upsert 覆盖成一行
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_state：每构建一份最新快照 > F11 blockers 往返不失真（转义名、双向控制符、中文标签、S2 名单上限），存的是合法 JSON
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_digest：每 (buildId, headSha) 一份摘要 > F12 同一 head 第二份被主键拒绝；update-branch 后新 head 同摘要照常落
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F6 删构建：本构建四表的行随之删除，别的构建不动 > DELETE build 级联
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+FAIL |@xiechimon/pacman| test/merge-gate-tables.test.ts > F14 共享表清单 > 四表进 DB_TABLES 与 INTERNAL_ONLY_TABLES（无 wire record，readiness 经构建记录展示）
+FAIL |@xiechimon/pacman| test/schema.test.ts > 35 表 migration（01 §6 清单） > drizzle schema 表名集 = DB_TABLES
+FAIL |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6）
+FAIL |@pacman/shared| test/vocabulary.test.ts > record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*) > DB table registry is the 01 §6 list + chief + steer/stop_pending + attachment + branch_sync + github_connection − skill − mcp_server − document_diff + skill_audit + shell_command + webhook_token + the four gate tables (35 incl. the todo_tag join)
+
+errors, by kind:
+      1 AssertionError: expected [ 'agent', 'agent_memory', …(29) ] to have a length of 35 but got 31
+      1 AssertionError: expected [ 'user', 'team', 'project', …(28) ] to have a length of 35 but got 31
+      1 AssertionError: expected [ 'user', 'team', 'project', …(28) ] to include 'gate_digest'
+      1 AssertionError: expected [Function] to throw error matching /FOREIGN KEY constraint failed/ but got 'no such table: gate_verdict'
+      2 AssertionError: journal 里找不到建 gate_verdict 的 migration: expected -1 to be greater than 0
+      2 SqliteError: no such table: gate_digest
+      3 SqliteError: no such table: gate_round
+      1 SqliteError: no such table: gate_state
+      5 SqliteError: no such table: gate_verdict
+      4 TypeError: Cannot read properties of undefined (reading 'Symbol(drizzle:Columns)')
+⎯⎯⎯⎯⎯⎯ Failed Tests 22 ⎯⎯⎯⎯⎯⎯⎯
+  Snapshots  1 failed
+ Test Files  4 failed (4)
+      Tests  22 failed | 119 passed (141)
+
+The one test of merge-gate-tables.test.ts that passes on main is F15 (the machine wire modules do not
+reference the gate tables): it pins a property main already has, for the segments that add the writers.
+
+== green (2662c3b0)
+ Test Files  4 passed (4)
+      Tests  141 passed (141)
+
+merge-gate-tables.test.ts, verbose:
+PASS F1 / F16 旧库升级：main 的库补跑本迁移 > 本迁移的 when 大于此前每一条（否则 migrator 对旧库静默跳过）
+PASS F1 / F16 旧库升级：main 的库补跑本迁移 > 截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行
+PASS gate_round：每 (buildId, patchDigest) 一轮 > F2 同一构建同一摘要的第二轮被 UNIQUE 拒绝；别的构建同摘要、同构建别的摘要照常
+PASS gate_round：每 (buildId, patchDigest) 一轮 > F3 同一构建两轮同号被 UNIQUE 拒绝（roundsMax 按轮号数）
+PASS gate_round：每 (buildId, patchDigest) 一轮 > 缺省值：fixRound 0、state open、timedOut []、dispatches {}（drizzle 读回）
+PASS gate_verdict：每步一条，只挂真实的步与构建 > F4 同一步的第二条判定被主键拒绝
+PASS gate_verdict：每步一条，只挂真实的步与构建 > F5 不存在的步、不存在的构建：外键拒绝
+PASS gate_verdict：每步一条，只挂真实的步与构建 > F8 head 对不上的判定（patchDigest null）、没报 head、没有视角：照存，读回 null
+PASS gate_verdict：每步一条，只挂真实的步与构建 > S2 的三种 kind 与七种 outcome 都存得下
+PASS gate_verdict：每步一条，只挂真实的步与构建 > F9 chief 小合并步（step.buildId = chief 线程，无 build 行）的判定挂被审构建；删构建带走判定、不动 chief 步
+PASS gate_verdict：每步一条，只挂真实的步与构建 > 判定表按 buildId 有索引（readiness 每轮读本构建全部判定）
+PASS gate_state：每构建一份最新快照 > F10 同一构建第二份快照被主键拒绝；按 buildId upsert 覆盖成一行
+PASS gate_state：每构建一份最新快照 > F11 blockers 往返不失真（转义名、双向控制符、中文标签、S2 名单上限），存的是合法 JSON
+PASS gate_digest：每 (buildId, headSha) 一份摘要 > F12 同一 head 第二份被主键拒绝；update-branch 后新 head 同摘要照常落
+PASS F6 删构建：本构建四表的行随之删除，别的构建不动 > DELETE build 级联
+PASS F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+PASS F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+PASS F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+PASS F14 共享表清单 > 四表进 DB_TABLES 与 INTERNAL_ONLY_TABLES（无 wire record，readiness 经构建记录展示）
+PASS F15 机器回传面不碰闸表 > routes-machine.ts 与 services/machine*.ts 不引用四张表
+      Tests  20 passed (20)

@@ -1,0 +1,19 @@
+# #1403 round 10 mutations (pr-gate run 5 suggestions on #1414): each one applied alone, then
+# pr-reconcile.test.ts and ci-loop.test.ts. Run on the tree that became the round 10 commit.
+grind held by any queued step                        1 failed | 89 passed (90)
+    #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > #1403 没人领的 verify / review 步（排队中或等额度）不挡磨绿；已领取的照挡
+    #1403 没人领的 verify / review 步（排队中或等额度）不挡磨绿；已领取的照挡 34ms
+no phase recheck before the unreadable-compare hint  1 failed | 89 passed (90)
+    #1403 PR reconcile for review-phase builds > ㊽ the card leaves review during the second unreadable compare → no hint
+    ㊽ the card leaves review during the second unreadable compare → no hint 58ms
+
+# Definitions (name, file, text replaced, replacement):
+## grind held by any queued step | apps/server/src/services/ci-loop.ts
+-     // 有步在飞不叠派（幂等，口径见 hasActiveStep）：读到的 checks 是旧 head 的。
+-     if (hasActiveStep(cand.buildId)) {
++     // 有步在飞不叠派（幂等，口径见 hasActiveStep）：读到的 checks 是旧 head 的。
++     if (hasActiveStep(cand.buildId) || deps.db.select({ id: step.id }).from(step).where(and(eq(step.buildId, cand.buildId), inArray(step.status, ['pending', 'waiting_quota']))).get() !== undefined) {
+## no phase recheck before the unreadable-compare hint | apps/server/src/services/ci-loop.ts
+-             (pairs.get(cmpKey)?.failures ?? 0) >= 2 &&
+-             freshReviewRow(cand.todoId, cand.buildId) !== null
++             (pairs.get(cmpKey)?.failures ?? 0) >= 2

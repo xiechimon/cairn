@@ -1,0 +1,65 @@
+[
+  {
+    "label": "empty-omitted",
+    "spawned": true,
+    "error": null,
+    "hasStrict": false,
+    "hasMcpConfig": false,
+    "mcpConfig": null,
+    "settingSources": "--setting-sources=user,project,local"
+  },
+  {
+    "label": "empty-object",
+    "spawned": true,
+    "error": null,
+    "hasStrict": false,
+    "hasMcpConfig": false,
+    "mcpConfig": null,
+    "settingSources": "--setting-sources=user,project,local"
+  },
+  {
+    "label": "sdk-only",
+    "spawned": true,
+    "error": null,
+    "hasStrict": false,
+    "hasMcpConfig": false,
+    "mcpConfig": null,
+    "settingSources": "--setting-sources=user,project,local"
+  },
+  {
+    "label": "sdk-plus-stdio",
+    "spawned": true,
+    "error": null,
+    "hasStrict": false,
+    "hasMcpConfig": true,
+    "mcpConfig": "{\"mcpServers\":{\"figma\":{\"type\":\"stdio\",\"command\":\"figma-mcp\"}}}",
+    "settingSources": "--setting-sources=user,project,local"
+  },
+  {
+    "label": "empty-strict",
+    "spawned": true,
+    "error": null,
+    "hasStrict": true,
+    "hasMcpConfig": false,
+    "mcpConfig": null,
+    "settingSources": "--setting-sources=user,project,local"
+  },
+  {
+    "label": "sdk-only-strict",
+    "spawned": true,
+    "error": null,
+    "hasStrict": true,
+    "hasMcpConfig": false,
+    "mcpConfig": null,
+    "settingSources": "--setting-sources=user,project,local"
+  },
+  {
+    "label": "stdio-strict",
+    "spawned": true,
+    "error": null,
+    "hasStrict": true,
+    "hasMcpConfig": true,
+    "mcpConfig": "{\"mcpServers\":{\"figma\":{\"type\":\"stdio\",\"command\":\"figma-mcp\"}}}",
+    "settingSources": "--setting-sources=user,project,local"
+  }
+]

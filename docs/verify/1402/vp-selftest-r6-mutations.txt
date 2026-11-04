@@ -1,0 +1,48 @@
+# vp-selftest.mjs mutations, round 6 (#1411): each mutation applied alone to the tree committed as 405194a,
+# then the whole self-test; every one turns at least one case red. Script: the definitions below.
+
+feature lookup through `in`                      33/34 passed  caught by: feature and case names are looked up as registry keys only
+-- args drop the probe name                      33/34 passed  caught by: arguments after -- keep the case's own positional args (the probe or journey name)
+auto directory reused when it exists             33/34 passed  caught by: a drive never writes into an evidence directory that already exists
+ports from ports.json not passed on              33/34 passed  caught by: a case that needs the stack gets the ports of the stack doctor checks
+port clash not refused                           33/34 passed  caught by: a case that needs the stack gets the ports of the stack doctor checks
+links without -z                                 33/34 passed  caught by: links encodes non-ASCII file names instead of quoting them
+required arguments not enforced                  33/34 passed  caught by: a case whose usage names required arguments refuses to run without them
+missing script found only after doctor           33/34 passed  caught by: a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+tsx without cwd found only at run time           33/34 passed  caught by: a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+output option given after -- ignored             31/34 passed  caught by: a case whose probe takes an output flag gets the evidence directory through it; arguments after -- keep the case's own positional args (the probe or journey name); an output option given after -- is the evidence directory; drive makes none of its own
+flag not passed in a real run                    33/34 passed  caught by: an output option given after -- is the evidence directory; drive makes none of its own
+evidence env name ignored                        33/34 passed  caught by: a probe that reads another variable gets the evidence directory through it
+evidence root in the checkout of vp.mjs          33/34 passed  caught by: a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+capture reuses capture-<label>                   33/34 passed  caught by: capture never writes into a capture directory that already exists
+a machineId case back to current                 33/34 passed  caught by: no current case creates an agent without machineId (ADR 0019)
+needsArgs dropped from restart-with-feedback     33/34 passed  caught by: a case whose usage names required arguments refuses to run without them
+evidence dropped from mea-live                   33/34 passed  caught by: every case writes where drive points it, or the registry says where it writes
+
+# Definitions (name, file, text replaced, replacement):
+M=[
+ ('feature lookup through `in`', V, "if (!Object.hasOwn(features, feature)) fail(", "if (!(feature in features)) fail("),
+ ('-- args drop the probe name', V, "const args = extra.length > 0 ? [...own, ...extra] : [...c.args];", "const args = extra.length > 0 ? [...extra] : [...c.args];"),
+ ('auto directory reused when it exists', V, "const dir = named ?? freshDir(planned);", "const dir = named ?? ((d) => (mkdirSync(d, { recursive: true }), d))(planned);"),
+ ('ports from ports.json not passed on', V, "      process.env[key] = String(port);\n", "\n"),
+ ('port clash not refused', V, "      if (process.env[key] !== undefined && process.env[key] !== String(port)) {", "      if (false) {"),
+ ('links without -z', V, "git(['ls-tree', '-r', '-z', '--name-only', sha, '--', `docs/verify/${ticket}`]).split('\\0')", "git(['ls-tree', '-r', '--name-only', sha, '--', `docs/verify/${ticket}`]).split('\\n')"),
+ ('required arguments not enforced', V, "if (c.needsArgs && extra.length === 0) {", "if (false) {"),
+ ('missing script found only after doctor', V, "  if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);\n  if (c.runner", "  if (c.runner"),
+ ('tsx without cwd found only at run time', V, "  if (c.runner === 'tsx' && c.cwd === undefined) fail(", "  if (false) fail("),
+ ('output option given after -- ignored', V, "const given = flagAt === -1 ? undefined : args[flagAt + 1];", "const given = undefined;"),
+ ('flag not passed in a real run', V, "    run = withEvidence(dir);\n", "\n"),
+ ('evidence env name ignored', V, "const envName = evidence.env ?? 'VERIFY_EVIDENCE_DIR';", "const envName = 'VERIFY_EVIDENCE_DIR';"),
+ ('evidence root in the checkout of vp.mjs', V, "const EVIDENCE_ROOT = join(mainCheckout(SCRIPT_ROOT), '.claude', 'verify-evidence');", "const EVIDENCE_ROOT = join(SCRIPT_ROOT, '.claude', 'verify-evidence');"),
+ ('capture reuses capture-<label>', V, "const dir = freshDir(envDir ? join(envDir, `capture-${label}`)", "const dir = ((d) => (mkdirSync(d, { recursive: true }), d))(envDir ? join(envDir, `capture-${label}`)"),
+]
+
+# registry mutations
+for name,k,edit in [('a machineId case back to current',('machine-concurrency','zombie-claim'),lambda c: c.update(status='current')),
+                    ('needsArgs dropped from restart-with-feedback',('failed-send','restart-with-feedback'),lambda c: c.pop('needsArgs')),
+                    ('evidence dropped from mea-live',('local-daemon-executor','mea-live-claude-code'),lambda c: c.pop('evidence'))]:
+    s=open(R).read(); r=json.loads(s); edit(r['features'][k[0]]['cases'][k[1]])
+    open(R,'w').write(json.dumps(r,indent=2,ensure_ascii=False)+'\n')
+    try: score,fails=run()
+    finally: open(R,'w').write(s)
+    res.append((name,score,fails))

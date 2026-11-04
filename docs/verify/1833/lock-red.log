@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1833
+
+ ❯ |@cairn/shared| test/github-create-gate.test.ts (4 tests | 1 failed | 3 skipped) 104ms
+   × an abandoned lock fails closed instead of waiting forever 103ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/shared| test/github-create-gate.test.ts > an abandoned lock fails closed instead of waiting forever
+Error: Test timed out in 100ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/github-create-gate.test.ts:48:1
+     46| });
+     47|
+     48| test('an abandoned lock fails closed instead of waiting forever', asyn…
+       | ^
+     49|   const dir = await mkdtemp(join(tmpdir(), 'github-create-locked-'));
+     50|   let now = 0;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  19:04:02
+   Duration  211ms (tests 76%, transform 16%, import 5%, worker 2%)
+

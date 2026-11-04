@@ -1,0 +1,192 @@
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (4.238597ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.154857ms)
+✖ documented preparation overrides inherited bot author and committer identities (21.435481ms)
+✖ identity wrappers are explicitly excluded from commit preparation (0.612712ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.246236ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.112851ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (36.47777ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 104.326892
+
+✖ failing tests:
+
+test at scripts/commit-author-policy.test.mjs:18:1
+✖ documented preparation overrides inherited bot author and committer identities (21.435481ms)
+  AssertionError [ERR_ASSERTION]: AUTHOR
+  + actual - expected
+  
+  + 'cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>'
+  - 'Cairnwright <348051526+cairnwright@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2093/scripts/commit-author-policy.test.mjs:55:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>',
+    expected: 'Cairnwright <348051526+cairnwright@users.noreply.github.com>|Cairnwright <348051526+cairnwright@users.noreply.github.com>',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/commit-author-policy.test.mjs:64:1
+✖ identity wrappers are explicitly excluded from commit preparation (0.612712ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Do not prepare commits with `as-bot\.sh` or `as-bot-author\.sh`/. Input:
+  
+  '# The agent pushes and opens PRs as the GitHub App cairnwright\n' +
+    '\n' +
+    `Issue #1666. Goal: pushes and PRs made on behalf of dispatched work no longer use ian's (xiechimon's) identity, so that after enabling "Require review from Code Owners" ian can approve PRs opened by the App. This document records facts only.\n` +
+    '\n' +
+    '## The App and the bot user\n' +
+    '\n' +
+    '- App: `cairnwright`. The original name `cairn-bot` was taken by an existing GitHub account; `cairn-bot-xmon` was used first, and it was renamed to `cairnwright` on 2026-10-25.\n' +
+    '- App ID `5462173`, installation ID `174994433`.\n' +
+    '- Installed only on the single repository `xiechimon/cairn`.\n' +
+    '- Permissions: Contents, Pull requests, Issues, Workflows read/write; Metadata read-only. No webhook.\n' +
+    '- Bot user: `cairnwright[bot]`, id `347615582` (`gh api /users/cairnwright%5Bbot%5D --jq .id`, with `[` `]` written as `%5B` `%5D`).\n' +
+    '- Noreply email: `347615582+cairnwright[bot]@users.noreply.github.com`.\n' +
+    '\n' +
+    '## Private key\n' +
+    '\n' +
+    '- File: `~/.cairn/cairnwright.private-key.pem`, mode 600.\n' +
+    '- Read only inside processes on this machine: never copied, never committed to the repo, never printed, never handed to an agent.\n' +
+    '\n' +
+    '## The token-swapping tool\n' +
+    '\n' +
+    'Lives outside the repo at `~/.cairn/tools/app-token/`; the repo gains no dependency.\n' +
+    '\n' +
+    "- `token.mjs`: written with GitHub's official `@octokit/auth-app` (v8). Reads `~/.cairn/cairn-bot.json` (fields `appSlug`, `appId`, `installationId`, `privateKeyPath`) and exchanges for a one-hour installation token.\n" +
+    "- `as-bot.sh <command>`: calls `token.mjs` to swap a token, places it only in that command's process environment, and then `exec`s the command:\n" +
+    '  - `GH_TOKEN`: for `gh`.\n' +
+    "  - git's http extraheader: injected through the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n` environment variables, never through command-line arguments. `credential.helper` is also cleared so pushes do not go through `gh auth git-credential`.\n" +
+    '  - git author and committer: `GIT_AUTHOR_*`, `GIT_COMMITTER_*` set to `cairnwright[bot]` and the noreply email above.\n' +
+    "- gh's global default account is still xiechimon; neither `gh auth login` nor `gh auth switch` has been run.\n" +
+    '\n' +
+    'Usage:\n' +
+    '\n' +
+    '```sh\n' +
+    '~/.cairn/tools/app-token/as-bot.sh git push origin <branch>\n' +
+    'node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...\n' +
+    '```\n' +
+    '\n' +
+    '## Measured\n' +
+    '\n' +
+    'On 2026-10-25 the App pushed a test branch and opened PRs (#1670 under the old name, #1672 under the new one): the PR author shows `app/cairnwright` (`is_bot=true`) and the commit author is `cairnwright[bot]`. Both test PRs have been closed and the branches deleted.\n' +
+    '\n' +
+    '## What was switched\n' +
+    '\n' +
+    'Now going through `as-bot.sh` (the dispatching side):\n' +
+    '\n' +
+    '- Pushing.\n' +
+    '- Opening PRs (`gh pr create`).\n' +
+    '- Merge preparation follows the identity checks below; merge authorization uses the human login.\n' +
+    '\n' +
+    'The agents (codex, pi, grok) themselves never commit and never push.\n' +
+    '\n' +
+    'Other scripts that write to the remote should likewise prefix their commands with `as-bot.sh` when they need the App identity: `scripts/cleanup-merged-branches.sh` (`git push origin --delete`, `gh pr list`).\n' +
+    '\n' +
+    'Not switched:\n' +
+    '\n' +
+    '- `scripts/dispatch-agent.mjs`: only `spawn`s the commands given to it; it never commits, pushes, or opens PRs.\n' +
+    "- `scripts/dispatch-dedupe.mjs`: read-only duplicate checks via `gh pr list --repo xiechimon/cairn` and `git ls-remote --heads origin`, using xiechimon's gh login.\n" +
+    '- `~/.local/bin/ai-route` (symlinked to `~/.agents/automation/ai-route/ai-route.py`): only spawns `codex app-server`, pi, and grok child processes; no git commit, git push, or gh calls.\n' +
+    '- `GITHUB_TOKEN` in CI: belongs to none of these identities.\n' +
+    '\n' +
+    "Merging, approving, and label changes — operations that need a human identity — still use xiechimon's gh login and never go through the App token.\n" +
+    '\n' +
+    '## Merge identity\n' +
+    '\n' +
+    "The GitHub App identity opens PRs and authenticates pushes. The Git author on main is a separate identity. The `commit-author` workflow rejects `cairnwright[bot]` in any checked commit's author name or email. PRs check `BASE_SHA..HEAD` from the PR base to its explicit head. Main pushes check `BEFORE_SHA..HEAD`; when the previous SHA is missing or all zeros, the check falls back to `HEAD^!` (the tip only).\n" +
+    '\n' +
+    'Read the PR opener and all commit authors with `gh pr view <n> --json author,commits` before choosing the merge method.\n' +
+    '\n' +
+    "- Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher's `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.\n" +
+    '- Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.\n' +
+    "- Both paths require fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit's author and its `commit-author` Actions result.\n" +
+    '\n' +
+    "Squashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit's author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.\n" +
+    '\n' +
+    'This repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.\n' +
+    '\n' +
+    '## Commit preparation\n' +
+    '\n' +
+    'App authentication authorizes remote operations; Git authorship records who prepared the commit. The dispatcher prepares commits outside the token wrapper, with inherited `GIT_AUTHOR_*` and `GIT_COMMITTER_*` variables unset so they cannot override the configured identity:\n' +
+    '\n' +
+    '```sh\n' +
+    'git -c user.name=Cairnwright -c user.email=348051526+cairnwright@users.noreply.github.com commit --file COMMIT_MSG.txt\n' +
+    "git log --format='%H %an <%ae>' origin/main..HEAD\n" +
+    '```\n' +
+    '\n' +
+    'Check every commit in that range before pushing: neither its author name nor email may contain `cairnwright[bot]`. Bot-opened PRs still require the single prepared commit and rebase path above. The token wrapper remains the authentication path for pushes and PR creation.\n' +
+    '\n' +
+    '## Recovery after a rejected main push\n' +
+    '\n' +
+    'Preserve main history. Prepare and merge the correction through the identity checks above. A subsequent compliant push checks `BEFORE_SHA..HEAD`, excluding historical violations outside its own pushed range. When `BEFORE_SHA` is missing or all zeros, the workflow checks `HEAD^!`. PR validation checks every commit in `BASE_SHA..HEAD`, including a forbidden author beneath a compliant tip.\n' +
+    '\n' +
+    "Read the resulting main commit's author and its `commit-author` Actions result after the merge. A green result establishes compliance for the checked range; it does not repair `b667fc4d133208d7650b66906d4be97a01939615` or any other historical commit. Keep the author gate unchanged. Dispatcher enforcement belongs to the external helper; this checkout cannot establish its implementation or which bypass caused the merge.\n" +
+    '\n' +
+    '## Token constraints\n' +
+    '\n' +
+    '- One-hour expiry; exchanged fresh each time, never cached.\n' +
+    '- Never written to a file, never committed to the repo, never logged, never put into PR or issue text; this document contains no token value.\n' +
+    '- Neither the token nor the `.pem` is handed to an agent process: token swapping and pushing are done by the dispatching side through the command prefix.\n' +
+    '\n' +
+    '## Code Owners review\n' +
+    '\n' +
+    '`.github/CODEOWNERS` sets the owner of `integration/eval/**`, `.claude/hillclimb/**`, and the CODEOWNERS file itself to `@xiechimon`. The merge gate already routes these paths to human review (`.claude/**` and `.github/**` are on the protected list; `integration/eval/**` is outside the auto-mergeable set).\n' +
+    '\n' +
+    '"Require review from Code Owners" is to be enabled only after the App can open PRs. Reason: if the PR author is xiechimon, ian cannot approve his own PR, and the owner in CODEOWNERS is also xiechimon — once enabled, PRs touching these paths would never obtain a valid code-owner review. For PRs opened by the App the author is `cairnwright[bot]`, which ian can approve. App-opened PRs were measured working on 2026-10-25.\n' +
+    '\n' +
+    'Conditions and how to enable:\n' +
+    '\n' +
+    '- Condition: #1669 merged into main, and ian personally confirms.\n' +
+    "- Setting: `required_approving_review_count=0` plus `require_code_owner_reviews=true`. This way only PRs touching CODEOWNERS paths need ian's approval; other PRs require no review.\n" +
+    '- Before changing it, save a snapshot of the current main branch protection so it can be rolled back.\n' +
+    '\n' +
+    '## Create traffic throttle\n' +
+    '\n' +
+    'Run bot issue, PR, and issue-comment creation through the repository wrapper:\n' +
+    '\n' +
+    '```sh\n' +
+    'node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue create --repo xiechimon/cairn --title Example --body-file /tmp/issue.md\n' +
+    'node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head branch --body-file /tmp/pr.md\n' +
+    'node scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue comment 123 --repo xiechimon/cairn --body-file /tmp/comment.md\n' +
+    '```\n' +
+    '\n' +
+    'The server issue creation path and this wrapper reserve attempts in the same\n' +
+    '`~/.cairn/github-create/state.json` sliding window. Set `CAIRN_HOME` identically\n' +
+    'for both processes when overriding the home directory. Defaults are 3000 ms\n' +
+    'between attempts and 300 attempts per rolling hour. Configure\n' +
+    '`CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS` and `CAIRN_GITHUB_CREATE_HOURLY_CAP`\n' +
+    'consistently across callers. Delays log their reason and duration. Failed attempts\n' +
+    'also consume slots so errors cannot produce an unthrottled burst.\n' +
+    '\n' +
+    'Only explicit rate-limit responses retry, at most three times after the initial\n' +
+    'attempt, with increasing waits. REST honors Retry-After seconds or dates and\n' +
+    'x-ratelimit-reset; the CLI honors Retry-After when gh includes it in stderr,\n' +
+    'otherwise secondary limi'... 772 more characters
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2093/scripts/commit-author-policy.test.mjs:66:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# The agent pushes and opens PRs as the GitHub App cairnwright\n\nIssue #1666. Goal: pushes and PRs made on behalf of dispatched work no longer use ian\'s (xiechimon\'s) identity, so that after enabling "Require review from Code Owners" ian can approve PRs opened by the App. This document records facts only.\n\n## The App and the bot user\n\n- App: `cairnwright`. The original name `cairn-bot` was taken by an existing GitHub account; `cairn-bot-xmon` was used first, and it was renamed to `cairnwright` on 2026-10-25.\n- App ID `5462173`, installation ID `174994433`.\n- Installed only on the single repository `xiechimon/cairn`.\n- Permissions: Contents, Pull requests, Issues, Workflows read/write; Metadata read-only. No webhook.\n- Bot user: `cairnwright[bot]`, id `347615582` (`gh api /users/cairnwright%5Bbot%5D --jq .id`, with `[` `]` written as `%5B` `%5D`).\n- Noreply email: `347615582+cairnwright[bot]@users.noreply.github.com`.\n\n## Private key\n\n- File: `~/.cairn/cairnwright.private-key.pem`, mode 600.\n- Read only inside processes on this machine: never copied, never committed to the repo, never printed, never handed to an agent.\n\n## The token-swapping tool\n\nLives outside the repo at `~/.cairn/tools/app-token/`; the repo gains no dependency.\n\n- `token.mjs`: written with GitHub\'s official `@octokit/auth-app` (v8). Reads `~/.cairn/cairn-bot.json` (fields `appSlug`, `appId`, `installationId`, `privateKeyPath`) and exchanges for a one-hour installation token.\n- `as-bot.sh <command>`: calls `token.mjs` to swap a token, places it only in that command\'s process environment, and then `exec`s the command:\n  - `GH_TOKEN`: for `gh`.\n  - git\'s http extraheader: injected through the `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n` environment variables, never through command-line arguments. `credential.helper` is also cleared so pushes do not go through `gh auth git-credential`.\n  - git author and committer: `GIT_AUTHOR_*`, `GIT_COMMITTER_*` set to `cairnwright[bot]` and the noreply email above.\n- gh\'s global default account is still xiechimon; neither `gh auth login` nor `gh auth switch` has been run.\n\nUsage:\n\n```sh\n~/.cairn/tools/app-token/as-bot.sh git push origin <branch>\nnode scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head <branch> ...\n```\n\n## Measured\n\nOn 2026-10-25 the App pushed a test branch and opened PRs (#1670 under the old name, #1672 under the new one): the PR author shows `app/cairnwright` (`is_bot=true`) and the commit author is `cairnwright[bot]`. Both test PRs have been closed and the branches deleted.\n\n## What was switched\n\nNow going through `as-bot.sh` (the dispatching side):\n\n- Pushing.\n- Opening PRs (`gh pr create`).\n- Merge preparation follows the identity checks below; merge authorization uses the human login.\n\nThe agents (codex, pi, grok) themselves never commit and never push.\n\nOther scripts that write to the remote should likewise prefix their commands with `as-bot.sh` when they need the App identity: `scripts/cleanup-merged-branches.sh` (`git push origin --delete`, `gh pr list`).\n\nNot switched:\n\n- `scripts/dispatch-agent.mjs`: only `spawn`s the commands given to it; it never commits, pushes, or opens PRs.\n- `scripts/dispatch-dedupe.mjs`: read-only duplicate checks via `gh pr list --repo xiechimon/cairn` and `git ls-remote --heads origin`, using xiechimon\'s gh login.\n- `~/.local/bin/ai-route` (symlinked to `~/.agents/automation/ai-route/ai-route.py`): only spawns `codex app-server`, pi, and grok child processes; no git commit, git push, or gh calls.\n- `GITHUB_TOKEN` in CI: belongs to none of these identities.\n\nMerging, approving, and label changes — operations that need a human identity — still use xiechimon\'s gh login and never go through the App token.\n\n## Merge identity\n\nThe GitHub App identity opens PRs and authenticates pushes. The Git author on main is a separate identity. The `commit-author` workflow rejects `cairnwright[bot]` in any checked commit\'s author name or email. PRs check `BASE_SHA..HEAD` from the PR base to its explicit head. Main pushes check `BEFORE_SHA..HEAD`; when the previous SHA is missing or all zeros, the check falls back to `HEAD^!` (the tip only).\n\nRead the PR opener and all commit authors with `gh pr view <n> --json author,commits` before choosing the merge method.\n\n- Bot-opened PRs require exactly one commit authored by `Cairnwright` before a rebase merge. Check that neither its author name nor email contains `cairnwright[bot]`. Use the dispatcher\'s `~/.cairn/tools/merge-pr.sh` after inspecting its source and usage on the dispatch host. If the helper is unavailable or authorship is wrong, return the PR to the dispatcher for preparation.\n- Human-opened PRs use `gh pr merge <n> --squash --auto` after checking that none of their commit authors contains `cairnwright[bot]`.\n- Both paths require fully checked Acceptance and no `needs-decision` label. After merging, verify the resulting main commit\'s author and its `commit-author` Actions result.\n\nSquashing a bot-opened PR can attribute the main commit to the bot opener even when the branch commit has the required author. Rebase preserves the prepared commit\'s author. A later green push checks its own pushed range; historical bot commits outside that range are excluded, and their authorship remains unchanged.\n\nThis repository documents the external helper contract. Its implementation is outside this checkout and must be inspected separately before changing dispatcher behavior.\n\n## Commit preparation\n\nApp authentication authorizes remote operations; Git authorship records who prepared the commit. The dispatcher prepares commits outside the token wrapper, with inherited `GIT_AUTHOR_*` and `GIT_COMMITTER_*` variables unset so they cannot override the configured identity:\n\n```sh\ngit -c user.name=Cairnwright -c user.email=348051526+cairnwright@users.noreply.github.com commit --file COMMIT_MSG.txt\ngit log --format=\'%H %an <%ae>\' origin/main..HEAD\n```\n\nCheck every commit in that range before pushing: neither its author name nor email may contain `cairnwright[bot]`. Bot-opened PRs still require the single prepared commit and rebase path above. The token wrapper remains the authentication path for pushes and PR creation.\n\n## Recovery after a rejected main push\n\nPreserve main history. Prepare and merge the correction through the identity checks above. A subsequent compliant push checks `BEFORE_SHA..HEAD`, excluding historical violations outside its own pushed range. When `BEFORE_SHA` is missing or all zeros, the workflow checks `HEAD^!`. PR validation checks every commit in `BASE_SHA..HEAD`, including a forbidden author beneath a compliant tip.\n\nRead the resulting main commit\'s author and its `commit-author` Actions result after the merge. A green result establishes compliance for the checked range; it does not repair `b667fc4d133208d7650b66906d4be97a01939615` or any other historical commit. Keep the author gate unchanged. Dispatcher enforcement belongs to the external helper; this checkout cannot establish its implementation or which bypass caused the merge.\n\n## Token constraints\n\n- One-hour expiry; exchanged fresh each time, never cached.\n- Never written to a file, never committed to the repo, never logged, never put into PR or issue text; this document contains no token value.\n- Neither the token nor the `.pem` is handed to an agent process: token swapping and pushing are done by the dispatching side through the command prefix.\n\n## Code Owners review\n\n`.github/CODEOWNERS` sets the owner of `integration/eval/**`, `.claude/hillclimb/**`, and the CODEOWNERS file itself to `@xiechimon`. The merge gate already routes these paths to human review (`.claude/**` and `.github/**` are on the protected list; `integration/eval/**` is outside the auto-mergeable set).\n\n"Require review from Code Owners" is to be enabled only after the App can open PRs. Reason: if the PR author is xiechimon, ian cannot approve his own PR, and the owner in CODEOWNERS is also xiechimon — once enabled, PRs touching these paths would never obtain a valid code-owner review. For PRs opened by the App the author is `cairnwright[bot]`, which ian can approve. App-opened PRs were measured working on 2026-10-25.\n\nConditions and how to enable:\n\n- Condition: #1669 merged into main, and ian personally confirms.\n- Setting: `required_approving_review_count=0` plus `require_code_owner_reviews=true`. This way only PRs touching CODEOWNERS paths need ian\'s approval; other PRs require no review.\n- Before changing it, save a snapshot of the current main branch protection so it can be rolled back.\n\n## Create traffic throttle\n\nRun bot issue, PR, and issue-comment creation through the repository wrapper:\n\n```sh\nnode scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue create --repo xiechimon/cairn --title Example --body-file /tmp/issue.md\nnode scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh pr create --repo xiechimon/cairn --head branch --body-file /tmp/pr.md\nnode scripts/lib/github-create-gate.mjs ~/.cairn/tools/app-token/as-bot.sh gh issue comment 123 --repo xiechimon/cairn --body-file /tmp/comment.md\n```\n\nThe server issue creation path and this wrapper reserve attempts in the same\n`~/.cairn/github-create/state.json` sliding window. Set `CAIRN_HOME` identically\nfor both processes when overriding the home directory. Defaults are 3000 ms\nbetween attempts and 300 attempts per rolling hour. Configure\n`CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS` and `CAIRN_GITHUB_CREATE_HOURLY_CAP`\nconsistently across callers. Delays log their reason and duration. Failed attempts\nalso consume slots so errors cannot produce an unthrottled burst.\n\nOnly explicit rate-limit responses retry, at most three times after the initial\nattempt, with increasing waits. REST honors Retry-After seconds or dates and\nx-ratelimit-reset; the CLI honors Retry-After when gh includes it in stderr,\notherwise secondary limi'... 772 more characters,
+    expected: /Do not prepare commits with `as-bot\.sh` or `as-bot-author\.sh`/,
+    operator: 'match',
+    diff: 'simple'
+  }

@@ -1,0 +1,28 @@
+file://<WORKTREE>/scripts/lessons-ledger-gate.mjs:398
+  if (problems.length > 0) throw new Error(problems.join('\n'));
+                                 ^
+
+Error: recurrence event needs a non-empty "pr"
+    at storeEvent (file://<WORKTREE>/scripts/lessons-ledger-gate.mjs:398:34)
+    at recordEvent (file://<WORKTREE>/scripts/lessons-ledger-gate.mjs:425:16)
+    at recordAll (file://<WORKTREE>/scripts/lessons-ledger-gate.mjs:648:22)
+    at runCli (file://<WORKTREE>/scripts/lessons-ledger-gate.mjs:677:21)
+    at file://<WORKTREE>/scripts/lessons-ledger-gate.mjs:716:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.8.1
+lessons ledger recorded 1 of 1 events
+---
+Title: lessons escalation: verification-command-context recurred after its safeguard (1686-verification-command-context.md)
+Labels: correction
+---
+
+The same kind of error reappeared after its safeguard landed, so the ledger counts it as a recurrence.
+
+- Category key: verification-command-context
+- Ledger entry: docs/lessons/1686-verification-command-context.md
+- Suggested stronger safeguard: move the safeguard from level 2 to level 1
+lessons ledger ok
+lessons ledger ok

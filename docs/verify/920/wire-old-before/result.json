@@ -1,0 +1,37 @@
+{
+  "probe": "drive-920-skills-manifest/wire",
+  "expect": "old",
+  "server": "http://127.0.0.1:8793",
+  "skillsDir": "/tmp/pacman-before-920-run/home/skills",
+  "db": "/tmp/pacman-before-920-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-920-daemon-home",
+  "passed": 5,
+  "total": 5,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（5 技能 / 13 文件）",
+      "ok": true,
+      "detail": "/tmp/pacman-before-920-run/home/skills"
+    },
+    {
+      "name": "enroll 机器凭证",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "claim 到 build 步",
+      "ok": true,
+      "detail": "todo=pAcc7rQWBaG_TR-i2LZPp build=01a11575-5ad6-71f3-8517-e40958336d3e"
+    },
+    {
+      "name": "旧 server 整包端点 400（根因复现）",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "400 点名旧单文件闸 512000",
+      "ok": true,
+      "detail": "{\"error\":\"skill file too large: assets/template.html is 727976 bytes (limit 512000)\"}"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+TAP version 13
+# fatal: Needed a single revision
+# Subtest: local and CI plans execute behavior assertions and propagate deliberate failures
+ok 1 - local and CI plans execute behavior assertions and propagate deliberate failures
+  ---
+  duration_ms: 210.301869
+  type: 'test'
+  ...
+# Subtest: a controlled introduce/fix history exports one case that validates and replays
+ok 2 - a controlled introduce/fix history exports one case that validates and replays
+  ---
+  duration_ms: 142.847794
+  type: 'test'
+  ...
+# Subtest: unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank
+ok 3 - unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank
+  ---
+  duration_ms: 57.834558
+  type: 'test'
+  ...
+# Subtest: missing provenance, an invalid line range, or a replay base not in history fails validation
+ok 4 - missing provenance, an invalid line range, or a replay base not in history fails validation
+  ---
+  duration_ms: 111.429371
+  type: 'test'
+  ...
+# Subtest: exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location
+ok 5 - exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location
+  ---
+  duration_ms: 186.136216
+  type: 'test'
+  ...
+# Subtest: the reviewer-input object contains no defect label, location or correction
+ok 6 - the reviewer-input object contains no defect label, location or correction
+  ---
+  duration_ms: 89.614794
+  type: 'test'
+  ...
+# Subtest: validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case
+ok 7 - validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case
+  ---
+  duration_ms: 29506.25653
+  type: 'test'
+  ...
+# Subtest: export maps fixing-parent line ranges back through intervening inserts to the introducing tree
+ok 8 - export maps fixing-parent line ranges back through intervening inserts to the introducing tree
+  ---
+  duration_ms: 120.298365
+  type: 'test'
+  ...
+# Subtest: export maps a renamed path at the fixing parent back to the introducing path and lines
+ok 9 - export maps a renamed path at the fixing parent back to the introducing path and lines
+  ---
+  duration_ms: 148.704505
+  type: 'test'
+  ...
+# Subtest: newline-terminated blobs do not admit an extra phantom line in export or validate
+ok 10 - newline-terminated blobs do not admit an extra phantom line in export or validate
+  ---
+  duration_ms: 201.558189
+  type: 'test'
+  ...
+# Subtest: successive exports preserve existing cases and only upsert matching identities
+ok 11 - successive exports preserve existing cases and only upsert matching identities
+  ---
+  duration_ms: 159.769193
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 30986.747353

@@ -1,0 +1,93 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/git.test.ts (88 tests | 2 failed) 16409ms
+   ❯ #2006 a work-branch push already contained in the remote branch is not a failure (3)
+     × failure mode 1: remote branch is local HEAD plus a merge of main (Update branch) -> push succeeds, one log line names both short SHAs 611ms
+   ❯ #2047 containment binds to the attempted branch and fetched destination (7)
+     × a missing fetch mapping still accepts a real containing merge and reports its actual tip 650ms
+ ❯ |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts (6 tests | 2 failed) 61255ms
+   ❯ #2006 closing push of a work branch the remote already contains (2)
+     × failure mode 1: Update-branch merge commit on top of the local commit -> closing push returns normally and logs one line naming both short SHAs 30151ms
+     × failure mode 2: the remote work branch moves to a tip that does not contain the local commit -> closing push still fails 30167ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2006 a work-branch push already contained in the remote branch is not a failure > failure mode 1: remote branch is local HEAD plus a merge of main (Update branch) -> push succeeds, one log line names both short SHAs
+AssertionError: promise rejected "Error: git push failed (1): To /private/t…" instead of resolving
+ ❯ test/git.test.ts:912:6
+    910|     await expect(
+    911|       gitPrim.push(dir, 'work', null, (a, b) => lines.push(`${a} ${b}`…
+    912|     ).resolves.toBeUndefined();
+       |      ^
+    913|
+    914|     expect(gitOk(dir, ['rev-parse', 'HEAD'])).toBe(sha);
+
+Caused by: Error: git push failed (1): To /private/tmp/cairn-contained-remote-GQud3W/repo.git
+ ! [rejected]        work -> work (fetch first)
+error: failed to push some refs to '/private/tmp/cairn-contained-remote-GQud3W/repo.git'
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. This is usually caused by another repository pushing to
+hint: the same ref. If you want to integrate the remote changes, use
+hint: 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+ ❯ Object.push src/git.ts:491:13
+ ❯ test/git.test.ts:910:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > a missing fetch mapping still accepts a real containing merge and reports its actual tip
+AssertionError: promise rejected "Error: git push failed (1): To /private/t…" instead of resolving
+ ❯ test/git.test.ts:1048:87
+    1046|     const notices: string[] = [];
+    1047|
+    1048|     await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.pus…
+       |                                                                                       ^
+    1049|
+    1050|     expect(notices).toEqual([`${local} ${actualTip}`]);
+
+Caused by: Error: git push failed (1): To /private/tmp/cairn-contained-remote-fPZ0cx/repo.git
+ ! [rejected]        work -> work (fetch first)
+error: failed to push some refs to '/private/tmp/cairn-contained-remote-fPZ0cx/repo.git'
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. This is usually caused by another repository pushing to
+hint: the same ref. If you want to integrate the remote changes, use
+hint: 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+ ❯ Object.push src/git.ts:491:13
+ ❯ test/git.test.ts:1048:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts > #2006 closing push of a work branch the remote already contains > failure mode 1: Update-branch merge commit on top of the local commit -> closing push returns normally and logs one line naming both short SHAs
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/workspace-cred-fallback.test.ts:201:3
+    199|   }
+    200|
+    201|   test('failure mode 1: Update-branch merge commit on top of the local…
+       |   ^
+    202|     const { cwd, local, remote } = await branchAlreadyUpdated();
+    203|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/workspace-cred-fallback.test.ts > #2006 closing push of a work branch the remote already contains > failure mode 2: the remote work branch moves to a tip that does not contain the local commit -> closing push still fails
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/workspace-cred-fallback.test.ts:213:3
+    211|   }, 30_000);
+    212|
+    213|   test('failure mode 2: the remote work branch moves to a tip that doe…
+       |   ^
+    214|     const { cwd } = await branchAlreadyUpdated();
+    215|     await runGit(['checkout', '--orphan', 'publish'], { cwd });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 90 passed (94)
+   Start at  13:04:01
+   Duration  61.77s (tests 99%, transform 1%)
+

@@ -1,0 +1,33 @@
+[
+  {
+    "type": "ping",
+    "seq": 1
+  },
+  {
+    "type": "step",
+    "step": {
+      "id": "-ul4SY8u6BtS-jCD3W9c0",
+      "buildId": "01a13b57-11d7-7f3f-8175-f1a23df8c32e",
+      "kind": "build",
+      "machineId": "YD3PPPKbFh50H9pn2lwx1",
+      "createdAt": 1791996924375,
+      "status": "claimed",
+      "checkpointCommit": null,
+      "skillInjection": {
+        "hits": []
+      }
+    }
+  },
+  {
+    "type": "activity",
+    "activity": {
+      "phase": "thinking",
+      "stepId": "-ul4SY8u6BtS-jCD3W9c0",
+      "at": 1791996924794
+    }
+  },
+  {
+    "type": "thinking_delta",
+    "text": "REASONING-MARKER-1308"
+  }
+]

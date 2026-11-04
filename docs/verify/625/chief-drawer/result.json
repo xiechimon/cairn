@@ -1,0 +1,92 @@
+{
+  "probe": "chief-drawer",
+  "ok": true,
+  "at": "2026-10-02T15:06:13.123Z",
+  "stack": {
+    "api": "http://127.0.0.1:8793",
+    "web": "http://127.0.0.1:5275",
+    "homeDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0040-625-composer-wire-usecomposerwire/.claude/verify-run/home"
+  },
+  "checks": [
+    {
+      "name": "api-team-ready",
+      "ok": true,
+      "detail": "teamId=X44xIF9G_UFl2jODP_Bu1"
+    },
+    {
+      "name": "offboard-gate-rendered",
+      "ok": true,
+      "detail": "非 board 门控条设置钮在"
+    },
+    {
+      "name": "offboard-gate-reaches-settings",
+      "ok": true,
+      "detail": "落 board 设置视图（参已消费剥除）"
+    },
+    {
+      "name": "seed-bound",
+      "ok": true,
+      "detail": "agent=9VUkY3ew7icVccgyTD3Bu"
+    },
+    {
+      "name": "model-row-is-control",
+      "ok": true,
+      "detail": "模型行 = button[aria-haspopup=dialog]"
+    },
+    {
+      "name": "model-row-carries-runtime-mark",
+      "ok": true,
+      "detail": "行首 = 运行时标记（π svg，无头像 img）"
+    },
+    {
+      "name": "dialog-lists-provider-models",
+      "ok": true,
+      "detail": "dialog 开；含铺底两模型=true；含默认行=true"
+    },
+    {
+      "name": "pick-persists-and-echoes",
+      "ok": true,
+      "detail": "GET chief.model={\"provider\":\"verify-gw-40023\",\"modelId\":\"v-model-b-40023\"}；行回显含=false（v-model-b-40023）"
+    },
+    {
+      "name": "sqlite-row-holds-override",
+      "ok": true,
+      "detail": "chief.model 行={\"provider\":\"verify-gw-40023\",\"modelId\":\"v-model-b-40023\"}"
+    },
+    {
+      "name": "reload-echo",
+      "ok": true,
+      "detail": "重载后行=v-model-b-40023"
+    },
+    {
+      "name": "default-row-clears-to-inherit",
+      "ok": true,
+      "detail": "GET chief.model=null；行=v-model-a-40023 · 默认"
+    },
+    {
+      "name": "copy-button-writes-clipboard",
+      "ok": true,
+      "detail": "剪贴板读回=\"验证复制钮的一句话。\""
+    },
+    {
+      "name": "rewind-truncates-and-reenqueues",
+      "ok": true,
+      "detail": "user 消息=1（锚保留）；step 行=3（A+B+rewind）"
+    },
+    {
+      "name": "dead-glyphs-removed",
+      "ok": true,
+      "detail": "裸 svg：tools=0 foot=0"
+    }
+  ],
+  "artifacts": [
+    "01-offboard-settings.png",
+    "02-bound-model-row.png",
+    "06-drawer-head.png",
+    "03-model-dialog.png",
+    "04-after-pick.png",
+    "07-after-rewind.png",
+    "05-copy-feedback.png"
+  ],
+  "agentId": "9VUkY3ew7icVccgyTD3Bu"
+}

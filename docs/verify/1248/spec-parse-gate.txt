@@ -1,0 +1,4 @@
+[spec-parse-gate] apps/web/e2e: 923 tests in 123 files collected, disk count matches (0.9s)
+[spec-parse-gate] integration/test: 29 test files parsed clean by tsc (1.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0

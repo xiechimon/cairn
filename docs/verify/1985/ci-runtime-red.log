@@ -1,0 +1,37 @@
+$ flock /tmp/cairn-heavy.lock pnpm exec vitest run integration/test/routing-boundary.test.ts -t "runtime capability probes"
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ❯ |@cairn/integration| test/routing-boundary.test.ts (39 tests | 1 failed | 38 skipped) 298ms
+   ❯ real process read boundary (19)
+     × permits runtime capability probes without grading violations 296ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > real process read boundary > permits runtime capability probes without grading violations
+AssertionError: expected [ 'syscall 41: ' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "syscall 41: ",
++ ]
+
+ ❯ test/routing-boundary.test.ts:216:31
+    214|     expect(result.enforced, result.stderr).toBe(true);
+    215|     expect(result.exitCode, result.stderr).toBe(0);
+    216|     expect(result.violations).toEqual([]);
+       |                               ^
+    217|     expect(graded([oracle, result], []).status).toBe('pass');
+    218|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 skipped (39)
+   Start at  10:26:14
+   Duration  422ms (tests 87%, transform 8%, import 4%, worker 1%)
+

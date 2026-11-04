@@ -1,0 +1,24 @@
+{
+  "worker1": {
+    "stepId": "abjEiafdA2EsOYW5-F8Yn",
+    "kind": "build",
+    "localTools": [],
+    "agentToolsAtClaim": [
+      "推送分支",
+      "远程 shell"
+    ],
+    "machineShellEnabledAtClaim": false
+  },
+  "worker2": {
+    "stepId": "XyBObZkN6YPv-cLpcZJid",
+    "kind": "build",
+    "localTools": [
+      "remote_shell"
+    ],
+    "agentToolsAtClaim": [
+      "推送分支",
+      "远程 shell"
+    ],
+    "machineShellEnabledAtClaim": true
+  }
+}

@@ -1,0 +1,20 @@
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (1.438084ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (1.931109ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (113.720761ms)
+✔ PR validation reads the explicit head without executing PR code (2.499417ms)
+✔ a bot-authored commit beneath a human tip is rejected (65.236666ms)
+✔ a squash commit authored by the bot is rejected (57.488803ms)
+✔ every commit in a clean human range passes (59.246655ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (18.560482ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (13.942263ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (14.524752ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (13.44838ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (14.915743ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 332.479273

@@ -1,0 +1,17 @@
+{
+  "review": ".claude/hillclimb/reviews/2026-11-16/review.json",
+  "items": 39,
+  "available": {
+    "trials": 4,
+    "packs": 35,
+    "traces": {
+      "hit": 2,
+      "miss": 2
+    }
+  },
+  "traces": {
+    "hit": 2,
+    "miss": 2
+  }
+}
+eval-weekly: review packs=35 traces hit=2 miss=2

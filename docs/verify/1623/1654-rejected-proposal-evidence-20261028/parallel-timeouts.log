@@ -1,0 +1,44 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/first-pr-report.test.ts (14 tests | 1 failed) 14854ms
+   ❯ no code path in this feature performs an outbound request (1)
+     × marking due and building the link make zero fetch calls 5154ms
+ ❯ |@xiechimon/cairn| test/rework-plan-fallback.test.ts (4 tests | 1 failed) 15147ms
+   ❯ #1204 A: the slot fallback when rework returns to a plan step (agentForStep) (4)
+     × A2: a rework step with both slots empty -> still ends failed, the text names both slots 6754ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/first-pr-report.test.ts > no code path in this feature performs an outbound request > marking due and building the link make zero fetch calls
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/first-pr-report.test.ts:99:3
+     97|
+     98| describe('no code path in this feature performs an outbound request', …
+     99|   test('marking due and building the link make zero fetch calls', () =…
+       |   ^
+    100|     const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    101|     const s = bootServer();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn| test/rework-plan-fallback.test.ts > #1204 A: the slot fallback when rework returns to a plan step (agentForStep) > A2: a rework step with both slots empty -> still ends failed, the text names both slots
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/rework-plan-fallback.test.ts:178:3
+    176|   });
+    177|
+    178|   test('A2: a rework step with both slots empty -> still ends failed, …
+       |   ^
+    179|     const w = await setupWorld();
+    180|     const rw = await worldInReview(w, { plan: null, build: null });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 25 passed (27)
+      Tests  2 failed | 343 passed (345)
+   Start at  19:43:44
+   Duration  54.83s (import 58%, tests 38%, transform 4%)
+

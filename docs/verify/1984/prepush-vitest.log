@@ -1,0 +1,14 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1984
+
+ ✓ |@cairn/integration| test/routing-bench.test.ts (4 tests) 1467ms
+   ✓ #1984 routing benchmark fixtures (4)
+     ✓ every untouched throwing stub fails the actual oracle 681ms
+     ✓ independent references pass every actual oracle subprocess 782ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  07:46:53
+   Duration  1.59s (tests 98%, import 1%, transform 1%)
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-s1_s5tih/prepush-vitest-RWvTRa/report.json

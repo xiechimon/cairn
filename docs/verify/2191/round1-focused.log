@@ -1,0 +1,28 @@
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+ALERT UNDELIVERED Ysz7mgb2qXd8g850NsqsQ
+web push delivery failed
+ALERT FALLBACK FAILED DnqWlaOU3e67vqe42F6MG
+ALERT UNDELIVERED DnqWlaOU3e67vqe42F6MG
+web push delivery failed
+web push delivery failed
+ALERT UNDELIVERED orphan
+ALERT UNDELIVERED startup
+ALERT UNDELIVERED periodic
+
+  Snapshots  1 updated 
+ Test Files  7 passed (7)
+      Tests  181 passed (181)
+   Start at  14:56:21
+   Duration  3.69s (transform 40%, tests 32%, import 28%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 3.10s · 33% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

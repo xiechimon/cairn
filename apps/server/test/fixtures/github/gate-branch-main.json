@@ -1,0 +1,121 @@
+{
+  "name": "main",
+  "commit": {
+    "sha": "93b9ce215b5ee101cf5e511ddd2cb8d212d04e71",
+    "node_id": "C_kwDOUSKs6doAKDkzYjljZTIxNWI1ZWUxMDFjZjVlNTExZGRkMmNiOGQyMTJkMDRlNzE",
+    "commit": {
+      "author": {
+        "name": "Xmon Dai",
+        "email": "xiechimon@qq.com",
+        "date": "2026-10-22T11:06:55Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-10-22T11:06:55Z"
+      },
+      "message": "daemon(1490): an accepted stop reaches the step before the session opens and across a restart (#1495)\n\nA stop the daemon fetched while the step's runStep was still preparing\n(workspace prepare, setup hooks, team skills, or createSession in flight)\nwas dropped. fetchStop had already deleted stop_pending, deliverStop found\nno entry in sessionHandles, logged \"stop dropped (no live session)\", and\nthe session then opened and ran to success. The verify-step-claim model\n(P4) found two more ways to the same end: with two runs of one step on a\nmachine only the newest session handle got the stop, and a daemon restart\nafter the stop re-ran the step from its journal.\n\nAfter #1473 a step runs at most once per machine, so the per-step set of\nstop slots and the fan-out delivery only served a state that can no\nlonger occur. StepStops now keeps one RunStop per step id, and the slot\nwrites and clears the journal mark itself, so deliverStop is fetch, look\nup, deliver.\n\nA run that holds a stop before its session opens no longer has its own\nreport path. The session loop breaks before opening a session and the\nnormal tail runs: discard rewind, transcript upload, done(stopped). On\nrestart a journaled stop is passed into runStep instead of being\nreported directly, so discard now rewinds the worktree on that path too;\nthe separate reportStopped and resumeStoppedStep helpers are gone. The\ninterrupt at attach no longer blocks the stream watchdogs.\n\nTests share one stoppable backend and a defer() helper from the harness,\ndeliver through the same RunStop.deliver call as production, and drop\nthe two-runs case that #1473 made unreachable. The model's recover step\nnow starts a halted executor; all four properties pass.\n\nThe loop-top stop check ran before the pass state reset, so a stop that\nlanded during the network-retry wait kept the failed round's sawDone and\nlastError and the step reported failed. The check now runs after the\nreset. Adds a test for that window and one for the recover discard\nrewind, which had no coverage.\n\ncloses #1490",
+      "tree": {
+        "sha": "222cb186b9067ec0c1c7c6f6286ba3aa01e25a84",
+        "url": "https://api.github.com/repos/xiechimon/pacman/git/trees/222cb186b9067ec0c1c7c6f6286ba3aa01e25a84"
+      },
+      "url": "https://api.github.com/repos/xiechimon/pacman/git/commits/93b9ce215b5ee101cf5e511ddd2cb8d212d04e71",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq2e5PCRC1aQ7uu5UhlAAA0jsQAAUVoof86AFNstoxqValzJ7d\nFczthzhQFbKZoBIMtUBO1qTk9itQ2byBsLpzGd/m89PCfEOh/LW5P2n6xkI5zA7Q\nKpDHKYio/FjF2uFJTzFhgQDrwwxDESyVicQDePC3JUlHXR/jW8ThmEhEwYHaMwlH\nOADx/c8jW9PeyjIzwcHNEABVTjaqy8z7bKSH2d2HkvEM/XsQNbUwbXL0MuzuFBb6\nk/RzkGXQj+zynn22NjAPEmjl0Qs8tTTX42Oghi5rXdmCodtAGO1G9j7UgFh3g7Uk\nPvkvXTB4fzTv9FCagEo/PnHhVatDDH4yKXlxtgcoW/sldrvqv3ajMaIgcPgFM9B8\nOn18bchWCjqFqTVU22aWXjFWxbg4ehYek6wN2O/2BdPW5CowXfounOF9ysGXBvZd\n4RSCYC7vSwgqosBGd/HGcnA93AifLje2AACfDB7JrYwigkZ9X8JeLyaHKTkv7FfA\nOnvGlUHwM3eWAmxxOfH04H7ihfviPS1CDOUcbPo8ld1JU/TGhcO1ooZwsJzjuw2K\nEZszFmFtvKQ3wLM4HO7RjOaR6vCvmgadypjb4+kQ/0zeQ3k25EtD+dyYzxIo9DIF\nOLTeVBqFN+t5nZu9B0PNv7AOADmlSc0nWmgLrf7jk99X4nXUSF9B9C65hxPmHOAU\ndGM9Zhzm7VrFndP+0u/Y\n=4c5W\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree 222cb186b9067ec0c1c7c6f6286ba3aa01e25a84\nparent f45a36b120677b1d34053113c3ef0ec2209332f4\nauthor Xmon Dai <xiechimon@qq.com> 1792667215 -0700\ncommitter GitHub <noreply@github.com> 1792667215 +0000\n\ndaemon(1490): an accepted stop reaches the step before the session opens and across a restart (#1495)\n\nA stop the daemon fetched while the step's runStep was still preparing\n(workspace prepare, setup hooks, team skills, or createSession in flight)\nwas dropped. fetchStop had already deleted stop_pending, deliverStop found\nno entry in sessionHandles, logged \"stop dropped (no live session)\", and\nthe session then opened and ran to success. The verify-step-claim model\n(P4) found two more ways to the same end: with two runs of one step on a\nmachine only the newest session handle got the stop, and a daemon restart\nafter the stop re-ran the step from its journal.\n\nAfter #1473 a step runs at most once per machine, so the per-step set of\nstop slots and the fan-out delivery only served a state that can no\nlonger occur. StepStops now keeps one RunStop per step id, and the slot\nwrites and clears the journal mark itself, so deliverStop is fetch, look\nup, deliver.\n\nA run that holds a stop before its session opens no longer has its own\nreport path. The session loop breaks before opening a session and the\nnormal tail runs: discard rewind, transcript upload, done(stopped). On\nrestart a journaled stop is passed into runStep instead of being\nreported directly, so discard now rewinds the worktree on that path too;\nthe separate reportStopped and resumeStoppedStep helpers are gone. The\ninterrupt at attach no longer blocks the stream watchdogs.\n\nTests share one stoppable backend and a defer() helper from the harness,\ndeliver through the same RunStop.deliver call as production, and drop\nthe two-runs case that #1473 made unreachable. The model's recover step\nnow starts a halted executor; all four properties pass.\n\nThe loop-top stop check ran before the pass state reset, so a stop that\nlanded during the network-retry wait kept the failed round's sawDone and\nlastError and the step reported failed. The check now runs after the\nreset. Adds a test for that window and one for the recover discard\nrewind, which had no coverage.\n\ncloses #1490",
+        "verified_at": "2026-10-22T11:06:56Z"
+      }
+    },
+    "url": "https://api.github.com/repos/xiechimon/pacman/commits/93b9ce215b5ee101cf5e511ddd2cb8d212d04e71",
+    "html_url": "https://github.com/xiechimon/pacman/commit/93b9ce215b5ee101cf5e511ddd2cb8d212d04e71",
+    "comments_url": "https://api.github.com/repos/xiechimon/pacman/commits/93b9ce215b5ee101cf5e511ddd2cb8d212d04e71/comments",
+    "author": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "node_id": "U_kgDOCV-m2w",
+      "avatar_url": "https://avatars.githubusercontent.com/u/157263579?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/xiechimon",
+      "html_url": "https://github.com/xiechimon",
+      "followers_url": "https://api.github.com/users/xiechimon/followers",
+      "following_url": "https://api.github.com/users/xiechimon/following{/other_user}",
+      "gists_url": "https://api.github.com/users/xiechimon/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/xiechimon/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/xiechimon/subscriptions",
+      "organizations_url": "https://api.github.com/users/xiechimon/orgs",
+      "repos_url": "https://api.github.com/users/xiechimon/repos",
+      "events_url": "https://api.github.com/users/xiechimon/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/xiechimon/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "f45a36b120677b1d34053113c3ef0ec2209332f4",
+        "url": "https://api.github.com/repos/xiechimon/pacman/commits/f45a36b120677b1d34053113c3ef0ec2209332f4",
+        "html_url": "https://github.com/xiechimon/pacman/commit/f45a36b120677b1d34053113c3ef0ec2209332f4"
+      }
+    ]
+  },
+  "_links": {
+    "self": "https://api.github.com/repos/xiechimon/pacman/branches/main",
+    "html": "https://github.com/xiechimon/pacman/tree/main"
+  },
+  "protected": true,
+  "protection": {
+    "enabled": true,
+    "required_status_checks": {
+      "enforcement_level": "non_admins",
+      "contexts": [
+        "check",
+        "pack-smoke",
+        "e2e-gate",
+        "pr-evidence"
+      ],
+      "checks": [
+        {
+          "context": "check",
+          "app_id": 15368
+        },
+        {
+          "context": "pack-smoke",
+          "app_id": 15368
+        },
+        {
+          "context": "e2e-gate",
+          "app_id": 15368
+        },
+        {
+          "context": "pr-evidence",
+          "app_id": 15368
+        }
+      ]
+    }
+  },
+  "protection_url": "https://api.github.com/repos/xiechimon/pacman/branches/main/protection"
+}

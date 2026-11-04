@@ -1,0 +1,27 @@
+  .font-heading {
+    font-family: var(--font-source-serif);
+  }
+  .text-page {
+    font-size: var(--type-page);
+    line-height: var(--tw-leading, calc(24 / 18));
+  }
+  .text-heading {
+    font-size: var(--type-heading);
+    line-height: var(--tw-leading, calc(22 / 16));
+  }
+  .text-card-title {
+    font-size: var(--type-card-title);
+    line-height: var(--tw-leading, 1.5);
+  }
+  .text-ui {
+    font-size: var(--type-ui);
+    line-height: var(--tw-leading, calc(20 / 13.5));
+  }
+  .text-meta {
+    font-size: var(--type-meta);
+    line-height: var(--tw-leading, calc(16 / 12));
+  }
+  .text-caption {
+    font-size: var(--type-caption);
+    line-height: var(--tw-leading, calc(16 / 11.5));
+  }

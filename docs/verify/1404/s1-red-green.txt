@@ -1,0 +1,16 @@
+# #1404 S1: tests written first; red before the modules existed, green after.
+
+== red: the three test files before apps/server/src/services/merge-gate/ existed ==
+$ pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+ FAIL  |@xiechimon/pacman| test/merge-gate-digest.test.ts [ apps/server/test/merge-gate-digest.test.ts ]
+Error: Cannot find module '../src/services/merge-gate/digest.js' imported from <worktree>/apps/server/test/merge-gate-digest.test.ts
+ FAIL  |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts [ apps/server/test/merge-gate-evidence-link.test.ts ]
+Error: Cannot find module '../src/services/merge-gate/evidence-link.js' imported from <worktree>/apps/server/test/merge-gate-evidence-link.test.ts
+ FAIL  |@xiechimon/pacman| test/merge-gate-paths.test.ts [ apps/server/test/merge-gate-paths.test.ts ]
+Error: Cannot find module '../src/services/merge-gate/paths.js' imported from <worktree>/apps/server/test/merge-gate-paths.test.ts
+ Test Files  3 failed (3)
+      Tests  no tests
+
+== green ==
+ Test Files  3 passed (3)
+      Tests  58 passed (58)

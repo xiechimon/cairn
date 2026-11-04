@@ -1,0 +1,17 @@
+[
+  {
+    "id": "01a10c78-5b8b-7c39-8711-3aeb304b7288",
+    "todoId": "Jy9rabg8mLtaLYgwLIcCh",
+    "withPlan": true,
+    "prevPhase": "failed",
+    "triggerSource": "user",
+    "pinnedMachineId": null,
+    "planDocId": "AHfOBcoaN_-2SvOf6JgZO",
+    "errorMessage": null,
+    "prUrl": "https://github.com/demo-owner/demo-repo/pull/888",
+    "prNumber": 888,
+    "changes": null,
+    "diffHash": null,
+    "createdAt": 1791210576779
+  }
+]

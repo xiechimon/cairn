@@ -1,0 +1,8 @@
+{
+  "radiusComposer": "20px",
+  "radiusBubble": "18px",
+  "composerRadius": "20px",
+  "sendRadius": "10px",
+  "bubbleRadius": "18px",
+  "composerShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0"
+}

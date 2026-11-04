@@ -1,0 +1,34 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+ ❯ |@xiechimon/cairn-cli| test/claude-code-login.test.ts (5 tests | 1 failed) 11ms
+   ❯ parseClaudeOauthExpiresAt (4)
+     × missing, non-numeric, or unreadable expiry is null 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/claude-code-login.test.ts > parseClaudeOauthExpiresAt > missing, non-numeric, or unreadable expiry is null
+AssertionError: expected 1e+30 to be null
+
+- Expected:
+null
+
++ Received:
+1e+30
+
+ ❯ test/claude-code-login.test.ts:66:7
+     64|     expect(
+     65|       parseClaudeOauthExpiresAt(JSON.stringify({ claudeAiOauth: { expi…
+     66|     ).toBeNull();
+       |       ^
+     67|   });
+     68| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  10:35:47
+   Duration  303ms (transform 54%, import 20%, tests 15%, worker 10%)
+

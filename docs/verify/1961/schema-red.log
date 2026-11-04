@@ -1,0 +1,57 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+ ❯ test/page-bench-grade.test.ts (15 tests | 2 failed) 24ms
+   ❯ page-bench fail-closed grading (#1961) (15)
+     × a record missing required fields with buildOk as a string is invalid and stays out of aggregates 7ms
+     × null requirements yield invalid reasons and do not throw 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/page-bench-grade.test.ts > page-bench fail-closed grading (#1961) > a record missing required fields with buildOk as a string is invalid and stays out of aggregates
+AssertionError: expected 'valid' to be 'invalid' // Object.is equality
+
+Expected: "invalid"
+Received: "valid"
+
+ ❯ test/page-bench-grade.test.ts:396:27
+    394|     };
+    395|     const graded = gradeRun(malformed, BANK, { artifactRoot: home });
+    396|     expect(graded.status).toBe('invalid');
+       |                           ^
+    397|     if (graded.status === 'invalid') {
+    398|       expect(graded.reasons.length).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/page-bench-grade.test.ts > page-bench fail-closed grading (#1961) > null requirements yield invalid reasons and do not throw
+AssertionError: expected TypeError: Cannot convert undefined or nu… to be undefined
+
+- Expected:
+undefined
+
++ Received:
+TypeError {
+  "message": "Cannot convert undefined or null to object",
+}
+
+ ❯ test/page-bench-grade.test.ts:421:20
+    419|       thrown = error;
+    420|     }
+    421|     expect(thrown).toBeUndefined();
+       |                    ^
+    422|     expect(graded?.status).toBe('invalid');
+    423|     if (graded?.status === 'invalid') {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 13 passed (15)
+   Start at  18:50:09
+   Duration  177ms (transform 54%, tests 28%, import 15%, worker 3%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

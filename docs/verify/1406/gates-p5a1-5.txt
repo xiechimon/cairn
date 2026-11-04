@@ -1,0 +1,162 @@
+# P5a-1 gates, round 3b (item 3, option C) on 4cb207ee (4cb207ee9191e0bce69c37f178876a6c1b1cdd33)
+# date: 2026-10-21T12:28:20Z; user: root (uid 0); origin/main ref 2294b087, merge-base 1f61c793; main is not merged.
+
+## pnpm lint
+$ biome ci .
+Checked 787 files in 4s. No fixes applied.
+Found 1 info.
+exit=0
+
+## pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+## pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.4s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+## node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+## pnpm exec vitest run --changed origin/main
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 16ms
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ Test Files  1 failed | 247 passed (248)
+      Tests  1 failed | 2616 passed | 1 skipped (2618)
+   Duration  357.91s (tests 58%, import 41%, transform 1%)
+exit=1
+-> the one failure is the known root-only runner-brief case (chmod does not stop root); gates-p5a1-3.txt shows the same
+   test failing on origin/main 1f61c793 as root. This branch does not touch apps/daemon.
+
+## E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected
+lsof -iTCP:8396 exit=1 (1 = nothing listening)
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  README.md → none
+  README.zh.md → none
+  apps/server/src/config.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/index.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/lib/github.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief-tools.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-issues.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/issue-intake.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/scheduler.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/events-1406.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/events-1450.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/issue-1445-closed.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/issues-open-with-pr.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/issues-ready-for-agent.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/permission-admin.docs-example.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-issues.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/issue-intake.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/webhook.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  "docs/spec/28-\350\207\252\344\270\276\351\227\255\347\216\257-\350\207\252\345\206\231\350\207\252\345\220\210.md" → none
+  docs/verify/1406/api-notes.txt → none
+  docs/verify/1406/fixtures/events-1406.json → none
+  docs/verify/1406/fixtures/events-1450.json → none
+  docs/verify/1406/fixtures/issue-1445-closed.json → none
+  docs/verify/1406/fixtures/issues-open-with-pr.json → none
+  docs/verify/1406/fixtures/issues-ready-for-agent.json → none
+  docs/verify/1406/fixtures/permission-admin.docs-example.json → none
+  docs/verify/1406/gates-p5a1-2.txt → none
+  docs/verify/1406/gates-p5a1-3.txt → none
+  docs/verify/1406/gates-p5a1-4.txt → none
+  docs/verify/1406/gates-p5a1.txt → none
+  docs/verify/1406/p5a1-green.txt → none
+  docs/verify/1406/p5a1-mutations.txt → none
+  docs/verify/1406/p5a1-optin-green.txt → none
+  docs/verify/1406/p5a1-optin-live.txt → none
+  docs/verify/1406/p5a1-optin-red.txt → none
+  docs/verify/1406/p5a1-r2-live.txt → none
+  docs/verify/1406/p5a1-r2-mutations.txt → none
+  docs/verify/1406/p5a1-r2-red-green.txt → none
+  docs/verify/1406/p5a1-r3-mutations.txt → none
+  docs/verify/1406/p5a1-r3-red-green.txt → none
+  docs/verify/1406/p5a1-r3-reviews.txt → none
+  docs/verify/1406/p5a1-red.txt → none
+  docs/verify/1406/p5a1-reviews.txt → none
+  docs/verify/1406/pr-gate-1461-run1-f911447.json → none
+  docs/verify/1406/pr-gate-1461-run2-a313966.json → none
+  packages/shared/src/brand.ts → none
+  packages/shared/test/__snapshots__/snapshot.test.ts.snap → none
+  packages/shared/test/vocabulary.test.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8396
+  live-server-reap.spec.ts token-gate.spec.ts
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (5.1s)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (660ms)
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (4.4s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.2s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (5.1s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (643ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (660ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (720ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (724ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (608ms)
+  8 passed (23.4s)
+exit=0
+
+## /code-review (low), git pinned to the worktree
+### Pass 1: 8eb20fe6..591acbac, 13 findings
+1  An unbound chief made sweepTeam call reconcileClosed with no rows; its pruning forgot seen-open issues, so a close made
+   while unbound was lost after binding the same agent again.
+   -> Fixed in 6c51cd9c (no reconcile call while unbound). Test first in 27a61b0f (red there). Mutation U1.
+2  The per-project cap still counts hand and webhook github-issue tasks, which the reconcile no longer closes, so they
+   can hold the poller's slots.
+   -> Not changed: a cap rule change, left for a user decision (named in the report).
+3  The reconcile scope was read once at sweep start, before other teams' network reads.
+   -> Fixed in 6c51cd9c: read in sweepTeam next to the reconcile.
+4  That read sat outside the per-team try/catch, so a chief read error failed the whole sweep.
+   -> Fixed in 6c51cd9c. Test first in 27a61b0f (red there).
+5  The skip line fired for teams with only hand or webhook tasks and before the token check.
+   -> Fixed in 6c51cd9c: logged after the token check, and only when the team has a task whose createdBy is not the
+      seed user. Pinned in dc60bf07 (mutation U2).
+6  Teams with only hand or webhook tasks were no longer swept, so their caches were never pruned.
+   -> Fixed in 6c51cd9c: teams with any github-issue task are swept again, as before round 3.
+7  Redundant chief reads.
+   -> Fixed in 4cb207ee: one probe, chiefBinding, read twice (before the reconcile for the scope, after its awaits for
+      createdBy).
+8  The createdBy filter could be a SQL join.
+   -> Not changed: the filter is per team over rows already loaded; the join would not remove the per-team read.
+9  chiefRowOf duplicated ensureChief's lookup.  -> Fixed in 6c51cd9c (ensureChief uses chiefRowOf).
+10 The retry comment gave a stale reason for staying in memory.  -> Fixed in 6c51cd9c.
+11 The header and a group 11 test still used a hand import as the first-seen-closed example.
+   -> Fixed in 6c51cd9c (header) and 27a61b0f (test renamed).
+12 Test gaps: unbind and rebind of the same agent; agent without a model; cap with hand or webhook tasks.
+   -> First two added in 27a61b0f (mutations U1, F3); the cap is item 2 above.
+13 Evidence for this segment was missing.  -> This file, p5a1-r3b-red-green.txt and p5a1-r3b-mutations.txt.
+### Pass 2: 8eb20fe6..6c51cd9c, 9 findings
+1  After a rebind, the retry still started a task imported under the old agent, which the reconcile no longer covers.
+   -> Fixed in 4cb207ee: the retry drops a task whose createdBy is not the current agent (reason chief-rebound). Test
+      first in dc60bf07 (red there). Mutation R1.
+2  Tasks of an older agent drop out of the reconcile without a log line.
+   -> Not changed: the rebind rule is decided; a per-sweep line for them would repeat until a person closes them.
+3  The skip line repeats every sweep while the chief stays unbound.
+   -> Not changed: one line per sweep is the requested behavior.
+4  While unbound, no pruning runs for that team.
+   -> Not changed: the price of keeping the seen-open marks; nothing is added while unbound.
+5  Two chief reads per team; a rebind during the reconcile tags new imports with the new agent.
+   -> Kept on purpose (new imports go to the agent bound at import time); the reads now share one probe.
+6  An issue closed between the list read and the import is still imported (importGithubIssue's state is not checked).
+   -> Not changed: present since round 1 and outside this segment; named in the report as a follow-up.
+7  The header said the skip line is always written.  -> Fixed in 4cb207ee (states the condition).
+8  No test for the rebind rule or for the skip-log condition.  -> Added in dc60bf07 (mutations F1, F2, U2).
+9  chiefBoundAgentId was a one-line helper with one caller (CLAUDE.md: inline).
+   -> Fixed in 4cb207ee: folded into chiefBinding with chiefOrchestrateAgentId.
+
+/security-review: not run, no file on the AGENTS.md security list is touched (round 3b touches apps/server/src/services/
+{issue-intake,chief,github-issues}.ts, apps/server/test/issue-intake.test.ts, README.md, README.zh.md, docs/spec/28).

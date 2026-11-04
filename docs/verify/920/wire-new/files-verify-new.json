@@ -1,0 +1,86 @@
+[
+  {
+    "skill": "alpha",
+    "path": "notes.md",
+    "status": 200,
+    "sizeBytes": 1024,
+    "sha256Ok": true
+  },
+  {
+    "skill": "alpha",
+    "path": "SKILL.md",
+    "status": 200,
+    "sizeBytes": 118,
+    "sha256Ok": true
+  },
+  {
+    "skill": "bin",
+    "path": "assets/logo.png",
+    "status": 200,
+    "sizeBytes": 15,
+    "sha256Ok": true
+  },
+  {
+    "skill": "bin",
+    "path": "SKILL.md",
+    "status": 200,
+    "sizeBytes": 121,
+    "sha256Ok": true
+  },
+  {
+    "skill": "fat",
+    "path": "assets/template.html",
+    "status": 200,
+    "sizeBytes": 727976,
+    "sha256Ok": true
+  },
+  {
+    "skill": "fat",
+    "path": "SKILL.md",
+    "status": 200,
+    "sizeBytes": 124,
+    "sha256Ok": true
+  },
+  {
+    "skill": "heavy",
+    "path": "p0.txt",
+    "status": 200,
+    "sizeBytes": 450000,
+    "sha256Ok": true
+  },
+  {
+    "skill": "heavy",
+    "path": "p1.txt",
+    "status": 200,
+    "sizeBytes": 450000,
+    "sha256Ok": true
+  },
+  {
+    "skill": "heavy",
+    "path": "p2.txt",
+    "status": 200,
+    "sizeBytes": 450000,
+    "sha256Ok": true
+  },
+  {
+    "skill": "heavy",
+    "path": "p3.txt",
+    "status": 200,
+    "sizeBytes": 450000,
+    "sha256Ok": true
+  },
+  {
+    "skill": "heavy",
+    "path": "p4.txt",
+    "status": 200,
+    "sizeBytes": 450000,
+    "sha256Ok": true
+  },
+  {
+    "skill": "heavy",
+    "path": "SKILL.md",
+    "status": 200,
+    "sizeBytes": 127,
+    "sha256Ok": true
+  }
+]

@@ -1,0 +1,72 @@
+# P5a-1 round 5: /code-review (medium) outcomes
+# Pass 1 target: git diff 22cf8db1 HEAD at f03d1361, limited to the round 5 files (README.md, README.zh.md,
+#   apps/server/src/services/issue-intake.ts, apps/server/test/issue-intake.test.ts, docs/spec/28 section 4 P5 and
+#   section 8 P5 row; main's side of merge c2f2baa1 excluded). Worktree p5, branch claude/bootstrap-p5 confirmed.
+# Pass 2 target: git diff f03d1361 e4cb6ddd plus c36e0634 (the fixes after pass 1), with #1414 merged (6b74199a).
+
+## Pass 1: 14 findings
+
+Fixed (cd137e7f server, e4cb6ddd docs; c36e0634 after #1414 landed):
+1. Self-feed path not named: the team GitHub connection token (OAuth App) is issued to steps as git credentials and
+   reaches the repo's .agents/setup and .agents/resume hooks. Verified in machines.ts githubExecCredential,
+   daemon workspace.ts runHookStage and workspace-hooks.ts (env = gitCredentialEnv(credentials)). Spec 28 P5a,
+   both READMEs and the intake comments now name it. The cause (credentials in repo-controlled hook env) is not
+   changed here; see "Not fixed" below.
+2. README said the label must be applied "by hand" and then that gh / PAT labels are taken. "By hand" dropped.
+3. README said other phases stay until a person moves them; the CI loop moves a building task with a PR on.
+   Reworded (and reworded again after #1414 landed, see pass 2).
+4. Review tasks without a PR are settled by nothing; the README now says so.
+5. Docs said any rate-limited read stops the team; importGithubIssue's reads throw HttpError and count as an import
+   failure. Spec 28, both READMEs and the intake header now name the reads that stop the team. Pinned by group 24's
+   new import cases (mutation ME red).
+6. "The log gives the reset time" overstated: a secondary-limit 403 without headers logs resetAt null. Now "when
+   GitHub sends one".
+7. No case for an unlabeled event missing label.name, or a non-object entry. Added (mutations MC, MD red).
+8. No malformed-event case on the closer path. Added two group 11 cases (MB, MB-id, MB-at red).
+9. Comment said gh means an OAuth App token; gh carries whatever token it has (a GitHub App user token does set
+   performed_via_github_app, as events-1406.json shows). Comments and docs now name token types, not the CLI.
+10. The malformed closed case in the D5 group pinned an incidental coupling. Moved to the closer path in pass 1;
+    pass 2 (finding 10) asked for it back, since the shared parser voids the labeler read too. Restored with a
+    comment that says why.
+13. Restart test filtered calls by hand-written paths. Now uses issueReads / eventReads.
+14. Spec P5a clause listed only the App rule. It now lists the D5 conditions the code checks.
+
+Not fixed, with reasons:
+11. "Unit tests after the implementation" (CLAUDE.md). These tests pin behavior that shipped in earlier rounds,
+    asked for by pr-gate run 4; each is shown red under the mutation that undoes its rule
+    (p5a1-r5-tests.txt), which is the point of the rule.
+12. README cell is long and carries project status. The wording was the coordinator's request; a separate intake
+    section is a docs restructure outside this round.
+
+## Pass 2: 11 findings
+
+Fixed (0df7e197 server, 6a6fd572 docs):
+1. Intake comments (header, noDeliveredPr, write-time re-read) said every PR task is settled by the PR reconcile;
+   #1414 only takes review tasks with a PR. Reworded.
+2. Spec 28 P5 failure modes said the same. Reworded: review tasks with a PR go to the P2 reconcile (#1414 merged),
+   other phases to the CI loop or a person.
+3. README overstated #1414's conditions. Now "can finish ... (it checks more than that and may only leave a hint)";
+   building tasks keep going through the CI loop.
+4. Token exposure is wider than "build steps that change .agents hooks": git's own hooks run with the credential env
+   on fetch and push, and review / verify steps get credentials too. Docs now say "the steps' git commands (git's own
+   hooks run with it)" and "agent code that can change those hooks".
+5. pacman's own agent steps can run the machine's logged-in gh (runner.ts: the verify step posts the PR body through
+   it). Spec 28 P5a and both READMEs say so.
+9. No test for the rate-limited import read the docs now describe. Added (group 24, LIMITED x3; ME red for 429 and
+   for 403 with x-ratelimit-remaining 0; the message-only 403 maps to HttpError 502 and is unaffected by ME).
+10. See pass 1 item 10: the malformed closed case is back in group 2 with an accurate comment.
+
+Not fixed, with reasons (for the coordinator's Risk section or follow-ups):
+6. GithubRateLimitedError.retryAt prefers x-ratelimit-reset over retry-after, so for a secondary limit that sends both
+   the logged reset can be the primary window's. Log-only: the intake does not wait on it, the next sweep reads
+   anyway. Code in lib/github.ts from round 4; a fix needs its own test. Follow-up.
+7. Altitude: the self-feed path is documented, not closed. Closing it means not passing gitCredentialEnv into
+   runWorkspaceHook (or a separate read-only credential) and running credentialed git with core.hooksPath
+   disabled: daemon credential paths that CLAUDE.md lists for /security-review, outside this PR. Follow-up, and a
+   row for the spec 28 section 5 premortem ("D5 只认协作者打标" does not cover it).
+8. CLOSE_RECONCILE_SKIPPED keeps 'review', so a review task without a PR is closed by nothing. Review is the human
+   gate; letting the intake close review tasks is a design change (and group 11 pins "review 与 done 卡不读不动").
+   Comment reworded; behavior unchanged. Follow-up decision.
+11. closerVerdict does not refuse a close made through a GitHub App, while newestLabeler refuses such a label. Closing
+    is the conservative direction (it stops work, it does not start it); an app acting for a triage user closing the
+    issue closes the task. Recorded for the coordinator; not changed.

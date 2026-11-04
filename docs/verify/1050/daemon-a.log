@@ -1,0 +1,8 @@
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude (9.9.9-probe)
+Enrolled in team NGyJ0juNrmQb4EZ-CTpM_ (machine K4srK19CggrTw1LOEyx7h)
+Online (machineId=K4srK19CggrTw1LOEyx7h); polling http://127.0.0.1:8791
+Idle-sleep prevention active (caffeinate)
+[recover] no pending steps found
+[wake] push channel connected

@@ -1,0 +1,17 @@
+{
+    "task": {
+        "path": "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hidden-answer"
+    },
+    "trial_name": "hidden-answer__FHWG4Ld",
+    "trials_dir": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hidden-answer-TamperAgent-20261028005043",
+    "agent": {
+        "name": "integration.eval.harbor.tamper_agent:TamperAgent"
+    },
+    "environment": {
+        "type": "docker",
+        "kwargs": {
+            "keep_containers": true
+        }
+    },
+    "job_id": "7f3da0e7-4a74-4210-a602-011ded00cc16"
+}

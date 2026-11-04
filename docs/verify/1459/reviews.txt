@@ -1,0 +1,28 @@
+#1459 code-review
+Skill: code-review (forked execution)
+Args: "low 69722cc..HEAD (review in /home/user/pacman/.claude/worktrees/p5e, branch claude/bootstrap-p5-1459)"
+Range reviewed: 69722cc..3524b15a (HEAD at review time)
+
+Which diff the skill reviewed. The session's primary directory had moved to another worktree
+(.claude/worktrees/p5d, branch claude/bootstrap-p5-3, 7f5d250e), so this was checked, not assumed.
+Check, in one Bash call:
+  cd /home/user/pacman/.claude/worktrees/p5e && git rev-parse --abbrev-ref HEAD   -> claude/bootstrap-p5-1459
+  git diff --shortstat 69722cc..HEAD                                             -> 8 files changed, 662 insertions(+), 96 deletions(-)
+  git diff --shortstat 69722cc..HEAD -- ':!*.test.ts'                             -> 6 files changed, 218 insertions(+), 87 deletions(-)
+  sed -n 200,210p apps/server/src/services/webhook.ts                            -> line 206 is the teamGithubToken reason ternary
+  p5d's apps/server/src/services/webhook.ts has no teamGithubToken (grep -c = 0)
+The finding cites webhook.ts:206 and teamGithubToken, which exist only in this branch's diff, and the skill
+states it read "the non-test hunks for 69722cc..HEAD": it reviewed the right diff.
+
+Full findings, verbatim:
+- apps/server/src/services/webhook.ts:206: when `teamGithubToken` returns `no-secret-box` (the server has
+  no secret box configured), the 202 detail still says "github connection not found". An operator who reads
+  that will look at the GitHub connection, which is fine, rather than the missing box. The log line has the
+  right reason code, but the detail returned to the caller sends them the wrong way.
+- "I found no other runtime-correctness bugs in the non-test hunks for `69722cc..HEAD`."
+
+Disposition: not fixed. The state cannot occur on the webhook path: WebhookDeps.box is a required SecretBox
+(apps/server/src/services/webhook.ts line 60), and the only caller, routes-webhook.ts, passes svcOf(ctx),
+whose box is ctx.secretBox (routes-helpers.ts). teamGithubToken returns no-secret-box only for an undefined
+box, which the poller's BuildDeps allows and the webhook's type does not. The log line still carries the
+exact reason code if that ever changes.

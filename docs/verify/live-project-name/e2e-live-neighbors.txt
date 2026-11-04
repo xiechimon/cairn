@@ -1,0 +1,39 @@
+
+Running 35 tests using 4 workers
+
+[1/35] e2e/attachment-strip.spec.ts:273:1 › detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move
+[2/35] e2e/composer-paste.spec.ts:281:1 › detail face: a mid-line image paste lands the token whole-line at the caret
+[3/35] e2e/empty-review-closeout.spec.ts:163:1 › 看板：已上报空 diff 的 review 卡完成不合并、不拦授权
+[4/35] e2e/project-commit-detail.spec.ts:148:1 › C1+C2 点历史行 → 发详情请求，出 diff，元信息与行一致
+[5/35] e2e/composer-paste.spec.ts:309:1 › detail face: one multi-image paste puts every token on its own line
+[6/35] e2e/project-commit-detail.spec.ts:171:1 › C3 多提交来回切换不串数据（sha 进 queryKey）
+[7/35] e2e/attachment-strip.spec.ts:320:1 › detail face: clicking the settled chip opens the image preview; Esc closes it
+[8/35] e2e/composer-paste.spec.ts:327:1 › detail face: a text-only paste is never preventDefaulted (FM7 zero change)
+[9/35] e2e/empty-review-closeout.spec.ts:189:1 › 详情：已上报空 diff 的 review 卡同样不展示合并行且完成可点
+[10/35] e2e/project-commit-detail.spec.ts:193:1 › C4 选中态存 (projectId, sha)：SPA 切项目后旧 diff 不跟场
+[11/35] e2e/composer-paste.spec.ts:342:1 › detail face: a non-whitelisted paste is rejected with a toast, grant never fires
+[12/35] e2e/attachment-strip.spec.ts:355:1 › detail face: clicking the in-flight placeholder previews the local bytes
+[13/35] e2e/empty-review-closeout.spec.ts:198:1 › 有文件改动的卡仍展示合并行，缺授权时完成禁用
+[14/35] e2e/composer-paste.spec.ts:361:1 › detail face: an over-cap paste is rejected with a toast, grant never fires
+[15/35] e2e/project-commit-detail.spec.ts:213:1 › C5 详情不可达 → 人话降级（reason 分译），不白屏不空树
+[16/35] e2e/attachment-strip.spec.ts:389:1 › detail face: a failed upload clears the placeholder, toasts, keeps the draft
+[17/35] e2e/composer-paste.spec.ts:377:1 › detail face: a non-image whitelist file (text/plain) is accepted under its real name
+[18/35] e2e/empty-review-closeout.spec.ts:209:1 › git 仍有文件头但解析文件集为空时不跳过合并
+[19/35] e2e/attachment-strip.spec.ts:441:1 › new-task face: placeholder → settled chip → preview
+[20/35] e2e/composer-paste.spec.ts:395:1 › detail face: a mixed file+text clipboard takes the files and drops the text
+[21/35] e2e/composer-paste.spec.ts:423:1 › detail face: a failed upload toasts and the draft survives untouched
+[22/35] e2e/empty-review-closeout.spec.ts:218:1 › changes 未上报（无 reported）不当成空提交，合并行与授权闸保留
+[23/35] e2e/attachment-strip.spec.ts:518:1 › chief face: placeholder → settled chip → preview
+[24/35] e2e/composer-paste.spec.ts:445:1 › detail face: Enter during the upload does not send; after it lands, Enter sends the token
+[25/35] e2e/review-reject.spec.ts:136:1 › FM1/FM2: 静息 review 发送 = steps revision 动作面，draft 清空、chip 即时翻规划中
+[26/35] e2e/composer-paste.spec.ts:506:1 › new-task face: paste inserts the token line-atomic into the spec and save carries it
+[27/35] e2e/project-commit-detail.spec.ts:225:1 › C6 选中载体 aria-current + 关闭钮清选中回占位
+[28/35] e2e/review-reject.spec.ts:177:1 › FM3: 更多菜单出现「请求修改」入口，弹层收反馈后走同一动作面
+[29/35] e2e/project-commit-detail.spec.ts:241:1 › C7 hosted fixture（r2-24）：docs: README 行出 diff；种子空提交出定义态；关闭还原
+[30/35] e2e/composer-paste.spec.ts:536:1 › new-task face: save is blocked while the paste upload is in flight
+[31/35] e2e/project-commit-detail.spec.ts:263:1 › C7 local fixture（prj-local-files）：根提交 = 全文件新增
+[32/35] e2e/review-reject.spec.ts:211:1 › FM3 边界: 非 review 相位（live building）更多菜单不渲染打回行
+[33/35] e2e/composer-paste.spec.ts:565:1 › detail face probe: a real Cmd/Ctrl+V clipboard image paste rides the same chain
+[34/35] e2e/review-reject.spec.ts:221:1 › FM4: 运行中 review（claimed 步在场）发送保持 steer 语义，不抢动作面
+[35/35] e2e/review-reject.spec.ts:264:1 › FM2: 打回被拒（409 竞态）draft 逐字保留 + 提示行显性，不静默吞
+  35 passed (6.3s)

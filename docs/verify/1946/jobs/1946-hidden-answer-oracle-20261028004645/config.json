@@ -1,0 +1,16 @@
+{
+    "job_name": "1946-hidden-answer-oracle-20261028004645",
+    "jobs_dir": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs",
+    "n_concurrent_trials": 1,
+    "environment": {
+        "type": "docker",
+        "kwargs": {
+            "keep_containers": true
+        }
+    },
+    "tasks": [
+        {
+            "path": "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hidden-answer"
+        }
+    ]
+}

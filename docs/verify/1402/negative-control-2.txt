@@ -1,0 +1,56 @@
+Negative control 2 for vp.mjs drive search (#1402, pr-gate run 2 on #1411 asked for a seed
+that breaks what the probe claims to check: the result row text).
+
+Attempt A: drop the first server result (server.todos.slice(1) at search-panel.tsx:257).
+The drive still passed (evidence 20261020-neg2-search-seeded, not archived): the panel
+renders the local title match before the server reply arrives, so the probe sees the
+row either way. A seed on one data source is not enough; the row render is shared.
+
+Attempt B: truncate the rendered title in the shared todo row.
+Seed (apps/web/src/overlays/search-panel.tsx:181):
+-          #{todo.seqNum} {todo.title}
++          #{todo.seqNum} {todo.title.slice(0, 4)}
+
+== seeded: vp.mjs drive search ==
+vp: search/search needs the stack, running doctor first
+PASS  server 进程组存活(pid 4847) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 4848) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: search/search -> node .claude/skills/verify-pacman/scripts/drive.mjs search
+PASS  搜索面板打开(⌘K)
+FAIL  probe 异常:locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: '搜索目标 55933' }).first() to be visible
+
+shot  99-error.png
+drive search:FAIL(1 项)
+evidence:<worktree>/.claude/verify-evidence/20261020-neg3-search-seeded
+rc=1
+
+== reverted (git diff apps/web/src/overlays/search-panel.tsx is empty): vp.mjs drive search ==
+vp: search/search needs the stack, running doctor first
+PASS  server 进程组存活(pid 5126) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 5127) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: search/search -> node .claude/skills/verify-pacman/scripts/drive.mjs search
+PASS  搜索面板打开(⌘K)
+PASS  结果行命中「搜索目标 82825」
+shot  02-search-results.png
+drive search:PASS
+evidence:<worktree>/.claude/verify-evidence/20261020-neg3-search-reverted
+rc=0
+
+Archived: 20261020-neg3-search-seeded/ (99-error.png, result.json),
+20261020-neg3-search-reverted/ (02-search-results.png, result.json, and capture-board/
+from vp.mjs capture /app --name board with VERIFY_EVIDENCE_DIR set to that run, which
+now writes into a capture-<name> subdirectory instead of over the drive's result.json).

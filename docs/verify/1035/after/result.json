@@ -1,0 +1,173 @@
+{
+  "probe": "1035-zoom-fit",
+  "issue": 1035,
+  "expect": "new",
+  "ok": true,
+  "at": "2026-10-08T00:29:32.499Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0233-1035-110/.claude/verify-run/home"
+  },
+  "checks": [
+    {
+      "name": "seed-live-data",
+      "ok": true,
+      "detail": "API todos=4 SQLite todo=4"
+    },
+    {
+      "name": "nat-1440-resting-unchanged",
+      "ok": true,
+      "detail": "1fr 流值 cols=[281,281,281,281]（281±1）无横滚"
+    },
+    {
+      "name": "nat-natural-1309-fits",
+      "ok": true,
+      "detail": "110%（1309px）client=1069 scroll=1069 末列 right=1292 ≤ 窗缘 1309"
+    },
+    {
+      "name": "nat-natural-1200-fits",
+      "ok": true,
+      "detail": "120%（1200px）client=960 scroll=960 末列 right=1183 ≤ 窗缘 1200"
+    },
+    {
+      "name": "nat-natural-1152-fits",
+      "ok": true,
+      "detail": "125%（1152px）client=912 scroll=912 末列 right=1135 ≤ 窗缘 1152"
+    },
+    {
+      "name": "boundary-flip-measured",
+      "ok": true,
+      "detail": "1116 fits=true（cols 200px）/ 1115 fits=false（地板接管 cols 200px，诚实横滚）"
+    },
+    {
+      "name": "nat-1024-floor-holds",
+      "ok": true,
+      "detail": "cols=[200,200,200,200] ≥199，scroll 876 > client 784"
+    },
+    {
+      "name": "docked-1309-floor-280-scrolls",
+      "ok": true,
+      "detail": "⌘J 停靠 cols=[280,280,280,280] ≥279，横滚 scroll 1196 > client 651（#692 有意行为）"
+    },
+    {
+      "name": "toggle-restores-natural-fit",
+      "ok": true,
+      "detail": "关抽屉后 scroll 1069 ≤ client 1069，cols=[248,248,248,248]"
+    }
+  ],
+  "artifacts": [
+    "natural-1309-zoom-110%.png",
+    "natural-1200-zoom-120%.png",
+    "natural-1152-zoom-125%.png",
+    "boundary-1115-honest-scroll.png",
+    "docked-1309-floor-280.png"
+  ],
+  "sweep": [
+    {
+      "tag": "resting-1440",
+      "zoom": "100%",
+      "width": 1440,
+      "clientWidth": 1200,
+      "scrollWidth": 1200,
+      "fits": true,
+      "pageSpill": 0,
+      "colWidths": [
+        281,
+        281,
+        281,
+        281
+      ]
+    },
+    {
+      "tag": "natural-1309",
+      "zoom": "110%",
+      "width": 1309,
+      "clientWidth": 1069,
+      "scrollWidth": 1069,
+      "fits": true,
+      "pageSpill": 0,
+      "colWidths": [
+        248.3,
+        248.3,
+        248.3,
+        248.3
+      ]
+    },
+    {
+      "tag": "natural-1200",
+      "zoom": "120%",
+      "width": 1200,
+      "clientWidth": 960,
+      "scrollWidth": 960,
+      "fits": true,
+      "pageSpill": 0,
+      "colWidths": [
+        221,
+        221,
+        221,
+        221
+      ]
+    },
+    {
+      "tag": "natural-1152",
+      "zoom": "125%",
+      "width": 1152,
+      "clientWidth": 912,
+      "scrollWidth": 912,
+      "fits": true,
+      "pageSpill": 0,
+      "colWidths": [
+        209,
+        209,
+        209,
+        209
+      ]
+    },
+    {
+      "tag": "boundary-1116",
+      "zoom": "~129%",
+      "width": 1116,
+      "clientWidth": 876,
+      "scrollWidth": 876,
+      "fits": true,
+      "pageSpill": 0,
+      "colWidths": [
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "tag": "boundary-1115",
+      "zoom": "~129%",
+      "width": 1115,
+      "clientWidth": 875,
+      "scrollWidth": 876,
+      "fits": false,
+      "pageSpill": 0,
+      "colWidths": [
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "tag": "natural-1024",
+      "zoom": "~141%",
+      "width": 1024,
+      "clientWidth": 784,
+      "scrollWidth": 876,
+      "fits": false,
+      "pageSpill": 0,
+      "colWidths": [
+        200,
+        200,
+        200,
+        200
+      ]
+    }
+  ]
+}

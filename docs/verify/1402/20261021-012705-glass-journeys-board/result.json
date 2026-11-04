@@ -1,0 +1,36 @@
+{
+  "ok": false,
+  "journeys": [
+    {
+      "id": "board",
+      "ok": false,
+      "checks": [
+        {
+          "ok": false,
+          "label": "locator.textContent: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.board-topbar-title')\u001b[22m\n"
+        }
+      ],
+      "screenshots": [
+        "01-board.png",
+        "fail-board.png"
+      ]
+    }
+  ],
+  "consoleErrors": [
+    {
+      "text": "Base UI: A component that acts as a button expected a native <button> because the `nativeButton` prop is true. Rendering a non-<button> removes native button semantics, which can impact forms and accessibility. Use a real <button> in the `render` prop, or set `nativeButton` to `false`.\n    at Button (http://127.0.0.1:5273/src/components/ui/button.tsx:36:25)\n    at BoardSurface (http://127.0.0.1:5273/src/board/board.tsx:263:24)\n    at BoardPage (http://127.0.0.1:5273/src/routes/board-page.tsx:686"
+    }
+  ],
+  "failedRequests": [],
+  "observations": {
+    "doctor": {
+      "displayName": "Owner"
+    }
+  },
+  "stack": {
+    "serverPort": 8791,
+    "webPort": 5273,
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home"
+  },
+  "fatal": null
+}

@@ -1,0 +1,13 @@
+import { chromium } from '@playwright/test';
+const [base, out, scenario, theme = 'light', w = '1440', h = '900', hoverId = ''] = process.argv.slice(2);
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: +w, height: +h }, deviceScaleFactor: 2 });
+await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+await page.goto(`${base}/app?scenario=${scenario}`);
+await page.waitForSelector('.board-column');
+await page.evaluate(() => document.fonts.ready);
+await page.waitForTimeout(600);
+if (hoverId) await page.locator(`[data-todo-id="${hoverId}"] .todo-card-title`).hover();
+await page.waitForTimeout(300);
+await page.screenshot({ path: out });
+await browser.close();

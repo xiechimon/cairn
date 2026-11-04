@@ -1,0 +1,87 @@
+# #1459 round 2 (pr-gate run 1 on #1477 at 1573cda): red and green legs
+# Worktree /home/user/pacman/.claude/worktrees/p5, branch claude/bootstrap-p5 (pushed as claude/bootstrap-p5-r5).
+# Command for every leg: pnpm exec vitest run --reporter=verbose apps/server/test/webhook.test.ts
+#   apps/server/test/issue-intake.test.ts [apps/server/test/github-issues.test.ts ...] (files named per leg)
+# Tests were committed before the code that makes them pass; each red leg ran at the tests-only commit.
+
+## Red leg 1: 45b87f1b (server(1459): round 2 tests before the fixes), webhook + issue-intake
+ Test Files  2 failed (2)
+      Tests  19 failed | 193 passed (212)
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（429 without headers）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（429 with retry-after 60）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（403 with x-ratelimit-remaining 0 and x-ratelimit-reset）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（403 secondary limit, message only）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 存量 githubRepo 形坏 > W17 项目存的 githubRepo 是 ../user（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 存量 githubRepo 形坏 > W17 项目存的 githubRepo 是 owner/..（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 审计行 > W18 导入成功后编排抛错（总管没绑 Agent，409）→ 卡已建，「import accepted」审计行照写
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：本队别的项目这一轮也不读
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：本队这一轮不再读列表
+Green at 45b87f1b on purpose (guards for behavior that already held): W15 (the poller counts the webhook's import
+still waiting on GitHub), W16 (the import's own 404 reached through a connection deleted during the permission read).
+
+## Green leg 1: after bfa8b01f (webhook repo split, generic detail, audit line, retry-after first)
+webhook + issue-intake + github-issues:
+ Test Files  3 passed (3)
+      Tests  241 passed (241)
+
+## Red leg 2: 022c6a11 (server(1459): round 2 review, tests before the fixes), webhook + issue-intake + github-issues
+ Test Files  2 failed | 1 passed (3)
+      Tests  8 failed | 244 passed (252)
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W19 导入时 GitHub 说 issue 不存在（详情读 404，连接还在）→ 202 misconfigured 说 issue 读不到，不说连接没了，记日志
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（".."）→ 202 ignored，零出站，记日志
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"."）→ 202 ignored，零出站，记日志
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"a/b"）→ 202 ignored，零出站，记日志
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：本队别的项目这一轮也不读
+  FAIL |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：本队这一轮不再读列表
+Green at 022c6a11 on purpose: W20 with an empty login (stays no-sender), W20b (a `[bot]` login still gets its
+permission read).
+
+## Green leg 2: after b9f6d92f (login shape, import 404 split, header parsing)
+webhook + issue-intake + github-issues + github-reads + ci-loop + pr-reconcile:
+ Test Files  6 passed (6)
+      Tests  436 passed (436)
+new and changed round 2 tests (green):
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 存量 githubRepo 形坏 > W17 项目存的 githubRepo 是 ../user（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 存量 githubRepo 形坏 > W17 项目存的 githubRepo 是 owner/..（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 审计行 > W18 导入成功后编排抛错（总管没绑 Agent，409）→ 卡已建，「import accepted」审计行照写
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 在飞现数与导入的 404 > W15 webhook 的导入还在等 GitHub 时轮询器扫一轮：差一位到上限，轮询器把那条在飞的算进去，不读列表、不领
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W 在飞现数与导入的 404 > W16 权限读的 await 期间团队的 GitHub 连接被删 → 导入自己的 404 收成 202 misconfigured，不建卡
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W19 导入时 GitHub 说 issue 不存在（详情读 404，连接还在）→ 202 misconfigured 说 issue 读不到，不说连接没了，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（".."）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"."）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"a/b"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（""）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20b bot 账号（login 带 [bot]）照常读权限
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：本队别的项目这一轮也不读
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：本队别的项目这一轮也不读
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：本队这一轮不再读列表
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：本队这一轮不再读列表
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+
+## Source for the retry-after rule (R6)
+GitHub docs, "Rate limits for the REST API", fetched 2026-10-21
+(https://docs.github.com/api/article/body?pathname=/en/rest/using-the-rest-api/rate-limits-for-the-rest-api):
+"If the `retry-after` response header is present, you should not retry your request until after that many seconds
+has elapsed. If the `x-ratelimit-remaining` header is `0`, you should not retry your request until after the time,
+in UTC epoch seconds, specified by the `x-ratelimit-reset` header. Otherwise, wait for at least one minute before
+retrying."
+
+## Final head
+All of the above files pass at the gated head; see gates-r2.txt (vitest --changed origin/main: every related file).

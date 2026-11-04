@@ -1,0 +1,18 @@
+     × 在飞步被再次发回本机：不起第二个会话，只有一次 done 3043ms
+     × 准备工作区期间就有心跳；准备失败后心跳停止 3004ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+Error: waitFor timeout
+    344|   throw new Error('waitFor timeout');
+Error: waitFor timeout
+    344|   throw new Error('waitFor timeout');
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+     × 放回后同机重领：在飞那份的回报落账，之后的回报不再改动 70ms
+     × 卡已关、扫尾停掉的步：迟到回报不改步，git 凭证被回收 43ms
+     × GitHub 探测期间步被放回又被领走：回报 409，新领取保持 claimed 42ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 'failed' to be 'done' // Object.is equality
+AssertionError: expected 'done' to be 'stopped' // Object.is equality
+AssertionError: expected null to be an instance of HttpError
+ Test Files  1 failed (1)
+      Tests  3 failed (3)

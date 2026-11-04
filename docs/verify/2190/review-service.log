@@ -1,0 +1,13 @@
+✔ configured service launcher rejects missing node (20.675292ms)
+✔ configured service launcher rejects missing python3 (18.247709ms)
+✔ configured service launcher rejects missing sqlite3 (15.048958ms)
+✔ configured service launcher rejects missing tsx (555.126417ms)
+✔ configured service launcher uses the configured checkout and fresh mode (382.511708ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1182.294042

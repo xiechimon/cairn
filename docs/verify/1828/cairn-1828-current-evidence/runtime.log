@@ -1,0 +1,12 @@
+[heavy-slots] queued, position 2 (all 1 slots are busy)
+[heavy-slots] queued, position 1 (all 1 slots are busy)
+[heavy-slots] acquired slot 1/1
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1828-work-trace/cairn
+
+
+ Test Files  4 passed (4)
+      Tests  25 passed (25)
+   Start at  00:50:30
+   Duration  3.94s (tests 45%, transform 32%, import 23%)
+

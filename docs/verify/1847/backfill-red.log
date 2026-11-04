@@ -1,0 +1,105 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1847
+
+ ❯ |@xiechimon/cairn| test/token-usage-cost.test.ts (6 tests | 3 failed) 377ms
+   ❯ token usage cost at write time (6)
+     × startup backfill preserves recorded costs when free model pricing becomes paid 50ms
+     × startup backfill preserves recorded costs when free model pricing becomes removed 59ms
+     × backfill fills missing costs once and preserves recorded zero and partial costs 43ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/token-usage-cost.test.ts > token usage cost at write time > startup backfill preserves recorded costs when free model pricing becomes paid
+AssertionError: expected [ { …(11) }, { …(11) }, { …(11) } ] to deeply equal [ { …(11) }, { …(11) }, { …(11) } ]
+
+- Expected
++ Received
+
+@@ -1,15 +1,15 @@
+  [
+    {
+      "buildId": "01a17ca7-9d7b-792e-9029-e07346025ced",
+      "cacheRead": 4000,
+      "cacheWrite": 8000,
+-     "costCacheRead": 0,
+-     "costCacheWrite": 0,
+-     "costInput": 0,
+-     "costOutput": 0,
+-     "costTotal": 0,
++     "costCacheRead": 0.0012,
++     "costCacheWrite": 0.03,
++     "costInput": 0.003,
++     "costOutput": 0.03,
++     "costTotal": 0.06420000000000001,
+      "input": 1000,
+      "model": "stub-gw/free-model",
+      "output": 2000,
+    },
+    {
+
+ ❯ test/token-usage-cost.test.ts:337:56
+    335|         backfillTokenUsageCost(w.s.db);
+    336|         backfillTokenUsageCost(w.s.db);
+    337|         expect(w.s.db.select().from(tokenUsage).all()).toEqual(before);
+       |                                                        ^
+    338|         expect((await readTodo(w.s, todoId)).usageCost?.total).toBeClo…
+    339|       } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/token-usage-cost.test.ts > token usage cost at write time > startup backfill preserves recorded costs when free model pricing becomes removed
+AssertionError: expected [ { …(11) }, { …(11) }, { …(11) } ] to deeply equal [ { …(11) }, { …(11) }, { …(11) } ]
+
+- Expected
++ Received
+
+@@ -1,15 +1,15 @@
+  [
+    {
+      "buildId": "01a17ca7-9dbe-7a09-8853-06e19c3235b2",
+      "cacheRead": 4000,
+      "cacheWrite": 8000,
+-     "costCacheRead": 0,
+-     "costCacheWrite": 0,
+-     "costInput": 0,
+-     "costOutput": 0,
+-     "costTotal": 0,
++     "costCacheRead": null,
++     "costCacheWrite": null,
++     "costInput": null,
++     "costOutput": null,
++     "costTotal": null,
+      "input": 1000,
+      "model": "stub-gw/free-model",
+      "output": 2000,
+    },
+    {
+
+ ❯ test/token-usage-cost.test.ts:337:56
+    335|         backfillTokenUsageCost(w.s.db);
+    336|         backfillTokenUsageCost(w.s.db);
+    337|         expect(w.s.db.select().from(tokenUsage).all()).toEqual(before);
+       |                                                        ^
+    338|         expect((await readTodo(w.s, todoId)).usageCost?.total).toBeClo…
+    339|       } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/cairn| test/token-usage-cost.test.ts > token usage cost at write time > backfill fills missing costs once and preserves recorded zero and partial costs
+AssertionError: expected null to be close to 0.003, received difference is 0.003, but expected 5e-10
+ ❯ expectRates test/token-usage-cost.test.ts:156:25
+    154|   factor: number,
+    155| ) {
+    156|   expect(row.costInput).toBeCloseTo(0.003 * factor, 9);
+       |                         ^
+    157|   expect(row.costOutput).toBeCloseTo(0.03 * factor, 9);
+    158|   expect(row.costCacheRead).toBeCloseTo(0.0012 * factor, 9);
+ ❯ test/token-usage-cost.test.ts:389:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  09:18:39
+   Duration  2.24s (transform 56%, import 26%, tests 18%)

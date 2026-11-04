@@ -1,0 +1,2 @@
+pr-tasks: GREEN
+exit=0

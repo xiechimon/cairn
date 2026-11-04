@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "body": {
+    "id": "Z4PjVT7ZDZjXPBkR5e8AJ",
+    "name": "xmon74-verify-machine",
+    "teamId": "OOuRqKAkaNw6kd6zpJVvf",
+    "online": false,
+    "latestCliVersion": "0.1.0",
+    "kind": "remote",
+    "enabledRuntimes": [],
+    "shellEnabled": true
+  }
+}

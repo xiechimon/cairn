@@ -1,0 +1,34 @@
+fixture: rebuild worktree on remote-residue impl/104-ts-upgrade, dirty it
+HEAD is now at 1ae41741 chore(104): TypeScript 5.9.3→7.0.2 全线抬升 —— i18n 门改 TS7 unstable/ast scanner（TS5 AST oracle 逐 token 等价核验）+ 01 册 §4.5 pin 回写（#104）
+?? dirty-938.txt
+--- yes WITHOUT --force-dirty (expect KEEP: uncommitted changes):
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        yes
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+KEEP        impl/104-ts-upgrade (PR #117 merged, but worktree /private/tmp/pacman-938-fd has uncommitted changes; pass --force-dirty to discard)
+
+---
+nothing to clean (no merged-PR residue in scope); kept=1
+exit=0 (attempts=1)
+--- yes WITH --force-dirty (expect CLEANED: worktree+local+remote):
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        yes (force-dirty)
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+CLEANED     impl/104-ts-upgrade (PR #117) -> worktree(--force):/private/tmp/pacman-938-fd local-branch remote-branch
+
+---
+cleaned=1 kept=0 failed=0
+exit=0 (attempts=1)
+--- verify gone (empty = gone):
+ls: /tmp/pacman-938-fd: No such file or directory
+--- idempotent rerun (expect nothing to clean):
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        yes
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+
+---
+nothing to clean (no merged-PR residue in scope); kept=0
+exit=0 (attempts=1)

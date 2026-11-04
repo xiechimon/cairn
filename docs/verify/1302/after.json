@@ -1,0 +1,30 @@
+{
+  "beforeText": "未设置",
+  "options": [
+    "未设置",
+    "off",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
+  "afterPick": "high",
+  "afterReload": "high",
+  "patches": [
+    "{\"thinkingLevel\":\"high\"}"
+  ],
+  "apiThinkingLevel": "high",
+  "apiAfterReload": "high",
+  "rowAfterPick": {
+    "id": "8McoEUwv_ryxkBnhcfnfg",
+    "provider": null,
+    "thinkingLevel": "high"
+  },
+  "rowAfterReload": {
+    "id": "8McoEUwv_ryxkBnhcfnfg",
+    "provider": null,
+    "thinkingLevel": "high"
+  }
+}

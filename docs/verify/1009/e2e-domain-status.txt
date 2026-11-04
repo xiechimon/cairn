@@ -1,0 +1,1373 @@
+
+Running 179 tests using 4 workers
+
+[1/179] e2e/chief-composer-tools.spec.ts:264:1 › trigger: @ opens the inline listbox inside the drawer; arrows + Enter insert the token (FM1)
+[2/179] e2e/board-zoom-fit.spec.ts:72:5 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › no horizontal scroll at 110% zoom (1309px CSS viewport), all 4 columns whole
+[3/179] e2e/chief-drawer-model.spec.ts:31:3 › chief drawer model row (#615) › the model row is a control that opens the anchored model popover
+[4/179] e2e/board-docked-reflow.spec.ts:68:3 › board reflow under the docked chief drawer (#692) › docked columns hold the 280px floor and the first column is whole
+[5/179] e2e/board-zoom-fit.spec.ts:72:5 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › no horizontal scroll at 120% zoom (1200px CSS viewport), all 4 columns whole
+[6/179] e2e/chief-composer-tools.spec.ts:293:1 › mouse: hover highlights and the row click inserts without stealing focus (FM2)
+[7/179] e2e/board-zoom-fit.spec.ts:72:5 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › no horizontal scroll at 125% zoom (1152px CSS viewport), all 4 columns whole
+[8/179] e2e/chief-drawer-model.spec.ts:70:3 › chief drawer model row (#615) › the selected model row is readable in both themes (#751 A)
+[9/179] e2e/board-zoom-fit.spec.ts:93:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › natural floor still holds at 1024: honest scroll instead of collapsed columns
+[10/179] e2e/chief-composer-tools.spec.ts:311:1 › geometry: the listbox anchors above the composer wrap inside the drawer (FM2)
+[11/179] e2e/board-zoom-fit.spec.ts:109:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › floor follows data-chief-open live: ⌘J re-arms 280 with scroll, Escape restores the fit
+[12/179] e2e/chief-composer-tools.spec.ts:339:1 › Esc closes the listbox and the drawer survives (#146 ladder, FM9)
+[13/179] e2e/chief-composer-tools.spec.ts:352:1 › the mention button opens the popover with live group counts and inserts a token (FM1)
+[14/179] e2e/chief-drawer-model.spec.ts:124:3 › chief drawer model row (#615) › the selected row fill bleeds to the popover edges (#872)
+[15/179] e2e/chief-drawer-model.spec.ts:173:3 › chief drawer model row (#615) › the picker search is typeahead-only: absent until a key, retracted on clear (#756)
+[16/179] e2e/chief-composer-tools.spec.ts:379:1 › Esc with the popover open closes the popover, not the drawer (FM9)
+[17/179] e2e/chief-drawer-model.spec.ts:232:3 › chief drawer model row (#615) › the model row carries the runtime mark, not an agent avatar
+[18/179] e2e/chief-drawer-model.spec.ts:250:3 › chief drawer model row (#615) › message copy glyphs are clipboard buttons; no bare inert glyphs remain
+[19/179] e2e/chief-composer-tools.spec.ts:392:1 › a mid-line image paste lands the token whole-line at the caret (FM6)
+[20/179] e2e/chief-composer-tools.spec.ts:418:1 › Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)
+[21/179] e2e/chief-drawer-model.spec.ts:277:3 › chief drawer model row (#615) › restore button opens the rewind confirm; the foot chevron discloses tool rows
+[22/179] e2e/chief-composer-tools.spec.ts:535:1 › transcript: mention and attachment tokens in a user row render as chips, never literal (FM7)
+[23/179] e2e/chief-composer-tools.spec.ts:557:3 › fixture face stays inert (#732 FM3) › the composer is read-only: no listbox, attach inert, picker at zero counts
+[24/179] e2e/chief-drawer-model.spec.ts:313:3 › chief drawer model row (#615) › the gear reaches board settings from a wake surface
+  1) e2e/board-docked-reflow.spec.ts:68:3 › board reflow under the docked chief drawer (#692) › docked columns hold the 280px floor and the first column is whole 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:71:5
+
+    Error Context: test-results/board-docked-reflow-board--a2aea-d-the-first-column-is-whole/error-context.md
+
+
+[25/179] e2e/chief-drawer-slash.spec.ts:126:1 › trigger: `/` opens builtins plus skills, review/stop hidden (F2)
+[26/179] e2e/board-docked-reflow.spec.ts:85:3 › board reflow under the docked chief drawer (#692) › the clipped next column peeks >=16px at the scroll edge
+[27/179] e2e/chief-drawer-slash.spec.ts:148:1 › `/clear` runs without sending and toasts confirmation (F1)
+[28/179] e2e/chief-drawer-model.spec.ts:326:3 › chief drawer model row (#615) › closing the drawer (⌘J) recycles the model popover with it (#773)
+[29/179] e2e/chief-drawer-slash.spec.ts:167:1 › Tab completes without running; Enter without highlight sends (F4)
+[30/179] e2e/chief-drawer-slash.spec.ts:182:1 › mid-prompt accept inserts literal text, never runs (F3)
+[31/179] e2e/chief-drawer-slash.spec.ts:194:1 › /help opens the command panel with the drawer builtins
+  2) e2e/board-zoom-fit.spec.ts:109:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › floor follows data-chief-open live: ⌘J re-arms 280 with scroll, Escape restores the fit 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-zoom-fit.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-zoom-fit.spec.ts:120:5
+
+    Error Context: test-results/board-zoom-fit-natural-sta-80557-oll-Escape-restores-the-fit/error-context.md
+
+
+[32/179] e2e/board-zoom-fit.spec.ts:134:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › worst-case card data stays in-column at the 125% boundary width
+[33/179] e2e/chief-drawer-slash.spec.ts:215:1 › Esc closes the menu and the drawer survives (F5)
+[34/179] e2e/chief-fab.spec.ts:24:3 › detail FAB renders only with unread (#443) › unread 0: the detail route renders no FAB
+[35/179] e2e/chief-panel.spec.ts:53:3 › chief panel docked form (#447) › Esc closes the drawer on the board route
+[36/179] e2e/chief-fab.spec.ts:30:3 › detail FAB renders only with unread (#443) › unread > 0: the FAB renders with the badge value
+  3) e2e/board-docked-reflow.spec.ts:85:3 › board reflow under the docked chief drawer (#692) › the clipped next column peeks >=16px at the scroll edge 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:88:5
+
+    Error Context: test-results/board-docked-reflow-board--6f64b-eks-16px-at-the-scroll-edge/error-context.md
+
+
+[37/179] e2e/board-docked-reflow.spec.ts:100:3 › board reflow under the docked chief drawer (#692) › overflow is reachable: wheel scrolls and the last column lands whole
+  4) e2e/chief-drawer-model.spec.ts:326:3 › chief drawer model row (#615) › closing the drawer (⌘J) recycles the model popover with it (#773) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      335 |     // ⌘J 收起抽屉：弹层跟随回收（X/⌘J 同走 open=false，见 chief-drawer）
+      336 |     await page.keyboard.press('Meta+j');
+    > 337 |     await expect(drawer(page)).toHaveCount(0);
+          |                                ^
+      338 |     await expect(menu).toHaveCount(0);
+      339 |
+      340 |     // 再按 ⌘J 重开：弹层不带回 stale open 态
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-drawer-model.spec.ts:337:32
+
+    Error Context: test-results/chief-drawer-model-chief-d-a1849--model-popover-with-it-773-/error-context.md
+
+
+[38/179] e2e/chief-send-fallback.spec.ts:136:1 › stale slot: send goes out, fallback toast names it, row heals to 默认
+[39/179] e2e/chief-send-fallback.spec.ts:168:1 › fresh slot: send goes out with no fallback toast
+[40/179] e2e/chief-settings.spec.ts:29:1 › 返回按钮可用：点击回到总管抽屉 (#811)
+  5) e2e/chief-panel.spec.ts:53:3 › chief panel docked form (#447) › Esc closes the drawer on the board route 
+
+    Error: expect(locator).toBeHidden() failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: hidden
+    Received: visible
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeHidden" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to <aside id="_r_d_" data-open="" role="dialog" tabindex="-1" aria-label="总管" data-base-ui-focusable="" class="chief-drawer fixed right-2 bottom-2 z-(--z-floating) flex h-[600px] max-h-[calc(100dvh-1rem)] w-[380px] max-w-[calc(100dvw-1rem)] flex-col overflow-hidden rounded-[12px] bg-(--card) shadow-[var(--edge-ring),var(--floating-shadow)] origin-bottom-right duration-(--dur-overlay) data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:…>…</aside>
+           - unexpected value "visible"
+
+
+      56 |
+      57 |     await page.keyboard.press('Escape');
+    > 58 |     await expect(drawer(page)).toBeHidden();
+         |                                ^
+      59 |   });
+      60 |
+      61 |   test('Esc closes the drawer on a wake surface', async ({ page }) => {
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:58:32
+
+    Error Context: test-results/chief-panel-chief-panel-do-d51de-e-drawer-on-the-board-route/error-context.md
+
+
+[41/179] e2e/chief-settings.spec.ts:48:1 › agent row opens the 选择总管 Agent dialog with search + canon default row
+  6) e2e/chief-fab.spec.ts:30:3 › detail FAB renders only with unread (#443) › unread > 0: the FAB renders with the badge value 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('.detail-fab')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('.detail-fab') with timeout 5000ms
+      - waiting for locator('.detail-fab')
+
+
+      31 |     await page.goto(`${DETAIL}?scenario=detail-unread`);
+      32 |     const fab = page.locator('.detail-fab');
+    > 33 |     await expect(fab).toBeVisible();
+         |                       ^
+      34 |     await expect(fab.locator('.fab-badge')).toHaveText('3');
+      35 |   });
+      36 |
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-fab.spec.ts:33:23
+
+    Error Context: test-results/chief-fab-detail-FAB-rende-35011-enders-with-the-badge-value/error-context.md
+
+
+[42/179] e2e/chief-settings.spec.ts:64:1 › agent dialog search keeps its own 16px inset (#872 blast radius)
+[43/179] e2e/chief-panel.spec.ts:61:3 › chief panel docked form (#447) › Esc closes the drawer on a wake surface
+[44/179] e2e/chief-fab.spec.ts:37:3 › detail FAB renders only with unread (#443) › the gated FAB keeps the family geometry (48×48, pane offset, composer 让位)
+[45/179] e2e/chief-settings.spec.ts:82:1 › agent dialog family law: X, Escape and backdrop dismiss; panel clicks do not
+[46/179] e2e/chief-settings.spec.ts:100:1 › agent dialog search filters the list; no match shows the empty row
+[47/179] e2e/chief-settings.spec.ts:109:1 › fixture agent pick closes the dialog (accept 律)
+[48/179] e2e/chief-settings.spec.ts:123:1 › charter 编辑 opens the DialogShell editor with the r5 captured fields
+[49/179] e2e/chief-settings.spec.ts:135:1 › charter dialog family law: X, Escape, 取消 and backdrop dismiss
+  7) e2e/board-docked-reflow.spec.ts:100:3 › board reflow under the docked chief drawer (#692) › overflow is reachable: wheel scrolls and the last column lands whole 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:103:5
+
+    Error Context: test-results/board-docked-reflow-board--cd4ee-the-last-column-lands-whole/error-context.md
+
+
+[50/179] e2e/board-docked-reflow.spec.ts:124:3 › board reflow under the docked chief drawer (#692) › overflow discloses itself: the scroller no longer hides its scrollbar
+  8) e2e/chief-panel.spec.ts:61:3 › chief panel docked form (#447) › Esc closes the drawer on a wake surface 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      61 |   test('Esc closes the drawer on a wake surface', async ({ page }) => {
+      62 |     await page.goto('/app/team?scenario=12');
+    > 63 |     await expect(drawer(page)).toHaveCount(0);
+         |                                ^
+      64 |
+      65 |     await page.locator('button[aria-label="总管"]').click();
+      66 |     await expect(drawer(page)).toBeVisible();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:63:32
+
+    Error Context: test-results/chief-panel-chief-panel-do-1c79f-he-drawer-on-a-wake-surface/error-context.md
+
+
+[51/179] e2e/chief-panel.spec.ts:72:3 › chief panel docked form (#447) › Esc layers: the open thread switcher closes first, the drawer second
+[52/179] e2e/chief-settings.spec.ts:155:1 › fixture charter save closes the dialog (accept 律)
+[53/179] e2e/chief-settings.spec.ts:179:1 › 压缩模型 interactive (#204): button opens the anchored model menu
+[54/179] e2e/chief-settings.spec.ts:197:1 › 压缩模型 selected row fill bleeds to the menu edges (#872)
+[55/179] e2e/chief-settings.spec.ts:271:1 › 压缩模型 search is typeahead-only, same contract as the drawer picker (#756 续)
+[56/179] e2e/chief-settings.spec.ts:300:1 › 压缩模型 menu family law (#204): Escape and outside click dismiss
+[57/179] e2e/chief-settings.spec.ts:310:1 › 压缩模型 fixture pick = accept 律:选择即关 (#204)
+[58/179] e2e/chief-settings.spec.ts:321:3 › 压缩模型 long value truncates, full name on title (dark, #772)
+[59/179] e2e/chief-settings.spec.ts:321:3 › 压缩模型 long value truncates, full name on title (light, #772)
+[60/179] e2e/chief-settings.spec.ts:341:1 › 空态卡 centered and growth-proof: memo matches watches (#772)
+[61/179] e2e/chief-settings.spec.ts:373:1 › 压缩模型 stale preset value (#358): 裸串兜底回显 + 菜单无选中行
+  9) e2e/board-docked-reflow.spec.ts:124:3 › board reflow under the docked chief drawer (#692) › overflow discloses itself: the scroller no longer hides its scrollbar 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:129:5
+
+    Error Context: test-results/board-docked-reflow-board--c32e8--longer-hides-its-scrollbar/error-context.md
+
+
+[62/179] e2e/board-docked-reflow.spec.ts:135:3 › board reflow under the docked chief drawer (#692) › cards keep their resting width while docked
+[63/179] e2e/chief-settings.spec.ts:415:1 › 机器槽在位:Agent tab 有「机器」标题 + 描述 + chip(值 null = 自动)
+[64/179] e2e/chief-settings.spec.ts:428:1 › 机器 chip 开 popover:「自动」行 + 机器行 + listbox 语义 + 选中态
+[65/179] e2e/chief-settings.spec.ts:446:1 › 机器 popover family law: Escape / outside click dismiss
+  10) e2e/chief-panel.spec.ts:72:3 › chief panel docked form (#447) › Esc layers: the open thread switcher closes first, the drawer second 
+
+    Error: expect(locator).toBeHidden() failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: hidden
+    Received: visible
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeHidden" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to <aside id="_r_d_" data-open="" role="dialog" tabindex="-1" aria-label="总管" data-base-ui-focusable="" class="chief-drawer fixed right-2 bottom-2 z-(--z-floating) flex h-[600px] max-h-[calc(100dvh-1rem)] w-[380px] max-w-[calc(100dvw-1rem)] flex-col overflow-hidden rounded-[12px] bg-(--card) shadow-[var(--edge-ring),var(--floating-shadow)] origin-bottom-right duration-(--dur-overlay) data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:…>…</aside>
+           - unexpected value "visible"
+
+
+      81 |
+      82 |     await page.keyboard.press('Escape');
+    > 83 |     await expect(drawer(page)).toBeHidden();
+         |                                ^
+      84 |   });
+      85 |
+      86 |   test('composer bar carries the attach + mention tools and the send button', async ({ page }) => {
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:83:32
+
+    Error Context: test-results/chief-panel-chief-panel-do-40ffa-ses-first-the-drawer-second/error-context.md
+
+
+[66/179] e2e/chief-panel.spec.ts:86:3 › chief panel docked form (#447) › composer bar carries the attach + mention tools and the send button
+[67/179] e2e/chief-settings.spec.ts:456:1 › 机器 chip fixture pick = accept 律:选择即关 + 回显不变(无 mutation)
+[68/179] e2e/chief-panel.spec.ts:100:3 › chief panel docked form (#447) › the panel docks flush right as a full-height 418 column (board)
+[69/179] e2e/chief-settings.spec.ts:464:1 › 机器槽默认面(101):无 resources → 清单仅「自动」行且选中
+  11) e2e/chief-panel.spec.ts:100:3 › chief panel docked form (#447) › the panel docks flush right as a full-height 418 column (board) 
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 1022
+    Received: 1052
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   30
+
+      103 |     const box = await drawer(page).boundingBox();
+      104 |     expect(box).not.toBeNull();
+    > 105 |     expect(box!.x).toBeCloseTo(1440 - 418, 0);
+          |                    ^
+      106 |     expect(box!.y).toBeCloseTo(0, 0);
+      107 |     expect(box!.width).toBeCloseTo(418, 0);
+      108 |     expect(box!.height).toBeCloseTo(732, 0);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:105:20
+
+    Error Context: test-results/chief-panel-chief-panel-do-aa558-ll-height-418-column-board-/error-context.md
+
+
+[70/179] e2e/chief-stream-markdown.spec.ts:234:3 › chief drawer markdown 面（fixture，#650） › F-R1/R2/R3: robot markdown 行走共用块解析——bold/标题/列表/栅栏/chip 全渲染，星号零漏出
+[71/179] e2e/chief-stream-markdown.spec.ts:269:3 › chief drawer markdown 面（fixture，#650） › F-R13: todo 提及渲成 chip，锚点指任务详情并可点击导航；字面 #seq/伪 scheme 不出 chip（#675）
+[72/179] e2e/chief-panel.spec.ts:135:3 › chief panel docked form (#447) › board content yields to the panel and the columns keep the D8 guard
+[73/179] e2e/chief-stream-markdown.spec.ts:290:3 › chief drawer markdown 面（fixture，#650） › F-R4/R5: typing 打字行无 foot；定稿行 foot（复制 + 完成 44s）保留
+[74/179] e2e/chief-stream-markdown.spec.ts:306:3 › chief drawer markdown 面（fixture，#650） › F-R6/R8: 用户行头像 = 真人身份 img（XMON-105 单源），抽屉体可滚动
+[75/179] e2e/chief-stream-markdown.spec.ts:323:3 › chief drawer markdown 面（fixture，#650） › F-R9: r5 114 冻结捕获面不漂移——段数组行走原 .chief-para/.chief-bullet 路径
+  12) e2e/chief-panel.spec.ts:135:3 › chief panel docked form (#447) › board content yields to the panel and the columns keep the D8 guard 
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 782
+    Received: 1200
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   418
+
+      140 |     const main = await page.locator('.board-main').boundingBox();
+      141 |     expect(main).not.toBeNull();
+    > 142 |     expect(main!.width).toBeCloseTo(1440 - 240 - 418, 0);
+          |                         ^
+      143 |
+      144 |     const open = await page.locator('.board-scroller').evaluate((el) => ({
+      145 |       scrollable: el.scrollWidth > el.clientWidth,
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:142:25
+
+    Error Context: test-results/chief-panel-chief-panel-do-549a0-e-columns-keep-the-D8-guard/error-context.md
+
+
+[76/179] e2e/chief-panel.spec.ts:157:3 › chief panel docked form (#447) › closing restores the board grid to its resting geometry
+[77/179] e2e/chief-stream-markdown.spec.ts:341:3 › chief drawer markdown 面（fixture，#650） › F-R15: fixture 面（r5 113 running 捕获）不长存在行——ChiefStreamItem 新 kind 零污染
+[78/179] e2e/chief-stream-markdown.spec.ts:358:3 › chief drawer 流式面（live mock，#651） › F-R7/R10/R11: text_delta 增量上屏，message 终稿收敛不重复不残留
+[79/179] e2e/chief-stream-markdown.spec.ts:408:3 › chief drawer 流式面（live mock，#651） › F-R12: 双行去重（#667）——同文 POST + user-<stepId> 回声恰一个用户气泡；连发不同文各一条
+[80/179] e2e/chief-stream-markdown.spec.ts:442:3 › chief drawer 流式面（live mock，#651） › F-R14: 在飞存在行（#739）——静默窗口挂 streaming 行，首 delta 收敛为 typing，终稿两行皆退场
+[81/179] e2e/chief-stream-markdown.spec.ts:491:3 › chief drawer 流式面（live mock，#651） › F-R16: 轮中事件不闪清（#857）——工具行/文本行事件后重取在飞时打字面保留，收敛后落库行接管
+  13) e2e/board-docked-reflow.spec.ts:135:3 › board reflow under the docked chief drawer (#692) › cards keep their resting width while docked 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:143:5
+
+    Error Context: test-results/board-docked-reflow-board--9b641--resting-width-while-docked/error-context.md
+
+
+[82/179] e2e/chief-stream-markdown.spec.ts:543:3 › chief drawer 流式面（live mock，#651） › F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏
+[83/179] e2e/board-docked-reflow.spec.ts:154:3 › board reflow under the docked chief drawer (#692) › worst-case data holds: long title wraps in-column, 120-count header fits, empty column survives
+  14) e2e/chief-stream-markdown.spec.ts:543:3 › chief drawer 流式面（live mock，#651） › F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 24
+    Received: 22.885284423828125
+
+      580 |     // 恰为那 1.5px 补偿量）。
+      581 |     const hit = await toggle.boundingBox();
+    > 582 |     expect(hit?.height).toBe(24);
+          |                         ^
+      583 |     const label = presence.getByText('处理中...');
+      584 |     const inkInset = await label.evaluate((el) => {
+      585 |       const btn = el.closest('button') as HTMLElement;
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-stream-markdown.spec.ts:582:25
+
+    Error Context: test-results/chief-stream-markdown-chie-dbd9e-822）——点箭头看实时步骤，typing-接管不泄漏/error-context.md
+
+
+[84/179] e2e/chief-stream-markdown.spec.ts:622:3 › chief drawer 流式面（live mock，#651） › F-R15: robot 行身份 chip（live 面，#741）——头像+名字 anchor，点击全链进 Agent 设置页
+[85/179] e2e/chief-stream-markdown.spec.ts:676:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R14: 用户气泡走同源解析——todo chip 成锚可点导航、bold 成 strong、负例保持字面
+[86/179] e2e/chief-stream-markdown.spec.ts:703:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R15: 复制载荷 = markdown 原文（不是渲染结果）；两钮行（复制/恢复）不受影响
+[87/179] e2e/chief-stream-markdown.spec.ts:718:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效
+  15) e2e/chief-stream-markdown.spec.ts:718:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 44
+    Received: 42
+
+      726 |       return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
+      727 |     });
+    > 728 |     expect(geo.h).toBe(44); // 10px padding ×2 + 24px 行盒（现状逐像素同值）
+          |                   ^
+      729 |     expect(geo.font).toBe('14px');
+      730 |     // 整条消息 = 单个代码栅栏：首/尾块 margin 归零，不与 10px/12px padding
+      731 |     // 叠出双倍留白（#612 chat-bubble--md 修剪的抽屉版）。
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-stream-markdown.spec.ts:728:19
+
+    Error Context: test-results/chief-stream-markdown-chie-46da8-px-药丸）；多块气泡首-尾块-margin-修剪生效/error-context.md
+
+
+[88/179] e2e/chief-stream-markdown.spec.ts:743:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R17: fixture 捕获面用户气泡零漂移——无槽走字面路径（无 --md 类、无 chat-md 块）
+[89/179] e2e/chief-stream-markdown.spec.ts:757:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数
+[90/179] e2e/chief-stream-markdown.spec.ts:853:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R20: 在飞工具行带出具体命令（不是裸工具名）
+[91/179] e2e/chief-stream-markdown.spec.ts:886:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R21: 段序契约（#1003 / ADR 0011 premortem）——文本段在前、其工具行在后、各恰一次；收口后工具折进后随段
+  16) e2e/chief-panel.spec.ts:157:3 › chief panel docked form (#447) › closing restores the board grid to its resting geometry 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      159 |     await settled(page);
+      160 |     await page.keyboard.press('Escape');
+    > 161 |     await expect(drawer(page)).toHaveCount(0);
+          |                                ^
+      162 |
+      163 |     const main = await page.locator('.board-main').boundingBox();
+      164 |     expect(main!.width).toBeCloseTo(1440 - 240, 0);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:161:32
+
+    Error Context: test-results/chief-panel-chief-panel-do-59705-rid-to-its-resting-geometry/error-context.md
+
+
+[92/179] e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › pages: the main column narrows by 418 while docked and restores on close
+[93/179] e2e/detail-3pane.spec.ts:34:1 › three abutting panes: 240 sidebar | fluid center | 488 right
+[94/179] e2e/detail-3pane.spec.ts:63:1 › no 文档|聊天 tab group survives on any phase surface
+[95/179] e2e/detail-3pane.spec.ts:72:1 › detail head keeps the 更多 icon only — branch/token/history icons are gone
+[96/179] e2e/detail-3pane.spec.ts:83:1 › composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it
+[97/179] e2e/detail-3pane.spec.ts:133:1 › composer controls share one bottom row: stop is the send button's sibling
+  17) e2e/board-docked-reflow.spec.ts:154:3 › board reflow under the docked chief drawer (#692) › worst-case data holds: long title wraps in-column, 120-count header fits, empty column survives 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:159:5
+
+    Error Context: test-results/board-docked-reflow-board--e930a--fits-empty-column-survives/error-context.md
+
+
+[98/179] e2e/detail-3pane.spec.ts:187:1 › composer width tracks the center column across both pane states (488 pane / 418 chief dock)
+[99/179] e2e/board-docked-reflow.spec.ts:189:3 › board reflow under the docked chief drawer (#692) › narrowest usable viewport (1024) docked: floor holds and the page itself never scrolls
+  18) e2e/detail-3pane.spec.ts:187:1 › composer width tracks the center column across both pane states (488 pane / 418 chief dock) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('detail-right')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByTestId('detail-right') with timeout 5000ms
+      - waiting for getByTestId('detail-right')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      201 |   // composer width follows the column — in-flow needs no pane-var resync
+      202 |   await page.getByRole('button', { name: '总管' }).click();
+    > 203 |   await expect(page.getByTestId('detail-right')).toHaveCount(0);
+          |                                                  ^
+      204 |   const drawer = page.locator('.chief-drawer');
+      205 |   await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      206 |   const docked = await measure();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/detail-3pane.spec.ts:203:50
+
+    Error Context: test-results/detail-3pane-composer-widt-08e2f-es-488-pane-418-chief-dock-/error-context.md
+
+
+  19) e2e/board-docked-reflow.spec.ts:189:3 › board reflow under the docked chief drawer (#692) › narrowest usable viewport (1024) docked: floor holds and the page itself never scrolls 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:195:5
+
+    Error Context: test-results/board-docked-reflow-board--ddda6-e-page-itself-never-scrolls/error-context.md
+
+
+[100/179] e2e/detail-3pane.spec.ts:211:1 › right pane type select switches between the doc surface and the three sections
+[101/179] e2e/board-docked-reflow.spec.ts:209:3 › board reflow under the docked chief drawer (#692) › RTL mirror: the first column stays whole at the scroll-start edge
+[102/179] e2e/detail-3pane.spec.ts:247:1 › scenarios 30/31/32 freeze the pane view instead of popping dialogs
+[103/179] e2e/detail-3pane.spec.ts:262:1 › plan card activation in the thread opens the plan doc in the right pane
+[104/179] e2e/detail-3pane.spec.ts:276:1 › fresh phase: the brief owns the whole center column, right pane collapses
+[105/179] e2e/detail-narrow.spec.ts:49:1 › N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll
+[106/179] e2e/detail-narrow.spec.ts:67:1 › N2: 360 and 390 keep the same law
+[107/179] e2e/detail-narrow.spec.ts:81:1 › N3: the degradation stops at 768px — the 3-pane shell survives above it
+[108/179] e2e/detail-narrow.spec.ts:106:1 › N4: the docked chief panel cannot re-overflow the 320px shell
+[109/179] e2e/detail-narrow.spec.ts:127:1 › N5: head actions and the composer stay inside the 320px viewport
+[110/179] e2e/hotkeys.spec.ts:189:1 › C on the board opens the new-task dialog; ⌘C and the retired N do not
+  20) e2e/chief-fab.spec.ts:37:3 › detail FAB renders only with unread (#443) › the gated FAB keeps the family geometry (48×48, pane offset, composer 让位) 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.evaluate: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('.detail-fab')
+
+
+      39 |   }) => {
+      40 |     await page.goto(`${DETAIL}?scenario=detail-unread`);
+    > 41 |     const geometry = await page.locator('.detail-fab').evaluate((el) => {
+         |                                                        ^
+      42 |       const cs = getComputedStyle(el);
+      43 |       return { width: cs.width, height: cs.height, right: cs.right, bottom: cs.bottom };
+      44 |     });
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-fab.spec.ts:41:56
+
+    Error Context: test-results/chief-fab-detail-FAB-rende-54abd-48-pane-offset-composer-让位-/error-context.md
+
+
+[111/179] e2e/hotkeys.spec.ts:209:1 › sidebar 新任务 row carries the C badge and click-opens the dialog
+[112/179] e2e/chief-fab.spec.ts:79:3 › FAB icon follows the bound agent (#444) › bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay
+[113/179] e2e/hotkeys.spec.ts:220:1 › C on a non-board route opens the dialog in place
+[114/179] e2e/hotkeys.spec.ts:230:1 › C on the project page opens the page’s own dialog (route project chip)
+[115/179] e2e/hotkeys.spec.ts:245:1 › Space no longer opens the drawer; ⌘J does, composer focused, default consumed
+  21) e2e/board-docked-reflow.spec.ts:209:3 › board reflow under the docked chief drawer (#692) › RTL mirror: the first column stays whole at the scroll-start edge 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-route="board"][data-chief-open]')
+    Expected: 1
+    Received: 0
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-route="board"][data-chief-open]') with timeout 5000ms
+      - waiting for locator('[data-route="board"][data-chief-open]')
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      39 | async function dock(page: Page) {
+      40 |   await page.keyboard.press('Meta+j');
+    > 41 |   await expect(page.locator('[data-route="board"][data-chief-open]')).toHaveCount(1);
+         |                                                                       ^
+      42 |   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+      43 | }
+      44 |
+        at dock (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:41:71)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/board-docked-reflow.spec.ts:215:5
+
+    Error Context: test-results/board-docked-reflow-board--b5659-le-at-the-scroll-start-edge/error-context.md
+
+
+[116/179] e2e/board-docked-reflow.spec.ts:228:3 › board reflow under the docked chief drawer (#692) › resting geometry at 1440 is untouched by the floor token
+[117/179] e2e/machines-chief-state.spec.ts:28:1 › 总管主机徽标：钉在 host 行（data-orchestration=host + 文案）
+[118/179] e2e/machines-chief-state.spec.ts:36:1 › 总管回合进行中：running 状态行在在线远端行
+[119/179] e2e/machines-chief-state.spec.ts:42:1 › 总管等待机器：waiting 状态行在离线远端行（与离线灰点正交共存）
+[120/179] e2e/machines-chief-state.spec.ts:51:1 › 读态零控件：标注容器内零 button / 零 menu 语义（死钮纪律保持）
+[121/179] e2e/machines-chief-state.spec.ts:62:1 › 存量零漂移：无标注数据（06 canon 面）不长任何标注节点
+[122/179] e2e/machines-chief-state.spec.ts:68:1 › 行高契约保持：标注行不破行高（首行 60 / 分隔行 59+1px）
+[123/179] e2e/overlay-focus.spec.ts:49:3 › #15 focus ring收编 › click + key on 新建任务/topbar buttons: never the UA blue box
+[124/179] e2e/overlay-focus.spec.ts:96:3 › #15 focus ring收编 › Tab focus keeps the official ring (keyboard reachability preserved)
+[125/179] e2e/overlay-focus.spec.ts:116:3 › #10 schedules 新建定时弹层 = FloatingShell 全屏族（tw fade） › scrim covers the full viewport — sidebar included
+[126/179] e2e/overlay-focus.spec.ts:127:3 › #10 schedules 新建定时弹层 = FloatingShell 全屏族（tw fade） › Esc closes the overlay
+  22) e2e/chief-fab.spec.ts:79:3 › FAB icon follows the bound agent (#444) › bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: getByRole('button', { name: '总管', exact: true }).locator('img')
+    Expected: "https://api.dicebear.com/9.x/lorelei/svg?seed=r3-builder"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" getByRole('button', { name: '总管', exact: true }).locator('img') with timeout 5000ms
+      - waiting for getByRole('button', { name: '总管', exact: true }).locator('img')
+
+
+      86 |     const fab = page.getByRole('button', { name: '总管', exact: true });
+      87 |     const img = fab.locator('img');
+    > 88 |     await expect(img).toHaveAttribute('src', R3_SRC);
+         |                       ^
+      89 |     await expect(fab.locator('svg')).toHaveCount(0);
+      90 |     await expect(fab.locator('.fab-badge')).toHaveText('2');
+      91 |     // 头像铺满 48×48 圆（board 面无边框），FAB 几何不动
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-fab.spec.ts:88:23
+
+    Error Context: test-results/chief-fab-FAB-icon-follows-bd83f-tar-badge-and-geometry-stay/error-context.md
+
+
+[127/179] e2e/chief-fab.spec.ts:102:3 › FAB icon follows the bound agent (#444) › bound: a ChiefWake family swaps at the shared consumption point
+[128/179] e2e/overlay-focus.spec.ts:134:3 › #10 schedules 新建定时弹层 = FloatingShell 全屏族（tw fade） › backdrop click closes; entry rides the tw-animate-css fade
+[129/179] e2e/overlay-focus.spec.ts:147:3 › #10 schedules 新建定时弹层 = FloatingShell 全屏族（tw fade） › X and 取消 close the fixture face too (no dead buttons)
+  23) e2e/hotkeys.spec.ts:245:1 › Space no longer opens the drawer; ⌘J does, composer focused, default consumed 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      251 |   // must not wake the drawer (the ⌘N test's immediate-count negative form)
+      252 |   await page.keyboard.press('Space');
+    > 253 |   await expect(drawer(page)).toHaveCount(0);
+          |                              ^
+      254 |
+      255 |   await pressUntil(page, 'Meta+j', drawer(page));
+      256 |   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:253:30
+
+    Error Context: test-results/hotkeys-Space-no-longer-op-1b021-er-focused-default-consumed/error-context.md
+
+
+[130/179] e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › board: [aria-label="总管"] opens the drawer, close returns to the surface
+[131/179] e2e/hotkeys.spec.ts:284:1 › ⌘J wakes the chief drawer on a non-board route
+  24) e2e/chief-fab.spec.ts:102:3 › FAB icon follows the bound agent (#444) › bound: a ChiefWake family swaps at the shared consumption point 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('button[aria-label="总管"]').locator('img')
+    Expected: "https://api.dicebear.com/9.x/lorelei/svg?seed=r3-builder"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" locator('button[aria-label="总管"]').locator('img') with timeout 5000ms
+      - waiting for locator('button[aria-label="总管"]').locator('img')
+
+
+      107 |     const fab = page.locator('button[aria-label="总管"]');
+      108 |     // #950: .fab-avatar wrapper 类退役 → 直取按钮内 img。
+    > 109 |     await expect(fab.locator('img')).toHaveAttribute('src', R3_SRC);
+          |                                      ^
+      110 |     await expect(fab.locator('svg')).toHaveCount(0);
+      111 |     await expect(fab.locator('.fab-badge')).toHaveText('2');
+      112 |   });
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-fab.spec.ts:109:38
+
+    Error Context: test-results/chief-fab-FAB-icon-follows-56d79-he-shared-consumption-point/error-context.md
+
+
+[132/179] e2e/chief-fab.spec.ts:114:3 › FAB icon follows the bound agent (#444) › avatarUrl override wins over the generated face
+  25) e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › board: [aria-label="总管"] opens the drawer, close returns to the surface 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      120 |     test(`${name}: ${fab} opens the drawer, close returns to the surface`, async ({ page }) => {
+      121 |       await page.goto(route);
+    > 122 |       await expect(page.locator('.chief-drawer')).toHaveCount(0);
+          |                                                   ^
+      123 |
+      124 |       await page.locator(fab).click();
+      125 |       await expect(page.locator('.chief-drawer')).toBeVisible();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/shell-consistency.spec.ts:122:51
+
+    Error Context: test-results/shell-consistency-chief-FA-8ee89-lose-returns-to-the-surface/error-context.md
+
+
+  26) e2e/hotkeys.spec.ts:284:1 › ⌘J wakes the chief drawer on a non-board route ───────────────────
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  getByTestId('chief-composer-input')
+    Expected: focused
+    Received: inactive
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeFocused" getByTestId('chief-composer-input') with timeout 5000ms
+      - waiting for getByTestId('chief-composer-input')
+        14 × locator resolved to <textarea readonly data-slot="textarea" placeholder="有什么可以帮你的？" data-testid="chief-composer-input" class="flex w-full border border-input transition-colors outline-none focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 h-[60px] max-h-[120px] min-h-0 resize-none …></textarea>
+           - unexpected value "inactive"
+
+
+      286 |   await expect(page.getByRole('complementary')).toBeVisible();
+      287 |   await pressUntil(page, 'Meta+j', drawer(page));
+    > 288 |   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+          |                                                          ^
+      289 |   await expect(page).toHaveURL(/\/app\/schedules/);
+      290 |   await escapeUntilHidden(page, drawer(page));
+      291 |   await expect(drawer(page)).toHaveCount(0);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:288:58
+
+    Error Context: test-results/hotkeys-⌘J-wakes-the-chief-drawer-on-a-non-board-route/error-context.md
+
+
+[133/179] e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › pages: .page-fab opens the drawer, close returns to the surface
+[134/179] e2e/hotkeys.spec.ts:294:1 › editable focus swallows C and ⌘J — the c lands IN the input
+  27) e2e/chief-fab.spec.ts:114:3 › FAB icon follows the bound agent (#444) › avatarUrl override wins over the generated face 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: getByRole('button', { name: '总管', exact: true }).locator('img')
+    Expected: "/avatar-robot-2.svg"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveAttribute" getByRole('button', { name: '总管', exact: true }).locator('img') with timeout 5000ms
+      - waiting for getByRole('button', { name: '总管', exact: true }).locator('img')
+
+
+      114 |   test('avatarUrl override wins over the generated face', async ({ page }) => {
+      115 |     await page.goto('/app?scenario=fab-avatar-override');
+    > 116 |     await expect(page.getByRole('button', { name: '总管', exact: true }).locator('img')).toHaveAttribute(
+          |                                                                                        ^
+      117 |       'src',
+      118 |       '/avatar-robot-2.svg',
+      119 |     );
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-fab.spec.ts:116:88
+
+    Error Context: test-results/chief-fab-FAB-icon-follows-6e240-ins-over-the-generated-face/error-context.md
+
+
+[135/179] e2e/chief-fab.spec.ts:122:3 › FAB icon follows the bound agent (#444) › unbound: the static glyph stays, no avatar face
+[136/179] e2e/z-ladder.spec.ts:48:3 › z ladder: active surfaces above the docked drawer (#688) › every probe point of the new-task panel hit-tests inside the panel
+[137/179] e2e/z-ladder.spec.ts:67:3 › z ladder: active surfaces above the docked drawer (#688) › the modal scrim covers the drawer while the dialog is open
+[138/179] e2e/z-ladder.spec.ts:80:3 › z ladder: active surfaces above the docked drawer (#688) › the close button inside the drawer band receives the click
+  28) e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › pages: .page-fab opens the drawer, close returns to the surface 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      120 |     test(`${name}: ${fab} opens the drawer, close returns to the surface`, async ({ page }) => {
+      121 |       await page.goto(route);
+    > 122 |       await expect(page.locator('.chief-drawer')).toHaveCount(0);
+          |                                                   ^
+      123 |
+      124 |       await page.locator(fab).click();
+      125 |       await expect(page.locator('.chief-drawer')).toBeVisible();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/shell-consistency.spec.ts:122:51
+
+    Error Context: test-results/shell-consistency-chief-FA-8bc2b-lose-returns-to-the-surface/error-context.md
+
+
+[139/179] e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › resources: [aria-label="总管"] opens the drawer, close returns to the surface
+  29) e2e/hotkeys.spec.ts:294:1 › editable focus swallows C and ⌘J — the c lands IN the input ──────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      305 |   // surface, and the chord inserts no text of its own
+      306 |   await page.keyboard.press('Meta+j');
+    > 307 |   await expect(drawer(page)).toHaveCount(0);
+          |                              ^
+      308 |   // no preventDefault hijack — the c typed through into the query
+      309 |   await expect(field).toHaveValue('c');
+      310 | });
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:307:30
+
+    Error Context: test-results/hotkeys-editable-focus-swa-78f48--—-the-c-lands-IN-the-input/error-context.md
+
+
+[140/179] e2e/hotkeys.spec.ts:312:1 › textarea focus (chief composer) swallows C
+[141/179] e2e/z-ladder.spec.ts:90:3 › z ladder: active surfaces above the docked drawer (#688) › focus lands in the dialog and typing reaches it
+  30) e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › pages: the main column narrows by 418 while docked and restores on close 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('.page-fab')
+
+
+      199 |       expect(closed!.width).toBeCloseTo(1200, 0);
+      200 |
+    > 201 |       await page.locator(fab).click();
+          |                               ^
+      202 |       await settled(page);
+      203 |       const docked = await drawer(page).boundingBox();
+      204 |       expect(docked!.x).toBeCloseTo(1440 - 418, 0);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:201:31
+
+    Error Context: test-results/chief-panel-chief-panel-do-01645-ocked-and-restores-on-close/error-context.md
+
+
+[142/179] e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › resources: the main column narrows by 418 while docked and restores on close
+  31) e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › resources: the main column narrows by 418 while docked and restores on close 
+
+    Error: locator.click: Error: strict mode violation: locator('[aria-label="总管"]') resolved to 2 elements:
+        1) <button tabindex="0" type="button" aria-label="总管" data-size="icon" data-slot="button" data-variant="ghost" class="group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding text-sm whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-inv…>…</button> aka getByRole('button', { name: '总管' })
+        2) <aside hidden="" id="_r_f_" role="dialog" tabindex="-1" data-closed="" aria-label="总管" data-base-ui-focusable="" class="chief-drawer fixed right-2 bottom-2 z-(--z-floating) flex h-[600px] max-h-[calc(100dvh-1rem)] w-[380px] max-w-[calc(100dvw-1rem)] flex-col overflow-hidden rounded-[12px] bg-(--card) shadow-[var(--edge-ring),var(--floating-shadow)] origin-bottom-right duration-(--dur-overlay) data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 …>…</aside> aka getByText('新主题Nn/a请先为总管选择一个 Agent')
+
+    Call log:
+      - waiting for locator('[aria-label="总管"]')
+
+
+      199 |       expect(closed!.width).toBeCloseTo(1200, 0);
+      200 |
+    > 201 |       await page.locator(fab).click();
+          |                               ^
+      202 |       await settled(page);
+      203 |       const docked = await drawer(page).boundingBox();
+      204 |       expect(docked!.x).toBeCloseTo(1440 - 418, 0);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:201:31
+
+    Error Context: test-results/chief-panel-chief-panel-do-4dd33-ocked-and-restores-on-close/error-context.md
+
+
+[143/179] e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › secondary: the main column narrows by 418 while docked and restores on close
+  32) e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › secondary: the main column narrows by 418 while docked and restores on close 
+
+    Error: expect(received).toBeCloseTo(expected, precision)
+
+    Expected: 1022
+    Received: 1052
+
+    Expected precision:    0
+    Expected difference: < 0.5
+    Received difference:   30
+
+      202 |       await settled(page);
+      203 |       const docked = await drawer(page).boundingBox();
+    > 204 |       expect(docked!.x).toBeCloseTo(1440 - 418, 0);
+          |                         ^
+      205 |       expect(docked!.y).toBeCloseTo(0, 0);
+      206 |       expect(docked!.width).toBeCloseTo(418, 0);
+      207 |       expect(docked!.height).toBeCloseTo(732, 0);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:204:25
+
+    Error Context: test-results/chief-panel-chief-panel-do-c93c1-ocked-and-restores-on-close/error-context.md
+
+
+[144/179] e2e/chief-panel.spec.ts:219:3 › chief panel docked form (#447) › detail: the panel occupies the right-pane slot, mutually exclusive (D7)
+  33) e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › resources: [aria-label="总管"] opens the drawer, close returns to the surface 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      120 |     test(`${name}: ${fab} opens the drawer, close returns to the surface`, async ({ page }) => {
+      121 |       await page.goto(route);
+    > 122 |       await expect(page.locator('.chief-drawer')).toHaveCount(0);
+          |                                                   ^
+      123 |
+      124 |       await page.locator(fab).click();
+      125 |       await expect(page.locator('.chief-drawer')).toBeVisible();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/shell-consistency.spec.ts:122:51
+
+    Error Context: test-results/shell-consistency-chief-FA-0563a-lose-returns-to-the-surface/error-context.md
+
+
+[145/179] e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › secondary: button[aria-label="总管"] opens the drawer, close returns to the surface
+  34) e2e/hotkeys.spec.ts:312:1 › textarea focus (chief composer) swallows C ───────────────────────
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  getByTestId('chief-composer-input')
+    Expected: focused
+    Received: inactive
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeFocused" getByTestId('chief-composer-input') with timeout 5000ms
+      - waiting for getByTestId('chief-composer-input')
+        14 × locator resolved to <textarea readonly data-slot="textarea" placeholder="有什么可以帮你的？" data-testid="chief-composer-input" class="flex w-full border border-input transition-colors outline-none focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 h-[60px] max-h-[120px] min-h-0 resize-none …></textarea>
+           - unexpected value "inactive"
+
+
+      314 |   await pressUntil(page, 'Meta+j', drawer(page));
+      315 |   const composer = page.getByTestId('chief-composer-input');
+    > 316 |   await expect(composer).toBeFocused();
+          |                          ^
+      317 |   // fixture composer is readOnly — focus holds but typing lands nowhere;
+      318 |   // the guard must keep C from opening the dialog behind the drawer
+      319 |   await page.keyboard.press('c');
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:316:26
+
+    Error Context: test-results/hotkeys-textarea-focus-chief-composer-swallows-C/error-context.md
+
+
+[146/179] e2e/hotkeys.spec.ts:326:1 › Space on a focused button activates it natively; ⌘J fires past button focus
+  35) e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › secondary: button[aria-label="总管"] opens the drawer, close returns to the surface 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      120 |     test(`${name}: ${fab} opens the drawer, close returns to the surface`, async ({ page }) => {
+      121 |       await page.goto(route);
+    > 122 |       await expect(page.locator('.chief-drawer')).toHaveCount(0);
+          |                                                   ^
+      123 |
+      124 |       await page.locator(fab).click();
+      125 |       await expect(page.locator('.chief-drawer')).toBeVisible();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/shell-consistency.spec.ts:122:51
+
+    Error Context: test-results/shell-consistency-chief-FA-fb3d6-lose-returns-to-the-surface/error-context.md
+
+
+[147/179] e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › detail: .detail-fab opens the drawer, close returns to the surface
+  36) e2e/hotkeys.spec.ts:326:1 › Space on a focused button activates it natively; ⌘J fires past button focus 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      344 |   await page.keyboard.press('Space');
+      345 |   await expect(page.getByRole('dialog', { name: '搜索' })).toBeVisible();
+    > 346 |   await expect(drawer(page)).toHaveCount(0);
+          |                              ^
+      347 |
+      348 |   // Close the panel (its input holds focus — editable would swallow the
+      349 |   // chord) and refocus the button row: ⌘J's guard is editable-only, so it
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:346:30
+
+    Error Context: test-results/hotkeys-Space-on-a-focused-1a883--⌘J-fires-past-button-focus/error-context.md
+
+
+[148/179] e2e/hotkeys.spec.ts:361:1 › ⌘J toggles: the second press closes the drawer from its own composer focus
+  37) e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › detail: .detail-fab opens the drawer, close returns to the surface 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      120 |     test(`${name}: ${fab} opens the drawer, close returns to the surface`, async ({ page }) => {
+      121 |       await page.goto(route);
+    > 122 |       await expect(page.locator('.chief-drawer')).toHaveCount(0);
+          |                                                   ^
+      123 |
+      124 |       await page.locator(fab).click();
+      125 |       await expect(page.locator('.chief-drawer')).toBeVisible();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/shell-consistency.spec.ts:122:51
+
+    Error Context: test-results/shell-consistency-chief-FA-7be33-lose-returns-to-the-surface/error-context.md
+
+
+[149/179] e2e/shell-consistency.spec.ts:141:3 › sidebar form is route-invariant › expanded sidebar keeps identical geometry across /app ↔ /app/team ↔ resources hops
+[150/179] e2e/shell-consistency.spec.ts:161:3 › sidebar form is route-invariant › the brand head holds its inner geometry across the /app → /app/team hop
+  38) e2e/hotkeys.spec.ts:361:1 › ⌘J toggles: the second press closes the drawer from its own composer focus 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  getByTestId('chief-composer-input')
+    Expected: focused
+    Received: inactive
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeFocused" getByTestId('chief-composer-input') with timeout 5000ms
+      - waiting for getByTestId('chief-composer-input')
+        14 × locator resolved to <textarea readonly data-slot="textarea" placeholder="有什么可以帮你的？" data-testid="chief-composer-input" class="flex w-full border border-input transition-colors outline-none focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 h-[60px] max-h-[120px] min-h-0 resize-none …></textarea>
+           - unexpected value "inactive"
+
+
+      365 |   await expect(page.getByRole('complementary')).toBeVisible();
+      366 |   await pressUntil(page, 'Meta+j', drawer(page));
+    > 367 |   await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+          |                                                          ^
+      368 |   // The drawer-interior exemption law (#468): the composer is an editable
+      369 |   // target, but the chord that owns this surface must close it — without
+      370 |   // the exemption the editable guard swallows the closing press and this
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:367:58
+
+    Error Context: test-results/hotkeys-⌘J-toggles-the-sec-a556b-from-its-own-composer-focus/error-context.md
+
+
+[151/179] e2e/shell-consistency.spec.ts:177:3 › sidebar form is route-invariant › collapsed rail survives route hops (storage-backed on every shell)
+[152/179] e2e/hotkeys.spec.ts:381:1 › ⌘J toggle rides the non-board singleton hook too (schedules)
+[153/179] e2e/shell-consistency.spec.ts:194:3 › sidebar form is route-invariant › the collapse toggle works off-board and the state rides back
+[154/179] e2e/shell-consistency.spec.ts:213:1 › team route carries no subscription surface
+[155/179] e2e/shell-consistency.spec.ts:223:3 › theme default follows the system › no storage + system light boots light
+[156/179] e2e/shell-consistency.spec.ts:229:3 › theme default follows the system › no storage + system dark boots dark
+[157/179] e2e/shell-consistency.spec.ts:235:3 › theme default follows the system › a stored theme beats the system scheme
+  39) e2e/hotkeys.spec.ts:381:1 › ⌘J toggle rides the non-board singleton hook too (schedules) ─────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      384 |   await pressUntil(page, 'Meta+j', drawer(page));
+      385 |   await toggleUntilHidden(page, drawer(page));
+    > 386 |   await expect(drawer(page)).toHaveCount(0);
+          |                              ^
+      387 |   await expect(page).toHaveURL(/\/app\/schedules/);
+      388 | });
+      389 |
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:386:30
+
+    Error Context: test-results/hotkeys-⌘J-toggle-rides-th-0bf99-ngleton-hook-too-schedules-/error-context.md
+
+
+[158/179] e2e/hotkeys.spec.ts:390:1 › FAB click stays open-only; ⌘J closes what the click opened
+  40) e2e/hotkeys.spec.ts:390:1 › FAB click stays open-only; ⌘J closes what the click opened ───────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      400 |   // drawer-interior guard exemption lets ⌘J fire from there.
+      401 |   await toggleUntilHidden(page, drawer(page));
+    > 402 |   await expect(drawer(page)).toHaveCount(0);
+          |                              ^
+      403 | });
+      404 |
+      405 | test('the robot FAB surfaces the ⌘J hint on hover; at rest it stays hidden', async ({
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:402:30
+
+    Error Context: test-results/hotkeys-FAB-click-stays-op-e96bb-loses-what-the-click-opened/error-context.md
+
+
+[159/179] e2e/hotkeys.spec.ts:405:1 › the robot FAB surfaces the ⌘J hint on hover; at rest it stays hidden
+[160/179] e2e/hotkeys.spec.ts:419:1 › a wake-family FAB carries the same ⌘J hint (shared consumption point)
+[161/179] e2e/hotkeys.spec.ts:431:1 › the collapsed rail search icon hovers the ⌘K hint
+[162/179] e2e/hotkeys.spec.ts:443:1 › the drawer new-thread + hovers the N hint and advertises aria-keyshortcuts
+[163/179] e2e/hotkeys.spec.ts:460:1 › with the drawer closed, N stays retired — neither drawer nor dialog opens
+  41) e2e/chief-panel.spec.ts:219:3 › chief panel docked form (#447) › detail: the panel occupies the right-pane slot, mutually exclusive (D7) 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for locator('.detail-fab')
+
+
+      223 |     await expect(page.locator('.detail-right')).toBeVisible();
+      224 |
+    > 225 |     await page.locator('.detail-fab').click();
+          |                                       ^
+      226 |     await settled(page);
+      227 |     await expect(page.locator('.detail-right')).toHaveCount(0);
+      228 |     const box = await drawer(page).boundingBox();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:225:39
+
+    Error Context: test-results/chief-panel-chief-panel-do-48371-slot-mutually-exclusive-D7-/error-context.md
+
+
+[164/179] e2e/chief-panel.spec.ts:246:3 › chief panel docked form (#447) › hero examples: the four canon prompt cards, inert on the fixture face
+[165/179] e2e/chief-panel.spec.ts:267:3 › chief panel docked form (#447) › composer keeps one fixed size whether or not a draft is restored (XMON-102)
+[166/179] e2e/chief-panel.spec.ts:300:3 › chief panel docked form (#447) › composer placeholder switches to the steer canon while a turn runs (#624)
+[167/179] e2e/chief-panel.spec.ts:320:3 › chief panel docked form (#447) › the open state does not persist across a reload (D9)
+  42) e2e/hotkeys.spec.ts:460:1 › with the drawer closed, N stays retired — neither drawer nor dialog opens 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      147 |     await page.keyboard.press(key);
+      148 |     await page.waitForTimeout(120);
+    > 149 |     await expect(surface).toHaveCount(0);
+          |                           ^
+      150 |   }
+      151 | }
+      152 |
+        at pressesStayClosed (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:149:27)
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/hotkeys.spec.ts:468:3
+
+    Error Context: test-results/hotkeys-with-the-drawer-cl-6fc7f-her-drawer-nor-dialog-opens/error-context.md
+
+
+[168/179] e2e/hotkeys.spec.ts:505:1 › ⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, dialog closes)
+[169/179] e2e/hotkeys.spec.ts:524:1 › with the dialog closed, ⌘↵ on the board lands nothing
+[170/179] e2e/hotkeys.spec.ts:540:1 › ⌘↵ with an empty spec creates nothing (the button gate holds on the chord)
+[171/179] e2e/hotkeys.spec.ts:555:1 › ⌘↵ under the 未保存闸 confirm layer saves nothing (the layer owns the screen)
+  43) e2e/chief-panel.spec.ts:320:3 › chief panel docked form (#447) › the open state does not persist across a reload (D9) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chief-drawer')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.chief-drawer') with timeout 5000ms
+      - waiting for locator('.chief-drawer')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      320 |   test('the open state does not persist across a reload (D9)', async ({ page }) => {
+      321 |     await page.goto('/app?scenario=01');
+    > 322 |     await expect(drawer(page)).toHaveCount(0);
+          |                                ^
+      323 |     // #950: FAB 载体 = role + aria-label（.chief-fab 类退役；resources 家族
+      324 |     // #944 同款一级载体）。
+      325 |     await page.getByRole('button', { name: '总管', exact: true }).click();
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0239-1-l6-chief-1009/apps/web/e2e/chief-panel.spec.ts:322:32
+
+    Error Context: test-results/chief-panel-chief-panel-do-4d00a-persist-across-a-reload-D9-/error-context.md
+
+
+[172/179] e2e/hotkeys.spec.ts:579:1 › plain ↵ in the spec textarea stays the newline key — no hijack
+[173/179] e2e/hotkeys.spec.ts:591:1 › the 保存并开始 button carries a visible ⌘↵ badge at rest
+[174/179] e2e/hotkeys.spec.ts:602:1 › Tab cycles the dialog’s project chip from the composer focus
+[175/179] e2e/hotkeys.spec.ts:629:1 › the chip cycles on Tab while the list is open; Shift+Tab keeps native movement
+[176/179] e2e/hotkeys.spec.ts:660:1 › Tab off the driving seats stays native (mention button keeps its own walk)
+[177/179] e2e/hotkeys.spec.ts:679:1 › the project chip hovers its Tab hint (hidden at rest)
+[178/179] e2e/hotkeys.spec.ts:692:1 › Tab cycles nothing while the 未保存闸 confirm layer is up (that layer owns the keyboard)
+[179/179] e2e/hotkeys.spec.ts:720:1 › with the dialog closed Tab stays native
+  43 failed
+    e2e/board-docked-reflow.spec.ts:68:3 › board reflow under the docked chief drawer (#692) › docked columns hold the 280px floor and the first column is whole 
+    e2e/board-docked-reflow.spec.ts:85:3 › board reflow under the docked chief drawer (#692) › the clipped next column peeks >=16px at the scroll edge 
+    e2e/board-docked-reflow.spec.ts:100:3 › board reflow under the docked chief drawer (#692) › overflow is reachable: wheel scrolls and the last column lands whole 
+    e2e/board-docked-reflow.spec.ts:124:3 › board reflow under the docked chief drawer (#692) › overflow discloses itself: the scroller no longer hides its scrollbar 
+    e2e/board-docked-reflow.spec.ts:135:3 › board reflow under the docked chief drawer (#692) › cards keep their resting width while docked 
+    e2e/board-docked-reflow.spec.ts:154:3 › board reflow under the docked chief drawer (#692) › worst-case data holds: long title wraps in-column, 120-count header fits, empty column survives 
+    e2e/board-docked-reflow.spec.ts:189:3 › board reflow under the docked chief drawer (#692) › narrowest usable viewport (1024) docked: floor holds and the page itself never scrolls 
+    e2e/board-docked-reflow.spec.ts:209:3 › board reflow under the docked chief drawer (#692) › RTL mirror: the first column stays whole at the scroll-start edge 
+    e2e/board-zoom-fit.spec.ts:109:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › floor follows data-chief-open live: ⌘J re-arms 280 with scroll, Escape restores the fit 
+    e2e/chief-drawer-model.spec.ts:326:3 › chief drawer model row (#615) › closing the drawer (⌘J) recycles the model popover with it (#773) 
+    e2e/chief-fab.spec.ts:30:3 › detail FAB renders only with unread (#443) › unread > 0: the FAB renders with the badge value 
+    e2e/chief-fab.spec.ts:37:3 › detail FAB renders only with unread (#443) › the gated FAB keeps the family geometry (48×48, pane offset, composer 让位) 
+    e2e/chief-fab.spec.ts:79:3 › FAB icon follows the bound agent (#444) › bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay 
+    e2e/chief-fab.spec.ts:102:3 › FAB icon follows the bound agent (#444) › bound: a ChiefWake family swaps at the shared consumption point 
+    e2e/chief-fab.spec.ts:114:3 › FAB icon follows the bound agent (#444) › avatarUrl override wins over the generated face 
+    e2e/chief-panel.spec.ts:53:3 › chief panel docked form (#447) › Esc closes the drawer on the board route 
+    e2e/chief-panel.spec.ts:61:3 › chief panel docked form (#447) › Esc closes the drawer on a wake surface 
+    e2e/chief-panel.spec.ts:72:3 › chief panel docked form (#447) › Esc layers: the open thread switcher closes first, the drawer second 
+    e2e/chief-panel.spec.ts:100:3 › chief panel docked form (#447) › the panel docks flush right as a full-height 418 column (board) 
+    e2e/chief-panel.spec.ts:135:3 › chief panel docked form (#447) › board content yields to the panel and the columns keep the D8 guard 
+    e2e/chief-panel.spec.ts:157:3 › chief panel docked form (#447) › closing restores the board grid to its resting geometry 
+    e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › pages: the main column narrows by 418 while docked and restores on close 
+    e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › resources: the main column narrows by 418 while docked and restores on close 
+    e2e/chief-panel.spec.ts:190:5 › chief panel docked form (#447) › secondary: the main column narrows by 418 while docked and restores on close 
+    e2e/chief-panel.spec.ts:219:3 › chief panel docked form (#447) › detail: the panel occupies the right-pane slot, mutually exclusive (D7) 
+    e2e/chief-panel.spec.ts:320:3 › chief panel docked form (#447) › the open state does not persist across a reload (D9) 
+    e2e/chief-stream-markdown.spec.ts:543:3 › chief drawer 流式面（live mock，#651） › F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏 
+    e2e/chief-stream-markdown.spec.ts:718:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效 
+    e2e/detail-3pane.spec.ts:187:1 › composer width tracks the center column across both pane states (488 pane / 418 chief dock) 
+    e2e/hotkeys.spec.ts:245:1 › Space no longer opens the drawer; ⌘J does, composer focused, default consumed 
+    e2e/hotkeys.spec.ts:284:1 › ⌘J wakes the chief drawer on a non-board route ─────────────────────
+    e2e/hotkeys.spec.ts:294:1 › editable focus swallows C and ⌘J — the c lands IN the input ────────
+    e2e/hotkeys.spec.ts:312:1 › textarea focus (chief composer) swallows C ─────────────────────────
+    e2e/hotkeys.spec.ts:326:1 › Space on a focused button activates it natively; ⌘J fires past button focus 
+    e2e/hotkeys.spec.ts:361:1 › ⌘J toggles: the second press closes the drawer from its own composer focus 
+    e2e/hotkeys.spec.ts:381:1 › ⌘J toggle rides the non-board singleton hook too (schedules) ───────
+    e2e/hotkeys.spec.ts:390:1 › FAB click stays open-only; ⌘J closes what the click opened ─────────
+    e2e/hotkeys.spec.ts:460:1 › with the drawer closed, N stays retired — neither drawer nor dialog opens 
+    e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › board: [aria-label="总管"] opens the drawer, close returns to the surface 
+    e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › pages: .page-fab opens the drawer, close returns to the surface 
+    e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › resources: [aria-label="总管"] opens the drawer, close returns to the surface 
+    e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › secondary: button[aria-label="总管"] opens the drawer, close returns to the surface 
+    e2e/shell-consistency.spec.ts:120:5 › chief FAB wakes on every shell family › detail: .detail-fab opens the drawer, close returns to the surface 
+  136 passed (1.8m)

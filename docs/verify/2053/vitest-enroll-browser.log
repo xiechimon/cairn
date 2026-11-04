@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /workspace/.claude/worktrees/cn-2149-tailscale-confirm-f5e1/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  05:10:40
+   Duration  1.87s (transform 63%, import 33%, tests 4%)
+

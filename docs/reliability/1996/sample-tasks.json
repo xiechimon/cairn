@@ -1,0 +1,98 @@
+{
+  "repo": "xiechimon/cairn-sample-ufo",
+  "upstream": "unjs/ufo",
+  "baseTag": "v1.6.4",
+  "baseSha": "f06c800d0c59f2a4a1b9ba65eb6cb61a84419be6",
+  "tasks": [
+    {
+      "id": "ufo-01",
+      "kind": "feature",
+      "title": "Add a way to remove keys from a URL's query string",
+      "body": "`withQuery` adds or replaces query keys, and `filterQuery` can remove keys with a predicate, but there is no simple helper to drop a known list of keys. I keep writing `filterQuery(url, (key) => !['b', 'c'].includes(key))` for what is really a removal. Please add something like `withoutQuery(input, ...keys)` that removes the listed keys and leaves everything else (path, other keys, hash) untouched, for example `withoutQuery('/list?page=2&tab=all#x', 'tab') === '/list?page=2#x'`. Removing every key should drop the `?` entirely."
+    },
+    {
+      "id": "ufo-02",
+      "kind": "feature",
+      "title": "Option to sort keys in stringifyQuery for stable output",
+      "body": "`stringifyQuery({ b: 2, a: 1 })` returns `b=2&a=1`, following object insertion order. For cache keys and snapshot tests the key order must be deterministic no matter how the object was built. Please add an option such as `stringifyQuery(query, { sortKeys: true })` that emits keys in alphabetical order (keeping repeated array keys together), while the default behavior stays exactly as it is."
+    },
+    {
+      "id": "ufo-03",
+      "kind": "feature",
+      "title": "Let isEqual ignore the query string",
+      "body": "`isEqual` is great for comparing paths, but I also need to check that two URLs point at the same page regardless of query parameters (tracking params, pagination). Today `isEqual('/list?page=1', '/list?page=2')` is false. Please add an option so `isEqual('/list?page=1', '/list?page=2', { ignoreSearch: true })` is true, while path and hash still have to match. The default comparison must stay unchanged."
+    },
+    {
+      "id": "ufo-04",
+      "kind": "feature",
+      "title": "Date values in a query object serialize as a JSON-quoted string",
+      "body": "Passing a `Date` to `stringifyQuery` or `withQuery` produces a JSON-quoted value: `stringifyQuery({ since: new Date(Date.UTC(2026, 0, 1)) })` returns `since=%222026-01-01T00%3A00%3A00.000Z%22`, and parsing it back yields the string `\"2026-01-01T00:00:00.000Z\"` complete with literal quote characters. Dates should serialize as their ISO 8601 string without JSON quotes, so the round trip returns `2026-01-01T00:00:00.000Z`."
+    },
+    {
+      "id": "ufo-05",
+      "kind": "feature",
+      "title": "normalizeURL keeps the default port",
+      "body": "`normalizeURL('https://example.com:443/foo')` returns `https://example.com:443/foo`. The port matches the scheme default, so it is redundant; the native `URL` class drops it (`new URL('https://example.com:443/foo').href` is `https://example.com/foo`). Please make `normalizeURL` strip default ports, at least `http:80` and `https:443`, while keeping custom ports: `normalizeURL('http://example.com:8080/')` should stay `http://example.com:8080/`."
+    },
+    {
+      "id": "ufo-06",
+      "kind": "feature",
+      "title": "Opt-in support for bracket array syntax in parseQuery",
+      "body": "Many backends send arrays as repeated bracket keys: `?tags[]=a&tags[]=b`. `parseQuery` currently returns `{ 'tags[]': ['a', 'b'] }` with the brackets as part of the key. Please add an opt-in option such as `parseQuery(input, { bracketArrays: true })` (and the matching behavior in `getQuery`) that reads `tags[]` as the key `tags` with value `['a', 'b']`. The default must stay unchanged, because `a[]` is a legal literal key today."
+    },
+    {
+      "id": "ufo-07",
+      "kind": "bug",
+      "title": "parseHost breaks on IPv6 addresses",
+      "body": "`parseHost('[::1]:3000')` returns `{ hostname: '[', port: undefined }`; the colons inside the brackets confuse the split. Expected `{ hostname: '[::1]', port: '3000' }`, and `parseHost('[::1]')` should return `{ hostname: '[::1]', port: undefined }`. `parseURL` already keeps the bracketed form in `parsed.host` (`parseURL('http://[::1]:3000/a').host` is `'[::1]:3000'`), so only `parseHost` needs fixing."
+    },
+    {
+      "id": "ufo-08",
+      "kind": "bug",
+      "title": "parseAuth truncates passwords that contain a colon",
+      "body": "Passwords may legally contain `:`. `parseAuth('user:pa:ss')` returns `{ username: 'user', password: 'pa' }`; everything after the second colon is dropped. It should return `{ username: 'user', password: 'pa:ss' }` by splitting on the first colon only. Usernames cannot contain `:`, so the first colon is always the separator."
+    },
+    {
+      "id": "ufo-09",
+      "kind": "bug",
+      "title": "isRelative('..') is false",
+      "body": "`..` is a valid relative path segment (the parent directory), but `isRelative('..')` returns `false` while `isRelative('../foo')` returns `true`. The implementation only looks for the `./` and `../` prefixes. Expected: `isRelative('..') === true`."
+    },
+    {
+      "id": "ufo-10",
+      "kind": "bug",
+      "title": "normalizeURL does not lowercase the host",
+      "body": "Hosts are case-insensitive and browsers send them lowercase (`new URL('HTTP://EXAMPLE.com/Foo').host` is `example.com`). `normalizeURL` lowercases the scheme but keeps the host as typed: `normalizeURL('http://EXAMPLE.com/Foo')` returns `http://EXAMPLE.com/Foo`, so two spellings of the same URL never compare equal after normalization. Expected `http://example.com/Foo`; the path must stay case-sensitive."
+    },
+    {
+      "id": "ufo-11",
+      "kind": "bug",
+      "title": "withFragment double-encodes a fragment that starts with '#'",
+      "body": "Passing a fragment that already includes the `#` produces two hashes: `withFragment('/docs', '#intro')` returns `/docs##intro`, and `parseURL('/docs##intro')` then reports `hash: '##intro'`, so the value does not round trip. Expected `/docs#intro`. A bare `#` or `''` should keep clearing the fragment as it does today."
+    },
+    {
+      "id": "ufo-12",
+      "kind": "test",
+      "title": "parseAuth has no tests",
+      "body": "`parseAuth` is exported and documented, but no test suite covers it. Please add one describing: the empty string, a username with no password (`'user:'`), encoded characters (`parseAuth('user:p%40ss')` must decode the password to `p@ss`), unicode values, and the normal `'user:pass'` case."
+    },
+    {
+      "id": "ufo-13",
+      "kind": "test",
+      "title": "The prototype-pollution guard in parseQuery is untested",
+      "body": "The `parseQuery` docs say `__proto__` and `constructor` keys are ignored to prevent prototype pollution, but no test exercises that guard. Please add tests that `parseQuery('?__proto__=evil&constructor=evil&safe=1')` equals `{ safe: '1' }`, that `Object.prototype` is not modified afterwards, and that a plain `toString` key still parses normally."
+    },
+    {
+      "id": "ufo-14",
+      "kind": "docs",
+      "title": "Document the base-boundary rules of withBase and withoutBase",
+      "body": "The behavior around prefix boundaries is surprising and currently only visible by reading tests: `withBase('/admin-dashboard', '/admin')` prepends the base (returns `/admin/admin-dashboard`), while `withBase('/admin/dashboard', '/admin')` does not. `withoutBase` also collapses leading slashes, so `withoutBase('/legacy//evil.com', '/legacy')` returns `/evil.com` as a protocol-relative injection guard. Please document these rules with examples in the JSDoc of `withBase` and `withoutBase` and regenerate the generated README section."
+    },
+    {
+      "id": "ufo-15",
+      "kind": "docs",
+      "title": "Add a migration note for the deprecated $URL class",
+      "body": "`$URL` and `createURL` are marked deprecated in favor of `parseURL` and the native `URL`, but there is no migration guidance anywhere. Please add a short README section that maps each `$URL` member (`hostname`, `port`, `username`, `password`, `search`, `searchParams`, `origin`, `href`, `append`) to its `parseURL` / native `URL` equivalent with a small code example."
+    }
+  ]
+}

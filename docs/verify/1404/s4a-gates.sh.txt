@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Run the five repo gates in the worktree and log each with its exit code. Usage: gates.sh <worktree> <log>
+cd "$1" || exit 2
+LOG=$2
+: > "$LOG"
+echo "# head $(git rev-parse HEAD) on $(git branch --show-current), origin/main $(git rev-parse origin/main), $(date -u +%FT%TZ)" >> "$LOG"
+run() {
+  echo "\$ $*" >> "$LOG"
+  local out; out=$(mktemp)
+  env "$@" > "$out" 2>&1
+  local rc=$?
+  tail -n 25 "$out" | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g; s/\x1b\]8;;[^\x1b]*\x1b\\//g' >> "$LOG"
+  echo "exit $rc" >> "$LOG"
+  echo >> "$LOG"
+  rm -f "$out"
+}
+run pnpm lint
+run pnpm typecheck
+run pnpm spec:parse
+run pnpm exec vitest run --changed origin/main
+run E2E_AFFECTED_PORT=8406 pnpm --filter @pacman/web e2e:affected

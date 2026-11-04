@@ -1,0 +1,1273 @@
+{
+  "meta": {
+    "tool": "probe-dump",
+    "ticket": 921,
+    "date": "2026-10-06T00:00:23.318Z",
+    "commit": "ffe9e34e",
+    "port": 8401,
+    "specs": [
+      "overlay-focus",
+      "mention-picker-center",
+      "attachment-strip",
+      "attachment-title",
+      "dead-buttons",
+      "newtask-machine-persist",
+      "newtask-machine-pin",
+      "newtask-project-persist",
+      "newtask-project-select",
+      "newtask-single-field",
+      "z-ladder",
+      "escape-wiring",
+      "agent-delete"
+    ],
+    "specCount": 14,
+    "playwrightVersion": "1.63.0",
+    "workers": "4",
+    "testsPassed": 84,
+    "testsFailed": 0
+  },
+  "coverage": {
+    "styleOccurrences": 1,
+    "boxSites": 4,
+    "cssSites": 4,
+    "evaluateProbeSites": 4,
+    "assertionSites": 49,
+    "collectedStyle": 6,
+    "collectedBox": 4,
+    "collectedWait": 0,
+    "collectedCss": 4,
+    "collectedStyleSites": 4,
+    "collectedBoxSites": 4,
+    "collectedCssSites": 4,
+    "assertionRecords": 70,
+    "joinedAssertionSites": 49
+  },
+  "probeSites": [
+    {
+      "file": "agent-delete.spec.ts",
+      "line": 48,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "agent-delete.spec.ts",
+      "line": 49,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 298,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 316,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 509,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 510,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "mention-picker-center.spec.ts",
+      "line": 21,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "mention-picker-center.spec.ts",
+      "line": 22,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 20,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 23,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 126,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "z-ladder.spec.ts",
+      "line": 50,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "z-ladder.spec.ts",
+      "line": 69,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    }
+  ],
+  "probeValues": [
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "attachment-strip.spec.ts",
+      "l": 298,
+      "loc": "internal:testid=[data-testid=\"composer-float\"s] >> internal:role=status[name=\"附件\"i] >> internal:testid=[data-testid=\"attachment-pending\"s]",
+      "v": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      },
+      "tt": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "attachment-strip.spec.ts",
+      "l": 316,
+      "loc": "internal:testid=[data-testid=\"composer-float\"s] >> internal:role=status[name=\"附件\"i] >> internal:role=button[name=\"pasted-image-1.png\"i]",
+      "v": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      },
+      "tt": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "mention-picker-center.spec.ts",
+      "l": 22,
+      "loc": "internal:role=dialog[name=\"提及\"i]",
+      "v": {
+        "x": 520,
+        "width": 400
+      },
+      "tt": "mention picker stays centered in the production bundle (#448)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "overlay-focus.spec.ts",
+      "l": 20,
+      "v": {
+        "cls": "group/button border border-transparent bg-clip-padding whitespace-nowrap transition-[color,background-color,border-color,filter] duration-150 select-none disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 aria-expanded:bg-muted aria-expanded:text-foreground px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 sidebar-row sidebar-new-task relative flex w-full flex-none items-center text-left text-[13px] leading-4 text-muted-foreground no-underline outline-none before:absolute before:inset-x-2 before:inset-y-[2px] before:rounded-none before:content-[\"\"] focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 [&>span:not(.sidebar-kbd):not(.sidebar-online-dot)]:relative hover:before:bg-sidebar-hover justify-start gap-0 rounded-none border-none pr-0 font-normal hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 h-9 cursor-pointer pl-[18px]",
+        "style": "solid",
+        "width": "2px",
+        "color": "rgb(216, 156, 252)",
+        "focusVisible": true
+      },
+      "tt": "click + key on 新建任务/topbar buttons: never the UA blue box"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "dead-buttons.spec.ts",
+      "l": 509,
+      "loc": "internal:role=dialog[name=\"新建任务\"i] >> internal:testid=[data-testid=\"new-task-head\"s]",
+      "v": {
+        "x": 384,
+        "y": 146.5,
+        "width": 672,
+        "height": 44
+      },
+      "tt": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "dead-buttons.spec.ts",
+      "l": 510,
+      "loc": "internal:role=dialog[name=\"新建任务\"i] >> internal:role=button[name=\"关闭\"i]",
+      "v": {
+        "x": 1024,
+        "y": 154,
+        "width": 28,
+        "height": 28
+      },
+      "tt": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "overlay-focus.spec.ts",
+      "l": 20,
+      "v": {
+        "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding text-sm whitespace-nowrap transition-[color,background-color,border-color,filter] duration-150 select-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 page-new-action h-auto rounded-none font-normal active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto",
+        "style": "solid",
+        "width": "2px",
+        "color": "rgb(216, 156, 252)",
+        "focusVisible": true
+      },
+      "tt": "click + key on 新建任务/topbar buttons: never the UA blue box"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "overlay-focus.spec.ts",
+      "l": 20,
+      "v": {
+        "cls": "group/button border border-transparent bg-clip-padding whitespace-nowrap transition-[color,background-color,border-color,filter] duration-150 select-none disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 aria-expanded:bg-muted aria-expanded:text-foreground px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 sidebar-row sidebar-new-task relative flex w-full flex-none items-center text-left text-[13px] leading-4 text-muted-foreground no-underline outline-none before:absolute before:inset-x-2 before:inset-y-[2px] before:rounded-none before:content-[\"\"] focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 [&>span:not(.sidebar-kbd):not(.sidebar-online-dot)]:relative hover:before:bg-sidebar-hover justify-start gap-0 rounded-none border-none pr-0 font-normal hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 h-9 cursor-pointer pl-[18px]",
+        "style": "solid",
+        "width": "2px",
+        "color": "rgb(216, 156, 252)",
+        "focusVisible": true
+      },
+      "tt": "Tab focus keeps the brand ring (keyboard reachability preserved)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "z-ladder.spec.ts",
+      "l": 50,
+      "loc": "internal:role=dialog[name=\"新建任务\"i]",
+      "v": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "tt": "every probe point of the new-task panel hit-tests inside the panel"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "z-ladder.spec.ts",
+      "l": 69,
+      "v": "dialog-overlay",
+      "tt": "the modal scrim covers the drawer while the dialog is open"
+    }
+  ],
+  "assertions": [
+    {
+      "file": "agent-delete.spec.ts",
+      "line": 48,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('font-size', '14px');",
+      "testTitle": "概览页脚有删除入口，点开二次确认（canon 原文逐字）",
+      "old": "font-size: 14px",
+      "new": "14px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "font-size",
+        "14px"
+      ],
+      "rawNew": "14px"
+    },
+    {
+      "file": "agent-delete.spec.ts",
+      "line": 49,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('line-height', '20px');",
+      "testTitle": "概览页脚有删除入口，点开二次确认（canon 原文逐字）",
+      "old": "line-height: 20px",
+      "new": "20px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "line-height",
+        "20px"
+      ],
+      "rawNew": "20px"
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 296,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(CARD_W);",
+      "testTitle": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move",
+      "old": "120",
+      "new": "{\"x\":257,\"y\":543,\"width\":124,\"height\":84}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        120
+      ],
+      "rawNew": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 302,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move",
+      "old": "1",
+      "new": "{\"x\":257,\"y\":543,\"width\":124,\"height\":84}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 304,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move",
+      "old": "1",
+      "new": "{\"x\":257,\"y\":543,\"width\":124,\"height\":84}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 315,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(CARD_W);",
+      "testTitle": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move",
+      "old": "120",
+      "new": "{\"x\":257,\"y\":543,\"width\":124,\"height\":84}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        120
+      ],
+      "rawNew": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 317,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(afterBox).toEqual(beforeBox);",
+      "testTitle": "detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move",
+      "old": "{\"x\":257,\"y\":543,\"width\":124,\"height\":84}",
+      "new": "{\"x\":257,\"y\":543,\"width\":124,\"height\":84}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "x": 257,
+          "y": 543,
+          "width": 124,
+          "height": 84
+        }
+      ],
+      "rawNew": {
+        "x": 257,
+        "y": 543,
+        "width": 124,
+        "height": 84
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 330,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "detail face: clicking the settled chip opens the image preview; Esc closes it",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 332,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "detail face: clicking the settled chip opens the image preview; Esc closes it",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 345,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(",
+      "testTitle": "detail face: clicking the settled chip opens the image preview; Esc closes it",
+      "old": "120",
+      "new": "{\"__fn\":\"() => view.evaluate(el => el.naturalWidth)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        120
+      ],
+      "rawNew": {
+        "__fn": "() => view.evaluate(el => el.naturalWidth)"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 374,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(",
+      "testTitle": "detail face: clicking the in-flight placeholder previews the local bytes",
+      "old": "120",
+      "new": "{\"__fn\":\"() => view.evaluate(el => el.naturalWidth)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        120
+      ],
+      "rawNew": {
+        "__fn": "() => view.evaluate(el => el.naturalWidth)"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 379,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(true);",
+      "testTitle": "detail face: clicking the in-flight placeholder previews the local bytes",
+      "old": "true",
+      "new": "{\"__fn\":\"() => view.evaluate(el => el.src.startsWith('blob:'))\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => view.evaluate(el => el.src.startsWith('blob:'))"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 385,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "detail face: clicking the in-flight placeholder previews the local bytes",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 415,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => held.length).toBe(1);",
+      "testTitle": "detail face: a failed upload clears the placeholder, toasts, keeps the draft",
+      "old": "1",
+      "new": "{\"__fn\":\"() => held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 457,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "new-task face: placeholder → settled chip → preview",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 459,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "new-task face: placeholder → settled chip → preview",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 469,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(",
+      "testTitle": "new-task face: placeholder → settled chip → preview",
+      "old": "120",
+      "new": "{\"__fn\":\"() => view.evaluate(el => el.naturalWidth)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        120
+      ],
+      "rawNew": {
+        "__fn": "() => view.evaluate(el => el.naturalWidth)"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 531,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "chief face: placeholder → settled chip → preview",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 533,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "chief face: placeholder → settled chip → preview",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "attachment-strip.spec.ts",
+      "line": 543,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(",
+      "testTitle": "chief face: placeholder → settled chip → preview",
+      "old": "120",
+      "new": "{\"__fn\":\"() => view.evaluate(el => el.naturalWidth)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        120
+      ],
+      "rawNew": {
+        "__fn": "() => view.evaluate(el => el.naturalWidth)"
+      }
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 124,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');",
+      "testTitle": "project files pane: no export button, static branch chip, wired 文件|历史 segment",
+      "old": "SPAN",
+      "new": "SPAN",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "SPAN"
+      ],
+      "rawNew": "SPAN"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 516,
+      "matcher": "toBeLessThan",
+      "negated": false,
+      "source": "expect(Math.abs(hb.x + hb.width - (cb.x + cb.width) - 4)).toBeLessThan(1.5);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "< 1.5",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1.5
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 517,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(cb.width).toBeCloseTo(28, 0);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "28 ±0.5",
+      "new": "28",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        28,
+        0
+      ],
+      "rawNew": 28
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 518,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(cb.height).toBeCloseTo(28, 0);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "28 ±0.5",
+      "new": "28",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        28,
+        0
+      ],
+      "rawNew": 28
+    },
+    {
+      "file": "escape-wiring.spec.ts",
+      "line": 89,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(await readEscapeTap(page)).toEqual({",
+      "testTitle": "开着的层不被重渲染重挂 Escape 接线：URL 写回后单次 Escape 仍收层",
+      "old": "{\"winAdds\":0,\"winRems\":0,\"docAdds\":0,\"docRems\":0}",
+      "new": "{\"winAdds\":0,\"winRems\":0,\"docAdds\":0,\"docRems\":0}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "winAdds": 0,
+          "winRems": 0,
+          "docAdds": 0,
+          "docRems": 0
+        }
+      ],
+      "rawNew": {
+        "winAdds": 0,
+        "winRems": 0,
+        "docAdds": 0,
+        "docRems": 0
+      }
+    },
+    {
+      "file": "escape-wiring.spec.ts",
+      "line": 157,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect({ winAdds: tap.winAdds, winRems: tap.winRems }).toEqual({ winAdds: 0, winRems: 0 });",
+      "testTitle": "确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层",
+      "old": "{\"winAdds\":0,\"winRems\":0}",
+      "new": "{\"winAdds\":0,\"winRems\":0}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "winAdds": 0,
+          "winRems": 0
+        }
+      ],
+      "rawNew": {
+        "winAdds": 0,
+        "winRems": 0
+      }
+    },
+    {
+      "file": "escape-wiring.spec.ts",
+      "line": 158,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(tap.docAdds).toBe(tap.docRems);",
+      "testTitle": "确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层",
+      "old": "6",
+      "new": "6",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        6
+      ],
+      "rawNew": 6
+    },
+    {
+      "file": "mention-picker-center.spec.ts",
+      "line": 21,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(panel).toHaveCSS('transform', 'none');",
+      "testTitle": "mention picker stays centered in the production bundle (#448)",
+      "old": "transform: none",
+      "new": "none",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "transform",
+        "none"
+      ],
+      "rawNew": "none"
+    },
+    {
+      "file": "mention-picker-center.spec.ts",
+      "line": 26,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(rect.width).toBe(400);",
+      "testTitle": "mention picker stays centered in the production bundle (#448)",
+      "old": "400",
+      "new": "400",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        400
+      ],
+      "rawNew": 400
+    },
+    {
+      "file": "mention-picker-center.spec.ts",
+      "line": 28,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(rect.x - (1440 - rect.width) / 2)).toBeLessThanOrEqual(1);",
+      "testTitle": "mention picker stays centered in the production bundle (#448)",
+      "old": "≤ 1",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "newtask-machine-persist.spec.ts",
+      "line": 67,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(MACHINE_ID);",
+      "testTitle": "the picked machine survives a reload",
+      "old": "TlZ2sSD4EJCxjNJqVhdo_",
+      "new": "TlZ2sSD4EJCxjNJqVhdo_",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "TlZ2sSD4EJCxjNJqVhdo_"
+      ],
+      "rawNew": "TlZ2sSD4EJCxjNJqVhdo_"
+    },
+    {
+      "file": "newtask-machine-persist.spec.ts",
+      "line": 92,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe(",
+      "testTitle": "a remembered machine that is gone falls back to 自动 without a dangling pin",
+      "old": "ghost-machine",
+      "new": "ghost-machine",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "ghost-machine"
+      ],
+      "rawNew": "ghost-machine"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 57,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(info!.style).not.toBe('auto');",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "auto",
+      "new": "solid",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "auto"
+      ],
+      "rawNew": "solid"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 58,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(info!.color).not.toBe(UA_BLUE);",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "rgb(0, 95, 204)",
+      "new": "rgb(216, 156, 252)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(0, 95, 204)"
+      ],
+      "rawNew": "rgb(216, 156, 252)"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 62,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info!.style).toBe('solid');",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "solid",
+      "new": "solid",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "solid"
+      ],
+      "rawNew": "solid"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 63,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info!.color).toBe(RING);",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "rgb(216, 156, 252)",
+      "new": "rgb(216, 156, 252)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(216, 156, 252)"
+      ],
+      "rawNew": "rgb(216, 156, 252)"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 74,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(info2!.style).not.toBe('auto');",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "auto",
+      "new": "solid",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "auto"
+      ],
+      "rawNew": "solid"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 75,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(info2!.color).not.toBe(UA_BLUE);",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "rgb(0, 95, 204)",
+      "new": "rgb(216, 156, 252)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(0, 95, 204)"
+      ],
+      "rawNew": "rgb(216, 156, 252)"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 77,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info2!.style).toBe('solid');",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "solid",
+      "new": "solid",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "solid"
+      ],
+      "rawNew": "solid"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 78,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info2!.color).toBe(RING);",
+      "testTitle": "click + key on 新建任务/topbar buttons: never the UA blue box",
+      "old": "rgb(216, 156, 252)",
+      "new": "rgb(216, 156, 252)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(216, 156, 252)"
+      ],
+      "rawNew": "rgb(216, 156, 252)"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 92,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(found).toBe(true);",
+      "testTitle": "Tab focus keeps the brand ring (keyboard reachability preserved)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 95,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info!.focusVisible).toBe(true);",
+      "testTitle": "Tab focus keeps the brand ring (keyboard reachability preserved)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 96,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info!.style).toBe('solid');",
+      "testTitle": "Tab focus keeps the brand ring (keyboard reachability preserved)",
+      "old": "solid",
+      "new": "solid",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "solid"
+      ],
+      "rawNew": "solid"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 97,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(info!.color).toBe(RING);",
+      "testTitle": "Tab focus keeps the brand ring (keyboard reachability preserved)",
+      "old": "rgb(216, 156, 252)",
+      "new": "rgb(216, 156, 252)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(216, 156, 252)"
+      ],
+      "rawNew": "rgb(216, 156, 252)"
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 110,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(covers).toBe(true);",
+      "testTitle": "scrim covers the full viewport — sidebar included",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "overlay-focus.spec.ts",
+      "line": 126,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(overlay).toHaveCSS('animation-name', 'enter');",
+      "testTitle": "backdrop click closes; entry rides the tw-animate-css fade",
+      "old": "animation-name: enter",
+      "new": "enter",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "animation-name",
+        "enter"
+      ],
+      "rawNew": "enter"
+    },
+    {
+      "file": "z-ladder.spec.ts",
+      "line": 64,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(hits).toEqual([true, true, true, true, true]);",
+      "testTitle": "every probe point of the new-task panel hit-tests inside the panel",
+      "old": "[\"true\",\"true\",\"true\",\"true\",\"true\"]",
+      "new": "[\"true\",\"true\",\"true\",\"true\",\"true\"]",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        [
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      ],
+      "rawNew": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "file": "z-ladder.spec.ts",
+      "line": 75,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(overDrawer).toBe('dialog-overlay');",
+      "testTitle": "the modal scrim covers the drawer while the dialog is open",
+      "old": "dialog-overlay",
+      "new": "dialog-overlay",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "dialog-overlay"
+      ],
+      "rawNew": "dialog-overlay"
+    },
+    {
+      "file": "z-ladder.spec.ts",
+      "line": 95,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(focused).toBe(true);",
+      "testTitle": "focus lands in the dialog and typing reaches it",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    }
+  ],
+  "webFirstCss": [
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "font-size",
+      "e": [
+        {
+          "string": "14px",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": ".delete-confirm >> .delete-confirm-cancel",
+      "tt": "概览页脚有删除入口，点开二次确认（canon 原文逐字）"
+    },
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "line-height",
+      "e": [
+        {
+          "string": "20px",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": ".delete-confirm >> .delete-confirm-cancel",
+      "tt": "概览页脚有删除入口，点开二次确认（canon 原文逐字）"
+    },
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "transform",
+      "e": [
+        {
+          "string": "none",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": "internal:role=dialog[name=\"提及\"i]",
+      "tt": "mention picker stays centered in the production bundle (#448)"
+    },
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "animation-name",
+      "e": [
+        {
+          "string": "enter",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": ".sched-form-overlay",
+      "tt": "backdrop click closes; entry rides the tw-animate-css fade"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+    ······· │ 
+    375 377 │       ).rejects.toBeInstanceOf(GithubRateLimitedError);
+    376 378 │   
+    377     │ - ····const·tooMany·=·fakeFetch(()·=>·jsonResponse(429,·{·message:·'You·have·exceeded·a·secondary·rate·limit'·}));
+        379 │ + ····const·tooMany·=·fakeFetch(()·=>
+        380 │ + ······jsonResponse(429,·{·message:·'You·have·exceeded·a·secondary·rate·limit'·}),
+        381 │ + ····);
+    378 382 │       await expect(
+    379 383 │         githubIssueTimeline(tooMany.fetchImpl, TOKEN, OWNER, REPO, ISSUE),
+  
+
+Checked 1155 files in 1439ms. No fixes applied.
+Found 1 error.
+Found 1 info.
+ci ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✖ Some errors were emitted while running checks.
+  
+
+[ELIFECYCLE] Command failed with exit code 1.

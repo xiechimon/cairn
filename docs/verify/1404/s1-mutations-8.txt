@@ -1,0 +1,342 @@
+# #1404 S1 mutations, round 8: each round 8 rule undone or bent alone, applied at 56573f8 (134 tests). After each
+# mutation the runner runs the three S1 test files
+#   pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+# and restores the file; it checks that `git diff` is identical before and after the whole run. Every mutation turns
+# at least one test red; no survivors. Runner: mutate6.mjs from round 6 (s1-mutations-6.txt), unchanged.
+# Definitions: [name, file, text replaced, replacement], each text occurring exactly once; each mutation's patch is
+# the runner's `git diff` of the file while mutated.
+#
+#   comment rule (evidence-link.ts): every unclosed `<!--` hides the rest again; no indent allowed; four spaces
+#     allowed; an unclosed `<!--` searches to the end for `-->` each time (quadratic: the 65,536-character line of
+#     `x<!--` goes over 200 ms).
+#   pins: the `.` segment guard (evidence-link.ts), the empty filename guard (digest.ts).
+#   parity, both sides: an entry dropped from pr-gate.js PROTECTED, an entry dropped from the shared AUTO_MERGE list,
+#     and pr-gate.js's AUTO_MERGE renamed so the parser cannot find it (the test fails loudly, not with an empty list).
+#   extensions: each new family dropped from EVIDENCE_EXECUTABLE_EXTENSIONS.
+#   The two comment-only changes (PathFindings.protected, the vp.mjs wording) have no mutation.
+
+$ node mutate6.mjs /home/user/pacman/.claude/worktrees/p3a mutations8.json
+comment rule: every unclosed <!-- hides the rest again 2 failed | 132 passed (134)
+comment rule: no indent allowed before <!--          1 failed | 133 passed (134)
+comment rule: four spaces of indent allowed          1 failed | 133 passed (134)
+comment rule: unclosed <!-- searched for --> to the end each time 1 failed | 133 passed (134)
+pin, link: '.' segment accepted                      1 failed | 133 passed (134)
+pin, parse: empty filename accepted                  1 failed | 133 passed (134)
+parity: pr-gate.js PROTECTED drops '**/.npmrc'       1 failed | 133 passed (134)
+parity: shared AUTO_MERGE drops 'packages/*/test/**' 2 failed | 132 passed (134)
+parity: pr-gate.js AUTO_MERGE renamed (array not found) 1 failed | 133 passed (134)
+extensions: shell family dropped                     2 failed | 132 passed (134)
+extensions: PowerShell family dropped                2 failed | 132 passed (134)
+extensions: Windows batch family dropped             2 failed | 132 passed (134)
+extensions: HTML family dropped                      2 failed | 132 passed (134)
+
+git diff identical before and after the run: true
+survivors: 0
+
+per mutation: patch, then the failing tests
+
+== comment rule: every unclosed <!-- hides the rest again
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index b1947d63..a8bcce5e 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -55,7 +55,7 @@ function visibleText(body: string): string {
+       parts.push(body.slice(pos, open));
+       pos = close + 3;
+       from = pos;
+-    } else if (opensHtmlBlock(body, open)) {
++    } else if (true || opensHtmlBlock(body, open)) {
+       parts.push(body.slice(pos, open));
+       return parts.join(' ');
+     } else {
+failing tests:
+    × 行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文
+    × 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞
+
+== comment rule: no indent allowed before <!--
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index b1947d63..eb9b6434 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -31,7 +31,7 @@ const TRAILING_PUNCT = '.,;:!?*_~';
+  * 四个字符。 */
+ function opensHtmlBlock(body: string, open: number): boolean {
+   let i = open;
+-  while (i > 0 && open - i < 3 && body.charAt(i - 1) === ' ') i -= 1;
++  while (i > 0 && open - i < 0 && body.charAt(i - 1) === ' ') i -= 1;
+   return i === 0 || body.charAt(i - 1) === '\n';
+ }
+failing tests:
+    × 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞
+
+== comment rule: four spaces of indent allowed
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index b1947d63..0946aa2e 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -31,7 +31,7 @@ const TRAILING_PUNCT = '.,;:!?*_~';
+  * 四个字符。 */
+ function opensHtmlBlock(body: string, open: number): boolean {
+   let i = open;
+-  while (i > 0 && open - i < 3 && body.charAt(i - 1) === ' ') i -= 1;
++  while (i > 0 && open - i < 4 && body.charAt(i - 1) === ' ') i -= 1;
+   return i === 0 || body.charAt(i - 1) === '\n';
+ }
+failing tests:
+    × 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞
+
+== comment rule: unclosed <!-- searched for --> to the end each time
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index b1947d63..5b314937 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -50,7 +50,7 @@ function visibleText(body: string): string {
+       parts.push(body.slice(pos));
+       return parts.join(' ');
+     }
+-    const close = open + 2 <= lastClose ? body.indexOf('-->', open + 2) : -1;
++    const close = body.indexOf('-->', open + 2);
+     if (close !== -1) {
+       parts.push(body.slice(pos, open));
+       pos = close + 3;
+failing tests:
+    × 对抗性 body 线性解析：一行里成串没闭合的 <!--，65,536 个字符在 200 ms 内
+
+== pin, link: '.' segment accepted
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index b1947d63..785b59df 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -102,7 +102,7 @@ export function parseRawEvidenceLinks(
+       `${owner}/${repo}`.toLowerCase() === slug &&
+       /^[0-9a-f]{40}$/.test(sha) &&
+       path.startsWith(ownDir) &&
+-      !path.split('/').some((seg) => seg === '..' || seg === '.' || seg === '');
++      !path.split('/').some((seg) => seg === '..' || seg === '');
+     const key = ok ? `${sha}/${path}` : bare;
+     if (seen.has(key)) continue;
+     seen.add(key);
+failing tests:
+    × 路径里有 . 段的不算，列进 others
+
+== pin, parse: empty filename accepted
+diff --git a/apps/server/src/services/merge-gate/digest.ts b/apps/server/src/services/merge-gate/digest.ts
+index 764ad112..9004e61a 100644
+--- a/apps/server/src/services/merge-gate/digest.ts
++++ b/apps/server/src/services/merge-gate/digest.ts
+@@ -105,7 +105,7 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
+   for (const item of raw) {
+     if (item === null || typeof item !== 'object') return null;
+     const f = item as Record<string, unknown>;
+-    if (typeof f.filename !== 'string' || f.filename === '') return null;
++    if (typeof f.filename !== 'string') return null;
+     if (typeof f.status !== 'string' || !STATUSES.includes(f.status)) return null;
+     if (!(typeof f.sha === 'string' || f.sha === null)) return null;
+     if (!isCount(f.additions) || !isCount(f.deletions)) return null;
+failing tests:
+    × filename 为空串：形状不对，返回 null（compareFileSchema 要求至少一个字符）
+
+== parity: pr-gate.js PROTECTED drops '**/.npmrc'
+diff --git a/.claude/workflows/pr-gate.js b/.claude/workflows/pr-gate.js
+index 626f7780..7038a8ff 100644
+--- a/.claude/workflows/pr-gate.js
++++ b/.claude/workflows/pr-gate.js
+@@ -69,7 +69,6 @@ const PROTECTED = [
+   '**/package.json',
+   'pnpm-lock.yaml',
+   'pnpm-workspace.yaml',
+-  '**/.npmrc',
+   // 5 security-sensitive surfaces (the AGENTS.md /security-review list; change both together) and the DB bootstrap that runs migrations
+   'apps/server/src/lib/secret-box.ts',
+   'apps/server/src/lib/keys.ts',
+failing tests:
+    × PROTECTED 与 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS 逐项同序
+
+== parity: shared AUTO_MERGE drops 'packages/*/test/**'
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3dbfc4fb..14012849 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -65,7 +65,6 @@ export const AUTO_MERGE_PATH_GLOBS = [
+   'apps/*/test/**',
+   'apps/*/e2e/**',
+   'packages/*/src/**',
+-  'packages/*/test/**',
+   'integration/test/**',
+   'docs/verify/**',
+ ] as const;
+failing tests:
+    × 产品源码、测试、e2e 与本票证据在集内
+    × AUTO_MERGE 与 AUTO_MERGE_PATH_GLOBS 逐项同序
+
+== parity: pr-gate.js AUTO_MERGE renamed (array not found)
+diff --git a/.claude/workflows/pr-gate.js b/.claude/workflows/pr-gate.js
+index 626f7780..6e3916e8 100644
+--- a/.claude/workflows/pr-gate.js
++++ b/.claude/workflows/pr-gate.js
+@@ -33,7 +33,7 @@ const MAX_SKEPTICS = 4
+ // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
+ // may merge alone instead of what may not. Matching ignores case (APFS);
+ // globToRegExp says which matches fold Unicode.
+-const AUTO_MERGE = [
++const AUTO_MERGE_GLOBS = [
+   'apps/*/src/**',
+   'apps/*/test/**',
+   'apps/*/e2e/**',
+failing tests:
+    × AUTO_MERGE 与 AUTO_MERGE_PATH_GLOBS 逐项同序
+
+== extensions: shell family dropped
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3dbfc4fb..1ede15d3 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -47,9 +47,6 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
+   '.tsx',
+   '.sh',
+   '.py',
+-  '.bash',
+-  '.zsh',
+-  '.fish',
+   '.ps1',
+   '.psm1',
+   '.bat',
+failing tests:
+    × 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出
+    × shell：.bash .zsh .fish 新增即列出，扩展名换大小写也算
+
+== extensions: PowerShell family dropped
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3dbfc4fb..aca96443 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -50,8 +50,6 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
+   '.bash',
+   '.zsh',
+   '.fish',
+-  '.ps1',
+-  '.psm1',
+   '.bat',
+   '.cmd',
+   '.html',
+failing tests:
+    × 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出
+    × PowerShell：.ps1 .psm1 新增即列出，扩展名换大小写也算
+
+== extensions: Windows batch family dropped
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3dbfc4fb..d0336361 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -52,8 +52,6 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
+   '.fish',
+   '.ps1',
+   '.psm1',
+-  '.bat',
+-  '.cmd',
+   '.html',
+   '.htm',
+ ] as const;
+failing tests:
+    × 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出
+    × Windows 批处理：.bat .cmd 新增即列出，扩展名换大小写也算
+
+== extensions: HTML family dropped
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3dbfc4fb..71261ea2 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -54,8 +54,6 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
+   '.psm1',
+   '.bat',
+   '.cmd',
+-  '.html',
+-  '.htm',
+ ] as const;
+ 
+ /** 可以不经人合并的路径（ADR 0021 D4 默认拒绝）：产品源码、测试与证据。
+failing tests:
+    × 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出
+    × HTML（浏览器打开即跑脚本）：.html .htm 新增即列出，扩展名换大小写也算
+
+mutations8.json:
+  [
+   [
+    "comment rule: every unclosed <!-- hides the rest again",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "} else if (opensHtmlBlock(body, open)) {",
+    "} else if (true || opensHtmlBlock(body, open)) {"
+   ],
+   [
+    "comment rule: no indent allowed before <!--",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "while (i > 0 && open - i < 3 && body.charAt(i - 1) === ' ') i -= 1;",
+    "while (i > 0 && open - i < 0 && body.charAt(i - 1) === ' ') i -= 1;"
+   ],
+   [
+    "comment rule: four spaces of indent allowed",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "while (i > 0 && open - i < 3 && body.charAt(i - 1) === ' ') i -= 1;",
+    "while (i > 0 && open - i < 4 && body.charAt(i - 1) === ' ') i -= 1;"
+   ],
+   [
+    "comment rule: unclosed <!-- searched for --> to the end each time",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "const close = open + 2 <= lastClose ? body.indexOf('-->', open + 2) : -1;",
+    "const close = body.indexOf('-->', open + 2);"
+   ],
+   [
+    "pin, link: '.' segment accepted",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "seg === '..' || seg === '.' || seg === ''",
+    "seg === '..' || seg === ''"
+   ],
+   [
+    "pin, parse: empty filename accepted",
+    "apps/server/src/services/merge-gate/digest.ts",
+    "if (typeof f.filename !== 'string' || f.filename === '') return null;",
+    "if (typeof f.filename !== 'string') return null;"
+   ],
+   [
+    "parity: pr-gate.js PROTECTED drops '**/.npmrc'",
+    ".claude/workflows/pr-gate.js",
+    "  '**/.npmrc',\n",
+    ""
+   ],
+   [
+    "parity: shared AUTO_MERGE drops 'packages/*/test/**'",
+    "packages/shared/src/records/merge-gate.ts",
+    "  'packages/*/test/**',\n",
+    ""
+   ],
+   [
+    "parity: pr-gate.js AUTO_MERGE renamed (array not found)",
+    ".claude/workflows/pr-gate.js",
+    "const AUTO_MERGE = [\n",
+    "const AUTO_MERGE_GLOBS = [\n"
+   ],
+   [
+    "extensions: shell family dropped",
+    "packages/shared/src/records/merge-gate.ts",
+    "  '.bash',\n  '.zsh',\n  '.fish',\n",
+    ""
+   ],
+   [
+    "extensions: PowerShell family dropped",
+    "packages/shared/src/records/merge-gate.ts",
+    "  '.ps1',\n  '.psm1',\n",
+    ""
+   ],
+   [
+    "extensions: Windows batch family dropped",
+    "packages/shared/src/records/merge-gate.ts",
+    "  '.bat',\n  '.cmd',\n",
+    ""
+   ],
+   [
+    "extensions: HTML family dropped",
+    "packages/shared/src/records/merge-gate.ts",
+    "  '.html',\n  '.htm',\n",
+    ""
+   ]
+  ]

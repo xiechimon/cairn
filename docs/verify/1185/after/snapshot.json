@@ -1,0 +1,24 @@
+{
+  "expect": "new",
+  "api": "http://127.0.0.1:8791",
+  "home": "/workspace/.claude/verify-run/home",
+  "importStatus": 500,
+  "importBody": {
+    "error": "Internal server error"
+  },
+  "dirAfterFail": false,
+  "createsAfterFail": 0,
+  "listedAfterFail": [],
+  "refreshStatus": 404,
+  "refreshBody": {
+    "error": "skill orphan-1185 not found"
+  },
+  "reimportStatus": 201,
+  "reimportBody": {
+    "id": "orphan-1185",
+    "teamId": "LlVqC8aKElNjuhgvf_fYr",
+    "name": "orphan-1185",
+    "description": "import rollback repro"
+  },
+  "sourcesHasSkill": true
+}

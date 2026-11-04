@@ -1,0 +1,129 @@
+#1403 segment 2b, round 2 (pr-gate run 1 on 06c35b0d, suggestions 3, 4, 6): red and green
+=========================================================================================
+
+Date: 2026-10-22. Branch claude/bootstrap-p2-seg2b in worktree p5d.
+Base of this round: 1f531768 (06c35b0d with origin/main c99de106 merged in; the merge
+resolution is in seg2b-r2-reviews.txt). Fix commit: 95f2a30e.
+
+Command (both legs), run in apps/server:
+
+  pnpm exec vitest run test/pr-merge-api.test.ts test/pr-reconcile.test.ts \
+    test/second-pr-guard.test.ts
+
+The vector (pr-gate suggestion 6)
+---------------------------------
+mergeThroughGithub sent commit_title = `${pull.title} (#n)`. The PR author check admits
+OWNER / MEMBER / COLLABORATOR, and MEMBER / COLLABORATOR include read-only accounts
+(github.ts WRITE_AUTHOR_ASSOCIATIONS comment). Such an account can retitle the build's PR
+to hold a closing keyword and an issue reference; the squash commit lands on the default
+branch and closes that issue, bypassing closingLine (only the task's own same-repo issue).
+The body has the same hole by another field: with no closing line, commit_message was not
+sent, and GitHub then fills the squash body from the repository default
+(squash_merge_commit_message: PR_BODY, COMMIT_MESSAGES or BLANK), i.e. possibly the PR body.
+
+GitHub's rules, quoted from docs.github.com, "Linking a pull request to an issue"
+(/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue,
+fetched 2026-10-22):
+
+  "You can link a pull request to an issue by using a supported keyword in the pull
+   request's description or in a commit message. ...
+   * close * closes * closed * fix * fixes * fixed * resolve * resolves * resolved"
+  "Issue in the same repository | KEYWORD #ISSUE-NUMBER | Closes #10
+   Issue in a different repository | KEYWORD OWNER/REPOSITORY#ISSUE-NUMBER |
+   Fixes octo-org/octo-repo#100"
+  "The keywords can be followed by colons or in uppercase. For example: Closes: #10,
+   CLOSES #10, or CLOSES: #10."
+  "You can also use closing keywords in a commit message. The issue will be closed when you
+   merge the commit into the default branch"
+
+and "Autolinked references and URLs" lists the reference forms: an issue URL, #26, GH-26,
+Username/Repository#26. REST "Merge a pull request": commit_title "Title for the automatic
+commit message", commit_message "Extra detail to append to automatic commit message"; the
+repository object carries squash_merge_commit_message: PR_BODY | COMMIT_MESSAGES | BLANK.
+
+Fix (95f2a30e)
+--------------
+- Title: CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i
+  is tested on the composed title "<PR title> (#n)". A match sends pacman's own title
+  "Merge pull request #n" (no PR text at all). The shape is wider than GitHub's documented
+  syntax on purpose: any keyword followed by a token holding a digit counts, so every
+  reference form above (and undocumented ones such as a URL without a scheme) is covered;
+  a false match only loses the PR title. Not a rewrite in place: a rewritten title would
+  rely on GitHub not parsing the rewritten form, the fallback relies on nothing.
+- Body: commit_message is always sent: the closes line when closingLine gives one,
+  otherwise "Merged by pacman.". The PR body never reaches the squash body.
+- ADR 0021 D2 ("标题取 PR 标题") still describes the normal case; spec 02 A6 states the
+  fallback and the body.
+
+Red leg: tests at 95f2a30e on the sources of 1f531768
+-----------------------------------------------------
+     × [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+     × [2b-D2] closing line for an issue of another repository
+     × [2b-D2] closing line for an orchestration source
+     × [2b-D2] closing line for an orchestration source holding an issue-shaped ref
+     × [2b-D2] closing line for a malformed issue ref
+     × [2b-D2] closing line for no source
+     × [2b-D41] a PR title with a closing keyword and a reference (a same-repository reference) → the commit title is pacman’s own
+     × [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+     × [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+     × [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is pacman’s own
+     × [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+     × [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+     × [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is pacman’s own
+     × [2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 2 passed (3)
+      Tests  14 failed | 283 passed (297)
+
+D1 and the five no-line D2 cases are red because they now expect the body to be sent.
+The [2b-D41b] pins (a keyword followed by a word; a keyword inside another word; a
+reference with no keyword) pass on both legs: they guard against over-matching.
+
+Green leg: tests and sources at 95f2a30e
+----------------------------------------
+ Test Files  3 passed (3)
+      Tests  297 passed (297)
+
+[2b-D13c] strengthened (pr-gate suggestion 3)
+---------------------------------------------
+The old test passed with a no-op merge. It now asserts, before the sweep, that one PUT
+was sent and that exactly one row (the "没有明确答复" row) exists, and after the sweep
+that the sweep sent GET .../pulls/201, the phase is review, the rows are unchanged and no
+merge step exists. Each leg ran only [2b-D13c] (-t 2b-D13c); the old test is the file at
+06c35b0d copied to a temporary test file and removed afterwards. Sources restored from a
+scratchpad copy and compared before the next run.
+
+none (current sources)
+  old [2b-D13c] (06c35b0d): 1 passed | 92 skipped (93)
+none (current sources)
+  new [2b-D13c]: 1 passed | 103 skipped (104)
+N1 main-like routing: a GitHub-form build with a PR takes the merge step (no PUT)
+  old [2b-D13c] (06c35b0d): 1 passed | 92 skipped (93)
+N1 main-like routing: a GitHub-form build with a PR takes the merge step (no PUT)
+  new [2b-D13c]: 1 failed | 103 skipped (104)
+N2 mergeThroughGithub is a no-op that answers 202
+  old [2b-D13c] (06c35b0d): 1 passed | 92 skipped (93)
+N2 mergeThroughGithub is a no-op that answers 202
+  new [2b-D13c]: 1 failed | 103 skipped (104)
+
+N1 is what main does (the route to the API merge does not exist there: a GitHub-form
+build with a PR takes the merge step and no PUT is sent); N2 is a merge that does nothing
+and answers 202. The old test passes both; the new one fails both.
+
+Test-file header (pr-gate suggestion 4)
+---------------------------------------
+The failure-mode index listed "429 / 403 限流" under D13 (202). Rate limits answer 409
+with nothing written (D40). The D13 line now names timeout / network / 5xx only and
+points rate limits to D40. D41 (its pins are the [2b-D41b] cases) and D42 are added to
+the index.
+
+/code-review finding 4: the closing line reads the re-read todo ([2b-D43])
+---------------------------------------------------------------------------
+Red: [2b-D43] added on 95f2a30e sources (closingLine read gate.todoRow, taken before the
+PR read):
+     × [2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line reads the re-read todo
+      Tests  1 failed | 297 passed (298)
+  AssertionError: expected 'Merged by pacman.' to be 'closes #88'
+
+Green: closingLine(before.todoRow, ...):
+      Tests  298 passed (298)

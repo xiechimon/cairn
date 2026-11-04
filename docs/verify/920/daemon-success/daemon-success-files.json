@@ -1,0 +1,77 @@
+{
+  "viewDir": "/tmp/pacman-920-daemon-home-c1/team-skills/views/3bb2dcdcf54936d1c9bd6cd628314750891a6dbbea12203611a7b3553af1434b",
+  "perFile": [
+    {
+      "path": "alpha/SKILL.md",
+      "bytes": 118,
+      "sha256": "53ddd46c59fc3e389082d7c294a7c4000a2069dd5857ce575783efd824f7fc7b",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "alpha/notes.md",
+      "bytes": 1024,
+      "sha256": "4e5c5b81de326ffad84f95cecf5b9c1372968a892015645dd29ee61b002f3f9f",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "bin/SKILL.md",
+      "bytes": 121,
+      "sha256": "dd62d137aa9a84ec03a92ad957f151b6bee9e74a07e0ea08c71a2ecf9e35a790",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "bin/assets/logo.png",
+      "bytes": 15,
+      "sha256": "87d445ae9dceb62dc79e6a30a892eb38feba25c7607493b5a29e453384f0eda1",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "fat/SKILL.md",
+      "bytes": 124,
+      "sha256": "168da9ed8c71d2849cad906e2879d7b7dc79ee4f53a1b3b20b238d3ec448af44",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "fat/assets/template.html",
+      "bytes": 727976,
+      "sha256": "9f8a3c0a4b000a98b6b2047b4f648bdddfa8b3fee39d06cebef19b92c7775f44",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "heavy/SKILL.md",
+      "bytes": 127,
+      "sha256": "bdcca8d4cd940917dc5b9473920d13d5f1ebbe210832b4ac0559b8ae5ad9477c",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "heavy/p0.txt",
+      "bytes": 450000,
+      "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "heavy/p1.txt",
+      "bytes": 450000,
+      "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "heavy/p2.txt",
+      "bytes": 450000,
+      "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "heavy/p3.txt",
+      "bytes": 450000,
+      "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244",
+      "bytesIdenticalToServer": true
+    },
+    {
+      "path": "heavy/p4.txt",
+      "bytes": 450000,
+      "sha256": "ddf602640aa3e29f13acea888c48579e2276739788ae89e30b569b9dcd291244",
+      "bytesIdenticalToServer": true
+    }
+  ]
+}

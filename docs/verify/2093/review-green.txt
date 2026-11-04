@@ -1,0 +1,29 @@
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (4.557519ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.142078ms)
+✔ documented preparation overrides inherited bot author and committer identities (39.861841ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.458142ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.375408ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.549856ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (36.774873ms)
+✔ PR validation reads the explicit head without executing PR code (0.849865ms)
+✔ a bot-authored commit beneath a human tip is rejected (21.489473ms)
+✔ a squash commit authored by the bot is rejected (18.661969ms)
+✔ main push checks bot squash (16.348777ms)
+✔ main push checks bot beneath human tip (17.78719ms)
+✔ main push checks historical bot (19.252142ms)
+✔ main push checks missing before (14.538001ms)
+✔ main push checks zero before (15.805323ms)
+✔ every commit in a clean human range passes (20.265635ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (11.202644ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.214454ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (10.88692ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (10.644642ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (10.626624ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 249.039175

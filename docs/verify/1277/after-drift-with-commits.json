@@ -1,0 +1,91 @@
+{
+  "label": "drift-with-commits",
+  "doneBody": {
+    "status": "success",
+    "hasChanges": true,
+    "workBranchDrift": {
+      "expected": "pacman/conv-0198f6c0-0000-7000-8000-000000000000",
+      "actual": "dogfood/tracer-1153-verification-note"
+    },
+    "prUrl": "https://github.com/example/repo/pull/1277",
+    "prNumber": 1277
+  },
+  "http": {
+    "todo": {
+      "id": "nzAMTeBQ5xiLuldDi2ws6",
+      "teamId": "g-fRudzdYsH4lMESihLi-",
+      "projectId": "q2NQ0ARRIXhV2YkY5ga_o",
+      "title": "1277 drift-with-commits",
+      "spec": "probe: machine done payload, no daemon",
+      "phase": "failed",
+      "phaseAt": 1791993417400,
+      "seqNum": 4,
+      "orderIndex": 0,
+      "tagIds": [],
+      "assignment": {
+        "plan": {
+          "agentId": "fkxeFsPcXLVkw2Zu9uWjM"
+        },
+        "build": {
+          "agentId": "fkxeFsPcXLVkw2Zu9uWjM"
+        }
+      },
+      "agent": {
+        "id": "fkxeFsPcXLVkw2Zu9uWjM",
+        "displayName": "verify-builder-1277"
+      },
+      "latestBuildId": "01a13b21-8eae-756d-856c-c91efce9b4c2",
+      "lastRunAt": 1791993417390,
+      "hasChanges": false,
+      "hasPlan": false,
+      "buildHistory": [
+        {
+          "buildId": "01a13b21-8eae-756d-856c-c91efce9b4c2",
+          "createdAt": 1791993417390
+        }
+      ],
+      "sourceTodo": null,
+      "blockedBy": null,
+      "v": 4,
+      "createdBy": "NxP5oOj60t7IhZWjV135D",
+      "ownerId": "NxP5oOj60t7IhZWjV135D",
+      "sourceBuildId": null,
+      "sourceKind": null,
+      "sourceRef": null,
+      "quotaWait": null
+    },
+    "build": {
+      "id": "01a13b21-8eae-756d-856c-c91efce9b4c2",
+      "todoId": "nzAMTeBQ5xiLuldDi2ws6",
+      "withPlan": false,
+      "prevPhase": "todo",
+      "triggerSource": "user",
+      "planDocId": null,
+      "errorMessage": "agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「dogfood/tracer-1153-verification-note」，契约工作分支是「pacman/conv-0198f6c0-0000-7000-8000-000000000000」",
+      "prUrl": null,
+      "prNumber": null,
+      "diffHash": null,
+      "createdAt": 1791993417390
+    }
+  },
+  "sqlite": {
+    "build": {
+      "id": "01a13b21-8eae-756d-856c-c91efce9b4c2",
+      "errorMessage": "agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「dogfood/tracer-1153-verification-note」，契约工作分支是「pacman/conv-0198f6c0-0000-7000-8000-000000000000」",
+      "prUrl": null,
+      "prNumber": null
+    },
+    "todo": {
+      "id": "nzAMTeBQ5xiLuldDi2ws6",
+      "phase": "failed",
+      "hasChanges": 0
+    },
+    "steps": [
+      {
+        "id": "1ijdqHKcBSGrZN9E7PYY-",
+        "kind": "build",
+        "status": "failed"
+      }
+    ]
+  }
+}

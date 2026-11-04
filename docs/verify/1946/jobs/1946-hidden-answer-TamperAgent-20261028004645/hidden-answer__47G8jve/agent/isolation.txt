@@ -1,0 +1,4 @@
+agent-hostname=3a0499c145d3
+unreadable=/tests/expected.txt
+unreadable=/solution/solve.sh
+unreadable=/oracle/solve.sh

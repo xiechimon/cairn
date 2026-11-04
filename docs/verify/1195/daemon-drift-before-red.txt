@@ -1,0 +1,12 @@
+ RUN  v5.0.1 /private/tmp/pacman-1195-before/apps/daemon
+ ❯ test/runner-branch-drift.test.ts (12 tests | 6 failed) 153ms
+     × 失败方式 1：HEAD 在偏离分支且其上有提交 → hasChanges=true + drift 携带 + transcript 点名 31ms
+     × 失败方式 2（事故形）：HEAD 切回会话分支、自建分支留新提交 → 并集面认领 + PR 按候选 head 回填 9ms
+     × 失败方式 3：HEAD 偏离且处处无提交 → hasChanges=false + drift 携带（闸点名入参面） 6ms
+     × 失败方式 8：探测封顶 3 次（conv + 偏离 + 首候选） 5ms
+     × 失败方式 10：扫描入参 = 步起点 checkpoint + 步窗口起点墙钟 8ms
+     × 失败方式 9：repo 绑定 build 步 prompt 尾行 = 工作分支注记（含契约分支名） 61ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 1：HEAD 在偏离分支且其上有提交 → hasChanges=true + drift 携带 + transcript 点名
+AssertionError: expected undefined to deeply equal { Object (expected, actual) }
+ FAIL  test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 2（事故形）：HEAD 切回会话分支、自建分支留新提交 → 并集面认领 + PR 按候选 head 回填

@@ -1,0 +1,14 @@
+data-density=comfortable (--rem-scale calc(16 / 17))
+  text-page font-heading   font-size 18px       line-height 24px       sourceSerif4
+  text-heading font-heading font-size 16px       line-height 22px       sourceSerif4
+  text-card-title          font-size 14px       line-height 21px       inter
+  text-ui                  font-size 13.5px     line-height 20px       inter
+  text-meta                font-size 12px       line-height 16px       inter
+  text-caption             font-size 11.5px     line-height 16px       inter
+data-density=compact (--rem-scale 0.9375)
+  text-page font-heading   font-size 17.9297px  line-height 23.9062px  sourceSerif4
+  text-heading font-heading font-size 15.9375px  line-height 21.9141px  sourceSerif4
+  text-card-title          font-size 13.9453px  line-height 20.918px   inter
+  text-ui                  font-size 13.4473px  line-height 19.9219px  inter
+  text-meta                font-size 11.9531px  line-height 15.9375px  inter
+  text-caption             font-size 11.4551px  line-height 15.9375px  inter

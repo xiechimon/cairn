@@ -1,0 +1,124 @@
+#1459 live leg (branch claude/bootstrap-p5-1459 at 3524b15a)
+Server: cd apps/server && PACMAN_HOME=<scratch>/w1459-home PORT=8796 HOST=127.0.0.1 NODE_ENV=production pnpm exec tsx src/index.ts
+(port 8796 checked free with lsof first; PACMAN_ISSUE_INTAKE unset, so the poller is off and the webhook rule runs on its own)
+Driver: scratch script w1459-live.mts run with pnpm exec tsx from apps/server; project and webhook token through REST,
+GitHub connection / chief binding / seeded in-flight tasks straight into the server database with the server's own modules
+(the connection has no REST write path, OAuth only; same approach as docs/verify/1137).
+
+Fake GitHub: not used. apps/server/src/lib/github.ts hard-codes https://api.github.com and has no base-URL override, so
+the permission path with a qualifying or non-qualifying answer (W1-W3, W14) is covered by tests only. Live here:
+token check, other label, no sender, no connection, a real permission read that fails, cipher error, cap, redelivery.
+
+L5 outbound, checked separately with the same request from this container:
+  GET https://api.github.com/repos/xiechimon/pacman/collaborators/xiechimon/permission (Bearer ghp_w1459_not_a_real_token)
+  -> 401 {"message": "Bad credentials", ...}
+  so the server's read got GitHub's 401, which the permission read treats as unknown: nothing imported, not cached.
+
+================ requests and responses
+#1459 live leg: server http://127.0.0.1:8796 (this branch, NODE_ENV=production, PACMAN_ISSUE_INTAKE unset = poller off)
+PACMAN_HOME = <scratch>/w1459-home
+started 2026-10-21T13:52:33.908Z
+
+== setup
+POST /api/projects {name: pacman, kind: github, githubRepo: xiechimon/pacman} -> 201
+POST /api/teams/<team>/webhook-tokens {name: w1459} -> 201 (plaintext kept out of this file)
+chief bound to agent-w1459 (db insert); no GitHub connection yet
+
+== L1 URL token check unchanged
+--- L1 wrong token
+POST /api/webhook/github/pacman_wh_wrong  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l1
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 401 {"error":"invalid webhook token"}  (7 ms)
+
+== L2 labeled event for another label
+--- L2 label bug
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l2
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"bug"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l2","detail":"action labeled / label not pacman"}  (7 ms)
+
+== L3 payload without sender
+--- L3 no sender
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l3
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"someone"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l3","detail":"event has no sender"}  (3 ms)
+
+== L4 team has no GitHub connection
+--- L4 no connection
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l4
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"misconfigured","deliveryId":"w1459-l4","detail":"github connection not found"}  (5 ms)
+
+== L5 connection with a token GitHub will not accept: the permission read is real outbound
+github connection stored (db, sealed with the server keyfile): token ghp_w1459_not_a_real_token
+--- L5 sender xiechimon, permission read fails
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l5a
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l5a","detail":"permission of xiechimon on xiechimon/pacman unreadable"}  (94 ms)
+
+--- L5 again (new delivery id): failure not cached, read again
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l5b
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l5b","detail":"permission of xiechimon on xiechimon/pacman unreadable"}  (27 ms)
+
+== L6 stored token cannot be decrypted
+--- L6 cipher error
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l6
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"misconfigured","deliveryId":"w1459-l6","detail":"github token unreadable"}  (7 ms)
+
+connection restored
+
+== L7 project at the in-flight cap (3 github-issue tasks: todo, building, failed; db insert)
+--- L7 at cap
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l7
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l7","detail":"project at the in-flight cap (3 open github-issue tasks)"}  (10 ms)
+
+== L8 redelivery of a refused event (same X-GitHub-Delivery)
+--- L8 first delivery
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l8
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l8","detail":"project at the in-flight cap (3 open github-issue tasks)"}  (3 ms)
+
+--- L8 redelivered inside the 60 s window
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l8
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"duplicate","deliveryId":"w1459-l8","detail":"delivery within window"}  (3 ms)
+
+(waiting 61 s for the delivery window to pass)
+--- L8 redelivered after the window
+POST /api/webhook/github/<webhook token>  X-GitHub-Event: issues  X-GitHub-Delivery: w1459-l8
+request  {"action":"labeled","issue":{"number":1459,"title":"live leg","user":{"login":"xiechimon"}},"label":{"name":"pacman"},"repository":{"full_name":"xiechimon/pacman"},"sender":{"login":"xiechimon","type":"User"}}
+response 202 {"result":"ignored","deliveryId":"w1459-l8","detail":"project at the in-flight cap (3 open github-issue tasks)"}  (8 ms)
+
+== database after the run
+github-issue tasks: [{"sourceRef":"github:xiechimon/pacman#9001","phase":"todo","createdBy":"9R6bcGdJ3cUaDmAeTykEA"},{"sourceRef":"github:xiechimon/pacman#9002","phase":"building","createdBy":"9R6bcGdJ3cUaDmAeTykEA"},{"sourceRef":"github:xiechimon/pacman#9003","phase":"failed","createdBy":"9R6bcGdJ3cUaDmAeTykEA"}]
+chief threads: 0
+finished 2026-10-21T13:53:35.215Z
+
+================ server log lines for the webhook (pino JSON, NODE_ENV=production)
+{"level":30,"time":1792590754007,"pid":6021,"hostname":"vm","deliveryId":"w1459-l2","result":"ignored","msg":"github webhook"}
+{"level":30,"time":1792590754012,"pid":6021,"hostname":"vm","deliveryId":"w1459-l3","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":null,"reason":"no-sender","msg":"github webhook import refused"}
+{"level":30,"time":1792590754012,"pid":6021,"hostname":"vm","deliveryId":"w1459-l3","result":"ignored","msg":"github webhook"}
+{"level":30,"time":1792590754016,"pid":6021,"hostname":"vm","deliveryId":"w1459-l4","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"no-github-connection","msg":"github webhook import refused"}
+{"level":30,"time":1792590754016,"pid":6021,"hostname":"vm","deliveryId":"w1459-l4","result":"misconfigured","msg":"github webhook"}
+{"level":30,"time":1792590754115,"pid":6021,"hostname":"vm","deliveryId":"w1459-l5a","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"permission-unreadable","msg":"github webhook import refused"}
+{"level":30,"time":1792590754115,"pid":6021,"hostname":"vm","deliveryId":"w1459-l5a","result":"ignored","msg":"github webhook"}
+{"level":30,"time":1792590754141,"pid":6021,"hostname":"vm","deliveryId":"w1459-l5b","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"permission-unreadable","msg":"github webhook import refused"}
+{"level":30,"time":1792590754141,"pid":6021,"hostname":"vm","deliveryId":"w1459-l5b","result":"ignored","msg":"github webhook"}
+{"level":30,"time":1792590754148,"pid":6021,"hostname":"vm","deliveryId":"w1459-l6","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"token-unreadable","msg":"github webhook import refused"}
+{"level":30,"time":1792590754148,"pid":6021,"hostname":"vm","deliveryId":"w1459-l6","result":"misconfigured","msg":"github webhook"}
+{"level":30,"time":1792590754156,"pid":6021,"hostname":"vm","deliveryId":"w1459-l7","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"at-cap","msg":"github webhook import refused"}
+{"level":30,"time":1792590754161,"pid":6021,"hostname":"vm","deliveryId":"w1459-l7","result":"ignored","msg":"github webhook"}
+{"level":30,"time":1792590754165,"pid":6021,"hostname":"vm","deliveryId":"w1459-l8","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"at-cap","msg":"github webhook import refused"}
+{"level":30,"time":1792590754165,"pid":6021,"hostname":"vm","deliveryId":"w1459-l8","result":"ignored","msg":"github webhook"}
+{"level":30,"time":1792590754168,"pid":6021,"hostname":"vm","deliveryId":"w1459-l8","result":"duplicate","msg":"github webhook"}
+{"level":30,"time":1792590815211,"pid":6021,"hostname":"vm","deliveryId":"w1459-l8","projectId":"vJaJyKgue4GjYnLwWOPtC","repo":"xiechimon/pacman","issue":1459,"sender":"xiechimon","reason":"at-cap","msg":"github webhook import refused"}
+{"level":30,"time":1792590815212,"pid":6021,"hostname":"vm","deliveryId":"w1459-l8","result":"ignored","msg":"github webhook"}
+
+================ startup lines
+{"level":30,"time":1792590747408,"pid":6021,"hostname":"vm","issueIntake":false,"msg":"github issue intake off (set PACMAN_ISSUE_INTAKE=1 to enable)"}
+{"level":30,"time":1792590747420,"pid":6021,"hostname":"vm","port":8796,"dataDir":"<scratch>/w1459-home/server","teamId":"TrscWDprzZb98Z2aEhdMG","msg":"pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>"}
+
+Teardown: server stopped with SIGTERM (node pid 6021, its pnpm parent 5929); port 8796 no longer listening;
+scratch PACMAN_HOME deleted.

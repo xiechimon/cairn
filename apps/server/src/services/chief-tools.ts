@@ -1,0 +1,1348 @@
+import type { ChiefNoticeContent, SecretBox, UserRecord } from '@cairn/shared';
+import {
+  AGENT_TOOL_DEFAULTS,
+  CHIEF_NOTICE_KIND,
+  createSkillBodySchema,
+  DONE_ANNOUNCEMENT,
+  IN_PROGRESS_PHASES,
+  MERGE_HUMAN_ONLY_COPY,
+  MODEL_SOURCE_RUNTIME_LABELS,
+  snoozeTodoBodySchema,
+  todoOutputSchema,
+  updateSkillToolParamsSchema,
+} from '@cairn/shared';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
+import {
+  agent,
+  build,
+  chief,
+  chiefThread,
+  machine,
+  project,
+  schedule,
+  todo,
+  tokenUsage,
+} from '../db/schema.js';
+import { HttpError, parseWith } from '../lib/errors.js';
+import type { FetchLike } from '../lib/github.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
+import { todoAuthorizesAttachment } from './attachment-authorization.js';
+import { readAttachmentMeta } from './attachments.js';
+import {
+  advanceSplitWaves,
+  applyBuildStepAction,
+  cancelBuild,
+  dispatchSplitChildren,
+  messageTodo,
+  startBuilds,
+  stopActiveStepsAfterExit,
+} from './builds.js';
+import {
+  addChiefWatch,
+  clearChiefWake,
+  removeChiefWatches,
+  requireTurnProvenance,
+  setChiefWake,
+  upsertChiefMessage,
+} from './chief.js';
+import { readHistory, searchHistory } from './chief-history.js';
+import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import { readConversationPage } from './conversation-page.js';
+import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { isGithubRepoRef, readFile } from './git.js';
+import { executeGithubReadTool } from './github-reads.js';
+import { requireIntakeAssignment } from './intake-assignment.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
+import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
+import {
+  deleteMemoryEntry,
+  listMemoryEntries,
+  saveMemoryEntry,
+  updateMemoryEntry,
+} from './memory.js';
+import { notifyChiefMessage } from './notifications.js';
+import type { OAuthClientConfig } from './oauth.js';
+import { getModelSources } from './providers.js';
+import type { VapidKeys } from './push.js';
+import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
+import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
+import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
+import { snoozeTodo } from './snooze.js';
+import { seedFixedTags } from './tags.js';
+import { createSplitTodo, type SplitSubtodoInput } from './todo-split.js';
+import { createTodo, deleteTodo, getTodo, listTodos, setTodoPhase, updateTodo } from './todos.js';
+import { insertGateAnnouncement } from './transcript.js';
+
+export interface ChiefToolDeps {
+  intakeAgentAllowlist?: readonly string[];
+  db: Db;
+  hub: TeamStreamHub;
+  machineHub?: MachineWakeHub;
+  box: SecretBox;
+  user: UserRecord;
+  vapidKeys?: VapidKeys | null;
+  convHub?: ConversationStreamHub;
+  reposDir: string;
+  attachmentsDir: string;
+  skillsDir: string;
+  mcpConfigPath?: string;
+  githubFetch?: FetchLike;
+  oauthClient?: OAuthClientConfig | null;
+}
+
+export interface ChiefToolCtx {
+  teamId: string;
+  userId: string;
+  chiefId: string;
+  threadId: string;
+  chiefAgentId: string | null;
+  conversationId: string;
+  turnPrompt?: string | null;
+  turnScopeProjectId?: string | null;
+  turnScopeMixed?: boolean;
+}
+
+function skillAuditActor(ctx: ChiefToolCtx): { type: 'member' | 'agent'; id: string } {
+  return ctx.chiefAgentId !== null
+    ? { type: 'agent', id: ctx.chiefAgentId }
+    : { type: 'member', id: ctx.userId };
+}
+
+type Params = Record<string, unknown>;
+
+function str(params: Params, key: string): string {
+  const v = params[key];
+  if (typeof v !== 'string' || v === '')
+    throw new HttpError(400, `invalid params.${key}: expected non-empty string`);
+  return v;
+}
+function optStr(params: Params, key: string): string | undefined {
+  const v = params[key];
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
+  return v;
+}
+function optTodoOutput(params: Params, key: string): 'code' | 'info' | undefined {
+  const v = params[key];
+  if (v === undefined || v === null) return undefined;
+  const parsed = todoOutputSchema.safeParse(v);
+  if (!parsed.success) {
+    throw new HttpError(400, `invalid params.${key}: expected "code" or "info"`);
+  }
+  return parsed.data;
+}
+function strArr(params: Params, key: string): string[] {
+  const v = params[key];
+  if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) {
+    throw new HttpError(400, `invalid params.${key}: expected string[]`);
+  }
+  return v as string[];
+}
+function num(params: Params, key: string): number | undefined {
+  const v = params[key];
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== 'number' || !Number.isFinite(v)) {
+    throw new HttpError(400, `invalid params.${key}: expected number`);
+  }
+  return v;
+}
+function bool(params: Params, key: string, fallback: boolean): boolean {
+  const v = params[key];
+  if (v === undefined || v === null) return fallback;
+  if (typeof v !== 'boolean') throw new HttpError(400, `invalid params.${key}: expected boolean`);
+  return v;
+}
+
+function json(result: unknown): string {
+  return JSON.stringify(result ?? null);
+}
+
+function requireProjectRow(db: Db, projectId: string, teamId: string) {
+  const row = db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .get();
+  if (!row) throw new HttpError(404, `project ${projectId}`);
+  return row;
+}
+function requireTeamTodo(db: Db, todoId: string, teamId: string) {
+  const row = db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
+    .get();
+  if (!row) throw new HttpError(404, `todo ${todoId}`);
+  return row;
+}
+const PROJECT_WRITE_TOOLS = new Set([
+  'create_todo',
+  'split_todo',
+  'update_todo',
+  'delete_todos',
+  'close_todos',
+  'reopen_todos',
+  'complete_todos',
+  'message_todo',
+  'update_project',
+  'connect_repo',
+  'schedule_todo',
+  'unschedule_todo',
+  'snooze_todos',
+  'run_builds',
+  'run_review',
+  'confirm_builds',
+  'cancel_builds',
+  'merge_builds',
+  'save_memory',
+]);
+
+function idsOf(params: Params, keys: string[]): string[] {
+  return keys.flatMap((key) => {
+    const value = params[key];
+    if (typeof value === 'string') return [value];
+    return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : [];
+  });
+}
+
+function requireUnarchivedTargets(db: Db, teamId: string, name: string, params: Params): void {
+  if (!PROJECT_WRITE_TOOLS.has(name)) return;
+  const projectIds = idsOf(params, ['projectId', 'projectIds']);
+  const todoIds = idsOf(params, ['todoId', 'todoIds', 'sourceTodoId']);
+  const buildIds = idsOf(params, ['buildId', 'buildIds']);
+  const viaTodos =
+    todoIds.length === 0
+      ? []
+      : db
+          .select({ projectId: todo.projectId })
+          .from(todo)
+          .where(and(inArray(todo.id, todoIds), eq(todo.teamId, teamId)))
+          .all();
+  const viaBuilds =
+    buildIds.length === 0
+      ? []
+      : db
+          .select({ projectId: todo.projectId })
+          .from(build)
+          .innerJoin(todo, eq(todo.id, build.todoId))
+          .where(and(inArray(build.id, buildIds), eq(todo.teamId, teamId)))
+          .all();
+  const targets = [
+    ...projectIds,
+    ...viaTodos.map((r) => r.projectId),
+    ...viaBuilds.map((r) => r.projectId),
+  ];
+  if (targets.length === 0) return;
+  const archived = db
+    .select({ id: project.id })
+    .from(project)
+    .where(
+      and(inArray(project.id, targets), eq(project.teamId, teamId), isNotNull(project.archivedAt)),
+    )
+    .get();
+  if (archived) {
+    throw new HttpError(409, `project ${archived.id} is archived; unarchive it before changing it`);
+  }
+}
+
+function refuseIntakeSplit(row: typeof todo.$inferSelect): void {
+  if (row.assignment?.source === 'intake-label') {
+    throw new HttpError(
+      409,
+      `intake-label-split-refused: Build task #${row.seqNum} as is with its preset agent; an unlinked split cannot preserve its intake label.`,
+    );
+  }
+}
+
+const DOCS_MAX_PATHS = 24;
+
+export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
+export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
+export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
+
+function requireTeamAgent(db: Db, agentId: string, teamId: string) {
+  const row = db
+    .select()
+    .from(agent)
+    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId), eq(agent.status, 'active')))
+    .get();
+  if (!row) throw new HttpError(404, `agent ${agentId} is unavailable in this team`);
+  return row;
+}
+function requireTeamBuild(db: Db, buildId: string, teamId: string) {
+  const row = db.select({ todoId: build.todoId }).from(build).where(eq(build.id, buildId)).get();
+  if (!row) throw new HttpError(404, `build ${buildId}`);
+  const owned = db
+    .select({ id: todo.id })
+    .from(todo)
+    .where(and(eq(todo.id, row.todoId), eq(todo.teamId, teamId)))
+    .get();
+  if (!owned) throw new HttpError(404, `build ${buildId}`);
+  return row;
+}
+export async function executeChiefTool(
+  deps: ChiefToolDeps,
+  ctx: ChiefToolCtx,
+  name: string,
+  params: Params,
+): Promise<string> {
+  const { db } = deps;
+  const svc = {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
+    db,
+    hub: deps.hub,
+    machineHub: deps.machineHub,
+    user: deps.user,
+    vapidKeys: deps.vapidKeys,
+    box: deps.box,
+    ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+  };
+  const boundChiefName =
+    ctx.chiefAgentId !== null
+      ? db
+          .select({ name: agent.displayName })
+          .from(agent)
+          .where(eq(agent.id, ctx.chiefAgentId))
+          .get()?.name
+      : undefined;
+  const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Chief' };
+  requireUnarchivedTargets(db, ctx.teamId, name, params);
+  switch (name) {
+    case 'projects': {
+      const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();
+      return json(
+        rows.map((p) => {
+          const todoCount = db
+            .select({ n: sql<number>`count(*)` })
+            .from(todo)
+            .where(eq(todo.projectId, p.id))
+            .get();
+          return { id: p.id, name: p.name, repoKind: p.repoKind, todoCount: todoCount?.n ?? 0 };
+        }),
+      );
+    }
+    case 'todos': {
+      const todoId = optStr(params, 'todoId');
+      if (todoId !== undefined) {
+        requireTeamTodo(db, todoId, ctx.teamId);
+        return json(getTodo(svc, todoId));
+      }
+      const offset = num(params, 'offset') ?? 0;
+      if (!Number.isSafeInteger(offset) || offset < 0) {
+        throw new HttpError(400, 'invalid params.offset: expected non-negative safe integer');
+      }
+      const projectId = optStr(params, 'projectId');
+      const phase = optStr(params, 'phase');
+      let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
+      if (phase) records = records.filter((t) => t.phase === phase);
+      const todos: { id: string; seqNum: number; title: string; phase: string; summary: string }[] =
+        [];
+      const response = { todos, total: records.length, nextOffset: null as number | null };
+      for (const record of records.slice(offset)) {
+        todos.push({
+          id: record.id,
+          seqNum: record.seqNum,
+          title: record.title.slice(0, CHIEF_TASK_LIST_TITLE_MAX_CHARS),
+          phase: record.phase,
+          summary: record.spec.slice(0, CHIEF_TASK_LIST_SUMMARY_MAX_CHARS),
+        });
+        response.nextOffset = offset + todos.length < records.length ? offset + todos.length : null;
+        if (Buffer.byteLength(json(response), 'utf8') > CHIEF_TASK_LIST_MAX_OUTPUT_BYTES) {
+          todos.pop();
+          response.nextOffset = offset + todos.length;
+          break;
+        }
+      }
+      return json(response);
+    }
+    case 'agents': {
+      const rows = db.select().from(agent).where(eq(agent.teamId, ctx.teamId)).all();
+      return json(
+        rows.map((a) => ({
+          id: a.id,
+          displayName: a.displayName,
+          description: a.description,
+          provider: a.provider,
+          modelId: a.modelId,
+          thinkingLevel: a.thinkingLevel,
+          tools: a.tools,
+          defaultSkill: a.defaultSkill,
+          skillsAllowlist: a.skillsAllowlist,
+          mcpServers: a.mcpServers,
+        })),
+      );
+    }
+    case 'models': {
+      const keysvc = { db, box: deps.box };
+      const rows: {
+        provider: string;
+        providerLabel: string;
+        modelId: string;
+        modelName: string;
+      }[] = [];
+      const seen = new Set<string>();
+      const push = (row: (typeof rows)[number]) => {
+        const key = row.provider === 'claude-code' ? `${row.provider}/${row.modelId}` : row.modelId;
+        if (seen.has(key)) return;
+        seen.add(key);
+        rows.push(row);
+      };
+      for (const source of getModelSources(keysvc, ctx.teamId).sources) {
+        const providerLabel = MODEL_SOURCE_RUNTIME_LABELS[source.runtime] ?? source.runtime;
+        for (const m of source.models) {
+          if (m.id === '') continue;
+          push({ provider: source.runtime, providerLabel, modelId: m.id, modelName: m.name });
+        }
+      }
+      return json(rows);
+    }
+    case 'machines': {
+      const rows = db.select().from(machine).where(eq(machine.teamId, ctx.teamId)).all();
+      return json(
+        rows.map((m) => ({
+          id: m.id,
+          name: m.name,
+          online: m.online,
+          latestCliVersion: m.latestCliVersion,
+        })),
+      );
+    }
+    case 'skills': {
+      const scanned = scanLocalSkills(deps.skillsDir);
+      return json(scanned.map((s) => ({ id: s.id, name: s.name, description: s.description })));
+    }
+    case 'secrets': {
+      const keysvc = { db, box: deps.box };
+      return json(listSecrets(keysvc, ctx.teamId));
+    }
+    case 'mcp_servers': {
+      const rows = listMcpServers(
+        { mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath() },
+        ctx.teamId,
+      );
+      return json(
+        rows.map((m) => ({
+          id: m.id,
+          label: m.label,
+          slug: m.slug,
+          transport: m.transport,
+          url: m.url,
+        })),
+      );
+    }
+    case 'schedules': {
+      return json(listSchedules({ db, hub: deps.hub }, ctx.teamId));
+    }
+    case 'docs': {
+      const projectId = str(params, 'projectId');
+      const row = requireProjectRow(db, projectId, ctx.teamId);
+      const paths = strArr(params, 'paths');
+      if (paths.length === 0) {
+        return json({ projectId, name: row.name, repoKind: row.repoKind, files: [] });
+      }
+      const capped = paths.slice(0, DOCS_MAX_PATHS);
+      const ref = optStr(params, 'ref');
+      const files: Record<string, unknown>[] = [];
+      for (const p of capped) {
+        try {
+          const f = await readFile({ db, reposDir: deps.reposDir }, projectId, p, ref);
+          files.push({ path: f.path, ref: f.ref, encoding: f.encoding, content: f.content });
+        } catch (err) {
+          files.push({ path: p, error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      return json({
+        projectId,
+        name: row.name,
+        files,
+        ...(paths.length > capped.length ? { omitted: paths.length - capped.length } : {}),
+      });
+    }
+    case 'usage': {
+      const buildId = optStr(params, 'buildId');
+      const teamBuildIds = db
+        .select({ id: build.id })
+        .from(build)
+        .innerJoin(todo, eq(todo.id, build.todoId))
+        .where(eq(todo.teamId, ctx.teamId));
+      const teamThreadIds = db
+        .select({ id: chiefThread.id })
+        .from(chiefThread)
+        .where(eq(chiefThread.teamId, ctx.teamId));
+      const owned = or(
+        inArray(tokenUsage.buildId, teamBuildIds),
+        inArray(tokenUsage.buildId, teamThreadIds),
+      );
+      const rows = db
+        .select()
+        .from(tokenUsage)
+        .where(buildId ? and(eq(tokenUsage.buildId, buildId), owned) : owned)
+        .all();
+      return json(rows);
+    }
+    case 'issues':
+    case 'pull_requests':
+    case 'workflow_runs':
+      return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
+    case 'attachment': {
+      const attachmentId = str(params, 'attachmentId');
+      return json(readAttachmentMeta(deps, ctx.teamId, attachmentId));
+    }
+    case 'conversation': {
+      const conversationId = str(params, 'conversationId');
+      return json(readConversationPage(db, conversationId, optStr(params, 'before')));
+    }
+    case 'search_history':
+      return json(
+        await searchHistory(db, ctx, {
+          query: str(params, 'query'),
+          limit: num(params, 'limit'),
+          before: optStr(params, 'before'),
+        }),
+      );
+    case 'read_history':
+      return json(
+        readHistory(db, ctx, strArr(params, 'ids'), {
+          offset: num(params, 'offset'),
+          maxChars: num(params, 'maxChars'),
+        }),
+      );
+
+    case 'create_todo': {
+      const projectId = str(params, 'projectId');
+      requireProjectRow(db, projectId, ctx.teamId);
+      const output = optTodoOutput(params, 'output');
+      const record = createTodo(svc, {
+        teamId: ctx.teamId,
+        projectId,
+        title: str(params, 'title'),
+        spec: str(params, 'spec'),
+        createdBy: ctx.chiefAgentId,
+        ownerId: ctx.userId,
+        orchestration: { threadId: ctx.threadId },
+        ...(output !== undefined ? { output } : {}),
+      });
+      db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
+      return json({ ...record, sourceBuildId: ctx.chiefId });
+    }
+    case 'split_todo': {
+      const todoId = str(params, 'todoId');
+      const parent = requireTeamTodo(db, todoId, ctx.teamId);
+      refuseIntakeSplit(parent);
+      const splitPolicy = requireProjectRow(db, parent.projectId, ctx.teamId).splitPolicy;
+      const rawSubtodos = params.subtodos;
+      if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
+        throw new HttpError(400, 'invalid params.subtodos: expected non-empty array');
+      }
+      const subtodos: SplitSubtodoInput[] = rawSubtodos.map((raw, i) => {
+        if (typeof raw !== 'object' || raw === null) {
+          throw new HttpError(400, `invalid params.subtodos[${i}]: expected object`);
+        }
+        const item = raw as Record<string, unknown>;
+        const blockedByRaw = item.blockedBy;
+        const blockedBy =
+          blockedByRaw === undefined || blockedByRaw === null
+            ? undefined
+            : Array.isArray(blockedByRaw)
+              ? blockedByRaw.map((n) => {
+                  if (
+                    typeof n !== 'number' ||
+                    !Number.isFinite(n) ||
+                    (splitPolicy === 'human' && !Number.isInteger(n))
+                  ) {
+                    throw new HttpError(
+                      400,
+                      `invalid params.subtodos[${i}].blockedBy: expected integer[]`,
+                    );
+                  }
+                  return n;
+                })
+              : (() => {
+                  throw new HttpError(
+                    400,
+                    `invalid params.subtodos[${i}].blockedBy: expected array`,
+                  );
+                })();
+        const output = optTodoOutput(item, 'output');
+        return {
+          title: str(item, 'title'),
+          spec: str(item, 'spec'),
+          agentId: str(item, 'agentId'),
+          ...(blockedBy !== undefined ? { blockedBy } : {}),
+          ...(output !== undefined ? { output } : {}),
+        };
+      });
+      const result = createSplitTodo(
+        {
+          db,
+          hub: deps.hub,
+          machineHub: deps.machineHub,
+          user: deps.user,
+          vapidKeys: deps.vapidKeys,
+          convHub: deps.convHub,
+          intakeAgentAllowlist: deps.intakeAgentAllowlist,
+        },
+        {
+          parentId: todoId,
+          subtodos,
+          chiefAgentId: ctx.chiefAgentId,
+          chiefId: ctx.chiefId,
+          threadId: ctx.threadId,
+          actorName: chiefActor.name,
+        },
+      );
+      if (result.autoStart) {
+        dispatchSplitChildren(
+          {
+            db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            user: deps.user,
+            convHub: deps.convHub,
+          },
+          todoId,
+        );
+      }
+      return json(result);
+    }
+    case 'update_todo': {
+      const todoId = str(params, 'todoId');
+      requireTeamTodo(db, todoId, ctx.teamId);
+      const record = updateTodo(svc, todoId, {
+        ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
+        ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
+        ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
+        ...(optStr(params, 'projectId') !== undefined
+          ? { projectId: optStr(params, 'projectId') }
+          : {}),
+      });
+      if (!record) throw new HttpError(404, `todo ${todoId}`);
+      return json(record);
+    }
+    case 'delete_todos': {
+      const ids = strArr(params, 'todoIds');
+      for (const id of ids) {
+        const row = requireTeamTodo(db, id, ctx.teamId);
+        if (row.latestBuildId === null) refuseIntakeSplit(row);
+      }
+      const deleted = ids.filter((id) => deleteTodo(svc, id));
+      return json({ deleted });
+    }
+    case 'close_todos': {
+      const ids = strArr(params, 'todoIds');
+      for (const id of ids) {
+        const row = db
+          .select()
+          .from(todo)
+          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
+          .get();
+        if (row?.latestBuildId === null) refuseIntakeSplit(row);
+      }
+      return json(transitionTodos(deps, ctx.teamId, ids, 'closed', chiefActor));
+    }
+    case 'reopen_todos':
+      return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'todo', chiefActor));
+    case 'complete_todos':
+      return json(transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor));
+    case 'message_todo': {
+      return json(
+        await messageTodo(deps, ctx.teamId, str(params, 'todoId'), str(params, 'content')),
+      );
+    }
+    case 'create_project': {
+      const name = str(params, 'name');
+      const repoKind = optStr(params, 'repoKind');
+      const id = newRecordId();
+      db.insert(project)
+        .values({
+          id,
+          name,
+          teamId: ctx.teamId,
+          repoKind: repoKind === 'hosted' ? 'hosted' : null,
+          repoName: null,
+          githubRepo: null,
+        })
+        .run();
+      seedFixedTags(db, id);
+      return json({
+        id,
+        name,
+        note: repoKind === 'hosted' ? 'hosted repo provisioning via REST face' : 'plain project',
+      });
+    }
+    case 'update_project': {
+      const projectId = str(params, 'projectId');
+      requireProjectRow(db, projectId, ctx.teamId);
+      const name = optStr(params, 'name');
+      if (name !== undefined)
+        db.update(project).set({ name }).where(eq(project.id, projectId)).run();
+      return json({ id: projectId, name });
+    }
+    case 'connect_repo': {
+      const projectId = str(params, 'projectId');
+      requireProjectRow(db, projectId, ctx.teamId);
+      const githubRepo = str(params, 'githubRepo');
+      if (!isGithubRepoRef(githubRepo))
+        throw new HttpError(400, 'invalid params.githubRepo: expected "owner/repo"');
+      db.update(project)
+        .set({ repoKind: 'github', githubRepo })
+        .where(eq(project.id, projectId))
+        .run();
+      return json({ id: projectId, repoKind: 'github', githubRepo });
+    }
+    case 'create_agent': {
+      const id = newRecordId();
+      db.insert(agent)
+        .values({
+          id,
+          teamId: ctx.teamId,
+          displayName: str(params, 'displayName'),
+          description: optStr(params, 'description') ?? null,
+          status: 'active',
+          avatarUrl: null,
+          provider: optStr(params, 'provider') ?? null,
+          modelId: optStr(params, 'modelId') ?? null,
+          thinkingLevel: null,
+          tools: [...AGENT_TOOL_DEFAULTS],
+          secrets: [],
+          defaultSkill: null,
+          skillsAllowlist: null,
+          mcpServers: [],
+        })
+        .run();
+      return json({ id });
+    }
+    case 'update_agent': {
+      const agentId = str(params, 'agentId');
+      const row = db
+        .select()
+        .from(agent)
+        .where(and(eq(agent.id, agentId), eq(agent.teamId, ctx.teamId)))
+        .get();
+      if (!row) throw new HttpError(404, `agent ${agentId}`);
+      const sets: Partial<typeof row> = {};
+      const dn = optStr(params, 'displayName');
+      const desc = optStr(params, 'description');
+      const prov = optStr(params, 'provider');
+      const model = optStr(params, 'modelId');
+      if (dn !== undefined) sets.displayName = dn;
+      if (desc !== undefined) sets.description = desc;
+      if (prov !== undefined) sets.provider = prov;
+      if (model !== undefined) sets.modelId = model;
+      if (Object.keys(sets).length > 0)
+        db.update(agent).set(sets).where(eq(agent.id, agentId)).run();
+      return json({ id: agentId, ...sets });
+    }
+    case 'delete_agents': {
+      const ids = strArr(params, 'agentIds');
+      for (const id of ids)
+        db.delete(agent)
+          .where(and(eq(agent.id, id), eq(agent.teamId, ctx.teamId)))
+          .run();
+      return json({ deleted: ids });
+    }
+    case 'create_skill': {
+      const body = parseWith(createSkillBodySchema, params, 'params');
+      return json(
+        createLocalSkill(
+          {
+            db,
+            skillsDir: deps.skillsDir,
+            teamId: ctx.teamId,
+            actor: skillAuditActor(ctx),
+          },
+          body,
+        ),
+      );
+    }
+    case 'update_skill': {
+      const body = parseWith(updateSkillToolParamsSchema, params, 'params');
+      return json(
+        updateLocalSkill(
+          {
+            db,
+            skillsDir: deps.skillsDir,
+            teamId: ctx.teamId,
+            actor: skillAuditActor(ctx),
+          },
+          body.skillId,
+          body,
+        ),
+      );
+    }
+    case 'set_secret': {
+      const keysvc = { db, box: deps.box };
+      const name = str(params, 'name');
+      const projectId = optStr(params, 'projectId') ?? null;
+      const existing = listSecrets(keysvc, ctx.teamId).find(
+        (s) => s.name === name && s.projectId === projectId,
+      );
+      const value = str(params, 'value');
+      const description = optStr(params, 'description') ?? null;
+      if (existing) {
+        return json(updateSecret(keysvc, ctx.teamId, existing.id, { name, value, description }));
+      }
+      const record = createSecret(keysvc, {
+        teamId: ctx.teamId,
+        name,
+        description,
+        value,
+        projectId,
+      });
+      return json(record);
+    }
+    case 'delete_secrets': {
+      const keysvc = { db, box: deps.box };
+      const names = strArr(params, 'names');
+      const projectId = optStr(params, 'projectId') ?? null;
+      const all = listSecrets(keysvc, ctx.teamId);
+      const deleted: string[] = [];
+      for (const n of names) {
+        const hit =
+          all.find((s) => s.id === n) ?? all.find((s) => s.name === n && s.projectId === projectId);
+        if (hit && deleteSecret(keysvc, ctx.teamId, hit.id)) deleted.push(n);
+      }
+      return json({ deleted });
+    }
+    case 'schedule_todo': {
+      const todoId = str(params, 'todoId');
+      const row = requireTeamTodo(db, todoId, ctx.teamId);
+      const kind = str(params, 'kind') as 'once' | 'hourly' | 'daily' | 'weekly';
+      const at = num(params, 'at');
+      if (at === undefined) throw new HttpError(400, 'invalid params.at: expected number');
+      const record = createSchedule(
+        { db, hub: deps.hub },
+        {
+          teamId: ctx.teamId,
+          projectId: row.projectId,
+          todoId,
+          kind,
+          at,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          createdBy: ctx.userId,
+        },
+      );
+      return json(record);
+    }
+    case 'unschedule_todo': {
+      const todoId = str(params, 'todoId');
+      requireTeamTodo(db, todoId, ctx.teamId);
+      const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
+      for (const r of rows) deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id);
+      return json({ todoId, removed: rows.length });
+    }
+
+    case 'snooze_todos': {
+      const todoIds = strArr(params, 'todoIds');
+      const body = parseWith(
+        snoozeTodoBodySchema,
+        {
+          until:
+            typeof params.until === 'string' && /^\d+$/.test(params.until)
+              ? Number(params.until)
+              : params.until,
+          ...(optStr(params, 'tz') ? { tz: optStr(params, 'tz') } : {}),
+        },
+        'params',
+      );
+      const snoozed: { id: string; snoozeMode: string | null; snoozedUntil: number | null }[] = [];
+      const skipped: string[] = [];
+      for (const id of todoIds) {
+        const owned = db
+          .select({ id: todo.id })
+          .from(todo)
+          .where(and(eq(todo.id, id), eq(todo.teamId, ctx.teamId)))
+          .get();
+        const record = owned ? snoozeTodo(svc, id, body) : null;
+        if (!record) {
+          skipped.push(id);
+          continue;
+        }
+        snoozed.push({
+          id,
+          snoozeMode: record.snoozeMode ?? null,
+          snoozedUntil: record.snoozedUntil ?? null,
+        });
+      }
+      return json({ snoozed, skipped });
+    }
+
+    case 'run_builds': {
+      const todoIds = strArr(params, 'todoIds');
+      const withPlan = bool(params, 'withPlan', true);
+      const dispatchReason = optStr(params, 'dispatchReason') ?? null;
+      const assignmentIn = params.assignment as
+        | {
+            plan?: { agentId?: string };
+            build?: { agentId?: string };
+            review?: { agentId?: string };
+            verify?: { agentId?: string };
+          }
+        | undefined;
+      const assignment = {
+        plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
+        build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
+        review: assignmentIn?.review?.agentId ? { agentId: assignmentIn.review.agentId } : null,
+        verify: assignmentIn?.verify?.agentId ? { agentId: assignmentIn.verify.agentId } : null,
+      };
+      const targets = todoIds.map((todoId) => {
+        const row = requireTeamTodo(db, todoId, ctx.teamId);
+        const effectiveAssignment =
+          row.assignment?.source === 'intake-label'
+            ? {
+                ...assignment,
+                source: row.assignment.source,
+                plan: row.assignment.plan,
+                build: row.assignment.build,
+              }
+            : assignment;
+        return {
+          todoId,
+          row,
+          assignment: effectiveAssignment,
+          projectName: requireProjectRow(db, row.projectId, ctx.teamId).name,
+        };
+      });
+      for (const target of targets) {
+        requireIntakeAssignment(deps, ctx.teamId, target.assignment);
+        if (target.assignment.plan === null && target.assignment.build === null) {
+          throw new HttpError(
+            400,
+            'No agent is assigned to plan or build. Set assignment.build.agentId or assignment.plan.agentId, then retry run_builds.',
+          );
+        }
+        for (const slot of [
+          target.assignment.plan,
+          target.assignment.build,
+          target.assignment.review,
+          target.assignment.verify,
+        ]) {
+          if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
+        }
+      }
+      const started: unknown[] = [];
+      for (const { todoId, row, projectName, assignment } of targets) {
+        const builds = startBuilds(
+          {
+            intakeAgentAllowlist: deps.intakeAgentAllowlist,
+            db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            user: deps.user,
+            vapidKeys: deps.vapidKeys,
+          },
+          {
+            projectId: row.projectId,
+            todoIds: [todoId],
+            assignment,
+            withPlan,
+            triggerSource: 'chief',
+          },
+        );
+        started.push(...builds);
+        const todoRecord = getTodo(svc, todoId);
+        if (todoRecord) {
+          addChiefWatch(deps, {
+            teamId: ctx.teamId,
+            todo: todoRecord,
+            projectName,
+            threadId: ctx.threadId,
+          });
+        }
+      }
+      return json({ builds: started, withPlan, dispatchReason, triggerSource: 'chief' });
+    }
+    case 'run_review': {
+      const buildId = str(params, 'buildId');
+      requireTeamBuild(db, buildId, ctx.teamId);
+      await applyBuildStepAction(deps, buildId, { action: 'review' }, chiefActor.name);
+      return json({ buildId, review: 'fanned-out', dispatchedBy: 'chief' });
+    }
+    case 'confirm_builds': {
+      const buildIds = strArr(params, 'buildIds');
+      for (const buildId of buildIds) await confirmBuild(deps, buildId, chiefActor.name);
+      return json({ confirmed: buildIds });
+    }
+    case 'cancel_builds': {
+      const buildIds = strArr(params, 'buildIds');
+      for (const buildId of buildIds) {
+        requireTeamBuild(db, buildId, ctx.teamId);
+        cancelBuild(deps, buildId);
+      }
+      return json({ cancelled: buildIds });
+    }
+    case 'merge_builds': {
+      const buildIds = strArr(params, 'buildIds');
+      return json({ rejected: true, buildIds, reason: MERGE_HUMAN_ONLY_COPY });
+    }
+
+    case 'ask_user': {
+      const provenance = requireTurnProvenance(
+        ctx.turnPrompt ?? null,
+        params.provenance,
+        'ask_user',
+      );
+      const questions = askUserQuestionsOfParams(params);
+      const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
+      const { content } = createOrGetQuestion(
+        {
+          db,
+          hub: deps.hub,
+          user: deps.user,
+          vapidKeys: deps.vapidKeys,
+          ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+        },
+        {
+          threadId: ctx.threadId,
+          requestId,
+          questions,
+          provenance,
+        },
+      );
+      return json({
+        status: content.status,
+        requestId,
+        note: 'question card delivered; the blocking answer channel is POST /api/machine/ask (newer daemon builds relay it automatically)',
+      });
+    }
+    case 'notify_user': {
+      const provenance = requireTurnProvenance(
+        ctx.turnPrompt ?? null,
+        params.provenance,
+        'notify_user',
+      );
+      const text = str(params, 'message');
+      const notice = {
+        id: newRecordId(),
+        threadId: ctx.threadId,
+        role: 'system' as const,
+        content: JSON.stringify({
+          kind: CHIEF_NOTICE_KIND,
+          message: text,
+          provenance,
+        } satisfies ChiefNoticeContent),
+        createdAt: nowMs(),
+      };
+      upsertChiefMessage(db, notice);
+      deps.convHub?.publishMessage(ctx.threadId, notice);
+      const agentRow = ctx.chiefAgentId
+        ? db.select().from(agent).where(eq(agent.id, ctx.chiefAgentId)).get()
+        : undefined;
+      notifyChiefMessage(
+        { db, hub: deps.hub, user: deps.user },
+        {
+          threadId: ctx.threadId,
+          message: text,
+          agent: agentRow
+            ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
+            : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+        },
+      );
+      return json({ notified: true });
+    }
+    case 'save_memory': {
+      if (ctx.chiefAgentId === null)
+        throw new HttpError(409, 'chief agent not bound — memory has no store');
+      const explicitProject = optStr(params, 'projectId');
+      if (explicitProject === undefined && ctx.turnScopeMixed === true) {
+        throw new HttpError(
+          400,
+          'this turn now covers more than one project: pass projectId so the memory lands in the right project',
+        );
+      }
+      const projectId = explicitProject ?? ctx.turnScopeProjectId ?? null;
+      const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
+      if (projectId !== null) {
+        requireProjectRow(db, projectId, ctx.teamId);
+        requireUnarchivedTargets(db, ctx.teamId, name, { projectId });
+      }
+      if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
+      const row = saveMemoryEntry(db, {
+        agentId: ctx.chiefAgentId,
+        teamId: ctx.teamId,
+        title: str(params, 'title'),
+        content: str(params, 'content'),
+        force: bool(params, 'force', false),
+        projectId,
+        sourceTodoId,
+        sourceBuildId: ctx.conversationId,
+      });
+      return json(row);
+    }
+    case 'update_memory': {
+      const memoryId = str(params, 'memoryId');
+      if (ctx.chiefAgentId === null) throw new HttpError(404, `memory ${memoryId}`);
+      return json(
+        updateMemoryEntry(db, {
+          memoryId,
+          agentId: ctx.chiefAgentId,
+          teamId: ctx.teamId,
+          content: str(params, 'content'),
+        }),
+      );
+    }
+    case 'delete_memory': {
+      const memoryId = str(params, 'memoryId');
+      const removed =
+        ctx.chiefAgentId === null
+          ? 0
+          : deleteMemoryEntry(db, {
+              memoryId,
+              agentId: ctx.chiefAgentId,
+              teamId: ctx.teamId,
+            });
+      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
+      return json({ deleted: memoryId });
+    }
+    case 'memories': {
+      if (ctx.chiefAgentId === null) return json([]);
+      return json(
+        listMemoryEntries(
+          db,
+          { agentId: ctx.chiefAgentId, teamId: ctx.teamId },
+          bool(params, 'includeInvalid', false),
+        ),
+      );
+    }
+    case 'watch_todos': {
+      const todoIds = strArr(params, 'todoIds');
+      const reason = optStr(params, 'reason');
+      const targets = todoIds.flatMap((todoId) => {
+        const record = getTodo(svc, todoId);
+        if (!record || record.teamId !== ctx.teamId) return [];
+        return [{ record, projectName: requireProjectRow(db, record.projectId, ctx.teamId).name }];
+      });
+      for (const { record, projectName } of targets) {
+        addChiefWatch(deps, {
+          teamId: ctx.teamId,
+          todo: record,
+          projectName,
+          threadId: ctx.threadId,
+          ...(reason ? { reason } : {}),
+        });
+      }
+      return json({ watched: todoIds });
+    }
+    case 'unwatch_todos': {
+      const todoIds = strArr(params, 'todoIds');
+      removeChiefWatches(deps, ctx.teamId, todoIds);
+      return json({ unwatched: todoIds });
+    }
+    case 'wakes': {
+      const row = db.select().from(chief).where(eq(chief.id, ctx.chiefId)).get();
+      return json(row?.wakes ?? []);
+    }
+    case 'set_wake': {
+      const at = num(params, 'at');
+      if (at === undefined) throw new HttpError(400, 'invalid params.at: expected number');
+      const wake = setChiefWake(deps, ctx.teamId, {
+        at,
+        ...(optStr(params, 'note') ? { note: optStr(params, 'note') } : {}),
+        ...(optStr(params, 'todoId') ? { todoId: optStr(params, 'todoId') } : {}),
+        threadId: ctx.threadId,
+      });
+      return json(wake);
+    }
+    case 'clear_wake': {
+      const ok = clearChiefWake(deps, ctx.teamId, str(params, 'wakeId'));
+      return json({ cleared: ok });
+    }
+
+    default:
+      throw new HttpError(400, `unknown chief tool: ${name}`);
+  }
+}
+
+export type TransitionActor = { kind: 'user' | 'agent'; name: string };
+
+export type TransitionDeps = Pick<
+  ChiefToolDeps,
+  'db' | 'hub' | 'machineHub' | 'user' | 'vapidKeys' | 'convHub' | 'intakeAgentAllowlist'
+>;
+
+export function transitionTodos(
+  deps: TransitionDeps,
+  teamId: string,
+  todoIds: string[],
+  to: 'closed' | 'todo' | 'done',
+  actor: TransitionActor,
+): { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> } {
+  const svc = {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
+    db: deps.db,
+    hub: deps.hub,
+    machineHub: deps.machineHub,
+    user: deps.user,
+    vapidKeys: deps.vapidKeys,
+    convHub: deps.convHub,
+  };
+  const transitioned: string[] = [];
+  const skipped: string[] = [];
+  const reasons: Record<string, string> = {};
+  for (const id of todoIds) {
+    const owned = deps.db
+      .select({ id: todo.id, phase: todo.phase, latestBuildId: todo.latestBuildId })
+      .from(todo)
+      .where(and(eq(todo.id, id), eq(todo.teamId, teamId)))
+      .get();
+    if (!owned) {
+      skipped.push(id);
+      continue;
+    }
+    if (
+      to === 'done' &&
+      actor.kind === 'agent' &&
+      (owned.phase === 'review' || owned.phase === 'confirm')
+    ) {
+      skipped.push(id);
+      reasons[id] =
+        '待确认/审核关口的 done 落地必须由人过闸（发起合并，或用户在看板确认）。把卡停在当前关口，用 notify_user 唤醒用户处理。';
+      continue;
+    }
+    try {
+      const record = setTodoPhase(svc, id, to);
+      if (record) {
+        transitioned.push(id);
+        const doneFromInProgress =
+          to === 'done' && (IN_PROGRESS_PHASES as readonly string[]).includes(owned.phase);
+        if ((to === 'closed' && owned.phase !== 'closed') || doneFromInProgress)
+          stopActiveStepsAfterExit(svc, id);
+        if (to === 'done' && owned.phase !== 'done' && owned.latestBuildId !== null) {
+          insertGateAnnouncement(deps, owned.latestBuildId, DONE_ANNOUNCEMENT, actor.name);
+        }
+        if (to === 'done' && owned.phase !== 'done') {
+          advanceSplitWaves(
+            {
+              intakeAgentAllowlist: deps.intakeAgentAllowlist,
+              db: deps.db,
+              hub: deps.hub,
+              machineHub: deps.machineHub,
+              user: deps.user,
+              vapidKeys: deps.vapidKeys,
+            },
+            id,
+          );
+        }
+      } else skipped.push(id);
+    } catch {
+      skipped.push(id);
+    }
+  }
+  return Object.keys(reasons).length > 0
+    ? { transitioned, skipped, reasons }
+    : { transitioned, skipped };
+}
+
+function buildDeps(deps: ChiefToolDeps) {
+  return {
+    intakeAgentAllowlist: deps.intakeAgentAllowlist,
+    db: deps.db,
+    hub: deps.hub,
+    machineHub: deps.machineHub,
+    user: deps.user,
+    vapidKeys: deps.vapidKeys,
+    convHub: deps.convHub,
+    reposDir: deps.reposDir,
+    box: deps.box,
+    githubFetch: deps.githubFetch,
+    oauthClient: deps.oauthClient,
+  };
+}
+export async function confirmBuild(
+  deps: ChiefToolDeps,
+  buildId: string,
+  actor?: string,
+): Promise<void> {
+  if (!deps.db.select().from(build).where(eq(build.id, buildId)).get()) {
+    throw new HttpError(404, `build ${buildId}`);
+  }
+  try {
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+  } catch (err) {
+    if (
+      err instanceof HttpError &&
+      err.status === 409 &&
+      err.message.endsWith('当前相位 building')
+    ) {
+      return;
+    }
+    throw err;
+  }
+}
+
+export interface WorkerMemoryCtx {
+  teamId: string;
+  agentId: string;
+  todoId: string;
+  projectId: string | null;
+  buildId: string;
+  attachmentsDir: string;
+}
+
+export async function executeWorkerMemoryTool(
+  db: Db,
+  ctx: WorkerMemoryCtx,
+  name: string,
+  params: Params,
+): Promise<string> {
+  switch (name) {
+    case 'save_memory': {
+      const projectId = optStr(params, 'projectId');
+      const sourceTodoId = optStr(params, 'sourceTodoId');
+      if (projectId !== undefined) requireProjectRow(db, projectId, ctx.teamId);
+      if (sourceTodoId !== undefined) requireTeamTodo(db, sourceTodoId, ctx.teamId);
+      const row = saveMemoryEntry(db, {
+        agentId: ctx.agentId,
+        teamId: ctx.teamId,
+        title: str(params, 'title'),
+        content: str(params, 'content'),
+        force: bool(params, 'force', false),
+        projectId: projectId ?? ctx.projectId,
+        sourceTodoId: sourceTodoId ?? ctx.todoId,
+        sourceBuildId: ctx.buildId,
+      });
+      return json(row);
+    }
+    case 'update_memory': {
+      return json(
+        updateMemoryEntry(db, {
+          memoryId: str(params, 'memoryId'),
+          agentId: ctx.agentId,
+          teamId: ctx.teamId,
+          content: str(params, 'content'),
+        }),
+      );
+    }
+    case 'delete_memory': {
+      const memoryId = str(params, 'memoryId');
+      const removed = deleteMemoryEntry(db, {
+        memoryId,
+        agentId: ctx.agentId,
+        teamId: ctx.teamId,
+      });
+      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
+      return json({ deleted: memoryId });
+    }
+    case 'memories': {
+      return json(
+        listMemoryEntries(
+          db,
+          { agentId: ctx.agentId, teamId: ctx.teamId },
+          bool(params, 'includeInvalid', false),
+        ),
+      );
+    }
+    case 'attachment': {
+      const attachmentId = str(params, 'attachmentId');
+      if (!todoAuthorizesAttachment(db, ctx.todoId, attachmentId)) {
+        throw new HttpError(404, `attachment ${attachmentId}`);
+      }
+      return json(
+        readAttachmentMeta({ db, attachmentsDir: ctx.attachmentsDir }, ctx.teamId, attachmentId),
+      );
+    }
+    default:
+      throw new HttpError(400, `tool ${name} is not relayed for worker steps`);
+  }
+}

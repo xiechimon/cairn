@@ -1,0 +1,5 @@
+=== demo 1b: unregistered brand-ink text (expect RED, exit 1) ===
+[ui-drift-gate] G6 __gate-demo.tsx:2: brand ink in a text role without a ledger entry — brand slots are spot emphasis only (#987/#1055): move it to the text tiers / --primary / registry link tier, or register the spot role with reason + contrast in scripts/ui-consumer-registry.json (export const DEMO_INK = 'demo-brand-label text-(--card-button)';)
+[ui-drift-gate] FAIL: 1 drift site(s). See header for gate intent.
+=== full-gate exit code probe ===
+gate exit code: 1

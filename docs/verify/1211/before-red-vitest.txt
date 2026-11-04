@@ -1,0 +1,72 @@
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0308-1211-no-main-checkout-mutation/apps/daemon
+
+ ❯ test/runner-local.test.ts (13 tests | 3 failed) 599ms
+   ❯ runner repo 形态接线（spec 12 G2-T2） (5)
+     × 失败方式 1：local merge 步 → worktree + push 回用户仓库 = 落地全链；不对用户仓库目录再做任何 git 操作（#1211）+ done success 8ms
+     × 失败方式 2（#1211 真值面）：local merge 步真 git 全链 → 用户仓库只多 conv 分支，HEAD/reflog/工作树零变化 473ms
+   ❯ runner 权限闸：合并分支/推送分支（XMON-77） (6)
+     × 失败方式 7：merge 步双开关齐 → 失败方式 1 全流程不变 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/runner-local.test.ts > runner repo 形态接线（spec 12 G2-T2） > 失败方式 1：local merge 步 → worktree + push 回用户仓库 = 落地全链；不对用户仓库目录再做任何 git 操作（#1211）+ done success
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/runner-local.test.ts:351:69
+    349|     expect(calls).toContain('push:pacman/conv-conv-1');
+    350|     // #1211：用户主检出的分支/工作树永不被 pacman 推进——push 后收尾即结束。
+    351|     expect(calls.some((c) => c.startsWith('landLocalFastForward'))).to…
+       |                                                                     ^
+    352|     expect(client.doneBodies[0]!.body.status).toBe('success');
+    353|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/runner-local.test.ts > runner repo 形态接线（spec 12 G2-T2） > 失败方式 2（#1211 真值面）：local merge 步真 git 全链 → 用户仓库只多 conv 分支，HEAD/reflog/工作树零变化
+AssertionError: expected '51b33d4eb1073a9ea1e5564eceaf4a7605974…' to be '3407ef758b77425a42ab810ce3aceff13914d…' // Object.is equality
+
+Expected: "3407ef758b77425a42ab810ce3aceff13914d5dd"
+Received: "51b33d4eb1073a9ea1e5564eceaf4a7605974916"
+
+ ❯ test/runner-local.test.ts:386:45
+    384|
+    385|     // 主检出零触碰：HEAD 不动、reflog 无新增、工作树无新文件、status 干净。
+    386|     expect(git('rev-parse', 'HEAD').trim()).toBe(headBefore);
+       |                                             ^
+    387|     expect(git('reflog', 'main')).toBe(reflogBefore);
+    388|     expect(existsSync(join(userRepo, 'probe.txt'))).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/runner-local.test.ts > runner 权限闸：合并分支/推送分支（XMON-77） > 失败方式 7：merge 步双开关齐 → 失败方式 1 全流程不变
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/runner-local.test.ts:480:69
+    478|     expect(calls).toContain('mergeDefaultBranch');
+    479|     expect(calls).toContain('push:pacman/conv-conv-1');
+    480|     expect(calls.some((c) => c.startsWith('landLocalFastForward'))).to…
+       |                                                                     ^
+    481|     expect(client.doneBodies[0]!.body.status).toBe('success');
+    482|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 10 passed (13)
+   Start at  23:42:45
+   Duration  1.31s (tests 48%, import 31%, transform 21%)
+

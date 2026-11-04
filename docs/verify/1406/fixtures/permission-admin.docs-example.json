@@ -1,0 +1,11 @@
+{
+  "permission": "admin",
+  "role_name": "admin",
+  "user": {
+    "login": "octocat",
+    "id": 1,
+    "node_id": "MDQ6VXNlcjE=",
+    "type": "User",
+    "site_admin": false
+  }
+}

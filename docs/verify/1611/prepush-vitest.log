@@ -1,0 +1,634 @@
+
+ RUN  v5.0.1 /home/ian/lanes/cairn-1611
+
+ ✓ |@xiechimon/cairn-cli| test/acp.test.ts (10 tests) 11ms
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+Gemini ACP: no model configuration advertised; using the CLI default instead of gemini
+ ✓ |@xiechimon/cairn-cli| test/acp-stdio.test.ts (10 tests) 103ms
+ ✓ |@xiechimon/cairn| test/gemini-runtime.test.ts (2 tests) 4ms
+ ✓ |@xiechimon/cairn-cli| test/machine-boot.test.ts (5 tests) 91ms
+ ✓ |@xiechimon/cairn-cli| test/runner-blocker-handoff.test.ts (4 tests) 23ms
+ ✓ |@xiechimon/cairn-cli| test/runner-issue-fence.test.ts (14 tests) 45ms
+ ✓ |@xiechimon/cairn-cli| test/machine-backends.test.ts (4 tests) 222ms
+ ✓ |@xiechimon/cairn-cli| test/machine-claim.test.ts (3 tests) 177ms
+ ✓ |@xiechimon/cairn-cli| test/machine-recover.test.ts (7 tests) 213ms
+ ✓ |@xiechimon/cairn-cli| test/step-reclaim.test.ts (3 tests) 316ms
+ ✓ |@xiechimon/cairn-cli| test/machine-steer.test.ts (6 tests) 354ms
+ ✓ |@xiechimon/cairn-cli| test/machine-step-exec.test.ts (4 tests) 339ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel.test.ts (2 tests) 392ms
+ ✓ |@xiechimon/cairn-cli| test/machine-stop.test.ts (8 tests) 435ms
+ ✓ |@xiechimon/cairn-cli| test/machine-parallel-chief.test.ts (7 tests) 465ms
+ ✓ |@cairn/integration| test/m5-web-e2e.test.ts (3 tests) 16625ms
+   ✓ M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload) (3)
+     ✓ create → plan → confirm → build → review → merge → done (main-sequence spine) 2811ms
+     ✓ reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4) 2509ms
+     ✓ scheduled run parks at review: create once schedule in UI → tick trigger → direct build → parks at review + started-by-schedule marker (r3 §9) 2819ms
+
+[diag] stub requests consumed: 11
+[diag] daemon.log tail:
+
+ ✓ |@cairn/integration| test/rework-branch-reuse-e2e.test.ts (1 test) 1793ms
+   ✓ #931 both rework paths return to the original branch (E2E) (1)
+     ✓ failed restart and review reject: same conv / same branch / new commits land on the original branch / correct session shapes 1483ms
+
+[diag] stub requests consumed: 8
+[diag] daemon.log tail:
+[skills] filtered: grilling not in injected selection
+[skills] filtered: handoff not in injected selection
+[skills] filtered: herdr not in injected selection
+[skills] filtered: how not in injected selection
+[skills] filtered: humanizer-zh not in injected selection
+[skills] filtered: implement not in injected selection
+[skills] filtered: implement-spec not in injected selection
+[skills] filtered: improve-codebase-architecture not in injected selection
+[skills] filtered: in-your-own-words not in injected selection
+[skills] filtered: interface-review not in injected selection
+[skills] filtered: interview not in injected selection
+[skills] filtered: iphone-use not in injected selection
+[skills] filtered: job-apply not in injected selection
+[skills] filtered: job-match not in injected selection
+[skills] filtered: kami not in injected selection
+[skills] filtered: ketchup not in injected selection
+[skills] filtered: leader not in injected selection
+[skills] filtered: make-resume not in injected selection
+[skills] filtered: migrate-to-shoehorn not in injected selection
+[skills] filtered: offer not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: project-guide not in injected selection
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a174c9-c9e9-727f-9912-3987cfc1c91a
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a174c9-c9e9-727f-9912-3987cfc1c91a
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m3b-demo.test.ts (4 tests) 4088ms
+   ✓ M3b demo: single-machine full lifecycle todo→done (02 §4.2 main sequence) (4)
+     ✓ create → plan: worktree contract lands + plan.md v1 persisted + push (r3 §1.4/§3.3) 385ms
+     ✓ failure requires manual rerun (02/A6): provider 400 → failed → no auto rerun → POST builds rerun = new conv/new branch 2954ms
+
+[diag] stub requests consumed: 13
+[diag] daemon.log tail:
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a174c9-d279-724f-9a8d-53c527d03e02
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:45863/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:45863/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:45863/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:45863/v1"; machine "m4b-wake-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (1 running)
+claim step=BCRldepGY56oGtpjSwzHQ
+step BCRldepGY56oGtpjSwzHQ for conv chief-01a174c9-cee2-7c9e-878f-53fea93b619f (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: v1
+[skills] unknown-dispatch: chat
+[skills] unknown-dispatch: completions
+[skills] unknown-dispatch: json
+[skills] unknown-dispatch: v1
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-wake-home-Jab3pW/workspaces/chief-01a174c9-cee2-7c9e-878f-53fea93b619f/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4b-wake-home-Jab3pW/workspaces/chief-01a174c9-cee2-7c9e-878f-53fea93b619f/.pi/skills)
+[skills] loaded: 78 skills from /home/ian/.agents/skills
+[skills] catalog: entries=51 chars=14351 bytes=19729
+[step] brief written: AGENTS.md (create)
+continue session chief-01a174c9-cee2-7c9e-878f-53fea93b619f
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-watch-wake-e2e.test.ts (3 tests) 1525ms
+   ✓ M4b watch/wake three-trigger E2E (r5 §3.5 reference run) (3)
+     ✓ dispatch auto-watch (reason canon) + gate wake parks at review and reports 536ms
+     ✓ settle wake: two-phase merge report (delegation accepted → result confirmed) + watch auto-release 335ms
+     ✓ failed wake: step failed → chief calls machines first, then evidence-style report + watch release 311ms
+
+[diag] stub requests consumed: 7
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team: 3 skill(s), 4 file(s) materialized → /tmp/cairn-it-routing-home-pBzcT5/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 (fetched 4 file(s) / 396 byte(s), reused 0)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-pBzcT5/workspaces/01a174c9-d78b-7b85-8636-ae2f1d4b1250/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-pBzcT5/workspaces/01a174c9-d78b-7b85-8636-ae2f1d4b1250/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: beta-skill not in injected selection
+[skills] filtered: gamma-skill not in injected selection
+[skills] loaded: 2 skills from /tmp/cairn-it-routing-home-pBzcT5/team-skills/views/b794776452a99bdd1381b190217c6f63472f99db0ecc73fc89998bd941090150 + /tmp/cairn-it-routing-local-t4b1wo
+[skills] catalog: entries=2 chars=801 bytes=859
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a174c9-d78b-7b85-8636-ae2f1d4b1250
+[skills] denied-read: /tmp/cairn-it-routing-local-t4b1wo/local-blocked/SKILL.md (skill local-blocked not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=Ko-Qt1jDp3DiVzeRu-6HD
+step Ko-Qt1jDp3DiVzeRu-6HD for conv 01a174c9-d877-7249-b3a9-c890c86d857d (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-pBzcT5/workspaces/01a174c9-d877-7249-b3a9-c890c86d857d/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-routing-home-pBzcT5/workspaces/01a174c9-d877-7249-b3a9-c890c86d857d/.pi/skills)
+[skills] filtered: local-blocked not in agent allowlist
+[skills] filtered: local-one not in agent allowlist
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+[skills] deny: 2 skill dir(s) hard-blocked
+new session 01a174c9-d877-7249-b3a9-c890c86d857d
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-routing-e2e.test.ts (2 tests) 664ms
+
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+[skills] filtered: offer not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: project-guide not in injected selection
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a174c9-e08d-7daa-ad93-c8d60f8bd35a
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed cairn/conv-01a174c9-e08d-7daa-ad93-c8d60f8bd35a
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/g2t2-local-lifecycle.test.ts (2 tests) 1855ms
+   ✓ G2-T2 local form full lifecycle (spec 12: mirror clone + push back to the user repo = delivery, main checkout untouched) (2)
+     ✓ failure modes 1-3: plan/build → conv branch pushed back to the user repo → merge → conv branch update lands delivery, user main checkout unchanged (#1211) 888ms
+     ✓ failure mode 4: dirty workspace → merge step still done (#1211: delivery does not read the user workspace); user HEAD/dirty files unchanged 646ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+2026-10-25 13:39:11 Loading pi runtime…
+2026-10-25 13:39:11 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+2026-10-25 13:39:11 [machine] claude binary: /home/ian/.local/share/mise/installs/claude/latest/claude (2.1.302)
+2026-10-25 13:39:11 Enrolled in team Po654-w1JrfLwpJXKxwRc (machine ytKeJqqHNQhDPzFw0lXhx)
+2026-10-25 13:39:11 Online (machineId=ytKeJqqHNQhDPzFw0lXhx); polling http://127.0.0.1:39095
+2026-10-25 13:39:11 [recover] no pending steps found
+2026-10-25 13:39:11 [wake] push channel connected
+2026-10-25 13:39:11 claim step=2UM0iWLFNNVjLOcBvcU7v
+2026-10-25 13:39:11 step 2UM0iWLFNNVjLOcBvcU7v for conv chief-01a174c9-e6d5-75a9-a828-80721ceaad43 (1 running)
+2026-10-25 13:39:11 using model stub-gw/stub-model
+2026-10-25 13:39:11 [workspace] 准备工作区...
+2026-10-25 13:39:11 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-25 13:39:11 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-25 13:39:11 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-oIi4Uq/workspaces/chief-01a174c9-e6d5-75a9-a828-80721ceaad43/.claude/skills)
+2026-10-25 13:39:11 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-oIi4Uq/workspaces/chief-01a174c9-e6d5-75a9-a828-80721ceaad43/.pi/skills)
+2026-10-25 13:39:11 [skills] loaded: 78 skills from /home/ian/.agents/skills
+2026-10-25 13:39:11 [skills] catalog: entries=51 chars=14351 bytes=19729
+2026-10-25 13:39:11 [step] brief written: AGENTS.md (create)
+2026-10-25 13:39:11 new session chief-01a174c9-e6d5-75a9-a828-80721ceaad43
+2026-10-25 13:39:11 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-25 13:39:13 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-25 13:39:13 [step] brief removed (AGENTS.md)
+2026-10-25 13:39:13 finished (0 running)
+2026-10-25 13:39:13 claim step=7hOw48mqUH8KPC5T8r-oK
+2026-10-25 13:39:13 step 7hOw48mqUH8KPC5T8r-oK for conv chief-01a174c9-f123-783d-b389-564389338220 (1 running)
+2026-10-25 13:39:13 using model stub-gw/stub-model
+2026-10-25 13:39:13 [workspace] 准备工作区...
+2026-10-25 13:39:13 [mcp] managed-empty: strict MCP set (runtime config not inherited)
+2026-10-25 13:39:13 [skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+2026-10-25 13:39:13 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-oIi4Uq/workspaces/chief-01a174c9-f123-783d-b389-564389338220/.claude/skills)
+2026-10-25 13:39:13 [skills] missing-skill-md: skill path does not exist (/tmp/cairn-ask-home-oIi4Uq/workspaces/chief-01a174c9-f123-783d-b389-564389338220/.pi/skills)
+2026-10-25 13:39:13 [skills] loaded: 78 skills from /home/ian/.agents/skills
+2026-10-25 13:39:13 [skills] catalog: entries=51 chars=14351 bytes=19729
+2026-10-25 13:39:13 [step] brief written: AGENTS.md (create)
+2026-10-25 13:39:14 new session chief-01a174c9-f123-783d-b389-564389338220
+2026-10-25 13:39:14 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-25 13:39:14 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-25 13:39:14 [step] brief removed (AGENTS.md)
+2026-10-25 13:39:14 finished (0 running)
+
+ ✓ |@cairn/integration| test/chief-ask-user.test.ts (2 tests) 3395ms
+   ✓ #1049 chief ask_user blocking Q&A full chain (pi backend) (2)
+     ✓ question → card (row + notification) → answer card → same turn continues (D2/D3/D4) 2658ms
+     ✓ user cancels → cancelled tool result → model converges in the same turn (D4 user-side exit) 512ms
+ ✓ |@cairn/integration| test/port-base-e2e.test.ts (3 tests) 15674ms
+   ✓ #1148 E2E: port base segmentation (two concurrent worker steps in different segments) (1)
+     ✓ two concurrent worker steps see CAIRN_PORT_BASE = 20000 / 20100 in their bash env 665ms
+   ✓ #1260 E2E: chief occupies the machine concurrency slot (cap 1) (1)
+     ✓ while a worker runs (cap 1) the chief queues for a free slot; a later worker is FIFO behind it 8502ms
+   ✓ #1148 E2E: env fallback precedence (env > DB > default) (1)
+     ✓ DB 2 / env 1 → only 1 worker runs at a time (env beats DB; server gate narrows to self-report) 6499ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a174ca-3800-7378-996d-dc3d31a8324e
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-mcp-e2e.test.ts (3 tests) 2005ms
+   ✓ MCP client face E2E: local config registration + per-Agent slug authorization + daemon local resolution bridge (spec 13) (1)
+     ✓ server projection = config mirror (secret values never leave the API); authorized build step calls external tools for real; dead endpoint/unknown slug degrade without blocking 1691ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /home/ian/.local/share/mise/installs/claude/latest/claude (2.1.302)
+Enrolled in team PyGtNl-XnrZI9DVp9Chim (machine 811x1kCLKWwSBjU2vn-V0)
+Online (machineId=811x1kCLKWwSBjU2vn-V0); polling http://127.0.0.1:40617
+[recover] no pending steps found
+[wake] push channel connected
+claim step=60PKUhTkRmkxDKJyZKYYo
+step 60PKUhTkRmkxDKJyZKYYo for conv 01a174ca-42b2-722b-b068-87afe13c142b (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-skills-home-5UCM6t/workspaces/01a174ca-42b2-722b-b068-87afe13c142b/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-it-skills-home-5UCM6t/workspaces/01a174ca-42b2-722b-b068-87afe13c142b/.pi/skills)
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /tmp/cairn-it-skills-qNHsfE
+[skills] catalog: entries=1 chars=573 bytes=611
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a174ca-42b2-722b-b068-87afe13c142b
+[skills] denied-read: /tmp/cairn-it-skills-qNHsfE/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/skills-inject-e2e.test.ts (1 test) 540ms
+ ✓ |@cairn/integration| test/m7-failed-send-e2e.test.ts (1 test) 685ms
+   ✓ M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to confirm (1)
+     ✓ full-chain persistence + new round actually runs + phase gate rejects 374ms
+ ✓ |@cairn/integration| test/info-fastlane-e2e.test.ts (1 test) 905ms
+   ✓ #1626 info-class fast lane: info card report handed to the downstream code card (1)
+     ✓ info card only produces a report attachment, no branch push or merge; downstream code card brief carries the report and delivers as usual 602ms
+ ✓ |@cairn/integration| test/pi-session-policy.test.ts (1 test) 659ms
+   ✓ pi session policy (#925 trust/telemetry/settings + #927 cost/cache) (1)
+     ✓ failure modes 1-6: deny observable, brief not regressed, policy line readable, retention sent, cost persisted, four dims unchanged 346ms
+
+[timing] wake→confirm (incl. real pi execution) = 227ms; idle claim cadence (hold=1s) = 3/3.2s
+ ✓ |@cairn/integration| test/m3a-demo.test.ts (4 tests) 3884ms
+   ✓ M3a demo: server dispatches step → daemon executes for real → transcript persists (4)
+     ✓ claim cadence is isomorphic to server hold (r3 §1.5 ~75–76s at compressed test timescale; production default 75s pinned on the wire test) 3201ms
+
+[diag] stub requests consumed: 5
+[diag] daemon.log tail:
+[skills] filtered: offer not in injected selection
+[skills] filtered: pr not in injected selection
+[skills] filtered: project-guide not in injected selection
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a174ca-7605-7ca1-9e76-203ef6c14107
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4b-memory-e2e.test.ts (2 tests) 2457ms
+   ✓ M4b memory E2E: instruction-triggered + mid-step write + provenance + zero auto-write (r5 §6) (2)
+     ✓ spec instruction turn: save_memory persists mid-build-step, three-level provenance = live context 1891ms
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a174ca-7b60-78e0-9f82-a99e1b4b7a2c
+[gate] ask: rule=ask-rm-rf-root command=rm -rf /
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[gate] reject: rule=deny-echo tool=mcp__demo__echo
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/gate-e2e.test.ts (1 test) 684ms
+   ✓ #929 command gate tool_call seam E2E: both directions + MCP coverage (1)
+     ✓ reject and allow each land where they should: irreversible bash form denied (reason into transcript), MCP call passes the same gate, legal bash change lands 349ms
+ ✓ |@cairn/integration| test/web-plans-convergence.test.ts (1 test) 3947ms
+   ✓ plan card converges via the team-stream phase event when the conv stream is dead (#666) 770ms
+
+[diag] stub requests consumed: 3
+[diag] daemon.log tail:
+[skills] filtered: prototype not in injected selection
+[skills] filtered: prototype-switcher not in injected selection
+[skills] filtered: research not in injected selection
+[skills] filtered: retro not in injected selection
+[skills] filtered: reverse-engineer-anything not in injected selection
+[skills] filtered: scaffold-exercises not in injected selection
+[skills] filtered: setup-matt-pocock-skills not in injected selection
+[skills] filtered: setup-pre-commit not in injected selection
+[skills] filtered: shadcn not in injected selection
+[skills] filtered: sharpen not in injected selection
+[skills] filtered: show-me-your-work not in injected selection
+[skills] filtered: sync not in injected selection
+[skills] filtered: tdd not in injected selection
+[skills] filtered: teach not in injected selection
+[skills] filtered: technical-writing not in injected selection
+[skills] filtered: to-questionnaire not in injected selection
+[skills] filtered: to-spec not in injected selection
+[skills] filtered: to-tickets not in injected selection
+[skills] filtered: triage not in injected selection
+[skills] filtered: unslop not in injected selection
+[skills] filtered: wait-what not in injected selection
+[skills] filtered: wayfinder not in injected selection
+[skills] filtered: why not in injected selection
+[skills] filtered: wiki not in injected selection
+[skills] filtered: wizard not in injected selection
+[skills] filtered: writing-dna-skill not in injected selection
+[skills] filtered: writing-for-agents not in injected selection
+[skills] filtered: zread not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a174ca-93fd-7b0b-81b6-2be3be2c7d7d
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] shell allowed step=FUE_HtdaVDyXxCGduXKjI run=gz4c9WsrKA-sqsjZjVWEL cmd=echo SHELL-E2E-MARKER-110
+[step] shell done step=FUE_HtdaVDyXxCGduXKjI run=gz4c9WsrKA-sqsjZjVWEL exit=0 chars=21 ms=10
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/shell-e2e.test.ts (1 test) 584ms
+ ✓ |@cairn/integration| test/restart-blank-feedback-e2e.test.ts (1 test) 586ms
+   ✓ blank-feedback restart round (#720 negative case): no empty instruction injected (1)
+     ✓ blank feedback → plain restart round: no instruction, no blank user row, session prompt = task text 367ms
+
+[diag] todo phase: failed
+[diag] daemon.log tail:
+2026-10-25 13:39:58 [skills] filtered: wait-what not in injected selection
+2026-10-25 13:39:58 [skills] filtered: wayfinder not in injected selection
+2026-10-25 13:39:58 [skills] filtered: why not in injected selection
+2026-10-25 13:39:58 [skills] filtered: wiki not in injected selection
+2026-10-25 13:39:58 [skills] filtered: wizard not in injected selection
+2026-10-25 13:39:58 [skills] filtered: writing-dna-skill not in injected selection
+2026-10-25 13:39:58 [skills] filtered: writing-for-agents not in injected selection
+2026-10-25 13:39:58 [skills] filtered: zread not in injected selection
+2026-10-25 13:39:58 [skills] catalog: entries=0 chars=0 bytes=0
+2026-10-25 13:39:58 [step] brief written: AGENTS.md (create)
+2026-10-25 13:39:58 new session 01a174ca-9e5f-77d2-84f6-a264cc6703b9
+2026-10-25 13:39:58 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-25 13:39:58 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+2026-10-25 13:39:58 [step] brief removed (AGENTS.md)
+2026-10-25 13:39:58 [step] step failed: git commit failed (1): [0mapps/daemon/test/1262-ansi-probe.ts[0m[0m:[0m[0m1[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/no-unused-variables\lint/correctness/noUnusedVariables]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[33m⚠[0m[0m [0m[0m[33mThis variable [0m[0m[1m[33mgreeting[0m[0m[33m is unused.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m1 │ [0m[0mc[0m[0mo[0m[0mn[0m[0ms[0m[0mt[0m[0m [0m[0mg[0m[0mr[0m[0me[0m[0me[0m[0mt[0m[0mi[0m[0mn[0m[0mg[0m[0m [0m[0m=[0m[0m [0m[0m"[0m[0mh[0m[0me[0m[0ml[0m[0ml[0m[0mo[0m[0m"[0m[0m [0m[0m+[0m[0m [0m[0m"[0m[0m [0m[0mw[0m[0mo[0m[0mr[0m[0ml[0m[0md[0m[0m"[0m[0m;[0m[0m
+[0m[0m  [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2 │ [0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnused variables are often the result of typos, incomplete refactors, or other sources of bugs.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUnsafe fix: If this is intentional, prepend [0m[0m[1m[34mgreeting[0m[0m[34m with an underscore.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[1m[31mg[0m[0m[1m[31mr[0m[0m[1m[31me[0m[0m[1m[31me[0m[0m[1m[31mt[0m[0m[1m[31mi[0m[0m[1m[31mn[0m[0m[1m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[1m[32m_[0m[0m[1m[32mg[0m[0m[1m[32mr[0m[0m[1m[32me[0m[0m[1m[32me[0m[0m[1m[32mt[0m[0m[1m[32mi[0m[0m[1m[32mn[0m[0m[1m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[32m"[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[32m"[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0mapps/daemon/test/1262-ansi-probe.ts[0m[0m [0m[0mformat[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mFormatter would have printed the following content:[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m1[0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[31mc[0m[0m[31mo[0m[0m[31mn[0m[0m[31ms[0m[0m[31mt[0m[0m[2m[31m·[0m[0m[31mg[0m[0m[31mr[0m[0m[31me[0m[0m[31me[0m[0m[31mt[0m[0m[31mi[0m[0m[31mn[0m[0m[31mg[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[31mh[0m[0m[31me[0m[0m[31ml[0m[0m[31ml[0m[0m[31mo[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31m+[0m[0m[2m[31m·[0m[0m[1m[31m"[0m[0m[2m[31m·[0m[0m[31mw[0m[0m[31mo[0m[0m[31mr[0m[0m[31ml[0m[0m[31md[0m[0m[1m[31m"[0m[0m[31m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m[1m1[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[32mc[0m[0m[32mo[0m[0m[32mn[0m[0m[32ms[0m[0m[32mt[0m[0m[2m[32m·[0m[0m[32mg[0m[0m[32mr[0m[0m[32me[0m[0m[32me[0m[0m[32mt[0m[0m[32mi[0m[0m[32mn[0m[0m[32mg[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[32mh[0m[0m[32me[0m[0m[32ml[0m[0m[32ml[0m[0m[32mo[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32m+[0m[0m[2m[32m·[0m[0m[1m[32m'[0m[0m[2m[32m·[0m[0m[32mw[0m[0m[32mo[0m[0m[32mr[0m[0m[32ml[0m[0m[32md[0m[0m[1m[32m'[0m[0m[32m;[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m2[0m[0m [0m[0m[1m2[0m[0m[1m │ [0m[0m [0m[0m [0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1 file in 64[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[31mFound [0m[0m[31m1[0m[0m[31m error.[0m[0m
+[0m[0m[33mFound [0m[0m[33m1[0m[0m[33m warning.[0m
+[0mcheck[0m[0m [0m[0m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[31m✖[0m[0m [0m[0m[31mSome [0m[0m[1m[31merrors[0m[0m[31m were emitted while [0m[0m[1m[31mrunning checks[0m[0m[31m.[0m[0m
+[0m[0m  [0m[0m
+[0m
+2026-10-25 13:39:58 finished (0 running)
+
+ ✓ |@cairn/integration| test/ansi-errormessage-e2e.test.ts (1 test) 684ms
+   ✓ #1262 E2E: lint-failed commit → errorMessage persisted as plain text (1)
+     ✓ pre-commit colored biome output → failed → build.errorMessage unescaped, first line readable 678ms
+
+[diag] stub requests consumed: 2
+[diag] daemon.log tail:
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /home/ian/.local/share/mise/installs/claude/latest/claude (2.1.302)
+Enrolled in team Sv2xS1WGHO5Zvrt_n3keE (machine RW8uOF_pr5v3JB--fJjro)
+Online (machineId=RW8uOF_pr5v3JB--fJjro); polling http://127.0.0.1:42995
+[recover] no pending steps found
+[wake] push channel connected
+claim step=GiBY9K08L2FiRBb3hBuLl
+step GiBY9K08L2FiRBb3hBuLl for conv chief-01a174ca-a3c8-7ee5-8c16-edc5af3e0a48 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4a-home-XW39Du/workspaces/chief-01a174ca-a3c8-7ee5-8c16-edc5af3e0a48/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/cairn-m4a-home-XW39Du/workspaces/chief-01a174ca-a3c8-7ee5-8c16-edc5af3e0a48/.pi/skills)
+[skills] loaded: 78 skills from /home/ian/.agents/skills
+[skills] catalog: entries=51 chars=14351 bytes=19729
+[step] brief written: AGENTS.md (create)
+new session chief-01a174ca-a3c8-7ee5-8c16-edc5af3e0a48
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+ ✓ |@cairn/integration| test/m4a-chief-e2e.test.ts (1 test) 547ms
+ ✓ |@cairn/integration| test/m7-stop-e2e.test.ts (1 test) 566ms
+ ✓ |@cairn/integration| test/memory-regression-seed.test.ts (4 tests) 430ms
+ ✓ |@cairn/integration| test/w3-steer-e2e.test.ts (1 test) 8588ms
+   ✓ W3 steer E2E: message while building → pending → signal → pull-confirm → session.steer (1)
+     ✓ full-chain delivery + rendering + undisturbed step finish + gate reject 8290ms
+ ✓ |@cairn/integration| test/chief-eval-reap.test.ts (4 tests) 1910ms
+   ✓ reapEscapees (4)
+     ✓ cleans up dev servers that escaped their workspace 1436ms
+     ✓ pgrep -f substring matching bridges the /var vs /private/var symlink difference 428ms
+
+ Test Files  40 passed (40)
+      Tests  138 passed (138)
+   Start at  13:38:37
+   Duration  96.98s (tests 69%, import 29%, transform 2%)
+
+JSON report written to /tmp/prepush-vitest-TauzeY/report.json

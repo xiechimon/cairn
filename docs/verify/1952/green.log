@@ -1,0 +1,12 @@
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (196.172466ms)
+✔ CLI does not truncate more than 200 qualifying commits (2173.892234ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (163.306956ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (188.093957ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2767.179887

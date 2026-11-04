@@ -1,0 +1,35 @@
+#1403 segment 2: gates on 9be72069 (claude/bootstrap-p2-seg2, contains origin/main 659d8cb5)
+Run 2026-10-22 09:45-09:53 UTC in /home/user/pacman/.claude/worktrees/p3a.
+
+$ pnpm lint                                  exit 0
+  Checked 810 files in 3s. No fixes applied.
+  Found 1 info.
+  (the info is the existing noUselessFragments note in apps/web/src/resources/machines-page.tsx, not in this diff)
+
+$ pnpm typecheck                             exit 0
+  packages/shared typecheck: Done
+  apps/web typecheck: Done
+  apps/daemon typecheck: Done
+  apps/server typecheck: Done
+  integration typecheck: Done
+
+$ pnpm spec:parse                            exit 0
+  $ node scripts/spec-parse-gate.mjs
+  [spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (8.1s)
+  [spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.7s)
+  [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+$ pnpm exec vitest run --changed origin/main   exit 0   (origin/main = 659d8cb5)
+   Test Files  139 passed (139)
+        Tests  1643 passed | 1 skipped (1644)
+     Duration  379.27s (tests 66%, import 33%)
+
+$ lsof -iTCP:8404 -sTCP:LISTEN                exit 1 (no listener)
+$ E2E_AFFECTED_PORT=8404 pnpm --filter @pacman/web e2e:affected   exit 0
+  Running 8 tests using 2 workers
+    8 passed (19.1s)
+
+Earlier gate runs on this branch, all exit 0: 45ec317f (origin/main e410e826; all five
+gates; vitest --changed 138 files, 1602 passed; e2e:affected 8 passed) and 034441ed
+(origin/main bc1d99f8; lint, typecheck, spec:parse and vitest --changed, 138 files,
+1639 passed; e2e:affected was not run on that head).

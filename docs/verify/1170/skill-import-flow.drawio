@@ -1,0 +1,61 @@
+<mxfile host="app.diagrams.net" agent="pacman-lane">
+  <diagram id="skill-import-1170" name="skill import + refresh">
+    <mxGraphModel dx="900" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="A" value="Web 技能页「导入」弹窗&#10;localPath / GitHub URL 二选一" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;verticalAlign=middle;wrap=mixed;" vertex="1" parent="1">
+          <mxGeometry x="40" y="50" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="B" value="POST /api/teams/{id}/skills/import" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="300" y="62" width="230" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="C" value="services/skill-import.ts 收集 + 守卫&#10;SSRF: https + 公网 host, 出站只打固定 GitHub 域&#10;localPath: realpath 归一, 拒技能根内, 只读 walk&#10;字节闸 + utf8 严格 + 树声明预检" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=center;verticalAlign=middle;wrap=mixed;" vertex="1" parent="1">
+          <mxGeometry x="580" y="36" width="300" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="D" value="createLocalSkill&#10;既有校验: 目录名正则 / frontmatter 一致&#10;skill_audit 审计行" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="580" y="176" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E" value="技能根 &lt;skillsDir&gt;/&lt;frontmatter name&gt;/&#10;目录 + 文件落盘" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="300" y="186" width="230" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="F" value="来源记录 skill-sources.json&#10;kind = localPath | github&#10;ref + importedAt + refreshedAt&#10;(数据根侧车, 无 DB schema 改动)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="164" width="210" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="G" value="POST /api/teams/{id}/skills/{sid}/refresh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="380" width="230" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="H" value="按记录来源重拉（同收集器）&#10;id 不变闸: frontmatter name ≠ sid → 409&#10;无来源记录 → 409" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="330" y="366" width="260" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="I" value="updateLocalSkill 覆写（列出者覆写）&#10;物化清单 sha256 变 → 新 digest 视图 (#920)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="650" y="372" width="230" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="A" target="B">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="B" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="CreateSkillBody" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;labelBackgroundColor=#ffffff;fontSize=10;" edge="1" parent="1" source="C" target="D">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="D" target="E">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="登记来源" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;labelBackgroundColor=#ffffff;fontSize=10;" edge="1" parent="1" source="E" target="F">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="读来源" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;labelBackgroundColor=#ffffff;fontSize=10;" edge="1" parent="1" source="F" target="H">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="G" target="H">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" edge="1" parent="1" source="H" target="I">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

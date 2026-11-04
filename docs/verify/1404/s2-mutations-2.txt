@@ -1,0 +1,38 @@
+# #1404 S2 mutations, round 2 (after /code-review on #1421): each one applied alone to the round 2 source, then apps/server/test/merge-gate-readiness.test.ts (80 tests), then the file restored.
+# Covers the rules changed in round 2: items 1 (unavailable digests go to a person), 2 (foreign checks, unstable), 3 (a pass clears evidence_invalid), 4 (unreadable default branch is transient).
+# Item 5 is a comment only and has no mutation. No mutation survived.
+# Definitions (name, file, text replaced, replacement) below.
+
+unbindable digest reported as transient patch-unavailable   3 failed | 77 passed (80)
+patch-unbindable class transient                            2 failed | 78 passed (80)
+unreadable compare goes to a person                         2 failed | 78 passed (80)
+foreign checks ignored when clean                           2 failed | 78 passed (80)
+has_hooks skips the foreign check                           1 failed | 79 passed (80)
+judged checks listed again under clean                      4 failed | 76 passed (80)
+required run not marked judged                              2 failed | 78 passed (80)
+required status not marked judged                           2 failed | 78 passed (80)
+pr-evidence not marked judged                               1 failed | 79 passed (80)
+own status counted as foreign                               2 failed | 78 passed (80)
+unstable with nothing visible accepted                      1 failed | 79 passed (80)
+own success counts as a visible non-passing check           1 failed | 79 passed (80)
+pass does not clear evidence_invalid                        1 failed | 79 passed (80)
+pass on another digest clears evidence_invalid              1 failed | 79 passed (80)
+unreadable default branch goes to a person                  1 failed | 79 passed (80)
+unreadable default branch passes                            1 failed | 79 passed (80)
+
+["unbindable digest reported as transient patch-unavailable", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unbindable', digest.unavailable);", "block('patch-unavailable', digest.unavailable);"]
+["patch-unbindable class transient", "packages/shared/src/records/merge-gate.ts", "code: 'patch-unbindable',\n    class: 'human',", "code: 'patch-unbindable',\n    class: 'transient',"]
+["unreadable compare goes to a person", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unavailable', 'compare unreadable');", "block('patch-unbindable', 'compare unreadable');"]
+["foreign checks ignored when clean", "apps/server/src/services/merge-gate/readiness.ts", "if (foreign.length > 0)\n        block('mergeable-state'", "if (false)\n        block('mergeable-state'"]
+["has_hooks skips the foreign check", "apps/server/src/services/merge-gate/readiness.ts", "} else if (state === 'clean' || state === 'has_hooks') {", "} else if (state === 'has_hooks') {\n    } else if (state === 'clean') {"]
+["judged checks listed again under clean", "apps/server/src/services/merge-gate/readiness.ts", "(notPassing ?? []).filter((x) => !judged.has(x))", "(notPassing ?? [])"]
+["required run not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "        judged.add(run);\n", ""]
+["required status not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "        judged.add(status);\n", ""]
+["pr-evidence not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "    if (evidence !== undefined) judged.add(evidence);\n", ""]
+["own status counted as foreign", "apps/server/src/services/merge-gate/readiness.ts", "...checks.statuses.filter((s) => s.state !== 'success' && !isOwnStatus(s)),", "...checks.statuses.filter((s) => s.state !== 'success'),"]
+["unstable with nothing visible accepted", "apps/server/src/services/merge-gate/readiness.ts", "      else if (!ownNotPassing) block('mergeable-state', 'unstable, no failing check visible');\n", ""]
+["own success counts as a visible non-passing check", "apps/server/src/services/merge-gate/readiness.ts", "checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s))", "checks?.statuses.some((s) => isOwnStatus(s))"]
+["pass does not clear evidence_invalid", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'evidence_invalid'))", "if (has(verify, 'evidence_invalid'))"]
+["pass on another digest clears evidence_invalid", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'evidence_invalid'))", "if (!i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'pass') && has(verify, 'evidence_invalid'))"]
+["unreadable default branch goes to a person", "apps/server/src/services/merge-gate/readiness.ts", "if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');", "if (i.repo.defaultBranch === null) block('base-not-default', 'default branch unknown');"]
+["unreadable default branch passes", "apps/server/src/services/merge-gate/readiness.ts", "if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');", "if (i.repo.defaultBranch === null) {\n    }"]

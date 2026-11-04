@@ -1,0 +1,27 @@
+PASS  board-ready  — 看板 shell 就绪
+shot  01-board.png
+PASS  sidebar-badge-key  — 侧栏「新任务」行角标="C"
+PASS  sidebar-row-click-opens  — 行点击开 .new-task-dialog=true
+PASS  board-new-key-opens  — "c" → .new-task-dialog=true
+PASS  board-new-key-focus  — "c" 开面后正文框持焦=true
+shot  board-new-key-open.png
+PASS  board-old-key-stays-closed  — "n" ×5 → 弹层出现=false
+PASS  board-input-state-guard  — 输入态按 "c"：入框="c" 弹层=false
+PASS  schedules-new-key-opens  — "c" → .new-task-dialog=true
+PASS  schedules-new-key-focus  — "c" 开面后正文框持焦=true
+shot  schedules-new-key-open.png
+PASS  schedules-old-key-stays-closed  — "n" ×5 → 弹层出现=false
+PASS  project-page-ready  — 项目页=http://127.0.0.1:5273/app/project/ba-Oq1vfLQpTXjJHW2YQ2
+PASS  project-new-key-opens  — "c" → .new-task-dialog=true
+PASS  project-new-key-focus  — "c" 开面后正文框持焦=true
+shot  project-new-key-open.png
+PASS  project-old-key-stays-closed  — "n" ×5 → 弹层出现=false
+PASS  chain-open  — "c" 开面=true
+PASS  chain-saved-closed  — 保存后弹层收起
+shot  05-board-saved.png
+PASS  api-todo-created  — GET /api/todos 命中新任务(id=SvFP0A_WsGiqrV7_Q34zy)
+PASS  db-todo-created  — SQLite todo 表命中=true
+
+evidence: /Users/xmon/.pacman/workspaces/01a12aa3-7bc8-7de0-95f7-ab62d50d12e2/.claude/verify-evidence/2026-10-11T11-11-12-509Z-newtask-key
+allOk=true
+drive newtask-key:PASS

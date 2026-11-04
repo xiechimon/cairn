@@ -1,0 +1,52 @@
+{
+  "enabled": true,
+  "discussionCategories": {
+    "nodes": [
+      {
+        "id": "DIC_kwDOUSKs6c4DJxqx",
+        "name": "Announcements",
+        "slug": "announcements",
+        "isAnswerable": false
+      },
+      {
+        "id": "DIC_kwDOUSKs6c4DJxqy",
+        "name": "General",
+        "slug": "general",
+        "isAnswerable": false
+      },
+      {
+        "id": "DIC_kwDOUSKs6c4DJxq0",
+        "name": "Ideas",
+        "slug": "ideas",
+        "isAnswerable": false
+      },
+      {
+        "id": "DIC_kwDOUSKs6c4DJxq2",
+        "name": "Polls",
+        "slug": "polls",
+        "isAnswerable": false
+      },
+      {
+        "id": "DIC_kwDOUSKs6c4DJxqz",
+        "name": "Q&A",
+        "slug": "q-a",
+        "isAnswerable": true
+      },
+      {
+        "id": "DIC_kwDOUSKs6c4DJxq1",
+        "name": "Show and tell",
+        "slug": "show-and-tell",
+        "isAnswerable": false
+      }
+    ]
+  },
+  "discussions": {
+    "nodes": [
+      {
+        "title": "Welcome to Cairn Discussions",
+        "url": "https://github.com/xiechimon/cairn/discussions/2039",
+        "body": "# Welcome to Cairn Discussions\n\nCairn runs an agent on your own machine and delivers gated pull requests: the agent works, the gates run, and you decide whether the change lands. This is where people who run it help each other.\n\n## Where to post\n\n| Category | Use it for |\n|---|---|\n| **Q&A** | Installing, configuring and using Cairn. Ask here first; answers stay searchable for the next person. |\n| **Show and tell** | What you built, what your first gated pull request changed, and what you learned while it ran. |\n| **Ideas** | A change you want to see, before it becomes an issue. |\n| **General** | Everything else about running Cairn on your own hardware. |\n\n## Where not to post\n\n- **Bugs and confirmed feature work** belong in the [issue tracker](https://github.com/xiechimon/cairn/issues), where a maintainer labels them before an agent picks them up.\n- **Security reports** never go here. Follow [SECURITY.md](https://github.com/xiechimon/cairn/security/policy) and report privately.\n\n## Before you ask\n\n1. Read the README section for the install path you used.\n2. Search existing discussions; someone may have hit the same setup step.\n3. Redact secrets. API keys, tokens, `.env` contents and private repository names do not belong in a post, a log paste or a screenshot.\n\n## Your first gated pull request\n\nIf Cairn is the reason a pull request merged, the **Show and tell** category is a useful place to say what it changed and how long the first one took. Nothing is posted on your behalf: if Cairn offered you a prefilled post, you choose whether to submit it, and [docs/privacy.md](https://github.com/xiechimon/cairn/blob/lane/2001/docs/privacy.md) lists exactly what the prefilled text contains.\n\n## Conduct\n\nTechnical disagreement is welcome. Personal attacks, spam and disclosed secrets are removed.\n"
+      }
+    ]
+  }
+}

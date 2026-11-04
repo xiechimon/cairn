@@ -1,0 +1,69 @@
+=== CONTROL: candidate implementation (symlink copy bug + partial env scrub) ===
+✖ workspace package links keep their evaluated source after dependency copies (27.653207ms)
+✖ workspace links removed by a full dependency copy are restored before evaluation (47.611337ms)
+✖ isolated evaluation cannot read stored credentials or reach publication remotes (40.907449ms)
+✖ a preloaded module cannot be used to reach the publication credential store (18.239923ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 264.502902
+
+✖ failing tests:
+
+test at scripts/harness-eval-worker.round1.test.mjs:129:1
+✖ workspace package links keep their evaluated source after dependency copies (27.653207ms)
+  TypeError: linkWorkspaceDependencies is not a function
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.round1.test.mjs:143:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+
+test at scripts/harness-eval-worker.round1.test.mjs:167:1
+✖ workspace links removed by a full dependency copy are restored before evaluation (47.611337ms)
+  TypeError: linkWorkspaceDependencies is not a function
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.round1.test.mjs:178:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at scripts/harness-eval-worker.round1.test.mjs:192:1
+✖ isolated evaluation cannot read stored credentials or reach publication remotes (40.907449ms)
+  AssertionError [ERR_ASSERTION]: evaluation read a credential file: GIT_CONFIG_GLOBAL=set,GH_CONFIG_DIR=set,CAIRN_EVAL_RELAY_KEY=set,git_config_global=readable,gh_hosts=readable,tmp_git_credentials=readable
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.round1.test.mjs:247:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/harness-eval-worker.round1.test.mjs:260:1
+✖ a preloaded module cannot be used to reach the publication credential store (18.239923ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'GIT_CONFIG_GLOBAL=set,GH_CONFIG_DIR=set,git_config_global=readable'
+  - ''
+  
+      at TestContext.<anonymous> (/mnt/fast/lanes/cairn-1975/scripts/harness-eval-worker.round1.test.mjs:292:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'GIT_CONFIG_GLOBAL=set,GH_CONFIG_DIR=set,git_config_global=readable',
+    expected: '',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

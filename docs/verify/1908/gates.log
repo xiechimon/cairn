@@ -1,0 +1,7 @@
+prepush-vitest exit: 0
+single-use-helper-gate: 0 single-use helper(s)
+single-use-helper-gate exit: 0
+comment-discipline-gate: 0 new comment line(s)
+comment-discipline-gate exit: 0
+english-only-gate: 0 line(s) with Chinese text
+english-only-gate exit: 0

@@ -1,0 +1,19 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.2.0, pluggy-1.7.0
+rootdir: /mnt/fast/lanes/cairn-1517
+collected 6 items
+
+integration/eval/harbor/test_pr_to_task.py .....F                        [100%]
+
+=================================== FAILURES ===================================
+_________ test_control_classification_refuses_infrastructure_failures __________
+
+    def test_control_classification_refuses_infrastructure_failures():
+>       assert converter.classify_control({"verifier_result": {"rewards": {"reward": 0}}, "exception_info": None}, "Error: Cannot find module x", "nop") == "infrastructure"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'pr_to_task' has no attribute 'classify_control'
+
+integration/eval/harbor/test_pr_to_task.py:72: AttributeError
+=========================== short test summary info ============================
+FAILED integration/eval/harbor/test_pr_to_task.py::test_control_classification_refuses_infrastructure_failures
+========================= 1 failed, 5 passed in 1.47s ==========================

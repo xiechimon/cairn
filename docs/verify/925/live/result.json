@@ -1,0 +1,70 @@
+{
+  "probe": "drive-925-pi-policy",
+  "server": "http://127.0.0.1:8791",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0221-925-927-pi/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-925-daemon-home",
+  "passed": 12,
+  "total": 12,
+  "checks": [
+    {
+      "name": "plan 步真跑完（stub LLM + 真 daemon + 真 git worktree）",
+      "ok": true,
+      "detail": "{\"id\":\"OA8zGhowfZHL8eyu4a9HG\",\"kind\":\"plan\",\"status\":\"done\",\"buildErrorMessage\":null}"
+    },
+    {
+      "name": "策略宣告行五面齐（trust=deny telemetry=off version-check=off cache-retention=long settings=in-memory）",
+      "ok": true,
+      "detail": "2026-10-08 01:49:54 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=long settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)"
+    },
+    {
+      "name": "[trust] denied 行点名 .pi/SYSTEM.md（可观测记录，非静默跳过）",
+      "ok": true,
+      "detail": "2026-10-08 01:49:55 [trust] denied: .pi/SYSTEM.md present in worktree — project trust is denied by policy, protected resources are not loaded (spec 26)"
+    },
+    {
+      "name": "stub 收到请求（LLM 输入面可审）",
+      "ok": true,
+      "detail": "requests=2"
+    },
+    {
+      "name": "劫持 marker 零进入 LLM 输入面（deny 生效）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "简报通道零回归：任务文本仍进请求面（AGENTS.md 不受 trust 门控）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "PACMAN_PI_CACHE_RETENTION=long → 请求体带 prompt_cache_retention:\"24h\"",
+      "ok": true,
+      "detail": "first request prompt_cache_retention=\"24h\""
+    },
+    {
+      "name": "per-message usage 行 = stub 请求数（每条含 cost=2010 worked example 单消息值）",
+      "ok": true,
+      "detail": "lines=2 requests=2"
+    },
+    {
+      "name": "GET /api/builds/:id/usage 200 且单行（build×model）",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "成本五分项 = pi calculateCost worked example（2×(980×$2+100×$0.5)=$4020）",
+      "ok": true,
+      "detail": "{\"buildId\":\"01a1177c-7645-7ae3-a6f3-c5efa19999a3\",\"model\":\"stub-gw/stub-model\",\"input\":0,\"output\":1960,\"cacheRead\":200,\"cacheWrite\":0,\"costInput\":0,\"costOutput\":3920,\"costCacheRead\":100,\"costCacheWrite\":0,\"costTotal\":4020}"
+    },
+    {
+      "name": "四维回归：input/output/cacheRead/cacheWrite 与 stub usage 报告逐值一致",
+      "ok": true,
+      "detail": "{\"buildId\":\"01a1177c-7645-7ae3-a6f3-c5efa19999a3\",\"model\":\"stub-gw/stub-model\",\"input\":0,\"output\":1960,\"cacheRead\":200,\"cacheWrite\":0,\"costInput\":0,\"costOutput\":3920,\"costCacheRead\":100,\"costCacheWrite\":0,\"costTotal\":4020}"
+    },
+    {
+      "name": "SQLite token_usage 行 = API 同值（落库真值，real 列）",
+      "ok": true,
+      "detail": "{\"buildId\":\"01a1177c-7645-7ae3-a6f3-c5efa19999a3\",\"model\":\"stub-gw/stub-model\",\"input\":0,\"output\":1960,\"cacheRead\":200,\"cacheWrite\":0,\"costInput\":0,\"costOutput\":3920,\"costCacheRead\":100,\"costCacheWrite\":0,\"costTotal\":4020}"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Command: .agents/setup in a fresh clone of B2/agents-setup on the omarchy host (not an orb), with an empty HOME and an empty pnpm store (npm_config_store_dir), so the pnpm store, pnpm self-install and Playwright cache were all cold.
+
+cold store, cold HOME (pnpm store, corepack, Playwright cache empty):
+./.agents/setup rc=0 ms=39082
+second run:
+./.agents/setup rc=0 ms=1725
+git status --porcelain after second run: []
+test -x .husky/_/pre-push: ok
+resume:
+./.agents/resume rc=0 ms=1262
+host: omarchy Linux 7.2.8-9-omarchy x86_64, node v26.8.2, pnpm 12.5.1, commit 695cf5c9, at 2026-10-30T19:47:45Z

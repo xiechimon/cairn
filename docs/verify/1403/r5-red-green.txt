@@ -1,0 +1,27 @@
+# #1403 round 5 (pr-gate run 4 on #1414): the round 5 test file, red against the sources of 865e7f3, green at 6de470b.
+# Red leg: apps/server/src/{services/ci-loop.ts,services/builds.ts,lib/github.ts} taken from 865e7f3 with git show,
+# the round 5 pr-reconcile.test.ts and ci-loop.test.ts as committed in 6de470b; the three files were put back afterwards.
+
+== red, sources at 865e7f3 ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+     × ⑭a merged, but the branch has a later commit the merge does not contain → stays in review with a hint
+     × ⑱b merged before the card reached review (auto-merge the moment CI went green) → done
+     × ⑱c reopened done→review after the merge step finished it → not finished again
+     × ⑲ merged into a branch other than the default branch → stays in review, one hint
+     × ㉕ a checkpoint that is not a 40-hex sha is not put into a request URL
+     × ㉘c while compare is in flight the merge step finishes the card and a person reopens it → not finished again
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  6 failed | 61 passed (67)
+
+first assertion of each failure:
+  ⑭a merged, but the branch has a later commit the merge does not contain    AssertionError: expected true to be false // Object.is equality
+  ⑱b merged before the card reached review (auto-merge the moment CI went    AssertionError: expected 'review' to be 'done' // Object.is equality
+  ⑱c reopened done→review after the merge step finished it → not finished    AssertionError: expected 'done' to be 'review' // Object.is equality
+  ⑲ merged into a branch other than the default branch → stays in review,    AssertionError: expected 'PR #201 合并进了 feature-x，不是默认分支 main，改动…' to contain '「feature-x」'
+  ㉕ a checkpoint that is not a 40-hex sha is not put into a request URL      AssertionError: expected 'PR #201 已在 GitHub 合并，但执行步回报的分支提交「../.…' not to contain '../../user'
+  ㉘c while compare is in flight the merge step finishes the card and a per   AssertionError: expected 'done' to be 'review' // Object.is equality
+
+== green at 6de470b ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  67 passed (67)

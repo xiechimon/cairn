@@ -1,0 +1,117 @@
+✖ clean backup passes real checkout API and never reports key or plaintext (75157.65275ms)
+✔ one attachment byte changed names its storage key (4577.9865ms)
+✔ message content edited names table and id (3420.233292ms)
+✔ deleted row in backupDb fails (2175.04225ms)
+✔ deleted row in db fails (5083.954917ms)
+✔ scratch inside live directory is refused (3248.892208ms)
+✔ scratch through symlink is refused (1378.170333ms)
+✔ existing scratch is refused without overwriting it (1405.757917ms)
+✔ report cannot overwrite live DB or key (1382.041292ms)
+✔ invalid gzip fails and publishes failure status (1099.417417ms)
+✔ foreign key violation fails (1025.691834ms)
+✔ wrong key fails without leaking bytes (1378.424917ms)
+✔ no encrypted sample fails (1230.116167ms)
+✔ missing relationship sample fails (1029.444083ms)
+✖ post-backup timestamped updates and inserts are allowed (4959.451292ms)
+✔ missing attachment and unsafe attachment key fail (2501.588ms)
+✖ default backup directory selects the newest timestamp (16364.17925ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (14348.122959ms)
+✖ machine heartbeat allowlist is reported while machine name remains strict (43606.723625ms)
+✔ missing ready attachment names its storage key (9323.572708ms)
+✔ weekly units isolate scratch and do not install themselves (2.155417ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 17
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 201711.406333
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:52:1
+✖ clean backup passes real checkout API and never reports key or plaintext (75157.65275ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:78:1
+✖ post-backup timestamped updates and inserts are allowed (4959.451292ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:78:306)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:80:1
+✖ default backup directory selects the newest timestamp (16364.17925ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:80:137)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ops/restore-drill.test.mjs:82:1
+✖ machine heartbeat allowlist is reported while machine name remains strict (43606.723625ms)
+  AssertionError [ERR_ASSERTION]: FAIL api: api startup failed or timed out
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<WORKTREE>/scripts/ops/restore-drill.test.mjs:82:386)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

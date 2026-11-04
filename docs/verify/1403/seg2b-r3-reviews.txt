@@ -1,0 +1,79 @@
+#1403 segment 2b round 3 (PR #1509): review dispositions
+Inputs: pr-gate run 2 at efea0f26 (go, no blocking, six suggestions) and /code-review
+(medium) on efea0f26..07782010. Code head after this round: 68738770.
+
+== pr-gate run 2: the six suggestions ==
+
+S1 correctness, ci-loop.ts ownBranchPull, rejection floor over write authors only -> FIXED.
+   The floor is reduced over all of the build's own PRs (own); the author filter stays on
+   the adoptable pool. Red first: [2b-P7g] flipped, [2b-P7h] new (foreign path, the gate's
+   scenario), 4 red on efea0f26, green after. Mutations M1-M4 (M1 = the round 2 code).
+   The rationale was corrected after /code-review (see C1): the list does not say who
+   closed a PR, and not adopting is the cheaper error.
+
+S2 rules, ADR 0021 D2 squash-message clause differs from the code -> RECORDED, not edited
+   (ADR is a protected path; the user decides). D2 says: title = PR title, body's last line
+   always `closes #<sourceRef issue>`. The code (spec 02, user decision design D of
+   2026-10-22 for the same-repo narrowing; D41/D42 from round 2 for the title and the
+   always-present message) does: commit_title = `<PR title> (#n)`, replaced by
+   `Merge pull request #n` when the title carries a closing keyword + reference;
+   commit_message = `closes #N` only when the task's source is an issue of the same repo,
+   otherwise `Merged by pacman.`.
+   Proposed superseding note for the user to add to ADR 0021 (or a short ADR 0021a):
+     "D2 message clause, revised 2026-10-22 (#1403 segment 2b, PR #1509): the squash title
+      is `<PR title> (#n)`, or `Merge pull request #n` when the PR title carries a GitHub
+      closing keyword with a reference (a PR author, including a read-only member, sets the
+      title, and on the default branch it would close any issue). The body is
+      `closes #<N>` only when the task came from issue N of the same repository; otherwise
+      `Merged by pacman.`. The body is always sent so GitHub does not fall back to the PR
+      body or commit messages. Spec 02 holds the full rule."
+   Goes into the PR Risk section as a named item for the user.
+
+S3 rules, rate-limited PUT = 409 attributed to an orchestrator ruling -> FIXED. The user
+   confirmed the 409 behaviour on 2026-10-22, recorded at
+   https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763 (author
+   xiechimon, amending design D's Unknown class). github.ts (rate-limited branch of
+   githubMergePull), the D40 line of the pr-merge-api.test.ts header and spec 02 now cite
+   the user's decision and that comment instead of "编排者裁决".
+
+S4 tests, the API merge's PR GET failing is untested -> FIXED (pins). GithubFake.getAnswer
+   fails the GET; [2b-D44a] 404 / 429 / rate-limited 403 (header and secondary message) /
+   500 / 502 HTML / non-JSON 200 / JSON-array 200 / timeout / network -> 409 "读不到 PR #201
+   在 GitHub 上的状态", one GET, no PUT, no row; [2b-D44c] failed card stays failed with no
+   row; [2b-D44d] the next press reads again and merges. Passed at once (pins); mutations
+   M5-M8 caught. Spec 02 now lists these read failures.
+
+S5 tests, acceptance labelling of the round 1 mutations / gates files -> NOTED only.
+   seg2b-mutations.txt (51/51) and gates-seg2b.txt describe the round 1 tree; round 2 is
+   seg2b-mutations-2.txt / gates-seg2b-r2.txt; round 3 is seg2b-r3-mutations.txt /
+   gates-seg2b-r3.txt. Pushed evidence files are not edited; the PR body's Acceptance
+   should cite the r3 files for the head.
+
+S6 safety, the merge route cannot tell a human from an agent when PACMAN_TOKEN is unset
+   -> RECORDED for Risk, not changed. Pre-existing auth scope: with PACMAN_TOKEN unset
+   registerTokenAuth leaves /api/* open, so any process reaching the server port can POST
+   /api/builds/<id>/merge; with this PR that squash-merges with the team's OAuth token
+   instead of queueing a merge step. Limits: same gates as the human click (review or
+   restorable failed phase, own PR, write author, default branch, sha bound to the last
+   pushed commit); the agent machine's gh login could already merge. Telling human from
+   agent callers is a separate auth ticket, not segment 2b.
+
+== /code-review (medium) on efea0f26..07782010 ==
+
+C1 ci-loop.ts floor: "the close is the maintainer's act" is false; an author can close
+   their own PR, so a login without write access can open and self-close a same-repo PR
+   to block adoption -> PARTLY FIXED. The rule stays (floor over every PR): the
+   branch-pulls list carries no closer, and of the two errors this one fails closed (the
+   card goes failed and waits for a person, who can merge or rerun), while the author
+   filter re-records an older PR a maintainer may have superseded. Comment rewritten in
+   68738770. Residual (self-close veto) goes to Risk; a closed_by read per closed PR would
+   cost one issue GET each and is left for a later segment.
+C2 spec 02 repeats the false premise -> FIXED (same rewrite).
+C3 [2b-P7g] cements the self-close case -> FIXED in wording: the test name now says the
+   list does not tell who closed it, which is the rule being pinned.
+C4 builds.ts: a failed PR read gives a generic message without GitHub's rate-limit reset
+   time, and a 404 says "try later" -> NOT FIXED. githubPull folds every read failure into
+   null by design (fail-open, shared with the reconcile); the press costs one GET and
+   writes nothing. Splitting the read result is a wider change than this round; noted.
+C5 [2b-D44b] duplicates the 404 row of D44a -> FIXED (folded).
+C6 the fake's timeout / network mapping is copied for GET and PUT -> FIXED (throwIfFault).

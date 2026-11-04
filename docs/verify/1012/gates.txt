@@ -1,0 +1,25 @@
+# Sealed gate sweep — #1012, tree e87186d3 (+ ci.yml/debt-gate annotation edits), 2026-10-09
+
+=== ui-registry-gate ===
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 33 file(s) in apps/web/src/components/ui = 26 registry (19 pristine vs pinned snapshot / 7 registered deviations) + 7 adapters; snapshot shadcn@4.21.3 fetched 2026-10-08; ledger frozen from a06592799818; comparison: in-tree only.
+rc=0
+
+=== ui-debt-gate ===
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); 5 css + 199 tsx scanned. Baseline: in-tree only, frozen from 7257cbc709df.
+rc=0
+
+=== ui-drift-gate ===
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 33 components/ui file(s); 9 brand-ink text-role line(s), all registered (7 ledger entries).
+rc=0
+
+=== ui-consumer-shape-gate ===
+[ui-consumer-shape-gate] PASS: 7 flagged line(s) across 213 consumer file(s), all registered (7 entries = 4 deviation / 3 rides-primitive).
+rc=0
+
+=== ui-dead-class-gate ===
+ui-dead-class-gate: selector universe from apps/web/dist + apps/web/src/**/*.css
+scanned 227 files (19 pristine registry files skipped), 7529 class-token occurrences, 1666 living selectors
+zero-rule names: 248 — selector-exempt 245, manual-exempt 3, DEAD 0
+OK — every rendered class token matches a living rule or carries a disposition.
+rc=0

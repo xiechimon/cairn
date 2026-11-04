@@ -1,0 +1,8 @@
+{
+  "maxWarnings": 0,
+  "frozenFrom": {
+    "sha": "da2f165ac9566c6fcc2425102316bb2c9d51e3d3",
+    "date": "2026-10-14"
+  },
+  "scope": "biome ci . warning count from summary line \"Found N warnings\"; info diagnostics are excluded"
+}

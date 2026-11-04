@@ -1,0 +1,6 @@
+{
+  "enroll": 200,
+  "agent": 201,
+  "hasOldDaemon": true,
+  "text": "机器匹配\n\n执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的旧版 daemon 机器按可跑放行。\n\nrea\n要求执行机已安装该 MCP 服务器\ngrok-bot-vm-481311088\n离线\n可跑\nno-snapshot-box\n能力快照未上报（旧版 daemon）——按可跑放行\n可跑"
+}

@@ -1,0 +1,26 @@
+{
+  "teamId": "BjnaQfPsL804CHVtJzIDh",
+  "machineId": "NOTYolPFUUELKrGUYRr3o",
+  "agentId": "8McoEUwv_ryxkBnhcfnfg",
+  "agent": {
+    "id": "8McoEUwv_ryxkBnhcfnfg",
+    "displayName": "repro-1302",
+    "description": null,
+    "status": "active",
+    "avatarUrl": null,
+    "provider": null,
+    "modelId": null,
+    "thinkingLevel": null,
+    "tools": [
+      "推送分支"
+    ],
+    "secrets": [],
+    "defaultSkill": null,
+    "skillsAllowlist": null,
+    "mcpServers": [],
+    "maxConcurrentTasks": null,
+    "machineId": "NOTYolPFUUELKrGUYRr3o",
+    "persona": null,
+    "requiredCapabilities": null
+  }
+}

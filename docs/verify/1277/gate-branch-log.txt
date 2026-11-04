@@ -1,0 +1,11 @@
+Temporary console.error in stepArtifactGate, printed by the verify server
+(http://127.0.0.1:8791) while the four done payloads ran on unmodified gate
+logic. The log line was removed before the fix commit.
+
+[1277-gate] kind=build hasChanges=false drift=none entersFalseBranch=true
+[1277-gate] kind=build hasChanges=false drift=dogfood/tracer-1153-verification-note!=pacman/conv-0198f6c0-0000-7000-8000-000000000000 entersFalseBranch=true
+[1277-gate] kind=build hasChanges=true drift=none entersFalseBranch=false
+[1277-gate] kind=build hasChanges=true drift=dogfood/tracer-1153-verification-note!=pacman/conv-0198f6c0-0000-7000-8000-000000000000 entersFalseBranch=false
+
+The last line is the bug: hasChanges=true skips the drift branch, so the
+gate returns null and the todo enters review.

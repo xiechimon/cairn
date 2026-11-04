@@ -1,0 +1,44 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/mnt/fast/lanes/cairn-1974/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 1 test using 1 worker
+
+  ✘  1 e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret (5.8s)
+
+
+  1) e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('alertdialog', { name: '解除飞书绑定确认' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('alertdialog', { name: '解除飞书绑定确认' }) with timeout 5000ms
+      - waiting for getByRole('alertdialog', { name: '解除飞书绑定确认' })
+
+
+      59 |   await form.getByRole('button', { name: '解除绑定' }).click();
+      60 |   const dialog = page.getByRole('alertdialog', { name: '解除飞书绑定确认' });
+    > 61 |   await expect(dialog).toBeVisible();
+         |                        ^
+      62 |   await dialog.getByRole('button', { name: '取消' }).click();
+      63 |   await expect(dialog).toHaveCount(0);
+      64 |   expect(unbindCalls).toBe(0);
+        at /mnt/fast/lanes/cairn-1974/apps/web/e2e/account-feishu.spec.ts:61:24
+
+    Error Context: test-results/account-feishu-Feishu-sett-e9d24-thout-disclosing-the-secret/error-context.md
+
+  1 failed
+    e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret 
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-1974/apps/web
+

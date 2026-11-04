@@ -1,0 +1,94 @@
+{
+  "probe": "attachments",
+  "ok": true,
+  "at": "2026-10-02T15:10:36.985Z",
+  "stack": {
+    "api": "http://127.0.0.1:8793",
+    "web": "http://127.0.0.1:5275",
+    "homeDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0040-625-composer-wire-usecomposerwire/.claude/verify-run/home"
+  },
+  "checks": [
+    {
+      "name": "board-ready",
+      "ok": true,
+      "detail": "看板 shell 就绪"
+    },
+    {
+      "name": "dialog-open",
+      "ok": true,
+      "detail": "新建任务 dialog 打开"
+    },
+    {
+      "name": "spec-token",
+      "ok": true,
+      "detail": "spec 出现 attachment token(![verify-attachment-34906.txt](attachment:GgMNkcU-7IkQEC-pwjtXQ/EeEkVjGRQQfpmdXVOQIbA.txt))"
+    },
+    {
+      "name": "token-shape",
+      "ok": true,
+      "detail": "token 形态 ![名](attachment:<teamId>/<id>.txt)(GgMNkcU-7IkQEC-pwjtXQ/EeEkVjGRQQfpmdXVOQIbA.txt)"
+    },
+    {
+      "name": "dialog-closed",
+      "ok": true,
+      "detail": "保存后 dialog 关闭"
+    },
+    {
+      "name": "api-spec-token",
+      "ok": true,
+      "detail": "GET /api/todos 的 spec 携 token(命中任务)"
+    },
+    {
+      "name": "db-attachment-ready",
+      "ok": true,
+      "detail": "SQLite attachment 行 status=ready(status=ready)"
+    },
+    {
+      "name": "db-bytes-mime",
+      "ok": true,
+      "detail": "SQLite 行字节与 MIME 对账(60B / text/plain)"
+    },
+    {
+      "name": "disk-file",
+      "ok": true,
+      "detail": "附件落盘 <attachmentsDir>/<storageKey>(GgMNkcU-7IkQEC-pwjtXQ/EeEkVjGRQQfpmdXVOQIbA.txt)"
+    },
+    {
+      "name": "disk-bytes",
+      "ok": true,
+      "detail": "磁盘字节等于上传样本(60B)"
+    },
+    {
+      "name": "readback",
+      "ok": true,
+      "detail": "GET /api/attachments/:id 读回一致(status=200, text/plain)"
+    },
+    {
+      "name": "composer-draft-token",
+      "ok": true,
+      "detail": "composer draft 出现 attachment token(![verify-composer-34906.txt](attachment:GgMNkcU-7IkQEC-pwjtXQ/3SdEzo54DgwL-cZsPfd8L.txt))"
+    }
+  ],
+  "artifacts": [
+    "01-dialog-open.png",
+    "02-spec-token.png",
+    "03-card-saved.png",
+    "04-composer-before.png",
+    "05-composer-token.png"
+  ],
+  "sample": {
+    "fileName": "verify-attachment-34906.txt",
+    "bytes": 60
+  },
+  "token": "![verify-attachment-34906.txt](attachment:GgMNkcU-7IkQEC-pwjtXQ/EeEkVjGRQQfpmdXVOQIbA.txt)",
+  "todoId": "h9l-oSj3GtByd8TvXPCmm",
+  "attachmentRow": {
+    "id": "EeEkVjGRQQfpmdXVOQIbA",
+    "fileName": "verify-attachment-34906.txt",
+    "mimeType": "text/plain",
+    "sizeBytes": 60,
+    "storageKey": "GgMNkcU-7IkQEC-pwjtXQ/EeEkVjGRQQfpmdXVOQIbA.txt",
+    "scope": "spec",
+    "status": "ready"
+  }
+}

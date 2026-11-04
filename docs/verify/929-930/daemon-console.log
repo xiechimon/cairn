@@ -1,0 +1,23 @@
+Loading pi runtime…
+Enrolled in team Yx_wovJ-D86Rd9PtXTI5c (machine vF44md97sWhSc0joZizMG)
+Online (machineId=vF44md97sWhSc0joZizMG); polling http://127.0.0.1:8791
+Idle-sleep prevention active (caffeinate)
+[recover] no pending steps found
+[wake] push channel connected
+claim step=WepEIKtFDzgmMDWeGCoJ6
+step WepEIKtFDzgmMDWeGCoJ6 for conv 01a1179e-3537-7e9f-8677-f28ae60d80e1 (1 running)
+using model stub-929-30-muyfvpy1/stub-model
+[workspace] 准备工作区...
+[mcp] ghost: not in local config — its tools are unavailable this turn
+[mcp] loaded from /tmp/pacman-929-30-mcp/claude.json: demo, dead
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] catalog: entries=0 chars=0
+[step] brief written: AGENTS.md (create)
+new session 01a1179e-3537-7e9f-8677-f28ae60d80e1
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[gate] ask: rule=ask-rm-rf-root command=rm -rf /
+[step] brief removed (AGENTS.md)
+finished (0 running)
+
+[probe] daemon exited code=null
+[machine] Shutting down… (SIGTERM)

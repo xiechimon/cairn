@@ -1,0 +1,15 @@
+{
+  "row": {
+    "id": "YUbON3Q1a8u4t0YqTzRT5:chief-01a13b29-8fdb-7d68-955f-7619a594a98f",
+    "type": "chief_message",
+    "entityId": "chief-01a13b29-8fdb-7d68-955f-7619a594a98f",
+    "snippet": "第二条回复，仍是同一会话。",
+    "readAt": null,
+    "createdAt": 1791993942009
+  },
+  "unread": {
+    "unreadThreadIds": [
+      "chief-01a13b29-8fdb-7d68-955f-7619a594a98f"
+    ]
+  }
+}

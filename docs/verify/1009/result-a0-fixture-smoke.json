@@ -1,0 +1,469 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 732
+  },
+  "base": "http://127.0.0.1:8403",
+  "failures": 0,
+  "results": [
+    {
+      "group": "S1",
+      "name": "fab size 40x40",
+      "actual": {
+        "w": 40,
+        "h": 40
+      },
+      "expected": {
+        "w": 40,
+        "h": 40
+      },
+      "ok": true
+    },
+    {
+      "group": "S1",
+      "name": "fab right inset 8",
+      "actual": 8,
+      "expected": 8,
+      "ok": true
+    },
+    {
+      "group": "S1",
+      "name": "fab bottom inset 8",
+      "actual": 8,
+      "expected": 8,
+      "ok": true
+    },
+    {
+      "group": "S1",
+      "name": "fab round (radius >= half size)",
+      "actual": "3.35544e+07px",
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window 380x600",
+      "actual": {
+        "w": 380,
+        "h": 600
+      },
+      "expected": {
+        "w": 380,
+        "h": 600
+      },
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window right inset 8",
+      "actual": 8,
+      "expected": 8,
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window bottom inset 8",
+      "actual": 8,
+      "expected": 8,
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window position fixed（角落锚定，D10）",
+      "actual": "fixed",
+      "expected": "fixed",
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window radius 12px（D2）",
+      "actual": "12px",
+      "expected": "12px",
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window z = --z-floating 15（D10 新 rung）",
+      "actual": "15",
+      "expected": "15",
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window shadow = edge-ring + floating-shadow 双层（D2）",
+      "actual": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px",
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S2",
+      "name": "window bg 不透明非玻璃（D2）",
+      "actual": {
+        "bg": "rgb(38, 34, 31)",
+        "backdrop": "none"
+      },
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S2b",
+      "name": "FAB hidden while window open（D4 互斥）",
+      "actual": false,
+      "expected": false,
+      "ok": true
+    },
+    {
+      "group": "S3",
+      "name": "window never overlaps sidebar",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S13",
+      "name": "new-task dialog z (panel-low 21 ladder) > window z (15)",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S13b",
+      "name": "window survives the dialog Esc（D3：Esc 只收它自己的层）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S4",
+      "name": "Minimize 钮在位（无 X：关闭 aria 钮不存在）",
+      "actual": {
+        "minimize": true,
+        "closeX": 0
+      },
+      "expected": {
+        "minimize": true,
+        "closeX": 0
+      },
+      "ok": true
+    },
+    {
+      "group": "S4",
+      "name": "minimized window stays in DOM（D6 常驻，count=1）",
+      "actual": 1,
+      "expected": 1,
+      "ok": true
+    },
+    {
+      "group": "S4",
+      "name": "minimized window hidden from a11y tree",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S4",
+      "name": "FAB back after minimize（互斥反转）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S5",
+      "name": "⌘J opens",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S5",
+      "name": "Escape never closes the window（D3）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S5",
+      "name": "⌘J toggles shut（最小化语义）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S6",
+      "name": "draft survives minimize",
+      "actual": "draft-probe-a0",
+      "expected": "draft-probe-a0",
+      "ok": true
+    },
+    {
+      "group": "S7",
+      "name": "window still open after route switch",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S7",
+      "name": "draft survives route switch",
+      "actual": "draft-probe-a0",
+      "expected": "draft-probe-a0",
+      "ok": true
+    },
+    {
+      "group": "S8",
+      "name": "schedules: content column width unchanged (no yield)",
+      "actual": {
+        "before": 1200,
+        "after": 1200
+      },
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S8",
+      "name": "schedules: window geometry 380x600@8",
+      "actual": {
+        "w": 380,
+        "h": 600,
+        "right": 8,
+        "bottom": 8
+      },
+      "expected": {
+        "w": 380,
+        "h": 600,
+        "right": 8,
+        "bottom": 8
+      },
+      "ok": true
+    },
+    {
+      "group": "S8",
+      "name": "skills: content column width unchanged (no yield)",
+      "actual": {
+        "before": 1200,
+        "after": 1200
+      },
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S8",
+      "name": "skills: window geometry 380x600@8",
+      "actual": {
+        "w": 380,
+        "h": 600,
+        "right": 8,
+        "bottom": 8
+      },
+      "expected": {
+        "w": 380,
+        "h": 600,
+        "right": 8,
+        "bottom": 8
+      },
+      "ok": true
+    },
+    {
+      "group": "S8",
+      "name": "team: content column width unchanged (no yield)",
+      "actual": {
+        "before": 1200,
+        "after": 1200
+      },
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S8",
+      "name": "team: window geometry 380x600@8",
+      "actual": {
+        "w": 380,
+        "h": 600,
+        "right": 8,
+        "bottom": 8
+      },
+      "expected": {
+        "w": 380,
+        "h": 600,
+        "right": 8,
+        "bottom": 8
+      },
+      "ok": true
+    },
+    {
+      "group": "S8b",
+      "name": "board column tracks identical with window open (yield retired)",
+      "actual": {
+        "colsBefore": [
+          281,
+          281,
+          281,
+          281
+        ],
+        "colsAfter": [
+          281,
+          281,
+          281,
+          281
+        ]
+      },
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S8e",
+      "name": "detail FAB gated on unread, badge = 3（#443 保留）",
+      "actual": "3",
+      "expected": "3",
+      "ok": true
+    },
+    {
+      "group": "S8e",
+      "name": "detail RightPane coexists with open window（互斥退役）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S8e",
+      "name": "detail window geometry 380x600@8",
+      "actual": {
+        "w": 380,
+        "h": 600
+      },
+      "expected": {
+        "w": 380,
+        "h": 600
+      },
+      "ok": true
+    },
+    {
+      "group": "S9",
+      "name": "fixture capture shape: window open from scenario, 380x600",
+      "actual": {
+        "w": 380,
+        "h": 600
+      },
+      "expected": {
+        "w": 380,
+        "h": 600
+      },
+      "ok": true
+    },
+    {
+      "group": "S9",
+      "name": "fixture 111 hero examples carrier present",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S9",
+      "name": "fixture 114 stream carrier present",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S9",
+      "name": "fixture 114 window geometry 380x600",
+      "actual": {
+        "w": 380,
+        "h": 600
+      },
+      "expected": {
+        "w": 380,
+        "h": 600
+      },
+      "ok": true
+    },
+    {
+      "group": "S10",
+      "name": "/app/resources/agents/r3-builder?scenario=agent-detail: no FAB, no window",
+      "actual": {
+        "fab": 0,
+        "win": 0
+      },
+      "expected": {
+        "fab": 0,
+        "win": 0
+      },
+      "ok": true
+    },
+    {
+      "group": "S10",
+      "name": "/app/machines/authorize: no FAB, no window",
+      "actual": {
+        "fab": 0,
+        "win": 0
+      },
+      "expected": {
+        "fab": 0,
+        "win": 0
+      },
+      "ok": true
+    },
+    {
+      "group": "S11",
+      "name": "live face default = closed（never pops uninvited）",
+      "actual": {
+        "fab": true,
+        "winVisible": false
+      },
+      "expected": {
+        "fab": true,
+        "winVisible": false
+      },
+      "ok": true
+    },
+    {
+      "group": "S11",
+      "name": "live face writes pacman.chief-open=1 on open",
+      "actual": "1",
+      "expected": "1",
+      "ok": true
+    },
+    {
+      "group": "S11",
+      "name": "reload restores the persisted open state（D5，0004 D9 反转）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S11",
+      "name": "minimize writes pacman.chief-open=0",
+      "actual": "0",
+      "expected": "0",
+      "ok": true
+    },
+    {
+      "group": "S11",
+      "name": "fixture face reads nothing: scenario view decides, storage untouched",
+      "actual": null,
+      "expected": null,
+      "ok": true
+    },
+    {
+      "group": "S11",
+      "name": "fixture face writes nothing",
+      "actual": null,
+      "expected": null,
+      "ok": true
+    },
+    {
+      "group": "S12",
+      "name": "gear swaps board content to settings view",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S12",
+      "name": "settings swap closes the window（三态单值）",
+      "actual": false,
+      "expected": false,
+      "ok": true
+    }
+  ]
+}

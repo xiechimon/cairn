@@ -1,0 +1,524 @@
+{
+  "_comment": "Real read-only response of GET https://api.github.com/repos/xiechimon/pacman/compare/52d2cdca5ab286021d3514e4a6c6d91d95ccb03f...b4b1f96338aee1c2f69bf39d3a6736fbe31b6cd6?per_page=1, captured 2026-10-20 without a token (#1404 S1), captured again 2026-10-21 (S1 round 3, ETag \"e94571e44f02a79dab144a0ae86af6f8d969d303a7b98db72ebb5caac013a14f\") to see which entries carry a patch. Trimmed: where files[].patch was present its text is replaced by \"(patch trimmed)\"; where it was absent (the 20 PNG files) it stays absent. The URL fields are dropped, commits keep sha and parents. Every other field is as returned and equal in both captures.",
+  "status": "ahead",
+  "ahead_by": 1,
+  "behind_by": 0,
+  "total_commits": 1,
+  "merge_base_commit": {
+    "sha": "52d2cdca5ab286021d3514e4a6c6d91d95ccb03f"
+  },
+  "commits": [
+    {
+      "sha": "b4b1f96338aee1c2f69bf39d3a6736fbe31b6cd6",
+      "parents": [
+        {
+          "sha": "52d2cdca5ab286021d3514e4a6c6d91d95ccb03f"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "sha": "fd111846a1338d9769b0701311af6b74b75fc929",
+      "filename": ".claude/skills/verify-pacman/features/machines-local-row.md",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "a5916dd2d5e90e402457107862dc047c9f55561d",
+      "filename": ".claude/skills/verify-pacman/scripts/drive-machines-local.mjs",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3,
+      "changes": 6,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "41c0610731897dfad864c3819fecdd83f27ba13f",
+      "filename": ".claude/skills/verify-pacman/scripts/drive-provider-picker.mjs",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "0e590777fec0790de0a395704292a5294427fb72",
+      "filename": ".claude/skills/verify-pacman/scripts/drive-providers-tabs.mjs",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3,
+      "changes": 6,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "93350791b6fe1c30f1ef9dccfeb7b4b4f0901ae8",
+      "filename": "apps/web/e2e/accent-typo.spec.ts",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 4,
+      "changes": 8,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "1d37b4afdcb3ee8e9259d5cf80d0ffd953a9706a",
+      "filename": "apps/web/e2e/cds-settings.spec.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "1f1e56334cbca1cdbcab1394071152ccefddacc7",
+      "filename": "apps/web/e2e/chief-panel.spec.ts",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 12,
+      "changes": 23,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "231c2f42ec10f1fd376fefbad000b52448d11b1a",
+      "filename": "apps/web/e2e/machines-local.spec.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "f5f6502397f3b8d10bcc3c99f1bfd8a28b2734d5",
+      "filename": "apps/web/e2e/project-settings-delete.spec.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 1,
+      "changes": 3,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "e90d1f4a60372bb53f41450bca70bc581d249076",
+      "filename": "apps/web/e2e/providers-tabs.spec.ts",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 7,
+      "changes": 14,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "dbe40c7e1ebb94ca8f96e649768c8590b274e84b",
+      "filename": "apps/web/e2e/resource-back-spa.spec.ts",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 4,
+      "changes": 15,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "0bd744d78ef1f370b824f26ee498b3a214f57c9f",
+      "filename": "apps/web/e2e/shell-consistency.spec.ts",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "f711dc750dcad64cdc1f6c73e18cfdb67a5aa62f",
+      "filename": "apps/web/e2e/skills-page.spec.ts",
+      "status": "modified",
+      "additions": 10,
+      "deletions": 9,
+      "changes": 19,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "087423e5b38c1b3ffdfca69656d3aa6e3e10afc5",
+      "filename": "apps/web/e2e/title-band-clicks.spec.ts",
+      "status": "modified",
+      "additions": 41,
+      "deletions": 37,
+      "changes": 78,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "84cfe1176b11a725cc30cf3b56a026bf524297b1",
+      "filename": "apps/web/src/board/board.tsx",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 5,
+      "changes": 7,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "772fd1b6dbd8bcf236b03ca61e8c11995e1aea78",
+      "filename": "apps/web/src/board/filter-panel.tsx",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0,
+      "changes": 3,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "639bfb8095e14def642bb18d2fddf3640136593f",
+      "filename": "apps/web/src/pages/parts.ts",
+      "status": "removed",
+      "additions": 0,
+      "deletions": 8,
+      "changes": 8,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "414364121228d212c5a2c8301b9670e70d70ee3d",
+      "filename": "apps/web/src/pages/project-new-page.tsx",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 3,
+      "changes": 5,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "bc4d238b7f426d94bfcdb86f2b641ea97fb3cc7c",
+      "filename": "apps/web/src/pages/project-page.tsx",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2,
+      "changes": 6,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "16377169f0dc6b4a7afd3bcd9c480cbfff242c19",
+      "filename": "apps/web/src/pages/project-settings-page.tsx",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 2,
+      "changes": 10,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "270222ca2dcf8a57fd4cd70eecb2da5bccaf8eec",
+      "filename": "apps/web/src/pages/schedules-page.tsx",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 13,
+      "changes": 24,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "20f7575355d4aa480cc5ba95e64ee2ad1736d66d",
+      "filename": "apps/web/src/pages/shell.tsx",
+      "status": "modified",
+      "additions": 56,
+      "deletions": 76,
+      "changes": 132,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "86d33d2d27673f892ef95cf3d8da2decb1c6c9dd",
+      "filename": "apps/web/src/resources/machine-detail-page.tsx",
+      "status": "modified",
+      "additions": 9,
+      "deletions": 9,
+      "changes": 18,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "15ff31a11d27fd254653e8b00f03e1cf5c308768",
+      "filename": "apps/web/src/resources/machines-page.tsx",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 10,
+      "changes": 13,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "f807dc49567fa4cf50438b637cdb0c703e2833b3",
+      "filename": "apps/web/src/resources/mcp-servers-page.tsx",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 10,
+      "changes": 13,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "df71aa6b8da5b80aa3d3873e7996f68a6689f45e",
+      "filename": "apps/web/src/resources/parts.tsx",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 0,
+      "changes": 19,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "b5e8edebb5650cd96e7feff4e590042ec53f4ddb",
+      "filename": "apps/web/src/resources/providers-page.tsx",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 8,
+      "changes": 15,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "24e1d60faea6d4c99190f8ed4398bedf458b9ac5",
+      "filename": "apps/web/src/resources/secrets-page.tsx",
+      "status": "modified",
+      "additions": 16,
+      "deletions": 8,
+      "changes": 24,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "8e0e36cf5bb236c9880bba4a2c38e15ef6607890",
+      "filename": "apps/web/src/resources/shell.tsx",
+      "status": "removed",
+      "additions": 0,
+      "deletions": 143,
+      "changes": 143,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "f96b9bdc4d4d8af31aa97c0c9dfe75c469257b5f",
+      "filename": "apps/web/src/resources/skills-page.tsx",
+      "status": "modified",
+      "additions": 21,
+      "deletions": 12,
+      "changes": 33,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "f2aa38c314f45e50cec25da5d9a9b9e6c943a0fc",
+      "filename": "apps/web/src/routes/account-page.tsx",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 6,
+      "changes": 11,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "ead426026f3c8511f35f99ddf6ff58af2aec644b",
+      "filename": "apps/web/src/routes/agent-detail-page.tsx",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 17,
+      "changes": 22,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "6ac8d3c8c5dde084ecc57e4a68646d859d88f716",
+      "filename": "apps/web/src/routes/api-keys-page.tsx",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 4,
+      "changes": 9,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "09e0c45a16272e864e289508429c361580beb6d0",
+      "filename": "apps/web/src/routes/team-page.tsx",
+      "status": "modified",
+      "additions": 17,
+      "deletions": 17,
+      "changes": 34,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "af7877a08c7fe86c1580161806d11f8a3854bb1d",
+      "filename": "apps/web/src/secondary/shell.tsx",
+      "status": "removed",
+      "additions": 0,
+      "deletions": 85,
+      "changes": 85,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "2a2e1b43f38876604028c7ed91ada6da9c9f7293",
+      "filename": "docs/verify/paper-shell-merge/after-dark-agent-detail.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "442f1484c375f87d31cdf4eb556019f6026d6152",
+      "filename": "docs/verify/paper-shell-merge/after-dark-project.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "7954bddac060427d7df9eeea9f325502b42d2193",
+      "filename": "docs/verify/paper-shell-merge/after-dark-resources-skills.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "9478da95455b36138c1fc78d47e2becc98977014",
+      "filename": "docs/verify/paper-shell-merge/after-dark-schedules.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "4fc735b0a04e45c98d69f7571e9a83102bd7484a",
+      "filename": "docs/verify/paper-shell-merge/after-dark-team.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "e0bcaffa26e866ea9526661d40619828fb355f11",
+      "filename": "docs/verify/paper-shell-merge/after-light-agent-detail.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "cbc66a6aaf17a05cef18d9e573c8d46ffdf2d440",
+      "filename": "docs/verify/paper-shell-merge/after-light-project.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "657492e27f291efdd8c8a946681d504a57578118",
+      "filename": "docs/verify/paper-shell-merge/after-light-resources-skills.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "a529bb0813db87bdcd3a1e28c25399d07a0174ed",
+      "filename": "docs/verify/paper-shell-merge/after-light-schedules.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "86f47ff4702fa46b934b672f0b2a4f9fc6d84161",
+      "filename": "docs/verify/paper-shell-merge/after-light-team.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "7cd05b8ac3cdc22a7f8d3ac0cba70d729fde319e",
+      "filename": "docs/verify/paper-shell-merge/before-dark-agent-detail.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "c6ea9204ce7fce587c2332538cf19451a6cdabb6",
+      "filename": "docs/verify/paper-shell-merge/before-dark-project.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "c637a12252ec0bdea9fdc5bf6775afd7a02c4404",
+      "filename": "docs/verify/paper-shell-merge/before-dark-resources-skills.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "f10b6dab00e698d26bba88b08ebb8c21ca509d73",
+      "filename": "docs/verify/paper-shell-merge/before-dark-schedules.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "364df185a026e0e023c4b6a10d116e178882b4c1",
+      "filename": "docs/verify/paper-shell-merge/before-dark-team.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "90981bcc9e5fe3ac001faf31b9130c76a1e9e296",
+      "filename": "docs/verify/paper-shell-merge/before-light-agent-detail.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "a9f256a4874297f4396f56fb4c0b8af778274108",
+      "filename": "docs/verify/paper-shell-merge/before-light-project.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "a1267e4cdfab30804d5fc56da72808fef74ba868",
+      "filename": "docs/verify/paper-shell-merge/before-light-resources-skills.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "6d2f70943894790fcf11492616a16820c4667f4c",
+      "filename": "docs/verify/paper-shell-merge/before-light-schedules.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "8ba08f1d9d58a90ff9dc50ccbf429b0fd487ba3c",
+      "filename": "docs/verify/paper-shell-merge/before-light-team.png",
+      "status": "added",
+      "additions": 0,
+      "deletions": 0,
+      "changes": 0
+    },
+    {
+      "sha": "6bbbae9365ccff117a0d548c6151a8bc90e986bb",
+      "filename": "docs/verify/paper-shell-merge/capture.mjs",
+      "status": "added",
+      "additions": 40,
+      "deletions": 0,
+      "changes": 40,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "4ff48723a16def07157c9566a75f391f57c9c6e7",
+      "filename": "docs/verify/paper-shell-merge/probe.mjs",
+      "status": "added",
+      "additions": 46,
+      "deletions": 0,
+      "changes": 46,
+      "patch": "(patch trimmed)"
+    },
+    {
+      "sha": "0a0af34d5c7e296308374def7d1bf0606b4bfff2",
+      "filename": "scripts/ui-debt-baseline.json",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 20,
+      "changes": 24,
+      "patch": "(patch trimmed)"
+    }
+  ]
+}

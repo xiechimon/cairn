@@ -1,0 +1,215 @@
+{
+  "sourceCommit": "dfbb0a07ed2c7a4d658cdde3b1b60dbe9b0eef00",
+  "snapshotArchiveSha256": "1b18de0364d30d4cb8b6855c3ad4b0c67b920d2d11319bb0a7f7a326eae37a05",
+  "reviewReports": [
+    {
+      "model": "domestic-proxy/deepseek-v4.1-flash",
+      "contextWindow": 1000000,
+      "events": {
+        "session": 1,
+        "agent_start": 1,
+        "turn_start": 29,
+        "message_start": 76,
+        "message_end": 76,
+        "message_update": 1050,
+        "tool_execution_start": 45,
+        "tool_execution_end": 45,
+        "turn_end": 29,
+        "agent_end": 1,
+        "agent_settled": 1
+      },
+      "settled": true,
+      "aborted": false,
+      "stopReason": "stop",
+      "thinkingLevel": "off",
+      "textChars": 9658,
+      "validVerdict": true,
+      "smokeOnly": false,
+      "sourceReview": true
+    }
+  ],
+  "globalConfigurationUnchanged": true,
+  "isolatedAgentDirectory": true,
+  "toolCalls": [
+    {
+      "tool": "ls",
+      "path": "."
+    },
+    {
+      "tool": "find",
+      "path": "docs/verify/2047"
+    },
+    {
+      "tool": "read",
+      "path": "AGENTS.md"
+    },
+    {
+      "tool": "read",
+      "path": "request.txt"
+    },
+    {
+      "tool": "ls",
+      "path": "docs/verify/2047"
+    },
+    {
+      "tool": "read",
+      "path": "review.diff"
+    },
+    {
+      "tool": "read",
+      "path": "review.diff"
+    },
+    {
+      "tool": "read",
+      "path": "review.diff"
+    },
+    {
+      "tool": "read",
+      "path": "review.diff"
+    },
+    {
+      "tool": "find",
+      "path": "apps/daemon/src"
+    },
+    {
+      "tool": "find",
+      "path": "integration/eval"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/src/git.ts"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/src/workspace.ts"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/test/git.test.ts"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/test/workspace-cred-fallback.test.ts"
+    },
+    {
+      "tool": "grep",
+      "path": "."
+    },
+    {
+      "tool": "grep",
+      "path": "."
+    },
+    {
+      "tool": "read",
+      "path": "docs/verify/2047/review.md"
+    },
+    {
+      "tool": "read",
+      "path": "docs/verify/2047/failure-modes.md"
+    },
+    {
+      "tool": "grep",
+      "path": "apps/daemon/src/git.ts"
+    },
+    {
+      "tool": "grep",
+      "path": "apps/daemon/src"
+    },
+    {
+      "tool": "grep",
+      "path": "."
+    },
+    {
+      "tool": "grep",
+      "path": "apps/daemon/src/backend"
+    },
+    {
+      "tool": "find",
+      "path": "apps/daemon/src"
+    },
+    {
+      "tool": "ls",
+      "path": "."
+    },
+    {
+      "tool": "find",
+      "path": "apps"
+    },
+    {
+      "tool": "find",
+      "path": "packages"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/test/git-config-env.ts"
+    },
+    {
+      "tool": "read",
+      "path": "packages/shared/src/git-ops.ts"
+    },
+    {
+      "tool": "read",
+      "path": "docs/verify/2047/observation.md"
+    },
+    {
+      "tool": "read",
+      "path": "docs/verify/2047/proof-observation.json"
+    },
+    {
+      "tool": "grep",
+      "path": "apps/daemon/test/git.test.ts"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/test/git.test.ts"
+    },
+    {
+      "tool": "grep",
+      "path": "apps/daemon/src/workspace.ts"
+    },
+    {
+      "tool": "read",
+      "path": "docs/lessons/2047-fixture-implicit-merge-identity.md"
+    },
+    {
+      "tool": "read",
+      "path": "docs/lessons/2047-double-url-rewrite.md"
+    },
+    {
+      "tool": "ls",
+      "path": "docs"
+    },
+    {
+      "tool": "read",
+      "path": "docs/verify/2047/fixture-identity-green.log"
+    },
+    {
+      "tool": "read",
+      "path": "docs/pr-review.md"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/src/proxy.ts"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/test/git-loopback-proxy.test.ts"
+    },
+    {
+      "tool": "grep",
+      "path": "apps/daemon/src"
+    },
+    {
+      "tool": "grep",
+      "path": "."
+    },
+    {
+      "tool": "read",
+      "path": "docs/verify/2047/url-rewrite-original-runtime.json"
+    },
+    {
+      "tool": "read",
+      "path": "apps/daemon/src/git.ts"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (35 tests | 2 failed) 1062ms
+   × shadow stores a rejected fractional proposal at confirm without executable child references 37ms
+   × auto stores a rejected fractional proposal at confirm without executable child references 28ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow stores a rejected fractional proposal at confirm without executable child references
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto stores a rejected fractional proposal at confirm without executable child references
+HttpError: invalid params.subtodos[1].blockedBy: expected integer[]
+ ❯ src/services/chief-tools.ts:433:27
+    431|               ? blockedByRaw.map((n) => {
+    432|                   if (typeof n !== 'number' || !Number.isInteger(n)) {
+    433|                     throw new HttpError(
+       |                           ^
+    434|                       400,
+    435|                       `invalid params.subtodos[${i}].blockedBy: expect…
+ ❯ src/services/chief-tools.ts:431:30
+ ❯ executeChiefTool src/services/chief-tools.ts:421:57
+ ❯ Object.tool test/split-rejected-proposal.test.ts:44:5
+ ❯ test/split-rejected-proposal.test.ts:101:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 33 passed (35)
+   Start at  19:40:02
+   Duration  2.30s (tests 48%, transform 29%, import 23%)
+

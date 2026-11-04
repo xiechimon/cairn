@@ -1,0 +1,64 @@
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0335-1195/packages/shared
+ ✓ test/work-branch-note.test.ts > 注记组装（失败方式 6） > 注记形状：head 标记 + 分支名 + 硬约束 tail 1ms
+ ✓ test/work-branch-note.test.ts > 注记组装（失败方式 6） > 追加 = 单换行拼接（prompt 尾部一行） 0ms
+ ✓ test/work-branch-note.test.ts > 注记组装（失败方式 6） > 追加幂等：注记已在场（recover 面 resume prompt）→ 原文返回不双注 0ms
+ ✓ test/work-branch-note.test.ts > 注记组装（失败方式 6） > strip 还原：尾行注记剥除后余段原文返回；非注记收尾零触碰 0ms
+ ✓ test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 任务文本 + 注记 → task-prompt（build 步新会话投递形，不双渲染） 0ms
+ ✓ test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 续轮占位句 + 注记 → synthetic（CONTINUE_PROMPTS.build 形） 0ms
+ ✓ test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 失败重启组合行 + 注记 → synthetic（#720 组合形叠注记） 0ms
+ ✓ test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 任务前缀 + 用户自己话语 → user（不误杀真话，无注记负例不回归） 0ms
+ ✓ test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 注记形尾行但余段是用户话语 → user（strip 只放行模板比对，不是合成判定） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > 契约文本位置无关化（失败方式 1） > 首轮契约含文件名 + 四段名 + 交接位置引用；不再指向工作区根目录 3ms
+ ✓ test/plan-first-round-prompt.test.ts > 契约文本位置无关化（失败方式 1） > 补写指令同律（纠错轮模板不残留工作区根目录） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > 交接位置行（#1203 组装/追加单源） > 位置行形状：head 标记 + 路径 + 出仓约束（过滤侧 strip 的锚点） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > 交接位置行（#1203 组装/追加单源） > 追加 = 单换行拼接（prompt 尾部一行） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > 交接位置行（#1203 组装/追加单源） > 追加幂等：注记已在场（recover 面 resume prompt）→ 原文返回不双注 0ms
+ ✓ test/plan-first-round-prompt.test.ts > 契约组合形状（失败方式 6） > 任务文本在前、契约殿后，空行分隔（compose 单源形状） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 组合行 + 注记 → synthetic 整行退场（首轮 plan 步投递形） 1ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 裸契约指令 + 注记 → synthetic 0ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 补写指令 + 注记 → synthetic（续轮指令单行形） 1ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 续轮占位句 + 注记 → synthetic（CONTINUE_PROMPTS.plan 形） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 驳回重规划 + 注记 → synthetic（wrappedBy 族叠注记） 1ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 失败重启组合行 + 注记 → synthetic（#720 组合形叠注记） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 任务前缀 + 用户自己话语 → user（不误杀真话，无注记负例不回归） 0ms
+ ✓ test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 注记形尾行但余段是用户话语 → user（strip 只放行模板比对，不是合成判定） 0ms
+ ✓ test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > is exactly the nine docs-ordered values 1ms
+ ✓ test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > board columns are the four #351 workbench columns 0ms
+ ✓ test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > column mapping is the #351 single-key fold (no hasChanges param) 1ms
+ ✓ test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > manual drop targets are the four writable columns (#753) 0ms
+ ✓ test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > canBoardDrop is the per-source manual matrix (#753) 0ms
+ ✓ test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > has the 13 machine-face endpoints 0ms
+ ✓ test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > pins the observed cadence and retry budgets 0ms
+ ✓ test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > pi stream event vocabulary is the 17-item bundle extraction (02 §5.6) 0ms
+ ✓ test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > config kinds and machine custom tools (02 §5.6) 0ms
+ ✓ test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > CLI command face照抄 (02 §5.1) 0ms
+ ✓ test/vocabulary.test.ts > machine protocol (02 §5, r3 §1.6) > step lifecycle log line templates (02 §5.7) 0ms
+ ✓ test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > covers the observed GET list 0ms
+ ✓ test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > covers the observed POST/PATCH list 0ms
+ ✓ test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > carries query vocabularies for the parameterized GETs 0ms
+ ✓ test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > excludes /api/push — Web Push 不进 spec (R1 终裁, 02 §9.1/04 §5) 0ms
+ ✓ test/vocabulary.test.ts > web REST vocabulary (02 §6.1 canonical) > skills 写面回摆（XMON-109 spec 13 回摆：POST /api/skills + PUT teams/{id}/skills/{sid}）；scan 面仍无 0ms
+ ✓ test/vocabulary.test.ts > SSE channels (02 §1.2, 全 SSE 无 WS) > has exactly the three channels 0ms
+ ✓ test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > server-face whitelist = 11 read groups + 13 write tools = 24 0ms
+ ✓ test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > capability groups are the six docs原文 (02 §7.2) 0ms
+ ✓ test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > tool registry = 24 件 grant↔name 单源，白名单标签 1:1（02/A10 保形） 1ms
+ ✓ test/vocabulary.test.ts > MCP vocabulary (02 §7.2, r3 §6 matrix 1:1) > executor 最低版本门形状（02 §7.1：数值随复刻版本线自定 [设计]） 0ms
+ ✓ test/vocabulary.test.ts > worker memory tools (02 §4.4/r5 §6：worker 步 remoteTools 记忆三件套) > 三件 = MEMORY_TOOLS 同族，形状过 remoteToolDefSchema 1ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > covers every 02 §5.8 slot row 0ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > live values are the replacement pacman family (D3 已触发 2026-09-23, #109) 0ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > BRAND live values = BRAND_SLOTS replacement column (单源纪律, 素材替换计划 §2) 1ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > env vars are the PACMAN_ same-shape replacement (素材替换计划 §2; r3 §1.1 观测原名 TDS_*) 0ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > credential formats match the observed shapes (key prefix 随 BRAND 槽) 0ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > API-key list-row mask follows the r3 §6 display rule 0ms
+ ✓ test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > SecretBox envelope version word is v1 (01 §4.2) 0ms
+ ✓ test/vocabulary.test.ts > record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff) > DB table registry is the 01 §6 list + chief + steer/stop_pending + attachment + branch_sync + github_connection − skill − mcp_server − document_diff + skill_audit + shell_command (30 incl. the todo_tag join) 1ms
+ ✓ test/vocabulary.test.ts > record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff) > record shapes cover exactly the 22 wire tables (todo_tag join + steer/stop_pending internal + attachment binary + github_connection credential have none; skill = 磁盘投影无表位 #367, mcp_server = config 投影无表位 #368, document_diff = 死 schema 退役 #1029 但 wire 形状仍在 document-diff.js) 0ms
+ ✓ test/vocabulary.test.ts > AgentBackend seam (01 §5, 00/D1 缝) > StepEvent types = 02 §5.6 pi vocabulary session-facing 15 items, 1:1 no rename 0ms
+ ✓ test/vocabulary.test.ts > AgentBackend seam (01 §5, 00/D1 缝) > BACKEND_RUNTIME_IDS = spec 17 A3 backend 身份词表：只收 claude-code（pi 是模型源但非 backend 身份） 0ms
+ ✓ test/vocabulary.test.ts > AgentBackend seam (01 §5, 00/D1 缝) > isBackendRuntimeId：词表外（custom provider id / pi / null / undefined）一律 false 0ms
+ ✓ test/vocabulary.test.ts > 思考强度能力读面（XMON-16 / #499 B3 裁决 A） > THINKING_LEVELS = pi ThinkingLevel 七档原样 0ms
+ ✓ test/vocabulary.test.ts > 思考强度能力读面（XMON-16 / #499 B3 裁决 A） > 能力读面封套只认词表内的档位（词表外一律拒） 1ms
+ ✓ test/vocabulary.test.ts > machine wire (02 §5 canonical, wire 层进 CI) > MACHINE_WIRE covers exactly the 13 endpoint paths (single source) 0ms
+ ✓ test/vocabulary.test.ts > machine wire (02 §5 canonical, wire 层进 CI) > claim/stream verbs match observed evidence (long-poll claim + SSE stream) 0ms
+ Test Files  3 passed (3)
+      Tests  61 passed (61)

@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./src/*"],
+      "cn": ["./src/lib/cn.ts"],
+      "node:crypto": ["./.design-sync/shims/node-crypto.ts"]
+    }
+  }
+}

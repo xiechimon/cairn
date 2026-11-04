@@ -1,0 +1,12 @@
+# pr-gate invoked by name (Workflow {name: 'pr-gate'}) in a session resumed after 7f0b544 was committed
+# args deliberately invalid, so the script stops at its args check with zero agents
+$ Workflow({name: "pr-gate", args: {probe: "name lookup only; expected to throw on args"}})
+status: failed  agent_count: 0  subagent_tokens: 0  duration_ms: 10
+Error: pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from `git diff --name-only origin/main...<headSha>`}
+
+# which copy did the named run load? (the persisted script file vs. two candidates)
+$ diff <(git show 7f0b544:.claude/workflows/pr-gate.js) <persisted script>  -> identical
+$ diff .claude/workflows/pr-gate.js <persisted script>  -> differs (working tree already carries the run-2 fixes)
+
+# reading: the name resolves, and it resolves to the copy scanned when the session (re)started,
+# not to the file on disk at call time. spec 28 §7.5 keeps scriptPath on the origin/main copy for that reason.

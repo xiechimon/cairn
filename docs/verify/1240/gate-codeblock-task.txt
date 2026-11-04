@@ -1,0 +1,3 @@
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1

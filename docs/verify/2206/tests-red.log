@@ -1,0 +1,203 @@
+......FFF.F.FF.......F.....................
+======================================================================
+FAIL: test_601_visible_characters_fail_with_the_count (__main__.ProseCapTests.test_601_visible_characters_fail_with_the_count)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 249, in test_601_visible_characters_fail_with_the_count
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_code_cannot_open_a_details_exemption (__main__.ProseCapTests.test_code_cannot_open_a_details_exemption)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 286, in test_code_cannot_open_a_details_exemption
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_links_and_formatting_count_only_visible_characters (__main__.ProseCapTests.test_links_and_formatting_count_only_visible_characters)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 298, in test_links_and_formatting_count_only_visible_characters
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_long_legacy_six_section_body_is_exempt (__main__.ProseCapTests.test_long_legacy_six_section_body_is_exempt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 310, in test_long_legacy_six_section_body_is_exempt
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_pipe_in_prose_does_not_exempt_it (__main__.ProseCapTests.test_pipe_in_prose_does_not_exempt_it)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 265, in test_pipe_in_prose_does_not_exempt_it
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_text_after_details_still_counts (__main__.ProseCapTests.test_text_after_details_still_counts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 291, in test_text_after_details_still_counts
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fold_markup_does_not_answer_empty_sections (__main__.SectionContractTests.test_fold_markup_does_not_answer_empty_sections)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 119, in test_fold_markup_does_not_answer_empty_sections
+    self.assertIn(f'FAIL empty-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL empty-section: What' not found in 'pr-evidence: sections: 3/4 answered\nFAIL empty-section: Review\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Proof / Review / Risk).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (1 problem(s))\n'
+
+----------------------------------------------------------------------
+Ran 43 tests in 2.029s
+
+FAILED (failures=7)
+
+Final regression cases against origin/main gate (54be1eda04866db2c17baf0b8483d06b10f11319)
+test_600_visible_characters_pass (cap_tests.ProseCapTests.test_600_visible_characters_pass) ... ok
+test_601_visible_characters_fail_with_the_count (cap_tests.ProseCapTests.test_601_visible_characters_fail_with_the_count) ... FAIL
+test_code_cannot_open_a_details_exemption (cap_tests.ProseCapTests.test_code_cannot_open_a_details_exemption) ... FAIL
+test_links_and_formatting_count_only_visible_characters (cap_tests.ProseCapTests.test_links_and_formatting_count_only_visible_characters) ... FAIL
+test_long_code_comments_details_and_images_do_not_count (cap_tests.ProseCapTests.test_long_code_comments_details_and_images_do_not_count) ... ok
+test_long_legacy_six_section_body_is_exempt (cap_tests.ProseCapTests.test_long_legacy_six_section_body_is_exempt) ... FAIL
+test_long_markdown_tables_do_not_count (cap_tests.ProseCapTests.test_long_markdown_tables_do_not_count) ... ok
+test_pipe_in_prose_does_not_exempt_it (cap_tests.ProseCapTests.test_pipe_in_prose_does_not_exempt_it) ... FAIL
+test_text_after_details_still_counts (cap_tests.ProseCapTests.test_text_after_details_still_counts) ... FAIL
+test_fold_markup_does_not_answer_empty_sections (cap_tests.SectionContractTests.test_fold_markup_does_not_answer_empty_sections) ... FAIL
+
+======================================================================
+FAIL: test_601_visible_characters_fail_with_the_count (cap_tests.ProseCapTests.test_601_visible_characters_fail_with_the_count)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 250, in test_601_visible_characters_fail_with_the_count
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_code_cannot_open_a_details_exemption (cap_tests.ProseCapTests.test_code_cannot_open_a_details_exemption)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 287, in test_code_cannot_open_a_details_exemption
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_links_and_formatting_count_only_visible_characters (cap_tests.ProseCapTests.test_links_and_formatting_count_only_visible_characters)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 299, in test_links_and_formatting_count_only_visible_characters
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_long_legacy_six_section_body_is_exempt (cap_tests.ProseCapTests.test_long_legacy_six_section_body_is_exempt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 311, in test_long_legacy_six_section_body_is_exempt
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_pipe_in_prose_does_not_exempt_it (cap_tests.ProseCapTests.test_pipe_in_prose_does_not_exempt_it)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 266, in test_pipe_in_prose_does_not_exempt_it
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_text_after_details_still_counts (cap_tests.ProseCapTests.test_text_after_details_still_counts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 292, in test_text_after_details_still_counts
+    self.assertEqual(result, 1, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1 : pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+======================================================================
+FAIL: test_fold_markup_does_not_answer_empty_sections (cap_tests.SectionContractTests.test_fold_markup_does_not_answer_empty_sections)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 119, in test_fold_markup_does_not_answer_empty_sections
+    self.assertIn(f'FAIL empty-section: {name}', output)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'FAIL empty-section: What' not found in 'pr-evidence: sections: 3/4 answered\nFAIL empty-section: Review\npr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Proof / Review / Risk).\npr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.\npr-evidence: scanned 0 image link(s)\npr-evidence: RED (1 problem(s))\n'
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.056s
+
+FAILED (failures=7)
+Negative control: 7 failures, 0 errors across 10 tests; expected failures on main.
+...........F...............................
+======================================================================
+FAIL: test_long_markdown_tables_do_not_count (__main__.ProseCapTests.test_long_markdown_tables_do_not_count) (table='| Before |\n| --- |\n| xxxxxxxxx')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/2206-image-first/scripts/pr-evidence-gate.test.py", line 263, in test_long_markdown_tables_do_not_count
+    self.assertEqual(result, 0, output)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : pr-evidence: sections: 4/4 answered
+FAIL too-long: 2621 characters of prose outside tables, images, code and details (limit 600)
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (1 problem(s))
+
+
+----------------------------------------------------------------------
+Ran 43 tests in 1.681s
+
+FAILED (failures=1)

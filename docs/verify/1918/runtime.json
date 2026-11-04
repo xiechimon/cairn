@@ -1,0 +1,7 @@
+{
+  "command": "pnpm eval:sample-failures --week 2026-11-16 --out /tmp/cairn-1918-runtime-review",
+  "available": { "trials": 47, "packs": 0 },
+  "sampled": { "trials": 10, "packs": 0 },
+  "flows": ["chief-dispatch"],
+  "note": "Only chief-dispatch has stored baseline results in this checkout. Multi-flow and attributed-pack selection are exercised by the CLI fixture test."
+}

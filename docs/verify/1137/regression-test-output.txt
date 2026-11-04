@@ -1,0 +1,13 @@
+
+ RUN  v5.0.1 /home/measure/.pacman-chief/workspaces/01a131a3-8051-7757-b18e-d4f135e4e655/apps/server
+
+
+ Test Files  5 passed (5)
+      Tests  89 passed (89)
+   Start at  03:59:54
+   Duration  2.39s (transform 41%, tests 30%, import 29%)
+
+  Transform  transforming modules took 3.98s · 41% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

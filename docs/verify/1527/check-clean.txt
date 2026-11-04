@@ -1,0 +1,2 @@
+docs/feature-map.md: up to date with its sources
+exit=0

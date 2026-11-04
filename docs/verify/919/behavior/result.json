@@ -1,0 +1,68 @@
+{
+  "probe": "drive-919-skills-routing/behavior",
+  "server": "http://127.0.0.1:8795",
+  "web": "http://127.0.0.1:5277",
+  "db": "/tmp/pacman-919-run2/home/server/server.db",
+  "daemonHome": "/tmp/pacman-919-daemon-home2",
+  "localSkills": "/tmp/pacman-919-local-skills",
+  "model": "glm-5.3",
+  "passed": 11,
+  "total": 11,
+  "checks": [
+    {
+      "name": "票面自证：title/spec 零技能指涉词",
+      "ok": true,
+      "detail": "以「深夜写代码」为主题写一首三行俳句，保存到仓库根目录的 haiku.txt，然后简短汇报。"
+    },
+    {
+      "name": "在线机器 runtime 闸打开（pi + claude-code）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "真模型步 done（≤3 次尝试）",
+      "ok": true,
+      "detail": "build=01a11652-4cba-7868-8474-41e0c0e3b07b"
+    },
+    {
+      "name": "产物 haiku.txt 存在",
+      "ok": true,
+      "detail": "/tmp/pacman-919-daemon-home2/workspaces/01a11652-4cba-7868-8474-41e0c0e3b07b/haiku.txt"
+    },
+    {
+      "name": "产物含技能 marker SKILL-ROUTE-919（主判据）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "提交面 HEAD:haiku.txt 含 marker",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "transcript 含 haiku-helper SKILL.md 的工具读取",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "daemon.log 团队分发行（team: … materialized）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "daemon.log 目录行 entries=1（白名单 ∩ 全库）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "daemon.log 硬挡行（本机白名单外 2 技能）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "详情页汇总行读列点名命中技能（截图 behavior-detail-skills-summary.png）",
+      "ok": true,
+      "detail": "技能：haiku-helper"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "source": "GitHub REST GET repos/xiechimon/cairn/issues/2120/comments and pulls/2120, captured 2026-10-28",
+  "pull": {
+    "number": 2120,
+    "html_url": "https://github.com/xiechimon/cairn/pull/2120",
+    "merged_at": "2026-10-28T20:33:10Z",
+    "head": {
+      "sha": "49027209190d3b46a21ea27d3821da62fcd09b34"
+    }
+  },
+  "comments": [
+    {
+      "id": 6478062352,
+      "user": {
+        "login": "cairnwright[bot]",
+        "type": "Bot",
+        "id": 347615582
+      },
+      "html_url": "https://github.com/xiechimon/cairn/pull/2120#issuecomment-6478062352",
+      "created_at": "2026-10-28T19:05:29Z",
+      "updated_at": "2026-10-28T19:05:29Z",
+      "body": "<!-- review-gate:106e0432aaec693e64384bbf95e76c60c9c4bb3d -->\n**Independent review gate: BLOCK** (separate model; gate weakening, eval gaming, correctness) for `106e0432`.\n\nBlocking findings above go back to the PR author (thread or Cairn) to fix; auto-merge stays off until a new head passes this gate.\n<!-- review-gate-patch:8cd631d57bfbe2882e296103ddd9d9ff7fd1918e -->",
+      "performed_via_github_app": {
+        "id": 5462173,
+        "slug": "cairnwright"
+      }
+    },
+    {
+      "id": 6478745948,
+      "user": {
+        "login": "cairnwright[bot]",
+        "type": "Bot",
+        "id": 347615582
+      },
+      "html_url": "https://github.com/xiechimon/cairn/pull/2120#issuecomment-6478745948",
+      "created_at": "2026-10-28T19:37:19Z",
+      "updated_at": "2026-10-28T19:37:19Z",
+      "body": "<!-- review-gate:420567730a04b3a758b1a0dd31d79bb91f3dfab9 -->\n**Independent review gate: PASS** (separate model; gate weakening, eval gaming, correctness) for `42056773`.\n\nVERDICT: pass\n<!-- review-gate-patch:b1c99f2891637b12b6cfb3b7207c417b802f40ba -->",
+      "performed_via_github_app": {
+        "id": 5462173,
+        "slug": "cairnwright"
+      }
+    },
+    {
+      "id": 6479079130,
+      "user": {
+        "login": "cairnwright[bot]",
+        "type": "Bot",
+        "id": 347615582
+      },
+      "html_url": "https://github.com/xiechimon/cairn/pull/2120#issuecomment-6479079130",
+      "created_at": "2026-10-28T19:53:42Z",
+      "updated_at": "2026-10-28T19:53:42Z",
+      "body": "<!-- review-gate:91c105d022dfd597c9a372f881ba5f62b7efe051 -->\n**Independent review gate: PASS** (separate model; gate weakening, eval gaming, correctness) for `91c105d0`.\n\nVERDICT: pass\n<!-- review-gate-patch:84557af87c2450b0f01ce75e651d3872503e2bb3 -->",
+      "performed_via_github_app": {
+        "id": 5462173,
+        "slug": "cairnwright"
+      }
+    },
+    {
+      "id": 6479399238,
+      "user": {
+        "login": "cairnwright[bot]",
+        "type": "Bot",
+        "id": 347615582
+      },
+      "html_url": "https://github.com/xiechimon/cairn/pull/2120#issuecomment-6479399238",
+      "created_at": "2026-10-28T20:09:06Z",
+      "updated_at": "2026-10-28T20:09:06Z",
+      "body": "<!-- review-gate:736b69be917d418ca1d8273519585f14ba8c1e95 -->\n**Independent review gate: PASS** (carried over) for `736b69be`: same patch as the reviewed head `91c105d0`; only the base moved.\n<!-- review-gate-patch:84557af87c2450b0f01ce75e651d3872503e2bb3 -->",
+      "performed_via_github_app": {
+        "id": 5462173,
+        "slug": "cairnwright"
+      }
+    },
+    {
+      "id": 6479945877,
+      "user": {
+        "login": "cairnwright[bot]",
+        "type": "Bot",
+        "id": 347615582
+      },
+      "html_url": "https://github.com/xiechimon/cairn/pull/2120#issuecomment-6479945877",
+      "created_at": "2026-10-28T20:29:02Z",
+      "updated_at": "2026-10-28T20:29:02Z",
+      "body": "<!-- review-gate:49027209190d3b46a21ea27d3821da62fcd09b34 -->\n**Independent review gate: PASS** (carried over) for `49027209`: same patch as the reviewed head `91c105d0`; only the base moved.\n<!-- review-gate-patch:84557af87c2450b0f01ce75e651d3872503e2bb3 -->",
+      "performed_via_github_app": {
+        "id": 5462173,
+        "slug": "cairnwright"
+      }
+    }
+  ]
+}

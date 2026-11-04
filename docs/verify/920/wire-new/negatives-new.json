@@ -1,0 +1,50 @@
+{
+  "他机凭证取清单": {
+    "status": 404,
+    "body": {
+      "error": "step GDlsVOoyr0XdShdzeO7XS (not yours) not found"
+    }
+  },
+  "未知步取清单": {
+    "status": 404,
+    "body": {
+      "error": "step no-such-step not found"
+    }
+  },
+  "他机凭证取文件": {
+    "status": 404,
+    "body": {
+      "error": "step GDlsVOoyr0XdShdzeO7XS (not yours) not found"
+    }
+  },
+  "白名单外技能（beta）": {
+    "status": 404,
+    "body": {
+      "error": "skill beta not found"
+    }
+  },
+  "逃逸 path（../alpha）": {
+    "status": 404,
+    "body": {
+      "error": "file ../alpha/SKILL.md not found"
+    }
+  },
+  "逃逸 dirName（../）": {
+    "status": 404,
+    "body": {
+      "error": "skill .. not found"
+    }
+  },
+  "清单外路径（目录）": {
+    "status": 404,
+    "body": {
+      "error": "file assets not found"
+    }
+  },
+  "清单外路径（未知文件）": {
+    "status": 404,
+    "body": {
+      "error": "file ghost.md not found"
+    }
+  }
+}

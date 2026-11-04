@@ -1,0 +1,52 @@
+{
+  "probe": "drive-920-skills-manifest/daemon-incremental",
+  "expect": "new",
+  "server": "http://127.0.0.1:8791",
+  "skillsDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/skills",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-920-daemon-home-c1",
+  "passed": 8,
+  "total": 8,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（5 技能 / 13 文件）",
+      "ok": true,
+      "detail": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/skills"
+    },
+    {
+      "name": "增量步会话完整跑完",
+      "ok": true,
+      "detail": "{\"id\":\"Thq7K7KARaqn8DHN3kPx9\",\"kind\":\"build\",\"status\":\"failed\",\"buildErrorMessage\":\"构建零改动\"}"
+    },
+    {
+      "name": "新增 materialized 行",
+      "ok": true,
+      "detail": "1 → 2"
+    },
+    {
+      "name": "增量：fetched=1（只传变化文件）",
+      "ok": true,
+      "detail": "fetched=1"
+    },
+    {
+      "name": "增量：reused=11（其余命中 blobs 零传输）",
+      "ok": true,
+      "detail": "reused=11"
+    },
+    {
+      "name": "增量传输字节 = 变化文件的新尺寸",
+      "ok": true,
+      "detail": "fetchedBytes=1060 notes=1060（改前 1024）"
+    },
+    {
+      "name": "新视图目录（清单 digest 变化）",
+      "ok": true,
+      "detail": "/tmp/pacman-920-daemon-home-c1/team-skills/views/b58b814a795165bac26426721939826f8e5cf1e97dabd6f55b770c5b1e3b2b02"
+    },
+    {
+      "name": "新视图内容 = 第二版",
+      "ok": true,
+      "detail": null
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+pnpm prepush (injected apps/web/src/prepush-negative-probe.tsx with mt-[3px], exit 1)
+$ node scripts/prepush.mjs
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] D5 arbitrary spacing/size (SPACING_UTILITIES-[<len>]): 16 total > baseline 15 (grew at: prepush-negative-probe.tsx 0->1) — use the DESIGN.md scale (text-page/heading/card-title/ui/meta/caption, 4px-grid spacing) instead of an arbitrary value
+[ui-debt-gate] FAIL: 1 violation(s). Build with components/ui/* + Tailwind theme keys; per-face css, bare controls and arbitrary values may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write
+[ELIFECYCLE] Command failed with exit code 1.
+
+Probe removed. pnpm prepush --ci (exit 0)
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 16 text + 15 spacing in 13 file(s); 5 css + 208 tsx + 245 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from f2cdf40fc6d8.
+[prepush] pnpm lint
+[prepush] pnpm typecheck
+[prepush] pnpm spec:parse
+[spec-parse-gate] apps/web/e2e: 1186 tests in 170 files collected, disk count matches (1.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (1.5s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] PASS (4 checks)
+
+node scripts/ui-dead-class-gate.mjs (exit 0)
+ui-dead-class-gate: selector universe from postcss compile (apps/web/src/styles/app.css) + apps/web/src/**/*.css
+scanned 259 files (19 pristine registry files skipped), 7391 class-token occurrences, 1661 living selectors
+zero-rule names: 248 — selector-exempt 245, manual-exempt 3, DEAD 0
+OK — every rendered class token matches a living rule or carries a disposition.
+
+Affected E2E plan (execution unavailable: sandbox cannot bind ports)
+[e2e:affected] 2/170 specs on the standard fixture-build config, E2E_PORT=8398
+  live-server-reap.spec.ts token-gate.spec.ts
+
+pnpm exec vitest run apps/server/test/ci-loop.test.ts apps/server/test/pr-seg3.test.ts apps/server/test/github-writeback.test.ts (exit 0)
+
+ RUN  v5.0.1 /private/tmp/pmc-1533-1792693129
+
+
+ Test Files  3 passed (3)
+      Tests  125 passed (125)
+   Start at  02:28:06
+   Duration  2.98s (tests 49%, transform 26%, import 25%)
+
+
+pnpm exec vitest run --changed apps/server/test/ci-loop.test.ts apps/server/test/pr-seg3.test.ts apps/server/test/github-writeback.test.ts (exit 0)
+
+ RUN  v5.0.1 /private/tmp/pmc-1533-1792693129
+
+
+ Test Files  2 passed (2)
+      Tests  96 passed (96)
+   Start at  02:29:06
+   Duration  3.03s (tests 50%, transform 27%, import 23%)
+
+
+Unfiltered pnpm exec vitest run --changed: interrupted after failures in HTTP/process tests under sandbox restrictions; no full-suite pass claimed.

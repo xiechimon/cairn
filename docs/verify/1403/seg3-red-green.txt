@@ -1,0 +1,118 @@
+# #1403 segment 3: red and green legs
+
+Branch claude/bootstrap-p2-seg3, worktree .claude/worktrees/p3a. Command: pnpm exec vitest run test/pr-seg3.test.ts (apps/server).
+
+## Leg 1: plan failure modes F1-F24 (2026-10-22, tests written before ci-loop.ts / github.ts / builds.ts changes)
+
+Red: 26 failed / 13 passed (39). Failing lines:
+  x [s3-F1] the grind reads the PR, then the check runs of its head SHA (not the branch name)
+  x [s3-F3] a required check concluding neutral: no advance, no fix round, one hint per round
+  x [s3-F3] a required check concluding skipped: no advance, no fix round, one hint per round
+  x [s3-F3] a required check concluding cancelled: no advance, no fix round, one hint per round
+  x [s3-F4] a missing required check is pending, also past the empty-checks grace
+  x [s3-F4b] no run at all with a required list: pending past the grace (not "no CI")
+  x [s3-F5] a non-required check fails while the required ones pass: green
+  x [s3-F6] a required check concluding failure: a [ci-fix] round
+  x [s3-F6] a required check concluding timed_out: a [ci-fix] round
+  x [s3-F6] a required check concluding action_required: a [ci-fix] round
+  x [s3-F7] no required list: neutral and skipped do not block, cancelled does
+  x [s3-F8] the branch read answers 500: no move, no check-runs read
+  x [s3-F8] the branch read answers 404: no move, no check-runs read
+  x [s3-F8] the rules read answers 429: no move, no check-runs read
+  x [s3-F9] required names: classic contexts, classic checks and ruleset checks together
+  x [s3-F10] the required list is read once per repository and branch for ten minutes
+  x [s3-F11] the PR read fails (502): no check-runs read, no move
+  x [s3-F11] the PR read fails (a network error): no check-runs read, no move
+  x [s3-F12] dirty at building: one [merge-conflict] step on the same build, no [ci-fix]
+  x [s3-F13] dirty at review: the card goes back to queued with one [merge-conflict] step
+  x [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+  x [s3-F17] behind at review: one hint per round naming update-branch, no request, phase kept
+  x [s3-F17b] behind at building: the checks decide
+  x [s3-F19] a blocked-check hint cleans GitHub text
+  x [s3-F20] completeStep writes finishedAt; the last pushed checkpoint follows it
+  x [s3-F23] merge-conflict rounds do not count as CI fix rounds
+
+Green after the implementation: 39 passed (39).
+
+## Leg 2: the ten /code-review findings (F4 and F14 changed, F13b, F14b, F25, F25b, F26, F27, F28)
+
+Red: 11 failed / 40 passed (51). Failing lines:
+  x [s3-F4] a missing required check is pending; past the empty-checks grace it is a blocked hint (a commit status or a run past page 1 is not read), never green
+  x [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+  x [s3-F13b] dirty at review stops the unclaimed verify step before the card goes back to queued
+  x [s3-F25] building, the recorded PR is a fork PR with the same branch name: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25] building, the recorded PR is a deleted fork (head repo null): no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25] building, the recorded PR is a PR from another branch: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25] building, the recorded PR is a closed PR: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F26] runs that share a name: one success counts, a cancelled or skipped sibling does not block
+  x [s3-F27] the rules read answers 403 (no rulesets on this plan or server): no rules, the classic list decides
+  x [s3-F27] the rules read answers 404 (no rulesets on this plan or server): no rules, the classic list decides
+  x [s3-F28] the verdict follows a refreshed required list even when the check runs answer 304
+
+Green after the fixes: 51 passed (51); with the later F8, F24 and F25b additions, 54 passed (54). ci-loop.test.ts then failed 2/24: its mock answered pulls/{n} with head ref 'x', which the own-PR check (F25) now reads by branch name. The mock now answers with the build's own branch: 24 passed (24).
+
+Two F8 cases were added after the fix (the rules read answers 403 with a rate-limit header, or with a rate-limit message): they passed at once, so mutation M15 in seg3-mutations.txt is their red leg.
+
+Server suite after the fixes: 129 files, 2167 passed, 1 skipped.
+
+## Leg 3: the second /code-review (F6b, F8c, F13c, F25 and F25b base-branch cases, F26b; F13d is a control and passed on the red run)
+
+Red: 6 failed / 54 passed (60). Failing lines:
+  x [s3-F6b] a required check concluding action_required (a person must approve): blocked hint, no [ci-fix]
+  x [s3-F8c] a failed required-list read is not retried by the next candidate in the same sweep
+  x [s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review
+  x [s3-F26b] a blocked hint names a check once when several runs share its name
+  x [s3-F25] building, the recorded PR is a PR into another base branch: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25b] review, the recorded PR is a PR into another base branch and dirty: no merge-conflict round
+
+Green after the fixes: the four affected files, 360 passed (360). F13e was added afterwards for mutation N9 (it passed at once; N9 is its red leg): 361 passed.
+
+## Leg 4: the third /code-review (F8 SSO case, F9b, F13f, F13g, F13h)
+
+Red: 5 failed / 61 passed (66). Failing lines:
+  x [s3-F8] the rules read answers 403 asking for SAML SSO (x-github-sso): no move, no check-runs read
+  x [s3-F9b] classic protection with enforcement_level off: its contexts are not required
+  x [s3-F13f] the re-verify survives a [ci-fix] round after the merge-conflict round
+  x [s3-F13g] a verify that already ran on the pre-conflict head is queued again after the merge-conflict round
+  x [s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline
+
+Green after the fixes: the four affected files, 366 passed (366).
+
+## Leg 5: the fourth /code-review (F7b, F26c, F30, F30c, F13i; F30b is a control and passed on the red run)
+
+Red: 5 failed / 67 passed (72). Failing lines:
+  x [s3-F7b] no required list: action_required (waiting for a person) blocks too
+  x [s3-F26c] a name with one success passes although a sibling run of that name failed
+  x [s3-F30] right after pacman pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round
+  x [s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out
+  x [s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again
+
+Green after the fixes: the four affected files, 372 passed (372). Server suite: 129 files, 2188 passed, 1 skipped.
+
+## Leg 6: the fifth /code-review (F12b, F27b, F30d, F4c; F27 403 case reworded with the plan message)
+
+Red: 4 failed / 72 passed (76). Failing lines:
+  x [s3-F30d] a verify step that pushed just now also counts as pacman’s last push
+  x [s3-F27b] the rules read answers 403 for the token’s permissions (not the plan): no move
+  x [s3-F12b] a default branch name with shell characters is quoted in the merge-conflict prompt
+  x [s3-F4c] the missing-check grace keeps its start while another required check re-runs
+
+Green after the fixes: the four affected files, 376 passed (376).
+
+## Leg 7: /code-review on the two merges (F9c, F13j, F30e)
+
+Red: 3 failed / 76 passed (79). Failing lines:
+  x [s3-F30e] a later step that pushed nothing does not hide pacman’s last push
+  x [s3-F9c] a default branch with a slash keeps the slash in the branch and rules paths
+  x [s3-F13j] a merge-conflict round at building stops an unclaimed verify step and queues it again at review
+
+Green after the fixes: the four affected files, 408 passed (408).
+
+## Leg 8: the CLOSING_SHAPE title fix from the #1509 pr-gate (run 4 at 0d67951, correctness item 1), 2026-10-22
+
+pnpm exec vitest run test/pr-merge-api.test.ts -t 2b-D41. Red: 3 failed / 10 passed. Failing lines:
+  x [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "fix") keeps the PR title
+  x [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "close") keeps the PR title
+  x [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "resolved") keeps the PR title
+
+Green after testing pull.title alone (builds.ts, mergeThroughGithub): the existing [2b-D41] case 'Rename the handler; fixed' then failed, because it expected the appended ' (#n)' to count. That is the false positive the pr-gate names: the number is this PR's own, which the merge closes anyway. It moved to the D41c list (title kept). pr-merge-api.test.ts: 122 passed (122).

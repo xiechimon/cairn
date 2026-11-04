@@ -1,0 +1,6 @@
+$ node probe against the same origin/main sandboxed frame (storage accessor + first paint):
+{
+  "kids": 0,
+  "textLen": 0,
+  "storageError": "SecurityError: Failed to read the 'localStorage' property from 'Window': The document is sandboxed and lacks the 'allow-same-origin' flag."
+}

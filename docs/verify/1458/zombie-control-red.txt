@@ -1,0 +1,4 @@
+## control: workspace-hooks.ts kills only the hook process (`process.kill(child.pid)` instead of the group `-child.pid`), restored afterwards; new isGone helper
+     × 失败方式 4：超时 → 杀整组进程（挂起孙进程全灭）+ timeout 形错误 5013ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  1 failed | 8 skipped (9)

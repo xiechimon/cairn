@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1852
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  13:11:46
+   Duration  116ms (transform 46%, tests 33%, import 16%, worker 5%)
+

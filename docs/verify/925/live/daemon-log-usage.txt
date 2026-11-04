@@ -1,0 +1,2 @@
+2026-10-08 01:49:55 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=2010
+2026-10-08 01:49:55 [step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=2010

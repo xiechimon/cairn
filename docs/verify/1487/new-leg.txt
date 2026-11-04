@@ -1,0 +1,23 @@
+## new leg: this branch; tests = this branch
+## (cd apps/server && pnpm exec vitest run --reporter=verbose test/m3b-machine-git.test.ts -t '#1487|fast-forward|非快进')
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ↓ test/m3b-machine-git.test.ts > claim 载荷 repo 绑定位（M3b worktree 契约接线，02 §3/§5.5） > 托管项目 → project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>}
+ ↓ test/m3b-machine-git.test.ts > per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 push_credential r5 §3.1） > token/{stepId} → git {username,password}；done 后回收（撤销 = 行删除）
+ ↓ test/m3b-machine-git.test.ts > per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 push_credential r5 §3.1） > 未绑 repo 项目 → git null（M3a 兼容形状）
+ ↓ test/m3b-machine-git.test.ts > plan.md 产物上传（02 §4.2/r5 §4：plan 即文件，版本 = 文件版本） > upload-urls plan.md → plan v1 + build.planDocId；重规划轮 → v2
+ ↓ test/m3b-machine-git.test.ts > done 回传 commit = per-step checkpoint（r3 §3.5「恢复到此处」数据面） > step.checkpointCommit 落库
+ ✓ test/m3b-machine-git.test.ts > merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服务端 main 验证） > 合并步 done(commit) → bare repo main fast-forward + 时间线 🎉 287ms
+ ✓ test/m3b-machine-git.test.ts > merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服务端 main 验证） > 非快进（main 在合并窗口被推进）→ 步 failed + todo failed（失败仅人工重跑，02/A6） 190ms
+ ✓ test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 1：合并步在跑时关闭 → 成功回报不快进 main，卡仍 closed，时间线说明 163ms
+ ✓ test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 1b：回报进来时卡还在审核、落地的 git 检查期间被关闭 → 仍不快进 158ms
+ ✓ test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 2：关闭后重新打开回待开始 → 同样不落地，卡仍 todo 169ms
+ ✓ test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 3：同一 build 已有在途合并步（pending 或已领走）→ 再请求合并 409，不多排一个 132ms
+ ↓ test/m3b-machine-git.test.ts > 托管 repo provision 种子提交（M3b [设计]：空库不能 worktree） > init bare 即立 refs/heads/main（空树种子）
+
+ Test Files  1 passed (1)
+      Tests  6 passed | 6 skipped (12)
+   Start at  12:35:00
+   Duration  3.43s (transform 43%, tests 34%, import 23%)
+

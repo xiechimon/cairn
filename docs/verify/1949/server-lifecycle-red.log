@@ -1,0 +1,63 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/fixture-lifecycle.test.ts (5 tests | 2 failed) 2085ms
+   ❯ bootServer fixture lifecycle (5)
+     × bootServer that throws during startup leaves no owned dirs 43ms
+     × a test that never calls dispose has its dirs released by the fallback 1913ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/fixture-lifecycle.test.ts > bootServer fixture lifecycle > bootServer that throws during startup leaves no owned dirs
+AssertionError: expected [ 'cairn-att-ouKkaa', …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "cairn-att-ouKkaa",
++   "cairn-server-repos-0osCcT",
++   "cairn-skill-sources-NWfc2Q",
++   "cairn-skills-6dlncs",
++ ]
+
+ ❯ test/fixture-lifecycle.test.ts:52:20
+     50|     }
+     51|     const leaked = cairnEntries().filter((name) => !before.has(name));
+     52|     expect(leaked).toEqual([]);
+       |                    ^
+     53|   });
+     54|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/fixture-lifecycle.test.ts > bootServer fixture lifecycle > a test that never calls dispose has its dirs released by the fallback
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/fixture-lifecycle.test.ts:101:54
+     99|       expect(owned.length).toBe(4);
+    100|       for (const dir of owned) {
+    101|         expect(dir.includes(`cairn-test-${runId}-`)).toBe(true);
+       |                                                      ^
+    102|         expect(existsSync(dir)).toBe(false);
+    103|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  16:41:11
+   Duration  3.69s (tests 58%, transform 28%, import 14%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/apps/server
+

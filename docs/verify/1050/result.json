@@ -1,0 +1,72 @@
+{
+  "probe": "drive-1050-claude-bin",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "checks": [
+    {
+      "name": "stack-ready",
+      "ok": true,
+      "detail": "teamId=NGyJ0juNrmQb4EZ-CTpM_"
+    },
+    {
+      "name": "api-key",
+      "ok": true,
+      "detail": "status=201"
+    },
+    {
+      "name": "A1 daemon.log 报出探测结果",
+      "ok": true,
+      "detail": "[machine] claude binary: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude (9.9.9-probe)"
+    },
+    {
+      "name": "A2 machine 行 bin 实测值",
+      "ok": true,
+      "detail": "{\"path\":\"/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude\",\"version\":\"9.9.9-probe\"}"
+    },
+    {
+      "name": "A3 machine 行 auth 实测值",
+      "ok": true,
+      "detail": "{\"state\":\"logged-in\",\"method\":\"oauth_token\",\"provider\":\"firstParty\"}"
+    },
+    {
+      "name": "A4 model-sources 段带 bin/auth（server 透传）",
+      "ok": true,
+      "detail": "{\"bin\":{\"path\":\"/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude\",\"version\":\"9.9.9-probe\"},\"auth\":{\"state\":\"logged-in\",\"method\":\"oauth_token\",\"provider\":\"firstParty\"}}"
+    },
+    {
+      "name": "A5 页面细字行报版本与路径",
+      "ok": true,
+      "detail": "Claude Code | 已安装在 xmonsMac-3574.local |  | claude 9.9.9-probe · /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude |  | 执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。"
+    },
+    {
+      "name": "A6 页面凭据态 = logged-in、无「未登录」角标",
+      "ok": true,
+      "detail": "data-auth=logged-in"
+    },
+    {
+      "name": "B1 daemon.log 报「PATH 上没有」",
+      "ok": true,
+      "detail": "[machine] claude binary: not found on PATH"
+    },
+    {
+      "name": "B2 machine 行 bin = null（探过了没有，不是空对象、不是键缺席）",
+      "ok": true,
+      "detail": "{\"installed\":true,\"hostname\":\"xmonsMac-3574.local\",\"models\":[{\"id\":\"haiku\",\"name\":\"haiku\",\"slot\":\"default\"},{\"id\":\"kimi-k3[1M]\",\"name\":\"kimi-k3[1M]\",\"slot\":\"def"
+    },
+    {
+      "name": "B3 model-sources 段 bin = null（server 原样透传，不吞成缺席）",
+      "ok": true,
+      "detail": "\"MISSING\""
+    },
+    {
+      "name": "B4 页面回「未安装」（不再假报已安装）",
+      "ok": true,
+      "detail": "Claude Code | 未安装 |  | 执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。 |  | 安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。"
+    },
+    {
+      "name": "B5 页面无细字行、不写「未知」",
+      "ok": true,
+      "detail": "Claude Code | 未安装 |  | 执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。 |  | 安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。"
+    }
+  ]
+}

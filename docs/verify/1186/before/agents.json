@@ -1,0 +1,46 @@
+{
+  "open": {
+    "id": "MDAdB2gAcfQA6oPZsfUPz",
+    "displayName": "1186-open",
+    "description": null,
+    "status": "active",
+    "avatarUrl": null,
+    "provider": "stub-1186-mv8b7h4m",
+    "modelId": "stub-model",
+    "thinkingLevel": null,
+    "tools": [
+      "推送分支"
+    ],
+    "secrets": [],
+    "defaultSkill": null,
+    "skillsAllowlist": [
+      "demo-skill"
+    ],
+    "mcpServers": [],
+    "maxConcurrentTasks": null,
+    "machineId": "xz89QUvcMQWgR63UMDHEp",
+    "persona": null,
+    "requiredCapabilities": null
+  },
+  "closed": {
+    "id": "3-LsEYz_2VDaGOOWyq3Lw",
+    "displayName": "1186-closed",
+    "description": null,
+    "status": "active",
+    "avatarUrl": null,
+    "provider": "stub-1186-mv8b7h4m",
+    "modelId": "stub-model",
+    "thinkingLevel": null,
+    "tools": [
+      "推送分支"
+    ],
+    "secrets": [],
+    "defaultSkill": null,
+    "skillsAllowlist": [],
+    "mcpServers": [],
+    "maxConcurrentTasks": null,
+    "machineId": "xz89QUvcMQWgR63UMDHEp",
+    "persona": null,
+    "requiredCapabilities": null
+  }
+}

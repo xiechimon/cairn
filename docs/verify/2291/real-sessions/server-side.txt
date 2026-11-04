@@ -1,0 +1,30 @@
+# GET /api/teams/<team>/chief/threads (id, title)
+chief-01a18eac-e242-7c48-a0e1-281819621172 "pi real-sess…"
+chief-01a18eab-702f-7d4a-ae49-0b6c40e11712 "Codex real-s…"
+chief-01a18eaa-53cf-7264-8d41-8dd96d188f29 "Claude Code …"
+
+# GET /api/conversations/chief-01a18eaa-53cf-7264-8d41-8dd96d188f29/messages
+ZEVFeYXA0EjYtF8-Dfsdd user  "Claude Code real-session check for #2291: please list the files in the repository."
+BRTcXm0H1meEPzoRJ0_QO user  "Follow-up from Claude Code: no code changes needed, just a summary."
+
+# GET /api/conversations/chief-01a18eab-702f-7d4a-ae49-0b6c40e11712/messages
+DJw1tNi6RIZw7uYxSRHUf user  "Codex real-session check for #2291: please list the files in the repository."
+CTJz3fR7CJGfEBu-_N3vG user  "Follow-up from Codex: no code changes needed, just a summary."
+
+# GET /api/conversations/chief-01a18eac-e242-7c48-a0e1-281819621172/messages
+httffjsHuK2qTNX4POzFa user  "pi real-session check for #2291: please list the files in the repository."
+rHAD1tWXj_ntRar-JFZqf user  "Follow-up from pi: no code changes needed, just a summary."
+
+# SQLite (read-only): chief_message rows and Coordinator steps
+chief_message chief-01a18eaa-53cf-7264-8d41-8dd96d188f29 ZEVFeYXA0EjYtF8-Dfsdd user B0fy8CIOd9Toiqeklrqny
+chief_message chief-01a18eaa-53cf-7264-8d41-8dd96d188f29 BRTcXm0H1meEPzoRJ0_QO user B0fy8CIOd9Toiqeklrqny
+chief_message chief-01a18eab-702f-7d4a-ae49-0b6c40e11712 DJw1tNi6RIZw7uYxSRHUf user B0fy8CIOd9Toiqeklrqny
+chief_message chief-01a18eab-702f-7d4a-ae49-0b6c40e11712 CTJz3fR7CJGfEBu-_N3vG user B0fy8CIOd9Toiqeklrqny
+chief_message chief-01a18eac-e242-7c48-a0e1-281819621172 httffjsHuK2qTNX4POzFa user B0fy8CIOd9Toiqeklrqny
+chief_message chief-01a18eac-e242-7c48-a0e1-281819621172 rHAD1tWXj_ntRar-JFZqf user B0fy8CIOd9Toiqeklrqny
+step chief-01a18eaa-53cf-7264-8d41-8dd96d188f29 chief pending null
+step chief-01a18eaa-53cf-7264-8d41-8dd96d188f29 chief pending null
+step chief-01a18eab-702f-7d4a-ae49-0b6c40e11712 chief pending null
+step chief-01a18eab-702f-7d4a-ae49-0b6c40e11712 chief pending null
+step chief-01a18eac-e242-7c48-a0e1-281819621172 chief pending null
+step chief-01a18eac-e242-7c48-a0e1-281819621172 chief pending null

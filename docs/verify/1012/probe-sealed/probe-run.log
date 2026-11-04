@@ -1,0 +1,902 @@
+vite v8.3.0 building client environment for fixture...
+transforming...
+✓ 2856 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     1.73 kB │ gzip:   0.78 kB
+dist/assets/index-CpH_60ZL.css    154.19 kB │ gzip:  25.73 kB
+dist/assets/index-B2vsuBPj.js   1,372.49 kB │ gzip: 421.32 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 9.53s
+  ➜  Local:   http://127.0.0.1:8400/
+
+Running 862 tests using 4 workers
+
+[1/862] e2e/accent-typo.spec.ts:29:3 › font baseline: body 400, card title 500, var font really loaded (light)
+[2/862] e2e/agent-create-model.spec.ts:113:1 › 无候选：报告警行并给「配置服务商」外链，两级选择器都不出
+[3/862] e2e/account-team-cleanse.spec.ts:30:1 › account: 退出登录 / 删除 / 更换 removed (avatar stays)
+[4/862] e2e/account-controls.spec.ts:47:1 › 改名：名称行有真按钮载体，点进编辑态预填聚焦，Enter 提交落行（R1–R4）
+[5/862] e2e/accent-typo.spec.ts:51:3 › empty-state headline rides the registry EmptyTitle tier (light)
+[6/862] e2e/account-team-cleanse.spec.ts:43:1 › account switch: default permission renders off; click requests and grants
+[7/862] e2e/accent-typo.spec.ts:62:3 › sidebar header carries the Pacman brand mark + name (light)
+[8/862] e2e/agent-create-model.spec.ts:123:1 › 有候选：不出告警行，出两级选择器且模型级先禁用
+[9/862] e2e/account-controls.spec.ts:80:1 › 改名：Esc 取消不误提交；空串与纯空白名不提交（R5/R6）
+[10/862] e2e/accent-typo.spec.ts:92:3 › resources back chevron hover shows no background change (light)
+[11/862] e2e/account-team-cleanse.spec.ts:55:1 › account switch: granted permission renders checked without a click
+[12/862] e2e/agent-create-model.spec.ts:131:1 › 一级列运行时与内置清空行，二级只列所选运行时的模型（pi 段不泄漏）
+[13/862] e2e/account-team-cleanse.spec.ts:65:1 › account switch: denied 态点击落偏好开档 + 拦截解释（#1031 语义改写）
+[14/862] e2e/account-controls.spec.ts:101:1 › 改名 live：提交发 PATCH /api/user/me、刷新后仍是新名、失败有 toast 点名（R7–R9）
+[15/862] e2e/accent-typo.spec.ts:108:3 › the sidebar collapse toggle shows no hover face (light)
+[16/862] e2e/account-team-cleanse.spec.ts:80:1 › team: 设置 routes to the account surface
+[17/862] e2e/agent-create-model.spec.ts:157:1 › 模型行只出模型名：不带 provider 徽标、不编造上下文窗口数字
+[18/862] e2e/accent-typo.spec.ts:134:3 › the sidebar toggles hold face and geometry while pressed (light)
+[19/862] e2e/account-team-cleanse.spec.ts:87:1 › team: chart tab swaps to the org chart, persists, and returns
+[20/862] e2e/account-controls.spec.ts:153:1 › 开关：granted 态能关掉、关档随刷新持久、能再开回来（S1/S2）
+[21/862] e2e/agent-create-model.spec.ts:177:1 › 创建弹窗：两级菜单整块落在视口内（几何）
+[22/862] e2e/accent-typo.spec.ts:29:3 › font baseline: body 400, card title 500, var font really loaded (dark)
+[23/862] e2e/agent-delete.spec.ts:32:1 › 概览页脚有删除入口，点开二次确认（canon 原文逐字）
+[24/862] e2e/accent-typo.spec.ts:51:3 › empty-state headline rides the registry EmptyTitle tier (dark)
+[25/862] e2e/account-controls.spec.ts:174:1 › 开关：denied 态开出偏好档 + 拦截解释、关得掉，两档都随刷新持久（S3/S4）
+[26/862] e2e/agent-create-model.spec.ts:223:1 › 模型很多：选过运行时后菜单不越出视口，首行可点，40 行一个不少
+[27/862] e2e/accent-typo.spec.ts:62:3 › sidebar header carries the Pacman brand mark + name (dark)
+[28/862] e2e/agent-delete.spec.ts:53:1 › 入口只在概览 tab：记忆 / 权限 tab 不渲染
+[29/862] e2e/account-controls.spec.ts:203:1 › 开关：default 态开出驱动 requestPermission，granted 落定后开档持久（S5）
+[30/862] e2e/accent-typo.spec.ts:92:3 › resources back chevron hover shows no background change (dark)
+[31/862] e2e/agent-delete.spec.ts:64:1 › 家族律关闭：取消 / X / Esc / backdrop —— 不删不跳
+[32/862] e2e/agent-create-model.spec.ts:256:1 › 选齐运行时与模型后提交，POST body 带 provider 与 modelId
+[33/862] e2e/account-controls.spec.ts:220:1 › 开关 fixture 面：scenario 可冻 denied——关态起步、点开出拦截解释；13 基线仍开（S6）
+[34/862] e2e/accent-typo.spec.ts:108:3 › the sidebar collapse toggle shows no hover face (dark)
+[35/862] e2e/account-controls.spec.ts:249:1 › 探针：帐号卡内每个控件点击都有可观察效果（P1，不只验改名与开关两个）
+[36/862] e2e/accent-typo.spec.ts:134:3 › the sidebar toggles hold face and geometry while pressed (dark)
+[37/862] e2e/agent-delete.spec.ts:89:1 › 确认删除 → 落团队页，被删卡消失、邻居卡还在
+[38/862] e2e/agent-create-model.spec.ts:275:1 › 只选运行时提交：body 带 provider、modelId 为 null（半态不丢字段）
+[39/862] e2e/accent-typo.spec.ts:186:3 › resources back chevron keeps a keyboard focus ring (light)
+[40/862] e2e/agent-delete.spec.ts:102:1 › 会话内回退到详情路由落「找不到该 Agent」态，不白屏
+[41/862] e2e/agent-detail.spec.ts:65:1 › 团队页的 Agent 卡是链接，点击落到详情路由
+[42/862] e2e/agent-identity-chip.spec.ts:46:3 › 抽屉 robot 行身份 chip（fixture，#741 缺口 1） › F-E1/E2/E10: 头像+名字并排成链，href 指 Agent 设置页，几何 canon 不漂移
+[43/862] e2e/accent-typo.spec.ts:186:3 › resources back chevron keeps a keyboard focus ring (dark)
+[44/862] e2e/agent-create-model.spec.ts:288:1 › 切换运行时清掉旧模型：body 不带跨 provider 的脏 modelId
+[45/862] e2e/agent-detail.spec.ts:73:1 › 详情路由直链可打开，不落 catch-all
+[46/862] e2e/agent-identity-chip.spec.ts:69:3 › 抽屉 robot 行身份 chip（fixture，#741 缺口 1） › F-E9: hover 只变 cursor，不发明背景态（参考站正典）
+[47/862] e2e/agent-detail.spec.ts:82:1 › 三 tab 齐在，概览默认选中，点记忆切内容
+[48/862] e2e/accent-typo.spec.ts:253:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (light)
+[49/862] e2e/accent-typo.spec.ts:271:3 › P5 main-button pair passes 4.5 in both themes (light)
+[50/862] e2e/agent-identity-chip.spec.ts:78:3 › 抽屉 robot 行身份 chip（fixture，#741 缺口 1） › F-E3: 点击 → SPA 导航进 Agent 设置页，详情页解析出真记录
+[51/862] e2e/attachment-strip.spec.ts:274:1 › detail face: paste paints a placeholder, landing swaps it for a chip with zero geometry move
+[52/862] e2e/agent-detail.spec.ts:97:1 › 概览：名称行内编辑提交后回显新值
+[53/862] e2e/accent-typo.spec.ts:281:3 › P4 row hover rides accent-soft, delete row rides danger-soft (light)
+[54/862] e2e/agent-identity-chip.spec.ts:89:3 › 抽屉 robot 行身份 chip（fixture，#741 缺口 1） › F-E4: 键盘可达——focus 落在 chip 上，Enter 激活导航
+[55/862] e2e/agent-detail.spec.ts:107:1 › 概览：职责位渲染 canon 空态并可编辑
+[56/862] e2e/accent-typo.spec.ts:253:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (dark)
+[57/862] e2e/agent-identity-chip.spec.ts:104:3 › agent 提及 chip（fixture，#741 缺口 2） › F-E5: 抽屉面 agent 提及 chip 成链并可点击导航（F-R13 同款配方）
+[58/862] e2e/attachment-strip.spec.ts:321:1 › detail face: clicking the settled chip opens the image preview; Esc closes it
+[59/862] e2e/accent-typo.spec.ts:271:3 › P5 main-button pair passes 4.5 in both themes (dark)
+[60/862] e2e/agent-detail.spec.ts:125:1 › 概览：存量 provider 绑定裸串回显，一级只列内置行与运行时源
+[61/862] e2e/agent-identity-chip.spec.ts:116:3 › agent 提及 chip（fixture，#741 缺口 2） › F-E6: 详情页 transcript 面同律（segments 单源的第二消费面）
+[62/862] e2e/accent-typo.spec.ts:281:3 › P4 row hover rides accent-soft, delete row rides danger-soft (dark)
+[63/862] e2e/agent-identity-chip.spec.ts:127:3 › agent 提及 chip（fixture，#741 缺口 2） › F-E7: skill/project/machine 提及仍是惰性 span（字面负例）
+[64/862] e2e/agent-detail.spec.ts:165:1 › 概览：两级菜单锚在触发钮上且整块在视口内（几何）
+[65/862] e2e/attachment-strip.spec.ts:356:1 › detail face: clicking the in-flight placeholder previews the local bytes
+[66/862] e2e/attachment-title.spec.ts:30:1 › token-first spec titles the card with the prose line, not the token
+[67/862] e2e/agent-identity-chip.spec.ts:146:3 › 惰性面零变化（#741 负例） › F-E8: 无 agent 投影的 robot 行保 dashed 字形，零 anchor（r5 114 冻结捕获面）
+[68/862] e2e/agent-detail.spec.ts:201:1 › 概览：思考强度是只读值行，无模型时显示「默认」
+[69/862] e2e/attachment-strip.spec.ts:390:1 › detail face: a failed upload clears the placeholder, toasts, keeps the draft
+[70/862] e2e/attachment-title.spec.ts:38:1 › all-token spec titles the card with the file name
+[71/862] e2e/avatar-dicebear.spec.ts:32:1 › sidebar avatar chips (expanded + rail) and user-menu head share one seeded src
+[72/862] e2e/agent-detail.spec.ts:212:1 › 概览：不摆「状态」行
+[73/862] e2e/attachment-title.spec.ts:44:1 › inline token in the first line renders as the file name
+[74/862] e2e/agent-detail.spec.ts:220:1 › 记忆 tab：空态文案与 shared canon 同文
+[75/862] e2e/attachment-strip.spec.ts:442:1 › new-task face: placeholder → settled chip → preview
+[76/862] e2e/avatar-dicebear.spec.ts:53:1 › team agent card seeds by agent displayName — user/agent srcs differ (不同名不同像)
+[77/862] e2e/agent-detail.spec.ts:230:1 › 权限 tab：6 个工具开关全渲染（r3 §4 全 list，XMON-84 恢复）
+[78/862] e2e/board-dnd-live.spec.ts:110:1 › live: done(有变更)→待处理 fires PATCH phase=review, optimistic landing never flashes back
+[79/862] e2e/avatar-dicebear.spec.ts:62:1 › live members projection: two agents → two distinct seeded srcs; avatarUrl override wins
+[80/862] e2e/agent-detail.spec.ts:238:1 › 权限 tab：6 档各带说明副文案
+[81/862] e2e/attachment-strip.spec.ts:519:1 › chief face: placeholder → settled chip → preview
+[82/862] e2e/avatar-dicebear.spec.ts:114:1 › board todo card executor avatar seeds by the bound agent; fresh card keeps the placeholder
+[83/862] e2e/agent-detail.spec.ts:252:1 › 概览：运行时档在模型之上，值由 provider 派生
+[84/862] e2e/avatar-dicebear.spec.ts:134:1 › detail chip popover: user row + 执行对话 agent row both seeded
+[85/862] e2e/agent-detail.spec.ts:262:1 › 权限 tab：工具开关可切换
+[86/862] e2e/board-dnd-live.spec.ts:171:1 › live: PATCH 409 = 乐观值作废，卡片弹回源列 + toast 点名失败（#638）
+[87/862] e2e/avatar-dicebear.spec.ts:148:1 › create-agent dialog: empty name keeps the static asset; typing previews the seeded avatar
+[88/862] e2e/board-dnd.spec.ts:144:1 › 待开始 → 已完成: silent commit, end-of-column landing, counts couple, teardown sweeps
+[89/862] e2e/agent-detail.spec.ts:271:1 › 权限 tab：MCP 服务器逐个勾选行渲染
+[90/862] e2e/avatar-dicebear.spec.ts:165:1 › dicebear unreachable → img onError falls back to the static asset (不裂图)
+[91/862] e2e/agent-detail.spec.ts:284:1 › 权限 tab：有密钥时密钥区恰好一行总开关
+[92/862] e2e/board-dnd-live.spec.ts:198:1 › live: review(有变更)→已完成 开 done 闸，取消 = 零 PATCH、卡停源列 (#901)
+[93/862] e2e/board-dnd.spec.ts:179:1 › 待开始 → 执行中: the drop fires orchestration directly — no dialog, no local phase write (#640)
+[94/862] e2e/avatar-dicebear.spec.ts:177:1 › search agent rows + project task rows are seeded (Agent 列表 / 任务行头像位)
+[95/862] e2e/agent-detail.spec.ts:301:1 › 权限 tab：密钥总开关勾选态开→关→回
+[96/862] e2e/board-dnd.spec.ts:221:1 › per-source target matrix: the tint set follows the dragged card (#753)
+[97/862] e2e/avatar-dicebear.spec.ts:208:1 › conversation transcript: agent rows carry the assigned agent avatar, user rows the user avatar
+[98/862] e2e/agent-detail.spec.ts:316:1 › 权限 tab：零密钥时是空态，无开关
+[99/862] e2e/board-dnd-live.spec.ts:224:1 › live: review(有变更)→已完成 确认后发 PATCH phase=done，乐观落位 (#901)
+[100/862] e2e/avatar-dicebear.spec.ts:227:1 › account head shares the seeded user src (same identity as the sidebar chip)
+[101/862] e2e/agent-detail.spec.ts:327:1 › 权限 tab：零密钥空态旁有去添加密钥的入口，点击落到密钥页
+[102/862] e2e/board-docked-reflow.spec.ts:68:3 › board never reflows under the floating chief window (ADR 0013 D1) › window open leaves the 1440 columns at their closed geometry
+[103/862] e2e/agent-detail.spec.ts:340:1 › 权限 tab：有密钥时不出「去添加密钥」入口
+[104/862] e2e/board-filter.spec.ts:104:1 › 旧场景（无 projectNames）不渲染仓库面；右动作区恰好一钮 = 无底色类型钮；+任务 不存在
+[105/862] e2e/board-docked-reflow.spec.ts:83:3 › board never reflows under the floating chief window (ADR 0013 D1) › narrowest usable viewport (1024): honest scroll identical open and closed
+[106/862] e2e/agent-detail.spec.ts:387:1 › 权限 tab：保存失败出可见错误反馈，开关不回弹
+[107/862] e2e/board-filter.spec.ts:122:1 › 类型钮点开 anchored popover：词表 6 词全、aria-expanded 翻转
+[108/862] e2e/board-docked-reflow.spec.ts:105:3 › board never reflows under the floating chief window (ADR 0013 D1) › overflow stays reachable while the window is open
+[109/862] e2e/agent-detail.spec.ts:414:1 › 权限 tab：保存成功不出错误行
+[110/862] e2e/board-filter.spec.ts:138:1 › 类型单选收窄：命中卡可见、其余 tagged 隐、无标签恒可见；URL 带参保 scenario；列计数联动
+[111/862] e2e/board-dnd.spec.ts:247:1 › hover tier rides the hovered valid target for the new pairs (#753)
+[112/862] e2e/agent-detail.spec.ts:427:1 › 未知 agent id 不白屏，走回退呈现
+[113/862] e2e/board-docked-reflow.spec.ts:130:3 › board never reflows under the floating chief window (ADR 0013 D1) › overflow discloses itself while the window is open: scrollbar stays native
+[114/862] e2e/board-filter.spec.ts:157:1 › 类型多选 = OR 并集；URL 序 = 词表规范序；点选保持弹层开；选中态 chip 可见
+[115/862] e2e/agent-detail.spec.ts:436:1 › 记忆 tab：配额头 `记忆 · n / 100` 与搜索/排序控件齐在
+[116/862] e2e/board-dnd.spec.ts:267:1 › invalid pairs: no tint on the hovered target, release commits nothing (#753)
+[117/862] e2e/board-docked-reflow.spec.ts:142:3 › board never reflows under the floating chief window (ADR 0013 D1) › cards keep their exact width across window open/close
+[118/862] e2e/agent-detail.spec.ts:447:1 › 记忆 tab：搜索按标题过滤，只留命中行
+[119/862] e2e/board-filter.spec.ts:181:1 › 再点已选词 = 解除该词（切换语义）
+[120/862] e2e/board-docked-reflow.spec.ts:160:3 › board never reflows under the floating chief window (ADR 0013 D1) › worst-case data holds while the window is open
+[121/862] e2e/agent-detail.spec.ts:456:1 › 记忆 tab：搜索扫 content 且 ASCII 大小写不敏感
+[122/862] e2e/board-filter.spec.ts:195:1 › 弹层家族律：Escape / 外点 / 重点触发钮三路关闭
+[123/862] e2e/agent-detail.spec.ts:464:1 › 记忆 tab：零命中出「没有匹配的记忆。」，不回落 canon 空态
+[124/862] e2e/board-docked-reflow.spec.ts:193:3 › board never reflows under the floating chief window (ADR 0013 D1) › RTL mirror: the first column stays whole at the scroll-start edge while open
+[125/862] e2e/agent-detail.spec.ts:476:1 › 记忆 tab：`添加时间` 档按新 → 旧重排
+[126/862] e2e/board-dnd.spec.ts:310:1 › 待开始 → 待处理 stays invalid (#351 pair kept inside the #753 matrix)
+[127/862] e2e/board-filter.spec.ts:211:1 › 类型带参直达 = 预选（刷新/分享不丢；弹层内选中态可见）
+[128/862] e2e/board-docked-reflow.spec.ts:214:3 › board never reflows under the floating chief window (ADR 0013 D1) › resting geometry at 1440 is untouched by the floor token
+[129/862] e2e/agent-detail.spec.ts:498:1 › 记忆 tab：搜索与排序叠加——排序只在命中集内生效
+[130/862] e2e/board-filter.spec.ts:221:1 › URL 里的词表外名被丢弃：无选中态、全量可见
+[131/862] e2e/board-dnd.spec.ts:338:1 › 已完成(有变更) → 待处理: reopen commits review, lands after the pinned group
+[132/862] e2e/board-overflow.spec.ts:25:1 › 溢出列底边不冲出视口：列贴 scroller 可视高度（行高钉死）
+[133/862] e2e/board-filter.spec.ts:232:1 › 仓库段 = 项目选项集 + 计数 + 读数；默认全活、URL 无参、无生效筛选条
+[134/862] e2e/board-overflow.spec.ts:42:1 › 卡片列表有滚动出口：scrollHeight > clientHeight 且容器可滚
+[135/862] e2e/agent-detail.spec.ts:514:1 › 记忆 tab：零记忆时不出搜索行，保留 canon 空态
+[136/862] e2e/board-dnd.spec.ts:368:1 › 待处理(confirm) → 已完成 / → 待开始: silent phase commits (#753)
+[137/862] e2e/agent-detail.spec.ts:524:1 › 概览：名称行带编辑图标，点图标同样进编辑态
+[138/862] e2e/board-overflow.spec.ts:55:1 › 列表可滚：scrollTo 移动 scrollTop，滚轮同样生效
+[139/862] e2e/board-filter.spec.ts:258:1 › 仓库单选收窄：命中项目卡可见、他项目卡隐（无「无标签恒可见」豁免）；URL 带参；列计数联动
+[140/862] e2e/agent-detail.spec.ts:534:1 › 概览：职责的编辑钮是图标钮，带可访问名
+[141/862] e2e/board-overflow.spec.ts:77:1 › 列头固定：列表滚动时 header 的视口位置不动
+[142/862] e2e/board-dnd.spec.ts:399:1 › 待处理(confirm，有历史） → 待开始：开重置确认闸，不静默改相 (#755)
+[143/862] e2e/board-overflow.spec.ts:86:1 › 卡片上下缘由块向内边距保位：首卡上缘、滚到底的末卡下缘都不贴裁切线
+[144/862] e2e/board-filter.spec.ts:280:1 › 仓库多选 = OR 并集；URL 序 = 字典序规范序（与点击序无关）；面板保持开
+[145/862] e2e/agent-detail.spec.ts:551:1 › 概览：零在跑任务时段头不带计数，出 canon 空态
+[146/862] e2e/board-overflow.spec.ts:120:1 › 存量场景零漂移：01 列完整贴视口、列底不超 scroller 底缘
+[147/862] e2e/agent-detail.spec.ts:558:1 › 概览：有在跑任务时列出行，段头带计数
+[148/862] e2e/board-dnd.spec.ts:428:1 › 执行中 → 待开始：开重置确认闸 — gesture 只开闸，不写相位 (#755/#640)
+[149/862] e2e/board-zoom-fit.spec.ts:63:5 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › no horizontal scroll at 110% zoom (1309px CSS viewport), all 4 columns whole
+[150/862] e2e/board-filter.spec.ts:300:1 › 仓库再点已选 = 解除；全选行满选再点 = 清本维（清除钮撤除后的清除路径）
+[151/862] e2e/agent-detail.spec.ts:580:1 › 概览：点行进任务详情
+[152/862] e2e/board-zoom-fit.spec.ts:63:5 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › no horizontal scroll at 120% zoom (1200px CSS viewport), all 4 columns whole
+[153/862] e2e/board-dnd.spec.ts:458:1 › 重置闸·确认：started 卡确认后落待开始（fixture 本地重置投影）(#755)
+[154/862] e2e/agent-detail.spec.ts:592:1 › 概览：六个字段行长在同一张模板卡里，头像头在卡内
+[155/862] e2e/board-filter.spec.ts:327:1 › 仓库段「全部选中」= 写满项目源（读数 N/N）；清除 = 删参
+[156/862] e2e/board-zoom-fit.spec.ts:63:5 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › no horizontal scroll at 125% zoom (1152px CSS viewport), all 4 columns whole
+[157/862] e2e/agent-detail.spec.ts:603:1 › 记忆 tab：记忆行住在模板卡里
+[158/862] e2e/board-filter.spec.ts:342:1 › 仓库带参直达 = 预选；未知项目 id 不误配 = 板级空态
+[159/862] e2e/board-zoom-fit.spec.ts:84:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › natural floor still holds at 1024: honest scroll instead of collapsed columns
+[160/862] e2e/board-dnd.spec.ts:481:1 › 重置闸·取消：零提交（卡片不动、计数不动、无请求发出）(#755)
+[161/862] e2e/agent-detail.spec.ts:610:1 › 权限 tab：三组开关各自住在模板卡里
+[162/862] e2e/board-zoom-fit.spec.ts:100:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › the floating window never re-arms a docked floor (yield retired, ADR 0013 D1)
+[163/862] e2e/agent-detail.spec.ts:623:1 › 记忆/权限卡：首行不吃卡的上圆角与描边（无方角外溢、无 2px 顶边）
+[164/862] e2e/board-filter.spec.ts:356:1 › 零卡项目选中 = 板级空态明示 + 摘要；清除回全量
+[165/862] e2e/board-dnd.spec.ts:509:1 › 重置闸·静默：零历史卡拖回待开始不设闸 (#755)
+[166/862] e2e/board-zoom-fit.spec.ts:130:3 › natural-state board fits the zoomed-out-equivalent viewports (#1035) › worst-case card data stays in-column at the 125% boundary width
+[167/862] e2e/branch-button.spec.ts:12:1 › 有分支卡：分支钮可见且为分支 glyph，点开分支与 PR 弹层
+[168/862] e2e/board-filter.spec.ts:371:1 › 类型轴空结果态沿用：板级明示 + 清除（board-tags-empty）
+[169/862] e2e/board-dnd.spec.ts:534:1 › done 闸·取消：review(有变更) 拖已完成开弹层，取消零提交（卡不动、计数不动、无写请求）(#901)
+[170/862] e2e/branch-button.spec.ts:23:1 › 无分支卡：分支钮不渲染
+[171/862] e2e/card-press.spec.ts:44:3 › press tints the whole card one surface step (light)
+[172/862] e2e/chat-md-toolout.spec.ts:46:1 › A1: tool output is collapsed behind the group toggle by default
+[173/862] e2e/board-filter.spec.ts:389:1 › 双轴组合 = AND 收窄；组合见底 = 空态；清除钮清双轴
+[174/862] e2e/chat-md-toolout.spec.ts:59:1 › A2: expanding the group reveals one standalone block per tool output
+[175/862] e2e/board-dnd.spec.ts:569:1 › done 闸·确认：review(有变更) 确认后落已完成（fixture 本地提交，计数耦合）(#901)
+[176/862] e2e/card-press.spec.ts:44:3 › press tints the whole card one surface step (dark)
+[177/862] e2e/chat-md-toolout.spec.ts:70:1 › A3: the output block is left aligned, mono, normal contrast — not a chat-note
+[178/862] e2e/board-filter.spec.ts:425:1 › 类型段批次键：全部选中 = 写满词表（读数 N/N，非 0/N）；「仅此」塌成单值
+[179/862] e2e/chat-md-toolout.spec.ts:91:1 › B1: a markdown heading renders as a heading element, not literal ##
+[180/862] e2e/card-press.spec.ts:78:1 › card face is selection- and native-drag-locked (「小链接」绝迹)
+[181/862] e2e/board-dnd.spec.ts:592:1 › done 闸·静默：无变更产物的 confirm 卡与 building 源拖已完成不设闸 (#901)
+[182/862] e2e/chat-md-toolout.spec.ts:104:1 › B2: ordered list renders ordinals and unordered list renders bullets
+[183/862] e2e/chat-md-toolout.spec.ts:119:1 › B3: nested list items indent past their parent
+[184/862] e2e/board-filter.spec.ts:454:1 › 生效筛选条：只列生效维度、点条清该维度、两轴齐时出「清除全部」
+[185/862] e2e/card-press.spec.ts:129:1 › plain click on a done card still navigates to the detail route
+[186/862] e2e/board-dnd.spec.ts:625:1 › cards from every column arm the drag gesture (#753)
+[187/862] e2e/chat-md-toolout.spec.ts:134:1 › B4: a code fence renders as a mono block with no literal ``` leak
+[188/862] e2e/chat-tools-identity.spec.ts:34:1 › I1: the collapsed group names itself — terminal glyph + 工具过程 label
+[189/862] e2e/chat-md-toolout.spec.ts:146:1 › B5: inline code keeps the existing mono chip
+[190/862] e2e/board-filter.spec.ts:488:1 › 任务卡渲染标签 chip：词表配色、无标签零占位、卡面 chip 20px 默认档
+[191/862] e2e/chat-tools-identity.spec.ts:56:1 › I2: collapsed offers no copy — the affordance lives in the expanded state
+[192/862] e2e/chat-md-toolout.spec.ts:154:1 › B6: no raw markdown syntax survives as literal prose
+[193/862] e2e/chat-type-measure.spec.ts:30:1 › chat body reads at 15px on a unitless 1.6 — the 24px pitch survives
+[194/862] e2e/checkbox-unified.spec.ts:63:1 › accept: 原生 input 走官方遮蔽（不画 Mac 复选框）
+[195/862] e2e/chat-tools-identity.spec.ts:71:1 › I3: expanded copy still puts pills and outputs on the clipboard
+[196/862] e2e/chat-type-measure.spec.ts:75:1 › 68ch measure cap binds the body text and the centered note
+[197/862] e2e/checkbox-unified.spec.ts:78:1 › accept: 未选中态不露勾
+[198/862] e2e/chat-tools-identity.spec.ts:82:1 › I4: expand/collapse interaction and the #470 row geometry are untouched
+[199/862] e2e/board-dnd.spec.ts:653:1 › click navigation survives sensor arming on the newly draggable columns (#753/#629)
+[200/862] e2e/chat-type-measure.spec.ts:125:1 › composer placeholder steps to 14px — one notch under the 15px body
+[201/862] e2e/chat-tools-identity.spec.ts:108:1 › I5: the identity row draws no rule — the transcript boundary stays air
+[202/862] e2e/checkbox-unified.spec.ts:88:1 › accept: 整行可点（文字也是点击目标）
+[203/862] e2e/chat-type-measure.spec.ts:139:1 › bubble / avatar / footer keep their own geometry (#470 scope fence)
+[204/862] e2e/board-dnd.spec.ts:667:1 › same-column gesture: siblings never shift, drop is a no-op
+[205/862] e2e/chief-composer-tools.spec.ts:264:1 › trigger: @ opens the inline listbox inside the drawer; arrows + Enter insert the token (FM1)
+[206/862] e2e/chat-type-measure.spec.ts:160:1 › turn boundary is air, not a rule: no divider between a user turn and the agent row
+[207/862] e2e/checkbox-unified.spec.ts:103:1 › accept: 盒几何 = 16×16 / 圆角 4px / 与文字 gap 8 / 文字 14px
+[208/862] e2e/chief-drawer-model.spec.ts:31:3 › chief drawer model row (#615) › the model row is a control that opens the anchored model popover
+[209/862] e2e/board-dnd.spec.ts:715:3 › lifted card rides the compact drag-tier recipe (light)
+[210/862] e2e/chief-composer-tools.spec.ts:293:1 › mouse: hover highlights and the row click inserts without stealing focus (FM2)
+[211/862] e2e/checkbox-unified.spec.ts:126:1 › provider: 未选中态不露白勾（#dlg-provider-authheader id 存活）
+[212/862] e2e/chief-drawer-model.spec.ts:70:3 › chief drawer model row (#615) › the selected model row is readable in both themes (#751 A)
+[213/862] e2e/board-dnd.spec.ts:715:3 › lifted card rides the compact drag-tier recipe (dark)
+[214/862] e2e/checkbox-unified.spec.ts:141:1 › accept: 键盘 Space 切换（焦点落在 Root 本体）
+[215/862] e2e/chief-composer-tools.spec.ts:311:1 › geometry: the listbox anchors above the composer wrap inside the drawer (FM2)
+[216/862] e2e/chief-drawer-slash.spec.ts:126:1 › trigger: `/` opens builtins plus skills, review/stop hidden (F2)
+[217/862] e2e/board-dnd.spec.ts:784:3 › valid targets tint base tier, hovered column tints hot (light)
+[218/862] e2e/chief-drawer-model.spec.ts:124:3 › chief drawer model row (#615) › the selected row fill bleeds to the popover edges (#872)
+[219/862] e2e/chief-composer-tools.spec.ts:339:1 › Esc closes the listbox and the drawer survives (#146 ladder, FM9)
+[220/862] e2e/board-dnd.spec.ts:784:3 › valid targets tint base tier, hovered column tints hot (dark)
+[221/862] e2e/chief-drawer-model.spec.ts:173:3 › chief drawer model row (#615) › the picker search is typeahead-only: absent until a key, retracted on clear (#756)
+[222/862] e2e/chief-drawer-slash.spec.ts:148:1 › `/clear` runs without sending and toasts confirmation (F1)
+[223/862] e2e/chief-composer-tools.spec.ts:352:1 › the mention button opens the popover with live group counts and inserts a token (FM1)
+[224/862] e2e/chief-drawer-model.spec.ts:232:3 › chief drawer model row (#615) › the model row carries the runtime mark, not an agent avatar
+[225/862] e2e/board-dnd.spec.ts:844:1 › committed drop never flashes the card back to the source column
+[226/862] e2e/chief-drawer-slash.spec.ts:167:1 › Tab completes without running; Enter without highlight sends (F4)
+[227/862] e2e/chief-drawer-model.spec.ts:253:3 › chief drawer model row (#615) › message copy glyphs are clipboard buttons; no bare inert glyphs remain
+[228/862] e2e/chief-composer-tools.spec.ts:379:1 › Esc with the popover open closes the popover, not the drawer (FM9)
+[229/862] e2e/chief-drawer-slash.spec.ts:182:1 › mid-prompt accept inserts literal text, never runs (F3)
+[230/862] e2e/board-dnd.spec.ts:883:1 › overlay unmounts with the pointerup frame — no glide
+[231/862] e2e/chief-drawer-model.spec.ts:280:3 › chief drawer model row (#615) › restore button opens the rewind confirm; the foot chevron discloses tool rows
+[232/862] e2e/chief-composer-tools.spec.ts:392:1 › a mid-line image paste lands the token whole-line at the caret (FM6)
+[233/862] e2e/chief-drawer-slash.spec.ts:194:1 › /help opens the command panel with the drawer builtins
+[234/862] e2e/chief-fab.spec.ts:27:3 › detail FAB renders only with unread (#443) › unread 0: the detail route renders no FAB
+[235/862] e2e/chief-drawer-model.spec.ts:316:3 › chief drawer model row (#615) › the gear reaches board settings from a wake surface
+[236/862] e2e/chief-composer-tools.spec.ts:418:1 › Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)
+[237/862] e2e/chief-fab.spec.ts:34:3 › detail FAB renders only with unread (#443) › unread > 0: the FAB renders with the badge value
+[238/862] e2e/chief-drawer-slash.spec.ts:215:1 › Esc closes the menu and the drawer survives (F5)
+[239/862] e2e/chief-drawer-model.spec.ts:329:3 › chief drawer model row (#615) › closing the drawer (⌘J) recycles the model popover with it (#773)
+[240/862] e2e/chief-fab.spec.ts:41:3 › detail FAB renders only with unread (#443) › the FAB keeps the A0 corner geometry (40x40 @ 8px inset, fixed)
+[241/862] e2e/chief-fab.spec.ts:88:3 › FAB icon follows the bound agent (#444) › bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay
+[242/862] e2e/chief-panel.spec.ts:57:3 › chief panel floating form (ADR 0013) › Esc never closes the panel on the board route (D3)
+[243/862] e2e/chief-composer-tools.spec.ts:535:1 › transcript: mention and attachment tokens in a user row render as chips, never literal (FM7)
+[244/862] e2e/chief-send-fallback.spec.ts:136:1 › stale slot: send goes out, fallback toast names it, row heals to 默认
+[245/862] e2e/chief-panel.spec.ts:65:3 › chief panel floating form (ADR 0013) › Esc never closes the panel on a wake surface
+[246/862] e2e/chief-fab.spec.ts:111:3 › FAB icon follows the bound agent (#444) › bound: a non-board route swaps at the same single consumption point
+[247/862] e2e/chief-composer-tools.spec.ts:557:3 › fixture face stays inert (#732 FM3) › the composer is read-only: no listbox, attach inert, picker at zero counts
+[248/862] e2e/chief-send-fallback.spec.ts:168:1 › fresh slot: send goes out with no fallback toast
+[249/862] e2e/chief-fab.spec.ts:122:3 › FAB icon follows the bound agent (#444) › avatarUrl override wins over the generated face
+[250/862] e2e/chief-panel.spec.ts:79:3 › chief panel floating form (ADR 0013) › Esc layers: the open thread switcher closes first, the panel survives both
+[251/862] e2e/chief-fab.spec.ts:130:3 › FAB icon follows the bound agent (#444) › unbound: the static glyph stays, no avatar face
+[252/862] e2e/chief-settings.spec.ts:29:1 › 返回按钮可用：点击回到总管抽屉 (#811)
+[253/862] e2e/chief-panel.spec.ts:95:3 › chief panel floating form (ADR 0013) › composer bar carries the attach + mention tools and the send button
+[254/862] e2e/chief-stream-markdown.spec.ts:249:3 › chief drawer markdown 面（fixture，#650） › F-R1/R2/R3: robot markdown 行走共用块解析——bold/标题/列表/栅栏/chip 全渲染，星号零漏出
+[255/862] e2e/chip-assign.spec.ts:31:1 › 编辑分配 opens the agent pick dialog with search + bound row checked
+[256/862] e2e/chief-settings.spec.ts:48:1 › agent row opens the 选择总管 Agent dialog with search + canon default row
+[257/862] e2e/chief-panel.spec.ts:109:3 › chief panel floating form (ADR 0013) › the panel floats as a 380x600 window anchored 8px off the corner (board)
+[258/862] e2e/chief-settings.spec.ts:64:1 › agent dialog search keeps its own 16px inset (#872 blast radius)
+[259/862] e2e/chip-assign.spec.ts:44:1 › fixture pick closes the dialog (accept 律); popover row echo unchanged
+[260/862] e2e/chief-stream-markdown.spec.ts:284:3 › chief drawer markdown 面（fixture，#650） › F-R13: todo 提及渲成 chip，锚点指任务详情并可点击导航；字面 #seq/伪 scheme 不出 chip（#675）
+[261/862] e2e/chief-panel.spec.ts:154:3 › chief panel floating form (ADR 0013) › board content never yields to the window (D1 overlay, no yield)
+[262/862] e2e/chief-settings.spec.ts:82:1 › agent dialog family law: X, Escape and backdrop dismiss; panel clicks do not
+[263/862] e2e/chip-assign.spec.ts:56:1 › assign dialog family law: X, Escape and backdrop dismiss; panel clicks do not
+[264/862] e2e/chief-panel.spec.ts:173:3 › chief panel floating form (ADR 0013) › minimizing leaves the board grid at the same geometry (nothing to restore)
+[265/862] e2e/chief-stream-markdown.spec.ts:305:3 › chief drawer markdown 面（fixture，#650） › F-R4/R5: typing 打字行无 foot；定稿行 foot（复制 + 完成 44s）保留
+[266/862] e2e/chief-stream-markdown.spec.ts:321:3 › chief drawer markdown 面（fixture，#650） › F-R6/R8: 用户行头像 = 真人身份 img（XMON-105 单源），抽屉体可滚动
+[267/862] e2e/chief-panel.spec.ts:204:5 › chief panel floating form (ADR 0013) › pages: the main column never narrows while the window is open
+[268/862] e2e/chief-settings.spec.ts:100:1 › agent dialog search filters the list; no match shows the empty row
+[269/862] e2e/chief-stream-markdown.spec.ts:338:3 › chief drawer markdown 面（fixture，#650） › F-R9: r5 114 冻结捕获面不漂移——段数组行走原 .chief-para/.chief-bullet 路径
+[270/862] e2e/chief-settings.spec.ts:109:1 › fixture agent pick closes the dialog (accept 律)
+[271/862] e2e/chip-assign.spec.ts:74:1 › assign dialog search filters the list; no match shows the empty row
+[272/862] e2e/chief-panel.spec.ts:204:5 › chief panel floating form (ADR 0013) › resources: the main column never narrows while the window is open
+[273/862] e2e/chief-stream-markdown.spec.ts:356:3 › chief drawer markdown 面（fixture，#650） › F-R15: fixture 面（r5 113 running 捕获）不长存在行——ChiefStreamItem 新 kind 零污染
+[274/862] e2e/chief-settings.spec.ts:123:1 › charter 编辑 opens the DialogShell editor with the r5 captured fields
+[275/862] e2e/chip-hotzone.spec.ts:25:1 › H1: the chevron side of the chip toggles the popover
+[276/862] e2e/chief-panel.spec.ts:204:5 › chief panel floating form (ADR 0013) › secondary: the main column never narrows while the window is open
+[277/862] e2e/chief-stream-markdown.spec.ts:373:3 › chief drawer 流式面（live mock，#651） › F-R7/R10/R11: text_delta 增量上屏，message 终稿收敛不重复不残留
+[278/862] e2e/chief-settings.spec.ts:135:1 › charter dialog family law: X, Escape, 取消 and backdrop dismiss
+[279/862] e2e/chip-hotzone.spec.ts:34:1 › H2: keyboard focus + Enter toggles the popover
+[280/862] e2e/chief-panel.spec.ts:230:3 › chief panel floating form (ADR 0013) › detail: the right pane coexists with the floating window (D7 reversed)
+[281/862] e2e/chief-stream-markdown.spec.ts:423:3 › chief drawer 流式面（live mock，#651） › F-R12: 双行去重（#667）——同文 POST + user-<stepId> 回声恰一个用户气泡；连发不同文各一条
+[282/862] e2e/collapse-family.spec.ts:12:1 › sidebar group collapse hides sub-rows, flips aria, survives reload
+[283/862] e2e/chief-panel.spec.ts:259:3 › chief panel floating form (ADR 0013) › hero examples: the four canon prompt cards, inert on the fixture face
+[284/862] e2e/chief-stream-markdown.spec.ts:457:3 › chief drawer 流式面（live mock，#651） › F-R14: 在飞存在行（#739）——静默窗口挂 streaming 行，首 delta 收敛为 typing，终稿两行皆退场
+[285/862] e2e/chief-settings.spec.ts:155:1 › fixture charter save closes the dialog (accept 律)
+[286/862] e2e/collapse-family.spec.ts:48:1 › rail group collapse hides member rows and survives reload
+[287/862] e2e/chief-panel.spec.ts:285:3 › chief panel floating form (ADR 0013) › composer grows with a restored draft to the six-line cap, empty face keeps the base track (#860 supersedes XMON-102)
+[288/862] e2e/chief-settings.spec.ts:179:1 › 压缩模型 interactive (#204): button opens the anchored model menu
+[289/862] e2e/chief-stream-markdown.spec.ts:506:3 › chief drawer 流式面（live mock，#651） › F-R16: 轮中事件不闪清（#857）——工具行/文本行事件后重取在飞时打字面保留，收敛后落库行接管
+[290/862] e2e/collapse-family.spec.ts:66:1 › both sidebar groups persist side by side
+[291/862] e2e/chief-panel.spec.ts:324:3 › chief panel floating form (ADR 0013) › composer placeholder switches to the steer canon while a turn runs (#624)
+[292/862] e2e/chief-settings.spec.ts:197:1 › 压缩模型 selected row fill bleeds to the menu edges (#872)
+[293/862] e2e/chief-stream-markdown.spec.ts:558:3 › chief drawer 流式面（live mock，#651） › F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏
+[294/862] e2e/composer-inline-mention.spec.ts:184:1 › trigger: line start / after whitespace / after CJK punctuation — never mid-word or in an email (F2)
+[295/862] e2e/chief-panel.spec.ts:347:3 › chief panel floating form (ADR 0013) › the open state persists across a reload (D5, reversing 0004 D9)
+[296/862] e2e/chief-settings.spec.ts:271:1 › 压缩模型 search is typeahead-only, same contract as the drawer picker (#756 续)
+[297/862] e2e/composer-inline-mention.spec.ts:206:1 › filter: fuzzy subsequence, smart case, empty-state row
+[298/862] e2e/chief-stream-markdown.spec.ts:638:3 › chief drawer 流式面（live mock，#651） › F-R15: robot 行身份 chip（live 面，#741）——头像+名字 anchor，点击全链进 Agent 设置页
+[299/862] e2e/chief-settings.spec.ts:300:1 › 压缩模型 menu family law (#204): Escape and outside click dismiss
+[300/862] e2e/composer-paste.spec.ts:282:1 › detail face: a mid-line image paste lands the token whole-line at the caret
+[301/862] e2e/chief-settings.spec.ts:310:1 › 压缩模型 fixture pick = accept 律:选择即关 (#204)
+[302/862] e2e/chief-stream-markdown.spec.ts:694:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R14: 用户气泡走同源解析——todo chip 成锚可点导航、bold 成 strong、负例保持字面
+[303/862] e2e/composer-inline-mention.spec.ts:233:1 › filter: candidate list caps at 15 (CN=15)
+[304/862] e2e/composer-paste.spec.ts:310:1 › detail face: one multi-image paste puts every token on its own line
+[305/862] e2e/chief-settings.spec.ts:321:3 › 压缩模型 long value truncates, full name on title (dark, #772)
+[306/862] e2e/composer-inline-mention.spec.ts:243:1 › keyboard: arrows cycle the highlight, the top row is NOT preselected
+[307/862] e2e/chief-stream-markdown.spec.ts:721:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R15: 复制载荷 = markdown 原文（不是渲染结果）；两钮行（复制/恢复）不受影响
+[308/862] e2e/chief-settings.spec.ts:321:3 › 压缩模型 long value truncates, full name on title (light, #772)
+[309/862] e2e/composer-paste.spec.ts:328:1 › detail face: a text-only paste is never preventDefaulted (FM7 zero change)
+[310/862] e2e/chief-settings.spec.ts:341:1 › 空态卡 centered and growth-proof: memo matches watches (#772)
+[311/862] e2e/composer-inline-mention.spec.ts:265:1 › Enter with a highlight inserts WITHOUT sending; the second Enter sends (r9 §5 fix)
+[312/862] e2e/chief-stream-markdown.spec.ts:736:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R23: 行 id 贯通——live 行 Item 携源 chief_message id（messageId），顺序 = 存储序
+[313/862] e2e/composer-paste.spec.ts:343:1 › detail face: a non-whitelisted paste is rejected with a toast, grant never fires
+[314/862] e2e/chief-settings.spec.ts:373:1 › 压缩模型 stale preset value (#358): 裸串兜底回显 + 菜单无选中行
+[315/862] e2e/chief-stream-markdown.spec.ts:752:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效
+[316/862] e2e/composer-inline-mention.spec.ts:292:1 › Enter without a highlight sends as typed (F1: composer-wire-reject law survives)
+[317/862] e2e/composer-paste.spec.ts:362:1 › detail face: an over-cap paste is rejected with a toast, grant never fires
+[318/862] e2e/chief-settings.spec.ts:415:1 › 机器槽在位:Agent tab 有「机器」标题 + 描述 + chip(值 null = 自动)
+[319/862] e2e/composer-paste.spec.ts:378:1 › detail face: a non-image whitelist file (text/plain) is accepted under its real name
+[320/862] e2e/composer-inline-mention.spec.ts:303:1 › Tab inserts the top match without sending and keeps focus (rule 22/56)
+[321/862] e2e/chief-stream-markdown.spec.ts:777:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R17: fixture 捕获面用户气泡零漂移——无槽走字面路径（无 --md 类、无 chat-md 块）
+[322/862] e2e/chief-settings.spec.ts:428:1 › 机器 chip 开 popover:「自动」行 + 机器行 + listbox 语义 + 选中态
+[323/862] e2e/composer-paste.spec.ts:396:1 › detail face: a mixed file+text clipboard takes the files and drops the text
+[324/862] e2e/chief-stream-markdown.spec.ts:791:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数
+[325/862] e2e/chief-settings.spec.ts:446:1 › 机器 popover family law: Escape / outside click dismiss
+[326/862] e2e/composer-inline-mention.spec.ts:315:1 › mouse: hover highlights, click inserts, the textarea never loses focus (F4 combobox)
+[327/862] e2e/composer-paste.spec.ts:424:1 › detail face: a failed upload toasts and the draft survives untouched
+[328/862] e2e/chief-stream-markdown.spec.ts:887:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R20: 在飞工具行带出具体命令（不是裸工具名）
+[329/862] e2e/chief-settings.spec.ts:456:1 › 机器 chip fixture pick = accept 律:选择即关 + 回显不变(无 mutation)
+[330/862] e2e/composer-inline-mention.spec.ts:346:1 › insert lands a trailing space and the caret after it — typing continues outside the token (F6)
+[331/862] e2e/composer-paste.spec.ts:446:1 › detail face: Enter during the upload does not send; after it lands, Enter sends the token
+[332/862] e2e/chief-stream-markdown.spec.ts:920:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R21: 段序契约（#1003 / ADR 0011 premortem）——文本段在前、其工具行在后、各恰一次；收口后工具折进后随段
+[333/862] e2e/chief-settings.spec.ts:464:1 › 机器槽默认面(101):无 resources → 清单仅「自动」行且选中
+[334/862] e2e/composer-inline-mention.spec.ts:364:1 › close set: Esc closes the listbox and stays on the detail (#634 layering)
+[335/862] e2e/composer-paste.spec.ts:507:1 › new-task face: paste inserts the token line-atomic into the spec and save carries it
+[336/862] e2e/chief-settings.spec.ts:478:1 › Agent tab 无「派发方式」行:设置槽已删,邻座决策行健在(#903)
+[337/862] e2e/chief-stream-markdown.spec.ts:1028:3 › chief drawer 用户气泡 markdown 面（live mock，#742） › F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）
+[338/862] e2e/composer-inline-mention.spec.ts:383:1 › close set: backspace shortens the query, backspacing past @ closes (F7)
+[339/862] e2e/composer-slash.spec.ts:151:1 › trigger: `/` opens builtins then skills, paths and mid-word stay literal (F2/F6)
+[340/862] e2e/composer-paste.spec.ts:537:1 › new-task face: save is blocked while the paste upload is in flight
+[341/862] e2e/composer-wire-reject.spec.ts:140:1 › detail face: a rejected steer (409) keeps the draft word for word
+[342/862] e2e/composer-inline-mention.spec.ts:408:1 › close set: typing a space ends the token (rule 34)
+[343/862] e2e/composer-slash.spec.ts:177:1 › filter: word-prefix only, alias, empty state (F3/F7)
+[344/862] e2e/composer-wire-reject.spec.ts:165:1 › detail face: an accepted steer clears the draft
+[345/862] e2e/composer-paste.spec.ts:566:1 › detail face probe: a real Cmd/Ctrl+V clipboard image paste rides the same chain
+[346/862] e2e/composer-inline-mention.spec.ts:416:1 › close set: caret-only moves out of the token close the list (F3)
+[347/862] e2e/composer-slash.spec.ts:197:1 › no dual-open with the @ face (F4)
+[348/862] e2e/dead-buttons.spec.ts:40:1 › feedback route is gone — old URL redirects to the board
+[349/862] e2e/composer-wire-reject.spec.ts:206:1 › chief face: a rejected send (500) keeps the draft and toasts
+[350/862] e2e/composer-inline-mention.spec.ts:443:1 › close set: clicking outside the composer closes the list
+[351/862] e2e/composer-slash.spec.ts:212:1 › Enter on a highlighted execute row runs it without sending (F1)
+[352/862] e2e/dead-buttons.spec.ts:46:1 › user menu drops its dead rows — 反馈 (#149), 新功能/快捷键 (#163)
+[353/862] e2e/composer-wire-reject.spec.ts:229:1 › chief face: an accepted send clears the draft
+[354/862] e2e/composer-slash.spec.ts:225:1 › Tab completes without running; Enter without highlight sends (F1)
+[355/862] e2e/composer-inline-mention.spec.ts:452:1 › multiple mentions: a second @ after an insert opens fresh and lands in order (F10)
+[356/862] e2e/dead-buttons.spec.ts:65:1 › board topbar drops the 看板指南 button — right actions keep exactly one button (#363, #445 改指类型钮)
+[357/862] e2e/detail-3pane.spec.ts:34:1 › three abutting panes: 240 sidebar | fluid center | 488 right
+[358/862] e2e/composer-slash.spec.ts:240:1 › mid-prompt accept inserts literal text, never runs (F5)
+[359/862] e2e/dead-buttons.spec.ts:84:1 › board renders exactly the four #351 columns, retired names and collapse family gone
+[360/862] e2e/composer-inline-mention.spec.ts:473:1 › popover multi-select inserts every token with trailing spaces (F11)
+[361/862] e2e/detail-3pane.spec.ts:63:1 › no 文档|聊天 tab group survives on any phase surface
+[362/862] e2e/dead-buttons.spec.ts:114:1 › project files pane: no export button, static branch chip, wired 文件|历史 segment
+[363/862] e2e/composer-slash.spec.ts:252:1 › close set: Esc, space, backspace-past-slash, outside click
+[364/862] e2e/dead-buttons.spec.ts:140:1 › schedules empty state drops the 查看文档 button; 新建定时 really opens and saves (#149, #1037)
+[365/862] e2e/composer-inline-mention.spec.ts:489:1 › IME: a composing Enter neither inserts nor sends (F8)
+[366/862] e2e/composer-slash.spec.ts:285:1 › skill row inserts the wire token with trailing space
+[367/862] e2e/detail-3pane.spec.ts:72:1 › detail head keeps the 更多 icon only — branch/token/history icons are gone
+[368/862] e2e/dead-buttons.spec.ts:160:1 › schedules fixture face: topbar 新建 opens the dialog, freq tabs respond, save lands a card (#1037)
+[369/862] e2e/detail-3pane.spec.ts:83:1 › composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it
+[370/862] e2e/composer-inline-mention.spec.ts:519:1 › geometry: the listbox stays anchored above the composer (#688 ladder untouched)
+[371/862] e2e/composer-slash.spec.ts:298:1 › mixed: slash skill token plus @ mention coexist
+[372/862] e2e/detail-3pane.spec.ts:133:1 › composer controls share one bottom row: stop is the send button's sibling
+[373/862] e2e/composer-slash.spec.ts:315:1 › /help opens the command panel
+[374/862] e2e/dead-buttons.spec.ts:180:1 › doc pane 变更▾ opens the document-type listbox and closes on Escape
+[375/862] e2e/composer-inline-mention.spec.ts:577:1 › files: empty query lists entities then files in roster order
+[376/862] e2e/detail-3pane.spec.ts:187:1 › composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1)
+[377/862] e2e/dead-buttons.spec.ts:196:1 › doc pane 型选行 click re-selects the current type and closes (#306)
+[378/862] e2e/detail-esc.spec.ts:34:1 › E1: clean ESC leaves the detail, carrying the search home
+[379/862] e2e/detail-3pane.spec.ts:211:1 › right pane type select switches between the doc surface and the three sections
+[380/862] e2e/detail-esc.spec.ts:52:1 › E2: ESC with the chip popover open closes the popover first
+[381/862] e2e/composer-inline-mention.spec.ts:591:1 › files: fuzzy filters both faces, agents keep ties
+[382/862] e2e/dead-buttons.spec.ts:210:1 › machines rows render no inline action buttons (#222 wontfix 出账)
+[383/862] e2e/detail-3pane.spec.ts:247:1 › scenarios 30/31/32 freeze the pane view instead of popping dialogs
+[384/862] e2e/detail-esc.spec.ts:63:1 › E3: ESC with a modal overlay open closes the overlay first
+[385/862] e2e/dead-buttons.spec.ts:225:1 › composer toolbar drops the 语音输入 button, keeps attachment + mention
+[386/862] e2e/composer-inline-mention.spec.ts:604:1 › files: Enter inserts the bare path with a trailing space and sends on second Enter
+[387/862] e2e/dead-buttons.spec.ts:238:1 › new-task dialog tools drop the 语音输入 button, keep two live tools
+[388/862] e2e/detail-3pane.spec.ts:262:1 › plan card activation in the thread opens the plan doc in the right pane
+[389/862] e2e/detail-narrow.spec.ts:49:1 › N1: 320px degrades instead of clipping — no page overflow, no swallowed column scroll
+[390/862] e2e/dead-buttons.spec.ts:255:1 › api-keys empty state drops the 查看文档 button, keeps 新建密钥 (#307)
+[391/862] e2e/detail-3pane.spec.ts:276:1 › fresh phase: the brief owns the whole center column, right pane collapses
+[392/862] e2e/detail-narrow.spec.ts:67:1 › N2: 360 and 390 keep the same law
+[393/862] e2e/composer-inline-mention.spec.ts:623:1 › files: directory row inserts with a trailing slash
+[394/862] e2e/dead-buttons.spec.ts:265:1 › resources empty state drops the 查看文档 link (#307); skills 空态主钮 = 新建技能弹窗 (XMON-114)
+[395/862] e2e/dialog-viewport.spec.ts:56:1 › provider: 3 模型行把 body 撑溢,submit 钉底且滚动不位移
+[396/862] e2e/detail-narrow.spec.ts:81:1 › N3: the degradation stops at 768px — the 3-pane shell survives above it
+[397/862] e2e/dead-buttons.spec.ts:288:1 › mcp page is read-only: 无新建入口、行无更多菜单 ink、空态指向 ~/.claude.json (#368)
+[398/862] e2e/composer-inline-mention.spec.ts:641:1 › chips: Enter-select renders the file chip with a fresh pop
+[399/862] e2e/detail-narrow.spec.ts:106:1 › N4: the docked chief panel cannot re-overflow the 320px shell
+[400/862] e2e/dialog-viewport.spec.ts:85:1 › secret: 静态表单面 submit 在视口
+[401/862] e2e/dead-buttons.spec.ts:306:1 › create-agent dialog drops the avatar 更换 ink (#307)
+[402/862] e2e/dialog-viewport.spec.ts:95:1 › machine: disclosure 展开(最高内容态)底部链接在视口
+[403/862] e2e/composer-inline-mention.spec.ts:661:1 › chips: agent select renders the agent chip
+[404/862] e2e/detail-narrow.spec.ts:127:1 › N5: head actions and the composer stay inside the 320px viewport
+[405/862] e2e/dead-buttons.spec.ts:320:1 › project settings drops the avatar 更换 ink (#307, supersedes the #177 chrome verdict)
+[406/862] e2e/dead-buttons.spec.ts:332:1 › chief drawer drops the ⋮ 更多 button — thread view keeps three head actions (#306)
+[407/862] e2e/diff-full-file.spec.ts:20:1 › 初始态渲染 hunk 面与「显示完整文件」钮,无全文(初渲不污染)
+[408/862] e2e/dialog-viewport.spec.ts:107:1 › create-agent: submit 在视口
+[409/862] e2e/composer-inline-mention.spec.ts:672:1 › chips: Tab and click render the identical chip (accept 路径一致）
+[410/862] e2e/diff-full-file.spec.ts:27:1 › 点击内联展开全文:hunks 隐去、全文带连续行号、钮翻转「显示差异」
+[411/862] e2e/dead-buttons.spec.ts:358:1 › sched card 更多 opens a menu and deletes the row through the confirm (#306)
+[412/862] e2e/dialog-viewport.spec.ts:116:1 › charter: 取消/保存章程在视口
+[413/862] e2e/diff-full-file.spec.ts:45:1 › 再点回到 hunk 面,钮文案翻回「显示完整文件」
+[414/862] e2e/dialog-viewport.spec.ts:127:1 › chief-agent 列表态(无按钮读面)面板整体不越视口
+[415/862] e2e/composer-inline-mention.spec.ts:691:1 › chips: editing the path retires the chip; the pop plays only once (C8)
+[416/862] e2e/escape-wiring.spec.ts:76:1 › 开着的层不被重渲染重挂 Escape 接线：URL 写回后单次 Escape 仍收层
+[417/862] e2e/dead-buttons.spec.ts:392:1 › skills 排序 opens the single-select listbox, picking an option closes it (#306)
+[418/862] e2e/dialog-viewport.spec.ts:138:1 › branch sync tab: 视口压过内容高,同步钮钉底,body 溢出;git tab 正常
+[419/862] e2e/composer-inline-mention.spec.ts:712:1 › chips: the strip yields while the listbox is open (C6)
+[420/862] e2e/escape-wiring.spec.ts:135:1 › 确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层
+[421/862] e2e/dialog-viewport.spec.ts:161:1 › accept(34): 取消/完成在视口
+[422/862] e2e/dead-buttons.spec.ts:421:1 › account drops the 更换 button, keeps the avatar head (#306 wontfix 出账)
+[423/862] e2e/dialog-viewport.spec.ts:174:1 › schedules 新建定时(900×420): 封顶、body 内滚、取消/保存/X 恒在视口 (#1037)
+[424/862] e2e/composer-inline-mention.spec.ts:738:1 › five-kind: bare @ lists all five kinds in roster order
+[425/862] e2e/dead-buttons.spec.ts:431:1 › transcript tool group: 收起 collapses, the footer row re-expands (#306)
+[426/862] e2e/file-viewer.spec.ts:18:1 › viewer opens with the placeholder and no selected row
+[427/862] e2e/composer-inline-mention.spec.ts:751:1 › five-kind: skill Tab-inserts the scheme token and the chip confirms
+[428/862] e2e/fixture-mode-chip.spec.ts:25:1 › fixture mode shows the 示例数据 chip naming the scenario, site-wide (#1037)
+[429/862] e2e/dead-buttons.spec.ts:454:1 › more menu 完成 opens the accept dialog on the review surface (#318)
+[430/862] e2e/file-viewer.spec.ts:26:1 › clicking a file row selects it and renders the file content
+[431/862] e2e/fixture-mode-chip.spec.ts:38:1 › the chip never swallows clicks — pointer-events-none (#1037)
+[432/862] e2e/file-viewer.spec.ts:35:1 › selection survives a files/history seg round-trip
+[433/862] e2e/composer-inline-mention.spec.ts:766:1 › five-kind: todo Enter-inserts the plain #seq token without sending
+[434/862] e2e/dead-buttons.spec.ts:468:1 › more menu 关闭 is phase-gated by the server funnel edges (#318)
+[435/862] e2e/fixture-mode-chip.spec.ts:43:1 › live face renders no fixture chip (#1037)
+[436/862] e2e/footer-copy.spec.ts:22:1 › C1: robot row copy puts the row text on the clipboard
+[437/862] e2e/composer-inline-mention.spec.ts:782:1 › five-kind: project click inserts the scheme token and the chip confirms
+[438/862] e2e/github-issue-writeback.spec.ts:118:1 › 1. 已建成且一致：回显行 = 号 + 状态 + 上游标题，无漂移提示
+[439/862] e2e/dead-buttons.spec.ts:484:1 › todo-phase 开始 fires orchestration directly — no start dialog (#640)
+[440/862] e2e/footer-copy.spec.ts:31:1 › C2: plan card copy puts title + preview on the clipboard
+[441/862] e2e/github-issue-writeback.spec.ts:132:1 › 2. 不一致：中性提示出现，本地标题不被覆盖（D5 只提示不覆盖）
+[442/862] e2e/composer-inline-mention.spec.ts:794:1 › five-kind: machine Enter-inserts without sending; second Enter sends
+[443/862] e2e/dead-buttons.spec.ts:493:1 › failed rerun dialog is the slim single-exit face — no agent selector, no split switch, no plan/run branch (#640)
+[444/862] e2e/footer-copy.spec.ts:40:1 › C3: tools row copy puts pills and outputs on the clipboard
+[445/862] e2e/github-issue-writeback.spec.ts:149:1 › 3. 拉不到（echo 404）：整行隐藏，页面无错误态
+[446/862] e2e/hotkeys.spec.ts:208:1 › C on the board opens the new-task dialog; ⌘C and the retired N do not
+[447/862] e2e/dead-buttons.spec.ts:509:1 › reuse panel 查看方案 flips the doc pane to the plan face (#318)
+[448/862] e2e/footer-copy.spec.ts:48:1 › C4: chevron renders only where it expands the tool group
+[449/862] e2e/github-issue-writeback.spec.ts:159:1 › 4. 未建成：状态行 + 重试入口；重试成功 → 行升级为回显态（AC3）
+[450/862] e2e/machine-add-dialog.spec.ts:30:1 › 添加机器 button opens the dialog with the two-step command blocks
+[451/862] e2e/dead-buttons.spec.ts:522:1 › project task rows and cards are real links to the todo detail (#318)
+[452/862] e2e/machine-authorize.spec.ts:32:1 › 无参到达 → idle 面（背板 + 卡 + 标题 + 引导语 + 生成授权链接钮）
+[453/862] e2e/machine-authorize.spec.ts:41:1 › ?enroll=<id> + poll=pending → 待授权面（文案 + 确认授权钮）
+[454/862] e2e/machine-add-dialog.spec.ts:49:1 › family law: X, Escape and backdrop dismiss; panel clicks do not
+[455/862] e2e/hotkeys.spec.ts:228:1 › sidebar 新任务 row carries the C badge and click-opens the dialog
+[456/862] e2e/dead-buttons.spec.ts:540:1 › new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)
+[457/862] e2e/machine-authorize.spec.ts:50:1 › ?enroll=<id> + poll=expired → 失效面（文案，无钮）
+[458/862] e2e/machine-authorize.spec.ts:57:1 › ?enroll=<id> + poll=authorized → 完成面（文案 + machineId 元信息）
+[459/862] e2e/hotkeys.spec.ts:239:1 › C on a non-board route opens the dialog in place
+[460/862] e2e/dead-buttons.spec.ts:562:1 › new-task dialog gates unsaved closes and resets on discard (#318)
+[461/862] e2e/machines-chief-state.spec.ts:28:1 › 总管主机徽标：钉在 host 行（data-orchestration=host + 文案）
+[462/862] e2e/hotkeys.spec.ts:249:1 › C on the project page opens the page’s own dialog (route project chip)
+[463/862] e2e/machines-chief-state.spec.ts:36:1 › 总管回合进行中：running 状态行在在线远端行
+[464/862] e2e/machine-add-dialog.spec.ts:65:1 › API key disclosure expands the key command and the api-keys link
+[465/862] e2e/machines-chief-state.spec.ts:42:1 › 总管等待机器：waiting 状态行在离线远端行（与离线灰点正交共存）
+[466/862] e2e/hotkeys.spec.ts:264:1 › Space no longer opens the drawer; ⌘J does, composer focused, default consumed
+[467/862] e2e/machine-add-dialog.spec.ts:85:1 › copy buttons write their command to the clipboard
+[468/862] e2e/machines-chief-state.spec.ts:51:1 › 读态零控件：标注容器内零 button / 零 menu 语义（死钮纪律保持）
+[469/862] e2e/dead-buttons.spec.ts:615:1 › detail transcript action rows carry no restore glyph (#884)
+[470/862] e2e/machines-chief-state.spec.ts:62:1 › 存量零漂移：无标注数据（06 canon 面）不长任何标注节点
+[471/862] e2e/hotkeys.spec.ts:304:1 › ⌘J wakes the chief drawer on a non-board route
+[472/862] e2e/machines-local.spec.ts:32:1 › 本机行钉列表首：data-kind=local + id 句柄 + hostname canon
+[473/862] e2e/machines-shell-switch.spec.ts:96:1 › 每行开关读自己的记录真值（本机开 / 接入机关）
+[474/862] e2e/machines-chief-state.spec.ts:68:1 › 行高契约保持：标注行不破行高（首行 60 / 分隔行 59+1px）
+[475/862] e2e/machines-local.spec.ts:41:1 › 托管 facade 行已除（spec 11 A8 负向）
+[476/862] e2e/machines-shell-switch.spec.ts:111:1 › 接入机行同样有开关：授权面覆盖非本机机器
+[477/862] e2e/hotkeys.spec.ts:314:1 › editable focus swallows C and ⌘J — the c lands IN the input
+[478/862] e2e/mention-picker-center.spec.ts:15:1 › mention picker stays centered in the production bundle (#448)
+[479/862] e2e/machines-local.spec.ts:49:1 › per-runtime 品牌 mark：两个在位 + 亮度分态 = enabledRuntimes canon
+[480/862] e2e/machines-shell-switch.spec.ts:117:1 › 拨 on：PATCH 单字段 {shellEnabled:true}，刷新后仍 on（读侧真值一致）
+[481/862] e2e/hotkeys.spec.ts:332:1 › textarea focus (chief composer) swallows C
+[482/862] e2e/machines-local.spec.ts:74:1 › 行内控件面 = 机器 shell 开关恰一个（XMON-113；其余仍无）
+[483/862] e2e/merge-reject.spec.ts:191:1 › 看板入口：执行 Agent 缺「推送分支」时完成钮禁用并点名缺项
+[484/862] e2e/machines-local.spec.ts:84:1 › 副行只剩 shell 开关说明（#503 的 id 尾巴 / 并发上限不许回来）
+[485/862] e2e/machines-shell-switch.spec.ts:137:1 › 拨 off：同律回写 false 并持久
+[486/862] e2e/hotkeys.spec.ts:346:1 › Space on a focused button activates it natively; ⌘J fires past button focus
+[487/862] e2e/machines-local.spec.ts:94:1 › 本机行不可删：行内无删除类控件（负向）
+[488/862] e2e/merge-reject.spec.ts:199:1 › 详情入口：同一 Agent 在同一弹层上禁用并点名缺项
+[489/862] e2e/machines-local.spec.ts:100:1 › 行无 chevron 可点感装饰（spec 11 A7 负向）
+[490/862] e2e/machines-shell-switch.spec.ts:151:1 › 响应在途期间即显示新态（乐观更新，不等服务器回执）
+[491/862] e2e/merge-reject.spec.ts:207:1 › 非空授权集里两项都缺时，两处开关都被点名
+[492/862] e2e/machines-local.spec.ts:113:1 › mark 几何：16×16 mark，on/off 透明度分离，行高契约不破
+[493/862] e2e/hotkeys.spec.ts:381:1 › ⌘J toggles: the second press closes the drawer from its own composer focus
+[494/862] e2e/machines-shell-switch.spec.ts:169:1 › PATCH 失败：开关回滚 + 可见错误反馈
+[495/862] e2e/newtask-dismiss-gesture.spec.ts:27:1 › outside-press cycles: every gesture closes exactly the popover layer
+[496/862] e2e/merge-reject.spec.ts:214:1 › 空授权集照拦（#994）：显式全关 = 一无授权，两处入口都禁用并点名两项
+[497/862] e2e/machines-shell-switch.spec.ts:187:1 › 保存成功后不留错误行
+[498/862] e2e/hotkeys.spec.ts:401:1 › ⌘J toggle rides the non-board singleton hook too (schedules)
+[499/862] e2e/merge-reject.spec.ts:233:1 › 两项都开时不拦：完成钮可点，无缺项提示
+[500/862] e2e/newtask-machine-persist.spec.ts:65:1 › the picked machine survives a reload
+[501/862] e2e/hotkeys.spec.ts:410:1 › FAB click stays open-only; ⌘J closes what the click opened
+[502/862] e2e/merge-reject.spec.ts:239:1 › 看板入口：server 真拒（403）时弹层不关，server 文案原样显出
+[503/862] e2e/hotkeys.spec.ts:425:1 › the robot FAB surfaces the ⌘J hint on hover; at rest it stays hidden
+[504/862] e2e/newtask-machine-persist.spec.ts:82:1 › a remembered machine that is gone falls back to 自动 without a dangling pin
+[505/862] e2e/merge-reject.spec.ts:257:1 › 合并成功（202）时弹层照常关，不留错误行
+[506/862] e2e/hotkeys.spec.ts:441:1 › a wake-family route carries the same ⌘J hint (single root FAB)
+[507/862] e2e/hotkeys.spec.ts:456:1 › the collapsed rail search icon hovers the ⌘K hint
+[508/862] e2e/newtask-machine-persist.spec.ts:102:1 › a remembered offline machine is kept and honestly shown offline
+[509/862] e2e/newtask-machine-pin.spec.ts:43:1 › the machine chip renders with the 自动 default label
+[510/862] e2e/hotkeys.spec.ts:469:1 › the drawer new-thread + hovers the N hint and advertises aria-keyshortcuts
+[511/862] e2e/newtask-machine-persist.spec.ts:119:1 › picking 自动 clears the memory and a reload stays on 自动
+[512/862] e2e/newtask-machine-pin.spec.ts:49:1 › the popover lists the 自动 row and the scenario machine row
+[513/862] e2e/hotkeys.spec.ts:486:1 › with the drawer closed, N stays retired — neither drawer nor dialog opens
+[514/862] e2e/newtask-machine-pin.spec.ts:58:1 › selecting the machine row backfills the chip label
+[515/862] e2e/newtask-machine-persist.spec.ts:138:1 › with nothing stored the chip starts on 自动
+[516/862] e2e/newtask-project-persist.spec.ts:52:1 › the picked project survives a reload
+[517/862] e2e/hotkeys.spec.ts:531:1 › ⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, dialog closes)
+[518/862] e2e/newtask-machine-pin.spec.ts:76:1 › Esc closes the machine popover only — the dialog stays open
+[519/862] e2e/hotkeys.spec.ts:550:1 › with the dialog closed, ⌘↵ on the board lands nothing
+[520/862] e2e/newtask-project-persist.spec.ts:66:1 › a remembered project that is gone falls back to the first row
+[521/862] e2e/newtask-machine-pin.spec.ts:85:1 › chip selection survives close and reopen via memory, 自动 clears it (#758)
+[522/862] e2e/newtask-project-persist.spec.ts:79:1 › with nothing stored the chip starts on the first row
+[523/862] e2e/hotkeys.spec.ts:566:1 › ⌘↵ with an empty spec creates nothing (the button gate holds on the chord)
+[524/862] e2e/newtask-dismiss-gesture.spec.ts:39:1 › escape cycles: every gesture closes exactly the popover layer
+[525/862] e2e/newtask-project-persist.spec.ts:85:1 › the anchored project page keeps its route project while the board honors the memory
+[526/862] e2e/newtask-machine-pin.spec.ts:110:1 › a machine-selected save still lands the fixture card
+[527/862] e2e/newtask-project-select.spec.ts:46:1 › the project chip opens the project listbox with the scenario rows
+[528/862] e2e/hotkeys.spec.ts:581:1 › ⌘↵ under the 未保存闸 confirm layer saves nothing (the layer owns the screen)
+[529/862] e2e/newtask-project-select.spec.ts:53:1 › row click selects and backfills the chip; the check moves on reopen
+[530/862] e2e/newtask-single-field.spec.ts:30:1 › the dialog has no title input and no tag UI
+[531/862] e2e/newtask-single-field.spec.ts:38:1 › save buttons gate on the spec body, not a title
+[532/862] e2e/hotkeys.spec.ts:605:1 › plain ↵ in the spec textarea stays the newline key — no hijack
+[533/862] e2e/newtask-project-select.spec.ts:72:1 › a scenario without projectNames falls back to the canon default row
+[534/862] e2e/newtask-single-field.spec.ts:49:1 › fixture 保存 lands a card titled by the first line
+[535/862] e2e/hotkeys.spec.ts:617:1 › the 保存并开始 button carries a visible ⌘↵ badge at rest
+[536/862] e2e/hotkeys.spec.ts:628:1 › Tab cycles the dialog’s project chip from the composer focus
+[537/862] e2e/newtask-project-select.spec.ts:80:1 › Escape closes the popover layer first, then the dialog
+[538/862] e2e/newtask-dismiss-gesture.spec.ts:48:1 › negative control: with no inner layer open, backdrop click still closes the dialog
+[539/862] e2e/newtask-single-field.spec.ts:60:1 › a >50-char first line is truncated with an ellipsis
+[540/862] e2e/hotkeys.spec.ts:655:1 › the chip cycles on Tab while the list is open; Shift+Tab keeps native movement
+[541/862] e2e/newtask-project-select.spec.ts:90:1 › outside click closes the popover layer only
+[542/862] e2e/newtask-dismiss-gesture.spec.ts:59:1 › negative control: with no inner layer open, Escape still closes the dialog
+[543/862] e2e/newtask-single-field.spec.ts:68:1 › autofocus lands on the spec textarea
+[544/862] e2e/newtask-single-field.spec.ts:73:1 › Esc close returns focus to the invoking button (#388 族律；#445 触发位 = 侧栏行)
+[545/862] e2e/newtask-dismiss-gesture.spec.ts:70:1 › negative control: second escape after the popover closed takes the dialog down
+[546/862] e2e/notify-banner.spec.ts:22:1 › permission=default → banner renders the canon copy
+[547/862] e2e/hotkeys.spec.ts:686:1 › Tab off the driving seats stays native (mention button keeps its own walk)
+[548/862] e2e/notify-banner.spec.ts:34:1 › 开启 → requestPermission() fires; granted hides the bar
+[549/862] e2e/notify-click.spec.ts:277:3 › 推送通知点击闭环（XMON-106） › T1: 已开窗口点击 → 客户端路由到 href 且不整页重载，pending 槽被清
+[550/862] e2e/hotkeys.spec.ts:705:1 › the project chip hovers its Tab hint (hidden at rest)
+[551/862] e2e/overlay-focus.spec.ts:49:3 › #15 focus ring收编 › click + key on 新建任务/topbar buttons: never the UA blue box
+[552/862] e2e/notify-banner.spec.ts:48:1 › 开启 → denied resolution also hides the bar
+[553/862] e2e/notify-click.spec.ts:310:3 › 推送通知点击闭环（XMON-106） › T2: 无已开窗口点击 → openWindow(href) + pending 槽交接，落地页消费路由
+[554/862] e2e/notify-banner.spec.ts:59:1 › scenarios without the flag never render the strip
+[555/862] e2e/hotkeys.spec.ts:720:1 › Tab cycles nothing while the 未保存闸 confirm layer is up (that layer owns the keyboard)
+[556/862] e2e/page-scroll.spec.ts:183:1 › 总管设置三个长内容 tab 都能滚到底 (#1032)
+[557/862] e2e/notify-click.spec.ts:345:3 › 推送通知点击闭环（XMON-106） › T3b: SSE 通知 → 走 SW showNotification 且 href 逐类映射正确（页内构造器零调用）
+[558/862] e2e/hotkeys.spec.ts:748:1 › with the dialog closed Tab stays native
+[559/862] e2e/overlay-focus.spec.ts:101:3 › #15 focus ring收编 › Tab focus keeps the official ring (keyboard reachability preserved)
+[560/862] e2e/plan-diff-full-file.spec.ts:20:1 › 初始态渲染 hunk 面与「显示完整文件」钮,无全文(初渲不污染)
+[561/862] e2e/notify-click.spec.ts:394:3 › 推送通知点击闭环（XMON-106） › T3a: SW 注册失败 → 回退页内 Notification，onclick 整页跳 href
+[562/862] e2e/plan-diff-full-file.spec.ts:27:1 › 点击内联展开 to 版本全文:hunks 隐去、行号连续、钮翻转「显示差异」
+[563/862] e2e/overlay-focus.spec.ts:130:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › scrim covers the full viewport — sidebar included
+[564/862] e2e/page-scroll.spec.ts:245:1 › 项目任务列表页能滚到底 (#1032)
+[565/862] e2e/overlay-focus.spec.ts:141:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › Esc closes the overlay
+[566/862] e2e/plan-diff-full-file.spec.ts:46:1 › 再点回到 hunk 面,钮文案翻回「显示完整文件」
+[567/862] e2e/overlay-focus.spec.ts:148:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › backdrop click closes; entry rides the registry fade-in
+[568/862] e2e/page-scroll.spec.ts:281:1 › 排期页能滚到底 (#1032)
+[569/862] e2e/project-empty-new-task.spec.ts:32:1 › the empty-state 新建任务 button opens the new-task dialog
+[570/862] e2e/project-empty-new-task.spec.ts:36:1 › the dialog preselects the route project on its chip
+[571/862] e2e/overlay-focus.spec.ts:161:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › X and 取消 close the fixture face too (no dead buttons)
+[572/862] e2e/page-scroll.spec.ts:295:1 › 项目设置页能滚到底 (#1032)
+[573/862] e2e/project-empty-new-task.spec.ts:41:1 › fixture 保存 lands the first task row with the 刚刚 label
+[574/862] e2e/page-scroll.spec.ts:309:1 › 新建项目页能滚到底 (#1032)
+[575/862] e2e/notify-click.spec.ts:423:3 › 推送通知点击闭环（XMON-106） › T4: chief 深链 → drawer 开在目标线程，参数一次性消费后从 URL 剥离
+[576/862] e2e/project-files-local.spec.ts:26:1 › local 项目：files tab 开闸，FilesPane 渲染（分支 chip/文件行/历史 seg）
+[577/862] e2e/project-github-issues.spec.ts:178:1 › 1. 已连接 github 项目：入口 → 弹层 → 点选导入 → 详情见 issue 标题与全部标签
+[578/862] e2e/project-empty-new-task.spec.ts:55:1 › Escape closes the dialog
+[579/862] e2e/notify-click.spec.ts:438:3 › 推送通知点击闭环（XMON-106） › T4b: chief 深链指向不存在的线程 → 不开 drawer、参数照清
+[580/862] e2e/project-files-local.spec.ts:41:1 › local 项目：文件点击 → 查看器内容；历史 seg → 提交行
+[581/862] e2e/project-new-dir-browser.spec.ts:143:1 › 422 unavailable → overlay 自动打开；Escape/点外部关闭后提示行仍在、输入不动
+[582/862] e2e/project-github-issues.spec.ts:203:1 › 2. local 项目：入口不渲染
+[583/862] e2e/notify-click.spec.ts:453:3 › 推送通知点击闭环（XMON-106） › T5: 帐号开关关档（偏好覆盖）→ SSE 通知不弹；开回来即恢复（#1031）
+[584/862] e2e/project-files-local.spec.ts:52:1 › local 项目：任务 tab 可点且往返
+[585/862] e2e/project-github-issues.spec.ts:210:1 › 3. 未连接 github 项目：入口不渲染，任务面正常不空白
+[586/862] e2e/project-new-fs-pick.spec.ts:70:1 › 浏览钮只在 local 选态在场
+[587/862] e2e/project-files-local.spec.ts:61:1 › 对照面：hosted 项目 files tab 照常（r2-24）
+[588/862] e2e/project-github-issues.spec.ts:218:1 › 4. 状态过滤与分页参数直达请求面；hasMore=false 下一页禁用
+[589/862] e2e/project-new-github.spec.ts:48:1 › 1. 未认证点「GitHub 仓库」→ 认证钮 + 手动兜底链接，无 picker
+[590/862] e2e/project-new-dir-browser.spec.ts:166:1 › 缺省起点 = server HOME（首请无 dir 参）；git 标记；dotfiles 默认隐藏
+[591/862] e2e/project-new-fs-pick.spec.ts:79:1 › 选取成功：路径回填（含空格）+ basename 项目名回填律联动
+[592/862] e2e/project-new-github.spec.ts:58:1 › 2. fixture accept 律：点认证钮 → 已认证面，trigger 开 picker（空列表面）
+[593/862] e2e/project-new-dir-browser.spec.ts:185:1 › 点行名下钻 + 面包屑跳任意层级（含根）
+[594/862] e2e/project-new-repo.spec.ts:140:1 › the 选择仓库 trigger lists exactly GitHub 仓库 and 本地文件夹
+[595/862] e2e/project-new-fs-pick.spec.ts:88:1 › 取消 = 静默 no-op：输入不动、无错误/提示行
+[596/862] e2e/project-new-repo.spec.ts:153:1 › the GitHub row swaps the trigger for the auth face; manual link reveals the input
+[597/862] e2e/project-new-github.spec.ts:72:1 › 3. 着陆参 connected → picker 自动开 + 列表 3 行 + 清参，刷新不重放
+[598/862] e2e/project-new-fs-pick.spec.ts:101:1 › unavailable 422：提示行 + 自动开应用内浏览器兜底；关闭后提示仍在，编辑即撤
+[599/862] e2e/project-new-github.spec.ts:85:1 › 4. picker 搜索：q 命中过滤，无命中走空面文案
+[600/862] e2e/project-new-dir-browser.spec.ts:204:1 › 单击「选择」→ 回填输入框 + basename 项目名联动 + 关 overlay
+[601/862] e2e/project-new-repo.spec.ts:168:1 › the 本地文件夹 row swaps the trigger for the path input; swap reopens
+[602/862] e2e/project-new-github.spec.ts:98:1 › 5. picker 单选 → trigger 回填 owner/repo + 项目名回填 repo 名 + 收面板
+[603/862] e2e/project-new-fs-pick.spec.ts:128:1 › 在飞期按钮 disabled，双击单发
+[604/862] e2e/project-new-repo.spec.ts:182:1 › switching forms drops the other face input
+[605/862] e2e/project-new-dir-browser.spec.ts:218:1 › dotfiles toggle：默认隐藏，toggle 后显示，aria-pressed 可断言
+[606/862] e2e/project-new-github.spec.ts:110:1 › 6. 回填律：手改名称不覆盖；等于上次回填值时跟随再选
+[607/862] e2e/project-new-repo.spec.ts:191:1 › Escape closes the repo popover
+[608/862] e2e/project-new-dir-browser.spec.ts:232:1 › 记住上次位置：reload 后重开 = lastDir 起点
+[609/862] e2e/project-new-fs-pick.spec.ts:141:1 › pick 结果覆盖对话框期间的手改路径（最后动作赢）
+[610/862] e2e/project-new-repo.spec.ts:199:1 › local path backfills the project name with the basename
+[611/862] e2e/project-new-github.spec.ts:129:1 › 7. 手动兜底：picker footer 与未认证面链接都切回 owner/repo input
+[612/862] e2e/project-new-repo.spec.ts:210:1 › a manual name edit stops the backfill; clearing resumes it
+[613/862] e2e/project-settings-dead-buttons.spec.ts:17:1 › settings: target branch is a static chip, not a button
+[614/862] e2e/project-new-github.spec.ts:142:1 › 7b. 未认证面手动链接 → input；swap 钮可回仓库菜单
+[615/862] e2e/project-new-dir-browser.spec.ts:249:1 › 空目录 = 空态文案，非白屏
+[616/862] e2e/project-settings-delete.spec.ts:29:1 › danger card renders and opens the project delete confirm
+[617/862] e2e/project-new-repo.spec.ts:224:1 › github owner/repo backfills the repo segment once valid
+[618/862] e2e/project-settings-delete.spec.ts:40:1 › family-law close: 取消 / X / Esc / backdrop — nothing deleted, no navigation
+[619/862] e2e/project-new-github.spec.ts:152:1 › 8. 着陆参 error 三译 → 内联错误行（denied/state/exchange）
+[620/862] e2e/project-new-dir-browser.spec.ts:259:1 › 子目录全被 dotfiles 隐藏 = 空态不谎称「没有子目录」，toggle 后现身
+[621/862] e2e/project-new-repo.spec.ts:243:1 › the name input focus ring is the registry ring, not the UA default
+[622/862] e2e/project-new-github.spec.ts:166:1 › 9. 断开钮 → 回未认证面（fixture accept 律）
+[623/862] e2e/project-new-repo.spec.ts:261:1 › untouched submit posts a repo-less body and navigates on 201
+[624/862] e2e/project-new-dir-browser.spec.ts:274:1 › 超大目录 = 截断提示行
+[625/862] e2e/project-new-repo.spec.ts:273:1 › local and github submits carry kind + their wire field
+[626/862] e2e/project-new-github.spec.ts:178:1 › 10. 行表键盘契约：焦点进列表、Arrow/typeahead 移动、Enter 选中生效、焦点归还
+[627/862] e2e/project-settings-delete.spec.ts:65:1 › confirm input gates the delete button — mismatch disables, exact match enables
+[628/862] e2e/project-new-dir-browser.spec.ts:284:1 › 列表 500 → overlay 内错误行，overlay 不关，面包屑仍可导航
+[629/862] e2e/project-settings-delete.spec.ts:81:1 › confirm deletes and lands on the board with the project row gone
+[630/862] e2e/project-tasks-toolbar.spec.ts:37:1 › view toggle swaps rows for grid cards and persists
+[631/862] e2e/provider-add-dialog.spec.ts:46:1 › topbar 新建 opens the picker: 38 preset rows, search, 自定义端点 entry, no dead submit
+[632/862] e2e/project-tasks-toolbar.spec.ts:62:1 › a seeded grid key boots the grid without a gesture
+[633/862] e2e/provider-add-dialog.spec.ts:60:1 › search filters by display name and id, case-insensitive; empty query restores 38
+[634/862] e2e/project-tasks-toolbar.spec.ts:72:1 › filter menu options cut the list and close on select
+[635/862] e2e/provider-add-dialog.spec.ts:78:1 › OAuth badge rides wired family rows only (github-copilot); codex unwired carries a note, xai none
+[636/862] e2e/project-new-repo.spec.ts:292:1 › empty local path / invalid github ref keep 创建项目 disabled
+[637/862] e2e/project-new-dir-browser.spec.ts:302:1 › lastDir 失效 400 → 自动回落缺省 HOME，不死端
+[638/862] e2e/provider-add-dialog.spec.ts:98:1 › 自定义端点 opens the existing form (fields and defaults unchanged); 返回 walks back
+[639/862] e2e/provider-add-dialog.spec.ts:120:1 › api_key row enters its preset key form prefilled; xai form shows the oauthLabel
+[640/862] e2e/provider-add-dialog.spec.ts:137:1 › family law: X, Escape and backdrop dismiss; panel clicks do not
+[641/862] e2e/project-new-dir-browser.spec.ts:319:1 › 409 busy → 不开 overlay，仅提示行（#440 行为不动面）
+[642/862] e2e/project-tasks-toolbar.spec.ts:105:1 › family law: Escape, outside click and re-click all close the menu
+[643/862] e2e/project-new-dir-browser.spec.ts:329:1 › pick 未分类错（500 无 reason）→ 不开 overlay，原文直透提示行
+[644/862] e2e/project-new-repo.spec.ts:315:3 › a 400 localPath reason renders the error row: 路径不存在
+[645/862] e2e/project-tasks-toolbar.spec.ts:129:1 › sort orders: 默认 source order, 最近更新 newest first, 标题 ascending
+[646/862] e2e/provider-oauth.spec.ts:32:1 › OAuth 徽标只骑已接线族(GitHub Copilot),codex 未接线行无徽标,xai 无徽标
+[647/862] e2e/provider-add-dialog.spec.ts:153:1 › providerId/label/baseUrl gate the submit; protocol segment swaps
+[648/862] e2e/project-new-repo.spec.ts:315:3 › a 400 localPath reason renders the error row: 不是 git 仓库
+[649/862] e2e/provider-oauth.spec.ts:54:1 › codex 未接线行点击零动作:不关窗、不进表单
+[650/862] e2e/provider-add-dialog.spec.ts:173:1 › fixture submit closes the dialog (accept 律) and reopens a clean picker
+[651/862] e2e/provider-oauth.spec.ts:63:1 › fixture 面点已接线徽标行 = accept 律(关窗),重开列表仍在
+[652/862] e2e/project-new-repo.spec.ts:315:3 › a 400 localPath reason renders the error row: 需要绝对路径
+[653/862] e2e/project-tasks-toolbar.spec.ts:156:1 › search filters by title; no-match shows the match line, not 暂无内容
+[654/862] e2e/project-tasks-toolbar.spec.ts:181:1 › filter and search compose
+[655/862] e2e/project-new-repo.spec.ts:315:3 › a 400 localPath reason renders the error row: invalid body at localPath: case none
+[656/862] e2e/provider-oauth.spec.ts:72:1 › 着陆参 oauth=error&reason=denied 自动重开弹窗 + 文案 + 清参
+[657/862] e2e/provider-add-dialog.spec.ts:194:1 › model rows keep the submit reachable (dialog body scrolls)
+[658/862] e2e/providers-tabs.spec.ts:30:1 › tablist = 恰 pi / Claude Code 两 tab，默认选中 pi
+[659/862] e2e/provider-oauth.spec.ts:83:1 › 着陆参 oauth=error&reason=exchange 走交换失败文案
+[660/862] e2e/reject-chain.spec.ts:14:1 › reject loop: 请求修改 → v2 → diff → 确认
+[661/862] e2e/providers-tabs.spec.ts:42:1 › pi tab：fixture 模型行 + facade/38 项负向 + 无可点感装饰
+[662/862] e2e/provider-oauth.spec.ts:92:1 › 着陆参 oauth=error&reason=state 走过期文案 + 重开弹窗
+[663/862] e2e/rerun-close-family.spec.ts:20:3 › X button closes the rerun dialog (scenario 56)
+[664/862] e2e/providers-tabs.spec.ts:59:1 › 切 Claude Code tab：aria-selected 翻转 + ?runtime= 写入（scenario 保留）
+[665/862] e2e/provider-oauth.spec.ts:99:1 › 着陆参 oauth=connected 静默：不弹窗、无错误行
+[666/862] e2e/rerun-close-family.spec.ts:28:3 › Escape closes the rerun dialog (scenario 56)
+[667/862] e2e/providers-tabs.spec.ts:79:1 › 深链 ?runtime=claude-code 直落，刷新后 tab 定位保持
+[668/862] e2e/rerun-close-family.spec.ts:36:3 › backdrop click closes the rerun dialog (scenario 56); panel clicks do not
+[669/862] e2e/providers-tabs.spec.ts:93:1 › header 卡：runtime 名 + 说明 + 「已安装在 <hostname>」（两 tab 同构）
+[670/862] e2e/rerun-close-family.spec.ts:20:3 › X button closes the reuse panel (scenario 75)
+[671/862] e2e/providers-tabs.spec.ts:108:1 › settings.json 缺失分支：header 转「未安装」指引态，模型行零渲染不崩
+[672/862] e2e/review-reject.spec.ts:137:1 › FM1/FM2: 静息 review 发送 = steps revision 动作面，draft 清空、chip 即时翻规划中
+[673/862] e2e/rerun-close-family.spec.ts:28:3 › Escape closes the reuse panel (scenario 75)
+[674/862] e2e/providers-tabs.spec.ts:130:1 › #1050 装了 + 已登录：细字行报版本与路径，无「未登录」角标
+[675/862] e2e/review-reject.spec.ts:178:1 › FM3: 更多菜单出现「请求修改」入口，弹层收反馈后走同一动作面
+[676/862] e2e/rerun-close-family.spec.ts:36:3 › backdrop click closes the reuse panel (scenario 75); panel clicks do not
+[677/862] e2e/providers-tabs.spec.ts:143:1 › #1050 装了 + 未登录：细字行尾出「未登录」角标（主句不变）
+[678/862] e2e/providers-tabs.spec.ts:156:1 › #1050 装了 + 没配：主句转「已安装，未配置模型槽」+ 配置补法句，模型行零渲染
+[679/862] e2e/rerun-close-family.spec.ts:49:1 › reuse panel back button returns to the rerun dialog
+[680/862] e2e/providers-tabs.spec.ts:175:1 › #1050 没装（bin: null = 探过了没有）：主句「未安装」+ 安装指引 + 零细字行
+[681/862] e2e/schedules-live.spec.ts:83:1 › live face: 保存 fires POST /api/schedules with the form state (#1037)
+[682/862] e2e/review-reject.spec.ts:212:1 › FM3 边界: 非 review 相位（live building）更多菜单不渲染打回行
+[683/862] e2e/providers-tabs.spec.ts:189:1 › #1050 配置文件在但二进制没了：不再假报「已安装在」（旧行为是假绿）
+[684/862] e2e/review-reject.spec.ts:222:1 › FM4: 运行中 review（claimed 步在场）发送保持 steer 语义，不抢动作面
+[685/862] e2e/providers-tabs.spec.ts:199:1 › #1050 bin 键缺席（老 daemon 没探过）：维持只看 installed 的旧行为，不写「未知」
+[686/862] e2e/search-close-flash.spec.ts:63:1 › 第二下 Ctrl+K 关闭不闪：退出透明度单调递减
+[687/862] e2e/providers-tabs.spec.ts:212:1 › 几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左 claude-code 右
+[688/862] e2e/review-reject.spec.ts:265:1 › FM2: 打回被拒（409 竞态）draft 逐字保留 + 提示行显性，不静默吞
+[689/862] e2e/search-focus.spec.ts:87:1 › ⌘K focuses the input — direct typing produces results
+[690/862] e2e/search-result-rows.spec.ts:65:1 › 结果行点击 → 面板关闭 + 跳 todo 详情
+[691/862] e2e/search-focus.spec.ts:103:1 › mid-exit reopen refocuses the retained input
+[692/862] e2e/search-result-rows.spec.ts:76:1 › 前往行点击 → 面板关闭 + 跳对应路由
+[693/862] e2e/search-close-flash.spec.ts:88:1 › 三连击：关→开落在开态且输入聚焦
+[694/862] e2e/search-focus.spec.ts:118:1 › scrim 可点关: clicking the dark area closes the panel
+[695/862] e2e/search-result-rows.spec.ts:85:1 › 静息无常亮;hover 哪行亮哪行,且只亮一行
+[696/862] e2e/search-focus.spec.ts:129:1 › 常亮互斥: page-layer pill dims while the panel is open, restores on close
+[697/862] e2e/secret-add-dialog.spec.ts:24:1 › topbar 新建 opens the 添加密钥 dialog with the captured fields
+[698/862] e2e/secret-add-dialog.spec.ts:38:1 › family law: X, Escape and backdrop dismiss; panel clicks do not
+[699/862] e2e/search-focus.spec.ts:153:1 › 常亮互斥 holds on the collapsed rail form
+[700/862] e2e/search-result-rows.spec.ts:103:1 › ↑↓ 键盘光标接管高亮;Enter 跳光标行
+[701/862] e2e/search-focus.spec.ts:182:1 › the caret is not clipped where it meets the input edge
+[702/862] e2e/search-result-rows.spec.ts:123:1 › 鼠标一动让位:键盘光标交还 hover
+[703/862] e2e/segmented-controls.spec.ts:90:1 › page-tab: unselected hover steps the chip ink — dark + light
+[704/862] e2e/secret-add-dialog.spec.ts:54:1 › empty name or value keeps the submit disabled; filling lifts it
+[705/862] e2e/secret-add-dialog.spec.ts:64:1 › fixture submit closes the dialog (accept 律)
+[706/862] e2e/shadcn-primitives.spec.ts:28:1 › avatar 落点：侧栏人像 / 看板执行者面共用同一个 components/ui 落点
+[707/862] e2e/shell-consistency.spec.ts:106:5 › the root FAB wakes the window on every shell family › board: the root FAB opens the window, minimize returns to the surface
+[708/862] e2e/shadcn-primitives.spec.ts:48:1 › avatar 落点定尺盒（#983/#1003）：Root 生成真盒承上游发丝环，img 几何不变
+[709/862] e2e/segmented-controls.spec.ts:106:1 › page-tab: selected chip keeps its fill under hover, same geometry as the rest state
+[710/862] e2e/shadcn-primitives.spec.ts:81:1 › kbd 落点：悬浮提示 = registry Tooltip+Kbd 组合，静息不挂载 / 悬浮浮出
+[711/862] e2e/shadcn-primitives.spec.ts:98:1 › tag-chip 落点：落在 registry Badge 上，别名类保留、几何单档 20px 正本
+[712/862] e2e/segmented-controls.spec.ts:143:1 › page-tab group rides the registry TabsList form (bg-muted, 32px, 3px inset)
+[713/862] e2e/shell-consistency.spec.ts:106:5 › the root FAB wakes the window on every shell family › pages: the root FAB opens the window, minimize returns to the surface
+[714/862] e2e/segmented-controls.spec.ts:169:1 › page-tab click swaps the active chip and the pane
+[715/862] e2e/sidebar-nav.spec.ts:37:1 › nav rows hop client-side: no reload, pill + aria-current follow
+[716/862] e2e/segmented-controls.spec.ts:182:1 › sched freq: dark active chip reads against the container, hover steps the rest ink
+[717/862] e2e/sidebar-nav.spec.ts:52:1 › subrow and team name hop client-side too
+[718/862] e2e/shell-consistency.spec.ts:106:5 › the root FAB wakes the window on every shell family › resources: the root FAB opens the window, minimize returns to the surface
+[719/862] e2e/sidebar-nav.spec.ts:71:1 › rail rows hop client-side
+[720/862] e2e/sidebar-nav.spec.ts:81:1 › 安装 App entries are gone from both sidebar states
+[721/862] e2e/shell-consistency.spec.ts:106:5 › the root FAB wakes the window on every shell family › secondary: the root FAB opens the window, minimize returns to the surface
+[722/862] e2e/sidebar-nav.spec.ts:90:1 › collapsed rail carries no install icon
+[723/862] e2e/segmented-controls.spec.ts:207:1 › files seg + tasks view toggle: hover steps the unselected ink (dark)
+[724/862] e2e/sidebar-nav.spec.ts:97:1 › /zh/install redirects to /app (unmatched-path divergence, 01 §8)
+[725/862] e2e/sidebar-nav.spec.ts:103:1 › hover tints the row pill — dark default + light theme
+[726/862] e2e/shell-consistency.spec.ts:106:5 › the root FAB wakes the window on every shell family › detail: the root FAB opens the window, minimize returns to the surface
+[727/862] e2e/segmented-controls.spec.ts:220:1 › user-menu 外观 seg: hover tints, click switches the theme
+[728/862] e2e/sidebar-nav.spec.ts:121:1 › rail hover tints the 24px pill
+[729/862] e2e/sidebar-nav.spec.ts:131:1 › selected row keeps its own pill under hover
+[730/862] e2e/shell-consistency.spec.ts:134:3 › sidebar form is route-invariant › expanded sidebar keeps identical geometry across /app ↔ /app/team ↔ resources hops
+[731/862] e2e/segmented-controls.spec.ts:236:1 › branch-dialog seg: hover tints Git, click swaps the tab body
+[732/862] e2e/sidebar-seam.spec.ts:23:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › board expanded: 1px seam replaces the floating shadow, divider aligns with the topbar border (light)
+[733/862] e2e/shell-consistency.spec.ts:154:3 › sidebar form is route-invariant › the brand head holds its inner geometry across the /app → /app/team hop
+[734/862] e2e/segmented-controls.spec.ts:257:1 › team layout toggle: registry default Tabs form (muted group, background chip, no ring)
+[735/862] e2e/sidebar-seam.spec.ts:64:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › team page: the r7 12 active pill geometry survives the divider row (light)
+[736/862] e2e/shell-consistency.spec.ts:170:3 › sidebar form is route-invariant › collapsed rail survives route hops (storage-backed on every shell)
+[737/862] e2e/sidebar-seam.spec.ts:80:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › rail: seam inherits, toggle divider aligns with the topbar border row (light)
+[738/862] e2e/segmented-controls.spec.ts:287:1 › chief tabs: hover tints, click swaps the view
+[739/862] e2e/sidebar-seam.spec.ts:112:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › pages shell: the divider runs full width on schedules too (light)
+[740/862] e2e/shell-consistency.spec.ts:187:3 › sidebar form is route-invariant › the collapse toggle works off-board and the state rides back
+[741/862] e2e/sidebar-seam.spec.ts:133:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › resources: the full-width line reads one color across the seam (light)
+[742/862] e2e/segmented-controls.spec.ts:305:1 › chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height
+[743/862] e2e/shell-consistency.spec.ts:206:1 › team route carries no subscription surface
+[744/862] e2e/sidebar-seam.spec.ts:23:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › board expanded: 1px seam replaces the floating shadow, divider aligns with the topbar border (dark)
+[745/862] e2e/shell-consistency.spec.ts:216:3 › theme default follows the system › no storage + system light boots light
+[746/862] e2e/sidebar-seam.spec.ts:64:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › team page: the r7 12 active pill geometry survives the divider row (dark)
+[747/862] e2e/segmented-controls.spec.ts:387:1 › chief tabs: reduced motion freezes the pill slide (#644)
+[748/862] e2e/shell-consistency.spec.ts:222:3 › theme default follows the system › no storage + system dark boots dark
+[749/862] e2e/sidebar-seam.spec.ts:80:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › rail: seam inherits, toggle divider aligns with the topbar border row (dark)
+[750/862] e2e/sidebar-search-offboard.spec.ts:21:3 › secondary page: search row opens the shared panel, Esc closes it
+[751/862] e2e/shell-consistency.spec.ts:228:3 › theme default follows the system › a stored theme beats the system scheme
+[752/862] e2e/sidebar-seam.spec.ts:112:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › pages shell: the divider runs full width on schedules too (dark)
+[753/862] e2e/sidebar-seam.spec.ts:133:5 › sidebar seam + full-width divider (dogfood 裁决 v2) › resources: the full-width line reads one color across the seam (dark)
+[754/862] e2e/sidebar-visual.spec.ts:43:3 › ⌘K chip is a bordered pill clear of the label (light)
+[755/862] e2e/sidebar-search-offboard.spec.ts:21:3 › resources page: search row opens the shared panel, Esc closes it
+[756/862] e2e/sidebar-visual.spec.ts:84:3 › hover and selected pills share one geometry (light)
+[757/862] e2e/skills-page.spec.ts:14:1 › 技能页新建入口（topbar 新建钮）在位，fixture 行集照常渲染
+[758/862] e2e/sidebar-visual.spec.ts:130:3 › selected pill deepens the hover step (light)
+[759/862] e2e/skills-page.spec.ts:24:1 › 旧导入路由不可达——catch-all 重定向回 /app（#149 feedback 路由同律）
+[760/862] e2e/skills-routing.spec.ts:17:1 › the durable summary row names reads and denials in two columns
+[761/862] e2e/skills-page.spec.ts:32:1 › 空态双入口——目录指引文案 + 新建技能主钮，无总管提示行
+[762/862] e2e/skills-routing.spec.ts:25:1 › a run without skill events grows no summary row (control zero-noise)
+[763/862] e2e/skills-page.spec.ts:67:1 › live 列表消费 GET /api/skills（server 换源后 wire 形状不变）
+[764/862] e2e/skills-write.spec.ts:112:1 › fixture 新建弹窗：字段集 + 提交闸 + accept 律提交即关
+[765/862] e2e/sidebar-visual.spec.ts:43:3 › ⌘K chip is a bordered pill clear of the label (dark)
+[766/862] e2e/skills-page.spec.ts:105:1 › 回归 #486/#494：技能列表可由滚轮到达，且滚动条贴面板右缘
+[767/862] e2e/sidebar-visual.spec.ts:84:3 › hover and selected pills share one geometry (dark)
+[768/862] e2e/skills-write.spec.ts:135:1 › live 新建：201 后弹窗关、列表即现，frontmatter 由表单组装
+[769/862] e2e/spec-brief-card.spec.ts:97:1 › 1. spec 块级 markdown 渲染：标题/列表/围栏成元素，字面标记不泄漏
+[770/862] e2e/sidebar-visual.spec.ts:130:3 › selected pill deepens the hover step (dark)
+[771/862] e2e/spec-brief-card.spec.ts:109:1 › 2. 附件 token 行渲染成 chip：图片带缩略约束，文件带名字与端点链接
+[772/862] e2e/skills-write.spec.ts:163:1 › live 新建撞同名 409：弹窗不关，错误行 headline + server 原文 detail
+[773/862] e2e/spec-brief-card.spec.ts:121:1 › 3. 图片附件受缩略约束——不再以原尺寸裸图撑破页面
+[774/862] e2e/sidebar-visual.spec.ts:170:1 › machine-online dot keeps its absolute anchor
+[775/862] e2e/spec-brief-card.spec.ts:131:1 › 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底）
+[776/862] e2e/skills-write.spec.ts:182:1 › live 编辑：行点击预填 frontmatter 拆分，PUT 后列表回读一致
+[777/862] e2e/spec-flow.spec.ts:107:1 › 1. 简报卡住进滚动列：.chat-col 内可见，不再是 .detail-center 直接子节点
+[778/862] e2e/spec-brief-card.spec.ts:158:1 › 4b. 宽屏下行宽吃 68ch cap（#470 的 60–75 字符带同律）
+[779/862] e2e/spec-flow.spec.ts:117:1 › 2. 简报卡随流滚走：滚到底出视口，滚到顶回列首
+[780/862] e2e/skills-write.spec.ts:210:1 › live 编辑预填读 404：表单让位错误块，列表失效重取
+[781/862] e2e/spec-brief-card.spec.ts:176:1 › 5. 有 spec 的 live 任务不再显示「尚无描述」；空 spec 保留占位
+[782/862] e2e/spec-flow.spec.ts:135:1 › 3. 超长无断点行包进中栏：chat 横向 scrollWidth 等于 clientWidth
+[783/862] e2e/skills-write.spec.ts:234:1 › 客户端预检：非法名与引号描述不发请求
+[784/862] e2e/spec-brief-card.spec.ts:186:1 › 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework)
+[785/862] e2e/spinner-live.spec.ts:55:3 › streaming row loading indicator (scenario 26) › Atom mounts: stylesheet injected, shell + 3 tilted orbits, staggered 900ms spin
+[786/862] e2e/team-create-agent.spec.ts:28:1 › the 创建 Agent slot opens the dialog
+[787/862] e2e/team-org-chart.spec.ts:38:1 › chart 组织图：每个成员 agent 渲染成一个节点
+[788/862] e2e/spinner-live.spec.ts:104:3 › streaming row loading indicator (scenario 26) › root is a 16px square, shell a 16px circle, row keeps 20px
+[789/862] e2e/team-create-agent.spec.ts:36:1 › family law: X, Escape and backdrop dismiss; panel clicks do not
+[790/862] e2e/spinner-live.spec.ts:136:3 › streaming row loading indicator (scenario 26) › root is aria-hidden and shell/ring strokes ride currentColor; label stays the cue
+[791/862] e2e/team-org-chart.spec.ts:44:1 › chart 组织图：根节点是总管绑定的 agent
+[792/862] e2e/spinner-live.spec.ts:154:3 › streaming row loading indicator (scenario 26) › elapsed seconds ride tabular figures
+[793/862] e2e/team-org-chart.spec.ts:58:1 › chart 组织图：皇冠徽标只出现在根节点上
+[794/862] e2e/spinner-live.spec.ts:161:3 › streaming row loading indicator (scenario 26) › prefers-reduced-motion freezes the spins with the static settle transform
+[795/862] e2e/team-org-chart.spec.ts:73:1 › chart 组织图：每个节点带服务商徽标与模型行
+[796/862] e2e/team-create-agent.spec.ts:52:1 › empty name keeps 创建 disabled; typing lifts it; fixture submit closes
+[797/862] e2e/team-org-chart.spec.ts:86:1 › chart 组织图：创建 Agent 是子列末位的虚线节点卡
+[798/862] e2e/spinner-live.spec.ts:186:3 › quiescent building gap (scenario spinner-quiescent) › one live row: spinning indicator + static 执行中... label, no seconds
+[799/862] e2e/theme-toggle.spec.ts:27:1 › default dark: 深色 active; 浅色 click repaints instantly + persists
+[800/862] e2e/team-org-chart.spec.ts:109:1 › chart 组织图：根与子列之间有 44×1 横向连接线
+[801/862] e2e/team-create-agent.spec.ts:62:1 › chart layout drops the grid 创建 Agent slot for the org chart
+[802/862] e2e/theme-toggle.spec.ts:42:1 › selection survives reload
+[803/862] e2e/team-org-chart.spec.ts:117:1 › chart 组织图：子列左缘括号连接件跨首末子节点中心
+  1) e2e/provider-oauth.spec.ts:99:1 › 着陆参 oauth=connected 静默：不弹窗、无错误行 ─────────────────────────────
+
+    Test timeout of 30000ms exceeded.
+
+    Error: page.waitForLoadState: Test timeout of 30000ms exceeded.
+
+       99 | test('着陆参 oauth=connected 静默：不弹窗、无错误行', async ({ page }) => {
+      100 |   await page.goto(`${PROVIDERS}&oauth=connected&provider=github-copilot`);
+    > 101 |   await page.waitForLoadState('networkidle');
+          |              ^
+      102 |   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toHaveCount(0);
+      103 |   await expect(page).toHaveURL((url) => !url.searchParams.has('oauth'));
+      104 | });
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0262-1012-sealed-e2e-980-2/apps/web/e2e/provider-oauth.spec.ts:101:14
+
+    Error Context: test-results/provider-oauth-着陆参-oauth-connected-静默：不弹窗、无错误行/error-context.md
+
+
+[804/862] e2e/team-create-agent.spec.ts:75:1 › 配置服务商 SPA-navigates to the providers route, scenario rides along
+[805/862] e2e/team-org-chart.spec.ts:134:1 › chart 组织图：零成员团队显示 暂无成员 且不渲染节点
+[806/862] e2e/theme-toggle.spec.ts:59:1 › injected storage pins the initial segment (storage injection path)
+[807/862] e2e/thinking-row-truncate.spec.ts:169:1 › T1: 行是 flex，头像与文字列水平不重叠（改前：头像压在文字上）
+[808/862] e2e/title-band-clicks.spec.ts:39:3 › secondary back owns its hit area and navigates home — /app/team
+[809/862] e2e/team-org-chart.spec.ts:142:1 › chart 组织图：切回 grid 仍渲染网格卡与成员数
+[810/862] e2e/theme-toggle.spec.ts:68:1 › clicking the active segment is a stable no-op
+[811/862] e2e/title-band-clicks.spec.ts:39:3 › secondary back owns its hit area and navigates home — /app/account
+[812/862] e2e/team-org-chart.spec.ts:150:1 › chart 组织图：布局选择刷新后持久
+[813/862] e2e/theme-toggle.spec.ts:82:1 › theme flip rides the transition suppression and drops it after the paint
+[814/862] e2e/thinking-row-truncate.spec.ts:187:1 › T2: chat-text 有宽度上限与 min-w-0——robot 行 :419 同款工具类
+[815/862] e2e/title-band-clicks.spec.ts:39:3 › secondary back owns its hit area and navigates home — /app/api-keys
+[816/862] e2e/theme-toggle.spec.ts:113:1 › icon + apple-touch-icon carry prefers-color-scheme variants that resolve
+[817/862] e2e/thinking-row-truncate.spec.ts:200:1 › T3: 长预览真截断——字符切片之后 CSS 省略号接力，钮宽 ≤ 文字列宽
+[818/862] e2e/title-band-clicks.spec.ts:47:1 › team right-slot action owns its hit area (设置 slot under the same band)
+[819/862] e2e/token-gate.spec.ts:133:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token=
+[820/862] e2e/title-band-clicks.spec.ts:66:3 › resources topbar actions own their hit areas, back navigates — /app/resources/skills
+[821/862] e2e/thinking-row-truncate.spec.ts:228:1 › T4: 页面级零横向溢出；展开交互不被截断修法砸掉
+[822/862] e2e/transcript-user-words.spec.ts:180:1 › 1. 任务原文只出现一次：描述区承担，气泡不再复述（套娃修复）
+[823/862] e2e/title-band-clicks.spec.ts:66:3 › resources topbar actions own their hit areas, back navigates — /app/resources/mcp-servers
+[824/862] e2e/transcript-user-words.spec.ts:200:1 › 2. CONTINUE 续轮指令不冒名用户气泡
+[825/862] e2e/user-menu-nav.spec.ts:35:3 › 「帐号」row SPA-navigates to /app/account?scenario=01
+[826/862] e2e/title-band-clicks.spec.ts:66:3 › resources topbar actions own their hit areas, back navigates — /app/resources/secrets
+[827/862] e2e/transcript-user-words.spec.ts:207:1 › 3. 审核宣告行 = note 家族（与「发起了合并」同形），不是气泡
+[828/862] e2e/user-menu-nav.spec.ts:35:3 › 「API 密钥」row SPA-navigates to /app/api-keys?scenario=01
+[829/862] e2e/title-band-clicks.spec.ts:66:3 › resources topbar actions own their hit areas, back navigates — /app/resources/machines
+[830/862] e2e/transcript-user-words.spec.ts:217:1 › 4. 真实 steer 话语走 markdown：围栏成代码块，字面 ``` 不泄漏
+[831/862] e2e/title-band-clicks.spec.ts:66:3 › resources topbar actions own their hit areas, back navigates — /app/resources/providers
+[832/862] e2e/user-menu-nav.spec.ts:35:3 › 「MCP」row SPA-navigates to /app/resources/mcp-servers?scenario=01
+[833/862] e2e/transcript-user-words.spec.ts:227:1 › 5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）
+[834/862] e2e/user-menu-trigger.spec.ts:104:1 › expanded chip: click opens anchored above the chip, re-click closes
+[835/862] e2e/visual-polish.spec.ts:72:3 › board card rides the single-source edge ring + card-tier shadow (light)
+[836/862] e2e/transcript-user-words.spec.ts:239:1 › 6. taskline 不错挂：任务文本行退场后没有 #seq 行残留
+[837/862] e2e/visual-polish.spec.ts:91:3 › board column container rides the same edge ring + card-tier shadow (light)
+[838/862] e2e/z-ladder.spec.ts:48:3 › z ladder: active surfaces above the docked drawer (#688) › every probe point of the new-task panel hit-tests inside the panel
+[839/862] e2e/user-menu-trigger.spec.ts:123:1 › outside click and Esc close the open menu
+[840/862] e2e/visual-polish.spec.ts:108:3 › notify banner rides the same edge ring + card-tier shadow (light)
+[841/862] e2e/z-ladder.spec.ts:67:3 › z ladder: active surfaces above the docked drawer (#688) › the modal scrim covers the drawer while the dialog is open
+[842/862] e2e/visual-polish.spec.ts:127:3 › account popover rides the V2 shell border, keeps the overlay-plate hard shadow (light)
+[843/862] e2e/user-menu-trigger.spec.ts:138:1 › rail chip opens the same popover, unclipped by the 40px rail
+[844/862] e2e/z-ladder.spec.ts:80:3 › z ladder: active surfaces above the docked drawer (#688) › the close button inside the drawer band receives the click
+[845/862] e2e/visual-polish.spec.ts:153:3 › sidebar shares the main-area surface, seam drawn in the divider token (light)
+[846/862] e2e/visual-polish.spec.ts:182:3 › board grid lays out four even columns with no horizontal scroll (light)
+[847/862] e2e/user-menu-trigger.spec.ts:153:1 › #163 anchoring: bottom distance is viewport-invariant, the chip is never covered — both shapes
+[848/862] e2e/z-ladder.spec.ts:90:3 › z ladder: active surfaces above the docked drawer (#688) › focus lands in the dialog and typing reaches it
+[849/862] e2e/visual-polish.spec.ts:72:3 › board card rides the single-source edge ring + card-tier shadow (dark)
+[850/862] e2e/visual-polish.spec.ts:91:3 › board column container rides the same edge ring + card-tier shadow (dark)
+[851/862] e2e/visual-polish.spec.ts:108:3 › notify banner rides the same edge ring + card-tier shadow (dark)
+[852/862] e2e/visual-polish.spec.ts:127:3 › account popover rides the V2 shell border, keeps the overlay-plate hard shadow (dark)
+[853/862] e2e/visual-polish.spec.ts:153:3 › sidebar shares the main-area surface, seam drawn in the divider token (dark)
+[854/862] e2e/user-menu-trigger.spec.ts:187:1 › 外观 row works from the click-opened menu and the choice survives reopen
+[855/862] e2e/visual-polish.spec.ts:182:3 › board grid lays out four even columns with no horizontal scroll (dark)
+[856/862] e2e/visual-polish.spec.ts:221:1 › collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2)
+[857/862] e2e/user-menu-trigger.spec.ts:209:1 › detail route: the trigger opens the menu over the confirm surface
+[858/862] e2e/token-gate.spec.ts:174:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除
+[859/862] e2e/token-gate.spec.ts:187:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页
+[860/862] e2e/token-gate.spec.ts:206:1 › 鉴权关：零门页零 token 附带，行为与现状一致
+[861/862] e2e/token-gate.spec.ts:225:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭）
+[862/862] e2e/token-gate.spec.ts:242:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值）
+  1 failed
+    e2e/provider-oauth.spec.ts:99:1 › 着陆参 oauth=connected 静默：不弹窗、无错误行 ──────────────────────────────
+  861 passed (5.4m)

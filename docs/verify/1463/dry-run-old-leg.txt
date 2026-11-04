@@ -1,0 +1,25 @@
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/helpers.ts
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/helpers.ts → FULL
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/probe-dump.mjs
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/probe-dump.mjs → FULL
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/palette-c.css
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/palette-c.css → FULL
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/evidence.ts
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/evidence.ts → FULL
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/live-server-tether.mjs
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/live-server-tether.mjs → file map
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8398
+

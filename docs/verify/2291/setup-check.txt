@@ -1,0 +1,12 @@
+Measured 2026-10-31. Dummy key, temporary configuration roots, no live sessions.
+
+claude: setup command exit 0
+codex: setup command exit 0
+pi: setup command exit 0
+Claude Code: HTTP URL and expanded Bearer header read back correctly
+Codex: HTTP URL and bearer_token_env_var read back correctly
+pi: HTTP URL, environment-backed Bearer header, and direct exposure read back correctly
+
+PASS: 10 assertions (three command exits, six URL/auth checks, one exposure check).
+Temporary config directories removed. Existing harness configuration was not changed.
+No key, personal config, or real model session was used.

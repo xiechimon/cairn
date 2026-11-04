@@ -1,0 +1,72 @@
+[
+  {
+    "phase": "preparing",
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369251665
+  },
+  {
+    "phase": "starting",
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369251689
+  },
+  {
+    "phase": "tool",
+    "tool": "skill: extra-skill",
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369256006
+  },
+  {
+    "phase": "awaiting_model",
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369256013
+  },
+  {
+    "phase": "awaiting_model",
+    "skills": [
+      {
+        "name": "extra-skill",
+        "denied": true
+      }
+    ],
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369256014
+  },
+  {
+    "phase": "tool",
+    "tool": "skill: demo-skill",
+    "skills": [
+      {
+        "name": "extra-skill",
+        "denied": true
+      }
+    ],
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369260021
+  },
+  {
+    "phase": "awaiting_model",
+    "skills": [
+      {
+        "name": "extra-skill",
+        "denied": true
+      }
+    ],
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369260029
+  },
+  {
+    "phase": "awaiting_model",
+    "skills": [
+      {
+        "name": "extra-skill",
+        "denied": true
+      },
+      {
+        "name": "demo-skill",
+        "denied": false
+      }
+    ],
+    "stepId": "vHJGOptjB0NGbNEVx497m",
+    "at": 1791369260030
+  }
+]

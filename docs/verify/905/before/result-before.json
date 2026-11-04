@@ -1,0 +1,76 @@
+{
+  "tag": "before",
+  "todoId": "SMdC6xibiRJXyIeVtFOVi",
+  "buildId": "01a10b97-84e1-7da9-b292-16e8a75f4c84",
+  "stepId": "CATl4XaTY5sK6D72UuuTy",
+  "stack": {
+    "server": "http://127.0.0.1:8801",
+    "web": "http://127.0.0.1:5283"
+  },
+  "samples": [
+    {
+      "at": "claim+0s",
+      "label": "处理中..."
+    },
+    {
+      "at": "preparing",
+      "label": "处理中..."
+    },
+    {
+      "at": "starting",
+      "label": "处理中..."
+    },
+    {
+      "at": "thinking",
+      "label": "处理中..."
+    },
+    {
+      "at": "thinking+8s(relays flowing)",
+      "label": "处理中..."
+    },
+    {
+      "at": "tool:bash",
+      "label": "处理中..."
+    },
+    {
+      "at": "tool:bash+8s(no new signal)",
+      "label": "处理中..."
+    },
+    {
+      "at": "responding",
+      "label": "处理中..."
+    }
+  ],
+  "panelTexts": [
+    "本步：规划中",
+    "执行机器：activity-probe"
+  ],
+  "stuckFreshnessSamples": [
+    "执行机器：activity-probe",
+    "执行机器：activity-probe",
+    "执行机器：activity-probe"
+  ],
+  "activityRelay": {
+    "posts": 8,
+    "accepted": 0,
+    "rejected": [
+      400,
+      400,
+      400,
+      400,
+      400,
+      400,
+      400,
+      400
+    ]
+  },
+  "shots": [
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-00-claimed.png",
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-01-thinking.png",
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-02-panel.png",
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-03-tool.png",
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-04-tool-aged.png",
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-05-responding.png",
+    "/tmp/pacman-before-905/.claude/verify-shots/905/before-06-silence.png"
+  ]
+}

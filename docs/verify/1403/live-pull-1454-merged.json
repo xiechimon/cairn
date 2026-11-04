@@ -1,0 +1,91 @@
+{
+  "id": 4948179059,
+  "node_id": "PR_kwDOUSKs6c8AAAABJu84cw",
+  "number": 1454,
+  "state": "closed",
+  "locked": false,
+  "title": "server(1453): a step that finishes before its stop lands leaves an exited card alone",
+  "draft": false,
+  "created_at": "2026-10-21T07:45:01Z",
+  "updated_at": "2026-10-21T07:54:02Z",
+  "closed_at": "2026-10-21T07:54:00Z",
+  "merged_at": "2026-10-21T07:54:00Z",
+  "merge_commit_sha": "23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458",
+  "merged": true,
+  "mergeable": null,
+  "rebaseable": null,
+  "mergeable_state": "unknown",
+  "comments": 0,
+  "review_comments": 0,
+  "maintainer_can_modify": false,
+  "commits": 2,
+  "additions": 474,
+  "deletions": 22,
+  "changed_files": 7,
+  "author_association": "OWNER",
+  "auto_merge": null,
+  "active_lock_reason": null,
+  "user": {
+    "login": "xiechimon",
+    "id": 157263579,
+    "type": "User"
+  },
+  "merged_by": {
+    "login": "xiechimon",
+    "id": 157263579,
+    "type": "User"
+  },
+  "labels": [],
+  "head": {
+    "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+    "ref": "claude/optimistic-albattani-r5pmfn",
+    "sha": "815d5b73f70829d44d6895e1a7a51e13bc6a0555",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "repo": {
+      "id": 1361226985,
+      "node_id": "R_kgDOUSKs6Q",
+      "name": "pacman",
+      "full_name": "xiechimon/pacman",
+      "private": false,
+      "fork": false,
+      "default_branch": "main",
+      "visibility": "public",
+      "archived": false,
+      "owner": {
+        "login": "xiechimon",
+        "id": 157263579,
+        "type": "User"
+      }
+    }
+  },
+  "base": {
+    "label": "xiechimon:main",
+    "ref": "main",
+    "sha": "66d5022e374da641ed37ca59ec4fa1c089cb1fac",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "repo": {
+      "id": 1361226985,
+      "node_id": "R_kgDOUSKs6Q",
+      "name": "pacman",
+      "full_name": "xiechimon/pacman",
+      "private": false,
+      "fork": false,
+      "default_branch": "main",
+      "visibility": "public",
+      "archived": false,
+      "owner": {
+        "login": "xiechimon",
+        "id": 157263579,
+        "type": "User"
+      }
+    }
+  }
+}

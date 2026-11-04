@@ -1,0 +1,174 @@
+{
+  "ticket": 949,
+  "domain": "overlays/",
+  "stack": {
+    "API": "http://127.0.0.1:8795",
+    "WEB": "http://127.0.0.1:5277"
+  },
+  "todo": {
+    "id": "mnah-fesjT5qeafciReDz",
+    "title": "验证任务 68556",
+    "query": "验证任务 6"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "A1[dark] 面板几何 520×440 @ top146（实测 {\"w\":520,\"h\":440,\"y\":146}）"
+    },
+    {
+      "ok": true,
+      "label": "A2[dark] 面板皮肤：radius=--edge-radius(14px)、shadow 在场"
+    },
+    {
+      "ok": true,
+      "label": "A3[dark] 行钮收编 components/ui Button（data-slot=button + data-row-kind 载体）"
+    },
+    {
+      "ok": true,
+      "label": "A4[dark] 行 hover 亮正典 pill（--row-selected）"
+    },
+    {
+      "ok": true,
+      "label": "A5[dark] 键盘光标 data-selected 载体 + 亮面跟随"
+    },
+    {
+      "ok": true,
+      "label": "A6[dark] 结果行 chip = StatusChip sm（data-tone + data-slot=badge + 16px，§5.2 正典）"
+    },
+    {
+      "ok": true,
+      "label": "A7[dark] 常亮互斥：静息亮(true) → 开面标记(true)+pill 透明(rgba(0, 0, 0, 0)) → 关面复原(true)"
+    },
+    {
+      "ok": true,
+      "label": "A8[dark] scrim = 壳 Backdrop 位（data-slot=dialog-overlay、fixed、z=--z-modal-scrim(40)），暗角点击即关"
+    },
+    {
+      "ok": true,
+      "label": "A9[dark] 退出透明度单调递减（#844 无闪律，samples=11）"
+    },
+    {
+      "ok": true,
+      "label": "B1[dark] popover 锚定几何 298×193、挂在 chip 下方（y 38.5 > 13.5）"
+    },
+    {
+      "ok": true,
+      "label": "B2[dark] V2 弹层壳：1px 墨线框 + 圆角 0 + Arrow clip-path 双三角在场"
+    },
+    {
+      "ok": true,
+      "label": "B3[dark] ClickCatcher 收编 Button（data-slot=button、fixed、z=--z-catcher(29)、透明、aria-hidden）"
+    },
+    {
+      "ok": true,
+      "label": "B4[dark] 选中 section data-selected 底(color(srgb 0.243373 0.200314 0.236157)) + 行族 data-row-kind=[owner,agent]"
+    },
+    {
+      "ok": true,
+      "label": "B5[dark] popover 行 hover tint = --accent-soft（#73 家族同值 utility 自持）"
+    },
+    {
+      "ok": true,
+      "label": "B6[dark] 编辑分配 = role button 一级载体，hover 底中和为透明（旧 unlayered 压制语义等值）"
+    },
+    {
+      "ok": true,
+      "label": "B7[dark] Esc 分层：先收 popover、不离开详情"
+    },
+    {
+      "ok": true,
+      "label": "D1[dark] 退役选择子零 CSS 规则（命中 {}）"
+    },
+    {
+      "ok": true,
+      "label": "D2[dark] 常亮互斥 utility 律在场（html[data-search-open] 变体已编译）"
+    },
+    {
+      "ok": true,
+      "label": "E-dark 对比度门控 27 对全过（report-only 软发丝线 3 对讲数不判：popover-divider=1.11, panel-border=1.11, popover-border=1.2；未过 0：）"
+    },
+    {
+      "ok": true,
+      "label": "A1[light] 面板几何 520×440 @ top146（实测 {\"w\":520,\"h\":440,\"y\":146}）"
+    },
+    {
+      "ok": true,
+      "label": "A2[light] 面板皮肤：radius=--edge-radius(14px)、shadow 在场"
+    },
+    {
+      "ok": true,
+      "label": "A3[light] 行钮收编 components/ui Button（data-slot=button + data-row-kind 载体）"
+    },
+    {
+      "ok": true,
+      "label": "A4[light] 行 hover 亮正典 pill（--row-selected）"
+    },
+    {
+      "ok": true,
+      "label": "A5[light] 键盘光标 data-selected 载体 + 亮面跟随"
+    },
+    {
+      "ok": true,
+      "label": "A6[light] 结果行 chip = StatusChip sm（data-tone + data-slot=badge + 16px，§5.2 正典）"
+    },
+    {
+      "ok": true,
+      "label": "A7[light] 常亮互斥：静息亮(true) → 开面标记(true)+pill 透明(rgba(0, 0, 0, 0)) → 关面复原(true)"
+    },
+    {
+      "ok": true,
+      "label": "A8[light] scrim = 壳 Backdrop 位（data-slot=dialog-overlay、fixed、z=--z-modal-scrim(40)），暗角点击即关"
+    },
+    {
+      "ok": true,
+      "label": "A9[light] 退出透明度单调递减（#844 无闪律，samples=12）"
+    },
+    {
+      "ok": true,
+      "label": "B1[light] popover 锚定几何 298×193、挂在 chip 下方（y 38.5 > 13.5）"
+    },
+    {
+      "ok": true,
+      "label": "B2[light] V2 弹层壳：1px 墨线框 + 圆角 0 + Arrow clip-path 双三角在场"
+    },
+    {
+      "ok": true,
+      "label": "B3[light] ClickCatcher 收编 Button（data-slot=button、fixed、z=--z-catcher(29)、透明、aria-hidden）"
+    },
+    {
+      "ok": true,
+      "label": "B4[light] 选中 section data-selected 底(color(srgb 0.875765 0.81051 0.85051)) + 行族 data-row-kind=[owner,agent]"
+    },
+    {
+      "ok": true,
+      "label": "B5[light] popover 行 hover tint = --accent-soft（#73 家族同值 utility 自持）"
+    },
+    {
+      "ok": true,
+      "label": "B6[light] 编辑分配 = role button 一级载体，hover 底中和为透明（旧 unlayered 压制语义等值）"
+    },
+    {
+      "ok": true,
+      "label": "B7[light] Esc 分层：先收 popover、不离开详情"
+    },
+    {
+      "ok": true,
+      "label": "D1[light] 退役选择子零 CSS 规则（命中 {}）"
+    },
+    {
+      "ok": true,
+      "label": "D2[light] 常亮互斥 utility 律在场（html[data-search-open] 变体已编译）"
+    },
+    {
+      "ok": true,
+      "label": "E-light 对比度门控 27 对全过（report-only 软发丝线 3 对讲数不判：popover-divider=1.06, panel-border=1.06, popover-border=1.12；未过 0：）"
+    }
+  ],
+  "failures": 0,
+  "artifacts": [
+    "01-board-dark.png",
+    "05-popover-dark.png",
+    "02-panel-dark.png",
+    "03-panel-light.png"
+  ]
+}

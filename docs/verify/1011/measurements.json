@@ -1,0 +1,303 @@
+{
+  "drawer": {
+    "scenario": "111",
+    "triggerName": "总管主模型",
+    "dialogName": "模型",
+    "nav": [
+      {
+        "step": "after-open(mouse)",
+        "tag": "div",
+        "role": "listbox",
+        "aria": "模型",
+        "text": "默认（与绑定 Agent 相同）",
+        "matchesFocusVisible": false
+      },
+      {
+        "step": "tab-1",
+        "tag": "button",
+        "role": "option",
+        "aria": null,
+        "text": "默认（与绑定 Agent 相同）",
+        "matchesFocusVisible": true
+      },
+      {
+        "step": "tab-2",
+        "tag": "button",
+        "role": null,
+        "aria": null,
+        "text": "帮我组建 Agent 团队",
+        "matchesFocusVisible": true
+      },
+      {
+        "step": "shift-tab",
+        "tag": "button",
+        "role": "option",
+        "aria": null,
+        "text": "默认（与绑定 Agent 相同）",
+        "matchesFocusVisible": true
+      },
+      {
+        "step": "menu-still-open",
+        "open": 1
+      }
+    ],
+    "focusLandedOnRow": true,
+    "geo": {
+      "row": {
+        "left": 1066,
+        "right": 1344,
+        "top": 196.25,
+        "bottom": 228.8125,
+        "w": 278,
+        "h": 32.5625
+      },
+      "listbox": {
+        "left": 1066,
+        "right": 1344,
+        "top": 196.25,
+        "bottom": 228.8125,
+        "w": 278,
+        "h": 32.5625
+      },
+      "dialog": {
+        "left": 1065,
+        "right": 1345,
+        "top": 183.25,
+        "bottom": 241.8125,
+        "w": 280,
+        "borderLeft": "1px"
+      },
+      "rowPadding": {
+        "left": "20px",
+        "right": "20px"
+      },
+      "nameInkInsetFromDialogInner": 20,
+      "listboxOverflow": {
+        "x": "auto",
+        "y": "auto"
+      },
+      "listboxPadding": {
+        "left": "0px",
+        "right": "0px",
+        "top": "0px",
+        "bottom": "0px"
+      },
+      "listboxScroll": {
+        "scrollHeight": 33,
+        "clientHeight": 33,
+        "scrollWidth": 278,
+        "clientWidth": 278
+      },
+      "rowFocusStyle": {
+        "focusVisible": true,
+        "outlineStyle": "none",
+        "outlineWidth": "2px",
+        "outlineOffset": "2px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.634075 0.00521928 0.00777471 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "tokens": {
+        "ring": "#8f8985",
+        "focusRing": "#97227e"
+      },
+      "rowFlushWithListbox": {
+        "left": true,
+        "right": true,
+        "top": true
+      }
+    },
+    "ringRow1": {
+      "changedPixels": 30424,
+      "bbox": {
+        "minX": 28,
+        "maxX": 1155,
+        "minY": 76,
+        "maxY": 223
+      },
+      "bands": {
+        "left": 805,
+        "right": 690,
+        "top": 7679,
+        "bottom": 7679
+      }
+    },
+    "ringRow2": {
+      "skipped": "single-row face",
+      "focusAfterSecondTab": {
+        "tag": "button",
+        "role": null,
+        "aria": null,
+        "text": "帮我组建 Agent 团队",
+        "matchesFocusVisible": true
+      }
+    },
+    "control": {
+      "afterEscape": {
+        "tag": "button",
+        "role": null,
+        "aria": null,
+        "text": "帮我组建 Agent 团队",
+        "matchesFocusVisible": true
+      },
+      "ringBands": {
+        "left": 0,
+        "right": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "changedPixels": 0
+    }
+  },
+  "settings": {
+    "scenario": "101",
+    "triggerName": "压缩模型",
+    "dialogName": "压缩模型",
+    "nav": [
+      {
+        "step": "after-open(mouse)",
+        "tag": "div",
+        "role": "listbox",
+        "aria": "压缩模型",
+        "text": "默认（与 Chief 相同）claude-sonnet-5Claude Code",
+        "matchesFocusVisible": false
+      },
+      {
+        "step": "tab-1",
+        "tag": "button",
+        "role": "option",
+        "aria": null,
+        "text": "默认（与 Chief 相同）",
+        "matchesFocusVisible": true
+      },
+      {
+        "step": "tab-2",
+        "tag": "button",
+        "role": "option",
+        "aria": null,
+        "text": "claude-sonnet-5Claude Code",
+        "matchesFocusVisible": true
+      },
+      {
+        "step": "shift-tab",
+        "tag": "button",
+        "role": "option",
+        "aria": null,
+        "text": "默认（与 Chief 相同）",
+        "matchesFocusVisible": true
+      },
+      {
+        "step": "menu-still-open",
+        "open": 1
+      }
+    ],
+    "focusLandedOnRow": true,
+    "geo": {
+      "row": {
+        "left": 839,
+        "right": 1206,
+        "top": 233,
+        "bottom": 265,
+        "w": 367,
+        "h": 32
+      },
+      "listbox": {
+        "left": 839,
+        "right": 1206,
+        "top": 233,
+        "bottom": 297,
+        "w": 367,
+        "h": 64
+      },
+      "dialog": {
+        "left": 838,
+        "right": 1207,
+        "top": 220,
+        "bottom": 310,
+        "w": 369,
+        "borderLeft": "1px"
+      },
+      "rowPadding": {
+        "left": "12px",
+        "right": "12px"
+      },
+      "nameInkInsetFromDialogInner": 12,
+      "listboxOverflow": {
+        "x": "auto",
+        "y": "auto"
+      },
+      "listboxPadding": {
+        "left": "0px",
+        "right": "0px",
+        "top": "0px",
+        "bottom": "0px"
+      },
+      "listboxScroll": {
+        "scrollHeight": 64,
+        "clientHeight": 64,
+        "scrollWidth": 367,
+        "clientWidth": 367
+      },
+      "rowFocusStyle": {
+        "focusVisible": true,
+        "outlineStyle": "none",
+        "outlineWidth": "2px",
+        "outlineOffset": "2px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.634075 0.00521928 0.00777471 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "tokens": {
+        "ring": "#8f8985",
+        "focusRing": "#97227e"
+      },
+      "rowFlushWithListbox": {
+        "left": true,
+        "right": true,
+        "top": true
+      }
+    },
+    "ringRow1": {
+      "changedPixels": 59409,
+      "bbox": {
+        "minX": 28,
+        "maxX": 1511,
+        "minY": 76,
+        "maxY": 347
+      },
+      "bands": {
+        "left": 791,
+        "right": 678,
+        "top": 10171,
+        "bottom": 14313
+      }
+    },
+    "ringRow2": {
+      "changedPixels": 59407,
+      "bbox": {
+        "minX": 28,
+        "maxX": 1511,
+        "minY": 76,
+        "maxY": 347
+      },
+      "bands": {
+        "left": 791,
+        "right": 678,
+        "top": 15764,
+        "bottom": 8718
+      }
+    },
+    "control": {
+      "afterEscape": {
+        "tag": "button",
+        "role": null,
+        "aria": "压缩模型",
+        "text": "默认（与 Chief 相同）",
+        "matchesFocusVisible": true
+      },
+      "ringBands": {
+        "left": 1029,
+        "right": 807,
+        "top": 7316,
+        "bottom": 6632
+      },
+      "changedPixels": 25990
+    }
+  }
+}

@@ -1,0 +1,51 @@
+[heavy-slots] acquired slot 1/1
+$ playwright test chief-panel.spec.ts detail-3pane.spec.ts
+[WebServer] (node:56081) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:56083) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1776-buttons/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:56108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:56110) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 26 tests using 2 workers
+
+(node:56124) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56123) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 e2e/detail-3pane.spec.ts:6:1 › three abutting panes: 248 sidebar | fluid center | 488 right (648ms)
+  ✓   1 e2e/chief-panel.spec.ts:18:3 › chief panel floating form (ADR 0013) › Esc never closes the panel on the board route (D3) (677ms)
+  ✓   4 e2e/chief-panel.spec.ts:26:3 › chief panel floating form (ADR 0013) › Esc never closes the panel on a wake surface (707ms)
+  ✓   3 e2e/detail-3pane.spec.ts:34:1 › no `文档|聊天` tab group survives on any phase surface (860ms)
+  ✓   5 e2e/chief-panel.spec.ts:40:3 › chief panel floating form (ADR 0013) › Esc layers: the open thread switcher closes first, the panel survives both (306ms)
+  ✓   6 e2e/detail-3pane.spec.ts:43:1 › detail head keeps the `更多` icon only — branch/token/history icons are gone (292ms)
+  ✓   8 e2e/detail-3pane.spec.ts:54:1 › composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it (256ms)
+  ✓   7 e2e/chief-panel.spec.ts:56:3 › chief panel floating form (ADR 0013) › chief header and composer tools retain 24px targets after conversation extraction (670ms)
+  ✓   9 e2e/detail-3pane.spec.ts:105:1 › composer controls share one bottom row: stop is the send button's sibling (326ms)
+  ✓  10 e2e/chief-panel.spec.ts:70:3 › chief panel floating form (ADR 0013) › composer bar carries the attach + mention tools and the send button (302ms)
+  ✓  11 e2e/detail-3pane.spec.ts:156:1 › composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1) (703ms)
+  ✓  12 e2e/chief-panel.spec.ts:82:3 › chief panel floating form (ADR 0013) › the panel floats as a 380x600 window anchored 8px off the corner (board) (591ms)
+  ✓  13 e2e/detail-3pane.spec.ts:179:1 › right pane type select switches between the doc surface and the three sections (677ms)
+  ✓  14 e2e/chief-panel.spec.ts:127:3 › chief panel floating form (ADR 0013) › board content never yields to the window (D1 overlay, no yield) (582ms)
+  ✓  15 e2e/detail-3pane.spec.ts:209:1 › scenarios 30/31/32 freeze the pane view instead of popping dialogs (480ms)
+  ✓  17 e2e/detail-3pane.spec.ts:224:1 › plan card activation in the thread opens the plan doc in the right pane (307ms)
+  ✓  16 e2e/chief-panel.spec.ts:146:3 › chief panel floating form (ADR 0013) › minimizing leaves the board grid at the same geometry (nothing to restore) (934ms)
+  ✓  18 e2e/detail-3pane.spec.ts:237:1 › fresh phase: the brief owns the whole center column, right pane collapses (283ms)
+  ✓  19 e2e/chief-panel.spec.ts:173:5 › chief panel floating form (ADR 0013) › pages: the main column never narrows while the window is open (994ms)
+  ✓  20 e2e/chief-panel.spec.ts:173:5 › chief panel floating form (ADR 0013) › resources: the main column never narrows while the window is open (980ms)
+  ✓  21 e2e/chief-panel.spec.ts:173:5 › chief panel floating form (ADR 0013) › secondary: the main column never narrows while the window is open (1.0s)
+  ✓  22 e2e/chief-panel.spec.ts:199:3 › chief panel floating form (ADR 0013) › detail: the right pane coexists with the floating window (D7 reversed) (978ms)
+  ✓  23 e2e/chief-panel.spec.ts:228:3 › chief panel floating form (ADR 0013) › hero examples: the four canon prompt cards, inert on the fixture face (637ms)
+  ✓  24 e2e/chief-panel.spec.ts:252:3 › chief panel floating form (ADR 0013) › composer grows with a restored draft to the six-line cap, empty face keeps the base track (#860 supersedes XMON-102) (984ms)
+  ✓  25 e2e/chief-panel.spec.ts:282:3 › chief panel floating form (ADR 0013) › composer placeholder switches to the steer canon while a turn runs (#624) (404ms)
+  ✓  26 e2e/chief-panel.spec.ts:298:3 › chief panel floating form (ADR 0013) › the open state persists across a reload (D5, reversing 0004 D9) (1.5s)
+
+  26 passed (15.0s)

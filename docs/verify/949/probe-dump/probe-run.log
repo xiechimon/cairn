@@ -1,0 +1,126 @@
+vite v8.3.0 building client environment for fixture...
+transforming...
+✓ 914 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     1.73 kB │ gzip:   0.77 kB
+dist/assets/index-Bcd5dooi.css    208.65 kB │ gzip:  33.54 kB
+dist/assets/index-CjVYT_L5.js   1,253.31 kB │ gzip: 386.23 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 810ms
+  ➜  Local:   http://127.0.0.1:8402/
+
+Running 106 tests using 4 workers
+
+[1/106] e2e/chip-assign.spec.ts:31:1 › 编辑分配 opens the agent pick dialog with search + bound row checked
+[2/106] e2e/chip-hotzone.spec.ts:25:1 › H1: the chevron side of the chip toggles the popover
+[3/106] e2e/avatar-dicebear.spec.ts:32:1 › sidebar avatar chips (expanded + rail) and user-menu head share one seeded src
+[4/106] e2e/dead-buttons.spec.ts:40:1 › feedback route is gone — old URL redirects to the board
+[5/106] e2e/dead-buttons.spec.ts:46:1 › user menu drops its dead rows — 反馈 (#149), 新功能/快捷键 (#163)
+[6/106] e2e/chip-hotzone.spec.ts:34:1 › H2: keyboard focus + Enter toggles the popover
+[7/106] e2e/chip-assign.spec.ts:42:1 › fixture pick closes the dialog (accept 律); popover row echo unchanged
+[8/106] e2e/avatar-dicebear.spec.ts:53:1 › team agent card seeds by agent displayName — user/agent srcs differ (不同名不同像)
+[9/106] e2e/dead-buttons.spec.ts:65:1 › board topbar drops the 看板指南 button — right actions keep exactly one button (#363, #445 改指类型钮)
+[10/106] e2e/detail-3pane.spec.ts:22:1 › three abutting panes: 240 sidebar | fluid center | 488 right
+[11/106] e2e/avatar-dicebear.spec.ts:62:1 › live members projection: two agents → two distinct seeded srcs; avatarUrl override wins
+[12/106] e2e/dead-buttons.spec.ts:84:1 › board renders exactly the four #351 columns, retired names and collapse family gone
+[13/106] e2e/detail-3pane.spec.ts:51:1 › no 文档|聊天 tab group survives on any phase surface
+[14/106] e2e/avatar-dicebear.spec.ts:114:1 › board todo card executor avatar seeds by the bound agent; fresh card keeps the placeholder
+[15/106] e2e/dead-buttons.spec.ts:114:1 › project files pane: no export button, static branch chip, wired 文件|历史 segment
+[16/106] e2e/avatar-dicebear.spec.ts:134:1 › detail chip popover: user row + 执行对话 agent row both seeded
+[17/106] e2e/chip-assign.spec.ts:54:1 › assign dialog family law: X, Escape and backdrop dismiss; panel clicks do not
+[18/106] e2e/dead-buttons.spec.ts:140:1 › schedules empty state drops the 查看文档 button, keeps 新建定时
+[19/106] e2e/avatar-dicebear.spec.ts:148:1 › create-agent dialog: empty name keeps the static asset; typing previews the seeded avatar
+[20/106] e2e/detail-3pane.spec.ts:60:1 › detail head keeps the 更多 icon only — branch/token/history icons are gone
+[21/106] e2e/dead-buttons.spec.ts:149:1 › doc pane 变更▾ opens the document-type listbox and closes on Escape
+[22/106] e2e/detail-3pane.spec.ts:70:1 › composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it
+[23/106] e2e/avatar-dicebear.spec.ts:163:1 › dicebear unreachable → img onError falls back to the static asset (不裂图)
+[24/106] e2e/detail-3pane.spec.ts:117:1 › composer controls share one bottom row: stop is the send button's sibling
+[25/106] e2e/avatar-dicebear.spec.ts:175:1 › search agent rows + project task rows are seeded (Agent 列表 / 任务行头像位)
+[26/106] e2e/dead-buttons.spec.ts:165:1 › doc pane 型选行 click re-selects the current type and closes (#306)
+[27/106] e2e/detail-3pane.spec.ts:169:1 › composer width tracks the center column across both pane states (488 pane / 418 chief dock)
+[28/106] e2e/avatar-dicebear.spec.ts:206:1 › conversation transcript: agent rows carry the assigned agent avatar, user rows the user avatar
+[29/106] e2e/chip-assign.spec.ts:72:1 › assign dialog search filters the list; no match shows the empty row
+[30/106] e2e/dead-buttons.spec.ts:179:1 › machines rows render no inline action buttons (#222 wontfix 出账)
+[31/106] e2e/detail-3pane.spec.ts:193:1 › right pane type select switches between the doc surface and the three sections
+[32/106] e2e/avatar-dicebear.spec.ts:225:1 › account head shares the seeded user src (same identity as the sidebar chip)
+[33/106] e2e/dead-buttons.spec.ts:194:1 › composer toolbar drops the 语音输入 button, keeps attachment + mention
+[34/106] e2e/detail-esc.spec.ts:26:1 › E1: clean ESC leaves the detail, carrying the search home
+[35/106] e2e/dead-buttons.spec.ts:207:1 › new-task dialog tools drop the 语音输入 button, keep two live tools
+[36/106] e2e/escape-wiring.spec.ts:76:1 › 开着的层不被重渲染重挂 Escape 接线：URL 写回后单次 Escape 仍收层
+[37/106] e2e/detail-esc.spec.ts:44:1 › E2: ESC with the chip popover open closes the popover first
+[38/106] e2e/detail-3pane.spec.ts:227:1 › scenarios 30/31/32 freeze the pane view instead of popping dialogs
+[39/106] e2e/dead-buttons.spec.ts:222:1 › api-keys empty state drops the 查看文档 button, keeps 新建密钥 (#307)
+[40/106] e2e/detail-esc.spec.ts:55:1 › E3: ESC with a modal overlay open closes the overlay first
+[41/106] e2e/escape-wiring.spec.ts:132:1 › 确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层
+[42/106] e2e/detail-3pane.spec.ts:241:1 › plan card activation in the thread opens the plan doc in the right pane
+[43/106] e2e/dead-buttons.spec.ts:229:1 › resources empty state drops the 查看文档 link (#307); skills 空态主钮 = 新建技能弹窗 (XMON-114)
+[44/106] e2e/detail-3pane.spec.ts:254:1 › fresh phase: the brief owns the whole center column, right pane collapses
+[45/106] e2e/hotkeys.spec.ts:189:1 › C on the board opens the new-task dialog; ⌘C and the retired N do not
+[46/106] e2e/project-settings-dead-buttons.spec.ts:15:1 › settings: target branch is a static chip, not a button
+[47/106] e2e/dead-buttons.spec.ts:252:1 › mcp page is read-only: 无新建入口、行无更多菜单 ink、空态指向 ~/.claude.json (#368)
+[48/106] e2e/search-close-flash.spec.ts:63:1 › 第二下 Ctrl+K 关闭不闪：退出透明度单调递减
+[49/106] e2e/search-focus.spec.ts:87:1 › ⌘K focuses the input — direct typing produces results
+[50/106] e2e/dead-buttons.spec.ts:270:1 › create-agent dialog drops the avatar 更换 ink (#307)
+[51/106] e2e/search-focus.spec.ts:103:1 › mid-exit reopen refocuses the retained input
+[52/106] e2e/hotkeys.spec.ts:209:1 › sidebar 新任务 row carries the C badge and click-opens the dialog
+[53/106] e2e/dead-buttons.spec.ts:281:1 › project settings drops the avatar 更换 ink (#307, supersedes the #177 chrome verdict)
+[54/106] e2e/search-focus.spec.ts:118:1 › scrim 可点关: clicking the dark area closes the panel
+[55/106] e2e/dead-buttons.spec.ts:293:1 › chief drawer drops the ⋮ 更多 button — thread view keeps three head actions (#306)
+[56/106] e2e/search-close-flash.spec.ts:88:1 › 三连击：关→开落在开态且输入聚焦
+[57/106] e2e/hotkeys.spec.ts:220:1 › C on a non-board route opens the dialog in place
+[58/106] e2e/dead-buttons.spec.ts:312:1 › sched card 更多 opens a menu and deletes the row through the confirm (#306)
+[59/106] e2e/search-focus.spec.ts:129:1 › 常亮互斥: page-layer pill dims while the panel is open, restores on close
+[60/106] e2e/hotkeys.spec.ts:230:1 › C on the project page opens the page’s own dialog (route project chip)
+[61/106] e2e/search-result-rows.spec.ts:65:1 › 结果行点击 → 面板关闭 + 跳 todo 详情
+[62/106] e2e/search-focus.spec.ts:153:1 › 常亮互斥 holds on the collapsed rail form
+[63/106] e2e/hotkeys.spec.ts:245:1 › Space no longer opens the drawer; ⌘J does, composer focused, default consumed
+[64/106] e2e/dead-buttons.spec.ts:344:1 › skills 排序 opens the single-select listbox, picking an option closes it (#306)
+[65/106] e2e/search-result-rows.spec.ts:76:1 › 前往行点击 → 面板关闭 + 跳对应路由
+[66/106] e2e/search-focus.spec.ts:182:1 › the caret is not clipped where it meets the input edge
+[67/106] e2e/search-result-rows.spec.ts:85:1 › 静息无常亮;hover 哪行亮哪行,且只亮一行
+[68/106] e2e/hotkeys.spec.ts:284:1 › ⌘J wakes the chief drawer on a non-board route
+[69/106] e2e/dead-buttons.spec.ts:373:1 › account drops the 更换 button, keeps the avatar head (#306 wontfix 出账)
+[70/106] e2e/sidebar-search-offboard.spec.ts:21:3 › secondary page: search row opens the shared panel, Esc closes it
+[71/106] e2e/dead-buttons.spec.ts:383:1 › transcript tool group: 收起 collapses, the footer row re-expands (#306)
+[72/106] e2e/hotkeys.spec.ts:294:1 › editable focus swallows C and ⌘J — the c lands IN the input
+[73/106] e2e/search-result-rows.spec.ts:103:1 › ↑↓ 键盘光标接管高亮;Enter 跳光标行
+[74/106] e2e/dead-buttons.spec.ts:406:1 › more menu 完成 opens the accept dialog on the review surface (#318)
+[75/106] e2e/hotkeys.spec.ts:312:1 › textarea focus (chief composer) swallows C
+[76/106] e2e/sidebar-search-offboard.spec.ts:21:3 › resources page: search row opens the shared panel, Esc closes it
+[77/106] e2e/search-result-rows.spec.ts:123:1 › 鼠标一动让位:键盘光标交还 hover
+[78/106] e2e/hotkeys.spec.ts:326:1 › Space on a focused button activates it natively; ⌘J fires past button focus
+[79/106] e2e/dead-buttons.spec.ts:419:1 › more menu 关闭 is phase-gated by the server funnel edges (#318)
+[80/106] e2e/dead-buttons.spec.ts:435:1 › todo-phase 开始 fires orchestration directly — no start dialog (#640)
+[81/106] e2e/dead-buttons.spec.ts:444:1 › failed rerun dialog is the slim single-exit face — no agent selector, no split switch, no plan/run branch (#640)
+[82/106] e2e/dead-buttons.spec.ts:460:1 › reuse panel 查看方案 flips the doc pane to the plan face (#318)
+[83/106] e2e/hotkeys.spec.ts:361:1 › ⌘J toggles: the second press closes the drawer from its own composer focus
+[84/106] e2e/dead-buttons.spec.ts:473:1 › project task rows and cards are real links to the todo detail (#318)
+[85/106] e2e/dead-buttons.spec.ts:491:1 › new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)
+[86/106] e2e/dead-buttons.spec.ts:513:1 › new-task dialog gates unsaved closes and resets on discard (#318)
+[87/106] e2e/hotkeys.spec.ts:381:1 › ⌘J toggle rides the non-board singleton hook too (schedules)
+[88/106] e2e/hotkeys.spec.ts:390:1 › FAB click stays open-only; ⌘J closes what the click opened
+[89/106] e2e/hotkeys.spec.ts:405:1 › the robot FAB surfaces the ⌘J hint on hover; at rest it stays hidden
+[90/106] e2e/hotkeys.spec.ts:419:1 › a wake-family FAB carries the same ⌘J hint (shared consumption point)
+[91/106] e2e/hotkeys.spec.ts:431:1 › the collapsed rail search icon hovers the ⌘K hint
+[92/106] e2e/dead-buttons.spec.ts:566:1 › detail transcript action rows carry no restore glyph (#884)
+[93/106] e2e/hotkeys.spec.ts:443:1 › the drawer new-thread + hovers the N hint and advertises aria-keyshortcuts
+[94/106] e2e/hotkeys.spec.ts:460:1 › with the drawer closed, N stays retired — neither drawer nor dialog opens
+[95/106] e2e/hotkeys.spec.ts:505:1 › ⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, dialog closes)
+[96/106] e2e/hotkeys.spec.ts:524:1 › with the dialog closed, ⌘↵ on the board lands nothing
+[97/106] e2e/hotkeys.spec.ts:540:1 › ⌘↵ with an empty spec creates nothing (the button gate holds on the chord)
+[98/106] e2e/hotkeys.spec.ts:555:1 › ⌘↵ under the 未保存闸 confirm layer saves nothing (the layer owns the screen)
+[99/106] e2e/hotkeys.spec.ts:579:1 › plain ↵ in the spec textarea stays the newline key — no hijack
+[100/106] e2e/hotkeys.spec.ts:591:1 › the 保存并开始 button carries a visible ⌘↵ badge at rest
+[101/106] e2e/hotkeys.spec.ts:602:1 › Tab cycles the dialog’s project chip from the composer focus
+[102/106] e2e/hotkeys.spec.ts:629:1 › the chip cycles on Tab while the list is open; Shift+Tab keeps native movement
+[103/106] e2e/hotkeys.spec.ts:660:1 › Tab off the driving seats stays native (mention button keeps its own walk)
+[104/106] e2e/hotkeys.spec.ts:679:1 › the project chip hovers its Tab hint (hidden at rest)
+[105/106] e2e/hotkeys.spec.ts:692:1 › Tab cycles nothing while the 未保存闸 confirm layer is up (that layer owns the keyboard)
+[106/106] e2e/hotkeys.spec.ts:720:1 › with the dialog closed Tab stays native
+  106 passed (29.2s)

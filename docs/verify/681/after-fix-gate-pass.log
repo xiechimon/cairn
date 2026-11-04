@@ -1,0 +1,15 @@
+# trigger file src/repro-681-hang.ts present in src/ (content below)
+// repro fixture for #681 — same trigger as the hang capture (deleted after run)
+export const seq = /^#(\d+)$/.exec('x')?.[1];
+
+# npx vitest run test/i18n-coverage.test.ts test/i18n-scan.test.ts --reporter=dot
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0072-681-i18n-coverage-gate-regex/apps/web
+
+··················
+
+ Test Files  2 passed (2)
+      Tests  18 passed (18)
+   Start at  14:26:08
+   Duration  510ms (transform 46%, import 42%, tests 11%, worker 1%)
+

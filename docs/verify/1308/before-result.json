@@ -1,0 +1,53 @@
+{
+  "probe": "drive-1308-thinking-delta",
+  "expect": "old",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "buildId": "01a13b4c-3eef-7bc1-acaf-7c494d21ba2a",
+  "stepId": "vMDUhP-ELlA-GrJsTyl1G",
+  "todoId": "mrIN6NDxynBJwmwoww8hn",
+  "passed": 8,
+  "total": 8,
+  "checks": [
+    {
+      "name": "activity thinking 上报 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "old：thinking_delta 机器体被拒",
+      "ok": true,
+      "detail": "400"
+    },
+    {
+      "name": "会话流有 activity thinking",
+      "ok": true,
+      "detail": "ping,step,activity"
+    },
+    {
+      "name": "old：流上没有 thinking_delta",
+      "ok": true,
+      "detail": "ping,step,activity"
+    },
+    {
+      "name": "old：流帧不含思考正文",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "name": "thinking_delta 不落库",
+      "ok": true,
+      "detail": "false"
+    },
+    {
+      "name": "页面有思考相位标签",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "old：页面没有思考正文",
+      "ok": true,
+      "detail": null
+    }
+  ]
+}

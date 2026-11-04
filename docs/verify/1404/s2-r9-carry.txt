@@ -1,0 +1,47 @@
+#1404 S2 round 9, carried onto main
+
+PR #1421 (S2) was merged at c4bf400 (squash 24db1c4) while pr-gate run 4 at that head said no-go and
+round 9 was being built. Round 9 was committed on claude/bootstrap-p3b, never pushed there, and is
+carried onto branch claude/bootstrap-p3-s2r9, cut from origin/main dcf839e, by cherry-pick (no rebase,
+no history rewrite of a pushed branch). No conflict.
+
+Original commit (claude/bootstrap-p3b)        Carried commit (claude/bootstrap-p3-s2r9)
+  2970bf4  tests first, compare and check heads   2d89de3
+  b484957  compare and checks bound by head SHA   a5bdec7
+  60af36c  tests first, code-review findings      34f888c
+  87700dc  code-review fixes                      a06ad0a
+  e08bcf5  S2 round 9 evidence                    2edf68e
+
+The evidence files (s2-r9-red-green.txt, s2-mutations-9.txt, gates-s2-9.txt, s2-r9-reviews.txt) name the
+original SHAs; each carried commit has the same tree change as its original.
+
+Gates on the carried head 2edf68e (clean tree; the background-noise lines of the test run are dropped):
+HEAD 2edf68edd2348524d4b2cd6e00e8cd52fe74b957 (clean tree)
+$ pnpm lint
+apps/web/src/resources/machines-page.tsx:317:15 lint/complexity/noUselessFragments  FIXABLE  ━━━━━━━━━━
+Checked 805 files in 4s. No fixes applied.
+Found 1 info.
+exit 0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit 0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit 0
+
+$ pnpm exec vitest run --changed origin/main
+ Test Files  251 passed (251)
+      Tests  2816 passed | 1 skipped (2817)
+exit 0
+
+$ env E2E_AFFECTED_PORT=8407 pnpm --filter @pacman/web e2e:affected
+  8 passed (19.3s)
+exit 0
+
+DONE

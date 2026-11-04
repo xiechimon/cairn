@@ -1,0 +1,44 @@
+ M .github/workflows/ci.yml
+ M apps/server/drizzle/meta/_journal.json
+ M apps/server/src/db/schema.ts
+ M apps/server/src/routes-push.ts
+ M apps/server/src/services/push.ts
+ M apps/server/src/services/scheduler.ts
+ M apps/server/test/push.test.ts
+ M apps/server/test/schema.test.ts
+ M apps/web/public/sw.js
+ M apps/web/src/api/auth.ts
+ M apps/web/src/pwa/register.tsx
+ M docs/lessons/1625-cross-package-tests-skipped.md
+ M docs/lessons/baselines.json
+ M docs/lessons/events.jsonl
+ M packages/shared/src/protocol/rest.ts
+ M packages/shared/src/tables.ts
+ M packages/shared/test/__snapshots__/snapshot.test.ts.snap
+ M packages/shared/test/vocabulary.test.ts
+ M scripts/prepush.mjs
+ M scripts/prepush.test.mjs
+?? apps/server/drizzle/0069_push_delivery.sql
+?? apps/server/drizzle/meta/0069_snapshot.json
+?? apps/server/src/services/push-alerts.ts
+?? apps/server/test/push-outcomes.test.ts
+?? apps/server/test/push-smtp.test.ts
+?? apps/web/test/push-auth.test.ts
+?? docs/lessons/2191-declarative-push-display.md
+?? docs/lessons/2191-late-push-receipt.md
+?? docs/lessons/2191-long-push-test-request.md
+?? docs/lessons/2191-migration-prefix-fixture.md
+?? docs/lessons/2191-ops-test-registration.md
+?? docs/lessons/2191-ordinary-push-storage.md
+?? docs/lessons/2191-pending-alert-recovery.md
+?? docs/lessons/2191-poll-test-clock.md
+?? docs/lessons/2191-provider-outcome-certainty.md
+?? docs/lessons/2191-provider-settlement-deadline.md
+?? docs/lessons/2191-push-auth-ordering.md
+?? docs/lessons/2191-push-partial-digest.md
+?? docs/lessons/2191-push-test-response-type.md
+?? docs/lessons/2191-smtp-process-input.md
+?? docs/verify/2191/
+?? scripts/ops/push-test.mjs
+?? scripts/ops/push-test.test.mjs
+?? scripts/ops/push-worker.test.mjs

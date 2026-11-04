@@ -1,0 +1,35 @@
+#1406 P5-3 /security-review (skill security-review), run on the branch diff
+origin/main...claude/bootstrap-p5-3 at c60ae648 (merge base 2294b087), before the
+evidence commit. Why it ran: the diff touches apps/server/src/services/machines.ts,
+which is on the AGENTS.md "/security-review" list.
+
+Files reviewed (source): apps/daemon/src/runner.ts, apps/server/src/services/builds.ts,
+apps/server/src/services/chief-tools.ts, apps/server/src/services/chief.ts,
+apps/server/src/services/machines.ts, apps/server/src/services/orchestrate.ts,
+apps/web/src/api/mappers.ts, apps/web/src/fixtures/records.ts,
+packages/shared/src/protocol/machine-wire.ts, packages/shared/src/records/persona.ts,
+packages/shared/src/records/prompts.ts. Tests and docs/verify were read for context
+only (excluded from findings by the skill's rules).
+
+Result: no findings at or above confidence 8.
+
+Notes per surface:
+- machines.ts claim payload: adds sourceKind / sourceRef of the todo being claimed.
+  The claiming machine is authenticated by its machine token and the step is already
+  scoped to its team; it already receives the same todo's title and spec. The two
+  fields (`github:owner/repo#N`, `chief:<uuid>`, or null) add no data the machine
+  could not already see through the todo, so no new exposure.
+- chief-tools.ts saveMemoryEntry: a new refusal (400) for title/content carrying the
+  fence marker. It only narrows what is written; no bypass or authorization change.
+  It does not stop a paraphrase (stated in the code comment and in the failure-mode
+  list); that part is a prompt-level control, not a security boundary.
+- prompts.ts fenceIssueText / chief.ts rule: prompt-injection hardening of
+  third-party text in the user layer. The fence is structural (every body line
+  prefixed after folding all line terminators; header label limited to GitHub name
+  characters), and no third-party text is added to a system layer. The skill's
+  rules exclude "user-controlled content in AI prompts" as a vulnerability class;
+  recorded here as hardening, not as a finding.
+- web mappers / classifyUserText: only decides whether a transcript row renders as a
+  user bubble (React text rendering, no raw HTML). A user message that exactly equals
+  the fenced task text would be hidden from the transcript; this is a display
+  choice, not a security issue.

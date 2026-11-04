@@ -1,0 +1,12 @@
+Command: flock /tmp/cairn-heavy.lock node scripts/prepush-vitest.mjs
+Exit status: 0
+ Test Files  409 passed (409)
+      Tests  5544 passed (5544)
+   Start at  12:56:57
+   Duration  181.38s (tests 59%, import 35%, transform 6%)
+
+  Transform  |@cairn/web| transforming modules took 13.99s · 55% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+JSON report written to /mnt/fast/tmp/ai-route-tmp/run-5bp462fa/prepush-vitest-HFWn4r/report.json

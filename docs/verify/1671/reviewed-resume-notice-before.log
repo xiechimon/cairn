@@ -1,0 +1,30 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1928-image-repair/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts (19 tests | 1 failed | 18 skipped) 12ms
+   × a fresh text-only session after a resume miss reports skipped task images 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > a fresh text-only session after a resume miss reports skipped task images
+AssertionError: expected '本机找不到会话 missing-session，无法续接。已改开新会话，按…' to contain '图片未被模型读取'
+
+Expected: "图片未被模型读取"
+Received: "本机找不到会话 missing-session，无法续接。已改开新会话，按原任务继续。"
+
+ ❯ test/runner-image-degrade.test.ts:646:41
+    644|   expect(client.attachmentCalls).toHaveLength(0);
+    645|   expect(created[0]?.opts.prompt).toContain(SPEC_TOKEN);
+    646|   expect(systemRows(client).join('\n')).toContain('图片未被模型读取');
+       |                                         ^
+    647|   expect(client.doneBodies[0]?.body.status).toBe('success');
+    648| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  18:20:12
+   Duration  1.84s (import 71%, transform 28%, tests 1%)
+

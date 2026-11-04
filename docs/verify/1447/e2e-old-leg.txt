@@ -1,0 +1,63 @@
+
+
+Running 2 tests using 1 worker
+
+[1/2] e2e/board-queued-column.spec.ts:92:1 › queued cards sit in 执行中 with a waiting footer; todo and building stay put
+  1) e2e/board-queued-column.spec.ts:92:1 › queued cards sit in 执行中 with a waiting footer; todo and building stay put 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: locator('.board-column[data-column="building"]').locator('[data-todo-id="todo-queued"]')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" locator('.board-column[data-column="building"]').locator('[data-todo-id="todo-queued"]') with timeout 5000ms
+      - waiting for locator('.board-column[data-column="building"]').locator('[data-todo-id="todo-queued"]')
+
+
+       97 |   await expect(page.locator(`[data-todo-id="${FRESH.id}"]`)).toBeVisible();
+       98 |   await evidencePanelShot(page, 'board-columns.png', page.getByTestId('board-scroller'), 0);
+    >  99 |   await expect(card(page, 'building', QUEUED.id)).toBeVisible();
+          |                                                   ^
+      100 |   await expect(card(page, 'building', HELD.id)).toBeVisible();
+      101 |   await expect(card(page, 'todo', FRESH.id)).toBeVisible();
+      102 |   await expect(card(page, 'building', RUNNING.id)).toBeVisible();
+        at /home/user/pacman/apps/web/e2e/board-queued-column.spec.ts:99:51
+
+    Error Context: test-results/board-queued-column-queued-12036--todo-and-building-stay-put/error-context.md
+
+
+[2/2] e2e/board-queued-column.spec.ts:119:1 › a queued card dropped on 待开始 opens the reset dialog
+  2) e2e/board-queued-column.spec.ts:119:1 › a queued card dropped on 待开始 opens the reset dialog ───
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  locator('.board-column[data-column="todo"]')
+    Expected: "true"
+    Received: ""
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" locator('.board-column[data-column="todo"]') with timeout 5000ms
+      - waiting for locator('.board-column[data-column="todo"]')
+        14 × locator resolved to <section aria-label="待开始" data-column="todo" class="board-column group/column relative flex h-full flex-col bg-background">…</section>
+           - unexpected value "null"
+
+
+      133 |     .locator('[data-todo-id]')
+      134 |     .waitFor({ state: 'visible', timeout: 15_000 });
+    > 135 |   await expect(column(page, 'todo')).toHaveAttribute('data-drop', 'true');
+          |                                      ^
+      136 |   await page.mouse.up();
+      137 |   await expect(page.getByRole('dialog', { name: '把任务重置回待开始？' })).toBeVisible();
+      138 | });
+        at /home/user/pacman/apps/web/e2e/board-queued-column.spec.ts:135:38
+
+    Error Context: test-results/board-queued-column-a-queu-4facb--待开始-opens-the-reset-dialog/error-context.md
+
+
+  2 failed
+    e2e/board-queued-column.spec.ts:92:1 › queued cards sit in 执行中 with a waiting footer; todo and building stay put 
+    e2e/board-queued-column.spec.ts:119:1 › a queued card dropped on 待开始 opens the reset dialog ────

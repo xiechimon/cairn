@@ -1,0 +1,288 @@
+#1403 segment 2b: failure modes, listed before the tests and the code
+Branch claude/bootstrap-p2-seg2b, from origin/claude/bootstrap-p2-seg2 at e92277d2, with
+origin/main 50a55000 (#1480) merged in as a685876b.
+Scope: design D (#1403 comment 6338182522, the user's decision of 2026-10-22). For a
+GitHub-form build with a recorded PR, a person pressing merge in pacman makes the server
+merge the PR through GitHub's REST API, bound to the build's last pushed commit. The
+machine merge step is no longer used for that form. GitHub form without a PR, hosted and
+local keep today's merge step.
+
+The path in requestMerge (GitHub form with build.prNumber):
+  1. checks without writes: phase review, or failed and restorable (#702); the #1217
+     second-PR guard, then the phase again; the XMON-77 permission gate; a GitHub token;
+     the build's last pushed checkpoint (40 hex); no merge of this build in flight
+  2. GET pulls/{n} with the token; then the checks on the PR; then the phase again
+  3. PUT pulls/{n}/merge {sha: checkpoint, merge_method: squash,
+     commit_title: "<PR title> (#n)", commit_message: "closes #N" only for an issue of
+     the same repository}
+  4. merged -> rows and done; refused -> 409 with GitHub's message, nothing written;
+     no clear answer -> 202 and one row, the reconcile settles it
+
+Merge request outcomes
+----------------------
+D1  Review card, token, own open PR whose head is the last checkpoint: exactly one PUT to
+    pulls/{n}/merge, body {sha: checkpoint, merge_method: "squash",
+    commit_title: "<title> (#n)"}; then the MERGE_ANNOUNCEMENT row (actor as today), one
+    row "PR #n 已由 pacman 经 GitHub 合并（squash，合并提交 abc1234）", DONE_ROW,
+    phase done, unclaimed verify / review steps stopped; no merge step row; the response
+    is {delegated: true}.
+D2  Closing line: commit_message is exactly "closes #N" when the todo came from issue N
+    of the project's own repository (sourceKind github-issue or github-issue-self,
+    sourceRef github:<owner>/<repo>#N, owner and repo compared without ASCII case);
+    absent for an issue of another repository, an orchestration source, no sourceRef,
+    a malformed ref.
+D3  No GitHub connection, or a connection the box cannot decrypt: 409 that asks to
+    connect GitHub (or to merge on GitHub); no GitHub request, no rows, no step, phase
+    unchanged.
+D4  The PR head differs from the last checkpoint: 409 naming both short shas; no PUT.
+D5  No checkpoint, or one that is not 40 hex: 409; no GitHub request; the value never
+    reaches a request URL or body.
+D6  The PR is already merged at the read: no PUT; 409 saying the reconcile finishes the
+    card; the next sweep does.
+D7  The PR is closed and not merged: 409; no PUT.
+D8  Not the build's own PR (head repository id differs from the base's, head repository
+    null, head branch is not the build's conversation branch): 409; no PUT.
+D9  Base branch is not the default branch: 409; no PUT.
+D10 PUT answers 405 / 409 / 422 / 404 / 403 without a rate-limit signal: 409 carrying
+    GitHub's message with control and format characters removed and the length bounded;
+    no rows; phase unchanged; a second press sends a second PUT (no hidden state).
+D11 PUT answers 401: 409 asking to reconnect GitHub.
+D12 PUT answers 200 with merged false: a refusal (as D10).
+D13 PUT times out, throws a network error, answers 500 / 502 / 503, 429, 403 with
+    x-ratelimit-remaining 0, 403 with retry-after, or 403 whose message names a rate
+    limit: 202 {delegated: true}, MERGE_ANNOUNCEMENT and one row saying GitHub gave no
+    clear answer; the card stays in review; a following sweep that reads the PR merged
+    finishes it once (its merged row, one DONE_ROW); a sweep that reads it open
+    changes nothing.
+D14 PUT answers 200 with a body that is not JSON or has no merged / sha: as D13.
+D15 Two presses on one build at the same time: one GET and one PUT; the second press
+    gets 409.
+D16 The reconcile sweeps while the PUT is in flight and its read already says merged:
+    it writes nothing; the card ends with one DONE_ROW and one merged row (pacman's).
+D17 The person closes the card while the GET is in flight: 409 at the re-read, no PUT.
+    Closes it while the PUT is in flight and GitHub merges: the two rows are written,
+    no throw, the phase stays closed (no DONE_ROW).
+D18 Failed card that can be restored: merged -> restored and done; refused -> stays
+    failed, no row; no clear answer -> restored to review (the reconcile reads only
+    review cards) with the row.
+D19 Failed card that cannot be restored (build leg not done, or no artifact): today's
+    409, no GitHub request.
+D20 The #1217 guard and the permission gate refuse before any request to the PR
+    (second-pr-guard and gate tests, updated for this path).
+D21 Phase building (or anything other than review / restorable failed): 409, no GitHub
+    request, no rows.
+D22 githubRepo with a "." or ".." segment (#1466): not GitHub form; today's merge step;
+    no request.
+D23 Hosted and local: merge step enqueued as before; its done finishes as before.
+D24 GitHub form without build.prNumber: merge step as before; its done finishes as
+    before.
+D25 A merge step completes on a GitHub-form build that has prNumber (queued before the
+    upgrade, or the merge step reported a PR): phase stays review, no DONE_ROW, one row
+    saying the card finishes when PR #n is merged on GitHub; a later merge on GitHub is
+    finished by the reconcile.
+D26 The token appears only in the Authorization header of the GET and the PUT, never in
+    a URL, an error text or a row.
+D27 The wire stays 202 {delegated: true} on the merged and the no-clear-answer outcomes.
+D28 The reconcile treats a build whose API merge is in flight like a build with a step
+    in flight (no read, no write), before and after its PR read.
+D29 GitHub text in the merged row and in the refusal (merge commit sha, message) goes
+    through the same cleaning as the reconcile's rows (control and format characters
+    removed, 100 characters at most).
+
+Added after the first /code-review pass (tests first, red on 2a3b2965):
+D30 The build is not the todo's current build (a rerun made a newer build while the old
+    PR stays open): 409, no request. Merging it would finish the card while the current
+    run's PR is unmerged.
+D31 A step of the build is in flight (claimed, or pending / waiting for quota and not a
+    verify or review step): 409, no request; also when it is claimed while the PR read
+    is in flight (no PUT). A claimed verify step pushes when it finishes; a squash
+    merge before that leaves its commit out. Unclaimed verify / review steps do not
+    block (D1 stops them).
+D32 Failed card, refusals that point elsewhere (PR already merged, no connection, head
+    moved, no checkpoint): the text does not promise the reconcile (it reads only review
+    cards) and points to dragging the card to done on the board.
+D33 A connection exists but does not decrypt: 409 asking to reconnect GitHub.
+D34 A merge step completes on a GitHub build with a PR while the card cannot reach done
+    (planning, after a #931 rework of the same build): illegal phase transition as
+    before, no row.
+
+GitHub REST facts this path relies on
+--------------------------------------
+Fetched 2026-10-22 from docs.github.com/api/article/body?pathname=... (rendered
+Markdown of the pages below).
+
+Merge a pull request, https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request
+- "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge"
+- Body parameters: "`commit_title` (string) Title for the automatic commit message.";
+  "`commit_message` (string) Extra detail to append to automatic commit message.";
+  "`sha` (string) SHA that pull request head must match to allow merge.";
+  "`merge_method` (string) The merge method to use. Can be one of: `merge`, `squash`,
+  `rebase`"
+- Status codes: "200 - if merge was successful"; "403 - Forbidden"; "404 - Resource not
+  found"; "405 - Method Not Allowed if merge cannot be performed"; "409 - Conflict if sha
+  was provided and pull request head did not match"; "422 - Validation failed, or the
+  endpoint has been spammed."
+- "Response schema (Status: 200): `sha`: required, string; `merged`: required, boolean;
+  `message`: required, string"
+- "Creating content too quickly using this endpoint may result in secondary rate
+  limiting."
+- The page also says: "We recommend using the asynchronous merge API instead. This
+  endpoint does not support stacked pull requests or merging with a merge queue."
+  Design D names this endpoint (ADR 0021 D2, spec 28 D2: "REST merge 带 sha"); the
+  asynchronous one needs a second call to read the result (plan section 2.3). On a
+  repository whose base branch uses a merge queue this endpoint refuses, and the person
+  sees GitHub's message (D10).
+
+Get a pull request, https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
+- "GET /repos/{owner}/{repo}/pulls/{pull_number}"
+- Fields used: `title` ("required, string"), `state`, `merged`, `head.sha`, `head.ref`,
+  `head.repo.id`, `base.ref`, `base.repo.id`, `base.repo.default_branch` (segment 1's
+  parser; segment 1 found head.repo null for a deleted fork).
+
+Errors and rate limits, https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api
+- "If you exceed your primary rate limit, you will receive a `403 Forbidden` or `429
+  Too Many Requests ` response, and the `x-ratelimit-remaining` header will be `0`. If
+  you exceed a secondary rate limit, you will receive a `403 Forbidden` or `429 Too Many
+  Requests ` response and an error message that indicates that you exceeded a secondary
+  rate limit."
+- "If the `retry-after` response header is present, you should not retry your request
+  until after that many seconds has elapsed."
+- "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate
+  the request and you will receive a timeout response and a "Server Error" message."
+  (plan section 8). A merge can have happened behind such a response: 5xx is "no clear
+  answer" (D13), never a refusal.
+- "If you observe an error that is not addressed here, you should refer to the error
+  message that the API gives you."
+
+Error body, https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api
+- "Unless otherwise specified, the response body is in JSON format."
+- The page's error example reads the text from `error.response.data.message`; the 200
+  schema above also carries `message`. The refusal text is that field.
+
+Added after the second /code-review pass (tests first, red on 6efdd458):
+D35 A leftover merge step pushes its merge of the default branch into the conversation
+    branch after the PR was merged on GitHub: that commit is not the build's delivered
+    work, so it is not the last pushed checkpoint (merge steps are left out like review
+    steps); the reconcile still finishes the card.
+S1  The list reads' failure classification reads the response body only for a 403
+    without rate-limit headers (a secondary rate limit says so in its message); 404 and
+    429 are classified without reading it. The /simplify commit had made every failure
+    read the body.
+
+Folded in from the segment 2 pr-gate (#1489, run 1 at 83259a9, suggestions 1-7; tests
+first, red on 6efdd458; pins P4-P6 and P7f pass on both sides, their red legs are
+mutations in seg2b-mutations.txt):
+P2  spec 02 section 4.2, the 确认回路 bullet: a confirm is accepted only in the confirm
+    phase; anything else is 409 with no row and no build step.
+P3  The single-use `thrown` helper in [s2-A14] is inlined.
+P4  Foreign path: the card leaves review while the branch list read is in flight -> no
+    adoption, no row.
+P5  The list-failure count belongs to one close: a confirmed close with one failed list
+    read, the card leaves review and comes back, the close is confirmed again and the
+    list read fails once more -> still review (the count started again).
+P6  Anonymous: a foreign list read skipped for lack of budget does not count as a
+    listing; the branch is listed on the first sweep that has budget, not an hour later.
+P7  Adoption takes only a PR whose author has write access, by the list response's
+    author_association: OWNER, MEMBER or COLLABORATOR. CONTRIBUTOR, FIRST_TIMER,
+    FIRST_TIME_CONTRIBUTOR, MANNEQUIN, NONE and a missing field are not adopted, on the
+    closed path (open or merged) and the foreign path (P7a, P7c, P7d); the three write
+    values are (P7b). The recorded PR showing up open again in the list is not
+    adoption and is not filtered (P7f). The parser reads the field from a live capture
+    (P7e, docs/verify/1403/live-branch-pulls-assoc.json).
+P1  Not done: a PR opened after the close was reported, on a card a person dragged back
+    to review, is still not adopted (as on main before segment 2). Doing it needs a
+    branch list read on every sweep for every such card, throttled per card like the
+    foreign path's relist and sharing the anonymous budget, plus a rule for which
+    merged PRs count after a reported close. That is new state and a new rule, not a
+    small change.
+
+author_association, quoted from GitHub's docs (fetched 2026-10-22):
+- REST, List pull requests, response "Array of `Pull Request Simple`":
+  "`author_association`: required, string, enum: `COLLABORATOR`, `CONTRIBUTOR`,
+  `FIRST_TIMER`, `FIRST_TIME_CONTRIBUTOR`, `MANNEQUIN`, `MEMBER`, `NONE`, `OWNER`"
+  (https://docs.github.com/en/rest/pulls/pulls#list-pull-requests)
+- GraphQL reference, CommentAuthorAssociation ("A comment author association with
+  repository."), https://docs.github.com/en/graphql/reference/issues:
+  "`COLLABORATOR`: Author has been invited to collaborate on the repository."
+  "`CONTRIBUTOR`: Author has previously committed to the repository."
+  "`FIRST_TIMER`: Author has not previously committed to GitHub."
+  "`FIRST_TIME_CONTRIBUTOR`: Author has not previously committed to the repository."
+  "`MANNEQUIN`: Author is a placeholder for an unclaimed user."
+  "`MEMBER`: Author is a member of the organization that owns the repository."
+  "`NONE`: Author has no association with the repository."
+  "`OWNER`: Author is the owner of the repository."
+- Limit of the rule: MEMBER is organization membership and COLLABORATOR an invitation;
+  neither names the permission level, so an organization member or collaborator with
+  read-only access still counts. The field is what the list response carries without a
+  further request per PR.
+- Live capture (read-only GET through the agent proxy, 2026-10-22 11:05:40 UTC, the
+  request headers the server sends): pulls?state=all&head=xiechimon%3Aclaude%2Fbootstrap-p2-seg2
+  &base=main&per_page=10 -> HTTP 200, one PR, #1489, "author_association": "OWNER",
+  user xiechimon. Trimmed copy: apps/server/test/fixtures/github/branch-pulls-assoc.json
+  (= docs/verify/1403/live-branch-pulls-assoc.json).
+
+Added after the third /code-review pass (tests first, red on 52b7d698):
+D36 A merge step merged the default branch into the conversation branch and pushed it
+    while the PR is open (the PR head is that commit): the API merge binds sha to it.
+    The API merge's "last pushed commit" counts merge steps; the reconcile's "the merge
+    contains the build's delivery" check does not (D35). Without this split, D35 made
+    every press on such a PR a head-mismatch 409.
+D3  (extended) Without a connection the reconcile reads anonymously and cannot read a
+    private repository: the no-connection refusal on a review card says so.
+D31 (extended) The busy refusal names the step kind in flight, including a merge step
+    queued before the upgrade, and says it can be stopped.
+P7g A closed PR from the branch by an author without write access does not raise the
+    rejection floor: a write author's merged PR is still adopted.
+Not changed after the third pass (reasons in seg2b-reviews.txt): MEMBER and COLLABORATOR
+can be read-only (the coordinator's rule, limit stated above); a pending verify step can
+be claimed while the PUT is in flight; a Verifier without the push permission reports a
+local commit as its checkpoint.
+
+Added after the fourth /code-review pass (tests first, red on bdeb6378):
+D37 Failed card whose PR is already merged on GitHub: restored to review, one row, 202, no
+    PUT; the next sweep finishes it. Before this, the board's done dialog (which merges a
+    failed card) led back to a 409 that told the person to drag the card to done: a loop.
+    To reach this case the PR read now comes before the checkpoint check; D5 keeps "no PUT,
+    and the value never reaches a request".
+D32 (reworded) Failed-card refusals say: merge on GitHub, then press merge again (D37);
+    without a connection, connect GitHub first.
+D38 The PR's author has no write access by the PR read's author_association (the daemon
+    records the highest-numbered open PR on the branch, whoever opened it): 409, no PUT.
+D3c The server has no secret box: 409 naming the server's key configuration.
+D31 (reworded) The busy refusal names the step kind in Chinese and no longer suggests a
+    stop (the build's stop takes the newest step, not necessarily the blocking one).
+
+Added after the fifth /code-review pass (tests first, red on dd6fdc1e):
+D39 Failed card whose merged PR is not the build's own (a fork's), has an author without
+    write access, or went into another branch: 409, the card stays failed. The restore
+    of D37 now runs only after the own-PR, author and base checks, so it only hands the
+    reconcile a card it can finish.
+D4  (reworded) GitHub's PR head can lag a fresh push for a moment: the head-mismatch
+    refusal says so before naming other causes.
+D31 (reworded) A claimed review step does not commit: its refusal does not say it will
+    push.
+
+2026-10-22, after the coordinator's decision on the rate-limited merge (tests first, red on
+58492955: 5 failed):
+D40 PUT answered 429, or 403 with x-ratelimit-remaining 0, retry-after, or a message naming
+    a secondary rate limit: GitHub did not process the request, so the merge did not happen.
+    409 carrying GitHub's cleaned message and the reset time when known (x-ratelimit-reset as
+    an ISO time, or retry-after in seconds); no row; a failed card stays failed (D40b). This
+    replaces the rate-limit cases of D13, which now covers timeout, network error, 5xx and an
+    unreadable 200 only. The quote it rests on (troubleshooting page, above): "If you exceed
+    your primary rate limit, you will receive a `403 Forbidden` or `429 Too Many Requests `
+    response, and the `x-ratelimit-remaining` header will be `0`" and "If the `retry-after`
+    response header is present, you should not retry your request until after that many
+    seconds has elapsed."; "The `x-ratelimit-reset` header is in UTC epoch seconds."
+D40c (2026-10-22, after /code-review of ae058c9f; tests first, 4 red): the wait shown
+    follows retry-after first (a secondary limit often carries a later primary-window
+    x-ratelimit-reset), as GithubRateLimitedError.retryAt does for the intake reads; an
+    empty, blank, negative or fractional header counts as absent. The merge path now uses
+    the intake's header parser (rateLimitOf in lib/github.ts) instead of its own.
+D40d (2026-10-22, second /code-review of the rate-limit change): a header of more than ten
+    digits counts as absent (a larger UTC-second value is past the Date range and
+    toISOString throws, which turned the 409 into a 500 and could break the intake and
+    webhook catches that share the parser). The rate-limited refusal also gives the same
+    next step as the other refusals (press merge later, or merge on GitHub). The test case
+    was added together with the fix; its red leg is reasoned (the old parser accepted the
+    value and toISOString throws), not recorded.

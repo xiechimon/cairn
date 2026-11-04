@@ -1,0 +1,12 @@
+$ pnpm --filter @cairn/integration exec vitest run test/routing-boundary.test.ts
+$ (post-fix implementation on lane/1985)
+
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985/integration
+
+
+ Test Files  1 passed (1)
+      Tests  34 passed (34)
+   Start at  08:54:35
+   Duration  10.57s (tests 99%, transform 1%)
+

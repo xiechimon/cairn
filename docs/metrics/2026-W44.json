@@ -1,0 +1,52 @@
+{
+  "week": "2026-W44",
+  "throughput": {
+    "merged": 208,
+    "autonomous": 153,
+    "human": 55
+  },
+  "leadTime": {
+    "sample": 208,
+    "medianMinutes": 34.2
+  },
+  "changeFailure": {
+    "cohortStart": "2026-10-12T03:20:45.780Z",
+    "cohortEnd": "2026-10-19T03:20:45.780Z",
+    "cohort": 99,
+    "known": 0,
+    "missing": 99,
+    "failed": 0,
+    "rate": null
+  },
+  "mainRed": {
+    "minutes": 600,
+    "intervals": 8,
+    "recovered": 8,
+    "medianRecoveryMinutes": 28,
+    "stillRed": false
+  },
+  "humanIntervention": {
+    "prs": 208,
+    "intervened": 156,
+    "rate": 0.75,
+    "byHumanCommit": 115,
+    "byChangesRequested": 0,
+    "byHumanMerge": 55
+  },
+  "tokens": {
+    "prs": 208,
+    "known": 0,
+    "missing": 208,
+    "total": 0,
+    "mean": null
+  },
+  "costUsd": {
+    "prs": 208,
+    "known": 0,
+    "missing": 208,
+    "total": 0,
+    "mean": null
+  },
+  "complete": true,
+  "incompleteReasons": []
+}

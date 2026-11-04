@@ -1,0 +1,44 @@
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (229.125988ms)
+✔ CLI does not truncate more than 200 qualifying commits (1307.246564ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (162.752647ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (193.326879ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (43.572333ms)
+✔ a revert body resolves to the reverted commit and its PR (43.681595ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (44.692373ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (41.524184ms)
+✔ blame split across two commits yields multiple-origin, not a guess (48.261619ms)
+✔ shallow history yields unresolved with a reason (52.607397ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (82.369279ms)
+✔ an introducing merge before --since is still resolvable (41.236894ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (42.235525ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (103.299323ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (45.905439ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (51.589329ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (41.968874ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.291618ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.136213ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.135415ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (45.267484ms)
+✔ blame resolves an unquoted path that contains spaces (45.891541ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (94.972557ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (31.513051ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (90.702081ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (192.462948ms)
+✔ the reviewer-input object contains no defect label, location or correction (61.212228ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (109.730333ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (68.472939ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (68.946963ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (92.085826ms)
+✔ successive exports preserve existing cases and only upsert matching identities (114.637357ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (40.697918ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (94.225934ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3787.943727

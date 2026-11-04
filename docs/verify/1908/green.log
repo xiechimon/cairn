@@ -1,0 +1,30 @@
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (1.383387ms)
+✔ CI environments skip the queue (0.166634ms)
+✔ each slot owns its own e2e port and build directory (0.429932ms)
+✔ slotPortHolder names the pid, cwd and command of whatever listens on the port (114.71941ms)
+✔ a bad slot count gets a warning and a single slot (83.289709ms)
+✔ waiters see their queue position and are served first-come first-served (365.333163ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (323.690291ms)
+✔ a clean exit releases the slot too (324.997653ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15100.798565ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (15617.741799ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (1933.728179ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1644.854334ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (184.381042ms)
+✔ an inherited slot variable that no live process holds is ignored (138.05416ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (109.879355ms)
+✔ CI skips the queue even when every slot is taken (227.900761ms)
+✔ run wrapper passes the exit code through and frees the slot (183.726096ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (156.157245ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (346.956382ms)
+✔ a squatted slot port fails e2e:affected before playwright and names the holding process (390.431476ms)
+✔ prepush queues for a slot in local mode and starts once the holder is killed (809.802588ms)
+✔ prepush reports a squatted slot port before running any check (240.398703ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38361.902656

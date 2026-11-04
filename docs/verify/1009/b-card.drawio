@@ -1,0 +1,49 @@
+<mxfile host="claude-agent" modified="2026-10-09T00:00:00.000Z" agent="drawio-skill" version="24.7.17" type="device">
+  <diagram id="b-attachment-card" name="B attachment card">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="620" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="lt" value="Before · hand-rolled chip (SPEC_CHIP utilities)" style="text;html=1;fontSize=15;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rt" value="After · registry Attachment card" style="text;html=1;fontSize=15;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="620" y="20" width="520" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1" value="chat-markdown.tsx" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="520" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="l1a" value="AttachmentChip&#10;· &lt;a class=&quot;spec-chip …&quot;&gt; / &lt;Button&gt; preview&#10;· SPEC_CHIP + SPEC_CHIP_IMG utilities" style="rounded=1;html=1;whiteSpace=wrap;align=left;spacing=6;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="l1">
+          <mxGeometry x="20" y="36" width="480" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="l1b" value="overlay/attachment-strip.tsx&#10;· pending placeholder = &lt;Button&gt;/&lt;span&gt; chip + 上传中 badge&#10;· settled = AttachmentChip" style="rounded=1;html=1;whiteSpace=wrap;align=left;spacing=6;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="l1">
+          <mxGeometry x="20" y="106" width="480" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="r1" value="overlay/attachment-card.tsx (new, single source)" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="620" y="60" width="520" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="r1a" value="Attachment state=&quot;uploading&quot; | &quot;done&quot;   border-0" style="rounded=1;html=1;whiteSpace=wrap;align=left;spacing=6;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="r1">
+          <mxGeometry x="20" y="36" width="480" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="r1b" value="AttachmentTrigger (a / button, aria-label=name, class=&quot;spec-chip …&quot; hook)&#10;  AttachmentMedia (image | icon)&#10;  AttachmentContent &gt; AttachmentTitle&#10;  + 上传中 badge (absolute, uploading only)" style="rounded=1;html=1;whiteSpace=wrap;align=left;spacing=6;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="r1">
+          <mxGeometry x="20" y="76" width="480" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ht" value="Why the box-equality contract still holds (attachment-strip.spec FM2, no re-pin)" style="text;html=1;fontSize=14;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="270" width="700" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="hb" value="· the placeholder and the settled card render the SAME bytes — only `state` differs (uploading vs done), and the 上传中 badge is absolutely positioned so it never adds a line&#10;· the card root is borderless: with the primitive's 1px frame the root box would be 2px larger than the trigger box the settled card measures through — border-0 makes root box ≡ trigger box&#10;· .spec-chip family classes survive as zero-rule hooks on the trigger, so spec-brief-card's a.spec-chip / img.spec-chip-img and chief-composer-tools' .spec-chip locators keep working unchanged" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=4;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="298" width="1100" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ht2" value="Three hosts, one card" style="text;html=1;fontSize=14;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="400" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="hb2" value="detail composer (composer-float)   ·   new-task dialog   ·   chief drawer composer  —  all mount AttachmentStrip, which renders AttachmentCard" style="text;html=1;align=left;verticalAlign=top;spacing=4;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="428" width="1100" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

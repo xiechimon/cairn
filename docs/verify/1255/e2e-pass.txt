@@ -1,0 +1,18 @@
+Running 7 tests using 2 workers
+
+(node:5541) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:5540) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/7] e2e/board-scroll-restore.spec.ts:12:1 › detail round trip keeps the column scroll position
+[2/7] e2e/board-overflow.spec.ts:25:1 › 溢出列底边不冲出视口：列贴 scroller 可视高度（行高钉死）
+[3/7] e2e/board-overflow.spec.ts:42:1 › 卡片列表有滚动出口：scrollHeight > clientHeight 且容器可滚
+[4/7] e2e/board-overflow.spec.ts:55:1 › 列表可滚：scrollTo 移动 scrollTop，滚轮同样生效
+[5/7] e2e/board-overflow.spec.ts:77:1 › 列头固定：列表滚动时 header 的视口位置不动
+[6/7] e2e/board-overflow.spec.ts:86:1 › 卡片上下缘由块向内边距保位：首卡上缘、滚到底的末卡下缘都不贴裁切线
+[7/7] e2e/board-overflow.spec.ts:126:1 › 存量场景零漂移：01 列完整贴视口、列底不超 scroller 底缘
+  7 passed (4.6s)

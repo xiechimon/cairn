@@ -1,0 +1,23 @@
+PASS  board-ready  — 看板 shell 就绪
+PASS  sidebar-row-badge  — 侧栏新任务行角标=C
+shot  01-sidebar-row.png
+PASS  row-click-opens  — 行点击开 dialog
+PASS  c-opens-focused  — C 开 dialog 且正文框持焦（#394 单字段面）
+PASS  board-save  — board 面 C 开 → 保存
+shot  02-board-saved.png
+PASS  fab-tooltip-rest-hidden  — 静息 tooltip 数=0（未挂载=隐藏）
+PASS  fab-tooltip-hover-reveals  — 悬浮浮出，键帽="⌘J"（registry Tooltip+Kbd）
+shot  02b-fab-tooltip.png
+PASS  editable-guard  — 输入态:dialog=0 drawer开=false 入框="c "
+PASS  cmdj-wakes-focused  — ⌘J 开抽屉且草稿框持焦
+shot  03-chief-drawer.png
+PASS  schedules-c-opens  — schedules 页原地开 dialog
+shot  04-schedules-saved.png
+PASS  api-todo-board  — board 面 todo 入 API(id=iuVL2p619Di-DIW1nBucu)
+PASS  api-todo-schedules  — schedules 全局面 todo 入 API(id=uJYoL6sz1RQZmEX0TRHRM)
+PASS  db-todo-board  — SQLite todo 表有 board 面行
+PASS  db-todo-schedules  — SQLite todo 表有 schedules 面行
+
+evidence: /Users/xmon/.pacman/workspaces/01a12aa3-7bc8-7de0-95f7-ab62d50d12e2/.claude/verify-evidence/2026-10-11T11-11-04-038Z-hotkeys
+allOk=true
+drive hotkeys:PASS

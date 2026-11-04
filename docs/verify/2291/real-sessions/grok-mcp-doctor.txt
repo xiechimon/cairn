@@ -1,0 +1,16 @@
+
+MCP Doctor
+
+  Config sources
+    ~/.grok/config.toml                      1 server
+    <temp-dir>/.grok/config.toml 1 server
+    ~/.claude.json                           not found
+    .mcp.json                                not found
+
+  cairn-user (http: http://127.0.0.1:8791/api/mcp)
+    ✓ server started (0.0s)
+    ✓ handshake OK (protocol 2025-11-25)
+    ✓ 6 tools discovered
+
+Found 1 healthy, 0 failing.
+

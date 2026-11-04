@@ -1,0 +1,193 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.1 [39m[90m/mnt/fast/cairn/workspaces/01a17e07-add3-76a2-94ca-fa80de0a3a0f[39m
+
+ [32m✓[39m [30m[46m @cairn/shared [49m[39m test/github-create-gate.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 266[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/review.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 2143[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/artifact-gate.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 2257[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-wire.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 2244[2mms[22m[39m
+   [32m✓[39m claim/wake timing (r3 section 1.5 measured: ~75s long poll cadence + wake low-latency dispatch) [2m(5)[22m
+     [33m[2m✓[22m[39m empty long poll returns {step:null} after about the hold duration (same cadence shape, shortened timescale)[33m 460[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/merge-gate-verdict-binding.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 2408[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-issues.test.ts [2m([22m[2m36 tests[22m[2m)[22m[33m 2325[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-queue-steer-stop.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 2558[2mms[22m[39m
+   [32m✓[39m chief turn queue (T5): one turn per thread, oldest first [2m(5)[22m
+     [33m[2m✓[22m[39m a message sent while a turn runs waits as queued and is not claimed beside it[33m 335[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-writeback.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 2865[2mms[22m[39m
+   [32m✓[39m self-created issues: stored as not-yet-created, source backfilled after async creation (A family) [2m(10)[22m
+     [33m[2m✓[22m[39m a secondary limit retries the pending task and backfills its source[33m 1061[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-pin.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 2974[2mms[22m[39m
+   [32m✓[39m #1259 worker home-machine gate [2m(2)[22m
+     [33m[2m✓[22m[39m bound to A -> A claims, B comes up empty; rebound to B -> B claims (reassignment immediate)[33m 636[2mms[22m[39m
+     [33m[2m✓[22m[39m no home machine set -> no machine can claim it (stays pending)[33m 479[2mms[22m[39m
+   [32m✓[39m #1312 other-machine mark on a resumed session [2m(1)[22m
+     [33m[2m✓[22m[39m same-machine resume carries no priorMachineId; claim after rebind carries the previous-round machine[33m 376[2mms[22m[39m
+   [32m✓[39m #1260 chief step delivery = bound Agent home machine [2m(1)[22m
+     [33m[2m✓[22m[39m Agent bound to B -> only B can claim the chief step; Agent rebound to A -> A claims (reassignment immediate)[33m 526[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/model-fallback.test.ts [2m([22m[2m41 tests[22m[2m)[22m[33m 2917[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/skill-write.test.ts [2m([22m[2m30 tests[22m[2m)[22m[33m 3217[2mms[22m[39m
+   [32m✓[39m machine-wire skill listing and on-demand fetch (GET /api/machine/skills/{stepId}[/file]) [2m(8)[22m
+     [33m[2m✓[22m[39m M5: an over-limit file no longer fails the whole package -- an asset past the per-file gate enters the listing with its real size and is delivered byte-complete; a total over the old package gate still gets a listing[33m 1552[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/pr-seg3.test.ts [2m([22m[2m79 tests[22m[2m)[22m[33m 3973[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/trajectory-outcome-backfill.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1341[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/attachment-gc.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 5140[2mms[22m[39m
+   [32m✓[39m attachment gc -- scheduler cadence [2m(3)[22m
+     [33m[2m✓[22m[39m a large transcript corpus does not block the event loop during a tick[33m 4403[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/memory-dedupe.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 1697[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/git-hosting.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 1861[2mms[22m[39m
+   [32m✓[39m hosted form: bare repo + git http-backend (02 section 3 locked) [2m(9)[22m
+     [33m[2m✓[22m[39m GET /api/projects/{id}/commits/{sha} -> metadata + first-parent diff; boundary 404/defined state[33m 310[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/m3b-machine-git.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 2013[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-reads.test.ts [2m([22m[2m39 tests[22m[2m)[22m[33m 2194[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/close-stops-active-steps.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 1917[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/ci-loop.test.ts [2m([22m[2m37 tests[22m[2m)[22m[33m 2514[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/token-auth.test.ts [2m([22m[2m45 tests[22m[2m)[22m[33m 1684[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/attachments.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 1680[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/skill-import.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 2072[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/build-abandoned-sweep.test.ts [2m([22m[2m34 tests[22m[2m)[22m[33m 1964[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/pr-merge-api.test.ts [2m([22m[2m122 tests[22m[2m)[22m[33m 7097[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/build-diff-fulltext.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1313[2mms[22m[39m
+   [32m✓[39m GET /api/builds/{id}/changes/file (#224 diff full-text read surface) [2m(4)[22m
+     [33m[2m✓[22m[39m text = conv branch history state full text (not main old version); envelope passes the shared schema; nested paths same surface[33m 390[2mms[22m[39m
+     [33m[2m✓[22m[39m binary -> 200 base64 decodes back to the original bytes; over the 1 MiB gate -> 413[33m 363[2mms[22m[39m
+     [33m[2m✓[22m[39m 404 surface: unknown build / non-managed project / conv branch not pushed / file missing / directory path[33m 326[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/manual-drop-matrix.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 1442[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/plan-handoff.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 1373[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/plan-server-auto-confirm.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 1891[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-questions.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1599[2mms[22m[39m
+   [32m✓[39m #1049 question line lifecycle (createOrGet / answer / cancel / wrap-up) [2m(8)[22m
+     [33m[2m✓[22m[39m hold semantics: expires back to pending (D3 does not auto-decide); answering after hold returns answered (<= poll granularity)[33m 886[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/memory-invalidation.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 838[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/team-ownership-1470.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 1229[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/notifications.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1239[2mms[22m[39m
+   [32m✓[39m three-event matrix (r5 section 7.2 field by field) [2m(6)[22m
+     [33m[2m✓[22m[39m entering done / entering failed has no in-app notification event (copied verbatim from the r5 section 7.2 observation window)[33m 771[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/failed-review-restore.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1359[2mms[22m[39m
+   [32m✓[39m #702 failed->review restore (B-C17 deadlock shape) [2m(7)[22m
+     [32m✓[39m failure mode 1 positive: exit open (build delivered) [2m(2)[22m
+       [33m[2m✓[22m[39m #519 shape run through: build done + review failed -> in-product merge 202 -> merge step -> done (PR not orphaned)[33m 451[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/retry-lessons.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 1528[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/persona-split-verify.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1583[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/delivery-surface.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1012[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/quota-hold.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1308[2mms[22m[39m
+   [32m✓[39m #1257 quota hold (done-surface classification + the hold/resume loop) [2m(7)[22m
+     [33m[2m✓[22m[39m failure mode 2: nothing claims while held (holdUntil not reached)[33m 314[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/merge-gate-tables.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 1408[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/pr-reconcile.test.ts [2m([22m[2m186 tests[22m[2m)[22m[33m 9915[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/stop.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 1126[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-capability-gate.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 1107[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/gate-actor.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 1245[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/m4b-memory.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1193[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/needs-you.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 784[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/schedules.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 1089[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/queued-cancel-release.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1259[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-abandoned-sweep.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 999[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-project-pick.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 1009[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-repo-dot-segments.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 1243[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/project-team-guard.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 949[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-create-throttle.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1024[2mms[22m[39m
+   [33m[2m✓[22m[39m parallel creates share slots and an explicit secondary limit retries successfully[33m 1019[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/wire.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 1252[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/project-identity.test.ts [2m([22m[2m29 tests[22m[2m)[22m[33m 952[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-todos-cap.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1960[2mms[22m[39m
+   [32m✓[39m chief todos output budget [2m(1)[22m
+     [33m[2m✓[22m[39m large todo lists stay within 32 KiB and can be paged without losing ids[33m 1957[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/issue-fence.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 803[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/oauth.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 872[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-demotion.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 899[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/task-meta.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 649[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/patch-todo-reset-gate.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 843[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/blocker-handoff-claim.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 1013[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-connection.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 733[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/skills-local.test.ts [2m([22m[2m24 tests[22m[2m)[22m[33m 1010[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/issue-intake.test.ts [2m([22m[2m176 tests[22m[2m)[22m[33m 12933[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-settings.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 837[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/mcp-servers.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 945[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/team-ownership-1497.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 964[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/g2t2-executor-wire.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 616[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/m5-face.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 890[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/steer.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 735[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/agent-concurrency.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 756[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-attachment.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 967[2mms[22m[39m
+   [32m✓[39m GET /api/machine/attachment/{stepId}/{attachmentId} (#730) [2m(8)[22m
+     [33m[2m✓[22m[39m #1481 only human task text authorizes both attachment interfaces[33m 326[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-oauth.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 882[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/rework-plan-fallback.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 606[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/unassigned-build.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 689[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/project-local.test.ts [2m([22m[2m32 tests[22m[2m)[22m[33m 785[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/keys.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 790[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-concurrency-recommendation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 390[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/phase-funnel.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 814[2mms[22m[39m
+   [32m✓[39m phase funnel same-phase idempotency (the XMON-59 main break) [2m(4)[22m
+     [33m[2m✓[22m[39m a same-phase replay does not throw and returns the current record; zero side effects (v/phaseAt unchanged, no new todo doc frame)[33m 565[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/mcp-face.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 734[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-concurrency-chief.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 900[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/orchestration-source.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 1002[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/skill-inject-claim.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 681[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/project-delete.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 584[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/review-reject.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 672[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/model-sources.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 724[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-local.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 626[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-concurrency.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 708[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-stale-sweep.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 616[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/quota-wait.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 577[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-unread-badge.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 604[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/conv-stream-catchup.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 746[2mms[22m[39m
+   [32m✓[39m chief wire surface: mid-way entry catch-up (#740 ticket symptom path) [2m(2)[22m
+     [33m[2m✓[22m[39m delta during zero-subscriber period -> one catch-up text_delta on stream open -> live as usual -> new stream after done has zero catch-up[33m 400[2mms[22m[39m
+     [33m[2m✓[22m[39m rewind clears the buffer (service-layer defensive clear point): explicit clear then new stream zero catch-up[33m 314[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/token-usage-cost.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 671[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/build-provenance.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 578[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/rework-branch-reuse.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 810[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-watch.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 655[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-dispatch.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 874[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/runtime-otel.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 591[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-zombie-claim.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 571[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/capability-pending-reason.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 739[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-skill-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 469[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/agent-delete.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 549[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-token-refresh.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 636[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-gate-budget.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 525[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/autonomy-api.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 629[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/credentials.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 500[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/search.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 560[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/step-session-upload.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 543[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/second-pr-guard.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 702[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/m4a-chief-loop.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 706[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/agent-home-machine.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 653[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/reset-todo.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 597[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/thinking-delta.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 534[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/step-claim-report.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 415[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/fs-list.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 145[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-shell.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 467[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-tools.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 436[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/stop-and-done-1247.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 395[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-thread.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 303[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/agent-tools.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 493[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/sse.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 406[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-exit.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 498[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/todo-usage-cost.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 329[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/project-dual-source.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 362[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-gate-transport.test.ts [2m([22m[2m80 tests[22m[2m)[22m[32m 289[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/merge-gate-github-adapter.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-reject-diff.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 265[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/agent-desc-limit.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 362[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/skill-injection-check.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 368[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-context-failure.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 254[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-auto-confirm.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/enroll-browser.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 141[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/github-create-gate-unwritable.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 224[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/chief-memory.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 276[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machines-module-split.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/user-patch.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 262[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/info-fastlane.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 106[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/persona-repo-rules.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/fs-pick.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/capabilities.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 105[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/provider-config.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m [30m[43m @xiechimon/cairn [49m[39m test/machine-concurrency-startup-backfill.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m142 passed[39m[22m[90m (142)[39m
+[2m      Tests [22m [1m[32m2287 passed[39m[22m[90m (2287)[39m
+[2m   Start at [22m 14:47:37
+[2m   Duration [22m 23.28s[2m (tests 53%, import 46%, transform 1%)[22m
+

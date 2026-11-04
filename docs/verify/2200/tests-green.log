@@ -1,0 +1,2364 @@
+Runtime: Node 24.14.0 through fnm. Worktree changes are uncommitted.
+
+Command results (latest attempt per command):
+EXIT 1: node --test scripts/*.test.mjs
+EXIT 0: node --test --test-concurrency=1 scripts/prepush.test.mjs scripts/dispatch-agent.test.mjs scripts/gardener-weekly.test.mjs scripts/eval-coverage.test.mjs scripts/doc-reader-tests.test.mjs scripts/agent-rules.test.mjs
+EXIT 0: python3 scripts/pr-evidence-gate.test.py
+EXIT 0: python3 scripts/pr-evidence-archive.test.py
+EXIT 0: pnpm typecheck
+EXIT 0: pnpm lint
+EXIT 0: pnpm spec:parse
+EXIT 0: pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+EXIT 0: node scripts/english-only-gate.mjs
+EXIT 0: node scripts/comment-discipline-gate.mjs
+EXIT 0: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
+EXIT 0: node --test scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
+EXIT 0: pnpm prepush --ci
+EXIT 1: pnpm prepush
+EXIT 1: pnpm prepush --self-test
+EXIT 0: git diff --check
+EXIT 0: python3 scripts/pr-evidence-gate.py /tmp/2200-body-no-links.md
+
+Full script suite: 355 passed, 5 failed. Four failures are loopback-listener EPERM; one is the native Node recording-trigger.js import failure also reproduced from origin/main.
+Local prepush: 135 self-tests passed, 3 failed on loopback-listener EPERM. CI prepush: PASS (15 checks).
+Server readiness and shared snapshots: 276 passed. Python evidence suites: 7 and 13 passed. Changed CI commands: 29 and 55 passed.
+Expected red-first runs: Python evidence suite had 4 failures; server readiness suite had 9 failures; the retired collector reader expectation failed before its exclusion was configured.
+Skill validator: all 3 attempts exited 1 because Python cannot import yaml. No dependency was installed.
+GitHub overlap lookup exited 1 because api.github.com was unreachable. Remote overlap and CI remain unverified.
+The initial Node 26 and overlapping verification attempt had timing failures. The final Node 24 full-suite dispatch tests all passed.
+
+Paths in the output are normalized to <worktree>, <home>, and <tmpdir>. ANSI rendering codes are omitted.
+
+=== Final complete script suite ===
+✔ merge instructions require the pr-gate auto-merge verdict (4.55325ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (1.051959ms)
+✔ active docs never tell agents to add needs-decision (2.665208ms)
+✔ checks only added source comment lines and exact allowlist entries (8486.395125ms)
+✔ AGENTS.md separates bot rebase from human squash (2.800709ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.332166ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.271541ms)
+✔ documented preparation overrides inherited bot author and committer identities (771.652208ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.676334ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.584125ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.28075ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (2107.357459ms)
+✔ recovery regression is run by the trusted main workflow (1.503917ms)
+✔ incident recovery documents #2136 rejected SHAs and pending production acceptance (0.30175ms)
+✔ incident recovery preserves trailers and history while passing the actual push check (785.267416ms)
+✔ PR validation reads the explicit head without executing PR code (3.43575ms)
+✔ a bot-authored commit beneath a human tip is rejected (390.885875ms)
+✔ a squash commit authored by the bot is rejected (385.298667ms)
+✔ main push checks bot squash (756.413166ms)
+✔ main push checks bot beneath human tip (1240.737ms)
+✔ main push checks historical bot (1650.08475ms)
+✔ main push checks missing before (3471.776958ms)
+✔ main push checks zero before (745.782333ms)
+✔ every commit in a clean human range passes (884.021416ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (355.082334ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (389.048833ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (314.226542ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (380.58325ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (318.058292ms)
+✔ colored gh JSON still parses (1.687958ms)
+✔ isBot uses one allowlist for logins, app prefixes and bot suffixes (0.396083ms)
+✔ isoWeek labels the week of a date (0.292334ms)
+✔ fixture metrics match the hand-computed table (3.771ms)
+✔ missing token data is counted separately instead of becoming zero (0.829125ms)
+✔ an empty week yields an empty table without errors or division by zero (0.350042ms)
+✔ duplicate pull requests from overlapping pages count once (0.280709ms)
+✔ report states the week, the table and the incomplete reason (0.350167ms)
+✔ a bot-authored pull request merged by a person without auto-merge counts as human (2.424291ms)
+✔ null backfill and null usage stay missing instead of counting as zero (0.294667ms)
+✔ a recorded zero token count stays zero (0.144916ms)
+✔ fetchPrs pages through results and normalizes nodes (1.137708ms)
+✔ fetchPrs keeps earlier pages and reports a rate limit as incomplete (0.420417ms)
+✔ fetchPrs rethrows errors that are not rate limits (0.533375ms)
+✔ fetchPrs marks the week incomplete when more pages remain after the cap (0.712375ms)
+✔ fetchMainRuns pages until a short page and normalizes runs (2.12925ms)
+✔ fetchMainRuns counts a main run as red only when a required check fails (0.2265ms)
+✔ fetchMainRuns keeps earlier runs and reports a rate limit while reading jobs (0.203083ms)
+✔ CLI writes the weekly JSON and the markdown report from a fixture (90.625709ms)
+✔ CLI runs on an empty fixture (79.684ms)
+✔ the weekly workflow runs delivery metrics and posts the report (0.683709ms)
+✔ ci runs the delivery metrics self-test beside the gardener sweep (0.612959ms)
+✔ CLI reads a ledger file for outcomes and usage (98.354625ms)
+✔ start verifies the process and writes the status file (601.874125ms)
+✔ check reports alive while the job runs and missing after it exits (3826.779667ms)
+✔ a job started with the old nohup syntax is reported missing (378.023333ms)
+✔ the boundary teardown kills the old-style job and spares the dispatched job (3015.808542ms)
+✔ start reports missing when the command dies immediately (711.71625ms)
+✔ start reports missing when the command cannot spawn (811.994083ms)
+✔ wait accepts a successful child regardless of its log text (1803.320666ms)
+✔ wait fails when the child exits non-zero after start returns (1463.508583ms)
+✔ wait ok when the child exits 0 after start returns with an ordinary log (1362.398666ms)
+✔ ticket numbers match only on digit boundaries (2.277209ms)
+✔ no sources hit means no conflicts (0.954042ms)
+✔ the 2026-10-24 #1569 workspaces are reported with their branches (0.323333ms)
+✔ the dispatch target directory itself is not a conflict (0.239208ms)
+✔ remote branches and open PRs mentioning the ticket are conflicts (0.372375ms)
+✔ a missing gh or git source is reported unchecked, not as clear (0.1665ms)
+✔ running agents mentioning the ticket are conflicts, the dispatch chain is not (0.394792ms)
+✔ start --ticket refuses when another git workdir in tmp holds the ticket, --force overrides (35482.277625ms)
+✔ start rejects a non-numeric ticket (43.993958ms)
+✔ a spec naming an existing path and an existing exported function reports nothing (750.452291ms)
+✔ a spec naming a deleted path reports it once with its line number (2190.697375ms)
+✔ a renamed function is reported as a missing identifier (4794.037375ms)
+✔ names inside fenced code blocks and URLs are ignored (1193.683958ms)
+✔ a table row marked superseded is ignored (973.145792ms)
+✔ short or common words in backticks are not treated as identifiers (612.126666ms)
+✔ a path that never existed in the repo is not reported (788.312417ms)
+✔ a relative path resolving under a tracked file is not reported (812.778208ms)
+✔ a path with a line-range suffix is checked without the range (899.544541ms)
+✔ a directory reference is not reported as a missing path (513.374541ms)
+✔ a deleted relative path is reported through its historical repository path (1082.017125ms)
+✔ historical suffix matching respects directory boundaries (1032.76925ms)
+✔ uncommitted file restoration does not hide drift at HEAD (713.409167ms)
+✔ an identifier mentioned only in integration fixtures is still missing from application code (743.737625ms)
+✔ a deleted relative path with a line-range suffix reports its normalized path (809.707875ms)
+✔ a doc change selects the tests that name it, split by runner (4.104583ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.837333ms)
+✔ the retired collector archive is excluded while current identity safeguards remain selected (2.535459ms)
+✔ prose flags Chinese outside code spans, fences and HTML comments (19.409958ms)
+✔ code checks comments only; UI strings and exempt paths pass (3.84175ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (8470.925542ms)
+✔ --text checks a PR body file (278.587584ms)
+✔ caller-only required-artifact.json cannot satisfy frozen checks (5193.975334ms)
+✔ caller-only ignored-artifact.json cannot satisfy frozen checks (1427.784167ms)
+✔ tracked caller edits do not affect checks in the detached main tree (1192.57675ms)
+✔ temporary main worktree is removed after success (1479.380125ms)
+✔ temporary main worktree is removed after failure (1434.357125ms)
+✔ temporary main worktree is removed after timeout (1580.134833ms)
+✔ temporary main worktree is removed after midway error (1189.12325ms)
+✔ temporary main worktree is removed after wrong HEAD (881.316334ms)
+✔ temporary main worktree is removed after add error (1006.96075ms)
+✔ complete: closed issues, isolated remote-main checks and one green commit (3.054542ms)
+✔ failure mode 1: API errors and rate limits are unknown, even with pause or fail (0.616209ms)
+✔ failure mode 1: malformed or partial GitHub data never completes (6.211875ms)
+✔ failure mode 2: not-planned, manual and unmerged closures name the issue (5.600834ms)
+✔ failure mode 3: a merged linked PR does not substitute for an open issue (1.023ms)
+✔ failure mode 4: no green main commit since the last closing SHA is incomplete (0.967708ms)
+✔ failure mode 5: green at the closing commit still completes after later red merges (1.723167ms)
+✔ required checks must succeed together on one eligible commit (1.087833ms)
+✔ missing, pending, skipped and neutral required checks do not count as success (8.112125ms)
+✔ caller edits and feature HEAD do not prevent checks at remote main (1.551083ms)
+✔ failure mode 7: frozen manifest comes only from git show at the selected ref (1.213458ms)
+✔ failure mode 8: invalid manifests fail closed before commands run (2.176833ms)
+✔ missing or malformed manifests and git runner failures are unknown (0.664625ms)
+✔ failure mode 9: missing commands, nonzero exits and missing expected stdout fail checks (3.94825ms)
+✔ unexpected command errors and malformed command output are unknown (2.301375ms)
+✔ failure mode 10: no started-at means no cap even when checks fail (0.788292ms)
+✔ paused: every human-wait label on issues or open linked PRs takes priority over failure (4.941375ms)
+✔ closed linked PR labels do not pause, while explicit pause does (2.809042ms)
+✔ failed: explicit failure and elapsed maxHours apply only when not complete or paused (4.247667ms)
+✔ commit closers must belong to main; the latest of multiple closing changes sets the boundary (2.529541ms)
+✔ all REST pages are consumed and incomplete check pages cannot masquerade as green (1.588833ms)
+✔ invalid CLI arguments fail before any runner executes (1.159334ms)
+✔ JSON output contains the same decision and the pure decision does not mutate facts (2.588708ms)
+✔ import has no CLI effects and the actual CLI guard emits unknown without network (217.704125ms)
+✔ CI includes this test and ownership covers the checker and frozen manifests (1.609041ms)
+✔ green side-branch commits cannot establish a green main after closure (3.272208ms)
+✔ parallel closing changes require a green main descendant of both changes (1.894541ms)
+✔ non-Error runner throws still produce unknown (0.520125ms)
+✔ check-run requests stop at the first green commit, newest first (3.043625ms)
+✔ at most 30 eligible commits are examined, including a green thirtieth commit (11.106541ms)
+✔ 31 eligible commits with green index 30 yield unknown (2.764417ms)
+✔ 30 eligible commits with green index -1 yield incomplete (3.851458ms)
+✔ 40 eligible commits with green index 0 yield complete (3.511167ms)
+✔ no green commit reports missing and unsuccessful required checks on the newest commit (2.114041ms)
+✔ remote main movement after the first read does not invalidate local checks (1.338291ms)
+✔ each command receives a 900 second timeout and a timeout fails that check (1.25725ms)
+✔ a remote main SHA missing locally stays unknown and requests an explicit fetch (0.357083ms)
+✔ only completed success is green, regardless of future GitHub status values (3.756417ms)
+✔ partial or reordered examined commits cannot establish completion (1.313333ms)
+✔ empty required checks cannot establish completion without CI evidence (0.481209ms)
+✔ untracked files before and during checks preserve every check result (1.725041ms)
+✔ default manifest is pinned to the GitHub main SHA before it is read (1.772458ms)
+✔ explicit manifest refs must resolve to ancestors of remote main (2.939084ms)
+✔ history and descendant membership do not perform repeated array scans (1.254583ms)
+✔ finding the latest closure reads issue SHAs independently of history length (5.378375ms)
+✔ last closing events need nodes and bounded length without forward pageInfo (1.883791ms)
+✔ git and gh capture stderr and include it in unknown reasons (10.822125ms)
+✔ manifest check failures capture stderr tails including timeouts (16.506458ms)
+✔ the checker stays within 400 lines (10.882917ms)
+✔ escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case (3410.446709ms)
+✔ scoped Cairn fix subjects enter the loop; incidental revert wording does not (3691.043958ms)
+✔ local and CI prepush plans execute escape-eval-loop tests (7.782166ms)
+✔ CLI rejects missing bounds and unknown arguments (463.289125ms)
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (4586.039708ms)
+✔ CLI does not truncate more than 200 qualifying commits (20226.074833ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (481.415042ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (310.02675ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (333.349916ms)
+✔ a revert body resolves to the reverted commit and its PR (627.167166ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (454.888667ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (345.503208ms)
+✔ blame split across two commits yields multiple-origin, not a guess (317.390167ms)
+✔ shallow history yields unresolved with a reason (254.740542ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (600.663834ms)
+✔ an introducing merge before --since is still resolvable (644.696ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (415.399709ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (514.828958ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (337.272667ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (333.864792ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (631.790083ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.372459ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.158667ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.129667ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (671.299625ms)
+✔ blame resolves an unquoted path that contains spaces (576.029417ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (1221.933541ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (658.892959ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (928.815042ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (2246.479792ms)
+✔ the reviewer-input object contains no defect label, location or correction (467.962666ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (676.466458ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (845.147333ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (642.885333ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (1019.895167ms)
+✔ successive exports preserve existing cases and only upsert matching identities (1393.493917ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (306.027458ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (667.038167ms)
+✔ a hillclimb flow with no capability row fails the coverage check (12.431458ms)
+✔ coverage rows report scored, built-not-run, none, and tests only (12.697209ms)
+✔ weekly CLI stratifies failures, blinds packs, preserves reviews and reports agreement (828.615208ms)
+✔ default --flows without flag resolves against the repository root (242.976167ms)
+✔ reports reject conflicting hand labels for a build across weekly reviews (238.32925ms)
+✔ prunes evidence folders older than the window and records their last commit (1310.497ms)
+✔ the last commit touching any file in the folder decides its age (1237.300583ms)
+✔ keeps folders that code, CI or scripts reference, matching whole folder names (851.345833ms)
+✔ dry run reports without touching the tree or the ledger (714.55325ms)
+✔ merges into an existing ledger with sorted keys and honours --days (1341.066875ms)
+✔ nothing due leaves the tree unchanged (736.848584ms)
+✔ refuses a shallow clone, where every folder looks freshly committed (629.850375ms)
+✔ a staged folder that has no commit yet is left alone (599.413416ms)
+✔ ranks growth by the 7-day delta and stock by current count (3.073084ms)
+✔ report lists every category with its 7-day change, sorted, and writes the summary file (1381.261667ms)
+✔ a baseline file born inside the window reports its whole count as growth (985.182ms)
+✔ refuses a shallow clone, whose history would fake every delta as growth (883.535208ms)
+✔ a write pattern added 3+ times in the window with no gate becomes a candidate ticket (1035.694375ms)
+✔ two new sites stay below the threshold and write no candidate (1096.864291ms)
+✔ a pattern that a gate already covers never becomes a candidate (647.397792ms)
+✔ the watchlist patterns compile and each has a suggested rule when ungated (0.314417ms)
+✔ with --drift the report appends the spec/ADR drift section and writes the JSON (936.527166ms)
+✔ searches titles and bodies with alternative terms and includes same-file PRs (6.661583ms)
+✔ lookup errors stop creation rather than reporting no overlaps (1.249208ms)
+✔ duplicate ask eval: a rephrased request extends the existing item without creating an issue (0.564375ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.486959ms)
+✔ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.36ms)
+node:internal/modules/esm/resolve:275
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<worktree>/packages/shared/src/records/recording-trigger.js' imported from <worktree>/packages/shared/src/records/merge-gate.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:991:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:719:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:736:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:765:52)
+    at #resolve (node:internal/modules/esm/loader:701:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:621:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:245:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file://<worktree>/packages/shared/src/records/recording-trigger.js'
+}
+
+Node.js v24.14.0
+✖ scripts/harness-eval-worker.test.mjs (441.716625ms)
+✔ an overridden TMPDIR on macOS does not move the shared lock directory (5.766666ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (3.493667ms)
+✔ CI environments skip the queue (0.880625ms)
+✔ each slot owns its own e2e port and build directory (0.5365ms)
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15019.60625ms)
+✔ a bad slot count gets a warning and a single slot (171.996833ms)
+✔ waiters see their queue position and are served first-come first-served (509.370208ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (381.524041ms)
+✔ a clean exit releases the slot too (379.864333ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15172.468917ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (15361.575042ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (1844.521ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1568.695875ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (104.314333ms)
+✔ an inherited slot variable that no live process holds is ignored (52.0085ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (85.85325ms)
+✔ CI skips the queue even when every slot is taken (93.847833ms)
+✔ run wrapper passes the exit code through and frees the slot (93.983875ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (115.224834ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (432.587708ms)
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15066.133666ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (702.124458ms)
+✔ prepush-vitest reuses an inherited live lease without queueing (274.174916ms)
+✔ local prepush starts fast checks even when every heavy slot is occupied (426.614667ms)
+✖ local prepush ignores a squatted slot port because fast checks do not bind it (15080.367041ms)
+✔ prepush e2e shard mode still queues for a heavy slot and releases it (655.391209ms)
+✔ deepseek-v4-flash from issue #2021 is banned; deepseek-v4.1-flash is not (4.814292ms)
+✔ parseAiRouteSelection reads the #2021 implement route line (1.179291ms)
+✔ bannedModelFromLog reds the real #1517/#1792 exit artifact (0.445625ms)
+✔ bannedModelFromLog stays quiet for the allowed deepseek-v4.1-flash route (0.163709ms)
+✔ AGENTS.md Do-not-use models are covered by BANNED_MODEL_IDS (3.775833ms)
+✔ AGENTS.md Model roles table pins the role models and names no banned id (1.34ms)
+✔ parseModelRoles finds a banned id written without backticks (0.315375ms)
+✔ parseModelRoles keeps a model id after an escaped pipe (0.177625ms)
+✔ parseModelRoles drops sentence punctuation after a model id (0.180083ms)
+✔ parseModelRoles retains banned ids and excludes tables under other headings (0.349167ms)
+✔ parseModelRoles returns no rows when the heading is missing (0.149042ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (3.20125ms)
+✔ hasCode classifies documents (2.436083ms)
+✔ hasCode classifies server markdown fixtures (1.623334ms)
+✔ hasCode classifies shared markdown fixtures (3.403541ms)
+✔ hasCode classifies integration markdown fixtures (0.420167ms)
+✔ hasCode classifies executable evidence (0.341125ms)
+✔ hasCode classifies non-markdown evidence (0.288ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.091042ms)
+✔ hasCode classifies data beside an executable check (1.751125ms)
+✔ hasCode classifies the #2188 lessons and evidence change (2.640917ms)
+✔ hasCode classifies epic data (0.184167ms)
+✔ hasCode classifies code (0.173958ms)
+✔ hasCode classifies unknown paths (0.205083ms)
+✔ hasCode classifies mixed changes (0.212875ms)
+✔ hasCode classifies empty changes (0.089792ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (3466.905167ms)
+✔ CI classifies before heavy work and always runs push coverage (5.743709ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (2429.92725ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (1.99525ms)
+✔ documentation skips code checks, unknown paths fail closed (4.877958ms)
+✔ changes to prepush scripts run the CI self-test files locally (32.882708ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.795042ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (930.52475ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (2.711625ms)
+✔ lesson entries use the same document checks as other Markdown (0.198292ms)
+✔ local code checks retain fast checks and advisory dead-class (0.646917ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.845208ms)
+✔ code changes keep suites in CI and out of local plans (5.262709ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (5.078ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (1.145209ms)
+✔ a docs-only data change still runs every test that reads the changed file (70.249583ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (17.188416ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (218.388459ms)
+✔ a board card source change selects the spec that reads its title (86.044542ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (1.804875ms)
+✔ CLI skips real document changes and rejects a missing base (3210.826667ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (1060.067291ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (618.158375ms)
+✔ prepush vitest only forgives files listed as known local red (9.443083ms)
+✔ plan children do not inherit the git hook repository binding (145.58125ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (75.37575ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (55.678458ms)
+✔ workflow preserves comments about external behavior (1.235459ms)
+✔ forced push coverage preserves the English gate range across multiple commits (799.999959ms)
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (14.783917ms)
+✔ every publishable package names this repository for provenance (1.717458ms)
+✔ the release workflow matches the pinned text (1.35625ms)
+✔ the release workflow pin accepts CRLF line endings (0.273875ms)
+✔ the pinned workflow grants an OIDC token only after the publish job begins (0.461417ms)
+✔ the pinned workflow names the npm environment exactly once inside the publish job (0.803375ms)
+✔ the workflow pin rejects fixture 1: top-level OIDC permission (1.27425ms)
+✔ the workflow pin rejects fixture 2: rebuild in publish (0.194292ms)
+✔ the workflow pin rejects fixture 3: recursive build in publish (0.568167ms)
+✔ the workflow pin rejects fixture 4: renamed plan output (3.668833ms)
+✔ the workflow pin rejects fixture 5: filtered build in publish (0.201959ms)
+✔ the workflow pin rejects fixture 6: pack in publish (0.273625ms)
+✔ the workflow pin rejects fixture 7: cache action in publish (0.113833ms)
+✔ the workflow pin rejects fixture 8: comment before an appended publish command (0.124292ms)
+✔ the workflow pin rejects fixture 9: flow-style build step (0.073083ms)
+✔ the workflow pin rejects fixture 10: extra spaces before a run key (0.07175ms)
+✔ the workflow pin rejects fixture 11: quoted run key (0.08625ms)
+✔ the workflow pin rejects fixture 12: space before a uses colon (0.068625ms)
+✔ the workflow pin rejects fixture 13: unquoted install continuation (0.065083ms)
+✔ the workflow pin rejects fixture 14: fourth job with OIDC permission (0.065208ms)
+✔ the workflow pin rejects fixture 15: publish step shell (0.066958ms)
+✔ the workflow pin rejects fixture 16: publish step environment injection (0.065417ms)
+✔ the workflow pin rejects fixture 17: publish checkout ref input (0.06475ms)
+✔ the workflow pin rejects fixture 18: different publish checkout SHA (0.104833ms)
+✔ the workflow pin rejects fixture 19: publish job container (0.0905ms)
+✔ the workflow pin rejects fixture 20: top-level OIDC permission after a comment (0.063417ms)
+✔ the workflow pin rejects fixture 21: top-level env between pack and publish (0.064584ms)
+✔ the workflow pin rejects fixture 22: escaped pack OIDC permission keys (0.063708ms)
+✔ the workflow pin rejects fixture 23: environment removed from publish (0.059708ms)
+✔ CLI fetches original PR reviews through every page and retains evidence (563.484084ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (1249.655ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (941.659833ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (2373.826375ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (657.474375ms)
+✔ the CLI suite runs in local and CI prepush plans (3.771208ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (1915.199ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (916.850083ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (424.640125ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (382.6605ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (755.866209ms)
+✔ non-approving formal AI reviews do not establish AI coverage (761.969459ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (909.531458ms)
+✔ drops repo-binding GIT_* variables and keeps the rest (2.036125ms)
+✔ vitest config scrubs the git hook environment before workers spawn (593.227334ms)
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'drop'
+Switched to a new branch 'lane'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'rename'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'preserve'
+Switched to a new branch 'lane'
+Switched to branch 'main'
+Switched to a new branch 'drop-option'
+✔ a stale head that never saw an upstream addition does not treat that addition as removed (1010.69625ms)
+✔ names the merged PR and its removed line, and accepts an explicit reference only (1707.625667ms)
+✔ unchanged added lines and commits outside the base interval do not fail (879.629083ms)
+✔ tracks a renamed file and distinguishes identical lines by position (1085.078083ms)
+✔ renaming protected lines without removing them passes (1252.973875ms)
+✔ setup-node without pnpm installed is rejected (1.324875ms)
+✔ an earlier pnpm setup or package-manager-cache false is accepted (0.6125ms)
+✔ committed workflows install pnpm before setup-node caches it (2.858708ms)
+✔ a removed line beginning with two dashes is content, not a patch header (833.378291ms)
+✔ release removes populated allocations and repeated release is harmless (13.309875ms)
+✔ explicit cleanup works after an exception and allows later allocations (4.993625ms)
+✔ concurrent identities and matching identities cannot release unallocated paths (3.10675ms)
+✔ allocation rejects path separators and invalid run identities (0.351375ms)
+✔ plain Node and node --test import without runner packages and clean up on exit (360.200166ms)
+✔ an uncaught exception still triggers exit cleanup (117.851625ms)
+✔ SIGKILL bypasses exit cleanup and requires external removal (125.780084ms)
+✔ default allocation and release are available without lifecycle adapters (1.594416ms)
+✖ capture --video finalizes a real WebM and reports it beside the screenshot (15.075125ms)
+✔ archive rejects oversized recordings before copying evidence (1154.462167ms)
+ℹ tests 360
+ℹ suites 0
+ℹ pass 355
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 100645.759375
+
+✖ failing tests:
+
+test at scripts/harness-eval-worker.test.mjs:1:1
+✖ scripts/harness-eval-worker.test.mjs (441.716625ms)
+  'test failed'
+
+test at scripts/heavy-slots.test.mjs:224:1
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15019.60625ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:230:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:576:1
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15066.133666ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:585:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:697:1
+✖ local prepush ignores a squatted slot port because fast checks do not bind it (15080.367041ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:718:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/vp-video.test.mjs:9:1
+✖ capture --video finalizes a real WebM and reports it beside the screenshot (15.075125ms)
+  Error: listen EPERM: operation not permitted 127.0.0.1
+      at Server.setupListenHandle [as _listen2] (node:net:1926:21)
+      at listenInCluster (node:net:2005:12)
+      at node:net:2214:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EPERM',
+    errno: -1,
+    syscall: 'listen',
+    address: '127.0.0.1'
+  }
+
+
+=== Verification commands, including the initial archived-collector failure ===
+
+$ node --test --test-concurrency=1 scripts/prepush.test.mjs scripts/dispatch-agent.test.mjs scripts/gardener-weekly.test.mjs scripts/eval-coverage.test.mjs scripts/doc-reader-tests.test.mjs scripts/agent-rules.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (2.601333ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.657292ms)
+✔ active docs never tell agents to add needs-decision (1.826208ms)
+✔ start verifies the process and writes the status file (542.833375ms)
+✔ check reports alive while the job runs and missing after it exits (3178.284875ms)
+✔ a job started with the old nohup syntax is reported missing (92.970583ms)
+✔ the boundary teardown kills the old-style job and spares the dispatched job (620.8585ms)
+✔ start reports missing when the command dies immediately (532.935208ms)
+✔ start reports missing when the command cannot spawn (538.025083ms)
+✔ wait accepts a successful child regardless of its log text (1079.392625ms)
+✔ wait fails when the child exits non-zero after start returns (1066.639416ms)
+✔ wait ok when the child exits 0 after start returns with an ordinary log (1085.976917ms)
+✔ a doc change selects the tests that name it, split by runner (0.71825ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.08775ms)
+✔ a hillclimb flow with no capability row fails the coverage check (3.134667ms)
+✔ coverage rows report scored, built-not-run, none, and tests only (2.694ms)
+✔ ranks growth by the 7-day delta and stock by current count (0.6645ms)
+✔ report lists every category with its 7-day change, sorted, and writes the summary file (210.586666ms)
+✔ a baseline file born inside the window reports its whole count as growth (197.41775ms)
+✔ refuses a shallow clone, whose history would fake every delta as growth (183.996208ms)
+✔ a write pattern added 3+ times in the window with no gate becomes a candidate ticket (208.191958ms)
+✔ two new sites stay below the threshold and write no candidate (204.51975ms)
+✔ a pattern that a gate already covers never becomes a candidate (206.564458ms)
+✔ the watchlist patterns compile and each has a suggested rule when ungated (0.105917ms)
+✔ with --drift the report appends the spec/ADR drift section and writes the JSON (268.050208ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (1.195208ms)
+✔ hasCode classifies documents (0.215209ms)
+✔ hasCode classifies server markdown fixtures (0.051125ms)
+✔ hasCode classifies shared markdown fixtures (0.056666ms)
+✔ hasCode classifies integration markdown fixtures (0.052542ms)
+✔ hasCode classifies executable evidence (0.139125ms)
+✔ hasCode classifies non-markdown evidence (0.12125ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.042ms)
+✔ hasCode classifies data beside an executable check (0.965792ms)
+✔ hasCode classifies the #2188 lessons and evidence change (0.545334ms)
+✔ hasCode classifies epic data (0.041792ms)
+✔ hasCode classifies code (0.045833ms)
+✔ hasCode classifies unknown paths (0.040458ms)
+✔ hasCode classifies mixed changes (0.028417ms)
+✔ hasCode classifies empty changes (0.023792ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (864.667542ms)
+✔ CI classifies before heavy work and always runs push coverage (1.233042ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (580.573708ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.414208ms)
+✔ documentation skips code checks, unknown paths fail closed (2.980042ms)
+✔ changes to prepush scripts run the CI self-test files locally (3.422125ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.153417ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (273.531792ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.098917ms)
+✔ lesson entries use the same document checks as other Markdown (0.077125ms)
+✔ local code checks retain fast checks and advisory dead-class (0.236125ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.315625ms)
+✔ code changes keep suites in CI and out of local plans (2.099791ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (4.274834ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.284584ms)
+✔ a docs-only data change still runs every test that reads the changed file (30.960083ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (5.321584ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (87.759833ms)
+✔ a board card source change selects the spec that reads its title (28.80775ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.54825ms)
+✔ CLI skips real document changes and rejects a missing base (1077.091625ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (535.831834ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (280.029958ms)
+✔ prepush vitest only forgives files listed as known local red (0.819584ms)
+✔ plan children do not inherit the git hook repository binding (49.953917ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (23.702417ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (20.104625ms)
+✔ workflow preserves comments about external behavior (0.342125ms)
+✔ forced push coverage preserves the English gate range across multiple commits (276.22575ms)
+ℹ tests 69
+ℹ suites 0
+ℹ pass 69
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14640.591792
+
+EXIT 0
+
+$ python3 scripts/pr-evidence-gate.test.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.026s
+
+OK
+
+EXIT 0
+
+$ python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.520s
+
+OK
+
+EXIT 0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+EXIT 0
+
+$ pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+Checked 1225 files in 1006ms. No fixes applied.
+Found 1 info.
+
+EXIT 0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (1.1s)
+[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (1.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+EXIT 0
+
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  2 passed (2)
+      Tests  276 passed (276)
+   Start at  16:36:23
+   Duration  523ms (transform 71%, import 21%, tests 8%, worker 1%)
+
+
+EXIT 0
+
+$ node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+
+EXIT 0
+
+$ node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+
+EXIT 0
+
+$ node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
+✔ start verifies the process and writes the status file (537.008916ms)
+✔ check reports alive while the job runs and missing after it exits (3162.193667ms)
+✔ a job started with the old nohup syntax is reported missing (96.266917ms)
+✔ the boundary teardown kills the old-style job and spares the dispatched job (646.193334ms)
+✔ start reports missing when the command dies immediately (535.960958ms)
+✔ start reports missing when the command cannot spawn (535.803875ms)
+✔ wait accepts a successful child regardless of its log text (1076.425167ms)
+✔ wait fails when the child exits non-zero after start returns (1078.164708ms)
+✔ wait ok when the child exits 0 after start returns with an ordinary log (1083.491167ms)
+✔ ticket numbers match only on digit boundaries (0.946958ms)
+✔ no sources hit means no conflicts (0.446208ms)
+✔ the 2026-10-24 #1569 workspaces are reported with their branches (0.146834ms)
+✔ the dispatch target directory itself is not a conflict (0.07175ms)
+✔ remote branches and open PRs mentioning the ticket are conflicts (0.174959ms)
+✔ a missing gh or git source is reported unchecked, not as clear (0.083917ms)
+✔ running agents mentioning the ticket are conflicts, the dispatch chain is not (0.186875ms)
+✔ start --ticket refuses when another git workdir in tmp holds the ticket, --force overrides (12191.861875ms)
+✔ start rejects a non-numeric ticket (38.152375ms)
+✔ deepseek-v4-flash from issue #2021 is banned; deepseek-v4.1-flash is not (0.867167ms)
+✔ parseAiRouteSelection reads the #2021 implement route line (0.406458ms)
+✔ bannedModelFromLog reds the real #1517/#1792 exit artifact (0.170333ms)
+✔ bannedModelFromLog stays quiet for the allowed deepseek-v4.1-flash route (0.065292ms)
+✔ AGENTS.md Do-not-use models are covered by BANNED_MODEL_IDS (0.523042ms)
+✔ AGENTS.md Model roles table pins the role models and names no banned id (0.518459ms)
+✔ parseModelRoles finds a banned id written without backticks (0.132916ms)
+✔ parseModelRoles keeps a model id after an escaped pipe (0.076792ms)
+✔ parseModelRoles drops sentence punctuation after a model id (0.0715ms)
+✔ parseModelRoles retains banned ids and excludes tables under other headings (0.134542ms)
+✔ parseModelRoles returns no rows when the heading is missing (0.05775ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12274.311459
+
+EXIT 0
+
+$ node --test scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
+✔ colored gh JSON still parses (0.9985ms)
+✔ isBot uses one allowlist for logins, app prefixes and bot suffixes (0.227542ms)
+✔ isoWeek labels the week of a date (0.131541ms)
+✔ fixture metrics match the hand-computed table (1.2485ms)
+✔ missing token data is counted separately instead of becoming zero (0.381625ms)
+✔ an empty week yields an empty table without errors or division by zero (0.160458ms)
+✔ duplicate pull requests from overlapping pages count once (0.0975ms)
+✔ report states the week, the table and the incomplete reason (0.192ms)
+✔ a bot-authored pull request merged by a person without auto-merge counts as human (0.125333ms)
+✔ null backfill and null usage stay missing instead of counting as zero (0.883333ms)
+✔ a recorded zero token count stays zero (0.214709ms)
+✔ fetchPrs pages through results and normalizes nodes (0.891583ms)
+✔ fetchPrs keeps earlier pages and reports a rate limit as incomplete (0.195791ms)
+✔ fetchPrs rethrows errors that are not rate limits (0.260291ms)
+✔ fetchPrs marks the week incomplete when more pages remain after the cap (0.342791ms)
+✔ fetchMainRuns pages until a short page and normalizes runs (1.011792ms)
+✔ fetchMainRuns counts a main run as red only when a required check fails (0.142042ms)
+✔ fetchMainRuns keeps earlier runs and reports a rate limit while reading jobs (0.127625ms)
+✔ CLI writes the weekly JSON and the markdown report from a fixture (51.155959ms)
+✔ CLI runs on an empty fixture (44.663834ms)
+✔ the weekly workflow runs delivery metrics and posts the report (0.180291ms)
+✔ ci runs the delivery metrics self-test beside the gardener sweep (0.125208ms)
+✔ CLI reads a ledger file for outcomes and usage (44.638ms)
+✔ a spec naming an existing path and an existing exported function reports nothing (245.505875ms)
+✔ a spec naming a deleted path reports it once with its line number (296.63175ms)
+✔ a renamed function is reported as a missing identifier (306.933375ms)
+✔ names inside fenced code blocks and URLs are ignored (282.747042ms)
+✔ a table row marked superseded is ignored (294.996209ms)
+✔ short or common words in backticks are not treated as identifiers (219.639042ms)
+✔ a path that never existed in the repo is not reported (249.971417ms)
+✔ a relative path resolving under a tracked file is not reported (214.785ms)
+✔ a path with a line-range suffix is checked without the range (252.30325ms)
+✔ a directory reference is not reported as a missing path (232.612167ms)
+✔ a deleted relative path is reported through its historical repository path (426.633125ms)
+✔ historical suffix matching respects directory boundaries (335.279167ms)
+✔ uncommitted file restoration does not hide drift at HEAD (266.7795ms)
+✔ an identifier mentioned only in integration fixtures is still missing from application code (235.6485ms)
+✔ a deleted relative path with a line-range suffix reports its normalized path (223.859709ms)
+✔ prunes evidence folders older than the window and records their last commit (397.105792ms)
+✔ the last commit touching any file in the folder decides its age (339.835625ms)
+✔ keeps folders that code, CI or scripts reference, matching whole folder names (354.186291ms)
+✔ dry run reports without touching the tree or the ledger (289.197375ms)
+✔ merges into an existing ledger with sorted keys and honours --days (543.572959ms)
+✔ nothing due leaves the tree unchanged (273.227667ms)
+✔ refuses a shallow clone, where every folder looks freshly committed (394.931625ms)
+✔ a staged folder that has no commit yet is left alone (446.21125ms)
+✔ ranks growth by the 7-day delta and stock by current count (0.921792ms)
+✔ report lists every category with its 7-day change, sorted, and writes the summary file (351.998208ms)
+✔ a baseline file born inside the window reports its whole count as growth (386.08825ms)
+✔ refuses a shallow clone, whose history would fake every delta as growth (323.925541ms)
+✔ a write pattern added 3+ times in the window with no gate becomes a candidate ticket (398.646709ms)
+✔ two new sites stay below the threshold and write no candidate (415.370833ms)
+✔ a pattern that a gate already covers never becomes a candidate (384.813041ms)
+✔ the watchlist patterns compile and each has a suggested rule when ungated (0.200208ms)
+✔ with --drift the report appends the spec/ADR drift section and writes the JSON (637.292709ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4145.4805
+
+EXIT 0
+
+$ pnpm prepush --ci
+$ node scripts/prepush.mjs --ci
+[prepush] git fetch origin main failed (exit 255); using local origin/main, which may be stale
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 227 tsx + 274 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.541s
+
+OK
+[prepush] pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+Checked 1225 files in 2s. No fixes applied.
+Found 1 info.
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (1.9s)
+[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (4.0s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (89.012666ms)
+✔ apps/web/e2e/board-reach.spec.ts (73.592167ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (65.594625ms)
+✔ registry reach: scripts/drive-unregistered.mjs (65.809334ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (57.277833ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (56.899875ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (103.878875ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (103.120083ms)
+✔ discovers committed, staged and untracked additions from the base (833.670417ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1557.373667
+[prepush] node --test scripts/escape-trace.test.mjs
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (985.836ms)
+✔ CLI does not truncate more than 200 qualifying commits (8211.34525ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (332.413417ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (268.308625ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (247.08375ms)
+✔ a revert body resolves to the reverted commit and its PR (262.783416ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (261.17975ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (263.751667ms)
+✔ blame split across two commits yields multiple-origin, not a guess (294.501084ms)
+✔ shallow history yields unresolved with a reason (250.362375ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (489.292917ms)
+✔ an introducing merge before --since is still resolvable (244.46275ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (243.930375ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (303.598916ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (263.667042ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (323.538541ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (250.445042ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.18325ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.076292ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.063ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (247.394083ms)
+✔ blame resolves an unquoted path that contains spaces (266.663583ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (546.930958ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (156.261041ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (512.53225ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (1125.371292ms)
+✔ the reviewer-input object contains no defect label, location or correction (348.714833ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (433.04325ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (398.375458ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (375.16775ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (538.247ms)
+✔ successive exports preserve existing cases and only upsert matching identities (683.109333ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (249.426416ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (542.026584ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19989.064292
+[prepush] node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
+{
+  "ok": true,
+  "caseCount": 0
+}
+[prepush] node --test scripts/review-escapes.test.mjs
+✔ CLI fetches original PR reviews through every page and retains evidence (484.199292ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (700.2375ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (543.756125ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (1229.188666ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (473.402125ms)
+✔ the CLI suite runs in local and CI prepush plans (1.025417ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (1478.718792ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (919.126875ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (476.551125ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (435.542583ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (878.286292ms)
+✔ non-approving formal AI reviews do not establish AI coverage (871.804ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (867.372541ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9413.551042
+[prepush] node --test scripts/escape-eval-loop.test.mjs
+✔ escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case (870.33025ms)
+✔ scoped Cairn fix subjects enter the loop; incidental revert wording does not (901.422083ms)
+✔ local and CI prepush plans execute escape-eval-loop tests (1.584ms)
+✔ CLI rejects missing bounds and unknown arguments (122.702959ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1936.238084
+[prepush] python3 scripts/pr-evidence-gate.test.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.031s
+
+OK
+[prepush] node scripts/doc-reader-tests.mjs .claude/skills/pr-cairn/SKILL.md .claude/skills/retro-cairn/SKILL.md .claude/skills/verify-cairn/SKILL.md .github/PULL_REQUEST_TEMPLATE.md AGENTS.md docs/README.md docs/adr/0025-eval-surface-into-d4-protected-paths.md docs/adr/0028-phase-1-merge-routes.md docs/agent-dispatch-prompts.md docs/feature-map.md docs/lessons/README.md docs/lessons/baselines.json docs/lessons/events.jsonl docs/ops/lane-workers.md docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md docs/spec/29-evaluation-and-data-loop.md .claude/skills/verify-cairn/changelog/2026-10-30-2200.md docs/lessons/2200-project-runtime-verification.md docs/verify/2200/deleted-reference-audit.log docs/verify/2200/plan-before-after.log
+[doc-reader-tests] node --test docs/verify/2136/review-check.test.mjs scripts/agent-rules.test.mjs scripts/commit-author-policy.test.mjs scripts/doc-reader-tests.test.mjs scripts/prepush.test.mjs
+✖ incident handoff leaves recurrence accounting to the collector (0.807209ms)
+✔ dispatcher message exists and retains the closing trailer (24.195666ms)
+✔ recovery fixture executes the recipe without incident wording assertions (0.181ms)
+✔ merge instructions require the pr-gate auto-merge verdict (1.620042ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.531625ms)
+✔ active docs never tell agents to add needs-decision (1.40825ms)
+✔ AGENTS.md separates bot rebase from human squash (1.523625ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.181708ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.46575ms)
+✔ documented preparation overrides inherited bot author and committer identities (306.173458ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.369208ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.274334ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.186083ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (324.639667ms)
+✔ a doc change selects the tests that name it, split by runner (0.888083ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.109417ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (2.306041ms)
+✔ hasCode classifies documents (0.360209ms)
+✔ hasCode classifies server markdown fixtures (0.070625ms)
+✔ hasCode classifies shared markdown fixtures (0.072166ms)
+✔ hasCode classifies integration markdown fixtures (0.063625ms)
+✔ hasCode classifies executable evidence (0.179125ms)
+✔ hasCode classifies non-markdown evidence (0.163333ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.077084ms)
+✔ hasCode classifies data beside an executable check (1.007333ms)
+✔ hasCode classifies the #2188 lessons and evidence change (0.707375ms)
+✔ hasCode classifies epic data (0.06225ms)
+✔ hasCode classifies code (0.078334ms)
+✔ hasCode classifies unknown paths (0.052958ms)
+✔ hasCode classifies mixed changes (0.0415ms)
+✔ hasCode classifies empty changes (0.030208ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (1261.392709ms)
+✔ CI classifies before heavy work and always runs push coverage (0.977916ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (774.269458ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.499417ms)
+✔ documentation skips code checks, unknown paths fail closed (1.229417ms)
+✔ changes to prepush scripts run the CI self-test files locally (4.633666ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.210792ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (317.689916ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.464958ms)
+✔ lesson entries use the same document checks as other Markdown (0.243583ms)
+✔ local code checks retain fast checks and advisory dead-class (0.339458ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.440292ms)
+✔ code changes keep suites in CI and out of local plans (2.47175ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (2.717708ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.495334ms)
+✔ a docs-only data change still runs every test that reads the changed file (24.319667ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (6.991ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (112.588125ms)
+✔ a board card source change selects the spec that reads its title (37.055042ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.811667ms)
+✔ CLI skips real document changes and rejects a missing base (1334.984083ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (662.652042ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (371.016583ms)
+✔ prepush vitest only forgives files listed as known local red (1.063167ms)
+✔ plan children do not inherit the git hook repository binding (66.613666ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (30.819583ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (24.6245ms)
+✔ workflow preserves comments about external behavior (0.414667ms)
+✔ forced push coverage preserves the English gate range across multiple commits (373.270542ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 59
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5499.72875
+
+✖ failing tests:
+
+test at docs/verify/2136/review-check.test.mjs:6:1
+✖ incident handoff leaves recurrence accounting to the collector (0.807209ms)
+  Error: ENOENT: no such file or directory, open 'docs/lessons/events.jsonl'
+      at readFileSync (node:fs:440:20)
+      at TestContext.<anonymous> (file://<worktree>/docs/verify/2136/review-check.test.mjs:7:18)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'docs/lessons/events.jsonl'
+  }
+[ELIFECYCLE] Command failed with exit code 1.
+
+EXIT 1
+
+$ pnpm prepush
+$ node scripts/prepush.mjs
+[prepush] git fetch origin main failed (exit 255); using local origin/main, which may be stale
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 227 tsx + 274 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.504s
+
+OK
+[prepush] pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+Checked 1225 files in 1766ms. No fixes applied.
+Found 1 info.
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (1.6s)
+[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (2.1s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (54.022708ms)
+✔ apps/web/e2e/board-reach.spec.ts (52.093541ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (54.463458ms)
+✔ registry reach: scripts/drive-unregistered.mjs (56.440166ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (54.348625ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (53.225292ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (92.325375ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (89.978083ms)
+✔ discovers committed, staged and untracked additions from the base (710.6385ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1289.371584
+[prepush] node --test scripts/escape-trace.test.mjs
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (1135.44525ms)
+✔ CLI does not truncate more than 200 qualifying commits (6325.453125ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (283.0735ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (215.285292ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (205.552667ms)
+✔ a revert body resolves to the reverted commit and its PR (220.038542ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (209.827542ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (210.471875ms)
+✔ blame split across two commits yields multiple-origin, not a guess (237.24975ms)
+✔ shallow history yields unresolved with a reason (213.520958ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (411.35925ms)
+✔ an introducing merge before --since is still resolvable (212.348ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (227.774666ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (278.447708ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (220.955167ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (263.831416ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (208.647542ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.16925ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.068916ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.05725ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (219.0215ms)
+✔ blame resolves an unquoted path that contains spaces (229.749125ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (470.503125ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (135.18225ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (442.0165ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (918.479333ms)
+✔ the reviewer-input object contains no defect label, location or correction (293.669333ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (355.689667ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (332.398708ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (325.25125ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (437.132041ms)
+✔ successive exports preserve existing cases and only upsert matching identities (551.5435ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (205.576917ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (471.176916ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16530.115584
+[prepush] node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
+{
+  "ok": true,
+  "caseCount": 0
+}
+[prepush] node --test scripts/review-escapes.test.mjs
+✔ CLI fetches original PR reviews through every page and retains evidence (709.366084ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (702.279166ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (521.685292ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (1215.220541ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (492.495083ms)
+✔ the CLI suite runs in local and CI prepush plans (0.881959ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (1800.743916ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (926.726208ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (473.22375ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (471.776666ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (948.543667ms)
+✔ non-approving formal AI reviews do not establish AI coverage (942.563042ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (943.744458ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10196.021417
+[prepush] node --test scripts/escape-eval-loop.test.mjs
+✔ escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case (882.945584ms)
+✔ scoped Cairn fix subjects enter the loop; incidental revert wording does not (918.992458ms)
+✔ local and CI prepush plans execute escape-eval-loop tests (1.433ms)
+✔ CLI rejects missing bounds and unknown arguments (109.904917ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1952.518833
+[prepush] python3 scripts/pr-evidence-gate.test.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.027s
+
+OK
+[prepush] node scripts/doc-reader-tests.mjs .claude/skills/pr-cairn/SKILL.md .claude/skills/retro-cairn/SKILL.md .claude/skills/verify-cairn/SKILL.md .github/PULL_REQUEST_TEMPLATE.md AGENTS.md docs/README.md docs/adr/0025-eval-surface-into-d4-protected-paths.md docs/adr/0028-phase-1-merge-routes.md docs/agent-dispatch-prompts.md docs/feature-map.md docs/lessons/README.md docs/lessons/baselines.json docs/lessons/events.jsonl docs/ops/lane-workers.md docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md docs/spec/29-evaluation-and-data-loop.md .claude/skills/verify-cairn/changelog/2026-10-30-2200.md docs/lessons/2200-project-runtime-verification.md docs/verify/2200/deleted-reference-audit.log docs/verify/2200/plan-before-after.log
+[doc-reader-tests] node --test docs/verify/2136/review-check.test.mjs scripts/agent-rules.test.mjs scripts/commit-author-policy.test.mjs scripts/doc-reader-tests.test.mjs scripts/prepush.test.mjs
+✖ incident handoff leaves recurrence accounting to the collector (0.369542ms)
+✔ dispatcher message exists and retains the closing trailer (15.417708ms)
+✔ recovery fixture executes the recipe without incident wording assertions (0.122959ms)
+✔ merge instructions require the pr-gate auto-merge verdict (2.127792ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.825708ms)
+✔ active docs never tell agents to add needs-decision (1.347084ms)
+✔ AGENTS.md separates bot rebase from human squash (1.2195ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.143542ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.102083ms)
+✔ documented preparation overrides inherited bot author and committer identities (208.846375ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.256333ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.166625ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.107417ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (209.747208ms)
+✔ a doc change selects the tests that name it, split by runner (0.6845ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.083292ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (0.895916ms)
+✔ hasCode classifies documents (0.711ms)
+✔ hasCode classifies server markdown fixtures (0.054541ms)
+✔ hasCode classifies shared markdown fixtures (0.05575ms)
+✔ hasCode classifies integration markdown fixtures (0.048042ms)
+✔ hasCode classifies executable evidence (0.137334ms)
+✔ hasCode classifies non-markdown evidence (0.120208ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.053416ms)
+✔ hasCode classifies data beside an executable check (0.276667ms)
+✔ hasCode classifies the #2188 lessons and evidence change (0.335917ms)
+✔ hasCode classifies epic data (0.042334ms)
+✔ hasCode classifies code (0.044334ms)
+✔ hasCode classifies unknown paths (0.030166ms)
+✔ hasCode classifies mixed changes (0.028666ms)
+✔ hasCode classifies empty changes (0.023958ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (863.720792ms)
+✔ CI classifies before heavy work and always runs push coverage (0.721834ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (585.802167ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.401042ms)
+✔ documentation skips code checks, unknown paths fail closed (0.981958ms)
+✔ changes to prepush scripts run the CI self-test files locally (3.652291ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.175417ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (248.993042ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.087542ms)
+✔ lesson entries use the same document checks as other Markdown (0.222042ms)
+✔ local code checks retain fast checks and advisory dead-class (0.325916ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.351041ms)
+✔ code changes keep suites in CI and out of local plans (1.449792ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (0.577083ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.278167ms)
+✔ a docs-only data change still runs every test that reads the changed file (20.107083ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (5.118042ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (81.098667ms)
+✔ a board card source change selects the spec that reads its title (26.871833ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.634542ms)
+✔ CLI skips real document changes and rejects a missing base (1038.588625ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (528.641625ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (275.835459ms)
+✔ prepush vitest only forgives files listed as known local red (0.582833ms)
+✔ plan children do not inherit the git hook repository binding (50.305917ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (22.643292ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (19.987375ms)
+✔ workflow preserves comments about external behavior (0.324042ms)
+✔ forced push coverage preserves the English gate range across multiple commits (272.024584ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 59
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4117.024833
+
+✖ failing tests:
+
+test at docs/verify/2136/review-check.test.mjs:6:1
+✖ incident handoff leaves recurrence accounting to the collector (0.369542ms)
+  Error: ENOENT: no such file or directory, open 'docs/lessons/events.jsonl'
+      at readFileSync (node:fs:440:20)
+      at TestContext.<anonymous> (file://<worktree>/docs/verify/2136/review-check.test.mjs:7:18)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'docs/lessons/events.jsonl'
+  }
+[ELIFECYCLE] Command failed with exit code 1.
+
+EXIT 1
+
+$ pnpm prepush --self-test
+$ node scripts/prepush.mjs --self-test
+[prepush] node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/epic-done.test.mjs scripts/agent-rules.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (1.192208ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.404334ms)
+✔ active docs never tell agents to add needs-decision (0.69675ms)
+✔ a doc change selects the tests that name it, split by runner (0.672042ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.081625ms)
+✔ prose flags Chinese outside code spans, fences and HTML comments (1.140667ms)
+✔ code checks comments only; UI strings and exempt paths pass (1.160959ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (711.030167ms)
+✔ --text checks a PR body file (76.766041ms)
+✔ caller-only required-artifact.json cannot satisfy frozen checks (223.972541ms)
+✔ caller-only ignored-artifact.json cannot satisfy frozen checks (267.390084ms)
+✔ tracked caller edits do not affect checks in the detached main tree (253.976167ms)
+✔ temporary main worktree is removed after success (313.979875ms)
+✔ temporary main worktree is removed after failure (282.327667ms)
+✔ temporary main worktree is removed after timeout (270.107375ms)
+✔ temporary main worktree is removed after midway error (271.791084ms)
+✔ temporary main worktree is removed after wrong HEAD (310.71275ms)
+✔ temporary main worktree is removed after add error (250.961542ms)
+✔ complete: closed issues, isolated remote-main checks and one green commit (1.059083ms)
+✔ failure mode 1: API errors and rate limits are unknown, even with pause or fail (0.330625ms)
+✔ failure mode 1: malformed or partial GitHub data never completes (1.191792ms)
+✔ failure mode 2: not-planned, manual and unmerged closures name the issue (1.722833ms)
+✔ failure mode 3: a merged linked PR does not substitute for an open issue (0.430417ms)
+✔ failure mode 4: no green main commit since the last closing SHA is incomplete (0.567916ms)
+✔ failure mode 5: green at the closing commit still completes after later red merges (0.543625ms)
+✔ required checks must succeed together on one eligible commit (0.504292ms)
+✔ missing, pending, skipped and neutral required checks do not count as success (4.149625ms)
+✔ caller edits and feature HEAD do not prevent checks at remote main (0.566583ms)
+✔ failure mode 7: frozen manifest comes only from git show at the selected ref (0.60875ms)
+✔ failure mode 8: invalid manifests fail closed before commands run (0.938375ms)
+✔ missing or malformed manifests and git runner failures are unknown (0.217333ms)
+✔ failure mode 9: missing commands, nonzero exits and missing expected stdout fail checks (1.882042ms)
+✔ unexpected command errors and malformed command output are unknown (0.969792ms)
+✔ failure mode 10: no started-at means no cap even when checks fail (0.554209ms)
+✔ paused: every human-wait label on issues or open linked PRs takes priority over failure (2.466625ms)
+✔ closed linked PR labels do not pause, while explicit pause does (0.74625ms)
+✔ failed: explicit failure and elapsed maxHours apply only when not complete or paused (1.94025ms)
+✔ commit closers must belong to main; the latest of multiple closing changes sets the boundary (0.887542ms)
+✔ all REST pages are consumed and incomplete check pages cannot masquerade as green (0.659708ms)
+✔ invalid CLI arguments fail before any runner executes (0.293708ms)
+✔ JSON output contains the same decision and the pure decision does not mutate facts (0.865917ms)
+✔ import has no CLI effects and the actual CLI guard emits unknown without network (69.8475ms)
+✔ CI includes this test and ownership covers the checker and frozen manifests (0.544875ms)
+✔ green side-branch commits cannot establish a green main after closure (0.764959ms)
+✔ parallel closing changes require a green main descendant of both changes (0.584917ms)
+✔ non-Error runner throws still produce unknown (0.126958ms)
+✔ check-run requests stop at the first green commit, newest first (1.021291ms)
+✔ at most 30 eligible commits are examined, including a green thirtieth commit (2.879917ms)
+✔ 31 eligible commits with green index 30 yield unknown (0.880333ms)
+✔ 30 eligible commits with green index -1 yield incomplete (0.54ms)
+✔ 40 eligible commits with green index 0 yield complete (0.406334ms)
+✔ no green commit reports missing and unsuccessful required checks on the newest commit (0.770375ms)
+✔ remote main movement after the first read does not invalidate local checks (0.585291ms)
+✔ each command receives a 900 second timeout and a timeout fails that check (0.452083ms)
+✔ a remote main SHA missing locally stays unknown and requests an explicit fetch (0.114292ms)
+✔ only completed success is green, regardless of future GitHub status values (1.832917ms)
+✔ partial or reordered examined commits cannot establish completion (0.448417ms)
+✔ empty required checks cannot establish completion without CI evidence (0.325125ms)
+✔ untracked files before and during checks preserve every check result (1.075958ms)
+✔ default manifest is pinned to the GitHub main SHA before it is read (0.549166ms)
+✔ explicit manifest refs must resolve to ancestors of remote main (0.7675ms)
+✔ history and descendant membership do not perform repeated array scans (0.511541ms)
+✔ finding the latest closure reads issue SHAs independently of history length (1.085542ms)
+✔ last closing events need nodes and bounded length without forward pageInfo (0.687833ms)
+✔ git and gh capture stderr and include it in unknown reasons (0.214709ms)
+✔ manifest check failures capture stderr tails including timeouts (0.937292ms)
+✔ the checker stays within 400 lines (0.1335ms)
+✔ an overridden TMPDIR on macOS does not move the shared lock directory (0.95525ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (0.523917ms)
+✔ CI environments skip the queue (0.103541ms)
+✔ each slot owns its own e2e port and build directory (0.156417ms)
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15007.528ms)
+✔ a bad slot count gets a warning and a single slot (109.84925ms)
+✔ waiters see their queue position and are served first-come first-served (382.8855ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (362.081709ms)
+✔ a clean exit releases the slot too (364.46775ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15157.704958ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (15356.310125ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (1850.026208ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (1525.233792ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (97.313916ms)
+✔ an inherited slot variable that no live process holds is ignored (56.62025ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (86.2ms)
+✔ CI skips the queue even when every slot is taken (96.945333ms)
+✔ run wrapper passes the exit code through and frees the slot (96.497ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (114.50325ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (3223.843583ms)
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15058.646166ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (425.202292ms)
+✔ prepush-vitest reuses an inherited live lease without queueing (132.52575ms)
+✔ local prepush starts fast checks even when every heavy slot is occupied (913.998542ms)
+✖ local prepush ignores a squatted slot port because fast checks do not bind it (15142.979958ms)
+✔ prepush e2e shard mode still queues for a heavy slot and releases it (472.56925ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (2.47325ms)
+✔ hasCode classifies documents (0.450459ms)
+✔ hasCode classifies server markdown fixtures (0.057875ms)
+✔ hasCode classifies shared markdown fixtures (0.055958ms)
+✔ hasCode classifies integration markdown fixtures (0.047ms)
+✔ hasCode classifies executable evidence (0.145667ms)
+✔ hasCode classifies non-markdown evidence (0.116958ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.136375ms)
+✔ hasCode classifies data beside an executable check (0.283625ms)
+✔ hasCode classifies the #2188 lessons and evidence change (0.481375ms)
+✔ hasCode classifies epic data (0.080459ms)
+✔ hasCode classifies code (0.045083ms)
+✔ hasCode classifies unknown paths (0.030875ms)
+✔ hasCode classifies mixed changes (0.029167ms)
+✔ hasCode classifies empty changes (0.040875ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (1072.1445ms)
+✔ CI classifies before heavy work and always runs push coverage (0.956875ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (751.157916ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.51125ms)
+✔ documentation skips code checks, unknown paths fail closed (1.170125ms)
+✔ changes to prepush scripts run the CI self-test files locally (4.398167ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.220541ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (319.646792ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.728459ms)
+✔ lesson entries use the same document checks as other Markdown (0.097167ms)
+✔ local code checks retain fast checks and advisory dead-class (0.483792ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.623167ms)
+✔ code changes keep suites in CI and out of local plans (2.353625ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (0.825292ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.413042ms)
+✔ a docs-only data change still runs every test that reads the changed file (23.476583ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (8.245666ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (114.157416ms)
+✔ a board card source change selects the spec that reads its title (37.210667ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.777083ms)
+✔ CLI skips real document changes and rejects a missing base (1200.883792ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (632.904041ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (338.058042ms)
+✔ prepush vitest only forgives files listed as known local red (0.665875ms)
+✔ plan children do not inherit the git hook repository binding (56.30275ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (25.788041ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (21.325084ms)
+✔ workflow preserves comments about external behavior (0.364834ms)
+✔ forced push coverage preserves the English gate range across multiple commits (326.308791ms)
+ℹ tests 137
+ℹ suites 0
+ℹ pass 134
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 86093.358666
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:224:1
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15007.528ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:230:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:576:1
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15058.646166ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:585:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:697:1
+✖ local prepush ignores a squatted slot port because fast checks do not bind it (15142.979958ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:718:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+[ELIFECYCLE] Command failed with exit code 1.
+
+EXIT 1
+
+$ git diff --check
+
+EXIT 0
+
+
+=== Final prepush and discipline reruns ===
+
+$ pnpm prepush --ci
+$ node scripts/prepush.mjs --ci
+[prepush] git fetch origin main failed (exit 255); using local origin/main, which may be stale
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 227 tsx + 274 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.413s
+
+OK
+[prepush] pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+Checked 1225 files in 935ms. No fixes applied.
+Found 1 info.
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (1.3s)
+[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (1.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (27.996166ms)
+✔ apps/web/e2e/board-reach.spec.ts (26.63675ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (26.733041ms)
+✔ registry reach: scripts/drive-unregistered.mjs (30.07525ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (28.116417ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (27.891916ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (55.795542ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (54.392916ms)
+✔ discovers committed, staged and untracked additions from the base (475.648583ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 793.193625
+[prepush] node --test scripts/escape-trace.test.mjs
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (718.741125ms)
+✔ CLI does not truncate more than 200 qualifying commits (5585.831375ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (250.219917ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (185.146125ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (178.331208ms)
+✔ a revert body resolves to the reverted commit and its PR (206.171042ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (197.579667ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (202.408334ms)
+✔ blame split across two commits yields multiple-origin, not a guess (216.542875ms)
+✔ shallow history yields unresolved with a reason (195.177791ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (394.001375ms)
+✔ an introducing merge before --since is still resolvable (187.009333ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (195.166291ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (244.559125ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (196.407667ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (228.308333ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (188.825083ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.164375ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.068084ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.050166ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (191.745083ms)
+✔ blame resolves an unquoted path that contains spaces (197.927125ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (400.5825ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (121.949375ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (389.995042ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (816.511042ms)
+✔ the reviewer-input object contains no defect label, location or correction (261.96575ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (315.867125ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (295.619208ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (287.87825ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (385.650333ms)
+✔ successive exports preserve existing cases and only upsert matching identities (487.096292ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (174.803709ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (406.152541ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14348.660625
+[prepush] node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
+{
+  "ok": true,
+  "caseCount": 0
+}
+[prepush] node --test scripts/review-escapes.test.mjs
+✔ CLI fetches original PR reviews through every page and retains evidence (318.751917ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (523.097083ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (358.6205ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (886.249042ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (306.138166ms)
+✔ the CLI suite runs in local and CI prepush plans (0.877084ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (943.459834ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (577.392542ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (291.753292ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (291.057791ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (579.793375ms)
+✔ non-approving formal AI reviews do not establish AI coverage (576.248042ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (555.474083ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6253.148667
+[prepush] node --test scripts/escape-eval-loop.test.mjs
+✔ escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case (708.862167ms)
+✔ scoped Cairn fix subjects enter the loop; incidental revert wording does not (741.741416ms)
+✔ local and CI prepush plans execute escape-eval-loop tests (1.521042ms)
+✔ CLI rejects missing bounds and unknown arguments (110.454625ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1605.913459
+[prepush] python3 scripts/pr-evidence-gate.test.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.029s
+
+OK
+[prepush] node scripts/doc-reader-tests.mjs .claude/skills/pr-cairn/SKILL.md .claude/skills/retro-cairn/SKILL.md .claude/skills/verify-cairn/SKILL.md .github/PULL_REQUEST_TEMPLATE.md AGENTS.md docs/README.md docs/adr/0025-eval-surface-into-d4-protected-paths.md docs/adr/0028-phase-1-merge-routes.md docs/agent-dispatch-prompts.md docs/feature-map.md docs/lessons/README.md docs/lessons/baselines.json docs/lessons/events.jsonl docs/ops/lane-workers.md docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md docs/spec/29-evaluation-and-data-loop.md .claude/skills/verify-cairn/changelog/2026-10-30-2200.md docs/lessons/2200-archived-collector-reader.md docs/lessons/2200-project-runtime-verification.md docs/verify/2200/deleted-reference-audit.log docs/verify/2200/plan-before-after.log
+[doc-reader-tests] node --test scripts/agent-rules.test.mjs scripts/commit-author-policy.test.mjs scripts/doc-reader-tests.test.mjs scripts/prepush.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (2.21575ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.904625ms)
+✔ active docs never tell agents to add needs-decision (1.337208ms)
+✔ AGENTS.md separates bot rebase from human squash (1.230791ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.1345ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.108875ms)
+✔ documented preparation overrides inherited bot author and committer identities (219.90875ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.297667ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.1715ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.133584ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (214.032708ms)
+✔ a doc change selects the tests that name it, split by runner (0.703375ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.078666ms)
+✔ the retired collector archive is excluded while current identity safeguards remain selected (0.732417ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (2.061916ms)
+✔ hasCode classifies documents (0.275083ms)
+✔ hasCode classifies server markdown fixtures (0.055583ms)
+✔ hasCode classifies shared markdown fixtures (0.063125ms)
+✔ hasCode classifies integration markdown fixtures (0.047125ms)
+✔ hasCode classifies executable evidence (0.146875ms)
+✔ hasCode classifies non-markdown evidence (0.122792ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.043083ms)
+✔ hasCode classifies data beside an executable check (0.333834ms)
+✔ hasCode classifies the #2188 lessons and evidence change (0.363208ms)
+✔ hasCode classifies epic data (0.044375ms)
+✔ hasCode classifies code (0.050208ms)
+✔ hasCode classifies unknown paths (0.033417ms)
+✔ hasCode classifies mixed changes (0.032542ms)
+✔ hasCode classifies empty changes (0.026584ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (879.52975ms)
+✔ CI classifies before heavy work and always runs push coverage (0.749875ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (587.474334ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.422875ms)
+✔ documentation skips code checks, unknown paths fail closed (0.955708ms)
+✔ changes to prepush scripts run the CI self-test files locally (3.5935ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.160416ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (254.131334ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.215417ms)
+✔ lesson entries use the same document checks as other Markdown (0.2015ms)
+✔ local code checks retain fast checks and advisory dead-class (0.269208ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.342875ms)
+✔ code changes keep suites in CI and out of local plans (1.442042ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (0.591ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.283834ms)
+✔ a docs-only data change still runs every test that reads the changed file (20.894ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (5.600125ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (81.749ms)
+✔ a board card source change selects the spec that reads its title (26.883334ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.65175ms)
+✔ CLI skips real document changes and rejects a missing base (1040.050625ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (505.383375ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (282.132416ms)
+✔ prepush vitest only forgives files listed as known local red (0.579375ms)
+✔ plan children do not inherit the git hook repository binding (49.323666ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (22.1835ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (19.615583ms)
+✔ workflow preserves comments about external behavior (0.320291ms)
+✔ forced push coverage preserves the English gate range across multiple commits (270.545458ms)
+ℹ tests 58
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4112.914
+[doc-reader-tests] pnpm exec vitest run apps/server/test/adoption-protected-paths.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/project-local.test.ts
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  3 passed (3)
+      Tests  127 passed (127)
+   Start at  16:42:43
+   Duration  2.76s (tests 40%, transform 32%, import 28%)
+
+[prepush] PASS (15 checks)
+
+EXIT 0
+
+$ pnpm prepush
+$ node scripts/prepush.mjs
+[prepush] git fetch origin main failed (exit 255); using local origin/main, which may be stale
+[prepush] node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+[prepush] node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 14 text + 14 spacing in 13 file(s); 5 css + 227 tsx + 274 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 1b84a9bf8469.
+[prepush] node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 34 components/ui file(s); 24 brand-ink text-role line(s), all registered (24 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+[prepush] python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.313s
+
+OK
+[prepush] pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+Checked 1225 files in 891ms. No fixes applied.
+Found 1 info.
+[prepush] pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[prepush] pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1391 tests in 198 files collected, disk count matches (1.1s)
+[spec-parse-gate] integration/test: 65 test files parsed clean by tsc (1.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+[prepush] node scripts/e2e-affected.mjs --check-coverage
+[e2e:affected] coverage: 0 uncovered spec(s)
+[prepush] node --test docs/verify/1542/reach.test.mjs
+✔ apps/web/e2e/unmapped-reach.spec.ts (28.091041ms)
+✔ apps/web/e2e/board-reach.spec.ts (26.771916ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (26.621667ms)
+✔ registry reach: scripts/drive-unregistered.mjs (32.156917ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (28.733083ms)
+✔ registry reach: .claude/skills/verify-cairn/scripts/drive-hotkeys.mjs (27.893625ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (53.813875ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (53.496833ms)
+✔ discovers committed, staged and untracked additions from the base (466.033833ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 782.633791
+[prepush] node --test scripts/escape-trace.test.mjs
+fatal: Needed a single revision
+fatal: Needed a single revision
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (717.244792ms)
+✔ CLI does not truncate more than 200 qualifying commits (5562.387458ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (251.921041ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (194.121875ms)
+✔ fix: repair regression introduced by #100 (#201) resolves origin PR 100 and fixing PR 201 (191.430917ms)
+✔ a revert body resolves to the reverted commit and its PR (191.483083ms)
+✔ Fixes #N where N is an issue keeps an unvalidated reference with reason issue-not-pr (182.501791ms)
+✔ blame on the parent: the changed line last commit is the introducing commit (184.546542ms)
+✔ blame split across two commits yields multiple-origin, not a guess (211.16425ms)
+✔ shallow history yields unresolved with a reason (187.755625ms)
+✔ exactly 14 days qualifies; 14 days plus one second does not (364.835833ms)
+✔ an introducing merge before --since is still resolvable (173.81075ms)
+✔ each resolved trace has immutable shas, PRs, method, timestamps and file/line evidence (187.44625ms)
+✔ candidates subcommand pipes into trace through the CLI with a recorded responder (235.93575ms)
+✔ blame resolves quotePath-quoted paths that contain a tab and newline (191.344042ms)
+✔ blame keeps separate origins when only one changed path is quotePath-quoted (287.4235ms)
+✔ missing PR metadata stays unresolved with unavailable-pr-metadata (534.1535ms)
+✔ parseDiffGitPaths decodes Git octal escapes as UTF-8 bytes (0.207542ms)
+✔ parseDiffGitPaths keeps unquoted paths that contain spaces (0.072208ms)
+✔ parseDiffGitPaths accepts rename headers with one quoted path and one unquoted path (0.059209ms)
+✔ blame resolves a UTF-8 path emitted as Git octal escapes (520.864209ms)
+✔ blame resolves an unquoted path that contains spaces (666.502ms)
+✔ a controlled introduce/fix history exports one case that validates and replays (1252.520958ms)
+✔ unresolved, conflicting or multiple-origin traces go to a separate candidates file, never the verified bank (404.506708ms)
+✔ missing provenance, an invalid line range, or a replay base not in history fails validation (1200.988417ms)
+✔ exporting twice is byte-identical and never duplicates a case for the same origin PR, fix and location (2368.202333ms)
+✔ the reviewer-input object contains no defect label, location or correction (712.864917ms)
+✔ validate-cases CLI accepts the empty bank and refuses a leaking reviewer-input case (1074.591583ms)
+✔ export maps fixing-parent line ranges back through intervening inserts to the introducing tree (820.813917ms)
+✔ export maps a renamed path at the fixing parent back to the introducing path and lines (773.495625ms)
+✔ newline-terminated blobs do not admit an extra phantom line in export or validate (1181.153416ms)
+✔ successive exports preserve existing cases and only upsert matching identities (1346.615875ms)
+✔ export refuses a history unreachable from origin/main, keeping the case off the verified bank (531.765ms)
+✔ validate refuses a case whose commits are unreachable from origin/main (1092.132958ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23849.86775
+[prepush] node scripts/escape-trace.mjs validate-cases integration/eval/review/cases
+{
+  "ok": true,
+  "caseCount": 0
+}
+[prepush] node --test scripts/review-escapes.test.mjs
+✔ CLI fetches original PR reviews through every page and retains evidence (360.443541ms)
+✔ recorded production gate evidence and formal AI and human reviews classify separately (626.134ms)
+✔ post-merge, edited-after-merge, stale, spoofed and unknown-bot evidence cannot qualify (383.116041ms)
+✔ UTC weeks count distinct original PRs and events and disclose unavailable and unresolved data (1012.683541ms)
+✔ partial pagination failure does not establish a definitive human-only outcome (337.217916ms)
+✔ the CLI suite runs in local and CI prepush plans (2.714916ms)
+✔ gate comments paginate and stale heads and ungrounded carryovers remain unknown (1045.856666ms)
+✔ metadata or comment API failure stays visible even when reviews were retrieved (576.484417ms)
+✔ a recorded BLOCK gate records AI review activity without claiming approval (288.712042ms)
+✔ the resolver outside-window status is excluded rather than counted as unresolved (282.982875ms)
+✔ malformed review and gate pages disclose unavailable data without crashing the CLI (585.871208ms)
+✔ non-approving formal AI reviews do not establish AI coverage (589.604292ms)
+✔ earlier PR commits retain human evidence with explicit head coverage (551.518125ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6712.697708
+[prepush] node --test scripts/escape-eval-loop.test.mjs
+✔ escape-eval-loop traces the introducing PR, labels review path, reports weekly, and exports a bank case (727.168334ms)
+✔ scoped Cairn fix subjects enter the loop; incidental revert wording does not (794.156791ms)
+✔ local and CI prepush plans execute escape-eval-loop tests (1.575167ms)
+✔ CLI rejects missing bounds and unknown arguments (176.200583ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1753.892291
+[prepush] python3 scripts/pr-evidence-gate.test.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.041s
+
+OK
+[prepush] node scripts/doc-reader-tests.mjs .claude/skills/pr-cairn/SKILL.md .claude/skills/retro-cairn/SKILL.md .claude/skills/verify-cairn/SKILL.md .github/PULL_REQUEST_TEMPLATE.md AGENTS.md docs/README.md docs/adr/0025-eval-surface-into-d4-protected-paths.md docs/adr/0028-phase-1-merge-routes.md docs/agent-dispatch-prompts.md docs/feature-map.md docs/lessons/README.md docs/lessons/baselines.json docs/lessons/events.jsonl docs/ops/lane-workers.md docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md docs/spec/29-evaluation-and-data-loop.md .claude/skills/verify-cairn/changelog/2026-10-30-2200.md docs/lessons/2200-archived-collector-reader.md docs/lessons/2200-project-runtime-verification.md docs/verify/2200/deleted-reference-audit.log docs/verify/2200/plan-before-after.log
+[doc-reader-tests] node --test scripts/agent-rules.test.mjs scripts/commit-author-policy.test.mjs scripts/doc-reader-tests.test.mjs scripts/prepush.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (26.791ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (1.07725ms)
+✔ active docs never tell agents to add needs-decision (2.764334ms)
+✔ AGENTS.md separates bot rebase from human squash (3.303041ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.82425ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.67025ms)
+✔ documented preparation overrides inherited bot author and committer identities (779.189208ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.573333ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.450625ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.272875ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (677.771834ms)
+✔ a doc change selects the tests that name it, split by runner (1.561834ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.17625ms)
+✔ the retired collector archive is excluded while current identity safeguards remain selected (1.303375ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (4.175ms)
+✔ hasCode classifies documents (0.579375ms)
+✔ hasCode classifies server markdown fixtures (0.254167ms)
+✔ hasCode classifies shared markdown fixtures (0.247875ms)
+✔ hasCode classifies integration markdown fixtures (0.142792ms)
+✔ hasCode classifies executable evidence (0.438709ms)
+✔ hasCode classifies non-markdown evidence (0.330917ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.117959ms)
+✔ hasCode classifies data beside an executable check (0.816ms)
+✔ hasCode classifies the #2188 lessons and evidence change (0.869333ms)
+✔ hasCode classifies epic data (0.113333ms)
+✔ hasCode classifies code (0.137542ms)
+✔ hasCode classifies unknown paths (0.080625ms)
+✔ hasCode classifies mixed changes (0.089375ms)
+✔ hasCode classifies empty changes (0.0685ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (3210.466791ms)
+✔ CI classifies before heavy work and always runs push coverage (2.036792ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (2432.317292ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (1.242375ms)
+✔ documentation skips code checks, unknown paths fail closed (3.128625ms)
+✔ changes to prepush scripts run the CI self-test files locally (10.800208ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.543375ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (689.820125ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (2.940583ms)
+✔ lesson entries use the same document checks as other Markdown (0.186875ms)
+✔ local code checks retain fast checks and advisory dead-class (0.682083ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (1.179291ms)
+✔ code changes keep suites in CI and out of local plans (4.288833ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (4.022625ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.971208ms)
+✔ a docs-only data change still runs every test that reads the changed file (42.9345ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (14.428709ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (208.894542ms)
+✔ a board card source change selects the spec that reads its title (61.318625ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (1.123792ms)
+✔ CLI skips real document changes and rejects a missing base (4361.556041ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (1033.040708ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (427.866875ms)
+✔ prepush vitest only forgives files listed as known local red (1.060084ms)
+✔ plan children do not inherit the git hook repository binding (71.554542ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (32.699916ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (27.9225ms)
+✔ workflow preserves comments about external behavior (0.613459ms)
+✔ forced push coverage preserves the English gate range across multiple commits (403.305916ms)
+ℹ tests 58
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13307.806834
+[doc-reader-tests] pnpm exec vitest run apps/server/test/adoption-protected-paths.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/project-local.test.ts
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  3 passed (3)
+      Tests  127 passed (127)
+   Start at  16:43:43
+   Duration  3.76s (tests 41%, transform 36%, import 23%)
+
+[prepush] node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+[prepush] node scripts/ui-registry-gate.mjs
+[ui-registry-gate] note: no base sha on this run (push event or local check) — the S5 ratchet has nothing to compare against; a status downgrade landing straight on main is guarded by review only (same posture as debt-gate D3 on main).
+[ui-registry-gate] PASS: 35 file(s) in apps/web/src/components/ui = 27 registry (20 pristine vs pinned snapshot / 7 registered deviations) + 8 adapters; snapshot shadcn@4.21.3 fetched 2026-10-25; ledger frozen from 1b84a9bf8469; comparison: in-tree only.
+[prepush] node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 3 flagged line(s) across 274 consumer file(s), all registered (3 entries = 3 deviation).
+[prepush] node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+[prepush] node --test scripts/prepush.test.mjs scripts/heavy-slots.test.mjs scripts/english-only-gate.test.mjs scripts/doc-reader-tests.test.mjs scripts/epic-done.test.mjs scripts/agent-rules.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (11.554958ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (2.812875ms)
+✔ active docs never tell agents to add needs-decision (1.491916ms)
+✔ a doc change selects the tests that name it, split by runner (2.196709ms)
+✔ root-level doc names, integration suites and known-red files are not selected (0.244541ms)
+✔ the retired collector archive is excluded while current identity safeguards remain selected (16.268542ms)
+✔ prose flags Chinese outside code spans, fences and HTML comments (3.020667ms)
+✔ code checks comments only; UI strings and exempt paths pass (3.114792ms)
+✔ diff mode reds added Chinese lines and Chinese commit messages only (1748.328625ms)
+✔ --text checks a PR body file (153.890625ms)
+✔ caller-only required-artifact.json cannot satisfy frozen checks (687.086417ms)
+✔ caller-only ignored-artifact.json cannot satisfy frozen checks (578.162916ms)
+✔ tracked caller edits do not affect checks in the detached main tree (566.71075ms)
+✔ temporary main worktree is removed after success (601.538542ms)
+✔ temporary main worktree is removed after failure (463.4075ms)
+✔ temporary main worktree is removed after timeout (414.772625ms)
+✔ temporary main worktree is removed after midway error (418.681375ms)
+✔ temporary main worktree is removed after wrong HEAD (465.264459ms)
+✔ temporary main worktree is removed after add error (451.505542ms)
+✔ complete: closed issues, isolated remote-main checks and one green commit (1.350458ms)
+✔ failure mode 1: API errors and rate limits are unknown, even with pause or fail (0.546875ms)
+✔ failure mode 1: malformed or partial GitHub data never completes (2.1225ms)
+✔ failure mode 2: not-planned, manual and unmerged closures name the issue (2.366333ms)
+✔ failure mode 3: a merged linked PR does not substitute for an open issue (0.580834ms)
+✔ failure mode 4: no green main commit since the last closing SHA is incomplete (0.591084ms)
+✔ failure mode 5: green at the closing commit still completes after later red merges (1.119792ms)
+✔ required checks must succeed together on one eligible commit (0.756875ms)
+✔ missing, pending, skipped and neutral required checks do not count as success (7.618542ms)
+✔ caller edits and feature HEAD do not prevent checks at remote main (0.976958ms)
+✔ failure mode 7: frozen manifest comes only from git show at the selected ref (1.110792ms)
+✔ failure mode 8: invalid manifests fail closed before commands run (1.6105ms)
+✔ missing or malformed manifests and git runner failures are unknown (0.373833ms)
+✔ failure mode 9: missing commands, nonzero exits and missing expected stdout fail checks (2.335917ms)
+✔ unexpected command errors and malformed command output are unknown (1.774791ms)
+✔ failure mode 10: no started-at means no cap even when checks fail (0.526125ms)
+✔ paused: every human-wait label on issues or open linked PRs takes priority over failure (4.417625ms)
+✔ closed linked PR labels do not pause, while explicit pause does (1.032042ms)
+✔ failed: explicit failure and elapsed maxHours apply only when not complete or paused (2.32375ms)
+✔ commit closers must belong to main; the latest of multiple closing changes sets the boundary (0.981208ms)
+✔ all REST pages are consumed and incomplete check pages cannot masquerade as green (0.701583ms)
+✔ invalid CLI arguments fail before any runner executes (0.491416ms)
+✔ JSON output contains the same decision and the pure decision does not mutate facts (0.943916ms)
+✔ import has no CLI effects and the actual CLI guard emits unknown without network (131.058792ms)
+✔ CI includes this test and ownership covers the checker and frozen manifests (0.756875ms)
+✔ green side-branch commits cannot establish a green main after closure (1.029708ms)
+✔ parallel closing changes require a green main descendant of both changes (0.778042ms)
+✔ non-Error runner throws still produce unknown (0.248208ms)
+✔ check-run requests stop at the first green commit, newest first (1.673083ms)
+✔ at most 30 eligible commits are examined, including a green thirtieth commit (5.6105ms)
+✔ 31 eligible commits with green index 30 yield unknown (1.943333ms)
+✔ 30 eligible commits with green index -1 yield incomplete (1.226375ms)
+✔ 40 eligible commits with green index 0 yield complete (0.896792ms)
+✔ no green commit reports missing and unsuccessful required checks on the newest commit (0.906792ms)
+✔ remote main movement after the first read does not invalidate local checks (0.739375ms)
+✔ each command receives a 900 second timeout and a timeout fails that check (0.91075ms)
+✔ a remote main SHA missing locally stays unknown and requests an explicit fetch (0.235792ms)
+✔ only completed success is green, regardless of future GitHub status values (1.852667ms)
+✔ partial or reordered examined commits cannot establish completion (0.753916ms)
+✔ empty required checks cannot establish completion without CI evidence (0.548875ms)
+✔ untracked files before and during checks preserve every check result (0.705042ms)
+✔ default manifest is pinned to the GitHub main SHA before it is read (0.690875ms)
+✔ explicit manifest refs must resolve to ancestors of remote main (1.166833ms)
+✔ history and descendant membership do not perform repeated array scans (0.627625ms)
+✔ finding the latest closure reads issue SHAs independently of history length (1.813417ms)
+✔ last closing events need nodes and bounded length without forward pageInfo (1.411042ms)
+✔ git and gh capture stderr and include it in unknown reasons (0.444042ms)
+✔ manifest check failures capture stderr tails including timeouts (1.425583ms)
+✔ the checker stays within 400 lines (0.273708ms)
+✔ an overridden TMPDIR on macOS does not move the shared lock directory (2.230959ms)
+✔ slot count defaults to 2 and falls back to 1 with a warning for bad values (1.33975ms)
+✔ CI environments skip the queue (0.261667ms)
+✔ each slot owns its own e2e port and build directory (0.405667ms)
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15027.830458ms)
+✔ a bad slot count gets a warning and a single slot (86.884791ms)
+✔ waiters see their queue position and are served first-come first-served (380.961333ms)
+✔ kill -9 on the holder frees the slot for the queued process within 5 seconds (338.181208ms)
+✔ a clean exit releases the slot too (339.249875ms)
+✔ simultaneous grabs for the last slot: exactly one wins, every round (15205.259667ms)
+✔ simultaneous reclaim of one dead holder: exactly one process inherits the slot (16279.2405ms)
+✔ two killed holders and several waiters: stale entries are reclaimed without double grants (4303.478916ms)
+✔ run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass (3260.573833ms)
+✔ a run wrapper inside a holder reuses its slot instead of queueing behind itself (387.068542ms)
+✔ an inherited slot variable that no live process holds is ignored (287.383709ms)
+✔ an inherited slot whose lock belongs to someone else is not reused (224.176916ms)
+✔ CI skips the queue even when every slot is taken (1060.469542ms)
+✔ run wrapper passes the exit code through and frees the slot (556.046958ms)
+✔ e2e:affected queues for a slot, but a dry run never waits (308.906791ms)
+✔ e2e:affected outside prepush uses only the port of the slot it acquired and releases it on exit (1617.563416ms)
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15366.21275ms)
+✔ prepush-vitest run directly queues for a slot and only starts vitest once the holder exits (571.240292ms)
+✔ prepush-vitest reuses an inherited live lease without queueing (255.47125ms)
+✔ local prepush starts fast checks even when every heavy slot is occupied (563.35775ms)
+✖ local prepush ignores a squatted slot port because fast checks do not bind it (15102.847083ms)
+✔ prepush e2e shard mode still queues for a heavy slot and releases it (611.244708ms)
+[prepush] git init -q
+[prepush] <home>/.local/share/fnm/node-versions/v24.14.0/installation/bin/node -e process.exit(3)
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (3.815916ms)
+✔ hasCode classifies documents (0.66175ms)
+✔ hasCode classifies server markdown fixtures (0.140125ms)
+✔ hasCode classifies shared markdown fixtures (0.141542ms)
+✔ hasCode classifies integration markdown fixtures (0.115084ms)
+✔ hasCode classifies executable evidence (0.482375ms)
+✔ hasCode classifies non-markdown evidence (0.323125ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.112ms)
+✔ hasCode classifies data beside an executable check (1.000583ms)
+✔ hasCode classifies the #2188 lessons and evidence change (1.032541ms)
+✔ hasCode classifies epic data (0.136209ms)
+✔ hasCode classifies code (0.122333ms)
+✔ hasCode classifies unknown paths (0.148792ms)
+✔ hasCode classifies mixed changes (0.075291ms)
+✔ hasCode classifies empty changes (0.0625ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (2414.631459ms)
+✔ CI classifies before heavy work and always runs push coverage (1.64875ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (1201.847583ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.722208ms)
+✔ documentation skips code checks, unknown paths fail closed (1.763709ms)
+✔ changes to prepush scripts run the CI self-test files locally (7.512125ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.381375ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (505.077958ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (2.966584ms)
+✔ lesson entries use the same document checks as other Markdown (0.448375ms)
+✔ local code checks retain fast checks and advisory dead-class (0.696292ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.884292ms)
+✔ code changes keep suites in CI and out of local plans (3.824458ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (1.567334ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.806167ms)
+✔ a docs-only data change still runs every test that reads the changed file (43.774ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (14.616917ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (209.561875ms)
+✔ a board card source change selects the spec that reads its title (60.685334ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (1.140792ms)
+✔ CLI skips real document changes and rejects a missing base (2170.788959ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (778.364875ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (383.310208ms)
+✔ prepush vitest only forgives files listed as known local red (0.761875ms)
+✔ plan children do not inherit the git hook repository binding (65.472584ms)
+✔ a failed check preserves its exit status and stops the plan without writing files (30.550334ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (24.977625ms)
+✔ workflow preserves comments about external behavior (0.40175ms)
+✔ forced push coverage preserves the English gate range across multiple commits (367.118084ms)
+ℹ tests 138
+ℹ suites 0
+ℹ pass 135
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 92339.982459
+
+✖ failing tests:
+
+test at scripts/heavy-slots.test.mjs:224:1
+✖ slotPortHolder names the pid, cwd and command of whatever listens on the port (15027.830458ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:230:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:576:1
+✖ a squatted slot port fails e2e:affected before playwright and names the holding process (15366.21275ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:585:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at scripts/heavy-slots.test.mjs:697:1
+✖ local prepush ignores a squatted slot port because fast checks do not bind it (15102.847083ms)
+  AssertionError [ERR_ASSERTION]: /SQUATTER-READY/ never appeared on out: SQUATTER-ERROR EPERM
+  
+      at until (file://<worktree>/scripts/heavy-slots.test.mjs:79:14)
+      at async TestContext.<anonymous> (file://<worktree>/scripts/heavy-slots.test.mjs:718:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+[ELIFECYCLE] Command failed with exit code 1.
+
+EXIT 1
+
+$ pnpm lint
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+  
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+  
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+  
+  ℹ Safe fix: Replace the chain with .flatMap().
+  
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+  
+
+Checked 1225 files in 2s. No fixes applied.
+Found 1 info.
+
+EXIT 0
+
+$ node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+
+EXIT 0
+
+$ node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+
+EXIT 0
+
+$ git diff --check
+
+EXIT 0
+
+
+=== No-links evidence CLI runtime ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+
+
+=== Baseline native import reproduction ===
+node:internal/modules/esm/resolve:275
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<tmpdir>/2200-baseline-import-k7d976km/packages/shared/src/records/recording-trigger.js' imported from <tmpdir>/2200-baseline-import-k7d976km/packages/shared/src/records/merge-gate.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:991:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:719:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:736:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:765:52)
+    at #resolve (node:internal/modules/esm/loader:701:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:621:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:160:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:245:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file://<tmpdir>/2200-baseline-import-k7d976km/packages/shared/src/records/recording-trigger.js'
+}
+
+Node.js v24.14.0
+
+EXIT 1
+

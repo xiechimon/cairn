@@ -1,0 +1,52 @@
+<mxfile host="drawio" version="24.0.0">
+  <diagram name="verdict-mechanism" id="verdict-1011">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="a0" value="&lt;b&gt;现状几何（两面同形）&lt;/b&gt;" style="text;html=1;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="listbox 滚动容器 = 裁剪盒&lt;br&gt;overflow: auto，零内垫" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="320" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="行盒 w-full：四缘贴裁剪盒&lt;br&gt;（#872 整行铺满律）" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="110" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="环 = 行盒外 3px box-shadow&lt;br&gt;左/右/上段出裁剪盒 → 被裁&lt;br&gt;设置面仅剩行下横杠；&lt;br&gt;抽屉面单行四段全裁" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="b0" value="&lt;b&gt;归因实测（逐像素 diff）&lt;/b&gt;" style="text;html=1;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry x="420" y="30" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="shadowRemoved：&lt;br&gt;实际画出的墨 = 行内透墨&lt;br&gt;+ 下段（设置面）/ 仅透墨（抽屉面）" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="420" y="70" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="overflowVisible：&lt;br&gt;被裁的左/右/上（抽屉面四段）回归&lt;br&gt;= 裁剪坐实" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="420" y="170" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="行内缩实测：抽屉面 20px vs 设置面 12px" style="rounded=0;html=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="270" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="c0" value="&lt;b&gt;判定与去向&lt;/b&gt;" style="text;html=1;fontSize=14;align=left;" vertex="1" parent="1">
+          <mxGeometry x="800" y="30" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="未自解：两缺陷与 #883 原报同形" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="800" y="70" width="320" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="重切票 #1095 继承 #883 验收&lt;br&gt;（环完整 before/after 放大对照、&lt;br&gt;两面内缩并排对照、归因探针复跑）" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="800" y="140" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="#883 关闭（被 #1095 取代）&lt;br&gt;证据归档 docs/verify/1011" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="800" y="240" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="a3" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="b2" target="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

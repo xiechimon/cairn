@@ -1,0 +1,2 @@
+generate-feature-map: docs/feature-map.md differs from a fresh extraction; re-run node scripts/generate-feature-map.mjs and commit the result
+exit=1

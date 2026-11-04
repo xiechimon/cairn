@@ -1,0 +1,65 @@
+{
+  "observedAt": "2026-10-28T11:02:43.276523+00:00",
+  "featureCheckpoint": "6091529dd1e38f5c7edaaeefb7e217718d05cef1",
+  "task": {
+    "id": "LZKbQS4GQ4oNwuip6HG2X",
+    "phase": "review",
+    "output": "info",
+    "latestBuildId": "01a1822b-17a5-70bf-8e11-7d53972dd7e1",
+    "hasChanges": false
+  },
+  "build": {
+    "id": "01a1822b-17a5-70bf-8e11-7d53972dd7e1",
+    "todoId": "LZKbQS4GQ4oNwuip6HG2X",
+    "withPlan": false,
+    "errorMessage": null,
+    "reportAttachmentId": "DvlP4XbuYjHpSq_EYg-D7"
+  },
+  "steps": [
+    {
+      "id": "H4Sus594ZPcz9DmX9jEko",
+      "buildId": "01a1822b-17a5-70bf-8e11-7d53972dd7e1",
+      "kind": "build",
+      "status": "done",
+      "skillInjection": {
+        "hits": []
+      }
+    }
+  ],
+  "buildUsage": [
+    {
+      "model": "domestic-proxy/deepseek-v4.1-flash",
+      "input": 8416,
+      "output": 570,
+      "cacheRead": 3840,
+      "cacheWrite": 0
+    }
+  ],
+  "unreadImageNotices": [
+    "图片未被模型读取：模型 domestic-proxy/deepseek-v4.1-flash 不支持图片输入，1 张图片未下载（步骤继续执行，请以文字描述或改用支持图片的模型）"
+  ],
+  "conversationActiveRun": null,
+  "chief": {
+    "agentId": "1oO8v1m75axiGhcHEugUh",
+    "machineActivity": [],
+    "threads": [
+      {
+        "id": "chief-01a1822a-f785-7b13-ab53-7233b0eb5d6f",
+        "activeRun": null,
+        "pendingCount": 0,
+        "turnQueue": null,
+        "lastTurnError": null
+      }
+    ]
+  },
+  "uiObservation": {
+    "observer": "coordinator",
+    "action": "Clicked Start in the actual built web application. The initial missing Chief binding was repaired locally, then Start succeeded.",
+    "result": "Review card displayed the unread-image system notice and the report marker, with no invented image contents.",
+    "screenshots": [
+      "live-text-only-card.png",
+      "live-text-only-notice.png"
+    ]
+  },
+  "scope": "Declared text-only real-provider path only; no real capability rejection or unknown-model late-steer acceptance."
+}

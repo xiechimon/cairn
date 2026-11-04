@@ -1,0 +1,10 @@
+Relevant Vitest: 3 files, 262 tests passed.
+Typecheck: passed under flock /tmp/cairn-heavy.lock.
+Lint: passed (one existing informational diagnostic).
+Spec parse: passed; 1388 web tests collected and 65 integration test files parsed.
+English-only gate: 0 lines with Chinese text.
+Single-use helper gate: 0 single-use helpers.
+Comment discipline gate: 0 new comment lines.
+Lessons ledger: passed.
+Git diff whitespace check: passed.
+Prepush Vitest: 205 files, 2746 tests passed under flock /tmp/cairn-heavy.lock.

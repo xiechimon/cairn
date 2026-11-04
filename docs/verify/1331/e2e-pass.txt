@@ -1,0 +1,104 @@
+
+Running 20 tests using 2 workers
+
+(node:13874) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:13875) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+[2/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14017) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:14011) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[3/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+[4/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14156) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[5/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14163) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[6/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[7/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14303) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[8/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[9/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14451) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[10/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14587) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:14594) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[11/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+[12/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14727) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[13/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14734) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[14/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14867) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[15/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:14873) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[16/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:15011) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:15018) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[17/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+[18/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+(node:15152) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+(node:15159) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[19/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+[20/20] e2e/board-scroll-restore.spec.ts:20:1 › detail round trip keeps the column scroll position
+  20 passed (11.8s)

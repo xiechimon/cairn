@@ -1,0 +1,80 @@
+## old leg: apps/server/src/services/machines.ts = origin/main 29e60bb7; tests = this branch
+## (cd apps/server && pnpm exec vitest run --reporter=verbose test/machine-wire.test.ts -t "'#1488|他机步骤'")
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ↓ test/machine-wire.test.ts > 机器面路由 = 02 §5 词表（13 端点单源对拍） > 实现面覆盖 MACHINE_WIRE 全部 13 端点（动词+路径逐一）
+ ↓ test/machine-wire.test.ts > 机器面路由 = 02 §5 词表（13 端点单源对拍） > 词表外仅登记 [设计] 附加端点（单源 = shared MACHINE_WIRE_EXTENSIONS）
+ ↓ test/machine-wire.test.ts > 机器面路由 = 02 §5 词表（13 端点单源对拍） > 生产默认 claim hold = 75s（r3 §1.5 ~75–76s 节奏；wire 常量单源）
+ ↓ test/machine-wire.test.ts > enroll / me / presence / recover（02 §5.2–§5.4） > 无凭证或坏凭证 = 401 {error}（错误形状 r5 §1 族）
+ ↓ test/machine-wire.test.ts > enroll / me / presence / recover（02 §5.2–§5.4） > 重注册复用同一 machineId（r3 §1.2 实测：logout 后重注册不变）
+ ↓ test/machine-wire.test.ts > enroll / me / presence / recover（02 §5.2–§5.4） > me = machine record 逐字段（02 §6.2）
+ ↓ test/machine-wire.test.ts > enroll / me / presence / recover（02 §5.2–§5.4） > presence 置 online + team stream machine_presence 事件（02 §1.2）
+ ↓ test/machine-wire.test.ts > enroll / me / presence / recover（02 §5.2–§5.4） > recover 初始空集（r3 §1.5 `[recover] no pending steps found` 行语义）
+ ↓ test/machine-wire.test.ts > claim/wake 时序（r3 §1.5 对照：~75s 长轮询节奏 + wake 低延迟派发） > 空手长轮询 ≈ hold 时长后返回 {step:null}（节奏同构，时标缩短）
+ ↓ test/machine-wire.test.ts > claim/wake 时序（r3 §1.5 对照：~75s 长轮询节奏 + wake 低延迟派发） > 入队即 wake：挂起的 claim 立即领取（远小于 hold = 低延迟派发）
+ ↓ test/machine-wire.test.ts > claim/wake 时序（r3 §1.5 对照：~75s 长轮询节奏 + wake 低延迟派发） > #1217 missed-wake 补醒：基线后 wake 先于武装 → waitWake 即刻返回
+ ↓ test/machine-wire.test.ts > claim/wake 时序（r3 §1.5 对照：~75s 长轮询节奏 + wake 低延迟派发） > machine stream SSE 推送 wake 事件（02 §1.2 机器通道）
+ ↓ test/machine-wire.test.ts > claim/wake 时序（r3 §1.5 对照：~75s 长轮询节奏 + wake 低延迟派发） > #863 机器通道保活：SSE 注释帧按 pingInterval 心跳（无事件机器的流不再被客户端 bodyTimeout 静默掐断 → machine.online 不闪断 → 会话亲和闸的判据不误放行）
+ ↓ test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > claim→heartbeat→tool→token→upload-urls→transcript→done→confirm→continue→review→merge→done 全链逐字段
+ ↓ test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > done failed → todo failed + build.errorMessage（02 §4.2 步级失败无自动重跑）
+ ↓ test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > recover 返回本机 claimed 未收尾步（journal 恢复 server 侧真值）
+ × test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > 他机步骤 = 404；未知步骤 = 410（错误形状 {error}） 114ms
+   → expected 404 to be 410 // Object.is equality
+ × test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > #1488 卡被重置删掉了在跑的步 → 心跳 410；本机仍持有的步 → 200 61ms
+   → expected 404 to be 410 // Object.is equality
+ ↓ test/machine-wire.test.ts > claim 载荷：agent.skillsAllowlist 授权 + defaultSkill 携带（#1169 拆字段） > 勾选子集原样携带（worker 步，不过滤不重排——过滤权在 daemon catalog 构建）
+ ↓ test/machine-wire.test.ts > claim 载荷：agent.skillsAllowlist 授权 + defaultSkill 携带（#1169 拆字段） > null（不限制）与 []（显式全拒）各自原样携带——两态不得塌缩
+ ↓ test/machine-wire.test.ts > claim 载荷：agent.skillsAllowlist 授权 + defaultSkill 携带（#1169 拆字段） > 从未设置的 agent 行（列缺省）= 携带 null（不限制——创建缺省即本票默认，不再是 [] 全拒）
+ ↓ test/machine-wire.test.ts > claim 载荷：agent.tools 权限开关集透传（XMON-77） > 已开集原样携带（读侧宽：存量残值也透传，过滤权不在 claim 面）
+ ↓ test/machine-wire.test.ts > claim 载荷：agent.tools 权限开关集透传（XMON-77） > 全关 = 携带 []（least-privilege 与 skills 同律；缺省保留给老 server fail-open）
+ ↓ test/machine-wire.test.ts > merge 权限闸：requestMerge 校验 build 槽 Agent 两开关（XMON-77） > 全关 agent（默认 []）→ 403 点名两开关；无合并步/无时间线行/相位停 review
+ ↓ test/machine-wire.test.ts > merge 权限闸：requestMerge 校验 build 槽 Agent 两开关（XMON-77） > 只持合并分支（缺推送）→ 403 只点名推送分支（落地以推送为前置）
+ ↓ test/machine-wire.test.ts > merge 权限闸：requestMerge 校验 build 槽 Agent 两开关（XMON-77） > 两开关齐 → 202 delegated（正路径钉在主时序全链测试）
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > 他机步骤 = 404；未知步骤 = 410（错误形状 {error}）
+AssertionError: expected 404 to be 410 // Object.is equality
+
+- Expected
++ Received
+
+- 410
++ 404
+
+ ❯ test/machine-wire.test.ts:668:28
+    666|       body: {},
+    667|     });
+    668|     expect(unknown.status).toBe(410);
+       |                            ^
+    669|   });
+    670|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/machine-wire.test.ts > 步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧） > #1488 卡被重置删掉了在跑的步 → 心跳 410；本机仍持有的步 → 200
+AssertionError: expected 404 to be 410 // Object.is equality
+
+- Expected
++ Received
+
+- 410
++ 404
+
+ ❯ test/machine-wire.test.ts:686:25
+    684|     );
+    685|     const gone = await beat();
+    686|     expect(gone.status).toBe(410);
+       |                         ^
+    687|     expect(Object.keys((await gone.json()) as object)).toEqual(['error…
+    688|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 24 skipped (26)
+   Start at  12:21:41
+   Duration  2.98s (transform 62%, import 32%, tests 6%)
+

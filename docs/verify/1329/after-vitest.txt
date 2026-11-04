@@ -1,0 +1,39 @@
+# after (#1329): affected-daemon vitest, lint, typecheck (post-merge)
+
+### vitest sync + git tests, git 2.43.0 (/tmp/git243/bin)
++ git --version: git version 2.43.0
++ command: pnpm exec vitest run apps/daemon/test/git.test.ts apps/daemon/test/sync.test.ts
+
+   RUN  v5.0.1 /workspace/wt-1329
+   Test Files  2 passed (2)
+        Tests  28 passed (28)
+     Start at  04:27:17
+     Duration  6.73s (tests 97%, transform 2%, import 1%)
+exit=0
+
+### vitest sync + git tests, git 2.47.3 (box default)
++ git --version: git version 2.47.3
++ command: pnpm exec vitest run apps/daemon/test/git.test.ts apps/daemon/test/sync.test.ts
+
+   RUN  v5.0.1 /workspace/wt-1329
+   Test Files  2 passed (2)
+        Tests  28 passed (28)
+     Start at  04:27:25
+     Duration  6.74s (tests 97%, transform 2%, import 1%)
+exit=0
+
+### lint (biome ci)
++ command: pnpm exec biome ci .
+
+  Checked 765 files in 601ms. No fixes applied.
+exit=0
+
+### typecheck (pnpm -r typecheck)
++ command: pnpm -r typecheck
+
+  packages/shared typecheck: Done
+  apps/web typecheck: Done
+  apps/daemon typecheck: Done
+  apps/server typecheck: Done
+  integration typecheck: Done
+exit=0

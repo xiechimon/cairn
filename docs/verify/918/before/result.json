@@ -1,0 +1,38 @@
+{
+  "probe": "drive-918-skill-facts",
+  "server": "http://127.0.0.1:8793",
+  "web": "http://127.0.0.1:5275",
+  "db": "/tmp/pacman-before-918-run/home/server/server.db",
+  "skillsDir": "/tmp/pacman-918-skills",
+  "daemonHome": "/tmp/pacman-918-daemon-home-before",
+  "passed": 2,
+  "total": 5,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（1 授权 + 1 白名单外）",
+      "ok": true,
+      "detail": "/tmp/pacman-918-skills"
+    },
+    {
+      "name": "真 daemon 上线（--server 指本栈，PACMAN_SKILLS_DIR 指 fixture）",
+      "ok": true,
+      "detail": "/tmp/pacman-918-daemon-home-before"
+    },
+    {
+      "name": "活行披露面出现「▶ skill: demo-skill」（运行中，实时）",
+      "ok": false,
+      "detail": "[]"
+    },
+    {
+      "name": "deny 事件同线可见「✕ skill: extra-skill（已挡下）」",
+      "ok": false,
+      "detail": "[]"
+    },
+    {
+      "name": "探针异常：waitFor timeout: wire skills facts",
+      "ok": false,
+      "detail": null
+    }
+  ],
+  "error": "Error: waitFor timeout: wire skills facts\n    at waitFor (file:///Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0216-918-deny/.claude/skills/verify-pacman/scripts/drive-918-skill-facts.mjs:336:49)\n    at async file:///Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0216-918-deny/.claude/skills/verify-pacman/scripts/drive-918-skill-facts.mjs:439:3"
+}

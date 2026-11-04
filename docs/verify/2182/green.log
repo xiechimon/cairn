@@ -1,0 +1,37 @@
+✔ the changeset config ignores exactly the private workspace packages and keeps the rest publishable (1.83225ms)
+✔ every publishable package names this repository for provenance (0.30925ms)
+✔ the release workflow matches the pinned text (0.443834ms)
+✔ the release workflow pin accepts CRLF line endings (0.07ms)
+✔ the pinned workflow grants an OIDC token only after the publish job begins (0.077459ms)
+✔ the pinned workflow names the npm environment exactly once inside the publish job (0.129458ms)
+✔ the workflow pin rejects fixture 1: top-level OIDC permission (0.099875ms)
+✔ the workflow pin rejects fixture 2: rebuild in publish (0.050209ms)
+✔ the workflow pin rejects fixture 3: recursive build in publish (0.067709ms)
+✔ the workflow pin rejects fixture 4: renamed plan output (0.108791ms)
+✔ the workflow pin rejects fixture 5: filtered build in publish (0.065375ms)
+✔ the workflow pin rejects fixture 6: pack in publish (0.0525ms)
+✔ the workflow pin rejects fixture 7: cache action in publish (0.040833ms)
+✔ the workflow pin rejects fixture 8: comment before an appended publish command (0.039042ms)
+✔ the workflow pin rejects fixture 9: flow-style build step (0.029917ms)
+✔ the workflow pin rejects fixture 10: extra spaces before a run key (0.028541ms)
+✔ the workflow pin rejects fixture 11: quoted run key (0.0495ms)
+✔ the workflow pin rejects fixture 12: space before a uses colon (0.040209ms)
+✔ the workflow pin rejects fixture 13: unquoted install continuation (0.030875ms)
+✔ the workflow pin rejects fixture 14: fourth job with OIDC permission (0.024125ms)
+✔ the workflow pin rejects fixture 15: publish step shell (0.022583ms)
+✔ the workflow pin rejects fixture 16: publish step environment injection (0.022167ms)
+✔ the workflow pin rejects fixture 17: publish checkout ref input (0.021834ms)
+✔ the workflow pin rejects fixture 18: different publish checkout SHA (0.023333ms)
+✔ the workflow pin rejects fixture 19: publish job container (0.027917ms)
+✔ the workflow pin rejects fixture 20: top-level OIDC permission after a comment (0.024584ms)
+✔ the workflow pin rejects fixture 21: top-level env between pack and publish (0.022208ms)
+✔ the workflow pin rejects fixture 22: escaped pack OIDC permission keys (0.019708ms)
+✔ the workflow pin rejects fixture 23: environment removed from publish (0.0195ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49.434333

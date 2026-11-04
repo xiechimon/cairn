@@ -1,0 +1,31 @@
+{
+  "steps": [
+    {
+      "id": "zH1ininiD5TmQ_tkybJb2",
+      "buildId": "01a130bc-6480-7fb5-8cf7-ebeb9777dc90",
+      "kind": "plan",
+      "machineId": "XzyEBMdJWlNpPHkbwNm4R",
+      "status": "done",
+      "sessionId": "01a130bc-6f69-7682-bc3d-f2e5a1fd1c84",
+      "checkpointCommit": "36ae2c8e7794358ee373bec71a135c336ac41476",
+      "claimedAt": 1791819015351,
+      "lastHeartbeatAt": 1791819015351,
+      "prompt": null,
+      "createdAt": 1791819015317,
+      "freshSession": 0,
+      "skillInjection": "{\"hits\":[]}",
+      "holdReason": null,
+      "holdUntil": null,
+      "holdCount": 0
+    }
+  ],
+  "plans": [
+    {
+      "id": "WrnWzY8QryJ_eLw4XEVal",
+      "version": 1,
+      "content": "# 方案：#1257 挂起续跑探针\n\nMarker 行：PLAN-1257-MARKER-mv5em8t0\nChanges: 挂起恢复后首轮即落 plan.md。\nVerification: plan 行 v1 + confirm 卡有物即验证。\n"
+    }
+  ],
+  "networkRetryLogLines": [],
+  "cutRequests": 4
+}

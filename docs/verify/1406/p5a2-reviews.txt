@@ -1,0 +1,101 @@
+#1406 P5a-2 reviews: /simplify, /code-review low, /security-review
+branch claude/bootstrap-p5b, range origin/main..HEAD
+
+== /simplify (Skill simplify) on 37077116
+Ran as a single inline pass (the Agent tool was not available to it, so not
+the usual four-agent fan-out). Fixed in e92b20d0:
+- lib/github.ts: one listUrl helper builds the three list URLs instead of
+  three hand-built URLSearchParams blocks.
+- services/github-reads.ts: deps type is github-issues' GithubIssueFaceDeps
+  (same db / box / githubFetch shape) instead of a duplicate interface; issue
+  refs are lowercased once; short strings skip the code-point split.
+- shared chief-tools.ts: projectId / page / perPage parameter texts built once.
+- test: the captured runs-main-success.json (committed, unused) now backs the
+  branch + status filter test.
+Skipped:
+- isAbort duplicates the abort check in mapFetchThrow; unifying touches the
+  existing REST error mapping outside this change.
+- claimedSourceRefs (github-issues.ts) not reused: it returns a set without
+  task ids and matches case-sensitively; changing it collides with segment 1
+  (#1461), which edits the same file.
+- Test helper duplication (ghMock, MCP rpc / key helpers): exporting them from
+  github-issues.test.ts collides with segment 1's import edits, and importing
+  a test file re-registers its tests.
+- Altitude: the '.' / '..' segment guard in openTarget is local; the root fix
+  is in shared isGithubRepoRef (see security notes), outside this diff.
+
+== /code-review low (Skill code-review), twice
+- on e92b20d0 (origin/main..HEAD): no findings.
+- on 59bc0e8f (origin/main..HEAD): no findings.
+The gate run between the two found what the review did not: enum / integer /
+minimum in the chief parameters break the daemon claude-code converter
+(fail-closed for the whole chief tool set). Fixed in 59bc0e8f, guarded by
+apps/daemon/test/claude-t4-tools.test.ts, a shared vocabulary test and
+mutation M27.
+
+== /security-review (Skill security-review)
+The skill could not run: its first step is `git log --no-decorate
+origin/HEAD...`, executed in the session's directory /home/user/pacman (the
+main checkout, another branch), and this repository has no origin/HEAD
+(`git symbolic-ref refs/remotes/origin/HEAD` fails). Switching the session
+into this worktree is refused for this agent (EnterWorktree: the launch
+directory is the repository root, not a worktree), so even with origin/HEAD
+set the skill would have reviewed the wrong checkout. The review below was
+done by hand on origin/main..HEAD of this worktree, with the skill's focus
+(exploitable issues introduced by the diff, high confidence only).
+
+Surface: services/mcp-face.ts (AGENTS.md security list: MCP auth / external
+entry), services/github-reads.ts (team token use, third-party text to an LLM),
+lib/github.ts, services/chief-tools.ts, shared chief-tools.ts.
+
+Checked, no vulnerability found:
+1. Tenancy. MCP: teamId comes from the API key row, tool registration is still
+   grant-filtered (unchanged). Chief: teamId from the chief thread. The
+   project row is selected by id AND teamId; another team's project id gets
+   the same 404 as a missing one, before any token is opened or any request
+   sent (tests 1, M1). Only the caller team's own connection token is used.
+2. Token handling. The token goes only into the Authorization header
+   (authHeaders); URLs carry none; error results are built from fixed text
+   plus owner/repo, never the URL or token; an undecryptable token gives a
+   fixed 409 text (SecretBoxError message not echoed). Tests assert the token
+   is absent from URLs, results and errors.
+3. Request forgery / path traversal. Host is fixed (api.github.com). owner and
+   repo come from the project row, must pass isGithubRepoRef and must not be
+   '.' or '..' (new guard: '../user' passes the shared regex and
+   `repos/../user/issues` normalizes to GET /user/issues, the token owner's
+   issues across all repos). Query values go through URLSearchParams
+   (branch cannot add parameters); state / status are enum-checked; page /
+   perPage are positive integers, perPage capped.
+4. Third-party text to the model. Lists carry no issue or PR bodies; titles,
+   labels, branch names, logins and workflow names are structured fields with
+   format characters (bidi overrides, zero-width, tag characters) and control
+   characters stripped and lengths capped (200 / 100 code points); the tool
+   descriptions say they are third-party data. Titles can still contain
+   natural-language instructions; that is inherent in returning titles and
+   is what the data framing addresses.
+5. Availability. Each read times out at 6000 ms (below the 10 s relay tool
+   timeout); the daemon retries replaySafe reads only on 5xx, so one tool call
+   makes at most three GitHub requests; rate limits map to 429 (no retry).
+   Response pages are capped at 30 entries.
+6. Regex cost. The cleaning and rate-limit regexes are single character
+   classes / a literal, linear in input size.
+
+Not fixed here (pre-existing, outside this diff; for the user):
+A. shared isGithubRepoRef accepts '.' and '..' as owner or repo. A project
+   with githubRepo '../user' (settable by a team member through POST
+   /api/projects or by the chief through connect_repo) makes the existing
+   GitHub calls built on repoPath (REST issue picker list and import, the
+   source-issue echo, the #452 issue write-back, the P5a-1 intake reads) hit
+   other api.github.com paths with the team token, e.g. GET /user/issues.
+   Same team, same token, so no cross-tenant read, but it escapes the
+   repository the project names. The read tools in this change refuse such
+   rows. Fix: reject '.' / '..' segments in isGithubRepoRef (shared) so
+   creation, connect_repo and every reader share one rule.
+B. requireProjectRow in mcp-face.ts (create_todo) and chief-tools.ts (docs,
+   create_todo, update_project, connect_repo) does not check the project's
+   team; an MCP key of team A can create a todo pointing at team B's project
+   id. Self-hosted installs have one team, so this is latent.
+C. save_memory content is inlined into the chief system prompt every turn
+   (chief.ts); if the chief saves text taken from a GitHub title, that text
+   becomes system prompt. Unchanged by this diff (titles are now cleaned and
+   bounded before they reach the chief).

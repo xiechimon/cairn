@@ -1,0 +1,16 @@
+git version: git version 2.43.0
+git binary: /usr/bin/git
+caller: gitPrim.resetHard (apps/daemon/src/git.ts) via tsx /tmp/after-1316.mts
+GIT_TRACE file: the built-in lines below are copied from that run
+----- stdout -----
+git version: git version 2.43.0
+sha: 800f77a36a6479cbac4a910bad88d88b22ebe678
+README before: corrupted
+README after: seed
+HEAD after: 800f77a36a6479cbac4a910bad88d88b22ebe678
+soft error: git rev-parse failed (128): fatal: Needed a single revision
+README after --soft: corrupted
+----- git trace (resetHard only) -----
+17:11:26.355564 git.c:463               trace: built-in: git rev-parse --verify --end-of-options '800f77a36a6479cbac4a910bad88d88b22ebe678^{commit}'
+17:11:26.359821 git.c:463               trace: built-in: git reset --hard 800f77a36a6479cbac4a910bad88d88b22ebe678
+17:11:26.364769 git.c:463               trace: built-in: git rev-parse --verify --end-of-options '--soft^{commit}'

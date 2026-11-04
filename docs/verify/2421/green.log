@@ -1,0 +1,66 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:176) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 41 tests using 1 worker
+
+(node:350) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/board-shell.spec.ts:3:1 › home splits work into needs-you, running and done, and folds week-old and not-started cards (1.2s)
+  ✓   2 e2e/board-shell.spec.ts:30:1 › a project filter keeps home; a filter that matches nothing shows the filter-empty state (403ms)
+  ✓   3 e2e/board-shell.spec.ts:46:1 › the needs-me inbox lists recent pending cards as rows and folds week-old ones (456ms)
+  ✓   4 e2e/board-shell.spec.ts:73:1 › the needs-me inbox shares its edges with the new-task bar (302ms)
+  ✓   5 e2e/board-shell.spec.ts:84:1 › since-last-seen counts tasks finished after the stored visit and hides when nothing changed (406ms)
+  ✓   6 e2e/board-shell.spec.ts:98:1 › the new-task bar opens the existing new-task surface (338ms)
+  ✓   7 e2e/board-shell.spec.ts:104:1 › a 390px board stacks non-empty columns tightly with no horizontal scroll (289ms)
+  ✓   8 e2e/board-shell.spec.ts:136:1 › a 390px needs-you row shows the whole title and keeps its actions on screen (342ms)
+  ✓   9 e2e/board-shell.spec.ts:165:1 › a 390px home scrolls down to its last row above the pinned composer (297ms)
+  ✓  10 e2e/board-shell.spec.ts:177:1 › a short phone screen scrolls the board as one page to reach the last group (539ms)
+  ✓  11 e2e/board-shell.spec.ts:192:1 › the phone chief launcher clears the new-task bar on the board and sits in the corner elsewhere (390ms)
+1440px light home: 24px
+1440px light detail: 24px
+  ✓  12 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in light (586ms)
+1440px dark home: 24px
+1440px dark detail: 24px
+  ✓  13 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 1440px in dark (559ms)
+390px light home: 24px
+390px light detail: 24px
+  ✓  14 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in light (493ms)
+390px dark home: 24px
+390px dark detail: 24px
+  ✓  15 e2e/board-shell.spec.ts:207:5 › home and detail share a 24px composer bottom gap at 390px in dark (495ms)
+  ✓  16 e2e/chief-home-chat.spec.ts:6:3 › home is one continuous chief chat (T1) › a fresh home shows the greeting, the composer and the sections, and no chief drawer (337ms)
+  ✓  17 e2e/chief-home-chat.spec.ts:34:3 › home is one continuous chief chat (T1) › the first send moves the composer to the bottom and the message joins the chat (401ms)
+  ✓  18 e2e/chief-home-chat.spec.ts:54:3 › home is one continuous chief chat (T1) › a first send that fails brings the greeting and the sections back (335ms)
+  ✓  19 e2e/chief-home-chat.spec.ts:66:3 › home is one continuous chief chat (T1) › Escape closes the thread menu on home (371ms)
+  ✓  20 e2e/chief-home-chat.spec.ts:77:3 › home is one continuous chief chat (T1) › a reply carries a live task chip, a hand-off row and an expandable trace; reload keeps it (642ms)
+  ✓  21 e2e/chief-home-chat.spec.ts:102:3 › home is one continuous chief chat (T1) › cmd+J on home focuses the home composer instead of opening the drawer (372ms)
+  ✓  22 e2e/chief-home-chat.spec.ts:111:3 › home is one continuous chief chat (T1) › the board view keeps the chief button and drawer (392ms)
+  ✓  23 e2e/chief-home-chat.spec.ts:119:3 › home is one continuous chief chat (T1) › a task chip in the drawer opens the task panel on the board instead of leaving it (1.1s)
+  ✓  24 e2e/chief-home-chat.spec.ts:137:3 › home is one continuous chief chat (T1) › phone width: the chat fills the screen and the composer stays on screen (554ms)
+  ✓  25 e2e/chief-home-chat.spec.ts:187:3 › the first open of each day starts on a clean home (T3) › yesterday stays above, dimmed, and today opens on the greeting, the date and a per-project brief (983ms)
+  ✓  26 e2e/chief-home-chat.spec.ts:236:3 › the first open of each day starts on a clean home (T3) › a need card in the brief opens the task panel in place (405ms)
+  ✓  27 e2e/chief-home-chat.spec.ts:254:3 › the first open of each day starts on a clean home (T3) › the first send of the day continues the chat below the brief (461ms)
+  ✓  28 e2e/chief-home-chat.spec.ts:283:3 › the first open of each day starts on a clean home (T3) › a send whose server time is still yesterday does not bring the clean layout back (435ms)
+  ✓  29 e2e/chief-home-chat.spec.ts:304:3 › the first open of each day starts on a clean home (T3) › a thread that already has messages from today opens as normal chat (347ms)
+  ✓  30 e2e/chief-home-chat.spec.ts:317:3 › the first open of each day starts on a clean home (T3) › a quiet night says so in one line and shows no need cards (349ms)
+  ✓  31 e2e/chief-home-chat.spec.ts:330:3 › the first open of each day starts on a clean home (T3) › phone width: the clean home fits the screen (365ms)
+  ✓  32 e2e/detail-3pane.spec.ts:6:1 › three abutting panes: 248 sidebar | fluid center | 488 right (300ms)
+  ✓  33 e2e/detail-3pane.spec.ts:34:1 › no `文档|聊天` tab group survives on any phase surface (975ms)
+  ✓  34 e2e/detail-3pane.spec.ts:43:1 › detail head keeps the `更多` icon only — branch/token/history icons are gone (320ms)
+  ✓  35 e2e/detail-3pane.spec.ts:54:1 › composer stays in-flow inside the center column: card form, 16px horizontal and 24px bottom insets, scroll port ends above it (303ms)
+  ✓  36 e2e/detail-3pane.spec.ts:95:1 › composer controls share one bottom row: stop is the send button's sibling (321ms)
+  ✓  37 e2e/detail-3pane.spec.ts:146:1 › composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1) (680ms)
+  ✓  38 e2e/detail-3pane.spec.ts:169:1 › right pane title switches plan and changes; usage, branch and history are sections (640ms)
+  ✓  39 e2e/detail-3pane.spec.ts:211:1 › scenarios 30/31/32 freeze the pane view instead of popping dialogs (611ms)
+  ✓  40 e2e/detail-3pane.spec.ts:226:1 › plan card activation in the thread opens the plan doc in the right pane (356ms)
+  ✓  41 e2e/detail-3pane.spec.ts:237:1 › fresh phase: the brief owns the whole center column, right pane collapses (357ms)
+
+  41 passed (23.0s)

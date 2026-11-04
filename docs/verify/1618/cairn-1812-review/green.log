@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1812-reviewed-intake/cairn
+
+
+ Test Files  2 passed (2)
+      Tests  200 passed (200)
+   Start at  05:06:26
+   Duration  6.89s (tests 82%, transform 11%, import 7%)
+

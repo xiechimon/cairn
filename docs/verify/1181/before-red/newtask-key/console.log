@@ -1,0 +1,22 @@
+PASS  board-ready  — 看板 shell 就绪
+shot  01-board.png
+PASS  sidebar-badge-key  — 侧栏「新任务」行角标="C"
+PASS  sidebar-row-click-opens  — 行点击开 .new-task-dialog=true
+PASS  board-new-key-opens  — "c" → .new-task-dialog=true
+PASS  board-new-key-focus  — "c" 开面后正文框持焦=true
+shot  board-new-key-open.png
+PASS  board-old-key-stays-closed  — "n" ×5 → 弹层出现=false
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.waitForSelector: Timeout 5000ms exceeded.
+Call log:
+[2m  - waiting for locator('.search-panel') to be visible[22m
+
+    at /Users/xmon/.pacman/workspaces/01a12aa3-7bc8-7de0-95f7-ab62d50d12e2/.claude/skills/verify-pacman/scripts/drive-newtask-key.mjs:194:14 {
+  log: [ "  - waiting for locator('.search-panel') to be visible" ],
+  name: 'TimeoutError'
+}
+
+Node.js v26.8.1

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "arms": [
+    "single"
+  ],
+  "planner": null,
+  "executors": [],
+  "singleModels": [
+    "stub-single"
+  ],
+  "taskIds": [
+    "slugify"
+  ],
+  "taskDigest": "eac50985b974bb92fae74f6408622e7e0bd2a2e45f7073625dafe394d4d2ce36",
+  "promptsDigest": "5093184c4b6ebde59fc0167265eda46f51cd456cf3f5d43686c4724f7294b9f6",
+  "harnessDigest": "65cd21233bdb4abc20e1e81273f039547d229fbfa0f3c00341c4d62136333046",
+  "reps": 1,
+  "timeoutS": 45,
+  "thinking": null,
+  "prices": null,
+  "pricesDigest": null
+}

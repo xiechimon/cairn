@@ -1,0 +1,18 @@
+✔ committed ci.yml matches the pinned job structure (25.926221ms)
+✔ PR #1540 misplaced freshness step goes red (21.316926ms)
+✔ a pinned step relocated to another job names both jobs (22.199554ms)
+✔ a pinned step deleted from ci.yml goes red (25.058848ms)
+✔ a step copied into another job while its pinned job keeps it goes red (22.164556ms)
+✔ a step pasted twice into one job goes red (21.571098ms)
+✔ a job absent from the baseline goes red (23.777325ms)
+✔ a baseline job gone from ci.yml goes red (22.03158ms)
+✔ site deployment applies the project root directory exactly once (3.019032ms)
+✔ site deployment limits uploads and retains main-only guarded triggers (2.040871ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 235.402803

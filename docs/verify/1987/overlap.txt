@@ -1,0 +1,7 @@
+checkedAt: 2026-10-28T17:27:57.878Z
+terms: ['1987', 'routing resume', 'planner resume']
+paths: ['integration/eval/routing/run.mts', 'integration/eval/routing/experiment.mts', 'integration/eval/routing/report.mts', 'integration/test/routing-resume.test.ts']
+openIssues: [1987, 1717]
+openPulls: []
+filePulls: []
+disposition: #1987 is this ticket; #1830 is the parent epic; no open PR touches the new routing CLI/resume/report files.

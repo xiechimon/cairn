@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2038-heading-repair/cairn
+
+
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Start at  12:42:05
+   Duration  229ms (import 50%, transform 39%, tests 9%, worker 2%)
+

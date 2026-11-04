@@ -1,0 +1,9 @@
+{
+  "deliveryId": "1a3abad0-a266-4633-87a5-3c5cfcef09c1",
+  "status": 202,
+  "body": {
+    "result": "ignored",
+    "deliveryId": "1a3abad0-a266-4633-87a5-3c5cfcef09c1",
+    "detail": "event ping not consumed"
+  }
+}

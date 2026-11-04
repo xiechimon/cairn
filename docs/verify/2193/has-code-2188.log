@@ -1,0 +1,10 @@
+# #2188 squash commit 54195adb0 changed files:
+#   docs/lessons/1678-no-verify-fixup-commit.md
+#   docs/lessons/events.jsonl
+#   docs/verify/2182/README.md
+#   docs/verify/2182/hookspath-green.log
+#   docs/verify/2182/hookspath-red.log
+# hasCode on origin/main before this fix:
+true
+# hasCode with this branch:
+false

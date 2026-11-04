@@ -1,0 +1,112 @@
+# #1403 round 11 mutations (fifth /code-review pass on #1414): each one applied alone, then
+# pr-reconcile.test.ts and ci-loop.test.ts. Run on the tree that became the round 11 commit.
+finish stops gate steps after publishing the done card     1 failed | 98 passed (99)
+    × [49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped
+finish stops no gate steps                                 6 failed | 93 passed (99)
+    × [49] the merge step finishes a card a person already marked done: the done card is published without the quota wait of the verify step it stopped
+    × [49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped
+    × ⑮c a review step waiting for quota does not hold the reconcile and is stopped on finish
+    × ⑮c a verify step waiting for quota does not hold the reconcile and is stopped on finish
+    × ⑳ merged: unclaimed verify / review steps are stopped when the reconcile finishes
+no republish when the card was already done                1 failed | 98 passed (99)
+    × [49] the merge step finishes a card a person already marked done: the done card is published without the quota wait of the verify step it stopped
+pulls read without room for its compare                    3 failed | 96 passed (99)
+    × [50] anonymous: a pulls read waits until the budget also has room for the compare it may need
+    × ㊴ anonymous: reads across all PRs stay under a per-hour budget
+    × ㊻ anonymous: the grind's check-runs reads count against the same budget
+grind reads take the reconcile's own share                 1 failed | 98 passed (99)
+    × [56] anonymous: the grind's reads count toward the per-IP total, not the reconcile's own share
+grind reads not counted toward the per-IP total            1 failed | 98 passed (99)
+    × ㊻ anonymous: the grind's check-runs reads count against the same budget
+per-IP total ignored                                       1 failed | 98 passed (99)
+    × ㊻ anonymous: the grind's check-runs reads count against the same budget
+a close acted on at the first read                         2 failed | 97 passed (99)
+    × [51] closed, then reopened before the next read (a close and reopen to rerun CI) → not failed
+    × ② closed without merge → todo failed with the cause on the build
+an open read does not reset the close count                1 failed | 98 passed (99)
+    × [51] closed, then reopened before the next read (a close and reopen to rerun CI) → not failed
+a missing merged field read as not merged                  1 failed | 98 passed (99)
+    × [52] a closed response without a merged field is unreadable, not a close
+unreadable-compare hint without the in-flight recheck      1 failed | 98 passed (99)
+    × [53] a merge step starts during the second unreadable compare → no hint
+unreadable-compare hint without the settled recheck        1 failed | 98 passed (99)
+    × [53] the merge step finishes the card and a person reopens it during the second unreadable compare → no hint
+completion row once per round again                        1 failed | 98 passed (99)
+    × [54] a second merge step in the same round writes its completion row again, as before this change
+reconcile counted in the grind's pending                   1 failed | 98 passed (99)
+    × [55] the sweep log counts the reconcile apart from the grind
+
+# Definitions (name, file, text replaced, replacement):
+## finish stops gate steps after publishing the done card | apps/server/src/services/builds.ts
+-   const stopped = stopUnclaimedGateSteps(deps, buildId);
+-   const wasDone =
+-     deps.db.select({ phase: todo.phase }).from(todo).where(eq(todo.id, todoId)).get()?.phase ===
+-     'done';
+-   setTodoPhase(deps, todoId, 'done');
++   const wasDone =
++     deps.db.select({ phase: todo.phase }).from(todo).where(eq(todo.id, todoId)).get()?.phase ===
++     'done';
++   setTodoPhase(deps, todoId, 'done');
++   const stopped = stopUnclaimedGateSteps(deps, buildId);
+## finish stops no gate steps | apps/server/src/services/builds.ts
+-   const stopped = stopUnclaimedGateSteps(deps, buildId);
+-   const wasDone =
++   const stopped = 0;
++   const wasDone =
+## no republish when the card was already done | apps/server/src/services/builds.ts
+-   if (wasDone && stopped > 0) {
++   if (false) {
+## pulls read without room for its compare | apps/server/src/services/ci-loop.ts
+- || !takeAnonRead(now, 2)) {
++ || !takeAnonRead(now)) {
+## grind reads take the reconcile's own share | apps/server/src/services/ci-loop.ts
+-     anonFree(now);
+-     anonAll.push(now);
+-   }
++     anonFree(now);
++     anonAll.push(now);
++     anonOwn.push(now);
++   }
+## grind reads not counted toward the per-IP total | apps/server/src/services/ci-loop.ts
+-     anonFree(now);
+-     anonAll.push(now);
+-   }
++     anonFree(now);
++   }
+## per-IP total ignored | apps/server/src/services/ci-loop.ts
+-       (run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR) - anonAll.length,
++       Number.POSITIVE_INFINITY,
+## a close acted on at the first read | apps/server/src/services/ci-loop.ts
+-     if (seen === undefined || now - seen < CI_CLOSED_CONFIRM_MS) {
++     if (false) {
+## an open read does not reset the close count | apps/server/src/services/ci-loop.ts
+-     if (pull === null || pull.state === 'open') {
+-       closedSeenAt.delete(key);
++     if (pull === null || pull.state === 'open') {
+## a missing merged field read as not merged | apps/server/src/lib/github.ts
+-   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
++   if (raw.state !== 'open' && raw.state !== 'closed') {
+## unreadable-compare hint without the in-flight recheck | apps/server/src/services/ci-loop.ts
+-             freshReviewRow(cand.todoId, cand.buildId) !== null &&
+-             !hasActiveStep(cand.buildId) &&
++             freshReviewRow(cand.todoId, cand.buildId) !== null &&
+## unreadable-compare hint without the settled recheck | apps/server/src/services/ci-loop.ts
+-             !hasActiveStep(cand.buildId) &&
+-             !settled(cand.buildId, true, closedText, since)
+-           ) {
++             !hasActiveStep(cand.buildId)
++           ) {
+## completion row once per round again | apps/server/src/services/builds.ts
+-   insertMessageRow(deps, buildId, {
+-     id: newRecordId(),
+-     role: 'system',
+-     content: DONE_ROW,
++   if (!hasMessageRow(deps, buildId, 'system', DONE_ROW, roundStart(deps, buildId))) insertMessageRow(deps, buildId, {
++     id: newRecordId(),
++     role: 'system',
++     content: DONE_ROW,
+## reconcile counted in the grind's pending | apps/server/src/services/ci-loop.ts
+-       closedSeenAt.delete(key);
+-       tally.reviewPending += 1;
++       closedSeenAt.delete(key);
++       tally.pending += 1;

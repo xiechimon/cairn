@@ -1,0 +1,28 @@
+schema_version = "1.4"
+artifacts = ["/app/answer.txt"]
+
+[task]
+name = "cairn/hidden-answer"
+version = "1.0.0"
+description = "The sealed token is graded in a separate container."
+authors = [{ name = "Cairn" }]
+keywords = ["harbor", "tamper"]
+
+[metadata]
+difficulty = "easy"
+category = "programming"
+tags = ["tamper-control"]
+
+[verifier]
+timeout_sec = 60.0
+environment_mode = "separate"
+
+[agent]
+timeout_sec = 60.0
+
+[environment]
+docker_image = "node:24-bookworm-slim"
+cpus = 1
+memory_mb = 512
+storage_mb = 1024
+network_mode = "public"

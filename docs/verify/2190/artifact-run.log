@@ -1,0 +1,10 @@
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (15834.176208ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (9211.650375ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25511.671333

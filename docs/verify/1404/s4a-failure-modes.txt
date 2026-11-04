@@ -1,0 +1,58 @@
+# #1404 S4a: failure modes for the merge gate's GitHub transport (apps/server/src/lib/github.ts).
+# Subset of failure modes 1-10 in docs/verify/1404/s4-plan.md section 6, split into the cases the tests pin.
+# Each line names the test that pins it in apps/server/test/github-gate-transport.test.ts (prefix T).
+# Scope: transport only. Nothing here interprets a response body; S4b (merge-gate/**) does that.
+
+Requests the transport must refuse (result failed/invalid, and no request is sent)
+FM-1  The token is empty, has whitespace, CR/LF or non-ASCII characters (the gate never reads anonymously;
+      a header-unsafe token must not reach fetch).                                                    T2
+FM-2  A SHA that is not 40 lowercase hex (uppercase, abbreviated, a branch name, "../x") goes into the
+      compare, check-runs, combined-status, statuses path or the contents ref.                         T3
+FM-3  A branch name or contents path with an empty, "." or ".." segment, or a control character, NUL,
+      "?" or "#" in a segment, reaches the path. Valid segments are percent-encoded one by one, "/"
+      kept between them.                                                                                T4
+FM-4  owner or repo is empty, "." or "..", or carries a character outside GitHub's name set.          T5
+FM-5  A PR number or page that is not a positive safe integer, per_page outside 1..100, a check-runs
+      filter other than latest/all, a timeout that is not a positive safe integer, an etag that is
+      empty or not visible ASCII, a status state outside error/failure/pending/success, an empty
+      context, a description that is not a string.                                                     T6
+
+What is sent
+FM-6  The token appears anywhere but the Authorization header (URL, result, thrown error).            T1, T7
+FM-7  Accept / X-GitHub-Api-Version / User-Agent differ from API_HEADERS (with another media type the
+      PR body is no longer raw markdown).                                                              T7
+FM-8  A query parameter is defaulted or dropped inside lib (compare without per_page/page lets GitHub
+      cap the list at 250 commits; check runs without the caller's filter): each URL is the documented
+      one, with exactly the caller's values.                                                           T8
+FM-9  If-None-Match is sent when the caller gave no etag, or not sent when it did; compare, contents and
+      the status POST send it at all.                                                                  T9
+FM-10 The caller's timeout is not applied (fetch gets no AbortSignal).                                T10
+FM-11 The status POST is not exactly POST statuses/{sha} with content-type application/json and the body
+      {state, context, description} (no target_url, no extra key).                                     T11
+
+What comes back
+FM-12 The body is interpreted: a field projected, filtered or defaulted (for example malformed check-run
+      rows skipped, as githubCommitCheckRuns does). The returned body must deep-equal the parsed
+      response, checked on live captures of every read endpoint.                                        T12
+FM-13 etag or Link is not returned, or Link is followed (a second request).                           T12, T13
+FM-14 A 304 without an etag sent is reported as not-modified (it is status 304); a 304 with an etag sent
+      is reported as anything else.                                                                    T9
+FM-15 A 2xx body that is not JSON throws or comes back ok (it is not-json); a body read that times out
+      is reported as not-json (it is timeout).                                                          T14
+FM-16 Rate limiting: 429; 403 with x-ratelimit-remaining 0; 403 with retry-after; 403 with "rate limit"
+      in the text and no such header. Each is rate-limited with status, resetAt (x-ratelimit-reset
+      seconds as ms) and retryAfterSeconds; an empty or non-numeric header is null, not 0; retry-after
+      wins over nothing, both are kept. A plain 403, 404, 409, 422 or 500 is not rate-limited.          T15
+FM-17 GitHub's error message on a non-2xx: passed with newlines, bidi overrides or zero-width characters,
+      or unbounded; or a non-JSON body / missing message gives anything but null. Cleaned to at most
+      200 characters.                                                                                   T16
+FM-18 fetch rejects: TimeoutError/AbortError must be timeout, TypeError and anything else network; the
+      function never throws.                                                                            T17
+FM-19 The status write retries, or throws on 422/403/404/5xx instead of returning the classified result;
+      201 must come back ok with its body.                                                              T11, T18
+
+What must not change
+FM-20 The existing reads and writes (githubPull, githubCompareStatus, githubBranchPulls,
+      githubCommitCheckRuns, the intake reads, githubCreateIssue, githubUpdateIssueTitle) change
+      behaviour: their suites (pr-reconcile, second-pr-guard, ci-loop, github-reads, issue-intake,
+      github-writeback) stay green.                                                                     existing suites

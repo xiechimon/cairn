@@ -1,0 +1,46 @@
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (3100.394959ms)
+✔ one attachment byte changed names its storage key (228.675916ms)
+✔ message content edited names table and id (229.787458ms)
+✔ deleted row in backupDb fails (241.640292ms)
+✔ deleted row in db fails (218.630083ms)
+✔ scratch inside live directory is refused (130.580291ms)
+✔ scratch through symlink is refused (129.912333ms)
+✔ existing scratch is refused without overwriting it (129.434ms)
+✔ report cannot overwrite live DB or key (134.2665ms)
+✔ invalid gzip fails and publishes failure status (329.559916ms)
+✔ orphaned chief message fails the selected relationship (297.648625ms)
+✔ wrong key fails without leaking bytes (542.841417ms)
+✔ no encrypted sample fails (269.836167ms)
+✔ missing relationship sample fails (250.335125ms)
+✔ post-backup timestamped updates and inserts are allowed (1745.415ms)
+✔ missing attachment and unsafe attachment key fail (308.289291ms)
+✔ default backup directory selects the newest timestamp (1930.535666ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (324.689792ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (4460.618708ms)
+✔ missing ready attachment names its storage key (428.319416ms)
+✔ weekly units isolate scratch and do not install themselves (1.094375ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (3316.816375ms)
+✔ invalid SQLite fails integrity checking (293.636ms)
+✔ ready attachment size mismatch fails (258.527833ms)
+✔ scratch equal to live DB is refused (172.332708ms)
+✔ missing key fails without creating a replacement (154.159625ms)
+✔ non-allowlisted machine field changes fail (288.388ms)
+✔ missing selected todo names the relationship sample (246.943417ms)
+✔ missing selected build names the relationship sample (228.228667ms)
+✔ missing selected step names the relationship sample (282.159417ms)
+✔ missing selected message names the relationship sample (277.986583ms)
+✔ missing selected chief_thread names the relationship sample (277.673167ms)
+✔ missing selected chief_message names the relationship sample (252.652166ms)
+✔ newest eligible build wins over todo activity and step-less builds (1984.313292ms)
+✔ partial step loss names selected sample (283.035ms)
+✔ partial message loss names selected sample (284.85225ms)
+✔ partial chief_message loss names selected sample (305.045708ms)
+✔ post-backup relationships are excluded while boundary rows are required (2306.404833ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26871.235625

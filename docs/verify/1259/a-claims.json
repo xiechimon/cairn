@@ -1,0 +1,1370 @@
+{
+  "homeClaim1": {
+    "step": {
+      "id": "eaDfm1NEKsLIvDyfHHCsN",
+      "buildId": "01a13104-acfd-7eb7-87ec-8bac44e3cf77",
+      "kind": "build",
+      "machineId": "zzWiIWz5xwjLeYm6amAvF",
+      "createdAt": 1791823752445
+    },
+    "conversationId": "01a13104-acfd-7eb7-87ec-8bac44e3cf77",
+    "session": {
+      "action": "new",
+      "sessionId": null
+    },
+    "todo": {
+      "id": "-DE3HfLKab9qnAo59R2Hn",
+      "seqNum": 1,
+      "title": "绑定探针任务",
+      "spec": "验证归属机派发"
+    },
+    "project": {
+      "id": "sT8DNgJJEIZskqN-7wLcv",
+      "name": "verify-1259",
+      "repo": null
+    },
+    "agent": {
+      "id": "S9MSBLCUVVeIvKoUAKZGw",
+      "displayName": "verify-bound-agent",
+      "description": "绑定探针",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "thinkingLevel": null,
+      "memories": [],
+      "defaultSkill": null,
+      "skillsAllowlist": null,
+      "injectedSkills": [],
+      "tools": [
+        "推送分支"
+      ]
+    },
+    "remoteTools": [
+      {
+        "name": "save_memory",
+        "description": "Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Short memory title."
+            },
+            "content": {
+              "type": "string",
+              "description": "Memory body."
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Optional project id for provenance."
+            },
+            "sourceTodoId": {
+              "type": "string",
+              "description": "Optional source todo id; defaults to the running task."
+            }
+          },
+          "required": [
+            "title",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "delete_memory",
+        "description": "Delete one of your memory entries by id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "memoryId": {
+              "type": "string",
+              "description": "Memory id."
+            }
+          },
+          "required": [
+            "memoryId"
+          ]
+        }
+      },
+      {
+        "name": "memories",
+        "description": "List your own memory entries.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "attachment",
+        "description": "Fetch an attachment referenced by a task spec or message. Spec tokens of the form ![name](attachment:<teamId>/<id>.<ext>) embed an attachment; call with the bare <id> (the part before the extension). Returns the file content (utf8 for text/* / json / xml, base64 for images / pdf).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "attachmentId": {
+              "type": "string",
+              "description": "Attachment id."
+            }
+          },
+          "required": [
+            "attachmentId"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "set_task_meta",
+        "description": "Set the title and category tag of the task you are currently working on. Call exactly once before starting work: title = a concise summary of the task spec (50 chars max, plain text, no markdown); tag = one name from the fixed tag vocabulary listed in your instructions (omit it when none fits).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Task title, 50 chars max."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional tag name from the fixed vocabulary."
+            }
+          },
+          "required": [
+            "title"
+          ]
+        }
+      },
+      {
+        "name": "create_skill",
+        "description": "Create a team skill as a folder in the team skills directory. Requires the 「创建技能」permission switch on your agent row. The SKILL.md frontmatter name and description must match the declared values.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Skill name; also the folder name and the SKILL.md frontmatter name."
+            },
+            "description": {
+              "type": "string",
+              "description": "One-line skill description; must match the SKILL.md frontmatter."
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "File path inside the skill folder."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "File text."
+                  }
+                }
+              },
+              "description": "Skill files; must include SKILL.md."
+            }
+          },
+          "required": [
+            "name",
+            "description",
+            "files"
+          ]
+        }
+      },
+      {
+        "name": "update_skill",
+        "description": "Update an existing team skill by id. Requires the「更新技能」permission switch on your agent row. Listed files are overwritten, unlisted files are kept; include a new SKILL.md to change the frontmatter (including renaming).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "skillId": {
+              "type": "string",
+              "description": "Skill id to update."
+            },
+            "name": {
+              "type": "string",
+              "description": "Declared skill name; must match the SKILL.md frontmatter."
+            },
+            "description": {
+              "type": "string",
+              "description": "Declared description; must match the SKILL.md frontmatter."
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "File path inside the skill folder."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "File text."
+                  }
+                }
+              },
+              "description": "Files to overwrite; include SKILL.md to change frontmatter."
+            }
+          },
+          "required": [
+            "skillId",
+            "name",
+            "description",
+            "files"
+          ]
+        }
+      }
+    ],
+    "localTools": []
+  },
+  "homeClaim2": {
+    "step": {
+      "id": "dAtbIfIhIw7ayeb0MfKX_",
+      "buildId": "chief-01a13104-ad00-7d8a-abea-a9e21c225c2b",
+      "kind": "chief",
+      "machineId": "zzWiIWz5xwjLeYm6amAvF",
+      "createdAt": 1791823752449
+    },
+    "conversationId": "chief-01a13104-ad00-7d8a-abea-a9e21c225c2b",
+    "session": {
+      "action": "new",
+      "sessionId": null
+    },
+    "instruction": "归属机路由探针。",
+    "agent": {
+      "id": "S9MSBLCUVVeIvKoUAKZGw",
+      "displayName": "verify-bound-agent",
+      "description": "绑定探针",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "thinkingLevel": null,
+      "memories": []
+    },
+    "chief": {
+      "threadId": "chief-01a13104-ad00-7d8a-abea-a9e21c225c2b",
+      "systemPrompt": "你是「总管」（Chief）——每「用户×团队」一个的调度与对话代理：理解用户请求、创建任务、分派给合适的 Agent 执行，并在关口/落地/失败时跟进汇报。\n\n## 章程（常设指示）\n（尚无章程）\n\n## 你的运行位\n绑定 Agent：verify-bound-agent（stub-gw/stub-model）。职责：绑定探针\n\n## 团队资源清单\nprojects: [{\"id\":\"sT8DNgJJEIZskqN-7wLcv\",\"name\":\"verify-1259\",\"repoKind\":null}]\nagents:\n- Planner（id: Pl0CCW6Irgy1inaddEqMp，模型: n/a）：角色：Planner（规划者）。\n职责：读票与仓库，产出四段式 plan.md（Context / Changes / Edge cases / Verification），不碰实现代码、不开 PR。\n产出形态：plan.md 交接文档，供 confirm 关口人审。\n规则：只读侦察（读文件 / 搜索 / 只读命令）；方案拆成可独立验收的薄垂直切片；Edge cases 段先列失败方式，执行轮照单施工。\nComposition：入口 = plan 步（assignment.plan 槽）；禁止被其他 persona 调用，也禁止调用其他 persona。\n- Implementer（id: QsgAei2xVtijluS_G_jcP，模型: n/a）：角色：Implementer（执行者）。\n职责：按已确认的 plan.md 薄垂直切片 TDD 施工，逐条 commit，开六节 body 的 PR。\n产出形态：会话分支 + PR（What / Verified / Upstream / Risk / Acceptance / Issues 六节 body）。\n规则：先列失败方式再写实现（Edge cases 段为准）；改动后跑 lint / typecheck / 受影响面测试；不合并自己的 PR——合并动作留人。\nComposition：入口 = build 步（assignment.build 槽）；禁止被其他 persona 调用，也禁止调用其他 persona。\n- CodeReviewer（id: uyRyJ2KUqzqBvkgEgnxYq，模型: n/a）：角色：CodeReviewer（代码审核，review 三视角之一）。\n职责：五轴 review——正确性、边界、可读性、一致性、性能；按 severity（blocking / suggestion / info）标注 findings。\n产出形态：JSON verdict（conclusion + 编号 findings，引用 file:line）——只出报告，不改码。\n规则：只读审核，不修改文件、不提交、不推送；blocking 只用于「按此合并会出错」级风险。\nComposition：入口 = review 步 fan-out（三视角并行之一）；禁止被其他 persona 调用，也禁止调用其他 persona。\n- SecurityAuditor（id: _U0lr18PsC6YMYPs7kPfe，模型: n/a）：角色：SecurityAuditor（安全审计，review 三视角之一）。\n职责：OWASP 式审计——注入、越权、密钥泄漏、不安全依赖；diff 触及 server / auth / crypto 面时重点参战。\n产出形态：JSON verdict（conclusion + 编号 findings，引用 file:line）——只出报告，不改码。\n规则：只读审计；安全发现的 severity 按可利用性与影响定档，不夸大也不降级。\nComposition：入口 = review 步 fan-out（三视角并行之一）；禁止被其他 persona 调用，也禁止调用其他 persona。\n- TestEngineer（id: 5trJDhNlmcHnLPDBtjM-N，模型: n/a）：角色：TestEngineer（测试工程师，review 三视角之一）。\n职责：读 diff 找覆盖缺口 + Prove-It——指出「哪条失败方式没有测试钉住」。\n产出形态：JSON verdict（conclusion + 编号 findings 的缺测清单）——只出报告，不改码、不替实现者补测试。\n规则：只读评审；每条缺口给最小可补的测试位置（文件 + 场景），不动手写。\nComposition：入口 = review 步 fan-out（三视角并行之一）；禁止被其他 persona 调用，也禁止调用其他 persona。\n- Verifier（id: K75oSJDrazw319xKV2lXk，模型: n/a）：角色：Verifier（验证者）。\n职责：跑 docs/verify/<票号>/ e2e 证据包（真实起栈、真用户路径、截图 / API JSON / 落库行实证）并回贴 PR body，与 CI 对账。\n产出形态：docs/verify/<票号>/ 证据包 + JSON verdict（passed / conclusion / evidence）——pass/fail 如实报。\n规则：证据取实物（运行时日志、编译产物、快照套件真值），不接受「装好了 / 看起来对」；与 TestEngineer 分工 = 读 diff 批评 vs 跑真系统取证，产物不同故分设。diff 触及 apps/web 时顺跑 Web 性能视角（WebPerf 不设独立 agent，是本角色的条件 skill hop）。\nComposition：入口 = verify 步（assignment.verify 槽）；禁止被其他 persona 调用，也禁止调用其他 persona。\n- verify-bound-agent（id: S9MSBLCUVVeIvKoUAKZGw，模型: stub-model）：绑定探针\nskills: []\n\n## 记忆（与绑定 Agent 共用同一份存储）\n（尚无记忆）\n\n## 工作约定\n- 措辞→spec：把用户口语请求变换为 todo——title = 动词短语提炼；spec = 三段式：① 用户原文 blockquote（`> …`）② `要求：` bullet 展开（文件位置/内容要点/读者对象）③ 需要时 `补充信息（探测得出，非用户确认）：` bullet（先探测仓库/资源再写事实，显式标注非用户确认）。\n- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。\n- 编排回合（开始任务入口，消息形「开始任务 #n」+ 编排请求行）：先规划再派发——单一工作单元：直接 run_builds 派该任务（assignment 按职责文本选）；确含多个可独立验收的交付物：create_todo 拆子卡 + run_builds 逐个派发 + close_todos 关掉原卡（看板不留父卡），回执列全部子卡实体引用。\n- 派发判定（逐次派发自行判断，无团队设置槽，ADR 0014）：先规划还是直接修，由你自己判。判断纪律：当信息会实质改变结果、执行方式、权限或安全时才问；否则自己决定，并说出你决定了什么。可判信号（非硬规则）：有可复现步骤或失败测试的缺陷 → 直接修（run_builds 传 withPlan=false）；引入新能力、或改动跨包 → 先问（问 = ask_user 结构化提问：本回合会挂起等用户在问答卡上作答，一次可带最多 4 问；判不准且不便当面问时也可传 withPlan=true 先规划，方案停在确认关口，用户批准或打回即表态）；判不准 → 先规划（withPlan 缺省即先规划）。直接修只跳过方案确认闸，审阅关口恒在——完成后仍停在审阅关口等用户审。\n- 派发回执：每次派发把判定理由写进 run_builds 的 dispatchReason 参数（随调用落 transcript，判定可审计），并在给用户的回执里写明「我判为直接修 / 先规划，因为 X」。用户可就地一句话推翻该判定——推翻只影响这一次派发（已开跑的先 cancel_builds 取消，再按相反模式重派），不外推为常设偏好。\n- 分派：读 agents 的职责文本按权重选择；归属按交付物与改动范围区分——面向读者的文档产出（README/手册/教程/变更日志）归文档职责 Agent；后端功能、缺陷、重构与性能归后端职责 Agent；Web 界面布局、样式与交互归前端职责 Agent；CI 流水线、构建打包、依赖与部署配置归运维职责 Agent。归属拿不准时先 ask_user 澄清，不猜。run_builds 传 assignment.build.agentId。\n- 交付物优先于路径：归属看交付物，不看请求里出现的路径或技术词——要更新的是 README 就归文档职责，哪怕那个 README 躺在 apps/web 下。\n- 主任务定归属：一句请求含多个同类子项时按主任务定归属，不拆成多个 todo，次任务随主任务交给同一个 Agent。\n- 症状按改动范围定：同一个用户可见症状可能归不同职责，看要改的代码在哪——接口返回错归后端，界面上点不到归前端。\n- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明完成或需要确认时会跟进汇报。\n- wake 轮：汇报区分「委派已受理」与「结果已确认」两阶段；failed wake 先调 machines 等工具核实环境，再做法证式汇报（失败原因/定性/工作保全位置/环境建议）。\n- 正文内联实体引用用自定义 URI markdown：[名](agent:<id>)、[#n](todo:<id>)。\n- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。\n- 技能路由提示节在位时：它是服务端按用户消息给的候选（仅建议），先用 skills 工具核对详情，切合才用，不切合直接忽略；普通对话绝不强行调用。\n- 用与用户相同的语言回复。",
+      "trigger": "user"
+    },
+    "remoteTools": [
+      {
+        "name": "projects",
+        "description": "List the team projects with their repo binding and todo counts.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "teamId": {
+              "type": "string",
+              "description": "Optional team id; defaults to the current team."
+            }
+          }
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "todos",
+        "description": "List todos. Filter by project or phase; returns full todo docs including spec, phase, seqNum and assignment.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Optional project id filter."
+            },
+            "phase": {
+              "type": "string",
+              "description": "Optional phase filter (todo/queued/planning/confirm/building/review/done/failed/closed)."
+            }
+          }
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "agents",
+        "description": "List the team agents with their responsibility text (description), model and permissions — the input for dispatch weighting.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "models",
+        "description": "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName}. Read this before setting provider/modelId on create_agent or update_agent — only values from this list are valid.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "machines",
+        "description": "List registered machines with online state, running/ max concurrency and CLI version.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "skills",
+        "description": "List team skills (folders with a SKILL.md) granted to agents.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "secrets",
+        "description": "List team secret names (values are write-only and never returned).",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "mcp_servers",
+        "description": "List team MCP servers available to agents (slug, transport, url).",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "schedules",
+        "description": "List scheduled reruns (kind, next run, bound todo).",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "docs",
+        "description": "Read repository documents (files at a ref) for a project. Pass several paths at once to read them in one call.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "File paths to read — batch them; one call may read many files."
+            },
+            "ref": {
+              "type": "string",
+              "description": "Optional git ref; defaults to the default branch."
+            }
+          },
+          "required": [
+            "projectId",
+            "paths"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "usage",
+        "description": "Token usage accounting per build and model (input/output/cache read/cache write).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "buildId": {
+              "type": "string",
+              "description": "Optional build id filter."
+            }
+          }
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "issues",
+        "description": "List issues of a GitHub-backed project (hosted repos have none).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "pull_requests",
+        "description": "List pull requests of a GitHub-backed project with merge state.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "workflow_runs",
+        "description": "List CI workflow runs of a GitHub-backed project.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "attachment",
+        "description": "Fetch an attachment referenced by a todo or message.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "attachmentId": {
+              "type": "string",
+              "description": "Attachment id."
+            }
+          },
+          "required": [
+            "attachmentId"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "conversation",
+        "description": "Read the full conversation (transcript messages and tool calls) of a build or chief thread.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string",
+              "description": "Conversation id (buildId or chief-<threadId>)."
+            }
+          },
+          "required": [
+            "conversationId"
+          ]
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "create_todo",
+        "description": "Create a todo in a project. Title = verb phrase; spec = the three-section transform (user quote block, 要求 bullets, 补充信息 bullets).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            },
+            "title": {
+              "type": "string",
+              "description": "Todo title (verb phrase)."
+            },
+            "spec": {
+              "type": "string",
+              "description": "Structured spec markdown."
+            }
+          },
+          "required": [
+            "projectId",
+            "title",
+            "spec"
+          ]
+        }
+      },
+      {
+        "name": "split_todo",
+        "description": "Split a big todo into N sub-cards with blocking dependency edges (ADR 0018 layer 2). Each sub-card pins one role agent and runs direct-execute (no per-card plan gate). The split scheme lands on the parent plan doc and parks at the parent confirm gate for human review — confirming the parent dispatches the unblocked sub-cards; later waves auto-start as their blockers finish; the parent auto-completes when every sub-card is done. Split only when subtasks are truly independent or orderable — single-view single-artifact work should run as one todo, not be split.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoId": {
+              "type": "string",
+              "description": "Parent todo id to split."
+            },
+            "subtodos": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Sub-card title (verb phrase)."
+                  },
+                  "spec": {
+                    "type": "string",
+                    "description": "Self-contained task text — the sub-card agent sees only this, not the parent ticket."
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "description": "Role agent id pinned to the sub-card (execution slot)."
+                  },
+                  "blockedBy": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Optional 1-based indices of prerequisite sub-cards in this array (e.g. [1, 2] = waits for the 1st and 2nd)."
+                  }
+                },
+                "required": [
+                  "title",
+                  "spec",
+                  "agentId"
+                ]
+              },
+              "description": "Sub-cards to create, in dispatch order."
+            }
+          },
+          "required": [
+            "todoId",
+            "subtodos"
+          ]
+        }
+      },
+      {
+        "name": "update_todo",
+        "description": "Update fields of a todo (title/spec/tags/order).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoId": {
+              "type": "string",
+              "description": "Todo id."
+            },
+            "title": {
+              "type": "string",
+              "description": "Optional new title."
+            },
+            "spec": {
+              "type": "string",
+              "description": "Optional new spec."
+            },
+            "tagIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional replacement tag ids."
+            }
+          },
+          "required": [
+            "todoId"
+          ]
+        }
+      },
+      {
+        "name": "delete_todos",
+        "description": "Delete todos permanently (builds and transcripts cascade).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to delete."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "close_todos",
+        "description": "Close todos as shelved (phase → closed).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to close."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "reopen_todos",
+        "description": "Reopen closed todos (phase closed → todo).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to reopen."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "complete_todos",
+        "description": "Mark todos done without a merge step. Rejected at the confirm/review gates: passing a gate is a human action (merge, or confirm on the board) - park the card at the gate and notify the user instead (#900).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to complete."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "message_todo",
+        "description": "Post a message into the latest build conversation of a todo (steer or feedback).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoId": {
+              "type": "string",
+              "description": "Todo id."
+            },
+            "content": {
+              "type": "string",
+              "description": "Message text."
+            }
+          },
+          "required": [
+            "todoId",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "create_project",
+        "description": "Create a project (hosted repo or plain).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Project name."
+            },
+            "repoKind": {
+              "type": "string",
+              "description": "Optional: \"hosted\" to provision a managed bare repo."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "update_project",
+        "description": "Rename a project or update its metadata.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            },
+            "name": {
+              "type": "string",
+              "description": "Optional new name."
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "connect_repo",
+        "description": "Connect a GitHub repo (owner/repo) to a project.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project id."
+            },
+            "githubRepo": {
+              "type": "string",
+              "description": "GitHub \"owner/repo\" reference."
+            }
+          },
+          "required": [
+            "projectId",
+            "githubRepo"
+          ]
+        }
+      },
+      {
+        "name": "create_agent",
+        "description": "Create an agent with model, responsibility text and permissions.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "displayName": {
+              "type": "string",
+              "description": "Agent display name."
+            },
+            "description": {
+              "type": "string",
+              "description": "Responsibility text (injected into every task and used for dispatch)."
+            },
+            "provider": {
+              "type": "string",
+              "description": "Optional provider id; call `models` for the candidate list."
+            },
+            "modelId": {
+              "type": "string",
+              "description": "Optional model id; call `models` for the candidate list."
+            }
+          },
+          "required": [
+            "displayName"
+          ]
+        }
+      },
+      {
+        "name": "update_agent",
+        "description": "Update an agent (responsibility text, model, permission switches).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "description": "Agent id."
+            },
+            "displayName": {
+              "type": "string",
+              "description": "Optional new display name."
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional new responsibility text."
+            },
+            "provider": {
+              "type": "string",
+              "description": "Optional provider id; call `models` for the candidate list."
+            },
+            "modelId": {
+              "type": "string",
+              "description": "Optional model id; call `models` for the candidate list."
+            }
+          },
+          "required": [
+            "agentId"
+          ]
+        }
+      },
+      {
+        "name": "delete_agents",
+        "description": "Delete agents from the team.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "agentIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Agent ids to delete."
+            }
+          },
+          "required": [
+            "agentIds"
+          ]
+        }
+      },
+      {
+        "name": "create_skill",
+        "description": "Create a team skill as a folder in the team skills directory. The skill is a SKILL.md entry file (frontmatter name and description are required and must match the declared values) plus optional extra files.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Skill name; also the folder name and the SKILL.md frontmatter name."
+            },
+            "description": {
+              "type": "string",
+              "description": "One-line skill description; must match the SKILL.md frontmatter."
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "File path inside the skill folder."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "File text."
+                  }
+                }
+              },
+              "description": "Skill files; must include SKILL.md."
+            }
+          },
+          "required": [
+            "name",
+            "description",
+            "files"
+          ]
+        }
+      },
+      {
+        "name": "update_skill",
+        "description": "Update an existing team skill by id. Listed files are overwritten, unlisted files are kept; include a new SKILL.md to change the frontmatter (including renaming).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "skillId": {
+              "type": "string",
+              "description": "Skill id to update."
+            },
+            "name": {
+              "type": "string",
+              "description": "Declared skill name; must match the SKILL.md frontmatter."
+            },
+            "description": {
+              "type": "string",
+              "description": "Declared description; must match the SKILL.md frontmatter."
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "File path inside the skill folder."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "File text."
+                  }
+                }
+              },
+              "description": "Files to overwrite; include SKILL.md to change frontmatter."
+            }
+          },
+          "required": [
+            "skillId",
+            "name",
+            "description",
+            "files"
+          ]
+        }
+      },
+      {
+        "name": "set_secret",
+        "description": "Create or overwrite a team secret (value is write-only, encrypted at rest).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Secret name (env var name)."
+            },
+            "value": {
+              "type": "string",
+              "description": "Secret value."
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional description."
+            }
+          },
+          "required": [
+            "name",
+            "value"
+          ]
+        }
+      },
+      {
+        "name": "delete_secrets",
+        "description": "Delete team secrets by name or id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "names": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Secret names or ids to delete."
+            }
+          },
+          "required": [
+            "names"
+          ]
+        }
+      },
+      {
+        "name": "set_remote_shell",
+        "description": "Grant or revoke the remote shell permission switch of an agent.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "description": "Agent id."
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Grant or revoke."
+            }
+          },
+          "required": [
+            "agentId",
+            "enabled"
+          ]
+        }
+      },
+      {
+        "name": "schedule_todo",
+        "description": "Schedule a todo to rerun (hourly/daily/weekly/once; minute steps 00/15/30/45).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoId": {
+              "type": "string",
+              "description": "Todo id."
+            },
+            "kind": {
+              "type": "string",
+              "description": "once | hourly | daily | weekly."
+            },
+            "at": {
+              "type": "number",
+              "description": "Epoch ms anchor (required for once; time-of-day anchor for recurring)."
+            },
+            "machineId": {
+              "type": "string",
+              "description": "Optional pinned machine id; null = automatic."
+            }
+          },
+          "required": [
+            "todoId",
+            "kind"
+          ]
+        }
+      },
+      {
+        "name": "unschedule_todo",
+        "description": "Remove the schedule of a todo.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoId": {
+              "type": "string",
+              "description": "Todo id."
+            }
+          },
+          "required": [
+            "todoId"
+          ]
+        }
+      },
+      {
+        "name": "run_builds",
+        "description": "Start builds for todos: assignment picks the executing agent per responsibility fit; withPlan is your per-dispatch judgment (omit = plan first) — state the reason via dispatchReason; the review gate applies either way. Assignment must set at least one slot (plan and/or build agentId) — an empty assignment is rejected.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to start."
+            },
+            "assignment": {
+              "type": "object",
+              "properties": {
+                "plan": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                      "description": "Planning agent id."
+                    }
+                  }
+                },
+                "build": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                      "description": "Executing agent id."
+                    }
+                  }
+                },
+                "review": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                      "description": "Fallback review agent id (used when no review persona is seeded)."
+                    }
+                  }
+                },
+                "verify": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                      "description": "Verifier agent id — set to enqueue a verify step when the review gate is reached."
+                    }
+                  }
+                }
+              }
+            },
+            "withPlan": {
+              "type": "boolean",
+              "description": "true (default when omitted) = plan first, parking at the confirm gate; false = direct fix, skipping only plan confirmation (the review gate always stands). Omit when unsure."
+            },
+            "dispatchReason": {
+              "type": "string",
+              "description": "Why plan-first or direct — recorded on the dispatch receipt so the user can audit or override the judgment."
+            },
+            "machineId": {
+              "type": "string",
+              "description": "Optional pinned machine id for the builds; omit to inherit the todo machine (null = automatic)."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "run_review",
+        "description": "Request an independent review run of a build: fans out the three review perspectives (CodeReviewer / SecurityAuditor / TestEngineer) as parallel read-only review steps, each reporting its own verdict; falls back to the assignment review slot when personas are absent.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "buildId": {
+              "type": "string",
+              "description": "Build id."
+            }
+          },
+          "required": [
+            "buildId"
+          ]
+        }
+      },
+      {
+        "name": "confirm_builds",
+        "description": "Confirm parked plans (confirm gate → building).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "buildIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Build ids to confirm."
+            }
+          },
+          "required": [
+            "buildIds"
+          ]
+        }
+      },
+      {
+        "name": "cancel_builds",
+        "description": "Cancel running or queued builds.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "buildIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Build ids to cancel."
+            }
+          },
+          "required": [
+            "buildIds"
+          ]
+        }
+      },
+      {
+        "name": "merge_builds",
+        "description": "Merge reviewed builds into the default branch (delegated to a machine merge step).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "buildIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Build ids to merge."
+            }
+          },
+          "required": [
+            "buildIds"
+          ]
+        }
+      },
+      {
+        "name": "ask_user",
+        "description": "Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). Use it whenever the answer would change what you do next; batch up to 4 questions per call instead of asking one at a time.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "header": {
+                    "type": "string",
+                    "description": "Short label of the question block (<= 24 chars)."
+                  },
+                  "question": {
+                    "type": "string",
+                    "description": "The question text."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "description": "Choice label shown as a button."
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "Optional one-line hint under the label."
+                        }
+                      },
+                      "required": [
+                        "label"
+                      ]
+                    },
+                    "description": "Answer choices; empty array = free-text answer."
+                  },
+                  "multiSelect": {
+                    "type": "boolean",
+                    "description": "Allow multiple choices (default single). Ignored for free-text questions."
+                  }
+                },
+                "required": [
+                  "header",
+                  "question",
+                  "options"
+                ]
+              },
+              "description": "Questions to ask in this call (1-4); each renders one block on the card."
+            }
+          },
+          "required": [
+            "questions"
+          ]
+        }
+      },
+      {
+        "name": "notify_user",
+        "description": "Push an in-app notification to the user (chief_message event).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string",
+              "description": "Notification body."
+            }
+          },
+          "required": [
+            "message"
+          ]
+        }
+      },
+      {
+        "name": "save_memory",
+        "description": "Save a one-fact memory entry for the agent running the chief (shared store, quota 100).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Short memory title."
+            },
+            "content": {
+              "type": "string",
+              "description": "Memory body."
+            },
+            "projectId": {
+              "type": "string",
+              "description": "Optional project id for provenance."
+            }
+          },
+          "required": [
+            "title",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "delete_memory",
+        "description": "Delete a memory entry by id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "memoryId": {
+              "type": "string",
+              "description": "Memory id."
+            }
+          },
+          "required": [
+            "memoryId"
+          ]
+        }
+      },
+      {
+        "name": "memories",
+        "description": "List the memory entries of the agent running the chief.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "watch_todos",
+        "description": "Watch todos so the chief is woken when they park at a gate, settle or fail.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to watch."
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional human-readable reason."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "unwatch_todos",
+        "description": "Stop watching todos.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todoIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Todo ids to unwatch."
+            }
+          },
+          "required": [
+            "todoIds"
+          ]
+        }
+      },
+      {
+        "name": "wakes",
+        "description": "List pending scheduled wake-ups.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "replaySafe": true
+      },
+      {
+        "name": "set_wake",
+        "description": "Schedule a wake-up to check back on a topic at a given time.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "number",
+              "description": "Epoch ms to wake at."
+            },
+            "note": {
+              "type": "string",
+              "description": "What to check back on."
+            },
+            "todoId": {
+              "type": "string",
+              "description": "Optional todo id to attach."
+            }
+          },
+          "required": [
+            "at"
+          ]
+        }
+      },
+      {
+        "name": "clear_wake",
+        "description": "Cancel a pending wake-up.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "wakeId": {
+              "type": "string",
+              "description": "Wake id."
+            }
+          },
+          "required": [
+            "wakeId"
+          ]
+        }
+      }
+    ]
+  }
+}

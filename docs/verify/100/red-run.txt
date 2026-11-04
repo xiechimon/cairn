@@ -1,0 +1,22 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.1 [39m[90m/mnt/fast/cairn/workspaces/01a17e07-add3-76a2-94ca-fa80de0a3a0f[39m
+
+ [31m❯[39m [30m[46m @cairn/shared [49m[39m test/github-create-gate.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 192[2mms[22m[39m
+   [32m✓[39m reservations respect spacing and a rolling hourly cap[32m 4[2mms[22m[39m
+   [32m✓[39m limits honor headers and secondary messages without retrying permissions[32m 0[2mms[22m[39m
+   [32m✓[39m an abandoned lock fails closed instead of waiting forever[32m 1[2mms[22m[39m
+[31m   [31m×[31m an unwritable gate directory fails with a typed error naming the directory and the remedy[39m[32m 5[2mms[22m[39m
+[31m   [31m×[31m a gate directory under an unwritable parent fails the same way[39m[32m 1[2mms[22m[39m
+   [32m✓[39m separate CLI processes reserve the same on-disk window[32m 179[2mms[22m[39m
+ [31m❯[39m [30m[43m @xiechimon/cairn [49m[39m test/github-create-throttle.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1015[2mms[22m[39m
+   [33m[2m✓[22m[39m parallel creates share slots and an explicit secondary limit retries successfully[33m 1007[2mms[22m[39m
+[31m   [31m×[31m an unwritable gate directory surfaces as HttpError 503 naming the directory, with zero outbound calls[39m[32m 7[2mms[22m[39m
+ [31m❯[39m [30m[43m @xiechimon/cairn [49m[39m test/github-create-gate-unwritable.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 108[2mms[22m[39m
+[31m   [31m×[31m retry on an unwritable gate directory answers 503 naming the directory, with zero outbound calls[39m[32m 73[2mms[22m[39m
+[31m   [31m×[31m a creation-time mirror failure on an unwritable gate directory logs the todo and the cause[39m[32m 32[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m3 failed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (10)[39m
+[2m   Start at [22m 14:17:10
+[2m   Duration [22m 1.61s[2m (tests 43%, transform 41%, import 15%)[22m
+

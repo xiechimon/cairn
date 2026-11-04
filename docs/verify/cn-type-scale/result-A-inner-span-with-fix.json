@@ -1,0 +1,17 @@
+{
+  "variant": "A-inner-span-with-fix",
+  "comfortable": {
+    "buttonClassHasTextMeta": false,
+    "buttonClassHasTextXs": true,
+    "buttonFontSize": "12px",
+    "labelFontSize": "12px",
+    "labelHost": "span"
+  },
+  "compact": {
+    "buttonClassHasTextMeta": false,
+    "buttonClassHasTextXs": true,
+    "buttonFontSize": "12px",
+    "labelFontSize": "11.9531px",
+    "labelHost": "span"
+  }
+}

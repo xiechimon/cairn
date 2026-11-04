@@ -1,0 +1,38 @@
+
+ RUN  v5.0.1 <home>/.codex/worktrees/pr-1839-prior-art/cairn
+
+ ❯ |@cairn/integration| test/plan-prior-art-grade.test.ts (16 tests | 2 failed) 8ms
+   ❯ prior-art decision scoring (15)
+     × does not award reuse credit to Decision: reuse croner because it is maintained; don't reuse croner in the final implementation. 3ms
+     × does not award reuse credit to Source: a rejected example; reuse croner because it is maintained.
+Decision: build a parser because the example is unsuitable. 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Decision: reuse croner because it is maintained; don't reuse croner in the final implementation.
+ FAIL  |@cairn/integration| test/plan-prior-art-grade.test.ts > prior-art decision scoring > does not award reuse credit to Source: a rejected example; reuse croner because it is maintained.
+Decision: build a parser because the example is unsuitable.
+AssertionError: expected 1 to be 0.5 // Object.is equality
+
+- Expected
++ Received
+
+- 0.5
++ 1
+
+ ❯ test/plan-prior-art-grade.test.ts:57:60
+     55|     '```text\nDecision: reuse croner because it is maintained.\n```\nD…
+     56|   ])('does not award reuse credit to %s', (decision) => {
+     57|     expect(gradePlanPriorArt(featurePlan(decision)).score).toBe(0.5);
+       |                                                            ^
+     58|   });
+     59|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 14 passed (16)
+   Start at  03:16:52
+   Duration  302ms (transform 68%, import 28%, tests 3%, worker 1%)
+

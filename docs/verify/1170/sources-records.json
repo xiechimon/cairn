@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sources": {
+    "my-live-skill": {
+      "skillId": "my-live-skill",
+      "kind": "localPath",
+      "ref": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0289-1170-localpath-github-url-refresh/.claude/verify-run/import-src/my-live-skill",
+      "importedAt": 1791642250677,
+      "refreshedAt": 1791642257722
+    },
+    "pdf": {
+      "skillId": "pdf",
+      "kind": "github",
+      "ref": "https://github.com/anthropics/skills/tree/main/skills/pdf",
+      "importedAt": 1791642257335,
+      "refreshedAt": null
+    }
+  }
+}

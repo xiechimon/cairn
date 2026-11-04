@@ -1,0 +1,54 @@
+✔ a spec naming an existing path and an existing exported function reports nothing (150.1885ms)
+✔ a spec naming a deleted path reports it once with its line number (155.706208ms)
+✔ a renamed function is reported as a missing identifier (159.333417ms)
+✔ names inside fenced code blocks and URLs are ignored (145.20625ms)
+✔ a table row marked superseded is ignored (146.438375ms)
+✔ short or common words in backticks are not treated as identifiers (107.112958ms)
+✔ a path that never existed in the repo is not reported (128.137666ms)
+✔ a relative path resolving under a tracked file is not reported (119.102ms)
+✔ a path with a line-range suffix is checked without the range (132.311042ms)
+✔ a directory reference is not reported as a missing path (115.3785ms)
+✔ a deleted relative path is reported through its historical repository path (157.33175ms)
+✔ historical suffix matching respects directory boundaries (157.302916ms)
+✔ uncommitted file restoration does not hide drift at HEAD (158.048792ms)
+✖ an identifier mentioned only in integration fixtures is still missing from application code (152.006667ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2025.627166
+
+✖ failing tests:
+
+test at scripts/doc-drift.test.mjs:284:1
+✖ an identifier mentioned only in integration fixtures is still missing from application code (152.006667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     doc: 'docs/spec/01-test.md',
+  -     kind: 'identifier',
+  -     line: 1,
+  -     name: 'oldHelper'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/scripts/doc-drift.test.mjs:295:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { doc: 'docs/spec/01-test.md', name: 'oldHelper', kind: 'identifier', line: 1 } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

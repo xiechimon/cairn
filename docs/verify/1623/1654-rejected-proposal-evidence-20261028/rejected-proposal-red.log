@@ -1,0 +1,192 @@
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (23 tests | 13 failed) 866ms
+   × shadow stores a rejected missing-agent proposal at confirm without executable child references 82ms
+   × shadow stores a rejected cycle proposal at confirm without executable child references 37ms
+   × shadow stores a rejected out-of-range proposal at confirm without executable child references 33ms
+   × auto stores a rejected missing-agent proposal at confirm without executable child references 32ms
+   × auto stores a rejected cycle proposal at confirm without executable child references 41ms
+   × auto stores a rejected out-of-range proposal at confirm without executable child references 35ms
+   × rejected proposal cannot be confirmed through http 37ms
+   × rejected proposal cannot be confirmed through chief 34ms
+   × shadow correction resubmits only the rejected current proposal and preserves its history 31ms
+   × auto correction resubmits only the rejected current proposal and preserves its history 44ms
+   × rejected proposal cannot bypass confirmation through http ordinary build start 59ms
+   × rejected proposal cannot bypass confirmation through chief ordinary build start 42ms
+   × rejected proposal directs correction to split_todo instead of queuing an ordinary planner revision 29ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow stores a rejected missing-agent proposal at confirm without executable child references
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto stores a rejected missing-agent proposal at confirm without executable child references
+HttpError: agent ghost（不在本团队，或 id 抄错了）
+ ❯ createSplitTodo src/services/todo-split.ts:114:13
+    112|       .get();
+    113|     if (row === undefined) {
+    114|       throw new HttpError(404, `agent ${item.agentId}（不在本团队，或 id 抄错了）`…
+       |             ^
+    115|     }
+    116|   }
+ ❯ executeChiefTool src/services/chief-tools.ts:455:22
+ ❯ Object.tool test/split-rejected-proposal.test.ts:43:5
+ ❯ test/split-rejected-proposal.test.ts:100:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow stores a rejected cycle proposal at confirm without executable child references
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto stores a rejected cycle proposal at confirm without executable child references
+HttpError: blockedBy 依赖成环（DFS 检测命中）
+ ❯ visit src/services/todo-split.ts:134:33
+    132|     const state = new Uint8Array(items.length);
+    133|     const visit = (n: number): void => {
+    134|       if (state[n] === 1) throw new HttpError(400, 'blockedBy 依赖成环（DFS…
+       |                                 ^
+    135|       if (state[n] === 2) return;
+    136|       state[n] = 1;
+ ❯ visit src/services/todo-split.ts:137:44
+ ❯ visit src/services/todo-split.ts:137:44
+ ❯ createSplitTodo src/services/todo-split.ts:140:44
+ ❯ executeChiefTool src/services/chief-tools.ts:455:22
+ ❯ Object.tool test/split-rejected-proposal.test.ts:43:5
+ ❯ test/split-rejected-proposal.test.ts:100:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow stores a rejected out-of-range proposal at confirm without executable child references
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto stores a rejected out-of-range proposal at confirm without executable child references
+HttpError: blockedBy 索引越界：3（1..2）
+ ❯ createSplitTodo src/services/todo-split.ts:123:15
+    121|     for (const idx of item.blockedBy ?? []) {
+    122|       if (!Number.isInteger(idx) || idx < 1 || idx > items.length) {
+    123|         throw new HttpError(400, `blockedBy 索引越界：${idx}（1..${items.len…
+       |               ^
+    124|       }
+    125|       if (idx === i + 1) throw new HttpError(400, 'blockedBy 不能自指');
+ ❯ executeChiefTool src/services/chief-tools.ts:455:22
+ ❯ Object.tool test/split-rejected-proposal.test.ts:43:5
+ ❯ test/split-rejected-proposal.test.ts:100:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > rejected proposal cannot be confirmed through http
+AssertionError: expected 202 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 202
+
+ ❯ test/split-rejected-proposal.test.ts:152:33
+    150|           action: 'confirm',
+    151|         });
+    152|         expect(response.status).toBe(409);
+       |                                 ^
+    153|         expect(await response.text()).toContain('split_todo');
+    154|       } else {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > rejected proposal cannot be confirmed through chief
+AssertionError: promise resolved "'{"confirmed":["rejected-build"]}'" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+"{\"confirmed\":[\"rejected-build\"]}"
+
+ ❯ test/split-rejected-proposal.test.ts:155:72
+    153|         expect(await response.text()).toContain('split_todo');
+    154|       } else {
+    155|         await expect(w.tool('confirm_builds', { buildIds: [buildId] })…
+       |                                                                        ^
+    156|           status: 409,
+    157|           message: expect.stringContaining('split_todo'),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow correction resubmits only the rejected current proposal and preserves its history
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto correction resubmits only the rejected current proposal and preserves its history
+HttpError: split 仅适用于未开工任务（当前相位 confirm）
+ ❯ createSplitTodo src/services/todo-split.ts:51:11
+     49|   if (parent === undefined) throw new HttpError(404, `todo ${input.par…
+     50|   if (parent.phase !== 'todo') {
+     51|     throw new HttpError(409, `split 仅适用于未开工任务（当前相位 ${parent.phase}）`);
+       |           ^
+     52|   }
+     53|   const existing = db
+ ❯ executeChiefTool src/services/chief-tools.ts:455:22
+ ❯ Object.tool test/split-rejected-proposal.test.ts:43:5
+ ❯ test/split-rejected-proposal.test.ts:179:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > rejected proposal cannot bypass confirmation through http ordinary build start
+AssertionError: expected 201 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 201
+
+ ❯ test/split-rejected-proposal.test.ts:299:11
+    297|             })
+    298|           ).status,
+    299|         ).toBe(409);
+       |           ^
+    300|       } else {
+    301|         await expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > rejected proposal cannot bypass confirmation through chief ordinary build start
+AssertionError: promise resolved "'{"builds":[{"id":"01a18249-c628-766c-…'" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+"{\"builds\":[{\"id\":\"01a18249-c628-766c-a729-c2863dc573e0\",\"todoId\":\"V2e3WHlpJflHwxBm9FWu1\",\"withPlan\":false,\"prevPhase\":\"confirm\",\"triggerSource\":\"chief\",\"planDocId\":null,\"errorMessage\":null,\"prUrl\":null,\"prNumber\":null,\"diffHash\":null,\"reportAttachmentId\":null,\"createdAt\":1793187235368}],\"withPlan\":false,\"dispatchReason\":null,\"triggerSource\":\"chief\"}"
+
+ ❯ test/split-rejected-proposal.test.ts:303:10
+    301|         await expect(
+    302|           w.tool('run_builds', { todoIds: [w.parentId], assignment, wi…
+    303|         ).rejects.toMatchObject({ status: 409 });
+       |          ^
+    304|       }
+    305|       expect(w.s.db.select().from(step).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > rejected proposal directs correction to split_todo instead of queuing an ordinary planner revision
+AssertionError: expected 202 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 202
+
+ ❯ test/split-rejected-proposal.test.ts:323:29
+    321|       clientMessageId: 'revision-1',
+    322|     });
+    323|     expect(response.status).toBe(409);
+       |                             ^
+    324|     expect(await response.text()).toContain('split_todo');
+    325|     expect(w.s.db.select().from(step).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 10 passed (23)
+   Start at  19:33:53
+   Duration  2.09s (tests 43%, transform 32%, import 24%)
+

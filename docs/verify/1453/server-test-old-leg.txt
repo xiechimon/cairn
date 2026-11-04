@@ -1,0 +1,103 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ❯ test/close-stops-active-steps.test.ts (23 tests | 4 failed) 1211ms
+   ❯ #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 (5)
+     × closed 卡的 plan 步成功回报（有方案文档）：回报不抛，步 done，卡仍 closed 40ms
+     × done 卡的 build 步成功回报：回报不抛，卡仍 done 32ms
+     × 挪回待开始的卡的 plan 步成功回报：卡仍 todo，不进 confirm 32ms
+     × closed 卡的 plan 步成功回报（无方案文档）：不补排重写步，机器领不到 37ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > closed 卡的 plan 步成功回报（有方案文档）：回报不抛，步 done，卡仍 closed
+AssertionError: promise rejected "PhaseTransitionError: illegal phase trans… { …(2) }" instead of resolving
+ ❯ test/close-stops-active-steps.test.ts:463:39
+    461|     withPlanDoc(w);
+    462|     await move(w, 'closed');
+    463|     await expect(report(w, success())).resolves.toBeUndefined();
+       |                                       ^
+    464|     expect(stepStatus(w)).toBe('done');
+    465|     expect(todoPhase(w)).toBe('closed');
+
+Caused by: PhaseTransitionError: illegal phase transition: closed -> confirm
+ ❯ assertPhaseTransition src/services/phase.ts:80:44
+ ❯ setTodoPhase src/services/todos.ts:541:3
+ ❯ completeStep src/services/builds.ts:1654:5
+ ❯ finishStep src/services/machines.ts:1986:5
+ ❯ report test/close-stops-active-steps.test.ts:444:5
+ ❯ test/close-stops-active-steps.test.ts:463:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { from: 'closed', to: 'confirm' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > done 卡的 build 步成功回报：回报不抛，卡仍 done
+AssertionError: promise rejected "PhaseTransitionError: illegal phase trans… { …(2) }" instead of resolving
+ ❯ test/close-stops-active-steps.test.ts:471:59
+    469|     const w = makeWorld({ phase: 'building', stepStatus: 'claimed', st…
+    470|     await move(w, 'done');
+    471|     await expect(report(w, success({ hasChanges: true }))).resolves.to…
+       |                                                           ^
+    472|     expect(stepStatus(w)).toBe('done');
+    473|     expect(todoPhase(w)).toBe('done');
+
+Caused by: PhaseTransitionError: illegal phase transition: done -> review
+ ❯ assertPhaseTransition src/services/phase.ts:80:44
+ ❯ setTodoPhase src/services/todos.ts:541:3
+ ❯ completeStep src/services/builds.ts:1668:7
+ ❯ finishStep src/services/machines.ts:1986:5
+ ❯ report test/close-stops-active-steps.test.ts:444:5
+ ❯ test/close-stops-active-steps.test.ts:471:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { from: 'done', to: 'review' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > 挪回待开始的卡的 plan 步成功回报：卡仍 todo，不进 confirm
+AssertionError: expected 'confirm' to be 'todo' // Object.is equality
+
+Expected: "todo"
+Received: "confirm"
+
+ ❯ test/close-stops-active-steps.test.ts:481:26
+    479|     await move(w, 'todo');
+    480|     await expect(report(w, success())).resolves.toBeUndefined();
+    481|     expect(todoPhase(w)).toBe('todo');
+       |                          ^
+    482|   });
+    483|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > closed 卡的 plan 步成功回报（无方案文档）：不补排重写步，机器领不到
+AssertionError: expected [ 'done', 'pending' ] to deeply equal [ 'done' ]
+
+- Expected
++ Received
+
+  [
+    "done",
++   "pending",
+  ]
+
+ ❯ test/close-stops-active-steps.test.ts:489:40
+    487|     await expect(report(w, success())).resolves.toBeUndefined();
+    488|     const steps = w.s.db.select().from(stepTable).where(eq(stepTable.b…
+    489|     expect(steps.map((r) => r.status)).toEqual(['done']);
+       |                                        ^
+    490|     expect(await claim(w)).toBeNull();
+    491|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 19 passed (23)
+   Start at  07:34:58
+   Duration  5.25s (transform 44%, import 31%, tests 24%)
+
+  Transform  transforming modules took 2.21s · 44% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

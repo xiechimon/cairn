@@ -1,0 +1,33 @@
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+
+  ℹ Safe fix: Replace the chain with .flatMap().
+
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+
+
+Checked 1116 files in 958ms. No fixes applied.
+Found 1 info.

@@ -1,0 +1,43 @@
+{
+  "shape": "package",
+  "pkg": "@cairn/web",
+  "globalName": "CairnUI",
+  "srcDir": "src/components",
+  "tsconfig": ".design-sync/tsconfig.json",
+  "cssEntry": ".design-sync/.cache/app.css",
+  "buildCmd": "pnpm exec vite build --outDir .design-sync-css && cp .design-sync-css/assets/index-*.css .design-sync/.cache/app.css && sed -i '' 's#url(/fonts/#url(../../public/fonts/#g; s#url(\"/fonts/#url(\"../../public/fonts/#g' .design-sync/.cache/app.css",
+  "projectId": "00efb588-c312-48f4-a651-e9cd52e6060d",
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    },
+    "AlertDialogShell": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    },
+    "AlertDialogActions": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    },
+    "DialogShell": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    },
+    "SelectScrollUpButton": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    },
+    "SelectScrollDownButton": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    }
+  },
+  "extraEntries": [
+    "./.design-sync/paper-root.tsx"
+  ],
+  "provider": {
+    "component": "PaperRoot"
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

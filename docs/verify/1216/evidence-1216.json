@@ -1,0 +1,109 @@
+[
+  {
+    "name": "after-detail-inflight",
+    "url": "http://127.0.0.1:5275/app/todo/7k6O3Cbd0CQcA8peTFR1N",
+    "facts": {
+      "rootHtmlLen": 471593,
+      "detailShell": true,
+      "detailMain": true,
+      "unavailable": null,
+      "headAction": {
+        "text": "编排中",
+        "disabled": true,
+        "orchestrating": "true"
+      },
+      "cardAction": null
+    },
+    "pageErrors": []
+  },
+  {
+    "name": "after-board-inflight",
+    "url": "http://127.0.0.1:5275/app",
+    "facts": {
+      "rootHtmlLen": 178237,
+      "detailShell": false,
+      "detailMain": false,
+      "unavailable": null,
+      "headAction": null,
+      "cardAction": {
+        "text": "编排中",
+        "disabled": true,
+        "orchestrating": "true"
+      }
+    },
+    "pageErrors": []
+  },
+  {
+    "name": "after-notfound",
+    "url": "http://127.0.0.1:5275/app/todo/does-not-exist-1216",
+    "facts": {
+      "rootHtmlLen": 25596,
+      "detailShell": true,
+      "detailMain": false,
+      "unavailable": "not-found",
+      "headAction": null,
+      "cardAction": null
+    },
+    "pageErrors": []
+  },
+  {
+    "name": "after-error-state",
+    "url": "http://127.0.0.1:5275/app/todo/7k6O3Cbd0CQcA8peTFR1N",
+    "facts": {
+      "rootHtmlLen": 26479,
+      "detailShell": true,
+      "detailMain": false,
+      "unavailable": "error",
+      "headAction": null,
+      "cardAction": null
+    },
+    "pageErrors": []
+  },
+  {
+    "name": "before-detail-blind",
+    "url": "http://127.0.0.1:5276/app/todo/7k6O3Cbd0CQcA8peTFR1N",
+    "facts": {
+      "rootHtmlLen": 471537,
+      "detailShell": true,
+      "detailMain": true,
+      "unavailable": null,
+      "headAction": {
+        "text": "重跑",
+        "disabled": false,
+        "orchestrating": null
+      },
+      "cardAction": null
+    },
+    "pageErrors": []
+  },
+  {
+    "name": "before-board-blind",
+    "url": "http://127.0.0.1:5276/app",
+    "facts": {
+      "rootHtmlLen": 178175,
+      "detailShell": false,
+      "detailMain": false,
+      "unavailable": null,
+      "headAction": null,
+      "cardAction": {
+        "text": "重试",
+        "disabled": false,
+        "orchestrating": null
+      }
+    },
+    "pageErrors": []
+  },
+  {
+    "name": "before-blank-shell",
+    "url": "http://127.0.0.1:5276/app/todo/does-not-exist-1216",
+    "facts": {
+      "rootHtmlLen": 1994,
+      "detailShell": false,
+      "detailMain": false,
+      "unavailable": null,
+      "headAction": null,
+      "cardAction": null
+    },
+    "pageErrors": []
+  }
+]

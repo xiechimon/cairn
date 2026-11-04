@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1948
+
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  17:56:44
+   Duration  1.70s (transform 43%, tests 31%, import 26%)
+

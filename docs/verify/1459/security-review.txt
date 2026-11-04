@@ -1,0 +1,46 @@
+#1459 security-review (routes-webhook.ts / the webhook receiver is on the AGENTS.md /security-review list)
+Skill: security-review
+Args: "Review the range 69722cc..HEAD in /home/user/pacman/.claude/worktrees/p5e (branch
+claude/bootstrap-p5-1459), not the current checkout's pending changes."
+
+The skill's pre-loaded diff was WRONG. Its GIT STATUS, FILES MODIFIED and COMMITS blocks came from the
+session's primary directory, .claude/worktrees/p5d (branch claude/bootstrap-p5-3, head 7f5d250e, 26 files:
+apps/daemon/src/runner.ts, apps/server/src/services/{builds,chief-tools,chief,machines,orchestrate}.ts,
+packages/shared/src/records/prompts.ts, ... the #1406 P5-3 issue-fence work), not from this branch. None of
+this branch's files were in it. So its procedure was applied by hand to the right diff:
+  cd /home/user/pacman/.claude/worktrees/p5e && git rev-parse --abbrev-ref HEAD  -> claude/bootstrap-p5-1459
+  git diff --shortstat 69722cc..HEAD  -> 8 files changed, 662 insertions(+), 96 deletions(-)
+  files: README.md, README.zh.md, apps/server/src/services/{github-issues,issue-intake,webhook}.ts,
+         apps/server/test/{issue-intake,webhook}.test.ts, packages/shared/src/webhook.ts
+The skill asks for one sub-task to find candidates and one per candidate to filter false positives; this
+run had no sub-agent tool, so both steps were done inline, with the skill's categories, exclusions and
+precedents, keeping only findings at confidence 8 or above.
+
+Untrusted input added by the diff: payload `sender.login` (any string; the payload's only authentication is
+the URL path token, unchanged). Where it goes: the permission read URL, the permission cache key, one log
+line, the 202 response detail.
+
+Candidates and filtering:
+1. Path manipulation in the permission read (lib/github.ts githubCollaboratorPermission, unchanged, now fed
+   by the payload): login is encodeURIComponent-encoded, host fixed to api.github.com. Dot segments are not
+   encoded: login ".." resolves to GET /repos/{o}/{r}/permission and "." to /repos/{o}/{r}/collaborators/
+   permission (checked with node's URL). The first is not a GitHub endpoint (404 = "none"), the second
+   answers 204 or 404 (no body = unreadable, or "none"). Both refuse; no reachable path returns a body with
+   a qualifying permission / role_name / user.permissions.triage. Only path control, fixed host (exclusion
+   13), fails closed. Confidence 2. Dropped.
+2. Forged sender by a holder of the webhook URL token (names the repo owner): the trust root is the URL
+   token, as before this change; before it, a holder could import any issue with no check at all. Not newly
+   introduced; recorded as a known limit in failure-modes.txt and the webhook.ts header. Confidence 3
+   (pre-existing model). Dropped.
+3. Cache key poisoning across teams or logins: the key is team id, repo from the project row, login,
+   lowercased, joined with NUL; the value is always GitHub's own answer for that team's token. A crafted
+   login only creates its own key. Confidence 1. Dropped.
+4. Reflected login in the 202 body: JSON via c.json, application/json; no HTML context. Confidence 1. Dropped.
+5. Logging: the refusal line carries deliveryId, projectId, repo, issue number, sender login, reason; no
+   token, no issue text (exclusion 12 / precedent 11). Dropped.
+6. Fail-open review of each refusal branch: no sender, at cap, no box / no connection / cipher error,
+   permission null, permission false, cap re-check: each returns before importGithubIssue. Mutations M1,
+   M2, M10, M11, M12 in mutations.txt turn each open and the tests go red. No finding.
+7. Holding import reservations to keep a project "at cap": availability only (exclusion 1). Dropped.
+
+Result: no findings at confidence 8 or above. Nothing to fix.

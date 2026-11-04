@@ -1,0 +1,84 @@
+{
+  "ticket": 926,
+  "generatedAt": "2026-10-07T17:35:21.999Z",
+  "phaseA": {
+    "buildPiSessionSettings": {
+      "compaction": {
+        "enabled": true
+      },
+      "retry": {
+        "enabled": true,
+        "maxRetries": 3,
+        "baseDelayMs": 2000,
+        "maxAgentDelayMs": 60000,
+        "provider": {
+          "maxRetries": 0
+        }
+      }
+    },
+    "piGetRetrySettings": {
+      "enabled": true,
+      "maxRetries": 3,
+      "baseDelayMs": 2000,
+      "maxAgentDelayMs": 60000
+    },
+    "piGetProviderRetrySettings": {
+      "maxRetries": 0,
+      "maxRetryDelayMs": 60000
+    },
+    "drivenProbe": {
+      "injectedMaxRetries": 5,
+      "readbackMaxRetries": 5
+    },
+    "RETRY_STORM_MAX": 3
+  },
+  "phaseB": {
+    "rawEventOrder": [
+      "agent_start",
+      "turn_start",
+      "message_start",
+      "message_end",
+      "message_start",
+      "message_end",
+      "message_start",
+      "message_update",
+      "message_update",
+      "message_update",
+      "message_update",
+      "message_update",
+      "message_end",
+      "turn_end",
+      "agent_end",
+      "agent_settled"
+    ],
+    "mappedEventOrder": [
+      "message_end",
+      "message_end",
+      "message_update",
+      "text_delta",
+      "message_update",
+      "text_delta",
+      "message_update",
+      "text_delta",
+      "message_update",
+      "message_update",
+      "message_end",
+      "done"
+    ],
+    "agentEndIdx": 14,
+    "settledIdx": 15,
+    "doneAtRawIndex": [
+      15
+    ]
+  },
+  "phaseC": {
+    "agentEndWillRetryFalse": [],
+    "agentSettled": [
+      {
+        "type": "done",
+        "usage": []
+      }
+    ]
+  },
+  "failures": 0
+}

@@ -1,0 +1,84 @@
+[heavy-slots] acquired slot 1/1
+
+ RUN  v5.0.1 <checkout>
+
+ ❯ |@xiechimon/cairn| test/split-rejected-proposal.test.ts (44 tests | 3 failed) 1615ms
+   × human validates a 12000-node cycle without losing its rejection contract 348ms
+   × shadow validates a 12000-node cycle without losing its rejection contract 38ms
+   × auto validates a 12000-node cycle without losing its rejection contract 37ms
+ ❯ |@xiechimon/cairn| test/todo-split-checker.test.ts (20 tests | 2 failed) 31ms
+   × checks a 12000-node chain below the HTTP size limit without recursion failure 11ms
+   × checks a 12000-node cycle below the HTTP size limit without recursion failure 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > human validates a 12000-node cycle without losing its rejection contract
+AssertionError: expected RangeError: Maximum call stack size excee… to match object { status: 400, …(1) }
+
+- Expected
++ Received
+
+- {
+-   "message": StringContaining "DFS",
+-   "status": 400,
++ RangeError {
++   "message": "Maximum call stack size exceeded",
+  }
+
+ ❯ test/split-rejected-proposal.test.ts:373:77
+    371|       expect(Buffer.byteLength(JSON.stringify(subtodos))).toBeLessThan…
+    372|       if (policy === 'human') {
+    373|         await expect(w.tool('split_todo', { todoId: w.parentId, subtod…
+       |                                                                             ^
+    374|         expect(w.s.db.select().from(build).all()).toEqual([]);
+    375|         expect(w.s.db.select().from(plan).all()).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > shadow validates a 12000-node cycle without losing its rejection contract
+ FAIL  |@xiechimon/cairn| test/split-rejected-proposal.test.ts > auto validates a 12000-node cycle without losing its rejection contract
+RangeError: Maximum call stack size exceeded
+ ❯ visit src/services/todo-split-checker.ts:71:30
+     69|     if (states[index] === 2) return;
+     70|     states[index] = 1;
+     71|     for (const next of edges.get(index) ?? []) visit(next);
+       |                              ^
+     72|     states[index] = 2;
+     73|   };
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > checks a 12000-node chain below the HTTP size limit without recursion failure
+ FAIL  |@xiechimon/cairn| test/todo-split-checker.test.ts > checks a 12000-node cycle below the HTTP size limit without recursion failure
+RangeError: Maximum call stack size exceeded
+ ❯ visit src/services/todo-split-checker.ts:71:30
+     69|     if (states[index] === 2) return;
+     70|     states[index] = 1;
+     71|     for (const next of edges.get(index) ?? []) visit(next);
+       |                              ^
+     72|     states[index] = 2;
+     73|   };
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+ ❯ visit src/services/todo-split-checker.ts:71:48
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 59 passed (64)
+   Start at  20:09:51
+   Duration  3.30s (tests 53%, import 25%, transform 22%)

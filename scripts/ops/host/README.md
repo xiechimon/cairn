@@ -1,0 +1,84 @@
+# Host control scripts
+
+Copies of the scripts that drive the lanes on the omarchy host. `tools/` mirrors `~/.cairn/tools/` and `lanes/` mirrors `~/lanes/`. The first commit that added this directory is the host state as it was measured, with only host-specific values in `tools/backup/db-backup.sh` parameterised (`CAIRN_REPO`, `CAIRN_BACKUP_REMOTE`).
+
+**The host still runs its own copies.** Nothing here is wired to a unit yet. A follow-up will point the units at a checkout and add a deploy-from-main step like `~/.cairn/tools/review-gate/deploy-from-main.sh` (fetch `origin/main`, skip when the tree hash is unchanged, run the copy's tests, then install it and record the deployed tree). Until then a change here does not change host behavior, and a host edit does not appear here.
+
+Not copied: `~/.cairn/tools/app-token/package.json`, its lockfile and `node_modules` (the host installs `@octokit/auth-app` there), `review-gate/` (already in `scripts/ops/review-gate/`), `backup/record-backup-status.sh` (identical to `scripts/ops/record-backup-status.sh`), `.bak` files, logs and state. `tools/eval-env.sh` reads the relay settings from the host's pi config and holds no value itself.
+
+Units are the host's `cairn-<name>.service` user units. "Called by" lists scripts that invoke the script directly; `main-watch.sh` is itself run by `cairn-main-watch.service`.
+
+| Script | Run by | Purpose |
+|---|---|---|
+| `tools/backup/db-backup.sh` | `cairn-db-backup.service` | Wraps `scripts/ops/backup-server-db.sh`, syncs attachments, pushes both to the rsync remote |
+| `tools/eval-env.sh` | sourced by `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression`, `cairn-review-eval` | Exports the eval relay URL and key without printing them |
+| `tools/app-token/as-bot.sh` | every bot caller below | Runs one `gh` or `git` command with a 1h App installation token in that process only, after `as-bot-policy.mjs` approves it (see below) |
+| `tools/app-token/as-bot-author.sh` | by hand | Sets the bot as git author and committer; no network, no token |
+| `tools/app-token/token.mjs` | `as-bot.sh` | Mints the installation token from `~/.cairn/cairn-bot.json`; holds no secret and reads the key from the path in that file |
+| `tools/merge-pr.sh` | called by `overnight/driver.sh`, `rearm-automerge.sh` | Rebase-merges a bot-opened PR with the human login after dependency and commit-author checks |
+| `tools/rearm-automerge.sh` | called by `overnight/driver.sh` | Disarms and re-arms auto-merge on bot PRs whose merge state changed |
+| `tools/overnight/driver.sh` | `cairn-overnight.service` | Per-lane loop: rebase, sign, push, open PRs, fix red CI, merge |
+| `tools/overnight/surface-stuck-rebase.sh` | called by `overnight/driver.sh` | When a lane's rebase worker has failed 3 times on one head, labels the PR `stale-pr` and comments the files `git merge-tree` reports as conflicting with main (the issue when there is no PR), once per head, instead of the driver skipping the lane silently |
+| `tools/overnight/lane-replaced.sh` | called by `overnight/driver.sh` | Exits 0 when the lane's issue is closed (prints `closed`) or another open PR closes it (prints that PR, a coordinator-prepared replacement), so the driver skips the lane instead of pushing a duplicate PR or surfacing a finished lane; an unreadable issue also skips |
+| `tools/plan/plan-issues.sh` | `cairn-plan-issues.service` (under `flock`), called by `lanes/run-worker.sh` | Writes an implementation plan into issues that lack one |
+| `tools/reminders/resume-1727.sh` | `cairn-resume-1727.service` | One-off reminder that releases the held Web Push ticket |
+| `tools/schedule/issue-schedule.mjs` | `cairn-issue-schedule.service` | Rewrites the scheduling issue from `batch:*` labels |
+| `tools/main-watch/main-watch.sh` | `cairn-main-watch.service` | Opens `main-red` issues for failing main checks and runs the scripts below each tick |
+| `tools/main-watch/{codex-watch,gh-health,model-health,tmp-clean}.sh` | `main-watch.sh` | Quota, GitHub API, model and temp-directory health |
+| `tools/governor/aged-prs.sh` | `main-watch.sh` | Pushes PRs open over 48h: lane PRs re-dispatch, `codex/`, `claude/` and `cursor/` branches get a `stale-pr` issue, other branches get a worktree worker |
+| `tools/governor/{block-governor,brake,lane-health,lane-sentinel}.sh` | `main-watch.sh` | Close blocked PRs after fix rounds, pause dispatch, report failing workers and red main |
+| `tools/governor/{selfcheck,split-issue,tier}.sh` | `driver.sh`, `block-governor.sh`, `dispatch-issue.sh` | Pre-push self-check, ticket splitting, ticket tier lookup |
+| `tools/governor/weekly-blocks.sh` | `cairn-weekly-blocks.service` | Weekly summary of review-gate block reasons |
+| `tools/governor/orchestration-report.sh` | by hand | Orchestration report |
+| `tools/merge-order/{lanes-retry,queue,stale-prs}.sh` | `main-watch.sh` | Retry lanes with no commit, update queued PR branches, flag stale PRs; `lanes-retry.sh` also dispatches the `pending` list |
+| `tools/merge-order/deps-open.mjs` | called by `dispatch-issue.sh`, `lanes-retry.sh`, `merge-pr.sh` | Exits non-zero and names open dependencies of an issue |
+| `tools/weekly/evidence-prune.sh` | `cairn-evidence-prune.service` | Weekly evidence prune PR (ADR 0022) |
+| `tools/weekly/{eval-weekly,learn-eval,memory-regression}.sh`, `baseline-record.mts` | `cairn-eval-weekly`, `cairn-learn-eval`, `cairn-memory-regression` | Weekly evals; `eval-weekly.sh` here is the older host copy of `scripts/ops/eval-weekly.sh` |
+| `lanes/dispatch-issue.sh` | called by the governor, `main-watch` and `merge-order` scripts | Starts a lane worker for an issue after the gates below |
+| `lanes/{build-prompt,run-worker,test-build-prompt}.sh` | `dispatch-issue.sh` | Render the worker prompt, run the worker, test the prompt renderer |
+| `lanes/{sign-commits,rebase-main,finish-branch,regen-migration}.sh` | `driver.sh`, `aged-prs.sh`, by hand | Re-sign, rebase, push and regenerate migrations for a lane branch |
+| `lanes/{deploy-omarchy,wait-rr}.sh` | by hand | Deploy and wait helpers |
+
+## Documented behavior covered by tests
+
+`node --test scripts/ops/host/*.test.mjs` drives the scripts with stub `gh`, `git`, `flock`, `setsid` and `nohup` on `PATH` and a scratch `HOME`.
+
+- `dispatch-issue.sh` exits 3 for a non-OPEN or unreadable issue state (a `main-red` note bypasses that check) and for an issue on the `never` list, before it reads the state. It does not look at `by:batch` or `batch:B*`/`batch:C*` labels today; a test pins that, and a later change that adds the refusal should replace it.
+- `aged-prs.sh` treats `codex/`, `claude/` and `cursor/` branches as foreign (a `stale-pr` issue, no worker), re-dispatches `lane/N` unless `N` is on `hold` or `never`, and handles each PR head once. Any other prefix is not foreign: it gets a worktree worker.
+- The `never` list wins over `pending`: `lanes-retry.sh` hands a pending ticket to `dispatch-issue.sh`, which refuses it, and the ticket stays pending.
+
+## as-bot allowlist (#2379)
+
+**The host still runs its own `as-bot.sh`, which has no allowlist.** The repo copy adds `tools/app-token/as-bot-policy.mjs`; `as-bot.sh` runs it before minting a token and exits 126 with `as-bot: refused: <reason>` on a denied command, so a refused command never gets a token. A later deploy must copy `as-bot.sh`, `as-bot-policy.mjs` and `token.mjs` together. `scripts/ops/secret-reach/broker.mjs` (#2189) scopes the token's permissions and has no command allowlist, so nothing there was reusable; the two layers stack.
+
+Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, and `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`.
+
+Added beyond the first list because current callers need them: `gh pr close`, `gh pr update-branch`, `gh issue pin`, `gh pr merge --disable-auto` (it only disarms), `git commit`, `git rebase`, `git -C`, and `git push --force-with-lease` (lane branches are rewritten by rebase; a lease never overwrites commits the pusher has not seen).
+
+Flags are matched by an allowlist after splitting `--name=value`, so inline values (`--input=-`, `--field=k=v`, `--exec=cmd`) and git's abbreviated long options (`--exe`, `--upload-p`) are refused like their full spellings.
+
+Denied: any other `gh` group (`variable`, `secret`, `repo`, `label`, `ruleset`, `auth`, `alias`, ...), every other `gh pr merge` form (any merge, `--auto`, `--admin`, extra flags or more than one PR), `gh pr edit` of anything but labels, `gh api` with a method other than GET, `--input`, `-H`, `--hostname`, fields without an explicit GET, or `graphql`, `git push` with `--force`, `-f`, `--delete`, `-d`, `--mirror`, `--all`, `--tags`, `-o`, a `+` or empty-source refspec, a non-`origin` remote, no explicit refspec, a ref outside `refs/heads/`, or `main`/`master` as the destination, `git rebase` with `--exec`/`-x`, `-i`, `-s`/`--strategy` or any other flag, `git -c`, `git fetch` with any other flag, any other `git` subcommand, and any program other than `gh` and `git` (so `bash -c` cannot wrap a denied command).
+
+### Callers on the host
+
+Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.config/systemd/user` (no unit references it), plus this repo. Commands each caller passes:
+
+| Caller | Commands | Under the policy |
+|---|---|---|
+| `tools/overnight/driver.sh` | `git push -q --no-verify --force-with-lease origin HEAD:lane/N`, `gh pr create` | allowed |
+| `lanes/finish-branch.sh` | `git push -q --no-verify --force-with-lease origin HEAD:<branch>` | allowed |
+| `lanes/rebase-main.sh` | `git rebase -q origin/main`, `git rebase --continue` | allowed |
+| `lanes/regen-migration.sh` | `git rebase -q -X theirs origin/main`, `git commit -qm ... --no-verify` | allowed |
+| `lanes/sign-commits.sh` | `git commit -q --no-verify --allow-empty -m` | allowed |
+| `tools/governor/split-issue.sh` | `gh issue create`, `gh issue comment` | allowed |
+| `tools/governor/block-governor.sh` | `gh issue comment`, `gh pr close` | allowed |
+| `tools/plan/plan-issues.sh` | `gh issue edit --body-file -` | allowed |
+| `tools/merge-order/queue.sh` | `gh pr update-branch --rebase` | allowed |
+| `tools/reminders/resume-1727.sh` | `gh issue create`, `gh issue edit --remove-label`, `gh issue comment` | allowed |
+| `~/.cairn/tools/review-gate/retro-review.sh` (not mirrored) | `gh issue create` | allowed |
+| `tools/schedule/issue-schedule.mjs` | `gh issue create|edit|comment|pin` | allowed |
+| `tools/rearm-automerge.sh` | `gh pr merge --disable-auto` | allowed |
+| `tools/weekly/evidence-prune.sh` | `git fetch`, `git commit`, `git push -u origin <branch>`, `gh pr create`, `gh pr comment` (it arms `gh pr merge --squash --auto --match-head-commit <sha>` as the human login, not through `as-bot.sh`) | allowed |
+| `tools/merge-pr.sh` | none: it merges bot-opened PRs with `gh pr merge <n> --rebase --match-head-commit <sha>` as the human login | not through `as-bot.sh` |
+
+Merge decision (C1 session, after the review gate found that a PASS comment can be forged through `gh pr comment`, which the bot may run): the bot never merges. Merge authorization uses the human login (`docs/ops/agent-bot-identity.md`): `merge-pr.sh` rebase-merges bot-opened PRs with plain `gh`, pinned to the head it read before its gate checks; for a lane or protected PR it requires the `review-gate` commit status on that head to be `success` and created by the gate's login (`xiechimon`), never a PR comment, because the bot can post comments, and `evidence-prune.sh` arms its auto-merge with plain `gh`. `as-bot-callers.test.mjs` runs both scripts through the real `as-bot.sh` and policy. The policy has no override switch.

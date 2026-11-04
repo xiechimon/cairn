@@ -1,0 +1,43 @@
+{
+  "id": "bwxDu0lHcZaGy6dV4dONx",
+  "teamId": "GzubfwBZPZvDmhs-IoBrT",
+  "projectId": "Lv5EqKVRfRqOuYxdudAo8",
+  "title": "有文件改动",
+  "spec": "有文件改动：review 收口探针",
+  "phase": "review",
+  "phaseAt": 1792539201090,
+  "seqNum": 2,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": {
+      "agentId": "JgdD88aT7NOO4GUzpctb7"
+    },
+    "build": {
+      "agentId": "JgdD88aT7NOO4GUzpctb7"
+    }
+  },
+  "agent": {
+    "id": "JgdD88aT7NOO4GUzpctb7",
+    "displayName": "empty-review-builder"
+  },
+  "latestBuildId": "01a15ba9-8e2e-7794-867d-f9c06061e175",
+  "lastRunAt": 1792539201070,
+  "hasChanges": true,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a15ba9-8e2e-7794-867d-f9c06061e175",
+      "createdAt": 1792539201070
+    }
+  ],
+  "sourceTodo": null,
+  "blockedBy": null,
+  "v": 4,
+  "createdBy": "c_MEzXOfyOIzOejR0rmdR",
+  "ownerId": "c_MEzXOfyOIzOejR0rmdR",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "quotaWait": null
+}

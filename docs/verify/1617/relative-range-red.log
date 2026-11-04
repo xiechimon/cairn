@@ -1,0 +1,55 @@
+✔ a spec naming an existing path and an existing exported function reports nothing (166.331ms)
+✔ a spec naming a deleted path reports it once with its line number (158.057167ms)
+✔ a renamed function is reported as a missing identifier (152.664ms)
+✔ names inside fenced code blocks and URLs are ignored (151.476583ms)
+✔ a table row marked superseded is ignored (145.518916ms)
+✔ short or common words in backticks are not treated as identifiers (110.163542ms)
+✔ a path that never existed in the repo is not reported (137.366042ms)
+✔ a relative path resolving under a tracked file is not reported (122.182625ms)
+✔ a path with a line-range suffix is checked without the range (134.873792ms)
+✔ a directory reference is not reported as a missing path (109.228542ms)
+✔ a deleted relative path is reported through its historical repository path (162.799792ms)
+✔ historical suffix matching respects directory boundaries (153.424459ms)
+✔ uncommitted file restoration does not hide drift at HEAD (159.200625ms)
+✔ an identifier mentioned only in integration fixtures is still missing from application code (160.389959ms)
+✖ a deleted relative path with a line-range suffix reports its normalized path (145.404542ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2222.727875
+
+✖ failing tests:
+
+test at scripts/doc-drift.test.mjs:304:1
+✖ a deleted relative path with a line-range suffix reports its normalized path (145.404542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     doc: 'docs/spec/01-test.md',
+  -     kind: 'path',
+  -     line: 1,
+  -     name: 'api/mode.ts'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file:///Users/xmon/.codex/worktrees/pr-2023-drift-repair/cairn/scripts/doc-drift.test.mjs:314:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { doc: 'docs/spec/01-test.md', name: 'api/mode.ts', kind: 'path', line: 1 } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

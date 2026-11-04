@@ -1,0 +1,29 @@
+# #1403 round 6 (/code-review on #1414): the round 6 test file, red against the sources of 6de470b, green at 82c6b50.
+# Red leg: apps/server/src/{services/ci-loop.ts,services/builds.ts,lib/github.ts} taken from 6de470b with git show,
+# the round 6 test files as committed in 82c6b50; the three files were put back afterwards.
+
+== red, sources at 6de470b ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+     × ⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in review with a hint; once it is there, done
+     × ⑮c a verify step waiting for quota does not hold the reconcile and is stopped on finish
+     × ⑮c a review step waiting for quota does not hold the reconcile and is stopped on finish
+     × ⑱e dragged to done by hand, then back to review → not finished again
+     × ⑱f closed by hand, then back to review, or closed before the card reached review → one hint, not failed
+     × ㉚ merged, the response has no head sha, the build has a checkpoint → not finished
+     × ㉜ a PR that leaves review drops its cache rows; back in review, the first read has no etag
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  7 failed | 66 passed (73)
+
+first assertion of each failure:
+  ⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in    AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+  ⑮c a verify step waiting for quota does not hold the reconcile and is st   
+  ⑮c a review step waiting for quota does not hold the reconcile and is st   AssertionError: expected 'review' to be 'done' // Object.is equality
+  ⑱e dragged to done by hand, then back to review → not finished again       AssertionError: expected 'done' to be 'review' // Object.is equality
+  ⑱f closed by hand, then back to review, or closed before the card reache   AssertionError: expected 'failed' to be 'review' // Object.is equality
+  ㉚ merged, the response has no head sha, the build has a checkpoint → not   AssertionError: expected 'done' to be 'review' // Object.is equality
+  ㉜ a PR that leaves review drops its cache rows; back in review, the firs   AssertionError: expected '"x"' to be undefined
+
+== green at 82c6b50 ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  73 passed (73)

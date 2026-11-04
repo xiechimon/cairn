@@ -1,0 +1,63 @@
+#1406 P5-3 follow-up, round 2 (#1480): /code-review on this round's code diff, branch
+claude/bootstrap-p5-3-fix (worktree .claude/worktrees/p5d). Before each run,
+`cd <worktree> && git rev-parse --abbrev-ref HEAD` printed claude/bootstrap-p5-3-fix and
+`git diff --stat <range>` was checked: 2 files, apps/daemon/src/step-attachments.ts and
+apps/daemon/test/step-attachments.test.ts. 82d91e30 is the merge of origin/main (e410e826) into the
+branch at the start of this round, so the ranges hold only this round's code.
+/simplify did not run: the source change is about 40 lines in one file (the rest is tests), below
+the "new file, refactor or large new logic" bar. /security-review is not required: no listed
+security path is touched.
+
+== /code-review medium, pass 1 (82d91e30..9ff61880, 92 insertions, 12 deletions) ==
+Eight findings. Decisions:
+  1. materializeFile now throws on purpose (the stepId guard), but resolveOne did not catch it: one
+     materialize failure (guard, ENOTDIR, ENOSPC, ENAMETOOLONG) left resolveStepImages, and the runner
+     and steer catch delivered the raw text, dropping every image of the step, including inline
+     images already resolved. CONFIRMED, FIXED in 1c8f1981: resolveOne turns a materialize failure
+     into the same "unavailable" outcome as a failed download (token kept, note, log line). Test
+     first: cf8d41ae red, 1c8f1981 green (p5-3-fix-red-green-2.txt round 2b, F6); mutation M19.
+  2. Every degenerate name falls back to the same "attachment", so two such attachments in one step
+     overwrite each other. NOT FIXED, reason: the "" and "." fallback has done this since #730, and
+     two attachments with the same ordinary name in one step collide the same way today; suggestion 7
+     asked for ".." to join the existing fallback. Giving every materialized file a per-attachment
+     path changes the layout for all names and is outside this round.
+  3. The fallback "attachment" has no extension when the mime is not in MATERIALIZE_EXT_BY_MIME.
+     NOT FIXED, reason: same as the "" and "." fallback since #730; mapped mimes (svg, bmp, ico, avif)
+     still get their extension through withMimeExt, and the note names the mime.
+  4. The stepId check sits on the joined path, not at intake, so other stepId-to-path uses are not
+     guarded. NOT FIXED, reason: stepIds are issued by the server the daemon is registered with;
+     validating them at intake touches the claim and steer paths, outside this round. The guard here
+     only makes sure this module never writes outside its root.
+  5. A symlink at <root>/<stepId> would let writes leave the root. NOT FIXED, reason: needs local
+     write access to PACMAN_HOME, which already gives full control of the daemon's state.
+  6. The guard's error message carried the raw path (with the stepId) into the step log.
+     CONFIRMED, FIXED in 1c8f1981: the path is JSON-encoded, one line. Test first: the guard test's
+     "../\nforged" case, cf8d41ae red, 1c8f1981 green (F7); mutation M18.
+  7. safeFileName runs twice on the materialize path and the name length is not capped
+     (ENAMETOOLONG). NOT FIXED, reason: safeFileName is idempotent and cheap; the length limit is the
+     #730 behavior, and after fix 1 an ENAMETOOLONG fails that one token visibly instead of the
+     whole resolve.
+  8. No test covers a bad stepId during resolveStepImages. CONFIRMED, FIXED with item 1 (the new
+     A3d end-to-end test runs a png token and an svg token with stepId ".." and with a file in place
+     of the step directory, inside and outside the fence).
+
+== /code-review medium, pass 2 (82d91e30..1c8f1981, 170 insertions, 27 deletions) ==
+The reviewer judged the 1c8f1981 fix correct: both the guard and fs errors now fail one token, the
+png in the same text still arrives inline, and all three callers (machine-loop.ts:498,
+runner.ts:537, runner.ts:1384) keep their outer catch. Six findings. Decisions:
+  1. Buffer.from(res.contentBase64, 'base64') sits outside the new try, so a response without
+     contentBase64 would still fail the whole resolve. NOT FIXED, reason: refuted. machine-client.ts
+     attachment() parses the response with machineAttachmentResponseSchema inside the download call,
+     so a missing or non-string contentBase64 fails there and is already caught as a download failure;
+     Buffer.from of a string never throws.
+  2. fs error messages and the success note carry the raw path, so a one-segment stepId holding a
+     line break could add a line to an unfenced prompt. NOT FIXED, reason: stepIds are server-issued
+     ids (see pass 1 item 4); the success note has carried the path since #730; inside the fence
+     quoteIssueLines folds line breaks.
+  3. With an invalid stepId every non-inline image is downloaded before the guard rejects it.
+     NOT FIXED, reason: only reachable with an invalid server-issued stepId; the outcome is the same.
+  4. A write that fails partway (ENOSPC) leaves a truncated file at the final path. NOT FIXED,
+     reason: #730 behavior; the token is reported unavailable, so the prompt does not point at the
+     file, and the 72 h sweep removes the step directory.
+  5. No test for a response without contentBase64. NOT FIXED, follows item 1.
+  6. The edited header comment was not re-wrapped. CONFIRMED, FIXED in e3e4a0dc (comment only).

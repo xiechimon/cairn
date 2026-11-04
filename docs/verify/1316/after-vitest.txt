@@ -1,0 +1,18 @@
+
+ RUN  v5.0.1 /workspace/apps/daemon
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 14 skipped (18)
+   Start at  17:11:26
+   Duration  336ms (tests 64%, transform 29%, import 6%, worker 2%)
+
+
+ RUN  v5.0.1 /workspace/apps/daemon
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 23 skipped (24)
+   Start at  17:11:27
+   Duration  631ms (transform 62%, import 20%, tests 17%)
+

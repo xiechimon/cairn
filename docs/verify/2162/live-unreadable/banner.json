@@ -1,0 +1,8 @@
+{
+  "api": {
+    "state": "unreadable"
+  },
+  "bannerCount": 1,
+  "kind": "unreadable",
+  "text": "!\n\nThe server database backup status file cannot be read, so the backup cannot be confirmed as running."
+}

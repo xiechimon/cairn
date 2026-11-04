@@ -1,0 +1,16 @@
+Local probes on Chromium 141.0.7390.37 (/opt/pw-browsers/chromium-1194), fixture build, 2026-10-21.
+The probe spec files were temporary and are not committed.
+
+1. registry-focus-ring badge, outline-offset sampled every frame after Tab / Shift+Tab
+   (scenario 57f, dark, [data-slot="badge"] with tabIndex 0):
+   {"duration":"0.15s","frames":["0ms:0px","1ms:0px","18ms:0.0625px","34ms:0.34375px","50ms:0.90625px","67ms:1.39062px","84ms:1.67188px","100ms:1.82812px","117ms:1.9375px","134ms:1.98438px","151ms:2px", ...]}
+   Running transitions right after focus: ["box-shadow","outline-color","outline-offset","outline-width"].
+   CI on #1412 (e04b2c4, e2e (4)) read outline-offset "1px" at registry-focus-ring.spec.ts:169 (badge leg).
+
+2. segmented-controls sched freq: hover 每周, reload the same page (light), read before any pointer move, x3:
+   {"beforeMove":{"hover":true,"idleInk":"rgb(46, 41, 35)","activeInk":"rgb(43, 38, 32)"},"afterMove":{"hover":false,"idleInk":"rgb(94, 86, 77)","activeInk":"rgb(43, 38, 32)"}}
+   {"beforeMove":{"hover":true,"idleInk":"rgb(44, 39, 33)","activeInk":"rgb(43, 38, 32)"},"afterMove":{"hover":false,"idleInk":"rgb(94, 86, 77)","activeInk":"rgb(43, 38, 32)"}}
+   {"beforeMove":{"hover":true,"idleInk":"rgb(44, 39, 33)","activeInk":"rgb(43, 38, 32)"},"afterMove":{"hover":false,"idleInk":"rgb(94, 86, 77)","activeInk":"rgb(43, 38, 32)"}}
+
+3. accent-typo: the mark declares `mask: url("/logo.svg") center / 100% no-repeat` (board/sidebar.tsx).
+   Chromium 141 computes mask-size "100%"; the CI log on #1412 shows Chrome for Testing 153.0.8010.12, where the spec passes with "100% auto".

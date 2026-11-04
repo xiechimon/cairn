@@ -1,0 +1,162 @@
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (2.007917ms)
+✔ hasCode classifies documents (0.524708ms)
+✔ hasCode classifies server markdown fixtures (0.126667ms)
+✔ hasCode classifies shared markdown fixtures (0.101583ms)
+✔ hasCode classifies integration markdown fixtures (0.104333ms)
+✔ hasCode classifies executable evidence (0.28375ms)
+✔ hasCode classifies non-markdown evidence (0.630041ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.087583ms)
+✔ hasCode classifies data beside an executable check (1.215667ms)
+✔ hasCode classifies the #2188 lessons and evidence change (5.531208ms)
+✔ hasCode classifies epic data (0.110834ms)
+✔ hasCode classifies code (0.078042ms)
+✔ hasCode classifies unknown paths (0.060292ms)
+✔ hasCode classifies mixed changes (0.059083ms)
+✔ hasCode classifies empty changes (0.066708ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (2130.142458ms)
+✔ CI classifies before heavy work and always runs push coverage (2.774083ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (1621.457167ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (1.037334ms)
+✔ documentation skips code checks, unknown paths fail closed (4.012417ms)
+✔ changes to prepush scripts run the CI self-test files locally (13.768709ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.502292ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (868.174166ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (3.041291ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (1.105416ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.260583ms)
+✔ local code checks retain fast checks and advisory dead-class (0.760292ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (1.532ms)
+✖ code changes keep suites in CI and out of local plans (8.627458ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (8.194125ms)
+✖ executable evidence keeps code checks and data evidence keeps document readers (1.557875ms)
+✔ a docs-only data change still runs every test that reads the changed file (62.867125ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (25.575708ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (232.231792ms)
+✔ a board card source change selects the spec that reads its title (74.925292ms)
+✖ CI shares the plan but keeps advisory and full e2e in separate jobs (3.025292ms)
+✔ CLI skips real document changes and rejects a missing base (2824.940125ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (1297.774791ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (807.04175ms)
+✔ prepush vitest only forgives files listed as known local red (1.6615ms)
+✔ plan children do not inherit the git hook repository binding (105.349666ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.320458ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (83.399375ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (57.379334ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (148.369792ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (169.647667ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (3.459875ms)
+✔ logging is opt-in and never projects counters into the checkout (22.653583ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (44.887625ms)
+✔ workflow preserves comments about external behavior (0.854208ms)
+✔ forced push coverage preserves the English gate range across multiple commits (670.675292ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 48
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11437.901875
+
+✖ failing tests:
+
+test at scripts/prepush.test.mjs:518:1
+✖ code changes keep suites in CI and out of local plans (8.627458ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!plan.some((step) => step[1] === 'scripts/prepush-vitest.mjs'))
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/prepush-vitest-cap/scripts/prepush.test.mjs:526:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:565:1
+✖ executable evidence keeps code checks and data evidence keeps document readers (1.557875ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!plan.some((step) => step.includes('e2e:affected')))
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/prepush-vitest-cap/scripts/prepush.test.mjs:575:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/prepush.test.mjs:666:1
+✖ CI shares the plan but keeps advisory and full e2e in separate jobs (3.025292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      [
+        'node',
+        'scripts/english-only-gate.mjs'
+      ],
+  ...
+      ],
+  -   [
+  -     'node',
+  -     'scripts/prepush-vitest.mjs'
+  -   ],
+  -   [
+  -     'pnpm',
+  -     '--filter',
+  -     '@cairn/web',
+  -     'test'
+  -   ],
+  -   [
+  -     'pnpm',
+  -     '--filter',
+  -     '@cairn/web',
+  -     'e2e:affected',
+  -     '--',
+  -     'apps/web/src/main.tsx'
+  -   ]
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/xmon/Code/AgentProjects/cairn/.claude/worktrees/prepush-vitest-cap/scripts/prepush.test.mjs:668:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ [ 'node', 'scripts/english-only-gate.mjs' ], [ 'node', 'scripts/ui-debt-gate.mjs' ], [ 'node', 'scripts/ui-drift-gate.mjs' ], [ 'python3', 'scripts/pr-evidence-archive.test.py' ], [ 'pnpm', 'lint' ], [ 'pnpm', 'typecheck' ], [ 'pnpm', 'spec:parse' ], [ 'node', 'scripts/recording-gate.mjs' ], [ 'node', 'scripts/e2e-affected.mjs', '--check-coverage' ], [ 'node', '--test', 'docs/verify/1542/reach.test.mjs' ], [ 'node', '--test', 'scripts/escape-trace.test.mjs' ], [ 'node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases' ], [ 'node', '--test', 'scripts/review-escapes.test.mjs' ], [ 'node', '--test', 'scripts/escape-eval-loop.test.mjs' ], [ 'node', 'scripts/lessons-ledger-gate.mjs' ], [ 'python3', 'scripts/pr-evidence-gate.test.py' ] ],
+    expected: [ [ 'node', 'scripts/english-only-gate.mjs' ], [ 'node', 'scripts/ui-debt-gate.mjs' ], [ 'node', 'scripts/ui-drift-gate.mjs' ], [ 'python3', 'scripts/pr-evidence-archive.test.py' ], [ 'pnpm', 'lint' ], [ 'pnpm', 'typecheck' ], [ 'pnpm', 'spec:parse' ], [ 'node', 'scripts/recording-gate.mjs' ], [ 'node', 'scripts/e2e-affected.mjs', '--check-coverage' ], [ 'node', '--test', 'docs/verify/1542/reach.test.mjs' ], [ 'node', '--test', 'scripts/escape-trace.test.mjs' ], [ 'node', 'scripts/escape-trace.mjs', 'validate-cases', 'integration/eval/review/cases' ], [ 'node', '--test', 'scripts/review-escapes.test.mjs' ], [ 'node', '--test', 'scripts/escape-eval-loop.test.mjs' ], [ 'node', 'scripts/lessons-ledger-gate.mjs' ], [ 'python3', 'scripts/pr-evidence-gate.test.py' ], [ 'node', 'scripts/prepush-vitest.mjs' ], [ 'pnpm', '--filter', '@cairn/web', 'test' ], [ 'pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', 'apps/web/src/main.tsx' ] ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

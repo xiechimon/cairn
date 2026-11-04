@@ -1,0 +1,57 @@
+[heavy-slots] acquired slot 1/1
+...............
+----------------------------------------------------------------------
+Ran 15 tests in 0.003s
+
+OK
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+
+  ℹ Safe fix: Replace the chain with .flatMap().
+
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+
+
+Checked 1116 files in 975ms. No fixes applied.
+Found 1 info.
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1371 tests in 193 files collected, disk count matches (1.3s)
+[spec-parse-gate] integration/test: 50 test files parsed clean by tsc (1.4s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+english-only-gate: 0 line(s) with Chinese text
+lessons ledger ok
+comment-discipline-gate: 0 new comment line(s)

@@ -1,0 +1,14 @@
+✔ round2 fresh status names mode and API reads a chief thread (10553.773584ms)
+✔ round2 hourly status names mode and API reads a chief thread (2691.457291ms)
+✔ round2 hourly rejects archive age 3 hours (285.033666ms)
+✔ round2 hourly rejects archive age -1 hours (299.608583ms)
+✔ round2 hourly rejects corrupt newest SQLite archive (285.327167ms)
+✔ round2 fresh backup failure preserves safe step and withholds secrets (666.46ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14888.812541

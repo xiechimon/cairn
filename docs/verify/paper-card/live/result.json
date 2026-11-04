@@ -1,0 +1,54 @@
+{
+  "web": "http://127.0.0.1:5273",
+  "api": "http://127.0.0.1:8791",
+  "checks": [
+    {
+      "ok": true,
+      "label": "待开始 header hover shows the plus"
+    },
+    {
+      "ok": true,
+      "label": "column plus opens the 新建任务 dialog"
+    },
+    {
+      "ok": true,
+      "label": "saved task lands in 待开始"
+    },
+    {
+      "ok": true,
+      "label": "rename project to a long name (HTTP 200)"
+    },
+    {
+      "ok": true,
+      "label": "create tag (HTTP 201)"
+    },
+    {
+      "ok": true,
+      "label": "every meta row is one 20px line (20,20,20,20,20,20)"
+    },
+    {
+      "ok": true,
+      "label": "tag icon carries the tag color"
+    },
+    {
+      "ok": true,
+      "label": "no solid TagChip on cards"
+    },
+    {
+      "ok": true,
+      "label": "long title clamps to 2 lines (2)"
+    },
+    {
+      "ok": true,
+      "label": "hover reveals the 开始 link"
+    },
+    {
+      "ok": true,
+      "label": "开始 link fires POST /api/todos/8GCsXhjiSjX6azjeOjYF7/orchestrate (HTTP 409)"
+    },
+    {
+      "ok": true,
+      "label": "SQLite holds 6 todo rows (6)"
+    }
+  ]
+}

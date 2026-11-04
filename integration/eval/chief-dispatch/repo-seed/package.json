@@ -1,0 +1,11 @@
+{
+  "name": "eval-project",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:web\" \"pnpm dev:server\"",
+    "build": "pnpm -r build"
+  }
+}

@@ -1,0 +1,11 @@
+
+Running 6 tests using 1 worker
+
+  ✓  1 e2e/live-agent-model-line.spec.ts:128:1 › unassigned todo: 未指派 alone, no model segment (811ms)
+  ✓  2 e2e/live-agent-model-line.spec.ts:137:1 › assigned agent: its own model and thinking level, not another member’s (1.2s)
+  ✓  3 e2e/live-agent-model-line.spec.ts:153:1 › agent without a model configured: the name alone (298ms)
+  ✓  4 e2e/live-agent-model-line.spec.ts:163:1 › members pending: the name alone, then the model fills in (679ms)
+  ✓  5 e2e/live-agent-model-line.spec.ts:176:1 › members read failed: the name alone (2.2s)
+  ✓  6 e2e/live-agent-model-line.spec.ts:193:1 › en locale: the null thinking level reads Default (301ms)
+
+  6 passed (7.9s)

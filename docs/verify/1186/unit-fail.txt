@@ -1,0 +1,155 @@
+
+ RUN  v5.0.1 /workspace
+
+ × |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A1 allowlist [] → red allowlist-closed 5ms
+   → expected 'ok' to be 'red' // Object.is equality
+ × |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A2 defaultSkill 不在数组 allowlist → red default-skill-unauthorized + not-injected 1ms
+   → expected 'ok' to be 'red' // Object.is equality
+ × |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A3 预算丢掉的被选名字 → not-injected，留下的未读名字仍是黄 0ms
+   → expected 'ok' to be 'red' // Object.is equality
+ × |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A4 requested 缺省时 omitted 名是红，注入未读是黄 1ms
+   → expected 'ok' to be 'red' // Object.is equality
+ × |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A5 授权且注入但无事实 → yellow，reds 空 1ms
+   → expected 'ok' to be 'yellow' // Object.is equality
+ ✓ |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A6 被拒的读取仍是命中，不黄 1ms
+ ✓ |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A7 成功读取不黄 0ms
+ ✓ |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A8 授权但没被选择的名字不红（#1106） 0ms
+ ✓ |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A9 零命中 + null allowlist + 空注入 = ok 1ms
+ ✓ |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A10 unrendered 的被选名字不红 0ms
+ × |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A12 defaultSkill 未授权且被注入：只红不黄 0ms
+   → expected 'ok' to be 'red' // Object.is equality
+ × |@pacman/shared| test/skill-injection-check.test.ts > skillFactsFromContents（#1186） > F1 对象形与 JSON 串形都抽出技能名 2ms
+   → expected [] to deeply equal [ { name: 'demo-skill', …(1) }, …(1) ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A1 allowlist [] → red allowlist-closed
+AssertionError: expected 'ok' to be 'red' // Object.is equality
+
+Expected: "red"
+Received: "ok"
+
+ ❯ test/skill-injection-check.test.ts:49:21
+     47|   test('A1 allowlist [] → red allowlist-closed', () => {
+     48|     const v = check({ skillsAllowlist: [], requested: [], names: empty…
+     49|     expect(v.level).toBe('red');
+       |                     ^
+     50|     expect(v.reds.map((r) => r.code)).toContain('allowlist-closed');
+     51|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A2 defaultSkill 不在数组 allowlist → red default-skill-unauthorized + not-injected
+AssertionError: expected 'ok' to be 'red' // Object.is equality
+
+Expected: "red"
+Received: "ok"
+
+ ❯ test/skill-injection-check.test.ts:60:21
+     58|       names: emptyNames,
+     59|     });
+     60|     expect(v.level).toBe('red');
+       |                     ^
+     61|     expect(v.reds.map((r) => r.code)).toEqual(
+     62|       expect.arrayContaining(['default-skill-unauthorized', 'not-injec…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A3 预算丢掉的被选名字 → not-injected，留下的未读名字仍是黄
+AssertionError: expected 'ok' to be 'red' // Object.is equality
+
+Expected: "red"
+Received: "ok"
+
+ ❯ test/skill-injection-check.test.ts:73:21
+     71|       names: { injected: ['a'], omitted: ['b'], unrendered: [] },
+     72|     });
+     73|     expect(v.level).toBe('red');
+       |                     ^
+     74|     expect(v.reds).toEqual([expect.objectContaining({ code: 'not-injec…
+     75|     expect(v.yellows).toEqual([expect.objectContaining({ code: 'inject…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A4 requested 缺省时 omitted 名是红，注入未读是黄
+AssertionError: expected 'ok' to be 'red' // Object.is equality
+
+Expected: "red"
+Received: "ok"
+
+ ❯ test/skill-injection-check.test.ts:84:21
+     82|       names: { injected: ['a'], omitted: ['b'], unrendered: [] },
+     83|     });
+     84|     expect(v.level).toBe('red');
+       |                     ^
+     85|     expect(v.reds).toEqual([expect.objectContaining({ code: 'not-injec…
+     86|     expect(v.yellows.map((y) => y.skill)).toEqual(['a']);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A5 授权且注入但无事实 → yellow，reds 空
+AssertionError: expected 'ok' to be 'yellow' // Object.is equality
+
+Expected: "yellow"
+Received: "ok"
+
+ ❯ test/skill-injection-check.test.ts:95:21
+     93|       names: { injected: ['demo-skill'], omitted: [], unrendered: [] },
+     94|     });
+     95|     expect(v.level).toBe('yellow');
+       |                     ^
+     96|     expect(v.reds).toEqual([]);
+     97|     expect(v.yellows).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > assertSkillInjection（#1186） > A12 defaultSkill 未授权且被注入：只红不黄
+AssertionError: expected 'ok' to be 'red' // Object.is equality
+
+Expected: "red"
+Received: "ok"
+
+ ❯ test/skill-injection-check.test.ts:156:21
+    154|       names: { injected: ['carry'], omitted: [], unrendered: [] },
+    155|     });
+    156|     expect(v.level).toBe('red');
+       |                     ^
+    157|     expect(v.reds.map((r) => r.code)).toContain('default-skill-unautho…
+    158|     expect(v.yellows).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  |@pacman/shared| test/skill-injection-check.test.ts > skillFactsFromContents（#1186） > F1 对象形与 JSON 串形都抽出技能名
+AssertionError: expected [] to deeply equal [ { name: 'demo-skill', …(1) }, …(1) ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "denied": false,
+-     "name": "demo-skill",
+-   },
+-   {
+-     "denied": false,
+-     "name": "demo-skill",
+-   },
+- ]
++ []
+
+ ❯ test/skill-injection-check.test.ts:173:66
+    171|
+    172|   test('F1 对象形与 JSON 串形都抽出技能名', () => {
+    173|     expect(skillFactsFromContents([call, JSON.stringify(call)])).toEqu…
+       |                                                                  ^
+    174|       { name: 'demo-skill', denied: false },
+    175|       { name: 'demo-skill', denied: false },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 5 passed (12)
+   Start at  16:23:16
+   Duration  260ms (import 43%, transform 38%, tests 15%, worker 4%)
+

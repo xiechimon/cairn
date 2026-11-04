@@ -1,0 +1,49 @@
+Container: Claude Code cloud session, preinstalled Chromium 141 aliased to the
+revision @playwright/test 1.63 asks for (the PR #1395 setup). CI runs the
+pinned browser.
+
+New spec, red before the change and green after:
+
+$ pnpm exec playwright test e2e/paper-chief.spec.ts      # before (origin/main 89cc029 + the chief-question fixture)
+    Error: W1   expect(locator).toHaveCSS(expected) failed
+    Error: W5   expect(locator).toHaveCSS(expected) failed
+    Error: S1   expect(locator).toHaveCSS(expected) failed
+    Error: Q1   expect(locator).toHaveCSS(expected) failed
+  8 failed
+
+$ pnpm exec playwright test e2e/paper-chief.spec.ts      # after
+  8 passed (16.8s)
+
+The S2 divider pin was added after a first pass drew the agent row without
+its divider (the row is a Button, whose transparent border hid the card's
+divide-y rule): it failed with `Expected "rgb(236, 229, 218)" Received
+"rgba(0, 0, 0, 0)"`, then passed once the row carried its own bottom border.
+
+Existing Chief specs plus the pages that host the window:
+
+$ pnpm exec playwright test e2e/chief-*.spec.ts e2e/machines-chief-state.spec.ts e2e/page-scroll.spec.ts e2e/title-band-clicks.spec.ts e2e/hotkeys.spec.ts
+  1 failed
+    e2e/chief-thread-switcher-scroll.spec.ts:77:3 › the short canon list (r5 116, 2 threads) keeps its natural height
+  151 passed (1.5m)
+
+That pin held the switcher at 2 rows x 30px + 8px = 68 tall and 262 wide.
+The switcher is now the Paper menu (32px rows, w-66), so the pin moves on
+purpose to 72 and 264; after the update:
+
+$ pnpm exec playwright test e2e/chief-thread-switcher-scroll.spec.ts
+  3 passed (7.3s)
+
+Full affected run:
+
+$ pnpm --filter @pacman/web e2e:affected      # E2E_PORT=8398
+[e2e:affected] 157/157 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  4 failed
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light)
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark)
+    e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink
+  1081 passed (9.7m)
+
+The same four fail on main in this container and pass in CI:
+docs/verify/1397/e2e.txt records them against an unchanged main build, and
+PR #1399's CI e2e shards were green on the pinned browser.

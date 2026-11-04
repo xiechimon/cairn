@@ -1,0 +1,55 @@
+---
+title: "GitHub merge gate (MergeGate.tla)"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: open
+    lg1: ready
+    lg2: merged
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  s0: No evaluation: 0 of 3 verdict kinds pass on the current patch
+  s1: Gate evaluated: blocked
+  s2: No evaluation: 1 of 3 verdict kinds pass on the current patch
+  s3: No evaluation: 2 of 3 verdict kinds pass on the current patch
+  s4: No evaluation: 3 of 3 verdict kinds pass on the current patch
+  s5: Gate ready on the current patch
+  s6: Merged on a judged patch
+  s7: Gate ready, but the patch digest moved since
+  [*] --> s0
+  s0 --> s1: mergeReadiness evaluates
+  s0 --> s2: a verdict is recorded
+  s1 --> s0: a verdict is recorded or evidence-only push (head moves) or code push (head and digest move)
+  s1 --> s2: a verdict is recorded or evidence-only push (head moves)
+  s2 --> s1: mergeReadiness evaluates
+  s2 --> s0: a verdict is recorded or default branch moves, digest changes or code push (head and digest move)
+  s2 --> s3: a verdict is recorded
+  s1 --> s3: a verdict is recorded or evidence-only push (head moves)
+  s3 --> s1: mergeReadiness evaluates
+  s3 --> s2: a verdict is recorded
+  s3 --> s4: a verdict is recorded
+  s3 --> s0: default branch moves, digest changes or code push (head and digest move)
+  s1 --> s4: a verdict is recorded or evidence-only push (head moves)
+  s4 --> s1: mergeReadiness evaluates
+  s4 --> s3: a verdict is recorded
+  s4 --> s0: default branch moves, digest changes or code push (head and digest move)
+  s4 --> s5: mergeReadiness evaluates
+  s5 --> s6: mergeThroughGithub merges
+  s5 --> s7: default branch moves, digest changes
+  s5 --> s4: a verdict is recorded or evidence-only push (head moves)
+  s5 --> s3: a verdict is recorded
+  s5 --> s0: code push (head and digest move)
+  s7 --> s1: mergeReadiness evaluates
+  s7 --> s0: a verdict is recorded or evidence-only push (head moves)
+  s7 --> s2: a verdict is recorded
+  s5 --> s1: mergeReadiness evaluates
+  class s0 blue
+  class s1 blue
+  class s2 blue
+  class s3 blue
+  class s4 blue
+  class s5 orange
+  class s6 teal
+  class s7 orange

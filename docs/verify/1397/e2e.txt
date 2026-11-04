@@ -1,0 +1,38 @@
+Container: Claude Code cloud session. Preinstalled Chromium 141 (rev 1194) is
+aliased to the rev @playwright/test 1.63 asks for (1243); the same aliasing
+the SessionStart hook in PR #1395 sets up. Geometry and type assertions
+below run on that browser; CI runs the pinned revision.
+
+$ pnpm --filter @pacman/web e2e:affected      # E2E_PORT=8398
+[e2e:affected] 156/156 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  4 failed
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light)
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark)
+    e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink
+  1073 passed (9.8m)
+
+The same four fail on main without this change. Fixture build of 3f3ea2d
+(origin/main, no edits) served by vite preview on 8410, same browser:
+
+$ E2E_PORT=8410 pnpm exec playwright test e2e/segmented-controls.spec.ts e2e/accent-typo.spec.ts
+  4 failed
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light)
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark)
+    e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink
+  28 passed (21.1s)
+
+accent-typo: `Expected "100% auto", Received "100%"` (mask-size serialisation
+differs on Chromium 141; PR #1395 docs/verify/1395/e2e.txt records the same).
+segmented-controls: both fail on the second (light) leg at
+`expect(rest).not.toBe(target)`; the pointer left hovering the idle option by
+the dark leg survives the reload on this browser. The schedules page is not
+touched by this change.
+
+New spec, red before the change and green after:
+
+$ pnpm exec playwright test e2e/paper-project-page.spec.ts   # before (origin/main)
+  6 failed   (T1 page-col missing, E1 no .empty-state heading, F3 placeholder 13px)
+$ pnpm exec playwright test e2e/paper-project-page.spec.ts   # after
+  6 passed (9.9s)

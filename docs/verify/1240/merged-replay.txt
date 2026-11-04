@@ -1,0 +1,74 @@
+# Real-corpus sweep (2026-10-12): last merged PR bodies replayed through the gate
+
+== PR #1239 ==
+pr-tasks: GREEN
+exit=0
+
+== PR #1237 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1235 ==
+FAIL unchecked-task: line 26: fresh checkout can commit a change that touches the web lint
+FAIL unchecked-task: line 27: web unit/e2e suites green (fixture values unchanged).
+pr-tasks: RED (2 problem(s))
+exit=1
+
+== PR #1234 ==
+FAIL unchecked-task: line 24: minimize then reopen keeps scroll position (e2e green).
+FAIL unchecked-task: line 25: chief panel behavior on non-docked routes unchanged (chief-p
+FAIL unchecked-task: line 26: CI green; coordinator lookback on merge commit.
+pr-tasks: RED (3 problem(s))
+exit=1
+
+== PR #1233 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1232 ==
+FAIL unchecked-task: line 44: CI green on this PR; coordinator lookback on the merge commi
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1231 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1230 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1229 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1228 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1227 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1224 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1223 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+
+== PR #1222 ==
+FAIL no-tasks: Acceptance section carries no task-list item (prose bullets do not count; quote the ticket's acceptance checklist as `- [x]` items, or write `- [x] no task surface: <reason>` when there is none)
+pr-tasks: RED (1 problem(s))
+exit=1
+

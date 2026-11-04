@@ -1,0 +1,17 @@
+
+ RUN  v5.0.1 <worktree>
+
+
+ Test Files  4 passed (4)
+      Tests  150 passed (150)
+   Start at  13:50:27
+   Duration  4.28s (transform 66%, import 21%, tests 12%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 3.51s · 56% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+  Transform  |@cairn/shared| transforming modules took 2.77s · 85% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

@@ -1,0 +1,8 @@
+2026-10-21 01:21:50 Loading pi runtime…
+2026-10-21 01:21:50 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+2026-10-21 01:21:50 [machine] claude binary: /opt/node22/bin/claude (2.1.305)
+2026-10-21 01:21:50 Enrolled in team fVVOZqcga3d5dw8jut9cl (machine DBVIgNFtOU2FNYH5YEVNk)
+2026-10-21 01:21:50 Online (machineId=DBVIgNFtOU2FNYH5YEVNk); polling http://127.0.0.1:8791
+2026-10-21 01:21:50 [recover] no pending steps found
+2026-10-21 01:21:50 [wake] push channel connected
+2026-10-21 01:25:32 [machine] claim failed: The operation was aborted due to timeout (backoff 1000ms)

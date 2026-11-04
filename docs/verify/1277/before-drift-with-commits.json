@@ -1,0 +1,91 @@
+{
+  "label": "drift-with-commits",
+  "doneBody": {
+    "status": "success",
+    "hasChanges": true,
+    "workBranchDrift": {
+      "expected": "pacman/conv-0198f6c0-0000-7000-8000-000000000000",
+      "actual": "dogfood/tracer-1153-verification-note"
+    },
+    "prUrl": "https://github.com/example/repo/pull/1277",
+    "prNumber": 1277
+  },
+  "http": {
+    "todo": {
+      "id": "LN_dJiIU1peauqYNyf8Ri",
+      "teamId": "Zl3FXST2HrkzYfH4cFLu1",
+      "projectId": "M_n9WsQ0wrKF5zcamdrcx",
+      "title": "1277 drift-with-commits",
+      "spec": "probe: machine done payload, no daemon",
+      "phase": "review",
+      "phaseAt": 1791993173017,
+      "seqNum": 4,
+      "orderIndex": 0,
+      "tagIds": [],
+      "assignment": {
+        "plan": {
+          "agentId": "ZbXLj4A4ey9L34o-E6f37"
+        },
+        "build": {
+          "agentId": "ZbXLj4A4ey9L34o-E6f37"
+        }
+      },
+      "agent": {
+        "id": "ZbXLj4A4ey9L34o-E6f37",
+        "displayName": "verify-builder-1277"
+      },
+      "latestBuildId": "01a13b1d-d40f-79dd-ba5c-14e0c8f014d8",
+      "lastRunAt": 1791993173007,
+      "hasChanges": true,
+      "hasPlan": false,
+      "buildHistory": [
+        {
+          "buildId": "01a13b1d-d40f-79dd-ba5c-14e0c8f014d8",
+          "createdAt": 1791993173007
+        }
+      ],
+      "sourceTodo": null,
+      "blockedBy": null,
+      "v": 4,
+      "createdBy": "QxvI6zlH3Z4u-093-QF9A",
+      "ownerId": "QxvI6zlH3Z4u-093-QF9A",
+      "sourceBuildId": null,
+      "sourceKind": null,
+      "sourceRef": null,
+      "quotaWait": null
+    },
+    "build": {
+      "id": "01a13b1d-d40f-79dd-ba5c-14e0c8f014d8",
+      "todoId": "LN_dJiIU1peauqYNyf8Ri",
+      "withPlan": false,
+      "prevPhase": "todo",
+      "triggerSource": "user",
+      "planDocId": null,
+      "errorMessage": null,
+      "prUrl": "https://github.com/example/repo/pull/1277",
+      "prNumber": 1277,
+      "diffHash": null,
+      "createdAt": 1791993173007
+    }
+  },
+  "sqlite": {
+    "build": {
+      "id": "01a13b1d-d40f-79dd-ba5c-14e0c8f014d8",
+      "errorMessage": null,
+      "prUrl": "https://github.com/example/repo/pull/1277",
+      "prNumber": 1277
+    },
+    "todo": {
+      "id": "LN_dJiIU1peauqYNyf8Ri",
+      "phase": "review",
+      "hasChanges": 1
+    },
+    "steps": [
+      {
+        "id": "S4XniPTuef1H0UHYmbv-S",
+        "kind": "build",
+        "status": "done"
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "call-stub-muyfvpxp-1",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muyfvpxp-1\",\"name\":\"bash\",\"arguments\":{\"command\":\"rm -rf /\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"command gate (ask-rm-rf-root): requires approval, and this daemon runs unattended (no approval surface), so it is denied.\\ncommand: rm -rf /\\nreplan without the irreversible shape (narrow the paths, drop the flags), or put the rationale in the plan and let a human approve it at the confirm/review gate.\"}],\"details\":{}},\"isError\":true,\"endedAt\":1791397612300}}"
+  },
+  {
+    "id": "call-stub-muyfvpxp-2",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muyfvpxp-2\",\"name\":\"read_mcp_resource\",\"arguments\":{\"server\":\"demo\",\"uri\":\"demo://note\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"demo-note-content\"}],\"details\":{\"server\":\"demo\",\"tool\":\"read_mcp_resource\"},\"structuredContent\":{\"server\":\"demo\",\"uri\":\"demo://note\",\"contents\":[{\"uri\":\"demo://note\",\"text\":\"demo-note-content\"}]}},\"isError\":false,\"endedAt\":1791397616322}}"
+  },
+  {
+    "id": "call-stub-muyfvpxp-3",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muyfvpxp-3\",\"name\":\"mcp__demo__echo\",\"arguments\":{\"text\":\"live-gate\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"verify-echo-muyfvpxm:live-gate\"}],\"details\":{\"server\":\"demo\",\"tool\":\"echo\"},\"structuredContent\":{\"content\":[{\"type\":\"text\",\"text\":\"verify-echo-muyfvpxm:live-gate\"}]}},\"isError\":false,\"endedAt\":1791397622336}}"
+  },
+  {
+    "id": "call-stub-muyfvpxp-4",
+    "role": "assistant",
+    "content": "{\"kind\":\"toolcall\",\"call\":{\"id\":\"call-stub-muyfvpxp-4\",\"name\":\"bash\",\"arguments\":{\"command\":\"printf \\\"verify 929 30\\\\n\\\" >> README.md\"},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"(no output)\"}],\"structuredContent\":{\"output\":\"\",\"truncated\":false,\"exit_code\":0,\"wall_time_seconds\":0}},\"isError\":false,\"endedAt\":1791397628362}}"
+  },
+  {
+    "id": "msg-WepEIKtFDzgmMDWeGCoJ6-6",
+    "role": "assistant",
+    "content": "[{\"type\":\"text\",\"text\":\"闸与桥双向验证完成。\"}]"
+  },
+  {
+    "id": "user-WepEIKtFDzgmMDWeGCoJ6",
+    "role": "user",
+    "content": "\"929/930 闸与桥探针\\n\\n按 stub 脚本跑一步（#929/#930 探针任务）\""
+  },
+  {
+    "id": "msg-WepEIKtFDzgmMDWeGCoJ6-1",
+    "role": "system",
+    "content": "\"\""
+  },
+  {
+    "id": "msg-WepEIKtFDzgmMDWeGCoJ6-2",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"command gate (ask-rm-rf-root): requires approval, and this daemon runs unattended (no approval surface), so it is denied.\\ncommand: rm -rf /\\nreplan without the irreversible shape (narrow the paths, drop the flags), or put the rationale in the plan and let a human approve it at the confirm/review gate.\"}]"
+  },
+  {
+    "id": "msg-WepEIKtFDzgmMDWeGCoJ6-3",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"demo-note-content\"}]"
+  },
+  {
+    "id": "msg-WepEIKtFDzgmMDWeGCoJ6-4",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"verify-echo-muyfvpxm:live-gate\"}]"
+  },
+  {
+    "id": "msg-WepEIKtFDzgmMDWeGCoJ6-5",
+    "role": "system",
+    "content": "[{\"type\":\"text\",\"text\":\"(no output)\"}]"
+  }
+]

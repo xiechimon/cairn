@@ -1,0 +1,60 @@
+#1403 segment 2b round 3 (PR #1509): mutations
+Runner: scratchpad script; each mutation is a one-place text substitution, the named test
+file is run in full, then the file is written back byte for byte. Run on the final code
+tree 68738770 (after the code-review follow-up).
+
+M1 floor reduced over adoptable again (the round 2 code) [apps/server/src/services/ci-loop.ts] -> CAUGHT (Tests  4 failed | 182 passed (186))
+    failing: [2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the list does n
+    failing: [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by CONTRIBUTOR closed unmerged → nothing adopted (pr
+    failing: [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by NONE closed unmerged → nothing adopted (pr-gate 1
+    failing: [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by null closed unmerged → nothing adopted (pr-gate 1
+    failing: × [2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the list does
+    failing: × [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by CONTRIBUTOR closed unmerged → nothing adopted (
+M2 floor ignored in the merged pool [apps/server/src/services/ci-loop.ts] -> CAUGHT (Tests  6 failed | 180 passed (186))
+    failing: [2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the list does n
+    failing: [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by CONTRIBUTOR closed unmerged → nothing adopted (pr
+    failing: [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by NONE closed unmerged → nothing adopted (pr-gate 1
+    failing: [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by null closed unmerged → nothing adopted (pr-gate 1
+    failing: [s2-A16] only a merged PR older than the recorded one is on the branch → not recorded; the close of the newer 
+    failing: [s2-A18] a merged PR of the build is not taken when a newer PR of the build was closed without merge (the pers
+M3 merged PRs count toward the floor [apps/server/src/services/ci-loop.ts] -> CAUGHT (Tests  4 failed | 182 passed (186))
+    failing: [s2-A11] only merged ones → the highest number
+    failing: [s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card
+    failing: [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is lis
+    failing: [s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded 
+    failing: × [s2-A11] only merged ones → the highest number 36ms
+    failing: × [s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card
+M4 floor seed mergedAfter dropped (0) [apps/server/src/services/ci-loop.ts] -> CAUGHT (Tests  1 failed | 185 passed (186))
+    failing: [s2-A16] only a merged PR older than the recorded one is on the branch → not recorded; the close of the newer 
+    failing: × [s2-A16] only a merged PR older than the recorded one is on the branch → not recorded; the close of the newe
+M5 drop `pull === null` from the read-failed check [apps/server/src/services/builds.ts] -> CAUGHT (Tests  14 failed | 105 passed (119))
+    failing: [2b-D44a] the PR read fails (200 whose body is a JSON array) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (200 whose body is not JSON) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (403 naming a secondary rate limit) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (403 with x-ratelimit-remaining 0) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (404) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (429) → 409 read failed; no PUT; nothing written
+M6 the read-failed refusal answers 503 instead of 409 [apps/server/src/services/builds.ts] -> CAUGHT (Tests  14 failed | 105 passed (119))
+    failing: [2b-D44a] the PR read fails (200 whose body is a JSON array) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (200 whose body is not JSON) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (403 naming a secondary rate limit) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (403 with x-ratelimit-remaining 0) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (404) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (429) → 409 read failed; no PUT; nothing written
+M7 conditional GET rethrows network/timeout errors [apps/server/src/lib/github.ts] -> CAUGHT (Tests  3 failed | 116 passed (119))
+    failing: [2b-D44a] the PR read fails (a network error) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44a] the PR read fails (a timeout) → 409 read failed; no PUT; nothing written
+    failing: [2b-D44c] failed card, the PR read fails (a network error) → 409; the card stays failed with no row
+    failing: × [2b-D44a] the PR read fails (a network error) → 409 read failed; no PUT; nothing written 51ms
+    failing: × [2b-D44a] the PR read fails (a timeout) → 409 read failed; no PUT; nothing written 66ms
+    failing: × [2b-D44c] failed card, the PR read fails (a network error) → 409; the card stays failed with no row 45ms
+M8 a failed read on a failed card restores it to review [apps/server/src/services/builds.ts] -> CAUGHT (Tests  3 failed | 116 passed (119))
+    failing: [2b-D44c] failed card, the PR read fails (429) → 409; the card stays failed with no row
+    failing: [2b-D44c] failed card, the PR read fails (503) → 409; the card stays failed with no row
+    failing: [2b-D44c] failed card, the PR read fails (a network error) → 409; the card stays failed with no row
+    failing: × [2b-D44c] failed card, the PR read fails (429) → 409; the card stays failed with no row 42ms
+    failing: × [2b-D44c] failed card, the PR read fails (503) → 409; the card stays failed with no row 42ms
+    failing: × [2b-D44c] failed card, the PR read fails (a network error) → 409; the card stays failed with no row 41ms
+
+Total: 8 mutations, 8 caught.
+M1 is the round 2 code itself (the regression pr-gate found).

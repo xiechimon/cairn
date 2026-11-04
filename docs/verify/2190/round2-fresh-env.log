@@ -1,0 +1,18 @@
+fresh-only launcher; no BACKUP_DB or BACKUP_ATTACHMENTS; dependency and final drill stubs
+--mode
+fresh
+--live-db
+/fixture/db
+--live-attachments
+/fixture/files
+--secretbox-key
+/fixture/key
+--scratch
+/fixture/scratch-fresh
+--report
+/fixture/report-fresh
+--attachments
+/fixture/files
+
+
+exit 0

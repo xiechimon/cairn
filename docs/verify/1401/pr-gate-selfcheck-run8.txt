@@ -1,0 +1,88 @@
+# pr-gate run 8 on #1410 (at b51eb4b, go true) and the round that took its suggestions (8e045cc).
+# Red: this round's self-check against pr-gate.js of b51eb4b. Only the refs case fails there: the stub pipeline
+# fix lives in the self-check, and b51eb4b's gate already counts a dropped dimension as missing.
+# Green: the same self-check at 8e045cc. Mutations: each applied alone to pr-gate.js at 8e045cc.
+
+== red ==
+pr-gate-selfcheck.mjs of this round against pr-gate.js of b51eb4b (stub pipeline as in this round)
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  binaryFiles is required and lists changed paths only (code-review on #1410)
+PASS  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+PASS  a binary file only the safety reviewer listed routes to the user
+PASS  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+PASS  a deleted colocated .spec file outside a test directory routes to the user (run 8)
+PASS  a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)
+FAIL  private refs carry the head, so two runs on one PR do not delete each other's refs (run 8)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the line count ignores in-tree attributes (run 6)
+PASS  a C-quoted binary path is refused with the quoting hint (run 7)
+PASS  the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)
+PASS  reviewers and skeptics skip PR comments from outside the repository (run 7)
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  a missing safety file list blocks go
+58/59 passed (/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/pr-gate-b51eb4b.js)
+exit=1
+
+== green at 8e045cc ==
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  a missing safety file list blocks go
+59/59 passed (.claude/workflows/pr-gate.js)
+
+== mutations ==
+glob star crosses a slash    58/59 passed  caught by: a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)
+spec suffix dropped          58/59 passed  caught by: a deleted colocated .spec file outside a test directory routes to the user (run 8)
+scripts class dropped        55/59 passed  caught by: CI-called script outside the *gate* glob routes to the user; CI gate helpers and data anywhere under scripts/ route to the user; gate files outside root scripts/ route to the user (run 4); case variants of protected paths route to the user (run 5)
+refs without the head        58/59 passed  caught by: private refs carry the head, so two runs on one PR do not delete each other's refs (run 8)
+
+== definitions (name, file, original, replacement) ==
+M=[
+ ('glob star crosses a slash', '.claude/workflows/pr-gate.js', "re += '[^/]*'", "re += '.*'"),
+ ('spec suffix dropped', '.claude/workflows/pr-gate.js', "/\\.(test|spec)\\.[cm]?[jt]sx?$/i", "/\\.(test)\\.[cm]?[jt]sx?$/i"),
+ ('scripts class dropped', '.claude/workflows/pr-gate.js', "  '**/scripts/**',\n", ""),
+ ('refs without the head', '.claude/workflows/pr-gate.js', "refs/pr-gate/${pr}/${headSha.slice(0, 12)}/${tag}/base", "refs/pr-gate/${pr}/${tag}/base"),
+ ('null result not filtered', '.claude/workflows/pr-gate.js', None, None),
+]

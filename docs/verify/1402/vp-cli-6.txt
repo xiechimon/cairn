@@ -1,0 +1,205 @@
+# #1402 round 5, after pr-gate run 4 on #1411: vp.mjs drive on live stacks.
+# Logs copied from the session's terminal output. Each block names the stack it ran on.
+# The fix: 13 cases that create an agent without machineId are marked stale; the registry's
+# evidence field tells vp.mjs how a probe that ignores VERIFY_EVIDENCE_DIR takes its directory
+# ({flag}) or where it writes ({writes}); the directory is made after doctor passes;
+# drive-1136-stale-sweep.mjs reads VERIFY_EVIDENCE_DIR.
+#
+# Note on the first after-fix stale-sweep run: it reused the stack on which the before-fix run had
+# enrolled the same machine, and check A (a machine with normal presence stays online for 60 s)
+# failed. On a fresh stack every check passed (20261021-012147-machine-stale-sweep-stale-sweep/).
+# The registry usage line for this case now asks for a fresh stack.
+#
+# glass-journeys: the board journey waits for .board-topbar-title, which #1375 removed; the other
+# five journeys pass in the same run (20261021-012912-glass-journeys-all/). Both board and all are
+# marked stale in this round.
+
+verify stack ready
+  web(驱动入口)  http://127.0.0.1:5273/app
+  api(server)     http://127.0.0.1:8791
+  PACMAN_HOME     /home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home(全新库,seed 用户 Owner)
+  技能目录        /home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home/skills(scratch,空集起步;放技能见 features/skills-page.md)
+  运行态          /home/user/pacman/.claude/worktrees/p1/.claude/verify-run
+next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>
+
+== before the fix (registry and vp.mjs at 35fe641), fresh stack ==
+$ vp.mjs drive unassigned-build
+vp: unassigned-build/unassigned-build usage: env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-011138-unassigned-build-unassigned-build
+vp: unassigned-build/unassigned-build needs the stack, running doctor first
+PASS  server 进程组存活(pid 9513) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 9514) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+exit=1
+
+$ vp.mjs drive gate-actor
+vp: gate-actor/gate-actor usage: --expect=new|old (env VERIFY_RUN_DIR for baseline)
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-011139-gate-actor-gate-actor
+vp: gate-actor/gate-actor needs the stack, running doctor first
+PASS  server 进程组存活(pid 9513) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 9514) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+exit=1
+
+$ vp.mjs drive machine-stale-sweep
+vp: machine-stale-sweep/stale-sweep usage: --expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-011140-machine-stale-sweep-stale-sweep
+vp: machine-stale-sweep/stale-sweep needs the stack, running doctor first
+PASS  server 进程组存活(pid 9513) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 9514) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+doctor:all PASS
+vp: machine-stale-sweep/stale-sweep -> node .claude/skills/verify-pacman/scripts/drive-1136-stale-sweep.mjs
+evidence → /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/2026-10-21T01-11-40-233Z-1136-stale-sweep
+exit=0
+
+== the same two drives, last lines ==
+$ vp.mjs drive unassigned-build
+    at file:///home/user/pacman/.claude/worktrees/p1/.claude/skills/verify-pacman/scripts/drive-1104-unassigned-build.mjs:124:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+Node.js v22.22.0
+exit=1
+
+$ vp.mjs drive gate-actor
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async file:///home/user/pacman/.claude/worktrees/p1/.claude/skills/verify-pacman/scripts/drive-902-gate-actor.mjs:303:17
+
+Node.js v22.22.0
+exit=1
+
+== machine-stale-sweep: the directory vp.mjs printed, and the one the probe wrote ==
+$ ls .claude/verify-evidence/20261021-011140-machine-stale-sweep-stale-sweep
+entries: 0
+$ ls .claude/verify-evidence/2026-10-21T01-11-40-233Z-1136-stale-sweep
+daemon-console.log
+daemon.log
+result.json
+server.log
+
+== the error line of each ==
+$ vp.mjs drive unassigned-build
+  throw new Error('agent → ' + agent.status + ' ' + JSON.stringify(agent.body));
+Error: agent → 400 {"error":"invalid body at machineId: Invalid input: expected string, received undefined"}
+
+$ vp.mjs drive gate-actor
+  if (![200, 201].includes(agent.status)) throw new Error('agent → ' + agent.status);
+Error: agent → 400
+
+== after the fix, same stack ==
+$ vp.mjs drive unassigned-build
+unassigned-build/unassigned-build is stale: Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor
+exit=0
+
+$ vp.mjs drive machine-stale-sweep
+vp: machine-stale-sweep/stale-sweep usage: --expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR
+vp: machine-stale-sweep/stale-sweep needs the stack, running doctor first
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-011747-machine-stale-sweep-stale-sweep
+vp: machine-stale-sweep/stale-sweep -> node .claude/skills/verify-pacman/scripts/drive-1136-stale-sweep.mjs
+evidence → /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-011747-machine-stale-sweep-stale-sweep
+FAIL  A: 正常 presence 的机器不被误翻（60s 全程 online）
+evidence → /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-011747-machine-stale-sweep-stale-sweep
+exit=1
+
+
+== after the fix, a second fresh stack ==
+$ vp.mjs drive unassigned-build
+unassigned-build/unassigned-build is stale: Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machin
+exit=2
+
+$ vp.mjs drive machine-stale-sweep
+vp: machine-stale-sweep/stale-sweep usage: --expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR
+vp: machine-stale-sweep/stale-sweep needs the stack, running doctor first
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012147-machine-stale-sweep-stale-sweep
+vp: machine-stale-sweep/stale-sweep -> node .claude/skills/verify-pacman/scripts/drive-1136-stale-sweep.mjs
+evidence → /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012147-machine-stale-sweep-stale-sweep
+evidence → /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012147-machine-stale-sweep-stale-sweep
+exit=0
+
+$ vp.mjs drive glass-journeys board
+/home/user/pacman/.claude/worktrees/p1/.claude/skills/verify-pacman/scripts/launch.mjs exited 1
+
+VERIFY_PORT 8791 被占——别的 lane?不能杀,换端口重试:
+  VERIFY_PORT=<别的> VERIFY_WEB_PORT=<别的> node /home/user/pacman/.claude/worktrees/p1/.claude/skills/verify-pacman/scripts/launch.mjs
+  查占用:lsof -iTCP:8791 -sTCP:LISTEN
+
+evidence  /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012548-glass-journeys-board
+FAIL
+exit=1
+$ ls <the printed directory>
+result.json
+
+$ vp.mjs drive api-keys create
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012549-api-keys-create
+drive api-key:FAIL(1 项)
+exit=1
+
+== third fresh stack: api-keys first (it needs an empty key list), then cleanup and glass (it starts its own stack) ==
+$ vp.mjs drive api-keys create
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012658-api-keys-create
+drive api-key:PASS
+exit=0
+
+$ vp.mjs cleanup; vp.mjs drive glass-journeys board
+vp: glass-journeys/board usage: starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up
+vp: evidence /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012705-glass-journeys-board
+vp: glass-journeys/board -> node .cursor/skills/verify-pacman/scripts/glass.mjs board --out /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012705-glass-journeys-board
+FAIL  board: locator.textContent: Timeout 30000ms exceeded.
+evidence  /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012705-glass-journeys-board
+FAIL
+exit=1
+$ ls <the printed directory>
+01-board.png
+fail-board.png
+result.json
+
+== fourth fresh stack started by glass.mjs itself: all six journeys, run directly (not through vp.mjs) ==
+$ node .cursor/skills/verify-pacman/scripts/glass.mjs --out <scratch>/glass-all/run
+launch
+seed review tasks
+shot  01-board.png
+shot  fail-board.png
+FAIL  board: locator.textContent: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('.board-topbar-title')
+
+shot  02-create-task-dialog.png
+shot  03-create-task-card.png
+PASS  create-task: card is in 待开始
+PASS  create-task: GET /api/todos phase=todo
+PASS  create-task: sqlite phase=todo
+shot  04-dispatch-toast.png
+PASS  dispatch: toast 已保存，交给总管编排
+shot  05-dispatch-chief.png
+PASS  dispatch: chief drawer open
+PASS  dispatch: chief threads 0 → 1
+PASS  dispatch: card still in 待开始 (no daemon)
+shot  06-view-diff.png
+PASS  view-diff: changes header visible
+PASS  view-diff: src/hello.txt visible
+PASS  view-diff: added line visible
+PASS  view-diff: changes paths=src/hello.txt
+shot  07-request-changes-dialog.png
+shot  08-request-changes-landed.png
+PASS  request-changes: chip=规划中
+PASS  request-changes: phase=planning
+PASS  request-changes: latestBuildId unchanged
+shot  09-merge-dialog.png
+PASS  merge: merge checkbox checked
+shot  10-merge-accepted.png
+PASS  merge: toast 已发起合并
+PASS  merge: phase stays review until a machine finishes (got review)
+evidence  /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/glass-all/run
+cleanup
+FAIL
+exit=1
+
+== archive of this round ==
+$ vp.mjs archive 1402 --from <three directories>
+vp: /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012147-machine-stale-sweep-stale-sweep -> /home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep
+vp: /home/user/pacman/.claude/worktrees/p1/.claude/verify-evidence/20261021-012705-glass-journeys-board -> /home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261021-012705-glass-journeys-board
+vp: /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/glass-all-arch/20261021-012912-glass-journeys-all -> /home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261021-012912-glass-journeys-all
+next: git add docs/verify/1402 && git commit, push, then vp.mjs links 1402

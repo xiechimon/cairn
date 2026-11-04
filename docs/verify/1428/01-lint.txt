@@ -1,0 +1,3 @@
+$ pnpm lint   # on the merged tree (66c7985c)
+Checked 781 files in 642ms. No fixes applied.
+Found 1 info.

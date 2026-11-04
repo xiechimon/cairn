@@ -1,0 +1,110 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ❯ test/close-stops-active-steps.test.ts (28 tests | 5 failed) 1388ms
+   ❯ #1453 同一竞态的其余形态 (5)
+     × closed 卡的 merge 步成功回报：回报不抛，卡仍 closed 67ms
+     × closed 卡的 review 步带 blocking 成功回报：回报不抛，不入队重规划 37ms
+     × done 卡的 build 步零改动成功回报：步 done，不被产物闸记成失败 40ms
+     × 关卡后重开并重跑（新 build）：旧 build 的步迟到成功不推进卡 37ms
+     × stop-and-done 预定 done 在途时 build 步先跑完：卡落 done，不进 review 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > closed 卡的 merge 步成功回报：回报不抛，卡仍 closed
+AssertionError: promise rejected "PhaseTransitionError: illegal phase trans… { …(2) }" instead of resolving
+ ❯ test/close-stops-active-steps.test.ts:517:51
+    515|     const w = makeWorld({ phase: 'review', stepStatus: 'claimed', step…
+    516|     await move(w, 'closed');
+    517|     await expect(report(w, { status: 'success' })).resolves.toBeUndefi…
+       |                                                   ^
+    518|     expect(stepStatus(w)).toBe('done');
+    519|     expect(todoPhase(w)).toBe('closed');
+
+Caused by: PhaseTransitionError: illegal phase transition: closed -> done
+ ❯ assertPhaseTransition src/services/phase.ts:80:44
+ ❯ setTodoPhase src/services/todos.ts:541:3
+ ❯ completeStep src/services/builds.ts:1806:3
+ ❯ finishStep src/services/machines.ts:1986:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { from: 'closed', to: 'done' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > closed 卡的 review 步带 blocking 成功回报：回报不抛，不入队重规划
+AssertionError: promise rejected "PhaseTransitionError: illegal phase trans… { …(2) }" instead of resolving
+ ❯ test/close-stops-active-steps.test.ts:529:61
+    527|       findings: [{ id: '1', severity: 'blocking' as const, summary: 'x…
+    528|     };
+    529|     await expect(report(w, { status: 'success', findings })).resolves.…
+       |                                                             ^
+    530|     expect(todoPhase(w)).toBe('closed');
+    531|     const steps = w.s.db.select().from(stepTable).where(eq(stepTable.b…
+
+Caused by: PhaseTransitionError: illegal phase transition: closed -> planning
+ ❯ assertPhaseTransition src/services/phase.ts:80:44
+ ❯ setTodoPhase src/services/todos.ts:541:3
+ ❯ enqueueReviewRevision src/services/builds.ts:1362:3
+ ❯ completeStep src/services/builds.ts:1766:9
+ ❯ finishStep src/services/machines.ts:1986:5
+ ❯ report test/close-stops-active-steps.test.ts:508:5
+ ❯ test/close-stops-active-steps.test.ts:529:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { from: 'closed', to: 'planning' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > done 卡的 build 步零改动成功回报：步 done，不被产物闸记成失败
+AssertionError: expected 'failed' to be 'done' // Object.is equality
+
+Expected: "done"
+Received: "failed"
+
+ ❯ test/close-stops-active-steps.test.ts:539:27
+    537|     await move(w, 'done');
+    538|     await expect(report(w, { status: 'success', hasChanges: false })).…
+    539|     expect(stepStatus(w)).toBe('done');
+       |                           ^
+    540|     expect(buildError(w)).toBeNull();
+    541|     expect(todoPhase(w)).toBe('done');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > 关卡后重开并重跑（新 build）：旧 build 的步迟到成功不推进卡
+AssertionError: expected 'confirm' to be 'planning' // Object.is equality
+
+Expected: "planning"
+Received: "confirm"
+
+ ❯ test/close-stops-active-steps.test.ts:570:26
+    568|     await expect(report(w, { status: 'success' })).resolves.toBeUndefi…
+    569|     expect(stepStatus(w)).toBe('done');
+    570|     expect(todoPhase(w)).toBe('planning');
+       |                          ^
+    571|   });
+    572|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > stop-and-done 预定 done 在途时 build 步先跑完：卡落 done，不进 review
+AssertionError: expected 'review' to be 'done' // Object.is equality
+
+Expected: "done"
+Received: "review"
+
+ ❯ test/close-stops-active-steps.test.ts:580:26
+    578|     await expect(report(w, { status: 'success', hasChanges: true })).r…
+    579|     expect(stepStatus(w)).toBe('done');
+    580|     expect(todoPhase(w)).toBe('done');
+       |                          ^
+    581|   });
+    582| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 23 passed (28)
+   Start at  07:40:59
+   Duration  4.23s (transform 48%, tests 34%, import 18%)
+

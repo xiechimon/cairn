@@ -1,0 +1,29 @@
+[
+  {
+    "sentAtMs": 1758,
+    "body": {
+      "maxConcurrent": 4
+    },
+    "status": 200,
+    "serverMaxConcurrent": 4,
+    "doneAtMs": 2572
+  },
+  {
+    "sentAtMs": 2578,
+    "body": {
+      "maxConcurrent": 5
+    },
+    "status": 200,
+    "serverMaxConcurrent": 5,
+    "doneAtMs": 3385
+  },
+  {
+    "sentAtMs": 3393,
+    "body": {
+      "maxConcurrent": 6
+    },
+    "status": 200,
+    "serverMaxConcurrent": 6,
+    "doneAtMs": 4199
+  }
+]

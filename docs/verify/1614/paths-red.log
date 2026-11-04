@@ -1,0 +1,36 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/merge-gate-paths.test.ts (91 tests | 1 failed | 90 skipped) 11ms
+   ❯ protected categories: any depth, case-insensitive, one true and one false each (49)
+     × ⑦ harness eval dispatch tooling is protected and never auto-merge (#1614) 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/merge-gate-paths.test.ts > protected categories: any depth, case-insensitive, one true and one false each > ⑦ harness eval dispatch tooling is protected and never auto-merge (#1614)
+AssertionError: apps/server/src/services/harness-eval-coordinator.ts: expected [] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+- [
+-   "apps/server/src/services/harness-eval-coordinator.ts",
+- ]
++ []
+
+ ❯ test/merge-gate-paths.test.ts:281:30
+    279|     for (const p of HARNESS_EVAL_DISPATCH_PATHS) {
+    280|       const r = classify([f(p)]);
+    281|       expect(r.protected, p).toEqual([p]);
+       |                              ^
+    282|       expect(r.outsideAutoMerge, p).toEqual([]);
+    283|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 90 skipped (91)
+   Start at  01:33:12
+   Duration  564ms (transform 73%, import 24%, tests 2%, worker 1%)
+

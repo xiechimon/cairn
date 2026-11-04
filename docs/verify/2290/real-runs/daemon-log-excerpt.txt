@@ -1,0 +1,57 @@
+2026-10-31 04:31:42 Online (machineId=NNiOJdHNiJKukAxubVkZ9); polling http://127.0.0.1:8791
+2026-10-31 04:33:38 Online (machineId=NNiOJdHNiJKukAxubVkZ9); polling http://127.0.0.1:8791
+2026-10-31 04:34:01 claim step=GUPB15obYyWq553iL6XZd
+2026-10-31 04:34:01 [machine] ACP adapter claude-code-acp selected for agent PCqsD7n_FMtLfSLzkmD9y
+2026-10-31 04:34:01 using model anthropic/claude-sonnet-5
+2026-10-31 04:34:14 new session 01a18e84-f851-7439-a4b3-a330e05d3631
+2026-10-31 04:34:46 pushed cairn/conv-01a18e84-f851-7439-a4b3-a330e05d3631
+2026-10-31 04:34:46 finished (0 running)
+2026-10-31 04:44:32 claim step=ecTqbS-IvkyAHPoISAAu6
+2026-10-31 04:44:32 [machine] ACP adapter claude-code-acp selected for agent PCqsD7n_FMtLfSLzkmD9y
+2026-10-31 04:44:32 using model anthropic/claude-sonnet-5
+2026-10-31 04:44:34 continue session 01a18e84-f851-7439-a4b3-a330e05d3631
+2026-10-31 04:44:45 pushed cairn/conv-01a18e84-f851-7439-a4b3-a330e05d3631
+2026-10-31 04:44:45 finished (0 running)
+2026-10-31 04:44:56 claim step=vzcmT8u1l65pOHa1lc3Jb
+2026-10-31 04:44:56 [machine] ACP adapter claude-code-acp selected for agent PCqsD7n_FMtLfSLzkmD9y
+2026-10-31 04:44:56 using model anthropic/claude-sonnet-5
+2026-10-31 04:44:58 new session 01a18e8e-f7a0-72ad-b9b1-d360d54b336a
+2026-10-31 04:45:21 [step] steer delivery failed: ACP steer is unsupported during a step
+2026-10-31 04:45:39 [step] stop delivered step=vzcmT8u1l65pOHa1lc3Jb
+2026-10-31 04:45:39 [step] step stopped by user (discard=false)
+2026-10-31 04:45:39 finished (0 running)
+2026-10-31 04:46:04 claim step=KFy6J4UoQxJi-OTkVtgak
+2026-10-31 04:46:04 [machine] ACP adapter codex-acp selected for agent Bjgh-DXr9Mzspr7OiMCcK
+2026-10-31 04:46:04 using model openai-codex/gpt-6.1-sol
+2026-10-31 04:46:08 new session 01a18e90-0018-76be-a1b4-d48c8125911c
+2026-10-31 04:46:10 [step] error: Internal error (retryable=false)
+2026-10-31 04:46:10 [step] step failed: Internal error
+2026-10-31 04:46:10 finished (0 running)
+2026-10-31 04:46:17 claim step=cNfu0mOvDHvkvYr3RWIOu
+2026-10-31 04:46:17 [machine] ACP adapter codex-acp selected for agent Bjgh-DXr9Mzspr7OiMCcK
+2026-10-31 04:46:17 using model openai-codex/gpt-6.1-sol
+2026-10-31 04:46:21 new session 01a18e90-33f1-7ef1-8fa8-627b51edd478
+2026-10-31 04:46:25 [step] error: Internal error (retryable=false)
+2026-10-31 04:46:25 [step] step failed: Internal error
+2026-10-31 04:46:25 finished (0 running)
+2026-10-31 04:47:46 Online (machineId=NNiOJdHNiJKukAxubVkZ9); polling http://127.0.0.1:8791
+2026-10-31 04:48:10 claim step=Ox2KeayhwEQZBnY4XHpKT
+2026-10-31 04:48:10 [machine] ACP adapter codex-acp selected for agent Bjgh-DXr9Mzspr7OiMCcK
+2026-10-31 04:48:10 using model openai-codex/gpt-6.1-sol
+2026-10-31 04:48:11 new session 01a18e91-eb9a-71ab-ad86-8a537cb7e821
+2026-10-31 04:48:29 pushed cairn/conv-01a18e91-eb9a-71ab-ad86-8a537cb7e821
+2026-10-31 04:48:30 finished (0 running)
+2026-10-31 04:48:50 claim step=bjT3ajo3vWx1gMcgHjFpm
+2026-10-31 04:48:50 [machine] ACP adapter codex-acp selected for agent Bjgh-DXr9Mzspr7OiMCcK
+2026-10-31 04:48:50 using model openai-codex/gpt-6.1-sol
+2026-10-31 04:48:53 continue session 01a18e91-eb9a-71ab-ad86-8a537cb7e821
+2026-10-31 04:48:57 pushed cairn/conv-01a18e91-eb9a-71ab-ad86-8a537cb7e821
+2026-10-31 04:48:57 finished (0 running)
+2026-10-31 04:49:05 claim step=AhHwyNxC-5z9DMx1U3FQ6
+2026-10-31 04:49:05 [machine] ACP adapter codex-acp selected for agent Bjgh-DXr9Mzspr7OiMCcK
+2026-10-31 04:49:05 using model openai-codex/gpt-6.1-sol
+2026-10-31 04:49:07 new session 01a18e92-c516-7f74-8331-88a168265f35
+2026-10-31 04:49:18 [step] steer delivery failed: ACP steer is unsupported during a step
+2026-10-31 04:49:26 [step] stop delivered step=AhHwyNxC-5z9DMx1U3FQ6
+2026-10-31 04:49:26 [step] step stopped by user (discard=false)
+2026-10-31 04:49:26 finished (0 running)

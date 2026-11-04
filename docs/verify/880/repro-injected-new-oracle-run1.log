@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0182-880-flake-m5-web-e2e/integration
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  15:30:32
+   Duration  7.27s (tests 76%, import 17%, transform 6%)
+

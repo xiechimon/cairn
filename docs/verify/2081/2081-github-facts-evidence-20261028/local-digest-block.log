@@ -1,0 +1,4 @@
+$ python3 docs/verify/2081/review-preflight.py /tmp/cairn-1623-local-representation-review.json --head 60aaf07a741186378cf027d635462157ee9ad755 --digest pd2:9666f694a30ef17f2e6051df8ab0c95b4a97a62b29ea91384faeb0ec52ef3763 --writer-family GPT --bundle /tmp/cairn-1623-final-review-bundle.txt --source-root <checkout> --github-pr /tmp/cairn-2084-rest-current.json --github-files /tmp/cairn-2084-files.json
+BLOCK: Supplied digest differs from captured GitHub patch
+BLOCK: Review digest differs from the current patch
+exit=1

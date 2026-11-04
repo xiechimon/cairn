@@ -1,0 +1,29 @@
+✔ CLI uses origin/main, preserves full records, and recognizes only candidate syntax (200.865808ms)
+✔ CLI does not truncate more than 200 qualifying commits (2097.53969ms)
+✔ CLI rejects missing refs and invalid or ambiguous UTC intervals (142.278497ms)
+✔ local and CI plans execute behavior assertions and propagate deliberate failures (186.586146ms)
+[prepush] git init -q
+✔ documentation skips code checks, unknown paths fail closed (1.351481ms)
+✔ changes to prepush scripts run the CI self-test files locally (0.230798ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.196631ms)
+✔ local code checks include both UI gates and affected e2e (0.143465ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.271564ms)
+✔ a web change runs the whole web unit suite, which catches tests that read sources instead of importing them (0.574485ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (0.596476ms)
+✔ affected e2e gets only code paths, so a bulk evidence prune fits on the command line (2.66904ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (72.735233ms)
+✔ a board card source change selects the spec that reads its title (29.912182ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.529239ms)
+✔ CLI skips real document changes and rejects a missing base (393.135646ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (144.129243ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (93.185118ms)
+✔ prepush vitest only forgives files listed as known local red (0.839649ms)
+✔ plan children do not inherit the git hook repository binding (8.461324ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2670.12282

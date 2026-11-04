@@ -1,0 +1,42 @@
+[heavy-slots] queued, position 1 (all 1 slots are busy)
+[heavy-slots] acquired slot 1/1
+[WebServer] (node:89359) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:89361) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/xmon/.codex/worktrees/pr-1828-work-trace/cairn/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:89379) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:89387) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 15 tests using 3 workers
+
+(node:89398) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:89400) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:89399) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/chat-tools-identity.spec.ts:12:1 › I1: the summary names the work performed and its duration (615ms)
+  ✓   3 e2e/thinking-row-truncate.spec.ts:152:1 › T1: thinking shares a work block with a compact row and no avatar overlap (675ms)
+  ✓   2 e2e/detail-work-trace.spec.ts:173:1 › work groups consecutive thinking and calls, with only the last block expanded (998ms)
+  ✓   5 e2e/thinking-row-truncate.spec.ts:162:1 › T2: the work block stays inside the transcript width (561ms)
+  ✓   4 e2e/chat-tools-identity.spec.ts:19:1 › I2: copy is available only while the work block is expanded (688ms)
+  ✓   6 e2e/detail-work-trace.spec.ts:200:1 › call details preserve commands, cap output and show edit lines (954ms)
+  ✓   8 e2e/chat-tools-identity.spec.ts:30:1 › I3: copying work includes commands and outputs (708ms)
+  ✓   7 e2e/thinking-row-truncate.spec.ts:171:1 › T3: the long preview stays on one line and hides while full thinking is open (854ms)
+  ✓   9 e2e/detail-work-trace.spec.ts:226:1 › a call cut off by a stopped run shows as unfinished, not done (634ms)
+  ✓  10 e2e/chat-tools-identity.spec.ts:40:1 › I4: call rows keep the agent column inset and compact height (627ms)
+  ✓  11 e2e/thinking-row-truncate.spec.ts:184:1 › T4: full thinking preserves whitespace without horizontal page overflow (780ms)
+  ✓  13 e2e/chat-tools-identity.spec.ts:51:1 › I5: work summaries keep the transcript boundary free of horizontal rules (596ms)
+  ✓  12 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (reduce) (734ms)
+  ✓  14 e2e/detail-work-trace.spec.ts:235:3 › history does not animate on first render (no-preference) (515ms)
+  ✓  15 e2e/detail-work-trace.spec.ts:247:1 › a long summary stays on one line in a narrow column and keeps the full text in its title (477ms)
+
+  15 passed (6.8s)

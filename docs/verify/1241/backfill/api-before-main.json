@@ -1,0 +1,17 @@
+{
+  "patchStatus": 200,
+  "machines": [
+    {
+      "name": "bf-legacy-fingerprinted",
+      "maxConcurrent": 3
+    },
+    {
+      "name": "bf-legacy-blank",
+      "maxConcurrent": 3
+    },
+    {
+      "name": "bf-manual-5",
+      "maxConcurrent": 5
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "probe": "1186-after",
+  "passed": 6,
+  "total": 6,
+  "checks": [
+    {
+      "name": "closed agent persisted skillsAllowlist []",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "open step still done",
+      "ok": true,
+      "detail": "done"
+    },
+    {
+      "name": "closed step still done",
+      "ok": true,
+      "detail": "done"
+    },
+    {
+      "name": "open check is yellow injected-unread and not red",
+      "ok": true,
+      "detail": "{\"kind\":\"skill_injection_check\",\"level\":\"yellow\",\"reds\":[],\"yellows\":[{\"code\":\"injected-unread\",\"skill\":\"demo-skill\",\"detail\":\"skill was injected and no skill fact names it\"}],\"injected\":[\"demo-skill\"],\"omitted\":[],\"unrendered\":[]}"
+    },
+    {
+      "name": "closed check is red allowlist-closed with empty injected",
+      "ok": true,
+      "detail": "{\"kind\":\"skill_injection_check\",\"level\":\"red\",\"reds\":[{\"code\":\"allowlist-closed\",\"detail\":\"skillsAllowlist is []: the skill surface is closed\"}],\"yellows\":[],\"injected\":[],\"omitted\":[],\"unrendered\":[]}"
+    },
+    {
+      "name": "step.skillInjection stays the requested hit set",
+      "ok": true,
+      "detail": "{\"hits\":[{\"id\":\"demo-skill\",\"rule\":\"explicit-mention\",\"reason\":\"任务文本显式点名「demo-skill」\"}]}"
+    }
+  ]
+}

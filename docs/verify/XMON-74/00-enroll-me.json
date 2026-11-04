@@ -1,0 +1,18 @@
+{
+  "enroll": {
+    "machineId": "Z4PjVT7ZDZjXPBkR5e8AJ",
+    "token": "d437623d27e485294447a6e5a39b7d5687a5a0867c6d883cf034f31fc9c6827e",
+    "teamId": "OOuRqKAkaNw6kd6zpJVvf",
+    "serverUrl": "http://127.0.0.1:8791"
+  },
+  "me": {
+    "id": "Z4PjVT7ZDZjXPBkR5e8AJ",
+    "name": "xmon74-verify-machine",
+    "teamId": "OOuRqKAkaNw6kd6zpJVvf",
+    "online": false,
+    "latestCliVersion": "0.1.0",
+    "kind": "remote",
+    "enabledRuntimes": [],
+    "shellEnabled": false
+  }
+}

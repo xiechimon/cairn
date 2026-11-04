@@ -1,0 +1,32 @@
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0214-917-pacman-spec-first/integration
+
+
+[diag] stub requests consumed: 4
+[diag] daemon.log tail:
+Loading pi runtime…
+Enrolled in team RAqWXOlzupE_KxqqpD0qh (machine t8VPgR1bOagl7FoW3vwKm)
+Online (machineId=t8VPgR1bOagl7FoW3vwKm); polling http://127.0.0.1:56990
+[recover] no pending steps found
+[wake] push channel connected
+claim step=ve7L0VUzb-ufN1ajd_Ch-
+step ve7L0VUzb-ufN1ajd_Ch- for conv 01a1157e-464a-7c8f-aad0-539806a751ff (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-it-skills-OV4Cst
+[skills] catalog: entries=1 chars=618
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a1157e-464a-7c8f-aad0-539806a751ff
+[skills] denied-read: /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-it-skills-OV4Cst/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  16:32:38
+   Duration  1.61s (import 47%, tests 28%, transform 26%)
+

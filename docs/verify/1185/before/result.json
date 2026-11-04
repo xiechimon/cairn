@@ -1,0 +1,66 @@
+{
+  "probe": "1185-import-rollback",
+  "expect": "old",
+  "checks": [
+    {
+      "ok": true,
+      "label": "import returns 500 when source registration cannot land",
+      "detail": "500"
+    },
+    {
+      "ok": true,
+      "label": "skill directory remains after the failed registration",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "create audit row remains",
+      "detail": "creates=1"
+    },
+    {
+      "ok": true,
+      "label": "skill is still listed",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "same process refresh still sees the unpersisted source",
+      "detail": "200 "
+    },
+    {
+      "ok": true,
+      "label": "same-name import is rejected",
+      "detail": "409 skill directory orphan-1185 already exists"
+    }
+  ],
+  "stack": {
+    "API": "http://127.0.0.1:8791",
+    "HOME": "/workspace/.claude/verify-run/home"
+  },
+  "snapshot": {
+    "expect": "old",
+    "api": "http://127.0.0.1:8791",
+    "home": "/workspace/.claude/verify-run/home",
+    "importStatus": 500,
+    "importBody": {
+      "error": "Internal server error"
+    },
+    "dirAfterFail": true,
+    "createsAfterFail": 1,
+    "listedAfterFail": [
+      "orphan-1185"
+    ],
+    "refreshStatus": 200,
+    "refreshBody": {
+      "id": "orphan-1185",
+      "teamId": "13vPIKm2rFGjaD4rJfx84",
+      "name": "orphan-1185",
+      "description": "import rollback repro"
+    },
+    "reimportStatus": 409,
+    "reimportBody": {
+      "error": "skill directory orphan-1185 already exists"
+    },
+    "sourcesHasSkill": true
+  }
+}

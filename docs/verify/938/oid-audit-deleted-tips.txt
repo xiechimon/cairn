@@ -1,0 +1,24 @@
+# OID audit: every branch tip deleted during the acceptance runs, compared against
+# the merged PR's head sha. Method: GitHub REST (repos/xiechimon/pacman/pulls/<n>
+# -> .head.sha) fetched over a direct-connection host, plus live
+# git/refs/heads/<branch> tips. Full 40-hex equality = the deletions removed only
+# landed work; no post-merge commit was destroyed.
+
+PR 936 hp/pacman/t-0194-932-320px-933 state=closed merged=True head.sha=3523d21858d68530559b4319840901e97293edd0
+  deleted tip: 3523d218 -> MATCH
+  (tip recorded at fixture creation — `git worktree add --track -b ... origin/hp/pacman/t-0194-932-320px-933`
+   checked out 3523d218, acceptance-session console capture; the deletion itself is
+   t3-clean-yes-t0194.txt, whose appended verify block shows all three faces gone)
+PR 764 ci/e2e-merge-gate-762 state=closed merged=True head.sha=e6c5a846873c81b15a9ff8b1e275c161b5e07d5e
+  deleted tip (worktree list before cleanup): e6c5a846 -> MATCH
+PR 117 impl/104-ts-upgrade state=closed merged=True head.sha=1ae41741c00e9151e808b09dfaa5fd2d3c0c78c3
+  deleted tip (t7-remote-delete-network-fail-impl104.txt "was 1ae41741"): 1ae41741 -> MATCH
+PR 119 impl/106-tailwind-4 state=closed merged=True head.sha=651df883ab922d896ca4b0475fd23b7acdce09e5
+  live remote tip at audit time: refs/heads/impl/106-tailwind-4 651df883ab922d896ca4b0475fd23b7acdce09e5 -> MATCH
+  (deleted afterwards by t9-oid-guard-impl106.txt only after the fixture commit was discarded
+   and the tip was restored to exactly this sha)
+
+PR 118 impl/105-react-router-8 state=closed merged=True head.sha=4738b82ad9caa0d43a2968d193f0232178bed767
+  deleted tip (v3-positive-fourface-impl105.txt "tip at creation: 4738b82a..."): 4738b82a -> MATCH
+
+Verdict: 5/5 tips == merged heads. Zero post-merge work destroyed by the acceptance runs.

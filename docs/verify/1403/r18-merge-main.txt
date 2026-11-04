@@ -1,0 +1,72 @@
+#1403 segment 1, round 18: merge of main (#1468, #1474, #1475, #1421, #1469, #1476) into claude/bootstrap-p2
+
+Merges (no rebase):
+  30c873c  origin/main 182f0ff (#1468, #1474). Conflict in apps/server/src/services/ci-loop.ts (imports, grind
+           target): the branch keeps githubTarget / tokenFor; githubTarget now goes through #1468's
+           githubRepoOfProject, so the reconcile and the grind refuse a githubRepo with a '.' or '..' segment.
+  d060723  origin/main 61e6cb2 (#1475). No conflict.
+  3aaf0ef  tests: pr-reconcile ㊳b (dot-segment repo, no request); github-repo-dot-segments R7b fixture sets
+           todo.latestBuildId (since #1403 the grind only takes the todo's current build), and its log
+           assertion checks every grind counter plus reviewCandidates 0.
+  cefad17  origin/main dcf839e (#1421, #1469, #1476). No conflict.
+The banned-vocabulary exit on 30c873c and cefad17 covers lines that main already carries, brought in verbatim
+(each flagged file identical to the merged main commit).
+
+Red leg: ㊳b on the old githubTarget (ci-loop.ts as merged, githubTarget body swapped back to the slash
+split), apps/server:
+$ pnpm exec vitest run test/pr-reconcile.test.ts -t '㊳'
+     × ㊳b githubRepo ../user with a dot segment (#1466) → no request 66ms
+     × ㊳b githubRepo octo/.. with a dot segment (#1466) → no request 56ms
+     × ㊳b githubRepo ./demo with a dot segment (#1466) → no request 66ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㊳b githubRepo ../user with a dot segment (#1466) → no request
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㊳b githubRepo octo/.. with a dot segment (#1466) → no request
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㊳b githubRepo ./demo with a dot segment (#1466) → no request
+      Tests  3 failed | 1 passed | 117 skipped (121)
+
+At the 182f0ff merge, vitest --changed had 2 failures, both #1468's R7b (fixture without latestBuildId):
+ FAIL  test/github-repo-dot-segments.test.ts > ... > R7b CI 轮询器防御位：... (../user)
+ FAIL  test/github-repo-dot-segments.test.ts > ... > R7b CI 轮询器防御位：... (owner/..)
+ expected candidates 1, skipped 1; received candidates 0 (no current build)
+Fixed in 3aaf0ef: github-repo-dot-segments 21 of 21 pass.
+
+Gates at cefad17 (clean tree):
+HEAD cefad171a3e1cd5f4074ff3d9cb6df360e0eb9cf (clean tree)
+$ pnpm lint
+apps/web/src/resources/machines-page.tsx:317:15 lint/complexity/noUselessFragments  FIXABLE  ━━━━━━━━━━
+Checked 806 files in 2s. No fixes applied.
+Found 1 info.
+exit 0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit 0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit 0
+
+$ pnpm exec vitest run --changed origin/main
+[mcp] dead: connect failed — its tools are unavailable this turn: failed: fetch failed
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[diag] todo phase: failed
+2026-10-21 14:48:56 [step] step failed: git commit failed (1): apps/daemon/test/1262-ansi-probe.ts:1:7 lint/correctness/noUnusedVariables  FIXABLE  ━━━━━━━━━━━━━━━
+Checked 1 file in 64ms. No fixes applied.
+Found 1 error.
+Found 1 warning.
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[step] shell done step=mmyDwvaIOIB3bcPhmedM9 run=oFQfCH8jqGxL8cgwNktjl exit=0 chars=21 ms=18
+ Test Files  138 passed (138)
+      Tests  1420 passed | 1 skipped (1421)
+exit 0
+
+$ env E2E_AFFECTED_PORT=8402 pnpm --filter @pacman/web e2e:affected
+  8 passed (14.5s)
+exit 0
+
+DONE

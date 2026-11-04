@@ -1,0 +1,14 @@
+[
+  {
+    "id": "my-live-skill",
+    "teamId": "dQ0glZF72pNXwDwX9PMih",
+    "name": "my-live-skill",
+    "description": "live 栈导入的本地技能 v1"
+  },
+  {
+    "id": "pdf",
+    "teamId": "dQ0glZF72pNXwDwX9PMih",
+    "name": "pdf",
+    "description": "Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill."
+  }
+]

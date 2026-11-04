@@ -1,0 +1,38 @@
+
+ RUN  v5.0.1 <worktree>
+
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push.test.ts (40 tests | 7 failed) 1100ms
+   ❯ subscription authorization boundaries (4)
+     × delivers only to the requested owner and team 67ms
+   ❯ delivery: only decisions push immediately (4)
+     × parallel delivery reaches a live endpoint while another is stalled 32ms
+   ❯ digest routing: merged, failed, plan-ready, review queue; 410 prunes (7)
+     × PATCH todo phase to confirm queues for the digest and sends no immediate push 49ms
+     × queues build review for the digest without an immediate push 25ms
+     × queues merged PR reconciliation for the digest without an immediate push 36ms
+     × queues failed work for the digest without an immediate push 42ms
+     × prunes a 410 subscription while delivering to live subscriptions 37ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > subscription authorization boundaries > delivers only to the requested owner and team
+ FAIL  |@xiechimon/cairn| test/push.test.ts > delivery: only decisions push immediately > parallel delivery reaches a live endpoint while another is stalled
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest routing: merged, failed, plan-ready, review queue; 410 prunes > PATCH todo phase to confirm queues for the digest and sends no immediate push
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest routing: merged, failed, plan-ready, review queue; 410 prunes > queues build review for the digest without an immediate push
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest routing: merged, failed, plan-ready, review queue; 410 prunes > queues merged PR reconciliation for the digest without an immediate push
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest routing: merged, failed, plan-ready, review queue; 410 prunes > queues failed work for the digest without an immediate push
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest routing: merged, failed, plan-ready, review queue; 410 prunes > prunes a 410 subscription while delivering to live subscriptions
+Error: listen EPERM: operation not permitted 127.0.0.1
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  7 failed | 47 passed (54)
+   Start at  13:28:33
+   Duration  2.17s (tests 44%, transform 28%, import 27%)
+

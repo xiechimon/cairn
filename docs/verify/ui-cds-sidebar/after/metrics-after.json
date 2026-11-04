@@ -1,0 +1,12 @@
+{
+  "sidebarW": 288,
+  "sidebarBg": "oklab(0.951594 0.00330357 0.00797668)",
+  "surface1": "color-mix(in oklab, #f6f1ec, #f0ebe6 50%)",
+  "background": "#f6f1ec",
+  "card": "#f0ebe6",
+  "borderRightW": "0px",
+  "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0",
+  "navScrollFade": true,
+  "pillRadius": "8px",
+  "cdsRadiusLg": "8px"
+}

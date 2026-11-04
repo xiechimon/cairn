@@ -1,0 +1,35 @@
+[
+  {
+    "id": "VE-pvniM2tn-X1fhLoKqD",
+    "buildId": "01a12465-a5d7-7f49-814a-319aa7e0ca9f",
+    "kind": "build",
+    "machineId": "7qZviVT4XncqIeTav_mk6",
+    "createdAt": 1791612003800,
+    "status": "claimed",
+    "checkpointCommit": null,
+    "skillInjection": {
+      "hits": [
+        {
+          "id": "better-colors",
+          "rule": "domain",
+          "reason": "任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「颜色」）"
+        },
+        {
+          "id": "better-layout",
+          "rule": "domain",
+          "reason": "任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「布局」）"
+        },
+        {
+          "id": "better-typography",
+          "rule": "domain",
+          "reason": "任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「ui」）"
+        },
+        {
+          "id": "kami",
+          "rule": "domain",
+          "reason": "任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「排版」）"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,13 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686
+
+(node:261) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+web push delivery failed
+web push delivery failed
+
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+   Start at  12:59:45
+   Duration  4.49s (tests 61%, transform 25%, import 13%)
+

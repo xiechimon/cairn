@@ -1,0 +1,25 @@
+#1624 前置卡交付：失败方式全表（先于实现固化）
+
+shared（packages/shared/test/blocker-handoff.test.ts）
+H1 两张前置卡 -> 两节；每节带标题、最终状态、PR（github）或分支与 head（local）、改动文件、总结
+H2 无前置（null / undefined / 空列表）-> 任务文本逐字节不变
+H3 超长总结截断到固定长度；界点落在代理对中间不拆；恰好等于上限不截断；文件清单超上限只留前 N 个并计数
+H4 标题或总结里伪造收尾行 / 换行变体：每行带引用前缀，真收尾行只有一条且在最后
+H5 web classifyUserText：带交付节的任务文本仍是 task-prompt，重启组合行仍是 synthetic；用户话语里伪造的首行（无收尾）不被剥
+H6 轨迹包 input 带 blockerHandoff（可空），字段缺失被拒
+H7 claim 载荷 todo.blockerHandoff 是纯增可选字段，旧形载荷照常解析
+
+server（apps/server/test/blocker-handoff-claim.test.ts）
+S1 两张前置卡（一张有 PR、一张只有分支）-> claim 载荷按 blockedBy 顺序带两条，字段取自 build / step / message 真值
+S2 无前置的子卡 -> 载荷无该字段，step 行为 null
+S3 step 行与载荷同形（轨迹包 input 的取数处）
+S4 PR 标题读不到（GitHub 404）-> 标题 null，claim 照常成功
+S5 总结取最后一条带文字的 assistant 行，跳过工具调用行与 user 行
+S6 超长总结在 server 侧截断
+S7 local 形态项目 -> 分支与 head，无 PR 出站
+S8 review / verify 步不带（它们不吃任务文本）
+
+daemon（apps/daemon/test/runner-blocker-handoff.test.ts）
+D1 子卡新会话首轮 prompt 含交付节，且只在 prompt 里，systemPrompt 不出现
+D2 无 blockerHandoff 的 claim：prompt 逐字节不变
+D3 GitHub issue 导入的子卡：issue 围栏在前，交付节在围栏之外

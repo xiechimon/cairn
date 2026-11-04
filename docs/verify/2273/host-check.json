@@ -1,0 +1,17 @@
+{
+    "daemonRelease": null,
+    "ufw": "ok",
+    "networkReady": true,
+    "networkWaitMs": 279,
+    "ipv4": "10.203.0.213",
+    "image": "cairn-orb-base",
+    "cloneStartStop": "ok",
+    "egress": "ok",
+    "privateEgress": "denied",
+    "firewall": "ok",
+    "memoryMax": 4294967296,
+    "homeVisible": false,
+    "negativeControl": "denied",
+    "ok": true,
+    "errors": []
+}

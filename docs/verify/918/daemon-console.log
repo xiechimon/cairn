@@ -1,0 +1,37 @@
+Loading pi runtime…
+Enrolled in team esmLFrO5dpbEBcM5OlF21 (machine AklJ0etvP8T65dlAqWLvN)
+Online (machineId=AklJ0etvP8T65dlAqWLvN); polling http://127.0.0.1:8791
+Idle-sleep prevention active (caffeinate)
+[recover] no pending steps found
+[wake] push channel connected
+claim step=vHJGOptjB0NGbNEVx497m
+step vHJGOptjB0NGbNEVx497m for conv 01a115ed-8b42-74b3-9440-eca0d415f165 (1 running)
+using model stub-918-muxyzz0k/stub-model
+[workspace] 准备工作区...
+[skills] team: 1 skill(s), 1 file(s) materialized → /tmp/pacman-918-daemon-home/team-skills/views/59e17e09573fde21de7869944c18d4f240a19374847e62636b3ddcd93178744b (fetched 1 file(s) / 158 byte(s), reused 0)
+[skills] collision: name "demo-skill" collision (winner=/tmp/pacman-918-daemon-home/team-skills/views/59e17e09573fde21de7869944c18d4f240a19374847e62636b3ddcd93178744b/demo-skill/SKILL.md loser=/tmp/pacman-918-skills/demo-skill/SKILL.md)
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /tmp/pacman-918-daemon-home/team-skills/views/59e17e09573fde21de7869944c18d4f240a19374847e62636b3ddcd93178744b + /tmp/pacman-918-skills
+[skills] catalog: entries=1 chars=630
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a115ed-8b42-74b3-9440-eca0d415f165
+[skills] denied-read: /tmp/pacman-918-skills/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] brief removed (AGENTS.md)
+finished (0 running)
+claim step=RXSEi635m5r_VsF3klRe7
+step RXSEi635m5r_VsF3klRe7 for conv 01a115ee-2244-79be-997b-8c6c8bd1226b (1 running)
+using model stub-918-ctl-muxyzz0k/stub-model
+[workspace] 准备工作区...
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] filtered: demo-skill not in agent allowlist
+[skills] filtered: extra-skill not in agent allowlist
+[skills] catalog: entries=0 chars=0
+[step] brief written: AGENTS.md (create)
+[skills] deny: 2 skill dir(s) hard-blocked
+new session 01a115ee-2244-79be-997b-8c6c8bd1226b
+[step] brief removed (AGENTS.md)
+finished (0 running)
+
+[probe] daemon exited code=null
+[machine] Shutting down… (SIGTERM)

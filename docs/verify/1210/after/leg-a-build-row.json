@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "id": "cQe0n20Gy6Gw8uuuHv8fE",
+      "kind": "build",
+      "status": "failed"
+    }
+  ],
+  "stepStatus": "failed",
+  "errorMessage": "local 形态项目无法在机器「verify-1210」上执行步骤：仓库路径 /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo 在本机不可达（路径不存在）。local 形态的仓库真值在登记机的文件系统上（ADR 0016），其它执行机看不到该路径——本项目只能在仓库所在机器上运行。补法（任选其一）：① 把任务的钉选机器改回仓库所在机器（或取消钉选，由该机器认领）；② 跨机开发请用 GitHub 形态建项目（githubRepo 为真值，同机可加挂 localPath 加速位，ADR 0017）。",
+  "elapsedMs": 1013
+}

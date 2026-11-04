@@ -1,0 +1,166 @@
+# vp-selftest.mjs after the second /code-review on #1411 (round 7).
+# Red: this round's vp-selftest.mjs against vp.mjs and vp-registry.json of e64d680 (copied in with git show,
+# run, copied back). The 7 cases this round adds fail; the other 34 pass.
+# Green: the same self-test on the code committed as f5e2f5d, Node 22 and Node 24.
+# Last block: the self-test run from a shell that already sets VERIFY_REPO_ROOT to another checkout and signs
+# commits by default. This round's self-test clears the variable and commits its own repo without signing or
+# hooks; the e64d680 self-test failed both links cases and left its repo behind.
+
+== red ==
+vp.mjs and vp-registry.json of e64d680; vp-selftest.mjs of this round
+v22.22.0
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+FAIL  arguments after -- replace only the default options they name
+FAIL  a probe gets the run directory doctor checked
+      dependent: attachments/clipboard-paste (setup-review-seed.mjs), branch-sync/sync-ui (setup-branch-sync-seed.mjs), mentions/mention-picker (setup-review-seed.mjs), review-700/verdict-extraction (setup-review-700-seed.mjs), review-reject/blocking-revision (setup-review-seed.mjs), review-reject/human-reject (setup-review-seed.mjs)
+FAIL  no current case depends on a seed script that creates an agent without machineId
+FAIL  cleanup reports the evidence root drive writes to
+FAIL  a case that needs arguments is not satisfied by options alone
+FAIL  an output path given after -- is made absolute against the caller's directory
+FAIL  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+34/41 passed
+exit=1
+
+== green, Node 22 ==
+v22.22.0
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+41/41 passed
+exit=0
+
+== green, Node 24 ==
+v24.22.0
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+41/41 passed
+exit=0
+
+== caller environment ==
+$ VERIFY_REPO_ROOT=<another checkout> GIT_CONFIG_GLOBAL=<config with commit.gpgsign=true> node vp-selftest.mjs
+41/41 passed
+
+== the same environment, vp-selftest.mjs of e64d680 ==
+error: gpg failed to sign the data:
+gpg: directory '/root/.gnupg' created
+gpg: keybox '/root/.gnupg/pubring.kbx' created
+gpg: skipped "nonexistent": No secret key
+[GNUPG:] INV_SGNR 9 nonexistent
+[GNUPG:] FAILURE sign 17
+gpg: signing failed: No secret key
+
+fatal: failed to write commit object
+FAIL  links encodes non-ASCII file names instead of quoting them
+FAIL  links prints sha-pinned raw links and refuses a ticket with no evidence
+32/34 passed
+leftover temp repos: 1

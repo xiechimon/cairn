@@ -1,0 +1,12 @@
+# Insert an early stub return into every S4a transport function (red leg). Usage: stubify.py <github.ts>
+import re, sys
+path = sys.argv[1]
+src = open(path, encoding='utf-8').read()
+names = ['githubPullRaw', 'githubBranchRaw', 'githubBranchRulesRaw', 'githubCompareRaw',
+         'githubCheckRunsRaw', 'githubCombinedStatusRaw', 'githubContentsRaw', 'githubCreateCommitStatus']
+for n in names:
+    i = src.index(f'export async function {n}(')
+    j = src.index('): Promise<GithubRawResult> {', i) + len('): Promise<GithubRawResult> {')
+    src = src[:j] + "\n  return { kind: 'failed', failure: { kind: 'network' } };" + src[j:]
+open(path, 'w', encoding='utf-8').write(src)
+print('stubbed', len(names))

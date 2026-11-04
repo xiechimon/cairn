@@ -1,0 +1,13 @@
+$ E2E_AFFECTED_PORT=8399 pnpm --filter @pacman/web e2e:affected   # merged tree 66c7985c (main + #1396)
+2:[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+27:[e2e:affected] 161/161 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8399
+...
+
+  1109 passed (3.2m)
+
+$ pnpm --filter @pacman/web probe:dump   # merged tree
+probe-dump: enumerated — getComputedStyle 265, boundingBox 163, toHaveCSS 117, probe-evaluate 245, assertion sites 1443
+probe-dump: collected — style sites 247 (914 records), box sites 160 (342 records), css 192, assertions 2985
+probe-dump: visual rows 1595 (all rows 1891) — KEPT 1587, DRIFT 0, NOT-RUN 8, VIOLATION 0, other 0
+
+# earlier run on the branch base 498517de: 1103 passed; probe KEPT 1571 / DRIFT 0 / NOT-RUN 8 / VIOLATION 5 (the five were the dark --canvas color-mix in non-shadow specs; #1396 made --canvas a literal, so they are gone on the merged tree)

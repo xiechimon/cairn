@@ -1,0 +1,8 @@
+exit=1
+BLOCK: Review must finish before merge
+BLOCK: Review must use the canonical pd2 digest
+BLOCK: Review head differs from the current PR head
+BLOCK: Review digest differs from the current patch
+BLOCK: Reviewer must use an approved different model family
+BLOCK: Review must complete normally with nonzero usage
+BLOCK: Review requires a successful process and at least 1000000 context tokens

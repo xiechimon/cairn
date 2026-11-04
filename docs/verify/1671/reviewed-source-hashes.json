@@ -1,0 +1,27 @@
+{
+  "base": "90a7e74c654c323eb9fef58e0b4fc40ba31152c3",
+  "originalSource": "750715d47820bf690fca7b14c422aa655e51abdc",
+  "node": "24.14.0",
+  "tests": 409,
+  "files": {
+    "apps/daemon/src/backend/acp.ts": "12b18284272126f3216c4477dfe289c2030992a6bd80bff6a27623e5c947f413",
+    "apps/daemon/src/backend/claude-code.ts": "ed5d80e49050c33752e5b0df2883c30bc9200dce47fb6682448635c3af513215",
+    "apps/daemon/src/backend/image-support.ts": "80c9b2fc966df1d97efe2369049db9402e702609646419eeabd1e22765b230d8",
+    "apps/daemon/src/backend/pi.ts": "2a09fc03a55b0414bb43616935761ceb34704a53403689b7535c12b1e4567672",
+    "apps/daemon/src/machine-loop.ts": "0cdf48e6a11dcb0b392a9df1dc9a75ef4e9853cd16a4c8eeb3292604865b89dc",
+    "apps/daemon/src/runner.ts": "3c5a5b661ce4a6c7be27f59b804ba955e7aac2fa5da6f309079f03e76a528ad3",
+    "apps/daemon/src/step-attachments.ts": "8a4edc08cf968a2e2486775d3a867cb94cf71307f2db4116c3b1d21938f0baa4",
+    "apps/daemon/test/acp-stdio.test.ts": "c47e26d89a0b3b5d53c7ae41785db8da366699113e66e144e08203cee4cbbe2a",
+    "apps/daemon/test/image-support.test.ts": "5dd6285134313f03b10f52b6d76236ef2ff50efc6548523c4cea137dabaca240",
+    "apps/daemon/test/machine-steer.test.ts": "1d55ecd74825344eff7524cabc559b2d62a5a867e9f93a981c327fc77082394e",
+    "apps/daemon/test/pi-config-effect.test.ts": "7b232c6c2ba76e86804febc5b89cd2da647a7bbe290bdfe55e653f455c4e1840",
+    "apps/daemon/test/runner-image-degrade.test.ts": "690ea269e86184c41d68be6f1ecaf246e651a2f4cb3fc1a8ac4aa721e44b2e5c",
+    "apps/daemon/test/step-attachments.test.ts": "d37ba004c095651ba003842f79a0f022bbe9cdad5a2f9c8dea1a0daa9ff0c779",
+    "packages/shared/src/agent-backend.ts": "7d24c6c8da3a114069e4521623e60bb9feee6e4a8b6f9c438e5c306c6876adfa",
+    "packages/shared/src/records/provider.ts": "e9a21aadb95f009fe0ce7d9602f0a013276a0ee6ba32489003efdb4cc10470da",
+    "packages/shared/src/task-failure.ts": "ac4b804bc84c3138ee87a9d4f585246437b08a2c85b5fe853694821979d12648",
+    "packages/shared/test/__snapshots__/snapshot.test.ts.snap": "4c98b224daa81fc7db9abefcdf04bfeb765d98b0e8b6640317117e4cae11255a",
+    "packages/shared/test/records.test.ts": "a7b011f5e86055b0b8a71a5d25125d0a17d20837539544c4fb9d58a48a622e82",
+    "packages/shared/test/task-failure.test.ts": "e6f293369d299cca4f3bcdafe90d36e95218386375027fc06ae1390038492f82"
+  }
+}

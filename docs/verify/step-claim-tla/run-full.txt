@@ -1,0 +1,88 @@
+work dir: $TMPDIR/verify-step-claim.XXXXXX
+P1_SingleExecutorPerMachine: FAIL in 1s, 322 distinct states - matches expected
+  1. Initial
+       st = "pending"
+       sm = NoMachine
+       phase = "open"
+       home = m1
+  2. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 1
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "idle", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       journal = (m1 :> "active" @@ m2 :> "none")
+  3. HeartbeatAges
+       fresh = FALSE
+  4. SchedulerTick
+       st = "pending"
+       sm = NoMachine
+       holder = 0
+  5. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 2
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       fresh = TRUE
+  full log: $TMPDIR/verify-step-claim.XXXXXX/P1_SingleExecutorPerMachine/tlc.log
+P2_OnlyHolderResultApplied: FAIL in 2s, 2935 distinct states - matches expected
+  1. Initial
+       st = "pending"
+       sm = NoMachine
+       phase = "open"
+       home = m1
+  2. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 1
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "idle", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       journal = (m1 :> "active" @@ m2 :> "none")
+  3. FinishSession
+       ex = << [ mach |-> m1, stage |-> "reporting", beat |-> FALSE, halt |-> FALSE, out |-> "failed" ], [ mach |-> m1, stage |-> "idle", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       journal = (m1 :> "awaiting" @@ m2 :> "none")
+  4. HeartbeatAges
+       fresh = FALSE
+  5. SchedulerTick
+       st = "pending"
+       sm = NoMachine
+       holder = 0
+  6. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 2
+       ex = << [ mach |-> m1, stage |-> "reporting", beat |-> FALSE, halt |-> FALSE, out |-> "failed" ], [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       fresh = TRUE
+       journal = (m1 :> "active" @@ m2 :> "none")
+  7. FinishStepOwnedCheck
+       st = "failed"
+       holder = 0
+       ex = << [ mach |-> m1, stage |-> "gone", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       journal = (m1 :> "none" @@ m2 :> "none")
+       staleApply = TRUE
+  full log: $TMPDIR/verify-step-claim.XXXXXX/P2_OnlyHolderResultApplied/tlc.log
+P3_NoClaimAfterClose: PASS in 132s, 2193222 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.XXXXXX/P3_NoClaimAfterClose/tlc.log
+P4_AcceptedStopReachesWorkers: FAIL in 1s, 315 distinct states - matches expected
+  1. Initial
+       st = "pending"
+       sm = NoMachine
+       phase = "open"
+       home = m1
+  2. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 1
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "idle", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       journal = (m1 :> "active" @@ m2 :> "none")
+  3. CloseCard
+       phase = "closed"
+       stopPending = TRUE
+       stopEvt = (m1 :> TRUE @@ m2 :> FALSE)
+  4. DeliverStopFetch
+       stopPending = FALSE
+       stopEvt = (m1 :> FALSE @@ m2 :> FALSE)
+       stopInHand = (m1 :> TRUE @@ m2 :> FALSE)
+  5. DeliverStopToHandle
+       stopInHand = (m1 :> FALSE @@ m2 :> FALSE)
+       stopDelivered = (m1 :> TRUE @@ m2 :> FALSE)
+  full log: $TMPDIR/verify-step-claim.XXXXXX/P4_AcceptedStopReachesWorkers/tlc.log
+covered code unchanged since sync-commit 23a39da9

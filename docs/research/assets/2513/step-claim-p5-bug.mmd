@@ -1,0 +1,30 @@
+---
+title: "Step claim (StepClaim.tla)"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: waiting
+    lg1: claimed
+    lg2: settled
+    lg3: Path to the ArchivedNeverClaimed bug
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  class lg3 bugPath
+  s0: Pending (card open)
+  s1: Stopped (task archived)
+  s2: Pending (task archived)
+  s3: Claimed (task archived)
+  [*] --> s0
+  s0 --> s1: user archives task
+  s1 --> s2: enqueueStep after archive
+  s2 --> s3: tryClaim
+  class s0 blue
+  class s0 bugPath
+  class s1 teal
+  class s1 bugPath
+  class s2 blue
+  class s2 bugPath
+  class s3 orange
+  class s3 bugPath

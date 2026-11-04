@@ -1,0 +1,68 @@
+{
+  "tag": "after",
+  "todoId": "qU0ThI2lXow4Tw_GusQjE",
+  "buildId": "01a10b96-856a-775b-afbb-29dbeb7c2372",
+  "stepId": "LXqOj1R7scMSw4MwnwdEO",
+  "stack": {
+    "server": "http://127.0.0.1:8796",
+    "web": "http://127.0.0.1:5278"
+  },
+  "samples": [
+    {
+      "at": "claim+0s",
+      "label": "处理中..."
+    },
+    {
+      "at": "preparing",
+      "label": "准备工作区..."
+    },
+    {
+      "at": "starting",
+      "label": "正在连接模型..."
+    },
+    {
+      "at": "thinking",
+      "label": "模型思考中..."
+    },
+    {
+      "at": "thinking+8s(relays flowing)",
+      "label": "模型思考中..."
+    },
+    {
+      "at": "tool:bash",
+      "label": "正在执行工具：bash"
+    },
+    {
+      "at": "tool:bash+8s(no new signal)",
+      "label": "正在执行工具：bash"
+    },
+    {
+      "at": "responding",
+      "label": "模型输出中..."
+    }
+  ],
+  "panelTexts": [
+    "本步：规划中",
+    "执行机器：activity-probe",
+    "最近信号：1s 前"
+  ],
+  "stuckFreshnessSamples": [
+    "最近信号：6s 前",
+    "最近信号：10s 前",
+    "最近信号：14s 前"
+  ],
+  "activityRelay": {
+    "posts": 8,
+    "accepted": 8,
+    "rejected": []
+  },
+  "shots": [
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-00-claimed.png",
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-01-thinking.png",
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-02-panel.png",
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-03-tool.png",
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-04-tool-aged.png",
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-05-responding.png",
+    "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0192-905/.claude/verify-shots/905/after-06-silence.png"
+  ]
+}

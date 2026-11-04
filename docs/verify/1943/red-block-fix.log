@@ -1,0 +1,124 @@
+
+ RUN  v5.0.1 /workspace/integration
+
+ ❯ test/prompt-set-resume.test.ts (12 tests | 5 failed | 7 skipped) 22146ms
+   ❯ prompt-set resume provenance (11)
+     × cut prompts are shorter than current prompts, and current prompts equal the production prompt bytes 5341ms
+     × learn cases receive the selected prompt set 2899ms
+     × changing --arm rejects resume before relay requests 4623ms
+     × changing --context-window rejects resume before relay requests 4640ms
+     × editing flow cases or roster rejects resume before relay requests 4641ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > cut prompts are shorter than current prompts, and current prompts equal the production prompt bytes
+AssertionError: expected '0fa121701fe300c20401fa09e20ddb55ed80e…' to be 'adc89aefa5a42f7287fa711617c7d6b181a11…' // Object.is equality
+
+Expected: "adc89aefa5a42f7287fa711617c7d6b181a1118e74d77b2151793d9f13839f38"
+Received: "0fa121701fe300c20401fa09e20ddb55ed80e6be8db1d9503987e79dc75ad339"
+
+ ❯ test/prompt-set-resume.test.ts:468:63
+    466|             JSON.parse(line) as { provenance?: { prompt_set_identity?:…
+    467|         );
+    468|       expect(currentRows[0]?.provenance?.prompt_set_identity).toBe(
+       |                                                               ^
+    469|         promptSetIdentity(currentPrompt),
+    470|       );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > learn cases receive the selected prompt set
+AssertionError: expected undefined to be 'no-memory' // Object.is equality
+
+- Expected:
+"no-memory"
+
++ Received:
+undefined
+
+ ❯ test/prompt-set-resume.test.ts:517:40
+    515|         );
+    516|       expect(rows[0]?.provenance?.prompt_set).toBe('cut');
+    517|       expect(rows[0]?.provenance?.arm).toBe('no-memory');
+       |                                        ^
+    518|       const sent = texts.find((text) => text.includes('交付物优先于路径'));
+    519|       expect(sent).toBeTruthy();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > changing --arm rejects resume before relay requests
+AssertionError: [v1] 0 of 1 (id,rep) to run
+[v1] 0/0 done (0 ok, 0 failed), 0s elapsed
+[v1] done - 0 ok, 0 failed -> /tmp/cairn-ps-arm-ck9hrd/v1/results.jsonl
+: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ test/prompt-set-resume.test.ts:544:42
+    542|         relay,
+    543|       );
+    544|       expect(result.code, result.output).toBe(2);
+       |                                          ^
+    545|       expect(relay.requests.length).toBe(afterSeed);
+    546|       expect(result.output).toMatch(/incompatible results\.jsonl prove…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > changing --context-window rejects resume before relay requests
+AssertionError: [v1] 0 of 1 (id,rep) to run
+[v1] 0/0 done (0 ok, 0 failed), 0s elapsed
+[v1] done - 0 ok, 0 failed -> /tmp/cairn-ps-window-3xYanh/v1/results.jsonl
+: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ test/prompt-set-resume.test.ts:571:42
+    569|         relay,
+    570|       );
+    571|       expect(result.code, result.output).toBe(2);
+       |                                          ^
+    572|       expect(relay.requests.length).toBe(afterSeed);
+    573|       expect(result.output).toMatch(/incompatible results\.jsonl prove…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/prompt-set-resume.test.ts > prompt-set resume provenance > editing flow cases or roster rejects resume before relay requests
+AssertionError: [v1] 0 of 1 (id,rep) to run
+[v1] 0/0 done (0 ok, 0 failed), 0s elapsed
+[v1] done - 0 ok, 0 failed -> /tmp/cairn-ps-flow-TaVVLr/v1/results.jsonl
+: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ test/prompt-set-resume.test.ts:592:42
+    590|       });
+    591|       const result = await runEval(home, ['--prompt-set', 'current'], …
+    592|       expect(result.code, result.output).toBe(2);
+       |                                          ^
+    593|       expect(relay.requests.length).toBe(afterSeed);
+    594|       expect(result.output).toMatch(/incompatible results\.jsonl prove…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 7 skipped (12)
+   Start at  17:47:06
+   Duration  23.30s (tests 95%, transform 3%, import 2%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/integration
+

@@ -1,0 +1,450 @@
+# Gardener weekly sweep 2026-10-28
+
+Window: 7 days since 2026-10-21T09:26:14.961Z. Format: rank. category | count | 7d change.
+
+## By growth
+1. comment-discipline-allowlist/entries | 158 | +158
+2. single-use-helper-allowlist/entries | 30 | +30
+3. feature-map-staleness/entries | 59 | 0
+4. ui-debt/bare-controls | 3 | 0
+5. lint-warning/warnings | 0 | 0
+6. ui-debt/per-face-css-lines | 0 | 0
+7. ui-debt/arbitrary-spacing | 14 | -1
+8. ui-debt/arbitrary-text | 14 | -2
+
+## By stock
+1. comment-discipline-allowlist/entries | 158 | +158
+2. feature-map-staleness/entries | 59 | 0
+3. single-use-helper-allowlist/entries | 30 | +30
+4. ui-debt/arbitrary-spacing | 14 | -1
+5. ui-debt/arbitrary-text | 14 | -2
+6. ui-debt/bare-controls | 3 | 0
+7. lint-warning/warnings | 0 | 0
+8. ui-debt/per-face-css-lines | 0 | 0
+
+Next target: comment-discipline-allowlist/entries (158, +158)
+Cleanup PR dispatch: not run; it waits on the autonomous merge loop (#1405 P4).
+
+## Lessons ledger weekly summary
+
+Week: 2026-10-21T09:26..2026-10-28T09:26
+New categories: 5
+Intercepts: 9
+Recurrences: 0
+Escalations filed: 0
+
+New categories:
+- git-checkout-discarded-an-unstaged-fix
+- page-counters-kept-balanced-by-the-prepush-human
+- ignored-skill-restaging
+- overwritten-verdict-history
+- unobserved-review-head
+
+Safeguards awaiting evaluation:
+none
+
+Escalations awaiting an issue:
+none
+
+No safeguarding date yet (253 entries, excluded from the counts above):
+- github-create-gate-eacces
+- cloud-container-missing-chromium
+- biome-import-order
+- partial-conflict-resolution
+- startbuild-in-review
+- use-optional-chain
+- test-spreads-unknown-response-body
+- avatar-spiral-off-center
+- avatar-swap-dashed-face
+- hook-git-dir-reach-test
+- mac-session-idle-13h
+- unbound-chief-face-missed
+- comments-added-while-renaming-helpers
+- escape-retry-hid-overlay
+- probe-counts-before-element-appears
+- attachment-token-neutralization
+- format-before-lint
+- zsh-nomatch-search
+- fixture-display-name-as-enum
+- shared-export-order
+- callback-assignment-narrowed-to-never
+- fixture-missing-required-fields
+- another-pr-added-blockerhandoff-to-the-step-input-the-trajectory
+- batch-export-treated-one-build-s-dirty-data-as-a
+- cli-tests-that-spawn-subprocesses-hand-wrote-timeouts-case-by
+- engine-session-shapes-and-model-inference-covered-only-one-form
+- export-verdicts-did-not-map-one-to-one-to-persisted
+- guard-tests-were-masked-by-another-mechanism-the-export-write
+- ran-pnpm-in-parallel-while-reusing-dependencies-the-automatic-dependency
+- the-export-target-was-compared-as-path-text-only-so
+- the-root-script-launched-the-tsx-cli-directly-and-failed
+- new-comments-written
+- fallback-row-wraps-in-narrow-column
+- new-web-source-missing-affected-map
+- prepush-skipped-ui-gates
+- recurring-review-findings
+- zsh-readonly-status-variable
+- banned-word-in-rule-text
+- ci-yml-conflict-step-in-wrong-job
+- theme-change-skipped-e2e
+- background-task-killed-on-return
+- prepush-stale-origin-main
+- nonexistent-npm-package-name
+- dispatch-without-duplicate-check
+- single-use-helper-gate
+- comment-count-edit-flagged
+- global-memory-dedupe-scope
+- long-test-without-tee-log
+- memory-retry-fingerprint
+- rest-projection-missing-field
+- tool-count-in-prose
+- supersede-chain-scoring
+- conflictids-narrowing
+- merge-evidence-newbuild-leak
+- merge-gate-eval-word
+- color-in-tokens-css-ui-drift
+- chief-failure-not-on-card
+- chief-failure-notification-added
+- chief-integer-param-vocabulary
+- chief-todos-output-uncapped
+- copied-node-modules-workspace-path
+- react-children-in-create-element
+- ui-copy-missing-english
+- idle-watchdog-kills-silent-tools
+- tool-call-fixture-args-field
+- board-spec-not-in-affected-family
+- infinity-lost-in-json
+- stat-fixture-below-min-samples
+- git-stash-baseline
+- trajectory-pack-fixture-field
+- acp-bridge-missing-impl
+- an-unauthenticated-gemini-cli-says-api-key-is-missing-and
+- copied-jsdoc-on-new-component
+- providers-tabs-vocabulary
+- single-use-adapter
+- lessons-section-broke-integration-tests
+- prior-round-mixes-reused-build-history
+- prompt-prefix-changed-dispatch-criterion
+- cost-fixture-contradiction
+- test-removed-baseline-in-real-repo
+- ticket-opened-without-spec-check
+- intake-branch-skipped-server-chain
+- reproduce-first-label-instructions
+- unicode-fold-fixture
+- git-proxy-breaks-loopback-integration
+- cross-package-tests-skipped
+- e2e-non-retrying-count-assertion
+- evidence-command-failure
+- local-index-observation
+- local-patch-whitespace
+- local-ref-transaction
+- patch-digest-fixture-hash
+- placeholder-digest-satisfies-gate
+- pnpm-test-filter
+- shared-record-file-missing
+- single-use-helper-gate-red
+- spec-copied-header-comment
+- unformatted-integration-test
+- prepush-test-missing-import
+- pkill-f-vitest-by-name
+- check-reach-fed-probe-scripts
+- a-122-ms-single-file-unit-test-was-wrapped-in
+- a-dispatched-implementer-reported-affected-e2e-passed-but-never-ran
+- a-time-based-rule-needs-me-cards-fold-after-7
+- board-filter-e2e-went-red-on-three-separate-pre-push
+- changing-what-a-shared-route-shows-by-default-app-from
+- claimed-e2e-cannot-run-locally
+- copied-a-deliverable-to-the-root-of-the-shared-project
+- fetch-main-only-refspec
+- force-push-on-reused-branch
+- git-commit-tail-1-swallowed-a-pre-commit-hook-failure
+- image-not-attached-to-reply
+- overwrote-existing-skill
+- pkill-f-killed-own-shell
+- screenshots-sent-to-ian-showed-the-phone-needs-you-row
+- single-use-helper-gate-diffed-a-moved-file-against-nothing
+- sketch-instead-of-real-ui
+- stopped-waiting-for-priority
+- the-overlay-folder-merge-grepped-its-consumers-saw-claude-skills
+- thread-attachment-cap
+- thread-closed-with-open-questions
+- waiting-on-ci-after-pr
+- import-split-existing-comment
+- multiple-transcript-buffers-overwrote-steer-notice
+- no-verify-fixup-commit
+- github-secondary-rate-limit
+- detached-new-branch-ref
+- directory-wide-absence-assertion
+- online-probe-exit-zero
+- rebase-resurrected-lessons-table
+- credential-fill-env-spread
+- breakpoint-collides-with-spec
+- family-table-sort-order
+- head-closed-pipe
+- spec-assumed-dialog
+- prepush-selftest-not-run
+- lockfile-regex-multiline
+- sed-corrupted-test-line
+- regression-setup-import
+- comment-gate-diff-base
+- timeout-left-vite-preview
+- direct-vitest-skipped-slot
+- screenshot-pixels-as-css-px
+- single-use-gate-icons-script
+- tabular-nums-widened-hyphen
+- ui-registry-gate-red
+- ui-reuse-inventory-red
+- evidence-branch-audit-option
+- e2e-affected-arg-overflow
+- fresh-worktree-no-hooks
+- conversation-summaries-recognised-content-blocks-but-omitted-tool-names-from
+- gate-retry-metadata-changed-the-established-wake-prefix
+- failed-build-delivery-skipped-already-committed-work-and-restart-selected
+- fetch-json-boundary
+- native-diagnostic-loader
+- partial-delivery-closing-keywords
+- summary-request-boundaries
+- thinking-output-budget
+- a-queued-verification-or-snapshot-update-was-treated-as-completed
+- identity-authentication-read-connection-metadata-before-checking-that-a-socket
+- a-docs-only-push-ran-only-the-language-gate-so
+- disabled-control-contrast
+- a-pr-body-from-a-cloud-session-went-red-on
+- eval-context-declaration
+- evidence-log-whitespace
+- model-roster-data-generated-from-the-lane-s-own-install
+- button-sizes-lost-on-extraction
+- merge-head-entered-by-hand
+- the-inherited-baseline-recorder-exposed-provenance-checks-but-never-called
+- a-learn-eval-headline-kept-on-a-closure-assigned-let
+- an-isolated-main-vitest-comparison-used-root-from-the-lane
+- archive-fixture-layout
+- gate-constant-freeze
+- json-import-attribute
+- verify-dispatch-diff
+- vp-fixture-dependency
+- a-pushed-pr-became-conflicted-with-main-and-sat-for
+- chief-capacity-provider-after-merge
+- fallback-copy-denied-chief-switch
+- retry-test-faked-the-push-wrapper
+- benchmark-verdict-provenance
+- random-candidate-ids-beginning-with-a-hyphen-were-parsed-as
+- merged-translation-key-collision
+- playwright-filter-full-title
+- squash-used-moving-remote-ref
+- assumed-verification-entry-point
+- prior-art-reuse-keyword-scoring
+- single-use-parser-helper
+- unclassified-plan-exemption
+- backfill-overwrote-recorded-free-costs
+- cloud-pid1-left-orphan-zombies
+- completion-fixtures-called-public-github
+- pr-head-not-refreshed-before-verification
+- model-roster-assigned-a-hosted-glm-model-to-mistral-allowing
+- an-e2e-shard-went-red-on-a-spec-the-branch
+- error-only-variants
+- harness-policy-dependencies
+- historical-replay-input-contract
+- probe-registration
+- process-inventory-boundary
+- report-score-eligibility
+- zero-pass-oracle-acceptance
+- evidence-docs-committed-on-a-lane-spelled-out-the-lane
+- a-grader-landed-with-an-unused-parameter-over-the-frozen
+- a-lane-appended-a-scheduler-run-slot-in-index-ts
+- a-new-file-backed-env-configured-seam-github-create-gate
+- an-orphaned-vite-preview-from-a-killed-run-squatted-a
+- click-contract-misses-integration
+- e2e-url-before-render
+- evidence-shot-mid-animation
+- panel-state-ignores-history
+- provider-misses-sibling-consumer
+- url-query-reencode
+- chief-queue-review-gate-findings
+- harbor-artifact-paths
+- tampering-control
+- verifier-container-evidence
+- node-test-child-context
+- test-fixture-types
+- nested-node-test-context
+- e2e-invalid-chief-stub
+- historical-seed-schema-drift
+- reserved-secret-namespace
+- bare-image-punctuation
+- ci-step-baseline
+- comment-only-test-section
+- archive-path-normalization
+- acceptance-command-named-unmerged-file
+- literal-premise-weakens-controls
+- mention-read-as-reference
+- module-url-resolution
+- platform-coupled-subprocess-tests
+- runtime-prefix-hides-violations
+- runtime-probe-grading
+- target-read-audit
+- task-exit-read-as-helper-failure
+- unreachable-grading-module
+- untraced-child-audit
+- partial-seed-assertions
+- relay-wire-assumptions
+- missing-opt-in-control
+- red-gates-on-push
+- wall-clock-bound-in-shared-host-test
+- bot-pr-squash-authorship
+- push-author-range
+- heading-extraction-before-item-splitting
+- inline-diagnostic-syntax
+- double-url-rewrite
+- fixture-implicit-merge-identity
+- push-oid-hook-bypass
+- source-only-push-refspec
+- stale-push-containment-proof
+- standalone-verifier-typecheck
+
+
+## Candidate tickets
+### double-cast
+Title: gardener: 20 new `as unknown as` double casts in 7 days, no gate covers them
+Locations: apps/daemon/src/backend/pi.ts:706, apps/daemon/test/map-claude-event.test.ts:268, apps/daemon/test/map-claude-event.test.ts:303, apps/daemon/test/runner-brief.test.ts:275, apps/daemon/test/runner-brief.test.ts:276, apps/server/test/github-gate-transport.test.ts:242, apps/server/test/github-gate-transport.test.ts:243, apps/server/test/github-gate-transport.test.ts:318, apps/server/test/github-gate-transport.test.ts:319, apps/server/test/merge-gate-github-facts.test.ts:805, +10 more
+Suggested lint rule: Biome GritQL plugin rejecting `as unknown as` outside an explicit allowlist; fix by narrowing with a type guard or fixing the producing type
+Status: candidate only, not filed
+
+### wait-for-timeout
+Title: gardener: 5 new fixed-delay `waitForTimeout(` in e2e in 7 days, no gate covers them
+Locations: apps/web/e2e/chief-home-chat.spec.ts:220, apps/web/e2e/overlay-focus.spec.ts:39, apps/web/e2e/overlay-focus.spec.ts:56, apps/web/e2e/overlay-focus.spec.ts:77, apps/web/e2e/probe-1011.mjs:134
+Suggested lint rule: Biome GritQL plugin rejecting `waitForTimeout(` under apps/web/e2e and integration; wait on a locator, `expect.poll`, or an event instead
+Status: candidate only, not filed
+
+### inline-import
+Title: gardener: 14 new inline `import()` expressions in 7 days, no gate covers them
+Locations: apps/daemon/src/machine-loop.ts:429, apps/daemon/test/machine-loop-harness.ts:265, apps/server/src/services/attachments.ts:120, apps/server/test/conv-stream-catchup.test.ts:417, apps/server/test/conv-stream-catchup.test.ts:491, apps/server/test/helpers.ts:258, apps/server/test/merge-gate-imports.test.ts:157, apps/server/test/merge-gate-imports.test.ts:188, apps/server/test/merge-gate-imports.test.ts:230, apps/server/test/merge-gate-imports.test.ts:231, +4 more
+Suggested lint rule: Biome GritQL plugin rejecting `import(` call expressions and `import("pkg").Type` (AGENTS.md: top-level imports only)
+Status: candidate only, not filed
+
+## Spec/ADR drift at HEAD
+
+Scanned 58 docs under docs/spec and docs/adr. 121 missing names: 121 paths, 0 identifiers.
+
+| doc | missing | kind | line |
+| --- | --- | --- | --- |
+| docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md | `apps/web/src/board/sidebar.css` | path | 18 |
+| docs/adr/0002-untitled-new-task-view-and-fixed-tag-vocabulary.md | `apps/web/src/overlay/overlay.css` | path | 18 |
+| docs/adr/0004-chief-panel-docked-right-rail.md | `apps/web/src/chief/chief.css` | path | 17 |
+| docs/adr/0004-chief-panel-docked-right-rail.md | `apps/web/src/chief/chief.css` | path | 18 |
+| docs/adr/0009-site-wide-motion-converges-on-shadcn-defaults.md | `docs/research/assets/r1/f965382e067739e9.css` | path | 12 |
+| docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md | `library/t-0909/reports/contrast.md` | path | 26 |
+| docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md | `library/t-0909/scripts/gen-palettes.mjs` | path | 34 |
+| docs/adr/0010-site-wide-ui-overhaul-free-redesign-of-hue-and-geometry.md | `library/t-0909/src/themes/c.css` | path | 34 |
+| docs/adr/0011-chief-process-segments-in-real-time-at-event-boundaries.md | `docs/verify/857/tail-samples.jsonl` | path | 18 |
+| docs/adr/0013-chief-panel-floating-window.md | `secondary/shell.tsx` | path | 24 |
+| docs/adr/0013-chief-panel-floating-window.md | `docs/verify/953/probe-sealed/probe-dump.json` | path | 26 |
+| docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md | `apps/server/src/routes-webhook.ts` | path | 41 |
+| docs/adr/0021-autonomous-merge-project-policy-patch-binding-verdict.md | `docs/lessons.md` | path | 41 |
+| docs/spec/00-foundation-decisions.md | `docs/research/r9-pi-sdk.md` | path | 4 |
+| docs/spec/00-foundation-decisions.md | `auth/chatgpt-oauth.ts` | path | 44 |
+| docs/spec/00-foundation-decisions.md | `docs/research/r3-protocol-executor.md` | path | 60 |
+| docs/spec/01-stack-v2.md | `docs/research/r1-site-inventory.md` | path | 5 |
+| docs/spec/02-architecture-parity.md | `docs/research/r3-protocol-executor.md` | path | 4 |
+| docs/spec/02-architecture-parity.md | `raw/bundle-remoteTools-extract.js` | path | 150 |
+| docs/spec/02-architecture-parity.md | `backend/mcp-bridge.ts` | path | 283 |
+| docs/spec/03-ROADMAP.md | `.claude/skills/verify-pacman/SKILL.md` | path | 77 |
+| docs/spec/04-acceptance-criteria.md | `parity/diff-regions.mjs` | path | 36 |
+| docs/spec/04-acceptance-criteria.md | `parity/match-text.mjs` | path | 36 |
+| docs/spec/04-acceptance-criteria.md | `parity/matrix.mjs` | path | 38 |
+| docs/spec/04-acceptance-criteria.md | `r8/54-失败态-详情-light.png` | path | 121 |
+| docs/spec/04-acceptance-criteria.md | `r8/73-失败态-探针详情-light.png` | path | 121 |
+| docs/spec/04-acceptance-criteria.md | `r8/55-失败态-看板卡片-light.png` | path | 122 |
+| docs/spec/04-acceptance-criteria.md | `r8/56-失败态-重跑dialog-light.png` | path | 123 |
+| docs/spec/04-acceptance-criteria.md | `r8/74-重跑dialog-复用方案钮-light.png` | path | 123 |
+| docs/spec/04-acceptance-criteria.md | `r8/57-运行历史-失败态单行-light.png` | path | 124 |
+| docs/spec/04-acceptance-criteria.md | `r8/77-运行历史-多行-light.png` | path | 124 |
+| docs/spec/04-acceptance-criteria.md | `r8/58-AI审核-弹层-light.png` | path | 125 |
+| docs/spec/04-acceptance-criteria.md | `r8/60-AI审核-审核结果-light.png` | path | 126 |
+| docs/spec/04-acceptance-criteria.md | `r8/61-AI审核后-状态-light.png` | path | 126 |
+| docs/spec/04-acceptance-criteria.md | `r8/63-版本下拉-v2v1-light.png` | path | 127 |
+| docs/spec/04-acceptance-criteria.md | `r8/70-版本下拉-v3v2v1-light.png` | path | 127 |
+| docs/spec/04-acceptance-criteria.md | `r8/65-diff视图-v1v2-light.png` | path | 128 |
+| docs/spec/04-acceptance-criteria.md | `r8/66-diff展开-unified-light.png` | path | 128 |
+| docs/spec/04-acceptance-criteria.md | `r8/71-diff视图-v2v3-light.png` | path | 128 |
+| docs/spec/04-acceptance-criteria.md | `r8/72-diff展开-v2v3-light.png` | path | 128 |
+| docs/spec/04-acceptance-criteria.md | `r8/67-驳回-重规划streaming-light.png` | path | 129 |
+| docs/spec/04-acceptance-criteria.md | `r8/68-驳回-planv3时间线-light.png` | path | 129 |
+| docs/spec/04-acceptance-criteria.md | `r8/75-复用方案-子面板-light.png` | path | 130 |
+| docs/spec/04-acceptance-criteria.md | `r8/76-直接执行-复用方案时间线-light.png` | path | 130 |
+| docs/spec/08-m7-feature-closed-loop.md | `docs/research/r9-attachments-mentions.md` | path | 110 |
+| docs/spec/08-m7-feature-closed-loop.md | `overlays/plan-dropdown.tsx` | path | 142 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/ui/button.tsx` | path | 42 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/ui/button.css` | path | 45 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/detail/detail.css` | path | 51 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/chief/chief.css` | path | 56 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/overlays/overlays.css` | path | 58 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/board/sidebar.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/chief/chief.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/detail/overlays.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/overlay/mention-picker.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/overlay/overlay.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/pages/pages.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/resources/resources.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `apps/web/src/secondary/secondary.css` | path | 61 |
+| docs/spec/09-frontend-style-unification-a6.md | `docs/a3/diff-audit.md` | path | 112 |
+| docs/spec/10-m7-acceptance-report.md | `.claude/skills/verify-pacman/SKILL.md` | path | 4 |
+| docs/spec/11-model-service-and-machine-localization.md | `apps/web/src/chief/chief-model-select.tsx` | path | 104 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `library/t-0909/src/themes/c.css` | path | 3 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `resources/shell.tsx` | path | 8 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `secondary/shell.tsx` | path | 8 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `routes/agent-detail.css` | path | 18 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `board/board.css` | path | 30 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `secondary/shell.tsx` | path | 32 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `ui/dialog.css` | path | 74 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `pages/pages.css` | path | 88 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `detail/detail.css` | path | 89 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `secondary/secondary.css` | path | 90 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `chief/chief.css` | path | 91 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `detail/overlays.css` | path | 92 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `resources/resources.css` | path | 93 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlays/overlays.css` | path | 94 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlay/overlay.css` | path | 95 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlay/mention-picker.css` | path | 96 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `resources/shell.tsx` | path | 97 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `routes/agent-detail.css` | path | 97 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `board/board.css` | path | 98 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `detail/detail.css` | path | 101 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `detail/overlays.css` | path | 101 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `routes/agent-detail.css` | path | 101 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `ui/kbd-hint.css` | path | 101 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `ui/tag-chip.css` | path | 101 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlays/search-panel.tsx` | path | 113 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `detail/overlays.css` | path | 136 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `resources/shell.tsx` | path | 156 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `secondary/shell.tsx` | path | 156 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `board/board.css` | path | 157 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `detail/detail.css` | path | 157 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `routes/agent-detail.css` | path | 157 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `board/board.css` | path | 165 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `routes/agent-detail.css` | path | 171 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlay/token-gate.css` | path | 177 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `routes/machine-authorize.css` | path | 177 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `apps/web/src/secondary/secondary.css` | path | 204 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlays/search-panel.tsx` | path | 242 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `chief/chief-model-select.tsx` | path | 246 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `board/repo-filter.tsx` | path | 251 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlays/plan-dropdown.tsx` | path | 256 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `board/tag-filter.tsx` | path | 260 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `chief/chief-wake.tsx` | path | 261 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlays/chip-popover.tsx` | path | 263 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `overlays/dismiss.tsx` | path | 264 |
+| docs/spec/16-shadcn-rollout-batch-table-and-acceptance-criteria.md | `resources/shell.tsx` | path | 267 |
+| docs/spec/19-test-layering-and-blast-radius.md | `.claude/skills/verify-pacman/SKILL.md` | path | 31 |
+| docs/spec/21-single-machine-orchestration-defaults.md | `docs/research/r5-chief-behavior.md` | path | 7 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `reports/contrast.md` | path | 7 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `src/ui/input.css` | path | 430 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `detail/overlays.css` | path | 461 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `ui/dialog.css` | path | 467 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `ui/chip.tsx` | path | 480 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `overlays/search-panel.tsx` | path | 485 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `ui/dialog.css` | path | 504 |
+| docs/spec/22-color-and-geometry-token-scale-canonical-table.md | `ui/dialog.css` | path | 540 |
+| docs/spec/asset-replacement-plan.md | `docs/research/r1-site-inventory.md` | path | 4 |
+| docs/spec/asset-replacement-plan.md | `scripts/generate-icons.mjs` | path | 83 |
+| docs/spec/asset-replacement-plan.md | `assets/r1/71fd990866a15643.css` | path | 107 |
+| docs/spec/asset-replacement-plan.md | `assets/r1/71fd990866a15643.css` | path | 161 |

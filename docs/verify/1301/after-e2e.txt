@@ -1,0 +1,57 @@
+Running 55 tests using 3 workers
+[1/55] e2e/agent-create-model.spec.ts:136:1 › 无机器：报机器告警行并给「接入机器」外链，选择器都不出
+[2/55] e2e/agent-model-width.spec.ts:23:1 › 长模型 id：概览 tab 模型弹层不横向裁切，最长 id 全名可见（#1301）
+[3/55] e2e/agent-detail.spec.ts:64:1 › 团队页的 Agent 卡是链接，点击落到详情路由
+[4/55] e2e/agent-detail.spec.ts:72:1 › 详情路由直链可打开，不落 catch-all
+[5/55] e2e/agent-create-model.spec.ts:146:1 › 有机器无候选：服务商告警行退成信息性，运行时/归属机两槽照出（pi 创建不受阻）
+[6/55] e2e/agent-detail.spec.ts:81:1 › 三 tab 齐在，概览默认选中，点记忆切内容
+[7/55] e2e/agent-create-model.spec.ts:161:1 › 有候选：不出告警行，出三级选择器且模型级先禁用
+[8/55] e2e/agent-detail.spec.ts:96:1 › 概览：名称行内编辑提交后回显新值
+[9/55] e2e/agent-detail.spec.ts:106:1 › 概览：职责位渲染 canon 空态并可编辑
+[10/55] e2e/agent-create-model.spec.ts:177:1 › 一级列运行时与内置清空行，且 pi 段进入候选（#1288 翻案不再跳过）
+[11/55] e2e/agent-detail.spec.ts:124:1 › 概览：存量 provider 绑定裸串回显，一级只列内置行与运行时源
+[12/55] e2e/agent-create-model.spec.ts:208:1 › 模型行只出模型名：不带 provider 徽标、不编造上下文窗口数字
+[13/55] e2e/agent-detail.spec.ts:164:1 › 概览：两级菜单锚在触发钮上且整块在视口内（几何）
+[14/55] e2e/agent-create-model.spec.ts:230:1 › 创建弹窗：两级菜单整块落在视口内（几何）
+[15/55] e2e/agent-detail.spec.ts:200:1 › 概览：思考强度空值是「未设置」下拉
+[16/55] e2e/agent-detail.spec.ts:210:1 › 概览：不摆「状态」行
+[17/55] e2e/agent-detail.spec.ts:218:1 › 记忆 tab：空态文案与 shared canon 同文
+[18/55] e2e/agent-create-model.spec.ts:278:1 › 模型很多：选过运行时后菜单不越出视口，首行可点，40 行一个不少
+[19/55] e2e/agent-detail.spec.ts:228:1 › 权限 tab：6 个工具开关全渲染（r3 §4 全 list，XMON-84 恢复）
+[20/55] e2e/agent-detail.spec.ts:236:1 › 权限 tab：6 档各带说明副文案
+[21/55] e2e/agent-create-model.spec.ts:313:1 › 选齐运行时与模型后提交，POST body 带 provider 与 modelId
+[22/55] e2e/agent-detail.spec.ts:250:1 › 概览：运行时档在模型之上，值由 provider 派生
+[23/55] e2e/agent-detail.spec.ts:260:1 › 权限 tab：工具开关可切换
+[24/55] e2e/agent-detail.spec.ts:269:1 › 权限 tab：MCP 服务器逐个勾选行渲染
+[25/55] e2e/agent-create-model.spec.ts:335:1 › 只选运行时与归属机提交：body 带 provider、machineId、modelId 为 null（半态不丢字段）
+[26/55] e2e/agent-detail.spec.ts:282:1 › 权限 tab：有密钥时密钥区恰好一行总开关
+[27/55] e2e/agent-detail.spec.ts:299:1 › 权限 tab：密钥总开关勾选态开→关→回
+[28/55] e2e/agent-create-model.spec.ts:359:1 › 切换运行时清掉旧模型：body 不带跨 provider 的脏 modelId
+[29/55] e2e/agent-detail.spec.ts:314:1 › 权限 tab：零密钥时是空态，无开关
+[30/55] e2e/agent-detail.spec.ts:325:1 › 权限 tab：零密钥空态旁有去添加密钥的入口，点击落到密钥页
+[31/55] e2e/agent-detail.spec.ts:338:1 › 权限 tab：有密钥时不出「去添加密钥」入口
+[32/55] e2e/agent-detail.spec.ts:426:1 › 思考强度：空值是下拉的「未设置」，选档 PATCH thinkingLevel，刷新后仍是该档
+[33/55] e2e/agent-detail.spec.ts:452:1 › 思考强度：claude-code 菜单含 off，不含 minimal
+[34/55] e2e/agent-detail.spec.ts:466:1 › 思考强度：切到 claude-code 时非法档随模型清空，合法档保留
+[35/55] e2e/agent-detail.spec.ts:492:1 › 权限 tab：保存失败出可见错误反馈，开关不回弹
+[36/55] e2e/agent-detail.spec.ts:519:1 › 权限 tab：保存成功不出错误行
+[37/55] e2e/agent-detail.spec.ts:538:1 › 授权技能：不限制 ↔ 勾空互转发显式 null/[]；勾选只进数组槽
+[38/55] e2e/agent-detail.spec.ts:581:1 › 默认 skill：单值 Select 只写 defaultSkill 槽，不带授权面键（两控件互不影响）
+[39/55] e2e/agent-detail.spec.ts:619:1 › 未知 agent id 不白屏，走回退呈现
+[40/55] e2e/agent-detail.spec.ts:628:1 › 记忆 tab：配额头 `记忆 · n / 100` 与搜索/排序控件齐在
+[41/55] e2e/agent-detail.spec.ts:639:1 › 记忆 tab：搜索按标题过滤，只留命中行
+[42/55] e2e/agent-detail.spec.ts:648:1 › 记忆 tab：搜索扫 content 且 ASCII 大小写不敏感
+[43/55] e2e/agent-detail.spec.ts:656:1 › 记忆 tab：零命中出「没有匹配的记忆。」，不回落 canon 空态
+[44/55] e2e/agent-detail.spec.ts:668:1 › 记忆 tab：`添加时间` 档按新 → 旧重排
+[45/55] e2e/agent-detail.spec.ts:690:1 › 记忆 tab：搜索与排序叠加——排序只在命中集内生效
+[46/55] e2e/agent-detail.spec.ts:706:1 › 记忆 tab：零记忆时不出搜索行，保留 canon 空态
+[47/55] e2e/agent-detail.spec.ts:716:1 › 概览：名称行带编辑图标，点图标同样进编辑态
+[48/55] e2e/agent-detail.spec.ts:726:1 › 概览：职责的编辑钮是图标钮，带可访问名
+[49/55] e2e/agent-detail.spec.ts:743:1 › 概览：零在跑任务时段头不带计数，出 canon 空态
+[50/55] e2e/agent-detail.spec.ts:750:1 › 概览：有在跑任务时列出行，段头带计数
+[51/55] e2e/agent-detail.spec.ts:772:1 › 概览：点行进任务详情
+[52/55] e2e/agent-detail.spec.ts:784:1 › 概览：六个字段行长在同一张模板卡里，头像头在卡内
+[53/55] e2e/agent-detail.spec.ts:808:1 › 记忆 tab：记忆行住在模板卡里
+[54/55] e2e/agent-detail.spec.ts:815:1 › 权限 tab：五组开关各自住在模板卡里（#1251 起新增机器匹配段）
+[55/55] e2e/agent-detail.spec.ts:830:1 › 记忆/权限卡：首行不吃卡的上圆角与描边（无方角外溢、无 2px 顶边）
+  55 passed (30.3s)

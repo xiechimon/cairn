@@ -1,0 +1,47 @@
+{
+  "ok": true,
+  "at": "2026-10-30T08:13:26.135409+00:00",
+  "tables": {},
+  "mode": "hourly",
+  "allowlist": {
+    "machine": {
+      "columns": {
+        "lastSeenAt": "Daemon heartbeat refreshes the last-seen timestamp.",
+        "capabilities": "Daemon heartbeat refreshes the reported capabilities snapshot."
+      }
+    },
+    "autonomy_state": {
+      "columns": {
+        "lastEvaluatedAt": "Scheduler evaluation heartbeat refreshes this timestamp even when the verdict is unchanged."
+      }
+    }
+  },
+  "backupTimestamp": "20261030T000000Z",
+  "integrity": "ok",
+  "relationships": {
+    "todo": "t",
+    "build": "b",
+    "steps": [
+      "s"
+    ],
+    "messages": [
+      "m"
+    ],
+    "chiefThread": "ct",
+    "chiefMessages": [
+      "cm"
+    ],
+    "cutoff": 1793318400000.0
+  },
+  "foreignKeys": "ok",
+  "attachments": {
+    "checked": 1
+  },
+  "decryption": "decrypt ok",
+  "api": {
+    "count": 1,
+    "surface": "fixture real Hono route, in-process transport",
+    "provider": "not exercised"
+  },
+  "fixtureOnly": true
+}

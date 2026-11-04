@@ -1,0 +1,84 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/eval-explicit-context/cairn
+
+ ❯ |@cairn/integration| test/chief-dispatch-context-window.test.ts (12 tests | 3 failed) 37171ms
+   × an explicit window rejects a chief model outside the roster: undefined 2332ms
+   × an explicit window rejects a chief model outside the roster: missing-chief 2114ms
+   × configuration failures record the requested window without claiming materialization 2110ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-context-window.test.ts > an explicit window rejects a chief model outside the roster: undefined
+AssertionError: harness approved: sha256 db6c3c93aad2 over 40 file(s) recorded in /private/tmp/cairn-context-missing-chief-I4VdYC/_state.json
+[baseline] 1 of 1 (id,rep) to run
+  [baseline] d01 rep0 FAILED: relay URL missing: set CAIRN_EVAL_RELAY_URL (for example http://<relay-host>:<port>/v1)
+[baseline] 1/1 done (0 ok, 1 failed), 1s elapsed, ~0s left
+[baseline] done - 0 ok, 1 failed -> /private/tmp/cairn-context-missing-chief-I4VdYC/baseline/results.jsonl
+[baseline] 收尾清掉 2 个残留 scratch 目录
+: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/chief-dispatch-context-window.test.ts:240:44
+    238|         },
+    239|       });
+    240|       expect(result.status, result.stderr).toBe(2);
+       |                                            ^
+    241|       expect(result.stderr).toContain(
+    242|         '--context-window requires the chief model to be in the roster…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-context-window.test.ts > an explicit window rejects a chief model outside the roster: missing-chief
+AssertionError: harness approved: sha256 db6c3c93aad2 over 40 file(s) recorded in /private/tmp/cairn-context-missing-chief-Fh6FUb/_state.json
+[baseline] 1 of 1 (id,rep) to run
+  [baseline] d01 rep0 FAILED: relay URL missing: set CAIRN_EVAL_RELAY_URL (for example http://<relay-host>:<port>/v1)
+[baseline] 1/1 done (0 ok, 1 failed), 0s elapsed, ~0s left
+[baseline] done - 0 ok, 1 failed -> /private/tmp/cairn-context-missing-chief-Fh6FUb/baseline/results.jsonl
+[baseline] 收尾清掉 2 个残留 scratch 目录
+: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/chief-dispatch-context-window.test.ts:240:44
+    238|         },
+    239|       });
+    240|       expect(result.status, result.stderr).toBe(2);
+       |                                            ^
+    241|       expect(result.stderr).toContain(
+    242|         '--context-window requires the chief model to be in the roster…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@cairn/integration| test/chief-dispatch-context-window.test.ts > configuration failures record the requested window without claiming materialization
+AssertionError: expected undefined to be 1000000 // Object.is equality
+
+- Expected:
+1000000
+
++ Received:
+undefined
+
+ ❯ test/chief-dispatch-context-window.test.ts:302:49
+    300|     expect(errors).toHaveLength(1);
+    301|     expect(errors[0]?.error).toContain('relay URL missing');
+    302|     expect(errors[0]?.requested_context_window).toBe(1_000_000);
+       |                                                 ^
+    303|     expect(errors[0]).not.toHaveProperty('context_window');
+    304|   } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 9 passed (12)
+   Start at  08:47:44
+   Duration  37.32s (tests 100%)

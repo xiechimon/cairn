@@ -1,0 +1,32 @@
+# #1403 segment 2: live GitHub REST captures of the branch PR list the reconcile reads for PR identity.
+# Captured 2026-10-21 14:47 UTC from this container with curl through the agent proxy, with no
+# Authorization header and the request headers the server sends (lib/github.ts API_HEADERS):
+#   accept: application/vnd.github+json / x-github-api-version: 2022-11-28 / user-agent: pacman-server
+# The proxy answered with X-Ratelimit-Limit: 15000 (an anonymous client gets 60), so it attached its own
+# credentials upstream: these captures show the response shape for a public repo, not the anonymous limit.
+#
+# Trimmed copies (only number, state, title, html_url, created_at, closed_at, merged_at and head/base
+# label, ref, sha, repo id, full_name, default_branch kept; PR bodies and URL fields dropped) are the test
+# fixtures apps/server/test/fixtures/github/branch-pulls-*.json, copied here as live-branch-pulls-*.json.
+# Test [71] in apps/server/test/pr-reconcile.test.ts parses them through githubBranchPulls.
+#
+# Finding used in the design: one head branch can carry several PRs into the same base (the merged
+# capture lists seven, newest first). An open PR is therefore preferred over merged ones when the
+# reconcile adopts a PR, and among merged ones the highest number.
+
+$ curl -sS -D - -H '<API_HEADERS>' 'https://api.github.com/repos/xiechimon/pacman/pulls?state=all&head=xiechimon%3Aclaude%2Fbootstrap-p2&base=main&per_page=10'
+HTTP/1.1 200 OK   Date: Wed, 21 Oct 2026 14:47:01 GMT
+Etag: "82bc742a824e01dac3758b52b86f7a2826617d208a23449a2eba225f777d0db9"   raw body 67136 bytes
+  1414 open merged_at= None head= xiechimon:claude/bootstrap-p2 claude/bootstrap-p2 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1414
+
+$ curl -sS -D - -H '<API_HEADERS>' 'https://api.github.com/repos/xiechimon/pacman/pulls?state=all&head=xiechimon%3Aclaude%2Foptimistic-albattani-r5pmfn&base=main&per_page=10'
+HTTP/1.1 200 OK   Date: Wed, 21 Oct 2026 14:47:01 GMT
+Etag: "2191697a8b9e37bf9d7bbefb86368e4e25f52c348401e4a5dd2c79cd4ce875cb"   raw body 183098 bytes
+  1474 closed merged_at= 2026-10-21T14:22:13Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1474
+  1456 closed merged_at= 2026-10-21T12:49:23Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1456
+  1454 closed merged_at= 2026-10-21T07:54:00Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1454
+  1452 closed merged_at= 2026-10-21T07:18:09Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1452
+  1449 closed merged_at= 2026-10-21T06:28:40Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1449
+  1436 closed merged_at= 2026-10-21T03:28:44Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1436
+  1425 closed merged_at= 2026-10-21T01:48:57Z head= xiechimon:claude/optimistic-albattani-r5pmfn claude/optimistic-albattani-r5pmfn 1361226985 base= main 1361226985 url= https://github.com/xiechimon/pacman/pull/1425
+

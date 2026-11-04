@@ -1,0 +1,42 @@
+# #1404 S2 mutations, round 1 (two survivors; tests added, see s2-mutations.txt): each one applied alone to readiness.ts, then merge-gate-readiness.test.ts.
+# Two mutations survived (all 67 passed): "mergeable null accepted" and "failed verify step counts as a verdict". Definitions (name, file, text replaced, replacement) below.
+
+chief go silences blocking                    3 failed | 64 passed (67)
+verdicts on any digest count                  1 failed | 66 passed (67)
+extraction failure counts as pass             1 failed | 66 passed (67)
+own status unstable blocks                    1 failed | 66 passed (67)
+foreign unstable accepted                     1 failed | 66 passed (67)
+missing required check is green               1 failed | 66 passed (67)
+unreadable required falls back to pass        2 failed | 65 passed (67)
+status-provided required check missed         1 failed | 66 passed (67)
+pr-evidence skipped is green                  2 failed | 65 passed (67)
+self-required not flagged                     1 failed | 66 passed (67)
+perspectives from the team, not the round     1 failed | 66 passed (67)
+unsorted blockers                             1 failed | 66 passed (67)
+unknown ancestry counts                       1 failed | 66 passed (67)
+has_hooks blocks                              1 failed | 66 passed (67)
+size cap off by one                           1 failed | 66 passed (67)
+fork check off                                1 failed | 66 passed (67)
+tampered only at D                            2 failed | 65 passed (67)
+mergeable null accepted                       67 passed (67)
+failed verify step counts as a verdict        67 passed (67)
+
+["chief go silences blocking", "apps/server/src/services/merge-gate/readiness.ts", "if (blocking.length > 0)\n      block('review-blocking'", "if (blocking.length > 0 && !has(at('decision'), 'pass'))\n      block('review-blocking'"]
+["verdicts on any digest count", "apps/server/src/services/merge-gate/readiness.ts", "          x.patchDigest === D &&\n", ""]
+["extraction failure counts as pass", "apps/server/src/services/merge-gate/readiness.ts", "if (has(mine, 'pass') || has(mine, 'block')) continue;", "if (has(mine, 'pass') || has(mine, 'block') || has(mine, 'extraction_failed')) continue;"]
+["own status unstable blocks", "apps/server/src/services/merge-gate/readiness.ts", "s.state !== 'success' && s.context.toLowerCase() !== MERGE_GATE_STATUS_CONTEXT", "s.state !== 'success'"]
+["foreign unstable accepted", "apps/server/src/services/merge-gate/readiness.ts", "if (foreign.length > 0) block('mergeable-state'", "if (false) block('mergeable-state'"]
+["missing required check is green", "apps/server/src/services/merge-gate/readiness.ts", "        block('required-check-missing', name);\n", ""]
+["unreadable required falls back to pass", "apps/server/src/services/merge-gate/readiness.ts", "if (checks === null || checks.required === null) {\n    block('required-checks-unreadable');\n  } else {", "if (checks === null || checks.required === null) {\n  } else {"]
+["status-provided required check missed", "apps/server/src/services/merge-gate/readiness.ts", "      } else if (status !== undefined) {", "      } else if (false) {"]
+["pr-evidence skipped is green", "apps/server/src/services/merge-gate/readiness.ts", "evidence.conclusion !== 'success'", "!runPasses(evidence)"]
+["self-required not flagged", "apps/server/src/services/merge-gate/readiness.ts", "if (required.some((n) => n.toLowerCase() === MERGE_GATE_STATUS_CONTEXT)) block('self-required');", ""]
+["perspectives from the team, not the round", "apps/server/src/services/merge-gate/readiness.ts", "const perspectives = i.round?.perspectives ?? i.availability.reviewerPerspectives;", "const perspectives = i.availability.reviewerPerspectives;"]
+["unsorted blockers", "apps/server/src/services/merge-gate/readiness.ts", ".sort(([a], [b]) => (ORDER.get(a) ?? 0) - (ORDER.get(b) ?? 0))", ""]
+["unknown ancestry counts", "apps/server/src/services/merge-gate/readiness.ts", "i.evidenceLinkAncestry[l.sha] === true", "i.evidenceLinkAncestry[l.sha] !== false"]
+["has_hooks blocks", "apps/server/src/services/merge-gate/readiness.ts", "state !== 'clean' && state !== 'has_hooks'", "state !== 'clean'"]
+["size cap off by one", "apps/server/src/services/merge-gate/readiness.ts", "digest.countedLines > GATE_LIMITS.maxLines", "digest.countedLines >= GATE_LIMITS.maxLines + 12"]
+["fork check off", "apps/server/src/services/merge-gate/readiness.ts", "      pr.headRepoFullName === null ||\n      pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()\n", "      false\n"]
+["tampered only at D", "apps/server/src/services/merge-gate/readiness.ts", "  if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))\n    block('verify-tampered');\n", ""]
+["mergeable null accepted", "apps/server/src/services/merge-gate/readiness.ts", "state === null || state === 'unknown'", "state === 'unknown'"]
+["failed verify step counts as a verdict", "apps/server/src/services/merge-gate/readiness.ts", "['pass', 'block', 'evidence_invalid', 'extraction_failed'].includes(x.outcome)", "x.outcome !== 'unbound'"]

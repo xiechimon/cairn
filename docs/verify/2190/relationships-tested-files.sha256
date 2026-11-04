@@ -1,0 +1,3 @@
+2e446e673fc6d086e444f44002217a60e691368673564d59df8a9f69578e70f4  scripts/ops/restore-drill.py
+6244bd20a1394e2addf833e0d6da8873da58ec7da058ecec24f3a80ce8ff9aa2  scripts/ops/restore-drill.test.mjs
+2b0503d764a1440d202f3798fa974e0cb6cbdd16aaabd6d5a213066d63e668c8  scripts/ops/restore-drill-fixture.mts

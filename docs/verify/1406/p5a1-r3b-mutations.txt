@@ -1,0 +1,107 @@
+# P5a-1 round 3b mutations at 4cb207ee9191e0bce69c37f178876a6c1b1cdd33: undo one rule at a time in the working tree, run
+# pnpm exec vitest run apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts apps/server/test/webhook.test.ts (166 tests),
+# write the file back from its saved content; git status was clean after the run.
+# F = the createdBy filter; D = the importGithubIssue default parameter; U = the unbound-chief branch; R = the retry's rebind guard.
+# 9 mutations, 9 RED.
+
+## F1  filter: reconcile every github-issue task of the team (createdBy ignored)
+file: apps/server/src/services/issue-intake.ts
+- before:
+    const taken = issueTasks.filter((t) => t.createdBy === agentId);
+- after:
+    const taken = issueTasks;
+result: RED  exit=1  Tests  2 failed | 164 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 换绑别的 Agent → 换绑前领的卡不再对账（issue 被仓主关了也不动）
+
+## F2  filter: any task not created by the seed user (instead of the current chief agent)
+file: apps/server/src/services/issue-intake.ts
+- before:
+    const taken = issueTasks.filter((t) => t.createdBy === agentId);
+- after:
+    const taken = issueTasks.filter((t) => t.createdBy !== deps.user.id);
+result: RED  exit=1  Tests  1 failed | 165 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 换绑别的 Agent → 换绑前领的卡不再对账（issue 被仓主关了也不动）
+
+## F3  filter scope requires a model (canOrchestrate) instead of a bound agent
+file: apps/server/src/services/issue-intake.ts
+- before:
+    const agentId = chiefBinding(deps, teamId).agentId;
+- after:
+    const b0 = chiefBinding(deps, teamId);
+        const agentId = b0.canOrchestrate ? b0.agentId : null;
+result: RED  exit=1  Tests  1 failed | 165 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 绑定的 Agent 没有模型（不能编排）→ 不领新票，但轮询器领过的卡照样对账
+
+## D1  default parameter: hand / webhook import createdBy defaults to null instead of the seed user
+file: apps/server/src/services/github-issues.ts
+- before:
+    createdBy: opts.createdBy ?? deps.user.id,
+- after:
+    createdBy: opts.createdBy ?? null,
+result: RED  exit=1  Tests  2 failed | 164 passed (166)
+  FAIL  |@xiechimon/pacman| test/github-issues.test.ts > todo 溯源两列（#446 D6） > 导入任务两列落值；级联面不动既有列
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户
+
+## D2  default parameter: the poller does not pass createdBy (its imports get the seed-user default)
+file: apps/server/src/services/issue-intake.ts
+- before:
+            { createdBy: access.createdBy },
+- after:
+    (removed)
+result: RED  exit=1  Tests  13 failed | 153 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器自己导入的卡：导入即记为见过 open，随后被协作者关闭 → 关闭
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前有人已手动开始（已有编排线程）→ 不再重试
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 轮询器在重启前领的卡，重启后照样对账（认卡靠库里的 createdBy，不靠进程内存）
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 绑定的 Agent 没有模型（不能编排）→ 不领新票，但轮询器领过的卡照样对账
+
+## U1  unbound chief: reconcileClosed still called with no rows (prunes seenOpen)
+file: apps/server/src/services/issue-intake.ts
+- before:
+            log({ teamId, reason: 'chief-not-bound' }, 'issue intake close reconcile skipped');
+          }
+- after:
+            log({ teamId, reason: 'chief-not-bound' }, 'issue intake close reconcile skipped');
+          }
+          await reconcileClosed(teamId, got.token, [], now, tally);
+result: RED  exit=1  Tests  1 failed | 165 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关
+
+## U2  unbound chief: skip line logged unconditionally
+file: apps/server/src/services/issue-intake.ts
+- before:
+    if (issueTasks.some((t) => t.createdBy !== null && t.createdBy !== deps.user.id)) {
+- after:
+    if (issueTasks.length >= 0) {
+result: RED  exit=1  Tests  1 failed | 165 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent、队里只有手工导入的卡 → 不记 close reconcile skipped
+
+## U3  unbound chief: skip line not logged
+file: apps/server/src/services/issue-intake.ts
+- before:
+            log({ teamId, reason: 'chief-not-bound' }, 'issue intake close reconcile skipped');
+- after:
+    (removed)
+result: RED  exit=1  Tests  1 failed | 165 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行
+
+## R1  retry: rebind guard removed (createdBy no longer checked)
+file: apps/server/src/services/issue-intake.ts
+- before:
+                  : row.createdBy !== agentId
+                    ? 'chief-rebound'
+                    : startedSince(
+- after:
+                  : startedSince(
+result: RED  exit=1  Tests  1 failed | 165 passed (166)
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行
+

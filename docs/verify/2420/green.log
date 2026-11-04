@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-2420/apps/web
+
+
+ Test Files  2 passed (2)
+      Tests  35 passed (35)
+   Start at  21:10:10
+   Duration  1.60s (transform 66%, import 27%, tests 7%)
+

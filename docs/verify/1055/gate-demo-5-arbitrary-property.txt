@@ -1,0 +1,6 @@
+=== demo 5 (self-review follow-up): arbitrary-property form [color:var(--card-button)] in a consumer file (expect RED, exit 1) ===
+[ui-drift-gate] G6 __g6-demo.ts:1: brand ink in a text role without a ledger entry — brand slots are spot emphasis only (#987/#1055): move it to the text tiers / --primary / registry link tier, or register the spot role with reason + contrast in scripts/ui-consumer-registry.json (export const X = "[color:var(--card-button)] text-sm";)
+[ui-drift-gate] FAIL: 1 drift site(s). See header for gate intent.
+gate exit code: 1
+=== file removed again (expect GREEN) ===
+gate exit code: 0

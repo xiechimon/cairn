@@ -1,0 +1,17 @@
+{
+  "variant": "C-on-button-without-fix",
+  "comfortable": {
+    "buttonClassHasTextMeta": false,
+    "buttonClassHasTextXs": true,
+    "buttonFontSize": "12px",
+    "labelFontSize": "12px",
+    "labelHost": "button"
+  },
+  "compact": {
+    "buttonClassHasTextMeta": false,
+    "buttonClassHasTextXs": true,
+    "buttonFontSize": "12px",
+    "labelFontSize": "12px",
+    "labelHost": "button"
+  }
+}

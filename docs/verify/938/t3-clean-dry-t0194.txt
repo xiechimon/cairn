@@ -1,0 +1,8 @@
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        dry
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+WOULD-CLEAN hp/pacman/t-0194-932-320px-933 (PR #936 merged) -> worktree:/private/tmp/pacman-938-pos local-branch remote-branch
+
+---
+plan: would-clean=1 kept=0 — re-run with --yes to execute

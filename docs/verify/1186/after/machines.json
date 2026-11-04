@@ -1,0 +1,38 @@
+[
+  {
+    "id": "MZb6lpbTkcoOBVvQhUVgg",
+    "name": "cursor",
+    "teamId": "YK-_7L-0zTw6nzbJzdjkH",
+    "online": false,
+    "latestCliVersion": null,
+    "kind": "local",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "runningSteps": 0,
+    "capabilities": null
+  },
+  {
+    "id": "bFMI8zkDQTIHDrZMk4n40",
+    "name": "verify-1186",
+    "teamId": "YK-_7L-0zTw6nzbJzdjkH",
+    "online": true,
+    "latestCliVersion": "0.2.0",
+    "kind": "remote",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "runningSteps": 0,
+    "capabilities": {
+      "mcpServers": [],
+      "skills": [
+        "demo-skill",
+        "extra-skill"
+      ]
+    }
+  }
+]

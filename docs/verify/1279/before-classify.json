@@ -1,0 +1,11 @@
+{
+  "expect": "old",
+  "classified": {
+    "feedback": "user",
+    "bare": "synthetic",
+    "matching": "synthetic",
+    "drifted": "user",
+    "staleTask": "user"
+  },
+  "drifted": "漂移前俳句\n\n写一首俳句，句号收尾。\n\n上一轮执行失败。用户反馈：「把句号改成叹号试试」。请把反馈纳入本轮：涉及方案先输出更新后的 plan.md（覆盖 Context/Changes/Edge cases/Verification 四段），再忠实执行完成任务。"
+}

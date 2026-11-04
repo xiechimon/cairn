@@ -1,0 +1,32 @@
+[
+  {
+    "url": "http://127.0.0.1/skills/x",
+    "status": 400,
+    "error": "invalid url: only https URLs are supported, got http://127.0.0.1/skills/x"
+  },
+  {
+    "url": "https://192.168.1.5/acme/repo",
+    "status": 400,
+    "error": "refusing to import from a private or loopback host: 192.168.1.5 (https://192.168.1.5/acme/repo)"
+  },
+  {
+    "url": "https://internal.corp.example/acme/repo",
+    "status": 400,
+    "error": "unsupported host: only GitHub URLs are supported (https://github.com/<owner>/<repo>[/tree/<ref>/<subdir>]), got https://internal.corp.example/acme/repo"
+  },
+  {
+    "url": "localPath in skillsDir",
+    "status": 400,
+    "error": "localPath /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0289-1170-localpath-github-url-refresh/.claude/verify-run/home/skills/hand-made-skill resolves inside the pacman skills directory (/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0289-1170-localpath-github-url-refresh/.claude/verify-run/home/skills) — it is already visible to pacman; import from a directory outside it"
+  },
+  {
+    "url": "binary file",
+    "status": 400,
+    "error": "skill file is not valid UTF-8 text (binary files are not importable through this channel): logo.png"
+  },
+  {
+    "url": "oversize",
+    "status": 400,
+    "error": "skill file too large: big.txt is 512001 bytes (limit 512000)"
+  }
+]

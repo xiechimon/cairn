@@ -1,0 +1,86 @@
+---
+title: "Step claim (StepClaim.tla)"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: waiting
+    lg1: claimed
+    lg2: settled
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  s0: Pending (card open)
+  s1: Stopped (card closed)
+  s2: Claimed (card open)
+  s3: Stopped (task archived)
+  s4: Claimed, stop pending (card closed)
+  s5: Claimed, archive stop requested (task archived)
+  s6: Pending (task archived)
+  s7: Claimed (card closed)
+  s8: Failed (card open)
+  s9: Claimed, archive stop acknowledged (task archived)
+  s10: Failed (card closed)
+  s11: Failed (task archived)
+  s12: Waiting for quota (card open)
+  s13: Waiting for quota (card closed)
+  s14: Done (card open)
+  s15: Done (card closed)
+  s16: Done (task archived)
+  [*] --> s0
+  s0 --> s1: user closes card
+  s0 --> s2: tryClaim or tryClaim (response lost)
+  s0 --> s3: user archives task
+  s1 --> s3: user archives task
+  s2 --> s4: user closes card
+  s2 --> s5: user archives task
+  s3 --> s6: enqueueStep after archive
+  s4 --> s5: user archives task
+  s4 --> s7: fetchStop
+  s2 --> s0: scheduler tick sweeps
+  s5 --> s9: fetchStop
+  s2 --> s8: finishStep or daemon restarts, recover
+  s6 --> s3: user closes card or scheduler tick sweeps
+  s4 --> s1: scheduler tick sweeps
+  s4 --> s10: finishStep or daemon restarts, recover
+  s7 --> s5: user archives task
+  s5 --> s3: scheduler tick sweeps or finishStep or daemon restarts, recover or finishStep lands after await
+  s2 --> s12: finishStep
+  s8 --> s10: user closes card
+  s8 --> s11: user archives task
+  s7 --> s1: scheduler tick sweeps or finishStep
+  s4 --> s13: finishStep
+  s7 --> s10: daemon restarts, recover or finishStep
+  s10 --> s11: user archives task
+  s9 --> s3: scheduler tick sweeps or daemon restarts, recover or finishStep or finishStep lands after await
+  s2 --> s14: finishStep lands after await
+  s11 --> s6: enqueueStep after archive
+  s12 --> s1: user closes card
+  s12 --> s3: user archives task
+  s4 --> s15: finishStep lands after await
+  s13 --> s3: user archives task
+  s13 --> s1: scheduler tick sweeps
+  s7 --> s13: finishStep
+  s14 --> s15: user closes card
+  s14 --> s16: user archives task
+  s12 --> s0: scheduler tick sweeps
+  s15 --> s16: user archives task
+  s7 --> s15: finishStep lands after await
+  s16 --> s6: enqueueStep after archive
+  class s0 blue
+  class s1 teal
+  class s2 orange
+  class s3 teal
+  class s4 orange
+  class s5 orange
+  class s6 blue
+  class s7 orange
+  class s8 teal
+  class s9 orange
+  class s10 teal
+  class s11 teal
+  class s12 blue
+  class s13 blue
+  class s14 teal
+  class s15 teal
+  class s16 teal

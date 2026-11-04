@@ -1,0 +1,10 @@
+{"source": "3e29c5631885f6d8ba4d049b0e2333bed353c8a2", "counts": {"cases": 64, "results": 176, "errors": 16}}
+flow=/private/tmp/cairn-1864-review/error-only-history  64 cases
+
+oracle     decision_ok 64/64 (100%)  receipt_ok 64/64 (100%)
+null       decision_ok 0/64 (0%)  receipt_ok 0/64 (0%)  failed: d01(0) d02(0) d03(0) d04(0) d05(0) d06(0) c01(0) c02(0) …
+misroute   decision_ok 0/44 (0%)  receipt_ok 44/44 (100%)  failed: d01(0) d02(0) d03(0) d04(0) d05(0) d06(0) c01(0) c02(0) …
+
+oracle 100% / null 0% / misroute 0%; grader controls passed
+wrote /private/tmp/cairn-1864-review/error-only-history/report.html (1 variants, 64 cases) and trajectory/scores.tsv
+historical report verified: s 7/18; s01 0/3 oracle verified; headline withheld

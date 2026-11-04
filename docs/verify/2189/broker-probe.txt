@@ -1,0 +1,6 @@
+# Broker token scope probe on omarchy, 2026-10-31, run as ian against the broker socket.
+# Other repository: an existing private xiechimon repository (name withheld). Invalid protection body, so a regression returns 422 without changing anything.
+branch-protection status=403
+other-repository status=404
+own-repository status=200
+probe exit=0

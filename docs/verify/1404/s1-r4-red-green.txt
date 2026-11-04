@@ -1,0 +1,72 @@
+# #1404 S1 round 4 (pr-gate run 2 suggestions): deleted-test regexes without case, renamed/copied entries need previous_filename,
+# plus tests that pin current behavior. New tests first, red, then green after the fix.
+
+== red: against the S1 sources at 0cc6b16, only tests changed; the tests for 1 and 2 fail, the pinning tests pass ==
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+     × 测试目录与 .test / .spec 后缀不分大小写（ADR 0021 D4，与 pr-gate 的 /i 一致） 8ms
+     × 改名或复制条目缺 previous_filename（缺省或 null）：形状不对，返回 null，原名不能悄悄丢掉 7ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: renamed: expected [ { status: 'renamed', …(6) } ] to be null
+AssertionError: expected [] to deeply equal [ Array(4) ]
+ Test Files  2 failed | 1 passed (3)
+      Tests  2 failed | 85 passed (87)
+exit=1
+
+the new tests in this round (--reporter=verbose, same run):
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 票号是另一票号的前缀：docs/verify/14040/ 不是 1404 的证据
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > biome.json 嵌套在源码里
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > gitattributes 嵌套
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > daemon 的合并决定
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸源码另列一份（D4 ④）
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > e2e/、tests/、__tests__/ 目录下删掉的文件都算，不必带 .test 后缀
+ × |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试目录与 .test / .spec 后缀不分大小写（ADR 0021 D4，与 pr-gate 的 /i 一致）
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 改名把别票的证据移进本票目录：按原名列出
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要
+ × |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 改名或复制条目缺 previous_filename（缺省或 null）：形状不对，返回 null，原名不能悄悄丢掉
+
+expected digest for the code-unit sort test, computed by an independent Python (sorted() orders by code point,
+which equals UTF-16 code-unit order inside the BMP), not read back from this implementation:
+$ python3 -I sortdigest.py
+["modified","apps/web/src/B.ts",null,"3333333333333333333333333333333333333333"]
+["modified","apps/web/src/a-b.ts",null,"4444444444444444444444444444444444444444"]
+["modified","apps/web/src/a.b.ts",null,"2222222222222222222222222222222222222222"]
+["modified","apps/web/src/a/b.ts",null,"1111111111111111111111111111111111111111"]
+pd1:705a58e14af8f2aac1703c4e4dbd299a69fa183e141630e556a97d7e12290436
+sortdigest.py:
+  import hashlib, json
+  files = [
+      ("apps/web/src/a/b.ts", "1" * 40),
+      ("apps/web/src/a.b.ts", "2" * 40),
+      ("apps/web/src/B.ts", "3" * 40),
+      ("apps/web/src/a-b.ts", "4" * 40),
+  ]
+  tuples = sorted(json.dumps(["modified", n, None, s], separators=(",", ":"), ensure_ascii=False) for n, s in files)
+  for t in tuples:
+      print(t)
+  print("pd1:" + hashlib.sha256("\n".join(tuples).encode("utf-8")).hexdigest())
+
+== green: round 4 sources (paths.ts: /i on TEST_DIR_RE and TEST_FILE_RE, ownEvidence inlined; digest.ts: renamed/copied without previous_filename -> null) ==
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ Test Files  3 passed (3)
+      Tests  87 passed (87)
+exit=0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0
+
+== /simplify on digest.ts, paths.ts, evidence-link.ts, packages/shared merge-gate.ts (single pass, no Agent tool) ==
+no code change: no existing glob or evidence helper to reuse; no dead code or copy-paste; no hot path or I/O.
+skipped: merging isEvidencePath (case-sensitive, digest) with isEvidence (case-insensitive, paths) changes behavior;
+folding the two previous_filename checks into one ternary reads worse; hoisting the 40-hex regex and the raw URL prefix
+in evidence-link.ts is negligible; MERGE_POLICIES / mergePolicySchema / MERGE_GATE_STATUS_CONTEXT are unused so far
+but are vocabulary for later slices (removal of intentional code needs the user first).
+$ pnpm exec vitest run apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ Test Files  3 passed (3)
+      Tests  87 passed (87)   (digest 25, paths 50, evidence-link 12)
+exit=0

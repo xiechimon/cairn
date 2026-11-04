@@ -1,0 +1,5 @@
+FAIL no-tasks: Acceptance section is missing
+pr-tasks: the body contract is .github/PULL_REQUEST_TEMPLATE.md (What / Verified / Upstream / Risk / Acceptance / Issues); its Acceptance section must carry at least one task-list item, all checked.
+pr-tasks: see .claude/skills/pr-pacman/SKILL.md.
+pr-tasks: RED (1 problem(s))
+exit=1

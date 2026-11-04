@@ -1,0 +1,137 @@
+# #1459 round 2 mutations: one per new rule, all run at head 2ef0d9ab. At the gated head 43e47e3c the three mutated
+# sources (webhook.ts, lib/github.ts, issue-intake.ts) and the three test files are byte-identical (git diff --quiet);
+# the merge of main #1480 in between changed chief.ts, chief-tools.ts and shared prompts.ts, and the 252 tests here
+# pass at 43e47e3c (gates-r2.txt, vitest --changed origin/main).
+# Driver: docs/verify/1459/r2-mutate.mjs with docs/verify/1459/r2-mutations.json. Each mutation applies its edits to
+# one source file, runs
+#   pnpm exec vitest run --reporter=verbose apps/server/test/webhook.test.ts apps/server/test/issue-intake.test.ts
+#     apps/server/test/github-issues.test.ts   (252 tests)
+# and writes the saved file content back; `git status --short` is printed at the end.
+#
+# rule (fix commit)                                   mutation  result (failing tests)   watched tests that fail
+# stored githubRepo via githubRepoOfProject (bfa8b01f)  R1      RED 2/252                W17 x2
+# audit line before orchestration (bfa8b01f)           R2      RED 1/252                W18
+# poller counts imports in flight (#1477, test only)    R3      RED 1/252                W15 (W8 is webhook-only, passes)
+# import 404 answered 202 misconfigured                 R4      RED 2/252                W16, W19 (D2 stops earlier)
+# generic 202 detail for sender refusals (bfa8b01f)    R5      RED 12/252               W1, W2, W4 x5, W4b x4, W12b
+#   one of the three told apart                         R5b     RED 3/252                W1, W2, W12b
+# retryAt prefers retry-after (bfa8b01f)               R6      RED 4/252                group 24 both-headers x4
+# sender login shape (b9f6d92f)                         R7      RED 3/252                W20 x3 (W20b passes)
+# import 404 split by re-reading the token (b9f6d92f)  R8      RED 1/252                W19 (W16 passes)
+# rate-limit headers as integers only (b9f6d92f)       R9      RED 4/252                group 24 empty retry-after x4
+
+## R1: webhook splits full_name again when githubRepoOfProject refuses the stored repo (pre-round-2 behavior)
+file: apps/server/src/services/webhook.ts
+  replace: "  const repoRef = githubRepoOfProject(repoRow);\n"
+     with: "  const slash0 = fullName.indexOf('/');\n  const repoRef = githubRepoOfProject(repoRow) ?? {\n    owner: fullName.slice(0, slash0),\n    repo: fullName.slice(slash0 + 1),\n  };\n"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  2 failed | 250 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W 存量 githubRepo 形坏 > W17 项目存的 githubRepo 是 ../user（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W 存量 githubRepo 形坏 > W17 项目存的 githubRepo 是 owner/..（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志
+  watched: FAIL  W17 项目存的 githubRepo 是 ../user
+  watched: FAIL  W17 项目存的 githubRepo 是 owner/..
+## R2: the 'import accepted' audit line is written after orchestrateTodo again
+file: apps/server/src/services/webhook.ts
+  replace: "  logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');\n"
+     with: ""
+  replace: "  const orchestration = orchestrateTodo(deps, todoId);\n"
+     with: "  const orchestration = orchestrateTodo(deps, todoId);\n  logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');\n"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 251 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W 审计行 > W18 导入成功后编排抛错（总管没绑 Agent，409）→ 卡已建，「import accepted」审计行照写
+  watched: FAIL  W18 
+## R3: the poller's in-flight count goes back to database rows only (the webhook's count unchanged)
+file: apps/server/src/services/issue-intake.ts
+  replace: "export function projectAtInFlightCap(db: Db, projectId: string): boolean {"
+     with: "export function projectAtInFlightCap(db: Db, projectId: string, countImports = true): boolean {"
+  replace: "  return inFlight + importsInFlightFor(projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;"
+     with: "  return inFlight + (countImports ? importsInFlightFor(projectId) : 0) >= ISSUE_INTAKE_IN_FLIGHT_CAP;"
+  replace (all): "projectAtInFlightCap(deps.db, row.id)"
+     with: "projectAtInFlightCap(deps.db, row.id, false)"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 251 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W 在飞现数与导入的 404 > W15 webhook 的导入还在等 GitHub 时轮询器扫一轮：差一位到上限，轮询器把那条在飞的算进去，不读列表、不领
+  watched: FAIL  W15 
+  watched: pass  W8 
+## R4: the webhook's mapping of the import's own 404 to 202 misconfigured is removed
+file: apps/server/src/services/webhook.ts
+  replace: "    if (err instanceof HttpError && err.status === 404) {\n      if ('reason' in teamGithubToken(deps, tokenRow.teamId)) {\n        return refuse('no-github-connection', 'misconfigured', 'github connection not found');\n      }\n      return refuse(\n        'issue-not-found',\n        'misconfigured',\n        `issue ${fullName}#${issueNumber} not found on GitHub (or not visible to the team token)`,\n      );\n    }\n"
+     with: ""
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  2 failed | 250 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W 在飞现数与导入的 404 > W16 权限读的 await 期间团队的 GitHub 连接被删 → 导入自己的 404 收成 202 misconfigured，不建卡
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W19 导入时 GitHub 说 issue 不存在（详情读 404，连接还在）→ 202 misconfigured 说 issue 读不到，不说连接没了，记日志
+  watched: FAIL  W16 
+  watched: FAIL  W19 
+  watched: pass  D2 
+## R5: every refusal answers its specific detail in the 202 again (login and permission verdict to the URL-token holder)
+file: apps/server/src/services/webhook.ts
+  replace: "    return respond(logger, { result, deliveryId, detail: answer });"
+     with: "    return respond(logger, { result, deliveryId, detail });"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  12 failed | 240 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（429 without headers）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（429 with retry-after 60）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（403 with x-ratelimit-remaining 0 and x-ratelimit-reset）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4b permission 读遇限流（403 secondary limit, message only）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  watched: FAIL  W1 
+  watched: FAIL  W2 
+  watched: FAIL  W4 permission 读失败
+  watched: FAIL  W4b 
+  watched: FAIL  W12b 
+## R5b: only sender-below-triage answers its specific detail (one of the three cases told apart)
+file: apps/server/src/services/webhook.ts
+  replace: "    return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);"
+     with: "    return refuse('sender-below-triage', 'ignored', `${sender} is below triage on ${fullName}`);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  3 failed | 249 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  FAIL  test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  watched: FAIL  W1 
+  watched: FAIL  W2 
+  watched: pass  W4 permission 读失败
+  watched: pass  W4b 
+  watched: FAIL  W12b 
+## R6: GithubRateLimitedError.retryAt prefers x-ratelimit-reset over retry-after again
+file: apps/server/src/lib/github.ts
+  replace: "    if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;\n    return this.resetAt;"
+     with: "    if (this.resetAt !== null) return this.resetAt;\n    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 248 passed (252)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）：本队这一轮不再读列表
+  watched: FAIL  （二级限流，retry-after 60 与 x-ratelimit-reset 都在）
+## R7: the sender login-shape check is skipped (`..`, `.`, `a/b` reach the permission URL)
+file: apps/server/src/services/webhook.ts
+  replace: "  if (!GITHUB_LOGIN.test(sender)) {"
+     with: "  if (false && !GITHUB_LOGIN.test(sender)) {"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  3 failed | 249 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（".."）→ 202 ignored，零出站，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"."）→ 202 ignored，零出站，记日志
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"a/b"）→ 202 ignored，零出站，记日志
+  watched: FAIL  W20 
+  watched: pass  W20b 
+## R8: every import 404 is answered 'github connection not found' again (no split by re-reading the team token)
+file: apps/server/src/services/webhook.ts
+  replace: "      if ('reason' in teamGithubToken(deps, tokenRow.teamId)) {"
+     with: "      if (true || 'reason' in teamGithubToken(deps, tokenRow.teamId)) {"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  1 failed | 251 passed (252)  -> RED
+  FAIL  test/webhook.test.ts > #1459 round 2 W review 发现 > W19 导入时 GitHub 说 issue 不存在（详情读 404，连接还在）→ 202 misconfigured 说 issue 读不到，不说连接没了，记日志
+  watched: FAIL  W19 
+  watched: pass  W16 
+## R9: rate-limit headers parsed with Number() again (an empty retry-after becomes 0 seconds)
+file: apps/server/src/lib/github.ts
+  replace: "        return /^\\d+$/.test(v) ? Number(v) : null;"
+     with: "        return res.headers.get(name) === null ? null : Number(v);"
+result: exit 1, Test Files  1 failed | 2 passed (3) ; Tests  4 failed | 248 passed (252)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）：本队这一轮不再读列表
+  watched: FAIL  （retry-after 是空串，x-ratelimit-remaining 0 带 reset）
+git status --short after the last mutation (source files restored):
+  (clean)

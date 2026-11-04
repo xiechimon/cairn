@@ -1,0 +1,36 @@
+✔ incident handoff leaves recurrence accounting to the collector (0.599155ms)
+✔ dispatcher message exists and retains the closing trailer (6.949823ms)
+✔ recovery fixture executes the recipe without incident wording assertions (0.16032ms)
+✔ AGENTS.md separates bot rebase from human squash (4.682831ms)
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (0.161322ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.102638ms)
+✔ documented preparation overrides inherited bot author and committer identities (34.458171ms)
+✔ identity wrappers are explicitly excluded from commit preparation (0.832541ms)
+✔ .claude/skills/pr-cairn/SKILL.md recovers through a compliant push without rewriting main (0.239677ms)
+✔ docs/ops/agent-bot-identity.md recovers through a compliant push without rewriting main (0.090515ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (36.611284ms)
+✔ recovery regression is run by the trusted main workflow (0.723188ms)
+✔ incident recovery documents #2136 rejected SHAs and pending production acceptance (3.938241ms)
+✔ incident recovery preserves trailers and history while passing the actual push check (34.220911ms)
+✔ PR validation reads the explicit head without executing PR code (0.884393ms)
+✔ a bot-authored commit beneath a human tip is rejected (22.375029ms)
+✔ a squash commit authored by the bot is rejected (16.536582ms)
+✔ main push checks bot squash (15.3785ms)
+✔ main push checks bot beneath human tip (18.643724ms)
+✔ main push checks historical bot (19.696612ms)
+✔ main push checks missing before (14.936719ms)
+✔ main push checks zero before (15.623524ms)
+✔ every commit in a clean human range passes (19.943303ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.706871ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (10.647673ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (10.891485ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (10.726012ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (10.850953ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 248.963397

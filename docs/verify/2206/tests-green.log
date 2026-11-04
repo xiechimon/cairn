@@ -1,0 +1,193 @@
+$ python3 scripts/pr-evidence-gate.test.py
+...........................................
+----------------------------------------------------------------------
+Ran 43 tests in 0.998s
+
+OK
+Exit: 0; expected: 0
+
+$ node --test scripts/agent-rules.test.mjs scripts/prepush.test.mjs
+✔ merge instructions require the pr-gate auto-merge verdict (2.659833ms)
+✔ AGENTS.md and pr-cairn agree that agents never add needs-decision (0.62075ms)
+✔ active docs never tell agents to add needs-decision (1.451958ms)
+[prepush] git init -q
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 0 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+[prepush] node scripts/comment-discipline-gate.mjs
+[prepush] scripts/comment-discipline-gate.mjs blocked the push; recorded 1 intercepts
+✔ scrubGateEnv drops every gate base SHA and the force-full switch (1.422ms)
+✔ hasCode classifies documents (0.280208ms)
+✔ hasCode classifies server markdown fixtures (0.052416ms)
+✔ hasCode classifies shared markdown fixtures (0.058125ms)
+✔ hasCode classifies integration markdown fixtures (0.051584ms)
+✔ hasCode classifies executable evidence (0.135083ms)
+✔ hasCode classifies non-markdown evidence (0.104875ms)
+✔ hasCode classifies unknown or executable-like files under docs (0.042625ms)
+✔ hasCode classifies data beside an executable check (1.063666ms)
+✔ hasCode classifies the #2188 lessons and evidence change (1.465916ms)
+✔ hasCode classifies epic data (0.047292ms)
+✔ hasCode classifies code (0.036459ms)
+✔ hasCode classifies unknown paths (0.027666ms)
+✔ hasCode classifies mixed changes (0.026375ms)
+✔ hasCode classifies empty changes (0.022917ms)
+✔ --has-code prints only a boolean, uses the supplied base and fails closed (1047.766083ms)
+✔ CI classifies before heavy work and always runs push coverage (1.265792ms)
+✔ required aggregates only accept skipped work after a successful docs-only classification (639.235542ms)
+✔ folded gates stay visibly red, continue after failures and retain full history (0.506834ms)
+✔ documentation skips code checks, unknown paths fail closed (1.944792ms)
+✔ changes to prepush scripts run the CI self-test files locally (5.694167ms)
+✔ the CI self-test step runs selfTests through prepush and names no self-test file itself (0.252917ms)
+✔ --self-test runs exactly the selfTests files, skips change detection and fails with them (382.651875ms)
+✔ escape-trace tests stay mandatory for every code prepush plan (1.237875ms)
+✔ the recording gate runs in local prepush, in CI prepush and in the CI self-test step (0.330083ms)
+✔ a ledger entry change runs the ledger gate even when only documents changed (0.091542ms)
+✔ local code checks retain fast checks and advisory dead-class (0.262375ms)
+✔ every CI node scripts step also runs in local prepush or is listed as CI-only (0.378666ms)
+✔ code changes keep suites in CI and out of local plans (2.518417ms)
+✔ local gates default their base to the merge-base, not the moving origin/main tip (5.589833ms)
+✔ executable evidence keeps code checks and data evidence keeps document readers (0.390292ms)
+✔ a docs-only data change still runs every test that reads the changed file (32.032167ms)
+✔ every node --test step in any workflow runs locally when its tests, sources or workflow change (9.473292ms)
+✔ e2e coverage check passes on the real suite and names an unmapped spec (101.268583ms)
+✔ a board card source change selects the spec that reads its title (33.630417ms)
+✔ CI shares the plan but keeps advisory and full e2e in separate jobs (0.544792ms)
+✔ CLI skips real document changes and rejects a missing base (1413.368ms)
+✔ a stale local origin/main is refreshed by fetch before computing changes (540.835917ms)
+✔ fetch failure falls back to the local origin/main and prints a stale notice (300.225583ms)
+✔ prepush vitest only forgives files listed as known local red (0.913333ms)
+✔ plan children do not inherit the git hook repository binding (49.808333ms)
+✔ only gate scripts are mapped to a ledger category when a step goes red (0.191625ms)
+✔ a gate that blocks a push records one intercept for every entry whose safeguard names it (34.76075ms)
+✔ a red gate step leaves the repository untouched and still exits non-zero (33.316583ms)
+✔ retrying the same gate on the same branch after another commit records nothing new (79.208333ms)
+✔ CAIRN_GATE_LOG appends the gate-red events for a CI job to collect (74.152125ms)
+✔ a checkout without docs/lessons, or CAIRN_LESSONS_LEDGER=0, leaves the tree untouched (1.651917ms)
+✔ logging is opt-in and never projects counters into the checkout (9.763458ms)
+✔ CI doc-reader checks select the real codeowners reader for identity documentation (18.440166ms)
+✔ workflow preserves comments about external behavior (0.357417ms)
+✔ forced push coverage preserves the English gate range across multiple commits (294.86425ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5180.86025
+Exit: 0; expected: 0
+
+$ pnpm lint
+$ biome ci .
+[0mapps/server/test/feishu-config.test.ts[0m[0m:[0m[0m144[0m[0m:[0m[0m7[0m[0m [0m[0m]8;;https://biomejs.dev/linter/rules/use-flat-map\lint/complexity/useFlatMap]8;;\[0m[0m [0m[0m[30m[47m FIXABLE [0m[0m [0m[0m━━━━━━━━━━━━━━━━━━[0m[0m
+
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mThe call chain [0m[0m[1m[34m.map().flat()[0m[0m[34m can be replaced with a single [0m[0m[1m[34m.flatMap()[0m[0m[34m call.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m142 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m{[0m[0m [0m[0md[0m[0mb[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m,[0m[0m [0m[0mb[0m[0mo[0m[0mx[0m[0m:[0m[0m [0m[0ms[0m[0m.[0m[0ms[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mB[0m[0mo[0m[0mx[0m[0m [0m[0m}[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m143 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0mt[0m[0me[0m[0ma[0m[0mm[0m[0m.[0m[0mi[0m[0md[0m[0m,[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m144 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0ms[0m[0m.[0m[0md[0m[0mb[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m145 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ms[0m[0me[0m[0ml[0m[0me[0m[0mc[0m[0mt[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m146 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m147 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m148 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mm[0m[0ma[0m[0mp[0m[0m([0m[0m([0m[0mr[0m[0mo[0m[0mw[0m[0m)[0m[0m [0m[0m=[0m[0m>[0m[0m [0m[0m[[0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mI[0m[0md[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m,[0m[0m [0m[0mr[0m[0mo[0m[0mw[0m[0m.[0m[0ma[0m[0mp[0m[0mp[0m[0mS[0m[0me[0m[0mc[0m[0mr[0m[0me[0m[0mt[0m[0mC[0m[0mi[0m[0mp[0m[0mh[0m[0me[0m[0mr[0m[0m][0m[0m)[0m[0m
+[0m[0m  [0m[0m[1m[31m>[0m[0m [0m[0m[1m149 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0ml[0m[0ma[0m[0mt[0m[0m([0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m[1m   │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m[1m[31m^[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150 │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151 │ [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mUsing [0m[0m[1m[34m.flatMap()[0m[0m[34m avoids the creation of an intermediate array.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m[1m[34mℹ[0m[0m [0m[0m[34mSafe fix: Replace the chain with [0m[0m[1m[34m.flatMap()[0m[0m[34m.[0m[0m
+[0m[0m  [0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m146[0m[0m [0m[0m[1m146[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0mf[0m[0mr[0m[0mo[0m[0mm[0m[0m([0m[0mf[0m[0me[0m[0mi[0m[0ms[0m[0mh[0m[0mu[0m[0mB[0m[0mi[0m[0mn[0m[0md[0m[0mi[0m[0mn[0m[0mg[0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m147[0m[0m [0m[0m[1m147[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m.[0m[0ma[0m[0ml[0m[0ml[0m[0m([0m[0m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m148[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[2m[31m·[0m[0m[31m.[0m[0m[1m[31mm[0m[0m[1m[31ma[0m[0m[1m[31mp[0m[0m[31m([0m[0m[31m([0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m)[0m[0m[2m[31m·[0m[0m[31m=[0m[0m[31m>[0m[0m[2m[31m·[0m[0m[31m[[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mI[0m[0m[31md[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m,[0m[0m[2m[31m·[0m[0m[31mr[0m[0m[31mo[0m[0m[31mw[0m[0m[31m.[0m[0m[31ma[0m[0m[31mp[0m[0m[31mp[0m[0m[31mS[0m[0m[31me[0m[0m[31mc[0m[0m[31mr[0m[0m[31me[0m[0m[31mt[0m[0m[31mC[0m[0m[31mi[0m[0m[31mp[0m[0m[31mh[0m[0m[31me[0m[0m[31mr[0m[0m[31m][0m[0m[1m[31m)[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m149[0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m │ [0m[0m[31m-[0m[0m [0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[2m[31m·[0m[0m[1m[31m.[0m[0m[1m[31mf[0m[0m[1m[31ml[0m[0m[1m[31ma[0m[0m[1m[31mt[0m[0m[1m[31m([0m[0m[31m)[0m[0m[31m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m148[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[2m[32m·[0m[0m[32m.[0m[0m[1m[32mf[0m[0m[1m[32ml[0m[0m[1m[32ma[0m[0m[1m[32mt[0m[0m[1m[32mM[0m[0m[1m[32ma[0m[0m[1m[32mp[0m[0m[32m([0m[0m[32m([0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m)[0m[0m[2m[32m·[0m[0m[32m=[0m[0m[32m>[0m[0m[2m[32m·[0m[0m[32m[[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mI[0m[0m[32md[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m,[0m[0m[2m[32m·[0m[0m[32mr[0m[0m[32mo[0m[0m[32mw[0m[0m[32m.[0m[0m[32ma[0m[0m[32mp[0m[0m[32mp[0m[0m[32mS[0m[0m[32me[0m[0m[32mc[0m[0m[32mr[0m[0m[32me[0m[0m[32mt[0m[0m[32mC[0m[0m[32mi[0m[0m[32mp[0m[0m[32mh[0m[0m[32me[0m[0m[32mr[0m[0m[32m][0m[0m[32m)[0m[0m[32m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m150[0m[0m [0m[0m[1m149[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m,[0m[0m
+[0m[0m  [0m[0m  [0m[0m[1m151[0m[0m [0m[0m[1m150[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1256 files in 1006[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[34mFound [0m[0m[34m1[0m[0m[34m info.[0m
+Exit: 0; expected: 0
+
+$ node scripts/english-only-gate.mjs
+english-only-gate: 0 line(s) with Chinese text
+Exit: 0; expected: 0
+
+$ node scripts/comment-discipline-gate.mjs
+comment-discipline-gate: 0 new comment line(s)
+Exit: 0; expected: 0
+
+$ python3 scripts/pr-evidence-gate.py .github/PULL_REQUEST_TEMPLATE.md
+pr-evidence: sections: 0/4 answered
+FAIL empty-section: What
+FAIL empty-section: Proof
+FAIL empty-section: Review
+FAIL empty-section: Risk
+pr-evidence: the body contract is .github/PULL_REQUEST_TEMPLATE.md (Proof / What / Review / Risk).
+pr-evidence: the global show-me /pr template (Summary/Evidence/Merge Danger) does not satisfy this gate; use the repo skill .claude/skills/pr-cairn/SKILL.md.
+pr-evidence: scanned 0 image link(s)
+pr-evidence: RED (4 problem(s))
+Exit: 1; expected: 1
+
+$ python3 scripts/pr-evidence-gate.py /tmp/2206-filled.md
+pr-evidence: sections: 4/4 answered
+pr-evidence: scanned 0 image link(s)
+pr-evidence: GREEN
+Exit: 0; expected: 0
+
+CHECKS COMPLETE: 7/7 expected results
+
+$ python3 scripts/pr-evidence-archive.test.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 1.068s
+
+OK
+Exit: 0
+
+$ node scripts/lessons-ledger-gate.mjs
+lessons ledger ok
+Exit: 0
+
+$ git diff --check
+Exit: 0
+
+$ python3 /Users/xmon/.codex/skills/.system/skill-creator/scripts/quick_validate.py .claude/skills/pr-cairn
+Traceback (most recent call last):
+  File "/Users/xmon/.codex/skills/.system/skill-creator/scripts/quick_validate.py", line 10, in <module>
+    import yaml
+ModuleNotFoundError: No module named 'yaml'
+Exit: 1
+
+Filled example used by the CLI check:
+## Proof
+
+`test_601_visible_characters_fail_with_the_count`: main returned `AssertionError: 0 != 1`; passes here.
+Not verified: CI and live screenshot hosting.
+
+## What
+
+Implement #2206 items 1–3: proof first, a prose cap and asset branches; extends #2199 and preserves #2201's other gate changes.
+
+<details><summary>Review and risk</summary>
+
+## Review
+
+Local diff reviewed; independent review not run. This is an uncommitted example body.
+
+## Risk
+
+Reversible gate change. The existing gardener producer exceeds the cap; its workflow is outside this task's scope and overlaps #2201.
+
+</details>
+
+Known compatibility limit: the unchanged gardener weekly producer exceeds the new prose cap. Its regression test asserts rejection; workflow edits remain with #2201.

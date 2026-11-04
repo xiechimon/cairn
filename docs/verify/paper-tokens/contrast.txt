@@ -1,0 +1,32 @@
+spot-soft = #f5e7e1 (card-button 14% over card)
+accent-soft over background = #f1e2d9
+pair                                                 ratio gate result
+foreground #2b2620 on card #ffffff                   14.99  4.5 pass
+foreground #2b2620 on background #fbf9f5             14.26  4.5 pass
+foreground #2b2620 on canvas #f3eee5                 12.97  4.5 pass
+text-secondary #5e564d on card #ffffff                7.21  4.5 pass
+text-secondary #5e564d on background #fbf9f5          6.85  4.5 pass
+text-secondary #5e564d on canvas #f3eee5              6.24  4.5 pass
+text-secondary #5e564d on secondary #ebe4d8           5.70  4.5 pass
+text-tertiary #746a5f on card #ffffff                 5.29  4.5 pass
+text-tertiary #746a5f on background #fbf9f5           5.03  4.5 pass
+text-tertiary #746a5f on canvas #f3eee5               4.58  4.5 pass
+text-tertiary #746a5f on secondary #ebe4d8            4.19  4.5 FAIL
+text-dim #8f8985 on card #ffffff                      3.45    3 pass
+text-dim #8f8985 on canvas #f3eee5                    2.99    3 FAIL
+card-button #b4532a on card #ffffff                   4.99  4.5 pass
+card-button #b4532a on background #fbf9f5             4.74  4.5 pass
+card-button #b4532a on canvas #f3eee5                 4.32    3 pass
+white #ffffff on card-button #b4532a                  4.99  4.5 pass
+background #fbf9f5 on foreground #2b2620             14.26  4.5 pass
+spot-text-on-tint #8a3a1a on spot-soft #f5e7e1        6.44  4.5 pass
+spot-text-on-tint #8a3a1a on accent-soft@background #f1e2d9  6.15  4.5 pass
+spot-text-on-tint #8a3a1a on accent-hover #f6ebe3     6.63  4.5 pass
+card-button #b4532a on spot-soft #f5e7e1              4.13    3 pass
+card-button #b4532a on accent-hover #f6ebe3           4.25  4.5 FAIL
+running #5f8f5a on card #ffffff                       3.77    3 pass
+running-text #4f7049 on card #ffffff                  5.61  4.5 pass
+running-text #4f7049 on background #fbf9f5            5.33  4.5 pass
+destructive #9e2c49 on card #ffffff                   7.22  4.5 pass
+border #ece5da on card #ffffff                        1.25    1 hairline (no gate)
+input #cbc5c1 on card #ffffff                         1.71    1 hairline (no gate)

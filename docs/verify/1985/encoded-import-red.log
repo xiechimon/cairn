@@ -1,0 +1,36 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1985
+
+ ❯ |@cairn/integration| test/routing-boundary.test.ts (48 tests | 1 failed | 39 skipped) 11ms
+   ❯ seeded implementation reuse detection (15)
+     × flags a module reference to the decoy (8) 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/routing-boundary.test.ts > seeded implementation reuse detection > flags a module reference to the decoy (8)
+AssertionError: expected [] to deeply equal [ 'adder.mjs' ]
+
+- Expected
++ Received
+
+- [
+-   "adder.mjs",
+- ]
++ []
+
+ ❯ test/routing-boundary.test.ts:105:63
+    103| describe('seeded implementation reuse detection', () => {
+    104|   test.each(referenceCases)('flags a module reference to the decoy (%#…
+    105|     expect(wrappedImplementations([{ path, content }], task)).toEqual(…
+       |                                                               ^
+    106|   });
+    107|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed | 39 skipped (48)
+   Start at  12:03:05
+   Duration  134ms (transform 53%, import 25%, tests 18%, worker 4%)
+

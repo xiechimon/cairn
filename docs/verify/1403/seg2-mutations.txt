@@ -1,0 +1,397 @@
+#1403 segment 2: mutation runs
+==============================
+
+Tree: 034441ed (segment 2 after four /code-review passes). The four mutated sources
+(lib/github.ts, services/ci-loop.ts, services/chief.ts, services/builds.ts) are
+identical at 9be72069, the head after the merge of origin/main 659d8cb5. Each
+mutation replaces exact text in one source file (each replacement matching exactly
+once), runs
+
+  (apps/server) pnpm exec vitest run test/pr-reconcile.test.ts \
+    test/chief-auto-confirm.test.ts test/chief-watch.test.ts test/gate-actor.test.ts
+
+and restores the file from a scratchpad copy, checked by sha256 before the next one.
+"caught" = at least one test fails.
+
+Result: 47 mutations, 46 caught, 1 equivalent (M06, below), 0 surviving rules.
+
+M06 is an equivalent mutant: the merged pool's floor `rejected` is already the
+highest number among the build's PRs closed without merge, so no closed unmerged PR
+can pass `p.number > rejected`, and dropping `p.merged` from that filter cannot
+change the result. The check stays in the code because it states the rule.
+
+M01  A1: a confirmed close adopts the build's own PR
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the closed path never adopts
+  result: caught (Tests  7 failed | 190 passed (197))
+    x [s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails
+    x [s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card
+    x [s2-A8] anonymous: the list read takes the slot the pulls read kept for it, within the reconcile's own budget
+    x [s2-A11] an open PR and merged ones → the open one
+    x [s2-A11] only merged ones → the highest number
+    x [s2-A19] the build records another PR while the list read is in flight (the daemon probe) → that value is kept, nothing written
+    x [s2-A13] the recorded URL is built from the repository and number, not taken from the response
+
+M02  A4: head repository must be the recorded base repository
+  file: apps/server/src/services/ci-loop.ts
+  mutation: drop the head repo id check
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-A4] the list holds only a fork PR with the same branch name → not recorded, failed as before
+    x [s2-A4] the list holds only a fork that was deleted (head repo null) → not recorded, failed as before
+
+M03  A4: base repository must be the recorded base repository
+  file: apps/server/src/services/ci-loop.ts
+  mutation: drop the base repo id check
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A4] the list holds only a PR whose base is another repository → not recorded, failed as before
+
+M04  A4: head ref must be the conversation branch
+  file: apps/server/src/services/ci-loop.ts
+  mutation: drop the head ref check
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A4] the list holds only a PR from another branch → not recorded, failed as before
+
+M05  A4: base must be the default branch
+  file: apps/server/src/services/ci-loop.ts
+  mutation: drop the base ref check
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A4] the list holds only a PR into another base → not recorded, failed as before
+
+M06  A4: a closed PR that was not merged is never taken
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the merged pool takes closed unmerged PRs too
+  result: equivalent mutant, see above (Tests  197 passed (197))
+
+M07  A11: an open PR before merged ones
+  file: apps/server/src/services/ci-loop.ts
+  mutation: open and merged in one pool
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A11] an open PR and merged ones → the open one
+
+M08  A11: among merged ones the highest number
+  file: apps/server/src/services/ci-loop.ts
+  mutation: pick the lowest number
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A11] only merged ones → the highest number
+
+M09  A5: an unreadable list keeps the first closed sighting
+  file: apps/server/src/services/ci-loop.ts
+  mutation: an unreadable list clears the sighting
+  result: caught (Tests  4 failed | 193 passed (197))
+    x [s2-A5] the list read fails (502) → nothing written; the next sweep confirms again and acts
+    x [s2-A5] the list read fails (429) → nothing written; the next sweep confirms again and acts
+    x [s2-A5] the list read fails (throw) → nothing written; the next sweep confirms again and acts
+    x [s2-A5b] the list read fails at two confirming reads in a row → the close is reported as in segment 1
+
+M10  A7: re-check after the list read (closed path)
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no re-check after the list read in the closed path
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-A7] the card leaves review while the list read is in flight → no write
+    x [s2-A7] a step starts while the list read is in flight → no write
+
+M11  A8: the anonymous list read is counted
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the list read takes no anonymous slot
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A8] anonymous: the list read takes the slot the pulls read kept for it, within the reconcile's own budget
+
+M12  A15: the recorded PR open again in the list is not an adoption
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no check at the caller
+  result: caught (Tests  3 failed | 194 passed (197))
+    x [s2-A15] the recorded PR shows up open in the list (reopened between the two reads) → not failed, nothing written
+    x [s2-A15b] the recorded PR is open again and the list also has a higher open PR of the branch → still a reopen, nothing recorded
+    x [s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card
+
+M13  A12: an adoption is counted in the sweep log
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the closed path does not count the adoption
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails
+
+M14  A12: an adoption publishes the build doc
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no build doc publish
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails
+
+M15  A9: a foreign recorded PR looks for the build's own PR first
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the foreign path never lists
+  result: caught (Tests  11 failed | 186 passed (197))
+    x [s2-A9] the recorded PR is another build's (9b shape) and this build has its own PR → its own PR is recorded, no foreign hint
+    x [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write
+    x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+    x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded number is someone else's)
+    x [s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round
+    x [s2-A20] the daemon probe records the foreign PR again and the reconcile adopts again → the adoption row is written once per round
+    x [s2-A21] anonymous: the foreign path lists the branch at most once an hour
+    x [s2-A22] the recorded PR changes: the ten-minute wait starts again for the new one
+    x [s2-A22b] the build goes back to a PR it recorded before: the old listing time is gone, the branch is listed at once
+
+M16  A9b: the foreign path lists at most every ten minutes
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the foreign path lists every sweep
+  result: caught (Tests  6 failed | 191 passed (197))
+    x [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+    x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round
+    x [s2-A21] anonymous: the foreign path lists the branch at most once an hour
+
+M17  A7b: re-check after the list read (foreign path)
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no re-check after the list read in the foreign path
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write
+
+M18  A14: merged comes from merged_at
+  file: apps/server/src/lib/github.ts
+  mutation: list items never read as merged
+  result: caught (Tests  6 failed | 191 passed (197))
+    x [s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card
+    x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+    x [s2-A11] only merged ones → the highest number
+    x [s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded number is someone else's)
+    x [s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card
+    x [s2-A14] the branch PR list parser: live captures, and unreadable answers
+
+M19  A14: the list asks for the default base only
+  file: apps/server/src/lib/github.ts
+  mutation: no base filter in the list URL
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails
+    x [s2-A14] the branch PR list parser: live captures, and unreadable answers
+
+M20  G1/G3: the review gate has its own wake text
+  file: apps/server/src/services/chief.ts
+  mutation: no review branch in wakeFacts
+  result: caught (Tests  3 failed | 194 passed (197))
+    x #1403 G9（G3）：关注的卡经相位漏斗进 review → wake 文本是 review 关口的，不是自动确认规则
+    x G1 review gate → no auto-confirm rules, no confirm_builds instruction, names the human exit
+    x G1 review gate on a todo that has split children → still the review text
+
+M21  G4: confirm refuses before the announcement row
+  file: apps/server/src/services/builds.ts
+  mutation: no phase check before the row
+  result: caught (Tests  4 failed | 193 passed (197))
+    x G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged
+    x G6 a second confirm on a todo already in building → 409, no second row, no second build step
+    x G7 confirm on a queued todo (direct execution, no confirm gate) → 409, no row, no build step
+    x G4 REST steps confirm on a review build → 409, no 通过了确认 row
+
+M22  G7: confirm only at the confirm gate (queued -> building is an edge, not a gate)
+  file: apps/server/src/services/builds.ts
+  mutation: the check uses the edge table
+  result: caught (Tests  2 failed | 195 passed (197))
+    x G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged
+    x G7 confirm on a queued todo (direct execution, no confirm gate) → 409, no row, no build step
+
+M22b  G6: a second confirm in building is refused
+  file: apps/server/src/services/builds.ts
+  mutation: the check lets the same phase through
+  result: caught (Tests  3 failed | 194 passed (197))
+    x G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged
+    x G6 a second confirm on a todo already in building → 409, no second row, no second build step
+    x G7 confirm on a queued todo (direct execution, no confirm gate) → 409, no row, no build step
+
+M23  T1: a close reported this round is not reported again
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the settled check ignores the closed row
+  result: caught (Tests  2 failed | 195 passed (197))
+    x ⑱d closed→review drag after the reconcile failed it → stays in review, errorMessage kept
+    x ⑱f closed by hand, then back to review → the close is reported once
+
+M24  T2: the round starts at the latest build or plan step
+  file: apps/server/src/services/builds.ts
+  mutation: roundStart without the kind filter
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-T2] a verify or review step created after the completion row does not start a new round
+
+M25  T3: the closed sighting is dropped when the card leaves review
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no closedSeenAt cleanup at the end of the sweep
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-T3] the first closed sighting is dropped when the card leaves review
+
+M26  T4: a failed step's checkpoint does not decide containment
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the checkpoint query without the status filter
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-T4] a failed build step that pushed a commit does not decide containment
+    x [s2-T5] a stopped build step that pushed a commit does not decide containment
+
+M27  T5: a stopped step's checkpoint does not decide containment
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the status filter also takes stopped
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-T5] a stopped build step that pushed a commit does not decide containment
+
+M28  T6: finishing stops queued gate steps only
+  file: apps/server/src/services/builds.ts
+  mutation: stopUnclaimedGateSteps also takes claimed
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-T6] finishing the card stops queued gate steps only: a claimed verify step is left alone
+
+M29  A16: on the closed path the floor is at least the recorded PR
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the closed path passes no floor
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A16] only a merged PR older than the recorded one is on the branch → not recorded; the close of the newer one stands
+
+M30  A9e: on the foreign path the recorded number is not a floor
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the foreign path uses the foreign number as the floor
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded number is someone else's)
+
+M31  A17: the head owner comes from the PR response
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the head owner is the stored one
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A17] the list asks for the owner the PR response names, not the stored one (renamed or transferred repository)
+
+M32  A9d: an open recorded PR that is not the build's own takes the foreign path
+  file: apps/server/src/services/ci-loop.ts
+  mutation: every open PR stays pending
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round
+
+M33  A9c: a failed foreign list read falls back to the hint
+  file: apps/server/src/services/ci-loop.ts
+  mutation: a failed foreign list read writes nothing
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+
+M34  A15b: the recorded PR comes first in the selection
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no precedence for the recorded PR
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-A15b] the recorded PR is open again and the list also has a higher open PR of the branch → still a reopen, nothing recorded
+    x [s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card
+
+M35  T7: an older build's PR does not decide the current build (pin 8b, closed half)
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no current-build rule (candidate join and freshReviewRow)
+  result: caught (Tests  17 failed | 180 passed (197))
+    x ⑥ an older PR build of the same todo is closed, the latest PR is open → nothing changes
+    x ⑧a the todo's current build has no PR; an older build's PR merged → nothing changes
+    x ⑧b the todo's current build has no PR; an older build's PR closed → not failed
+    x ⑨a two builds record one PR whose head is the current build's branch → read once, through the current build; rows land on it only
+    x ⑨b a second build records the PR the older build opened (its head is the older build's branch, #1217 / #1195) → foreign: stays in review, one hint, no merged row
+    x ⑯ the todo gets a new current build during the network window → no write
+    x [s2-A9] the recorded PR is another build's (9b shape) and this build has its own PR → its own PR is recorded, no foreign hint
+    x [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write
+    x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+    x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded number is someone else's)
+    x [s2-A18] a merged PR of the build is not taken when a newer PR of the build was closed without merge (the person rejected the newer work)
+    x [s2-A20] the daemon probe records the foreign PR again and the reconcile adopts again → the adoption row is written once per round
+    x [s2-A21] anonymous: the foreign path lists the branch at most once an hour
+    x [s2-A22] the recorded PR changes: the ten-minute wait starts again for the new one
+    x [s2-A22b] the build goes back to a PR it recorded before: the old listing time is gone, the branch is listed at once
+
+M36  A18: a merged PR must be newer than the newest PR of the build closed without merge
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the floor ignores closed unmerged PRs
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A18] a merged PR of the build is not taken when a newer PR of the build was closed without merge (the person rejected the newer work)
+
+M37  A19: adopt only while the build still records the old number
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no compare-and-set
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A19] the build records another PR while the list read is in flight (the daemon probe) → that value is kept, nothing written
+
+M38  A20: the adoption row once per round
+  file: apps/server/src/services/ci-loop.ts
+  mutation: a row on every adoption
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A20] the daemon probe records the foreign PR again and the reconcile adopts again → the adoption row is written once per round
+
+M39  A21: anonymous relist at most hourly
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the ten-minute relist also without a token
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A21] anonymous: the foreign path lists the branch at most once an hour
+
+M40  A22: the relist wait is keyed by the recorded PR
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the wait is keyed by the build only
+  result: caught (Tests  6 failed | 191 passed (197))
+    x [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+    x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round
+    x [s2-A21] anonymous: the foreign path lists the branch at most once an hour
+
+M40b  A22: the relist wait is keyed by the recorded PR
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the wait is keyed by the build only, cleaned up by build (the second-pass form)
+  result: caught (Tests  2 failed | 195 passed (197))
+    x [s2-A22] the recorded PR changes: the ten-minute wait starts again for the new one
+    x [s2-A22b] the build goes back to a PR it recorded before: the old listing time is gone, the branch is listed at once
+
+M41  A5b: two failed list reads in a row fall back to segment 1
+  file: apps/server/src/services/ci-loop.ts
+  mutation: no fallback
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A5b] the list read fails at two confirming reads in a row → the close is reported as in segment 1
+
+M42  A5c: forgetClose also clears the list failures
+  file: apps/server/src/services/ci-loop.ts
+  mutation: forgetClose leaves the count
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A5c] a failed list read during an earlier close does not count toward a later close
+
+M43  A15c: the recorded PR merged in the list is not a close
+  file: apps/server/src/services/ci-loop.ts
+  mutation: only an open recorded PR is caught
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card
+
+M44  A22b: listing times of PRs no longer recorded are dropped
+  file: apps/server/src/services/ci-loop.ts
+  mutation: cleanup by build only
+  result: caught (Tests  1 failed | 196 passed (197))
+    x [s2-A22b] the build goes back to a PR it recorded before: the old listing time is gone, the branch is listed at once
+
+M45  field completeness (hasPullFields)
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the guard does not need the default branch
+  result: caught (Tests  3 failed | 194 passed (197))
+    x ㉗ a merged response without default_branch is not taken as a merge into the default branch
+    x [61] a merged response without default_branch is read again on a later sweep; the complete one finishes the card
+    x [70c] a closed response without default_branch is unreadable: not failed; the close counts again from the next complete read
+
+History
+-------
+- First run, 28 mutations on the tree before /code-review (cf1bca12's code): 27
+  caught. M17 (no re-check after the list read on the foreign path) survived; test
+  [s2-A7b] was added and the rerun caught it.
+- After the first two /code-review passes the rules changed and the set was
+  rewritten: 36 mutations on 45ec317f, all caught.
+- After the third and fourth passes (rejection floor, compare-and-set adoption, one
+  adoption row per round, hourly anonymous relist keyed by build and recorded PR,
+  fallback after two failed list reads, forgetClose, a merged recorded PR in the
+  list, hasPullFields): the set above, M36-M45 and M40b new. M40 (a key that never
+  survives cleanup) is caught by other tests; M40b, the second-pass form (key and
+  cleanup by build), is the one that pins A22 and A22b.
+
+Control for T7 (pin 8b)
+-----------------------
+M35 (no current-build rule) applied with 8b put back to one sweep, then both files
+restored and checked by sha256 (on 034441ed):
+
+  (apps/server) pnpm exec vitest run test/pr-reconcile.test.ts -t "⑧b"
+  Tests  1 passed | 165 skipped (166)   (8b passes: the mutation survives one sweep)
+
+With 8b sweeping twice, M35 is caught by 8b among others (above), matching pr-gate
+run 11 on #1414 (its mutation M2c).

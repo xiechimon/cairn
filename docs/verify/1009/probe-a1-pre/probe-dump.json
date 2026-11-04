@@ -1,0 +1,3944 @@
+{
+  "meta": {
+    "tool": "probe-dump",
+    "ticket": 921,
+    "date": "2026-10-08T14:09:31.988Z",
+    "commit": "d62bc480",
+    "port": 8397,
+    "specs": [
+      "chief-panel",
+      "chief-stream-markdown",
+      "chief-send-fallback",
+      "chief-composer-tools",
+      "chief-drawer-slash",
+      "chief-drawer-model",
+      "chief-fab",
+      "chief-settings",
+      "agent-identity-chip"
+    ],
+    "specCount": 9,
+    "playwrightVersion": "1.63.0",
+    "workers": "4",
+    "testsPassed": 101,
+    "testsFailed": 0
+  },
+  "coverage": {
+    "styleOccurrences": 25,
+    "boxSites": 24,
+    "cssSites": 2,
+    "evaluateProbeSites": 23,
+    "assertionSites": 118,
+    "collectedStyle": 32,
+    "collectedBox": 34,
+    "collectedWait": 0,
+    "collectedCss": 2,
+    "collectedStyleSites": 24,
+    "collectedBoxSites": 24,
+    "collectedCssSites": 2,
+    "assertionRecords": 172,
+    "joinedAssertionSites": 140
+  },
+  "probeSites": [
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 60,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 65,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 65,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 71,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 71,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 73,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 73,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 75,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 75,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 322,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 327,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 51,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 52,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 53,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 102,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 105,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 111,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 111,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 140,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 144,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 145,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-drawer-slash.spec.ts",
+      "line": 209,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 43,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 44,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 101,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 102,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 114,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 121,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 122,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 157,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 162,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 178,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 183,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 185,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 209,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 214,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 219,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 224,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 235,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 241,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 248,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 255,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 292,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 296,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 296,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 297,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 297,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 73,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 210,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 214,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 215,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 240,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 240,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 259,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 265,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 329,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 356,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 358,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 334,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 334,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 597,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 600,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 742,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 744,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 753,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 754,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 755,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 828,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 833,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 835,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 864,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 865,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1056,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1058,
+      "kind": "style",
+      "api": "getComputedStyle"
+    }
+  ],
+  "probeValues": [
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "agent-identity-chip.spec.ts",
+      "l": 60,
+      "loc": "internal:testid=[data-testid=\"chief-stream\"s] >> internal:role=link[name=\"r3-builder\"i] >> img",
+      "v": {
+        "x": 1069,
+        "y": 326.15625,
+        "width": 24,
+        "height": 24
+      },
+      "tt": "F-E1/E2/E10: 头像+名字并排成链，href 指 Agent 设置页，几何 canon 不漂移"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "agent-identity-chip.spec.ts",
+      "l": 65,
+      "loc": "internal:testid=[data-testid=\"chief-stream\"s] >> internal:role=link[name=\"r3-builder\"i] >> internal:text=\"r3-builder\"i",
+      "v": "12px",
+      "tt": "F-E1/E2/E10: 头像+名字并排成链，href 指 Agent 设置页，几何 canon 不漂移"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 51,
+      "loc": "internal:role=button[name=\"总管主模型\"i]",
+      "v": {
+        "x": 1065,
+        "y": 154.5,
+        "width": 192.15625,
+        "height": 20.65625
+      },
+      "tt": "the model row is a control that opens the anchored model popover"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 52,
+      "loc": "internal:role=dialog[name=\"模型\"i]",
+      "v": {
+        "x": 1065,
+        "y": 183,
+        "width": 280,
+        "height": 58.5625
+      },
+      "tt": "the model row is a control that opens the anchored model popover"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 53,
+      "loc": ".chief-drawer",
+      "v": {
+        "x": 1052,
+        "y": 124,
+        "width": 380,
+        "height": 600
+      },
+      "tt": "the model row is a control that opens the anchored model popover"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "agent-identity-chip.spec.ts",
+      "l": 71,
+      "loc": "internal:testid=[data-testid=\"chief-stream\"s] >> internal:role=link[name=\"r3-builder\"i]",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "F-E9: hover 只变 cursor，不发明背景态（参考站正典）"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "agent-identity-chip.spec.ts",
+      "l": 73,
+      "loc": "internal:testid=[data-testid=\"chief-stream\"s] >> internal:role=link[name=\"r3-builder\"i]",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "F-E9: hover 只变 cursor，不发明背景态（参考站正典）"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "agent-identity-chip.spec.ts",
+      "l": 75,
+      "loc": "internal:testid=[data-testid=\"chief-stream\"s] >> internal:role=link[name=\"r3-builder\"i]",
+      "v": "pointer",
+      "tt": "F-E9: hover 只变 cursor，不发明背景态（参考站正典）"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 85,
+      "loc": "internal:role=option[selected=true] >> internal:testid=[data-testid=\"model-pick-name\"s]",
+      "v": 6.632010330240887,
+      "tt": "the selected model row is readable in both themes (#751 A)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 111,
+      "loc": "internal:role=option[selected=true]",
+      "v": "color(srgb 0.26102 0.195922 0.223137)",
+      "tt": "the selected model row is readable in both themes (#751 A)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-composer-tools.spec.ts",
+      "l": 322,
+      "loc": ".chief-drawer >> .mention-inline",
+      "v": {
+        "x": 1081,
+        "y": 376,
+        "width": 322,
+        "height": 220
+      },
+      "tt": "geometry: the listbox anchors above the composer wrap inside the drawer (FM2)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-composer-tools.spec.ts",
+      "l": 327,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": {
+        "x": 1081,
+        "y": 602,
+        "width": 322,
+        "height": 60
+      },
+      "tt": "geometry: the listbox anchors above the composer wrap inside the drawer (FM2)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 85,
+      "loc": "internal:role=option[selected=true] >> internal:testid=[data-testid=\"model-pick-name\"s]",
+      "v": 7.727365781659001,
+      "tt": "the selected model row is readable in both themes (#751 A)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 111,
+      "loc": "internal:role=option[selected=true]",
+      "v": "color(srgb 0.892314 0.811216 0.844863)",
+      "tt": "the selected model row is readable in both themes (#751 A)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-drawer-slash.spec.ts",
+      "l": 209,
+      "loc": ".slash-help",
+      "v": {
+        "x": 521.2597045898438,
+        "y": 228.68968200683594,
+        "width": 397.4805908203125,
+        "height": 217.6206512451172
+      },
+      "tt": "/help opens the command panel with the drawer builtins"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-drawer-model.spec.ts",
+      "l": 140,
+      "loc": "internal:role=dialog[name=\"模型\"i] >> internal:role=option[selected=true]",
+      "v": {
+        "fillLeft": 1,
+        "fillRight": 1,
+        "panelBorder": 1,
+        "bg": "color(srgb 0.892314 0.811216 0.844863)",
+        "padLeft": 20,
+        "padRight": 20,
+        "nameInset": 20,
+        "checkInset": 20
+      },
+      "tt": "the selected row fill bleeds to the popover edges (#872)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-fab.spec.ts",
+      "l": 43,
+      "loc": ".chief-fab",
+      "v": {
+        "width": "40px",
+        "height": "40px",
+        "right": "8px",
+        "bottom": "8px",
+        "position": "fixed"
+      },
+      "tt": "the FAB keeps the A0 corner geometry (40x40 @ 8px inset, fixed)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-fab.spec.ts",
+      "l": 101,
+      "loc": "internal:role=button[name=\"总管\"s]",
+      "v": {
+        "x": 1392,
+        "y": 684,
+        "width": 40,
+        "height": 40
+      },
+      "tt": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-fab.spec.ts",
+      "l": 102,
+      "loc": "internal:role=button[name=\"总管\"s] >> img",
+      "v": {
+        "x": 1392,
+        "y": 684,
+        "width": 40,
+        "height": 40
+      },
+      "tt": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 114,
+      "loc": ".chief-drawer",
+      "v": {
+        "x": 1052,
+        "y": 124,
+        "width": 380,
+        "height": 600
+      },
+      "tt": "the panel floats as a 380x600 window anchored 8px off the corner (board)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 121,
+      "loc": ".chief-drawer",
+      "v": {
+        "position": "fixed",
+        "radius": "12px",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px",
+        "z": "15",
+        "bg": "rgb(38, 34, 31)",
+        "backdrop": "none",
+        "sidebarRight": 240,
+        "left": 1052
+      },
+      "tt": "the panel floats as a 380x600 window anchored 8px off the corner (board)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 157,
+      "loc": ".board-main",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "board content never yields to the window (D1 overlay, no yield)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 162,
+      "loc": ".board-scroller",
+      "v": {
+        "scrollable": false,
+        "columns": [
+          281,
+          281,
+          281,
+          281
+        ]
+      },
+      "tt": "board content never yields to the window (D1 overlay, no yield)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 178,
+      "loc": ".board-main",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "minimizing leaves the board grid at the same geometry (nothing to restore)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 183,
+      "loc": ".board-main",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "minimizing leaves the board grid at the same geometry (nothing to restore)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 185,
+      "loc": ".board-scroller",
+      "v": {
+        "scrollable": false,
+        "columns": [
+          281,
+          281,
+          281,
+          281
+        ]
+      },
+      "tt": "minimizing leaves the board grid at the same geometry (nothing to restore)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 209,
+      "loc": ".page-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "pages: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 214,
+      "loc": ".chief-drawer",
+      "v": {
+        "x": 1052,
+        "y": 124,
+        "width": 380,
+        "height": 600
+      },
+      "tt": "pages: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 219,
+      "loc": ".page-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "pages: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 73,
+      "loc": "internal:role=dialog[name=\"选择总管 Agent\"i] >> internal:attr=[placeholder=\"搜索 Agent…\"i]",
+      "v": 16,
+      "tt": "agent dialog search keeps its own 16px inset (#872 blast radius)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 224,
+      "loc": ".page-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "pages: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 209,
+      "loc": ".res-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "resources: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 334,
+      "loc": "internal:testid=[data-testid=\"chief-body\"s]",
+      "v": "auto",
+      "tt": "F-R6/R8: 用户行头像 = 真人身份 img（XMON-105 单源），抽屉体可滚动"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 214,
+      "loc": ".chief-drawer",
+      "v": {
+        "x": 1052,
+        "y": 124,
+        "width": 380,
+        "height": 600
+      },
+      "tt": "resources: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 219,
+      "loc": ".res-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "resources: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 224,
+      "loc": ".res-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "resources: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 209,
+      "loc": ".secondary-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "secondary: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 214,
+      "loc": ".chief-drawer",
+      "v": {
+        "x": 1052,
+        "y": 124,
+        "width": 380,
+        "height": 600
+      },
+      "tt": "secondary: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 219,
+      "loc": ".secondary-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "secondary: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 224,
+      "loc": ".secondary-main-col",
+      "v": {
+        "x": 240,
+        "y": 0,
+        "width": 1200,
+        "height": 732
+      },
+      "tt": "secondary: the main column never narrows while the window is open"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 235,
+      "loc": ".detail-center",
+      "v": {
+        "x": 240,
+        "y": 44,
+        "width": 712,
+        "height": 688
+      },
+      "tt": "detail: the right pane coexists with the floating window (D7 reversed)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 241,
+      "loc": ".chief-drawer",
+      "v": {
+        "x": 1052,
+        "y": 124,
+        "width": 380,
+        "height": 600
+      },
+      "tt": "detail: the right pane coexists with the floating window (D7 reversed)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 248,
+      "loc": ".detail-center",
+      "v": {
+        "x": 240,
+        "y": 44,
+        "width": 712,
+        "height": 688
+      },
+      "tt": "detail: the right pane coexists with the floating window (D7 reversed)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 255,
+      "loc": ".detail-center",
+      "v": {
+        "x": 240,
+        "y": 44,
+        "width": 712,
+        "height": 688
+      },
+      "tt": "detail: the right pane coexists with the floating window (D7 reversed)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 597,
+      "loc": ".chief-drawer >> internal:testid=[data-testid=\"chief-msg\"s] >> nth=-1 >> internal:role=button[name=/实时步骤/]",
+      "v": {
+        "x": 1103,
+        "y": 332.65625,
+        "width": 312,
+        "height": 24
+      },
+      "tt": "F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 600,
+      "loc": ".chief-drawer >> internal:testid=[data-testid=\"chief-msg\"s] >> nth=-1 >> internal:text=\"处理中...\"i",
+      "v": 1.5,
+      "tt": "F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 292,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": {
+        "x": 1081,
+        "y": 602,
+        "width": 322,
+        "height": 60
+      },
+      "tt": "composer keeps one fixed size whether or not a draft is restored (XMON-102)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 296,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": "60px",
+      "tt": "composer keeps one fixed size whether or not a draft is restored (XMON-102)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 297,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": "auto",
+      "tt": "composer keeps one fixed size whether or not a draft is restored (XMON-102)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 292,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": {
+        "x": 1081,
+        "y": 602,
+        "width": 322,
+        "height": 60
+      },
+      "tt": "composer keeps one fixed size whether or not a draft is restored (XMON-102)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 296,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": "60px",
+      "tt": "composer keeps one fixed size whether or not a draft is restored (XMON-102)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-panel.spec.ts",
+      "l": 297,
+      "loc": "internal:testid=[data-testid=\"chief-composer-input\"s]",
+      "v": "auto",
+      "tt": "composer keeps one fixed size whether or not a draft is restored (XMON-102)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 742,
+      "loc": ".chief-drawer >> internal:testid=[data-testid=\"chief-bubble\"s] >> internal:has-text=\"收到，谢谢\"i",
+      "v": {
+        "h": 44,
+        "font": "14px"
+      },
+      "tt": "F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 753,
+      "loc": ".chief-drawer >> internal:testid=[data-testid=\"chief-bubble\"s] >> internal:has-text=\"echo before-and-after\"i >> pre.chat-md-code",
+      "v": {
+        "top": "0px",
+        "bottom": "0px"
+      },
+      "tt": "F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 828,
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"先把凭证面捋一遍\"i",
+      "v": {
+        "display": "flex",
+        "grow": "1",
+        "minW": "0px",
+        "imgW": 22.88525390625,
+        "imgH": 22.88525390625,
+        "colRightOfImg": true,
+        "colBesideImg": true
+      },
+      "tt": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 828,
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"先把凭证面捋一遍\"i",
+      "v": {
+        "display": "flex",
+        "grow": "1",
+        "minW": "0px",
+        "imgW": 23.909912109375,
+        "imgH": 23.909881591796875,
+        "colRightOfImg": true,
+        "colBesideImg": true
+      },
+      "tt": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 828,
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"先把凭证面捋一遍\"i",
+      "v": {
+        "display": "flex",
+        "grow": "1",
+        "minW": "0px",
+        "imgW": 24,
+        "imgH": 24,
+        "colRightOfImg": true,
+        "colBesideImg": true
+      },
+      "tt": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 1056,
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"用户只是打了个招呼「你好」，没有\"i >> internal:role=button[name=\"展开思考\"i]",
+      "v": {
+        "textOverflow": "ellipsis",
+        "overflowX": "hidden",
+        "labelClient": 294,
+        "labelScroll": 774,
+        "btnW": 298,
+        "colW": 298
+      },
+      "tt": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-stream-markdown.spec.ts",
+      "l": 1056,
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"> The user just \"i >> internal:role=button[name=\"展开思考\"i]",
+      "v": {
+        "textOverflow": "ellipsis",
+        "overflowX": "hidden",
+        "labelClient": 294,
+        "labelScroll": 699,
+        "btnW": 300,
+        "colW": 300
+      },
+      "tt": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 210,
+      "loc": "internal:role=dialog[name=\"压缩模型\"i] >> internal:role=option[selected=true]",
+      "v": {
+        "fillLeft": 1,
+        "fillRight": 1,
+        "panelBorder": 1,
+        "bg": "color(srgb 0.892314 0.811216 0.844863)",
+        "padLeft": 12,
+        "padRight": 12,
+        "nameInset": 12,
+        "checkInset": 12
+      },
+      "tt": "压缩模型 selected row fill bleeds to the menu edges (#872)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 240,
+      "loc": "internal:role=dialog[name=\"压缩模型\"i] >> internal:role=option >> nth=1",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "压缩模型 selected row fill bleeds to the menu edges (#872)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 259,
+      "loc": "internal:role=dialog[name=\"压缩模型\"i] >> internal:attr=[placeholder=\"搜索模型…\"i]",
+      "v": 12,
+      "tt": "压缩模型 selected row fill bleeds to the menu edges (#872)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 329,
+      "loc": "internal:role=button[name=\"压缩模型\"i]",
+      "v": {
+        "x": 1007,
+        "y": 184,
+        "width": 200,
+        "height": 32
+      },
+      "tt": "压缩模型 long value truncates, full name on title (dark, #772)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 329,
+      "loc": "internal:role=button[name=\"压缩模型\"i]",
+      "v": {
+        "x": 1007,
+        "y": 184,
+        "width": 200,
+        "height": 32
+      },
+      "tt": "压缩模型 long value truncates, full name on title (light, #772)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 356,
+      "loc": "internal:text=/No Agent selected yet/",
+      "v": {
+        "centered": true,
+        "contained": true
+      },
+      "tt": "空态卡 centered and growth-proof: memo matches watches (#772)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "chief-settings.spec.ts",
+      "l": 356,
+      "loc": "internal:text=/Nothing being watched yet/",
+      "v": {
+        "centered": true,
+        "contained": true
+      },
+      "tt": "空态卡 centered and growth-proof: memo matches watches (#772)"
+    }
+  ],
+  "assertions": [
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 61,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(box?.width).toBe(24);",
+      "testTitle": "F-E1/E2/E10: 头像+名字并排成链，href 指 Agent 设置页，几何 canon 不漂移",
+      "old": "24",
+      "new": "24",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        24
+      ],
+      "rawNew": 24
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 62,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(box?.height).toBe(24);",
+      "testTitle": "F-E1/E2/E10: 头像+名字并排成链，href 指 Agent 设置页，几何 canon 不漂移",
+      "old": "24",
+      "new": "24",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        24
+      ],
+      "rawNew": 24
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 66,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(fontSize).toBe('12px');",
+      "testTitle": "F-E1/E2/E10: 头像+名字并排成链，href 指 Agent 设置页，几何 canon 不漂移",
+      "old": "12px",
+      "new": "12px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "12px"
+      ],
+      "rawNew": "12px"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 74,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(bgAfter).toBe(bgBefore);",
+      "testTitle": "F-E9: hover 只变 cursor，不发明背景态（参考站正典）",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgba(0, 0, 0, 0)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 75,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await chip.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');",
+      "testTitle": "F-E9: hover 只变 cursor，不发明背景态（参考站正典）",
+      "old": "pointer",
+      "new": "pointer",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "pointer"
+      ],
+      "rawNew": "pointer"
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 93,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(focused).toBe(true);",
+      "testTitle": "F-E4: 键盘可达——focus 落在 chip 上，Enter 激活导航",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "agent-identity-chip.spec.ts",
+      "line": 134,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await chip.evaluate((el) => el.tagName), kind).toBe('SPAN');",
+      "testTitle": "F-E7: skill/project/machine 提及仍是惰性 span（字面负例）",
+      "old": "SPAN",
+      "new": "SPAN",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "SPAN"
+      ],
+      "rawNew": "SPAN"
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 333,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(l.y + l.height).toBeLessThanOrEqual(w.y);",
+      "testTitle": "geometry: the listbox anchors above the composer wrap inside the drawer (FM2)",
+      "old": "≤ 602",
+      "new": "596",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        602
+      ],
+      "rawNew": 596
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 335,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(l.width - w.width)).toBeLessThanOrEqual(8);",
+      "testTitle": "geometry: the listbox anchors above the composer wrap inside the drawer (FM2)",
+      "old": "≤ 8",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        8
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 336,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(l.x - w.x)).toBeLessThanOrEqual(8);",
+      "testTitle": "geometry: the listbox anchors above the composer wrap inside the drawer (FM2)",
+      "old": "≤ 8",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        8
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 408,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => uploads.grants.length).toBe(1);",
+      "testTitle": "a mid-line image paste lands the token whole-line at the caret (FM6)",
+      "old": "1",
+      "new": "{\"__fn\":\"() => uploads.grants.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => uploads.grants.length"
+      }
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 414,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => uploads.uploads).toBe(1);",
+      "testTitle": "a mid-line image paste lands the token whole-line at the caret (FM6)",
+      "old": "1",
+      "new": "{\"__fn\":\"() => uploads.uploads\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => uploads.uploads"
+      }
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 439,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 441,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => deferred.held.length).toBe(1);",
+      "testTitle": "Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)",
+      "old": "1",
+      "new": "{\"__fn\":\"() => deferred.held.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => deferred.held.length"
+      }
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 446,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => sent.length).toBe(1);",
+      "testTitle": "Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)",
+      "old": "1",
+      "new": "{\"__fn\":\"() => sent.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => sent.length"
+      }
+    },
+    {
+      "file": "chief-composer-tools.spec.ts",
+      "line": 449,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(sent[0]).toBe(`look at this\\n${TOKEN_1}`);",
+      "testTitle": "Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)",
+      "old": "look at this\n![pasted-image-1.png](attachment:team-1/att-1.png)",
+      "new": "look at this\n![pasted-image-1.png](attachment:team-1/att-1.png)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "look at this\n![pasted-image-1.png](attachment:team-1/att-1.png)"
+      ],
+      "rawNew": "look at this\n![pasted-image-1.png](attachment:team-1/att-1.png)"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 59,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(menuBox.y - (btnBox.y + btnBox.height + 8))).toBeLessThanOrEqual(2);",
+      "testTitle": "the model row is a control that opens the anchored model popover",
+      "old": "≤ 2",
+      "new": "0.15625",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        2
+      ],
+      "rawNew": 0.15625
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 60,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(menuBox.x - btnBox.x)).toBeLessThanOrEqual(2);",
+      "testTitle": "the model row is a control that opens the anchored model popover",
+      "old": "≤ 2",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        2
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 61,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(menuBox.x).toBeGreaterThanOrEqual(drawerBox.x);",
+      "testTitle": "the model row is a control that opens the anchored model popover",
+      "old": "≥ 1052",
+      "new": "1065",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1052
+      ],
+      "rawNew": 1065
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 62,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(drawerBox.x + drawerBox.width);",
+      "testTitle": "the model row is a control that opens the anchored model popover",
+      "old": "≤ 1432",
+      "new": "1345",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1432
+      ],
+      "rawNew": 1345
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 110,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(ratio, `${theme} selected-row contrast`).toBeGreaterThanOrEqual(4.5);",
+      "testTitle": "the selected model row is readable in both themes (#751 A)",
+      "old": "≥ 4.5",
+      "new": "6.632010330240887",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        4.5
+      ],
+      "rawNew": 6.632010330240887
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 111,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(await row.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(",
+      "testTitle": "the selected model row is readable in both themes (#751 A)",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgb(67, 50, 57)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": "color(srgb …) folded to rgb(67, 50, 57); re-pin the spec to the rgb/hex form (#411)",
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "color(srgb 0.26102 0.195922 0.223137)"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 159,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(geo.bg).not.toBe('rgba(0, 0, 0, 0)');",
+      "testTitle": "the selected row fill bleeds to the popover edges (#872)",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgb(228, 207, 215)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": "color(srgb …) folded to rgb(228, 207, 215); re-pin the spec to the rgb/hex form (#411)",
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "color(srgb 0.892314 0.811216 0.844863)"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 160,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.fillLeft).toBeCloseTo(geo.panelBorder, 1);",
+      "testTitle": "the selected row fill bleeds to the popover edges (#872)",
+      "old": "1 ±0.05",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1,
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 161,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.fillRight).toBeCloseTo(geo.panelBorder, 1);",
+      "testTitle": "the selected row fill bleeds to the popover edges (#872)",
+      "old": "1 ±0.05",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1,
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 163,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.nameInset).toBeCloseTo(geo.padLeft, 1);",
+      "testTitle": "the selected row fill bleeds to the popover edges (#872)",
+      "old": "20 ±0.05",
+      "new": "20",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        20,
+        1
+      ],
+      "rawNew": 20
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 164,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.checkInset).toBeCloseTo(geo.padRight, 1);",
+      "testTitle": "the selected row fill bleeds to the popover edges (#872)",
+      "old": "20 ±0.05",
+      "new": "20",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        20,
+        1
+      ],
+      "rawNew": 20
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 170,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(scroll.sw).toBe(scroll.cw);",
+      "testTitle": "the selected row fill bleeds to the popover edges (#872)",
+      "old": "278",
+      "new": "278",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        278
+      ],
+      "rawNew": 278
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 188,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(rowsOpen).toBe(1);",
+      "testTitle": "the picker search is typeahead-only: absent until a key, retracted on clear (#756)",
+      "old": "1",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 211,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await chipBtn.textContent()).toBe(chipTitle);",
+      "testTitle": "the picker search is typeahead-only: absent until a key, retracted on clear (#756)",
+      "old": "新主题",
+      "new": "新主题",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "新主题"
+      ],
+      "rawNew": "新主题"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 264,
+      "matcher": "toContain",
+      "negated": false,
+      "source": "expect(clip).toContain('CONTRIBUTING.md');",
+      "testTitle": "message copy glyphs are clipboard buttons; no bare inert glyphs remain",
+      "old": "CONTRIBUTING.md",
+      "new": "帮 r3-lifecycle 写一份 CONTRIBUTING.md 贡献指南，说明怎么给 Agent 提任务、怎么验收改动，写完放到项目根目录。",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "CONTRIBUTING.md"
+      ],
+      "rawNew": "帮 r3-lifecycle 写一份 CONTRIBUTING.md 贡献指南，说明怎么给 Agent 提任务、怎么验收改动，写完放到项目根目录。"
+    },
+    {
+      "file": "chief-drawer-model.spec.ts",
+      "line": 271,
+      "matcher": "toContain",
+      "negated": false,
+      "source": "expect(footClip).toContain('已创建并派工');",
+      "testTitle": "message copy glyphs are clipboard buttons; no bare inert glyphs remain",
+      "old": "已创建并派工",
+      "new": "已创建并派工 #11 「编写 CONTRIBUTING.md 贡献指南」， 由文档专职 Agent r5-scribe 承接，正在编写中。\n要求内容涵盖：如何给 Agent 提任务、如何验收改动，文件写入项目根目录 CONTRIBUTING.md。完成或需要确认时我会跟进汇报。",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "已创建并派工"
+      ],
+      "rawNew": "已创建并派工 #11 「编写 CONTRIBUTING.md 贡献指南」， 由文档专职 Agent r5-scribe 承接，正在编写中。\n要求内容涵盖：如何给 Agent 提任务、如何验收改动，文件写入项目根目录 CONTRIBUTING.md。完成或需要确认时我会跟进汇报。"
+    },
+    {
+      "file": "chief-drawer-slash.spec.ts",
+      "line": 163,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(posts()).toBe(0);",
+      "testTitle": "`/clear` runs without sending and toasts confirmation (F1)",
+      "old": "0",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-drawer-slash.spec.ts",
+      "line": 174,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(posts()).toBe(0);",
+      "testTitle": "Tab completes without running; Enter without highlight sends (F4)",
+      "old": "0",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-drawer-slash.spec.ts",
+      "line": 179,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(posts).toBe(1);",
+      "testTitle": "Tab completes without running; Enter without highlight sends (F4)",
+      "old": "1",
+      "new": "{\"__fn\":\"() => posts\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => posts"
+      }
+    },
+    {
+      "file": "chief-drawer-slash.spec.ts",
+      "line": 191,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(posts()).toBe(0);",
+      "testTitle": "mid-prompt accept inserts literal text, never runs (F3)",
+      "old": "0",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-drawer-slash.spec.ts",
+      "line": 211,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);",
+      "testTitle": "/help opens the command panel with the drawer builtins",
+      "old": "≥ 0",
+      "new": "228.68968200683594",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 228.68968200683594
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 50,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(geometry).toEqual({",
+      "testTitle": "the FAB keeps the A0 corner geometry (40x40 @ 8px inset, fixed)",
+      "old": "{\"width\":\"40px\",\"height\":\"40px\",\"right\":\"8px\",\"bottom\":\"8px\",\"position\":\"fixed\"}",
+      "new": "{\"width\":\"40px\",\"height\":\"40px\",\"right\":\"8px\",\"bottom\":\"8px\",\"position\":\"fixed\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "width": "40px",
+          "height": "40px",
+          "right": "8px",
+          "bottom": "8px",
+          "position": "fixed"
+        }
+      ],
+      "rawNew": {
+        "width": "40px",
+        "height": "40px",
+        "right": "8px",
+        "bottom": "8px",
+        "position": "fixed"
+      }
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 103,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(fabBox?.width).toBeCloseTo(40, 0);",
+      "testTitle": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay",
+      "old": "40 ±0.5",
+      "new": "40",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        40,
+        0
+      ],
+      "rawNew": 40
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 104,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(fabBox?.height).toBeCloseTo(40, 0);",
+      "testTitle": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay",
+      "old": "40 ±0.5",
+      "new": "40",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        40,
+        0
+      ],
+      "rawNew": 40
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 105,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(imgBox?.x).toBeCloseTo(fabBox?.x ?? Number.NaN, 0);",
+      "testTitle": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay",
+      "old": "1392 ±0.5",
+      "new": "1392",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1392,
+        0
+      ],
+      "rawNew": 1392
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 106,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(imgBox?.y).toBeCloseTo(fabBox?.y ?? Number.NaN, 0);",
+      "testTitle": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay",
+      "old": "684 ±0.5",
+      "new": "684",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        684,
+        0
+      ],
+      "rawNew": 684
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 107,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(imgBox?.width).toBeCloseTo(40, 0);",
+      "testTitle": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay",
+      "old": "40 ±0.5",
+      "new": "40",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        40,
+        0
+      ],
+      "rawNew": 40
+    },
+    {
+      "file": "chief-fab.spec.ts",
+      "line": 108,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(imgBox?.height).toBeCloseTo(40, 0);",
+      "testTitle": "bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay",
+      "old": "40 ±0.5",
+      "new": "40",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        40,
+        0
+      ],
+      "rawNew": 40
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 116,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.x).toBeCloseTo(WIN_BOX.x, 0);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "1052 ±0.5",
+      "new": "1052",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1052,
+        0
+      ],
+      "rawNew": 1052
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 117,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.y).toBeCloseTo(WIN_BOX.y, 0);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "124 ±0.5",
+      "new": "124",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        124,
+        0
+      ],
+      "rawNew": 124
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 118,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.width).toBeCloseTo(WIN_BOX.width, 0);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "380 ±0.5",
+      "new": "380",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        380,
+        0
+      ],
+      "rawNew": 380
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 119,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.height).toBeCloseTo(WIN_BOX.height, 0);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "600 ±0.5",
+      "new": "600",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        600,
+        0
+      ],
+      "rawNew": 600
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 135,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(skin.position).toBe('fixed');",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "fixed",
+      "new": "fixed",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "fixed"
+      ],
+      "rawNew": "fixed"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 137,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(skin.radius).toBe('12px');",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "12px",
+      "new": "12px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "12px"
+      ],
+      "rawNew": "12px"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 139,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(skin.shadow).not.toBe('none');",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "none",
+      "new": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "none"
+      ],
+      "rawNew": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 140,
+      "matcher": "toContain",
+      "negated": false,
+      "source": "expect(skin.shadow).toContain('inset');",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "inset",
+      "new": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "inset"
+      ],
+      "rawNew": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.46) 0px 20px 48px 0px, rgba(0, 0, 0, 0.28) 0px 4px 12px 0px"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 142,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(skin.z).toBe('15');",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "15",
+      "new": "15",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "15"
+      ],
+      "rawNew": "15"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 144,
+      "matcher": "toMatch",
+      "negated": false,
+      "source": "expect(skin.bg).toMatch(/^rgb\\(/);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "{\"__regex\":\"/^rgb\\\\(/\"}",
+      "new": "rgb(38, 34, 31)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "__regex": "/^rgb\\(/"
+        }
+      ],
+      "rawNew": "rgb(38, 34, 31)"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 145,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(skin.backdrop === 'none' || skin.backdrop === '').toBe(true);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 147,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(skin.left).toBeGreaterThanOrEqual(skin.sidebarRight);",
+      "testTitle": "the panel floats as a 380x600 window anchored 8px off the corner (board)",
+      "old": "≥ 240",
+      "new": "1052",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240
+      ],
+      "rawNew": 1052
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 160,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(main!.width).toBeCloseTo(1440 - 240, 0);",
+      "testTitle": "board content never yields to the window (D1 overlay, no yield)",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 167,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(open.scrollable).toBe(false);",
+      "testTitle": "board content never yields to the window (D1 overlay, no yield)",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 170,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "for (const w of open.columns) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);",
+      "testTitle": "board content never yields to the window (D1 overlay, no yield)",
+      "old": "≤ 1",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 184,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(main!.width).toBeCloseTo(openMain!.width, 0);",
+      "testTitle": "minimizing leaves the board grid at the same geometry (nothing to restore)",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 189,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(rest.scrollable).toBe(false);",
+      "testTitle": "minimizing leaves the board grid at the same geometry (nothing to restore)",
+      "old": "false",
+      "new": "false",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        false
+      ],
+      "rawNew": false
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 191,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "expect(first).toBeGreaterThan(0);",
+      "testTitle": "minimizing leaves the board grid at the same geometry (nothing to restore)",
+      "old": "> 0",
+      "new": "281",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 281
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 192,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "for (const w of rest.columns) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);",
+      "testTitle": "minimizing leaves the board grid at the same geometry (nothing to restore)",
+      "old": "≤ 1",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 210,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(closed!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 210,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(closed!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 210,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(closed!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 215,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.x).toBeCloseTo(WIN_BOX.x, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "1052 ±0.5",
+      "new": "1052",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1052,
+        0
+      ],
+      "rawNew": 1052
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 215,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.x).toBeCloseTo(WIN_BOX.x, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "1052 ±0.5",
+      "new": "1052",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1052,
+        0
+      ],
+      "rawNew": 1052
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 215,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.x).toBeCloseTo(WIN_BOX.x, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "1052 ±0.5",
+      "new": "1052",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1052,
+        0
+      ],
+      "rawNew": 1052
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 216,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.y).toBeCloseTo(WIN_BOX.y, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "124 ±0.5",
+      "new": "124",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        124,
+        0
+      ],
+      "rawNew": 124
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 216,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.y).toBeCloseTo(WIN_BOX.y, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "124 ±0.5",
+      "new": "124",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        124,
+        0
+      ],
+      "rawNew": 124
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 216,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.y).toBeCloseTo(WIN_BOX.y, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "124 ±0.5",
+      "new": "124",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        124,
+        0
+      ],
+      "rawNew": 124
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 217,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.width).toBeCloseTo(WIN_BOX.width, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "380 ±0.5",
+      "new": "380",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        380,
+        0
+      ],
+      "rawNew": 380
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 217,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.width).toBeCloseTo(WIN_BOX.width, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "380 ±0.5",
+      "new": "380",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        380,
+        0
+      ],
+      "rawNew": 380
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 217,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.width).toBeCloseTo(WIN_BOX.width, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "380 ±0.5",
+      "new": "380",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        380,
+        0
+      ],
+      "rawNew": 380
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 218,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.height).toBeCloseTo(WIN_BOX.height, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "600 ±0.5",
+      "new": "600",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        600,
+        0
+      ],
+      "rawNew": 600
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 218,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.height).toBeCloseTo(WIN_BOX.height, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "600 ±0.5",
+      "new": "600",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        600,
+        0
+      ],
+      "rawNew": 600
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 218,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(floating!.height).toBeCloseTo(WIN_BOX.height, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "600 ±0.5",
+      "new": "600",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        600,
+        0
+      ],
+      "rawNew": 600
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 220,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(open!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 220,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(open!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 220,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(open!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 225,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(restored!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 225,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(restored!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 225,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(restored!.width).toBeCloseTo(1200, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "1200 ±0.5",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200,
+        0
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 226,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(restored!.x).toBeCloseTo(closed!.x, 0);",
+      "testTitle": "pages: the main column never narrows while the window is open",
+      "old": "240 ±0.5",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240,
+        0
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 226,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(restored!.x).toBeCloseTo(closed!.x, 0);",
+      "testTitle": "resources: the main column never narrows while the window is open",
+      "old": "240 ±0.5",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240,
+        0
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 226,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(restored!.x).toBeCloseTo(closed!.x, 0);",
+      "testTitle": "secondary: the main column never narrows while the window is open",
+      "old": "240 ±0.5",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240,
+        0
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 242,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.x).toBeCloseTo(WIN_BOX.x, 0);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "1052 ±0.5",
+      "new": "1052",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1052,
+        0
+      ],
+      "rawNew": 1052
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 243,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.y).toBeCloseTo(WIN_BOX.y, 0);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "124 ±0.5",
+      "new": "124",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        124,
+        0
+      ],
+      "rawNew": 124
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 244,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.width).toBeCloseTo(WIN_BOX.width, 0);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "380 ±0.5",
+      "new": "380",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        380,
+        0
+      ],
+      "rawNew": 380
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 245,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(box!.height).toBeCloseTo(WIN_BOX.height, 0);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "600 ±0.5",
+      "new": "600",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        600,
+        0
+      ],
+      "rawNew": 600
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 249,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(center!.width).toBeCloseTo(restingCenter!.width, 0);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "712 ±0.5",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712,
+        0
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 250,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(center!.width).toBeCloseTo(1440 - 240 - 488, 0);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "712 ±0.5",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712,
+        0
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 256,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(restored!.width).toBe(1440 - 240 - 488);",
+      "testTitle": "detail: the right pane coexists with the floating window (D7 reversed)",
+      "old": "712",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 304,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(empty.height).toBe(drafted.height);",
+      "testTitle": "composer keeps one fixed size whether or not a draft is restored (XMON-102)",
+      "old": "60",
+      "new": "60",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        60
+      ],
+      "rawNew": 60
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 308,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(drafted.cssHeight).toBe('60px');",
+      "testTitle": "composer keeps one fixed size whether or not a draft is restored (XMON-102)",
+      "old": "60px",
+      "new": "60px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "60px"
+      ],
+      "rawNew": "60px"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 309,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(empty.cssHeight).toBe('60px');",
+      "testTitle": "composer keeps one fixed size whether or not a draft is restored (XMON-102)",
+      "old": "60px",
+      "new": "60px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "60px"
+      ],
+      "rawNew": "60px"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 310,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(drafted.overflowY).toBe('auto');",
+      "testTitle": "composer keeps one fixed size whether or not a draft is restored (XMON-102)",
+      "old": "auto",
+      "new": "auto",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "auto"
+      ],
+      "rawNew": "auto"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 328,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await placeholderAt('113')).toBe('向 Agent 补充说明，执行过程中即可送达');",
+      "testTitle": "composer placeholder switches to the steer canon while a turn runs (#624)",
+      "old": "向 Agent 补充说明，执行过程中即可送达",
+      "new": "向 Agent 补充说明，执行过程中即可送达",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "向 Agent 补充说明，执行过程中即可送达"
+      ],
+      "rawNew": "向 Agent 补充说明，执行过程中即可送达"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 329,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await placeholderAt('111')).toBe('有什么可以帮你的？');",
+      "testTitle": "composer placeholder switches to the steer canon while a turn runs (#624)",
+      "old": "有什么可以帮你的？",
+      "new": "有什么可以帮你的？",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "有什么可以帮你的？"
+      ],
+      "rawNew": "有什么可以帮你的？"
+    },
+    {
+      "file": "chief-panel.spec.ts",
+      "line": 330,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await placeholderAt('114')).toBe('有什么可以帮你的？');",
+      "testTitle": "composer placeholder switches to the steer canon while a turn runs (#624)",
+      "old": "有什么可以帮你的？",
+      "new": "有什么可以帮你的？",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "有什么可以帮你的？"
+      ],
+      "rawNew": "有什么可以帮你的？"
+    },
+    {
+      "file": "chief-send-fallback.spec.ts",
+      "line": 151,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(wire.posts).toBe(1);",
+      "testTitle": "stale slot: send goes out, fallback toast names it, row heals to 默认",
+      "old": "1",
+      "new": "{\"__fn\":\"() => posts\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => posts"
+      }
+    },
+    {
+      "file": "chief-send-fallback.spec.ts",
+      "line": 187,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(wire.posts).toBe(1);",
+      "testTitle": "fresh slot: send goes out with no fallback toast",
+      "old": "1",
+      "new": "{\"__fn\":\"() => posts\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": {
+        "__fn": "() => posts"
+      }
+    },
+    {
+      "file": "chief-send-fallback.spec.ts",
+      "line": 191,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "await expect.poll(() => chiefGets.length).toBeGreaterThan(0);",
+      "testTitle": "fresh slot: send goes out with no fallback toast",
+      "old": "> 0",
+      "new": "{\"__fn\":\"() => chiefGets.length\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": {
+        "__fn": "() => chiefGets.length"
+      }
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 79,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(inset).toBeCloseTo(16, 1);",
+      "testTitle": "agent dialog search keeps its own 16px inset (#872 blast radius)",
+      "old": "16 ±0.05",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        16,
+        1
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 229,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(geo.bg).not.toBe('rgba(0, 0, 0, 0)');",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgb(228, 207, 215)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": "color(srgb …) folded to rgb(228, 207, 215); re-pin the spec to the rgb/hex form (#411)",
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "color(srgb 0.892314 0.811216 0.844863)"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 230,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.fillLeft).toBeCloseTo(geo.panelBorder, 1);",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "1 ±0.05",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1,
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 231,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.fillRight).toBeCloseTo(geo.panelBorder, 1);",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "1 ±0.05",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1,
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 232,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.nameInset).toBeCloseTo(geo.padLeft, 1);",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "12 ±0.05",
+      "new": "12",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        12,
+        1
+      ],
+      "rawNew": 12
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 233,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.checkInset).toBeCloseTo(geo.padRight, 1);",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "12 ±0.05",
+      "new": "12",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        12,
+        1
+      ],
+      "rawNew": 12
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 241,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ").toBe('rgba(0, 0, 0, 0)');",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgba(0, 0, 0, 0)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 245,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(scroll.sw).toBe(scroll.cw);",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "367",
+      "new": "367",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        367
+      ],
+      "rawNew": 367
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 268,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(searchInset).toBeCloseTo(12, 1);",
+      "testTitle": "压缩模型 selected row fill bleeds to the menu edges (#872)",
+      "old": "12 ±0.05",
+      "new": "12",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        12,
+        1
+      ],
+      "rawNew": 12
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 330,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(box!.width).toBeLessThanOrEqual(202);",
+      "testTitle": "压缩模型 long value truncates, full name on title (dark, #772)",
+      "old": "≤ 202",
+      "new": "200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        202
+      ],
+      "rawNew": 200
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 330,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(box!.width).toBeLessThanOrEqual(202);",
+      "testTitle": "压缩模型 long value truncates, full name on title (light, #772)",
+      "old": "≤ 202",
+      "new": "200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        202
+      ],
+      "rawNew": 200
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 335,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(clipped).toBe(true);",
+      "testTitle": "压缩模型 long value truncates, full name on title (dark, #772)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 335,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(clipped).toBe(true);",
+      "testTitle": "压缩模型 long value truncates, full name on title (light, #772)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 364,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.centered).toBe(true);",
+      "testTitle": "空态卡 centered and growth-proof: memo matches watches (#772)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "chief-settings.spec.ts",
+      "line": 365,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.contained).toBe(true);",
+      "testTitle": "空态卡 centered and growth-proof: memo matches watches (#772)",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 221,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(true);",
+      "testTitle": "F-R7/R10/R11: text_delta 增量上屏，message 终稿收敛不重复不残留",
+      "old": "true",
+      "new": "{\"__fn\":\"() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)"
+      }
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 221,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(true);",
+      "testTitle": "F-R14: 在飞存在行（#739）——静默窗口挂 streaming 行，首 delta 收敛为 typing，终稿两行皆退场",
+      "old": "true",
+      "new": "{\"__fn\":\"() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)"
+      }
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 221,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(true);",
+      "testTitle": "F-R16: 轮中事件不闪清（#857）——工具行/文本行事件后重取在飞时打字面保留，收敛后落库行接管",
+      "old": "true",
+      "new": "{\"__fn\":\"() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)"
+      }
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 221,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(true);",
+      "testTitle": "F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏",
+      "old": "true",
+      "new": "{\"__fn\":\"() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(u => window.__es.some(es => es.url.includes(u)), part)"
+      }
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 296,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await stream.locator('.mention-chip').count()).toBe(",
+      "testTitle": "F-R13: todo 提及渲成 chip，锚点指任务详情并可点击导航；字面 #seq/伪 scheme 不出 chip（#675）",
+      "old": "2",
+      "new": "2",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        2
+      ],
+      "rawNew": 2
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 335,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(overflow).toBe('auto');",
+      "testTitle": "F-R6/R8: 用户行头像 = 真人身份 img（XMON-105 单源），抽屉体可滚动",
+      "old": "auto",
+      "new": "auto",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "auto"
+      ],
+      "rawNew": "auto"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 598,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(hit?.height).toBe(24);",
+      "testTitle": "F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏",
+      "old": "24",
+      "new": "24",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        24
+      ],
+      "rawNew": 24
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 604,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(inkInset).toBe(1.5);",
+      "testTitle": "F-R18: 在飞存在行可展开（#822）——点箭头看实时步骤，typing 接管不泄漏",
+      "old": "1.5",
+      "new": "1.5",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1.5
+      ],
+      "rawNew": 1.5
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 733,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(clip).toBe(MD_USER);",
+      "testTitle": "F-R15: 复制载荷 = markdown 原文（不是渲染结果）；两钮行（复制/恢复）不受影响",
+      "old": "派 [#16](todo:t16) 去处理，**优先** 检查；prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面",
+      "new": "派 [#16](todo:t16) 去处理，**优先** 检查；prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "派 [#16](todo:t16) 去处理，**优先** 检查；prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面"
+      ],
+      "rawNew": "派 [#16](todo:t16) 去处理，**优先** 检查；prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 746,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.h).toBe(44); // 10px padding ×2 + 24px 行盒（现状逐像素同值）",
+      "testTitle": "F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效",
+      "old": "44",
+      "new": "44",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        44
+      ],
+      "rawNew": 44
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 747,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.font).toBe('14px');",
+      "testTitle": "F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效",
+      "old": "14px",
+      "new": "14px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "14px"
+      ],
+      "rawNew": "14px"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 757,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(margins.top).toBe('0px');",
+      "testTitle": "F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 758,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(margins.bottom).toBe('0px');",
+      "testTitle": "F-R16: 单行纯文本气泡几何不漂移（44px 药丸）；多块气泡首/尾块 margin 修剪生效",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 847,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": ".toEqual({",
+      "testTitle": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数",
+      "old": "{\"display\":\"flex\",\"grow\":\"1\",\"minW\":\"0px\",\"imgW\":24,\"imgH\":24,\"colRightOfImg\":\"true\",\"colBesideImg\":\"true\"}",
+      "new": "{\"__fn\":\"() => thinking.evaluate(row => {\\n      var _row$querySelector;\\n      const img = (_row$querySelector = row.querySelector('img')) === null || _row$querySelector === void 0 ? void 0 : _row$querySelector.getBoundingClientRect();\\n      const colEl = row.querySelector(':scope > div');\\n      const col = colEl === null || colEl === void 0 ? void 0 : colEl.getBoundingClientRect();\\n      if (img == null || colEl == null || col == null) return null;\\n      const colCs = getComputedStyle(colEl);\\n      return {\\n        display: getComputedStyle(row).display,\\n        grow: colCs.flexGrow,\\n        minW: colC…\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "display": "flex",
+          "grow": "1",
+          "minW": "0px",
+          "imgW": 24,
+          "imgH": 24,
+          "colRightOfImg": true,
+          "colBesideImg": true
+        }
+      ],
+      "rawNew": {
+        "__fn": "() => thinking.evaluate(row => {\n      var _row$querySelector;\n      const img = (_row$querySelector = row.querySelector('img')) === null || _row$querySelector === void 0 ? void 0 : _row$querySelector.getBoundingClientRect();\n      const colEl = row.querySelector(':scope > div');\n      const col = colEl === null || colEl === void 0 ? void 0 : colEl.getBoundingClientRect();\n      if (img == null || colEl == null || col == null) return null;\n      const colCs = getComputedStyle(colEl);\n      return {\n        display: getComputedStyle(row).display,\n        grow: colCs.flexGrow,\n        minW: colC…"
+      }
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 864,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(toolRow).toHaveCSS('display', 'flex');",
+      "testTitle": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数",
+      "old": "display: flex",
+      "new": "flex",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "display",
+        "flex"
+      ],
+      "rawNew": "flex"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 865,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(toolRow.locator('> div')).toHaveCSS('flex-grow', '1');",
+      "testTitle": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数",
+      "old": "flex-grow: 1",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "flex-grow",
+        "1"
+      ],
+      "rawNew": "1"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1073,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(m.textOverflow, tag).toBe('ellipsis');",
+      "testTitle": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）",
+      "old": "ellipsis",
+      "new": "ellipsis",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "ellipsis"
+      ],
+      "rawNew": "ellipsis"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1074,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(m.overflowX, tag).toBe('hidden');",
+      "testTitle": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）",
+      "old": "hidden",
+      "new": "hidden",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "hidden"
+      ],
+      "rawNew": "hidden"
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1075,
+      "matcher": "toBeGreaterThan",
+      "negated": false,
+      "source": "expect(m.labelScroll, tag).toBeGreaterThan(m.labelClient);",
+      "testTitle": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）",
+      "old": "> 294",
+      "new": "774",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        294
+      ],
+      "rawNew": 774
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1077,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(m.btnW, tag).toBeLessThanOrEqual(m.colW);",
+      "testTitle": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）",
+      "old": "≤ 298",
+      "new": "298",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        298
+      ],
+      "rawNew": 298
+    },
+    {
+      "file": "chief-stream-markdown.spec.ts",
+      "line": 1083,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(pageOverflow).toBeLessThanOrEqual(0);",
+      "testTitle": "F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034）",
+      "old": "≤ 0",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0
+      ],
+      "rawNew": 0
+    }
+  ],
+  "webFirstCss": [
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "display",
+      "e": [
+        {
+          "string": "flex",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"正在调用 todo_write\"i",
+      "tt": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数"
+    },
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "flex-grow",
+      "e": [
+        {
+          "string": "1",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": ".chief-drawer >> .chief-msg >> internal:has-text=\"正在调用 todo_write\"i >> > div",
+      "tt": "F-R19: 段行投影（#955）——思考行单列、在飞工具行平铺并挂真实秒数"
+    }
+  ]
+}

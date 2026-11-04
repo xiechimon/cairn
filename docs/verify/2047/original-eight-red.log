@@ -1,0 +1,150 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/git.test.ts (89 tests | 8 failed) 17710ms
+   ❯ #2047 containment binds to the attempted branch and fetched destination (7)
+     × a missing fetch mapping cannot certify a divergent tip through stale tracking state 530ms
+     × a main-only fetch mapping cannot certify a divergent tip through stale tracking state 566ms
+     × the requested branch is checked even when the current HEAD is a contained ancestor 503ms
+     × a successful hook that rewinds the source ref cannot change the attempted commit being certified 1107ms
+     × 1 distinct push destination configuration cannot be certified from the fetch destination 537ms
+     × 2 distinct push destination configuration cannot be certified from the fetch destination 598ms
+     × a missing fetch mapping still accepts a real containing merge and reports its actual tip 620ms
+   × #2047 a hook that repoints origin cannot redirect the containment proof 1100ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > a missing fetch mapping cannot certify a divergent tip through stale tracking state
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > a main-only fetch mapping cannot certify a divergent tip through stale tracking state
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:973:89
+    971|       const notices: string[] = [];
+    972|
+    973|       await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.p…
+       |                                                                                         ^
+    974|
+    975|       expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > the requested branch is checked even when the current HEAD is a contained ancestor
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:990:87
+    988|     const notices: string[] = [];
+    989|
+    990|     await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.pus…
+       |                                                                                       ^
+    991|
+    992|     expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > a successful hook that rewinds the source ref cannot change the attempted commit being certified
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:1009:87
+    1007|     const notices: string[] = [];
+    1008|
+    1009|     await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.pus…
+       |                                                                                       ^
+    1010|
+    1011|     expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > 1 distinct push destination configuration cannot be certified from the fetch destination
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > 2 distinct push destination configuration cannot be certified from the fetch destination
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:1029:89
+    1027|       const notices: string[] = [];
+    1028|
+    1029|       await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.p…
+       |                                                                                         ^
+    1030|
+    1031|       expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 containment binds to the attempted branch and fetched destination > a missing fetch mapping still accepts a real containing merge and reports its actual tip
+AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+-   "694734e40a7f23d3248c065a418f1565ec37fe9f add7441bea56be77f8e0a32a77960dfa088914fd",
++   "694734e40a7f23d3248c065a418f1565ec37fe9f 694734e40a7f23d3248c065a418f1565ec37fe9f",
+  ]
+
+ ❯ test/git.test.ts:1050:21
+    1048|     await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.pus…
+    1049|
+    1050|     expect(notices).toEqual([`${local} ${actualTip}`]);
+       |                     ^
+    1051|     expect(gitOk(dir, ['for-each-ref', '--format=%(refname)', 'refs/ca…
+    1052|   }, 30_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/git.test.ts > #2047 a hook that repoints origin cannot redirect the containment proof
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ test/git.test.ts:1069:85
+    1067|   const notices: string[] = [];
+    1068|
+    1069|   await expect(gitPrim.push(dir, 'work', null, (a, b) => notices.push(…
+       |                                                                                     ^
+    1070|
+    1071|   expect(notices).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  8 failed | 87 passed (95)
+   Start at  13:06:52
+   Duration  18.21s (tests 96%, transform 2%, import 2%)
+

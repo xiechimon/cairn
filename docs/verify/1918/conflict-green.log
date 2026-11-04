@@ -1,0 +1,10 @@
+✔ weekly CLI stratifies failures, blinds packs, preserves reviews and reports agreement (297.040981ms)
+✔ reports reject conflicting hand labels for a build across weekly reviews (41.557597ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 412.119466

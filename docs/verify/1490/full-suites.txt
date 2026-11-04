@@ -1,0 +1,10 @@
+# full suites at e8c45630
+daemon (pnpm exec vitest run in apps/daemon):
+ Test Files  2 failed | 84 passed (86)
+      Tests  4 failed | 879 passed (883)
+  failures, all in files identical to origin/main:
+  - tag-tool.test.ts 失败方式 9/10/11 (real HTTP push to a local git server): rerun alone with proxy env vars unset -> 11 passed (11)
+  - workspace-hooks.test.ts 失败方式 4 (grandchild PID file not written within 200 ms): fails alone under load average 8-14
+server stop + step-claim-report + integration m7-stop-e2e (at 996daa64; e8c45630 changes only apps/daemon):
+  Test Files  3 passed (3)
+  Tests  16 passed (16)

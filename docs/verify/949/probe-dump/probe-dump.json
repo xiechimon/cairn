@@ -1,0 +1,1840 @@
+{
+  "meta": {
+    "tool": "probe-dump",
+    "ticket": 921,
+    "date": "2026-10-05T23:18:57.288Z",
+    "commit": "034bf7d5",
+    "port": 8402,
+    "specs": [
+      "search-focus",
+      "search-result-rows",
+      "search-close-flash",
+      "chip-hotzone",
+      "chip-assign",
+      "detail-esc",
+      "avatar-dicebear",
+      "detail-3pane",
+      "dead-buttons",
+      "hotkeys",
+      "escape-wiring",
+      "sidebar-search-offboard"
+    ],
+    "specCount": 13,
+    "playwrightVersion": "1.63.0",
+    "workers": "4",
+    "testsPassed": 106,
+    "testsFailed": 0
+  },
+  "coverage": {
+    "styleOccurrences": 13,
+    "boxSites": 3,
+    "cssSites": 2,
+    "evaluateProbeSites": 11,
+    "assertionSites": 56,
+    "collectedStyle": 26,
+    "collectedBox": 3,
+    "collectedWait": 0,
+    "collectedCss": 3,
+    "collectedStyleSites": 11,
+    "collectedBoxSites": 3,
+    "collectedCssSites": 2,
+    "assertionRecords": 81,
+    "joinedAssertionSites": 57
+  },
+  "probeSites": [
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 501,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 502,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 24,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 43,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 44,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 74,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 81,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 82,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 124,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 138,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 139,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 140,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 174,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 267,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "search-close-flash.spec.ts",
+      "line": 36,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "search-close-flash.spec.ts",
+      "line": 42,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "search-close-flash.spec.ts",
+      "line": 51,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 31,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 31,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 38,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 42,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 44,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 194,
+      "kind": "css",
+      "api": "toHaveCSS"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 195,
+      "kind": "box",
+      "api": "boundingBox"
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 26,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 26,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 32,
+      "kind": "style-evaluate",
+      "api": "evaluate"
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 36,
+      "kind": "style",
+      "api": "getComputedStyle"
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 38,
+      "kind": "style",
+      "api": "getComputedStyle"
+    }
+  ],
+  "probeValues": [
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 24,
+      "v": {
+        "sidebar": {
+          "left": 0,
+          "right": 240,
+          "width": 240
+        },
+        "center": {
+          "left": 240,
+          "right": 952,
+          "width": 712
+        },
+        "right": {
+          "left": 952,
+          "right": 1440,
+          "width": 488
+        }
+      },
+      "tt": "three abutting panes: 240 sidebar | fluid center | 488 right"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 43,
+      "v": {
+        "borderLeft": "1px",
+        "shadow": "none"
+      },
+      "tt": "three abutting panes: 240 sidebar | fluid center | 488 right"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 74,
+      "v": {
+        "centerLeft": 240,
+        "centerRight": 952,
+        "mainBottom": 732,
+        "colBottom": 632,
+        "compLeft": 256,
+        "compRight": 936,
+        "compTop": 632,
+        "compBottom": 716,
+        "radius": "0px",
+        "border": "1px",
+        "position": "relative",
+        "colPadBottom": 16
+      },
+      "tt": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 124,
+      "v": {
+        "stop": {
+          "l": 850,
+          "r": 882,
+          "w": 32,
+          "h": 32,
+          "cy": 687
+        },
+        "send": {
+          "l": 890,
+          "r": 922,
+          "w": 32,
+          "h": 32,
+          "cy": 687
+        },
+        "toolCy": 688,
+        "toolGlyphL": 274,
+        "phTextL": 272,
+        "stopFill": "rgb(63, 60, 54)",
+        "sendFill": "rgb(63, 60, 54)",
+        "stopGlyph": 1
+      },
+      "tt": "composer controls share one bottom row: stop is the send button's sibling"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 174,
+      "v": {
+        "center": 712,
+        "comp": 680
+      },
+      "tt": "composer width tracks the center column across both pane states (488 pane / 418 chief dock)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "detail-3pane.spec.ts",
+      "l": 174,
+      "v": {
+        "center": 782,
+        "comp": 750
+      },
+      "tt": "composer width tracks the center column across both pane states (488 pane / 418 chief dock)"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "detail-3pane.spec.ts",
+      "l": 267,
+      "loc": ".detail-center",
+      "v": 1200,
+      "tt": "fresh phase: the brief owns the whole center column, right pane collapses"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Page",
+      "f": "search-close-flash.spec.ts",
+      "l": 42,
+      "v": [
+        {
+          "t": 0,
+          "op": 1
+        },
+        {
+          "t": 18,
+          "op": 1
+        },
+        {
+          "t": 35,
+          "op": 0.558661
+        },
+        {
+          "t": 52,
+          "op": 0.314657
+        },
+        {
+          "t": 66,
+          "op": 0.160355
+        },
+        {
+          "t": 85,
+          "op": 0.0659818
+        },
+        {
+          "t": 102,
+          "op": 0.0153393
+        },
+        {
+          "t": 118,
+          "op": 0
+        },
+        {
+          "t": 134,
+          "op": 0
+        },
+        {
+          "t": 150,
+          "op": 0
+        },
+        {
+          "t": 168,
+          "op": 0
+        },
+        {
+          "t": 186,
+          "op": null
+        },
+        {
+          "t": 201,
+          "op": null
+        },
+        {
+          "t": 217,
+          "op": null
+        },
+        {
+          "t": 234,
+          "op": null
+        },
+        {
+          "t": 251,
+          "op": null
+        },
+        {
+          "t": 267,
+          "op": null
+        },
+        {
+          "t": 283,
+          "op": null
+        },
+        {
+          "t": 300,
+          "op": null
+        },
+        {
+          "t": 318,
+          "op": null
+        },
+        {
+          "t": 334,
+          "op": null
+        },
+        {
+          "t": 351,
+          "op": null
+        },
+        {
+          "t": 368,
+          "op": null
+        },
+        {
+          "t": 385,
+          "op": null
+        },
+        {
+          "t": 401,
+          "op": null
+        },
+        {
+          "t": 418,
+          "op": null
+        },
+        {
+          "t": 433,
+          "op": null
+        },
+        {
+          "t": 452,
+          "op": null
+        },
+        {
+          "t": 467,
+          "op": null
+        },
+        {
+          "t": 483,
+          "op": null
+        },
+        {
+          "t": 500,
+          "op": null
+        },
+        {
+          "t": 518,
+          "op": null
+        },
+        {
+          "t": 533,
+          "op": null
+        },
+        {
+          "t": 550,
+          "op": null
+        },
+        {
+          "t": 566,
+          "op": null
+        },
+        {
+          "t": 584,
+          "op": null
+        },
+        {
+          "t": 601,
+          "op": null
+        },
+        {
+          "t": 618,
+          "op": null
+        },
+        {
+          "t": 633,
+          "op": null
+        },
+        {
+          "t": 651,
+          "op": null
+        },
+        {
+          "t": 668,
+          "op": null
+        },
+        {
+          "t": 683,
+          "op": null
+        },
+        {
+          "t": 701,
+          "op": null
+        }
+      ],
+      "tt": "第二下 Ctrl+K 关闭不闪：退出透明度单调递减"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 31,
+      "loc": "internal:role=complementary[include-hidden=true] >> [aria-current=\"page\"]",
+      "v": "rgba(255, 252, 248, 0.1)",
+      "tt": "常亮互斥: page-layer pill dims while the panel is open, restores on close"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 31,
+      "loc": "internal:role=complementary[include-hidden=true] >> [aria-current=\"page\"]",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "常亮互斥: page-layer pill dims while the panel is open, restores on close"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 38,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> internal:role=button >> nth=0",
+      "v": false,
+      "tt": "常亮互斥: page-layer pill dims while the panel is open, restores on close"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 38,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> internal:role=button >> nth=0",
+      "v": true,
+      "tt": "常亮互斥: page-layer pill dims while the panel is open, restores on close"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 31,
+      "loc": "internal:role=complementary[include-hidden=true] >> [aria-current=\"page\"]",
+      "v": "rgba(255, 252, 248, 0.1)",
+      "tt": "常亮互斥: page-layer pill dims while the panel is open, restores on close"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 31,
+      "loc": "internal:role=complementary[include-hidden=true] >> [aria-current=\"page\"]",
+      "v": "rgba(255, 252, 248, 0.1)",
+      "tt": "常亮互斥 holds on the collapsed rail form"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 31,
+      "loc": "internal:role=complementary[include-hidden=true] >> [aria-current=\"page\"]",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "常亮互斥 holds on the collapsed rail form"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 31,
+      "loc": "internal:role=complementary[include-hidden=true] >> [aria-current=\"page\"]",
+      "v": "rgba(255, 252, 248, 0.1)",
+      "tt": "常亮互斥 holds on the collapsed rail form"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "search-focus.spec.ts",
+      "l": 195,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> internal:role=textbox",
+      "v": {
+        "x": 493,
+        "y": 157.5,
+        "width": 471,
+        "height": 16
+      },
+      "tt": "the caret is not clipped where it meets the input edge"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": false,
+      "tt": "静息无常亮;hover 哪行亮哪行,且只亮一行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": true,
+      "tt": "静息无常亮;hover 哪行亮哪行,且只亮一行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=1",
+      "v": false,
+      "tt": "静息无常亮;hover 哪行亮哪行,且只亮一行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=1",
+      "v": true,
+      "tt": "静息无常亮;hover 哪行亮哪行,且只亮一行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 26,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "静息无常亮;hover 哪行亮哪行,且只亮一行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": false,
+      "tt": "↑↓ 键盘光标接管高亮;Enter 跳光标行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": true,
+      "tt": "↑↓ 键盘光标接管高亮;Enter 跳光标行"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": false,
+      "tt": "鼠标一动让位:键盘光标交还 hover"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 32,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=0",
+      "v": true,
+      "tt": "鼠标一动让位:键盘光标交还 hover"
+    },
+    {
+      "k": "p",
+      "p": "style",
+      "cls": "Locator",
+      "f": "search-result-rows.spec.ts",
+      "l": 26,
+      "loc": "internal:role=dialog[name=\"搜索\"i] >> [data-row-kind=\"todo\"] >> nth=1",
+      "v": "rgba(0, 0, 0, 0)",
+      "tt": "鼠标一动让位:键盘光标交还 hover"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "dead-buttons.spec.ts",
+      "l": 501,
+      "loc": ".new-task-dialog >> .new-task-head",
+      "v": {
+        "x": 384,
+        "y": 146.5,
+        "width": 672,
+        "height": 44
+      },
+      "tt": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"
+    },
+    {
+      "k": "p",
+      "p": "box",
+      "cls": "Locator",
+      "f": "dead-buttons.spec.ts",
+      "l": 502,
+      "loc": ".new-task-dialog >> .new-task-close",
+      "v": {
+        "x": 1024,
+        "y": 154,
+        "width": 28,
+        "height": 28
+      },
+      "tt": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)"
+    }
+  ],
+  "assertions": [
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 124,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');",
+      "testTitle": "project files pane: no export button, static branch chip, wired 文件|历史 segment",
+      "old": "SPAN",
+      "new": "SPAN",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "SPAN"
+      ],
+      "rawNew": "SPAN"
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 508,
+      "matcher": "toBeLessThan",
+      "negated": false,
+      "source": "expect(Math.abs(hb.x + hb.width - (cb.x + cb.width) - 4)).toBeLessThan(1.5);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "< 1.5",
+      "new": "0",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1.5
+      ],
+      "rawNew": 0
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 509,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(cb.width).toBeCloseTo(28, 0);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "28 ±0.5",
+      "new": "28",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        28,
+        0
+      ],
+      "rawNew": 28
+    },
+    {
+      "file": "dead-buttons.spec.ts",
+      "line": 510,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(cb.height).toBeCloseTo(28, 0);",
+      "testTitle": "new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)",
+      "old": "28 ±0.5",
+      "new": "28",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        28,
+        0
+      ],
+      "rawNew": 28
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 35,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.sidebar.width).toBe(240);",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "240",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 36,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.right.width).toBe(488);",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "488",
+      "new": "488",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        488
+      ],
+      "rawNew": 488
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 38,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(Math.round(geo.center.left)).toBe(Math.round(geo.sidebar.right));",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "240",
+      "new": "240",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        240
+      ],
+      "rawNew": 240
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 39,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(Math.round(geo.right.left)).toBe(Math.round(geo.center.right));",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "952",
+      "new": "952",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        952
+      ],
+      "rawNew": 952
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 41,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.center.width).toBe(1440 - 240 - 488);",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "712",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 47,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(seam.borderLeft).toBe('1px');",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "1px",
+      "new": "1px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "1px"
+      ],
+      "rawNew": "1px"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 48,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(seam.shadow).toBe('none');",
+      "testTitle": "three abutting panes: 240 sidebar | fluid center | 488 right",
+      "old": "none",
+      "new": "none",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "none"
+      ],
+      "rawNew": "none"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 99,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.radius).toBe('0px');",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "0px",
+      "new": "0px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "0px"
+      ],
+      "rawNew": "0px"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 100,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.border).toBe('1px');",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "1px",
+      "new": "1px",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "1px"
+      ],
+      "rawNew": "1px"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 104,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.position).toBe('relative');",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "relative",
+      "new": "relative",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "relative"
+      ],
+      "rawNew": "relative"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 106,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.compLeft).toBeCloseTo(geo.centerLeft + 16, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "256 ±0.5",
+      "new": "256",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        256,
+        0
+      ],
+      "rawNew": 256
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 107,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.compRight).toBeCloseTo(geo.centerRight - 16, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "936 ±0.5",
+      "new": "936",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        936,
+        0
+      ],
+      "rawNew": 936
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 109,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.mainBottom - geo.compBottom).toBeCloseTo(16, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "16 ±0.5",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        16,
+        0
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 112,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.colBottom).toBeCloseTo(geo.compTop, 0);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "632 ±0.5",
+      "new": "632",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        632,
+        0
+      ],
+      "rawNew": 632
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 114,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(geo.colPadBottom).toBeGreaterThanOrEqual(16);",
+      "testTitle": "composer stays in-flow inside the center column: card form, 16px insets, scroll port ends above it",
+      "old": "≥ 16",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        16
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 153,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stop.w).toBe(32);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "32",
+      "new": "32",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        32
+      ],
+      "rawNew": 32
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 154,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stop.h).toBe(32);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "32",
+      "new": "32",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        32
+      ],
+      "rawNew": 32
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 158,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "687 ±0.5",
+      "new": "687",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        687,
+        0
+      ],
+      "rawNew": 687
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 159,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "≤ 1",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 161,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(geo.send.l - geo.stop.r).toBeCloseTo(8, 0);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "8 ±0.5",
+      "new": "8",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        8,
+        0
+      ],
+      "rawNew": 8
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 163,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stopFill).toBe(geo.sendFill);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "rgb(63, 60, 54)",
+      "new": "rgb(63, 60, 54)",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgb(63, 60, 54)"
+      ],
+      "rawNew": "rgb(63, 60, 54)"
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 164,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(geo.stopGlyph).toBe(1);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "1",
+      "new": "1",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1
+      ],
+      "rawNew": 1
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 166,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.abs(geo.toolGlyphL - geo.phTextL)).toBeLessThanOrEqual(2);",
+      "testTitle": "composer controls share one bottom row: stop is the send button's sibling",
+      "old": "≤ 2",
+      "new": "2",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        2
+      ],
+      "rawNew": 2
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 180,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(pane.center).toBe(1440 - 240 - 488);",
+      "testTitle": "composer width tracks the center column across both pane states (488 pane / 418 chief dock)",
+      "old": "712",
+      "new": "712",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        712
+      ],
+      "rawNew": 712
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 181,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(pane.comp).toBeCloseTo(pane.center - 32, 0);",
+      "testTitle": "composer width tracks the center column across both pane states (488 pane / 418 chief dock)",
+      "old": "680 ±0.5",
+      "new": "680",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        680,
+        0
+      ],
+      "rawNew": 680
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 189,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(docked.center).toBeCloseTo(1440 - 240 - 418, 0);",
+      "testTitle": "composer width tracks the center column across both pane states (488 pane / 418 chief dock)",
+      "old": "782 ±0.5",
+      "new": "782",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        782,
+        0
+      ],
+      "rawNew": 782
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 190,
+      "matcher": "toBeCloseTo",
+      "negated": false,
+      "source": "expect(docked.comp).toBeCloseTo(docked.center - 32, 0);",
+      "testTitle": "composer width tracks the center column across both pane states (488 pane / 418 chief dock)",
+      "old": "750 ±0.5",
+      "new": "750",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        750,
+        0
+      ],
+      "rawNew": 750
+    },
+    {
+      "file": "detail-3pane.spec.ts",
+      "line": 268,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(center).toBe(1440 - 240);",
+      "testTitle": "fresh phase: the brief owns the whole center column, right pane collapses",
+      "old": "1200",
+      "new": "1200",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        1200
+      ],
+      "rawNew": 1200
+    },
+    {
+      "file": "escape-wiring.spec.ts",
+      "line": 89,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect(await readEscapeTap(page)).toEqual({",
+      "testTitle": "开着的层不被重渲染重挂 Escape 接线：URL 写回后单次 Escape 仍收层",
+      "old": "{\"winAdds\":0,\"winRems\":0,\"docAdds\":0,\"docRems\":0}",
+      "new": "{\"winAdds\":0,\"winRems\":0,\"docAdds\":0,\"docRems\":0}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "winAdds": 0,
+          "winRems": 0,
+          "docAdds": 0,
+          "docRems": 0
+        }
+      ],
+      "rawNew": {
+        "winAdds": 0,
+        "winRems": 0,
+        "docAdds": 0,
+        "docRems": 0
+      }
+    },
+    {
+      "file": "escape-wiring.spec.ts",
+      "line": 154,
+      "matcher": "toEqual",
+      "negated": false,
+      "source": "expect({ winAdds: tap.winAdds, winRems: tap.winRems }).toEqual({ winAdds: 0, winRems: 0 });",
+      "testTitle": "确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层",
+      "old": "{\"winAdds\":0,\"winRems\":0}",
+      "new": "{\"winAdds\":0,\"winRems\":0}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        {
+          "winAdds": 0,
+          "winRems": 0
+        }
+      ],
+      "rawNew": {
+        "winAdds": 0,
+        "winRems": 0
+      }
+    },
+    {
+      "file": "escape-wiring.spec.ts",
+      "line": 155,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(tap.docAdds).toBe(tap.docRems);",
+      "testTitle": "确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层",
+      "old": "6",
+      "new": "6",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        6
+      ],
+      "rawNew": 6
+    },
+    {
+      "file": "hotkeys.spec.ts",
+      "line": 279,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "expect(consumed).toBe(true);",
+      "testTitle": "Space no longer opens the drawer; ⌘J does, composer focused, default consumed",
+      "old": "true",
+      "new": "true",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": true
+    },
+    {
+      "file": "hotkeys.spec.ts",
+      "line": 616,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe('r2-inventory');",
+      "testTitle": "Tab cycles the dialog’s project chip from the composer focus",
+      "old": "r2-inventory",
+      "new": "{\"__fn\":\"() => page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId'))\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "r2-inventory"
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId'))"
+      }
+    },
+    {
+      "file": "hotkeys.spec.ts",
+      "line": 624,
+      "matcher": "toBe",
+      "negated": false,
+      "source": ".toBe(FIRST_PROJECT_ID);",
+      "testTitle": "Tab cycles the dialog’s project chip from the composer focus",
+      "old": "ZAQczKCu0MOAzC1ZqcFlX",
+      "new": "{\"__fn\":\"() => page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId'))\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "ZAQczKCu0MOAzC1ZqcFlX"
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId'))"
+      }
+    },
+    {
+      "file": "hotkeys.spec.ts",
+      "line": 729,
+      "matcher": "toBe",
+      "negated": true,
+      "source": ".not.toBe('BODY');",
+      "testTitle": "with the dialog closed Tab stays native",
+      "old": "BODY",
+      "new": "{\"__fn\":\"() => page.evaluate(() => {\\n    var _document$activeEleme2, _document$activeEleme3;\\n    return (_document$activeEleme2 = (_document$activeEleme3 = document.activeElement) === null || _document$activeEleme3 === void 0 ? void 0 : _document$activeEleme3.tagName) !== null && _document$activeEleme2 !== void 0 ? _document$activeEleme2 : '';\\n  })\"}",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "BODY"
+      ],
+      "rawNew": {
+        "__fn": "() => page.evaluate(() => {\n    var _document$activeEleme2, _document$activeEleme3;\n    return (_document$activeEleme2 = (_document$activeEleme3 = document.activeElement) === null || _document$activeEleme3 === void 0 ? void 0 : _document$activeEleme3.tagName) !== null && _document$activeEleme2 !== void 0 ? _document$activeEleme2 : '';\n  })"
+      }
+    },
+    {
+      "file": "search-close-flash.spec.ts",
+      "line": 36,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(panel(page)).toHaveCSS('transform', 'none');",
+      "testTitle": "第二下 Ctrl+K 关闭不闪：退出透明度单调递减",
+      "old": "transform: none",
+      "new": "none",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "transform",
+        "none"
+      ],
+      "rawNew": "none"
+    },
+    {
+      "file": "search-close-flash.spec.ts",
+      "line": 36,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(panel(page)).toHaveCSS('transform', 'none');",
+      "testTitle": "三连击：关→开落在开态且输入聚焦",
+      "old": "transform: none",
+      "new": "none",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "transform",
+        "none"
+      ],
+      "rawNew": "none"
+    },
+    {
+      "file": "search-close-flash.spec.ts",
+      "line": 82,
+      "matcher": "toBeLessThanOrEqual",
+      "negated": false,
+      "source": "expect(f.op, `opacity rose back mid-exit at t=${f.t}ms`).toBeLessThanOrEqual(floor + 0.12);",
+      "testTitle": "第二下 Ctrl+K 关闭不闪：退出透明度单调递减",
+      "old": "≤ 0.434657",
+      "new": "0.314657",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        0.434657
+      ],
+      "rawNew": 0.314657
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 135,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(await pillBg(pill)).not.toBe(TRANSPARENT); // lit at rest",
+      "testTitle": "常亮互斥: page-layer pill dims while the panel is open, restores on close",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgba(255, 252, 248, 0.1)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "rgba(255, 252, 248, 0.1)"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 140,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => pillBg(pill)).toBe(TRANSPARENT); // extinguished",
+      "testTitle": "常亮互斥: page-layer pill dims while the panel is open, restores on close",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "{\"__fn\":\"() => pillBg(pill)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": {
+        "__fn": "() => pillBg(pill)"
+      }
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 146,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => isLit(row)).toBe(true);",
+      "testTitle": "常亮互斥: page-layer pill dims while the panel is open, restores on close",
+      "old": "true",
+      "new": "{\"__fn\":\"() => isLit(row)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => isLit(row)"
+      }
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 150,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "await expect.poll(() => pillBg(pill)).not.toBe(TRANSPARENT); // restored",
+      "testTitle": "常亮互斥: page-layer pill dims while the panel is open, restores on close",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "{\"__fn\":\"() => pillBg(pill)\"}",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": {
+        "__fn": "() => pillBg(pill)"
+      }
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 160,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "expect(await pillBg(rail)).not.toBe(TRANSPARENT);",
+      "testTitle": "常亮互斥 holds on the collapsed rail form",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "rgba(255, 252, 248, 0.1)",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": "rgba(255, 252, 248, 0.1)"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 163,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => pillBg(rail)).toBe(TRANSPARENT);",
+      "testTitle": "常亮互斥 holds on the collapsed rail form",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "{\"__fn\":\"() => pillBg(rail)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": {
+        "__fn": "() => pillBg(rail)"
+      }
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 167,
+      "matcher": "toBe",
+      "negated": true,
+      "source": "await expect.poll(() => pillBg(rail)).not.toBe(TRANSPARENT);",
+      "testTitle": "常亮互斥 holds on the collapsed rail form",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "{\"__fn\":\"() => pillBg(rail)\"}",
+      "status": "KEPT (negated)",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": {
+        "__fn": "() => pillBg(rail)"
+      }
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 194,
+      "matcher": "toHaveCSS",
+      "negated": false,
+      "source": "await expect(panel(page)).toHaveCSS('transform', 'none');",
+      "testTitle": "the caret is not clipped where it meets the input edge",
+      "old": "transform: none",
+      "new": "none",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "transform",
+        "none"
+      ],
+      "rawNew": "none"
+    },
+    {
+      "file": "search-focus.spec.ts",
+      "line": 221,
+      "matcher": "toBeGreaterThanOrEqual",
+      "negated": false,
+      "source": "expect(Math.max(...frames)).toBeGreaterThanOrEqual(box.height - 2);",
+      "testTitle": "the caret is not clipped where it meets the input edge",
+      "old": "≥ 14",
+      "new": "16",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        14
+      ],
+      "rawNew": 16
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 96,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => isLit(first)).toBe(true);",
+      "testTitle": "静息无常亮;hover 哪行亮哪行,且只亮一行",
+      "old": "true",
+      "new": "{\"__fn\":\"() => isLit(first)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => isLit(first)"
+      }
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 99,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => isLit(second)).toBe(true);",
+      "testTitle": "静息无常亮;hover 哪行亮哪行,且只亮一行",
+      "old": "true",
+      "new": "{\"__fn\":\"() => isLit(second)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => isLit(second)"
+      }
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 100,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => rowBg(first)).toBe(TRANSPARENT);",
+      "testTitle": "静息无常亮;hover 哪行亮哪行,且只亮一行",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "{\"__fn\":\"() => rowBg(first)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": {
+        "__fn": "() => rowBg(first)"
+      }
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 110,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => isLit(first)).toBe(true);",
+      "testTitle": "↑↓ 键盘光标接管高亮;Enter 跳光标行",
+      "old": "true",
+      "new": "{\"__fn\":\"() => isLit(first)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => isLit(first)"
+      }
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 137,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => isLit(first)).toBe(true);",
+      "testTitle": "鼠标一动让位:键盘光标交还 hover",
+      "old": "true",
+      "new": "{\"__fn\":\"() => isLit(first)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        true
+      ],
+      "rawNew": {
+        "__fn": "() => isLit(first)"
+      }
+    },
+    {
+      "file": "search-result-rows.spec.ts",
+      "line": 138,
+      "matcher": "toBe",
+      "negated": false,
+      "source": "await expect.poll(() => rowBg(second)).toBe(TRANSPARENT);",
+      "testTitle": "鼠标一动让位:键盘光标交还 hover",
+      "old": "rgba(0, 0, 0, 0)",
+      "new": "{\"__fn\":\"() => rowBg(second)\"}",
+      "status": "KEPT",
+      "violation": null,
+      "note": null,
+      "rawOld": [
+        "rgba(0, 0, 0, 0)"
+      ],
+      "rawNew": {
+        "__fn": "() => rowBg(second)"
+      }
+    }
+  ],
+  "webFirstCss": [
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "transform",
+      "e": [
+        {
+          "string": "none",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": "internal:role=dialog[name=\"搜索\"i]",
+      "tt": "第二下 Ctrl+K 关闭不闪：退出透明度单调递减"
+    },
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "transform",
+      "e": [
+        {
+          "string": "none",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": "internal:role=dialog[name=\"搜索\"i]",
+      "tt": "三连击：关→开落在开态且输入聚焦"
+    },
+    {
+      "k": "w",
+      "sel": "to.have.css",
+      "prop": "transform",
+      "e": [
+        {
+          "string": "none",
+          "regexSource": "__undefined__",
+          "regexFlags": "__undefined__",
+          "matchSubstring": "__undefined__",
+          "ignoreCase": "__undefined__",
+          "normalizeWhiteSpace": "__undefined__"
+        }
+      ],
+      "v": null,
+      "r": "pass",
+      "loc": "internal:role=dialog[name=\"搜索\"i]",
+      "tt": "the caret is not clipped where it meets the input edge"
+    }
+  ]
+}

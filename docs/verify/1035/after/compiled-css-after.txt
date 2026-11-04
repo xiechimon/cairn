@@ -1,0 +1,5 @@
+# compiled CSS artifact — AFTER (hp/pacman/t-0233-1035-110, pnpm --filter @pacman/web build)
+# grep -o -- '--board-col-min[a-z-]*:[^;}]*' apps/web/dist/assets/*.css | sort -u
+--board-col-min-docked:280px
+--board-col-min:200px
+--board-col-min:var(--board-col-min-docked)

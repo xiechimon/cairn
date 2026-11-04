@@ -1,0 +1,29 @@
+✔ searches titles and bodies with alternative terms and includes same-file PRs (1.586391ms)
+✔ lookup errors stop creation rather than reporting no overlaps (0.387504ms)
+✔ duplicate ask eval: a rephrased request extends the existing item without creating an issue (0.204554ms)
+✔ an existing same-ask PR also extends its discussion, and unknown references fail closed (0.159263ms)
+✖ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.544296ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48.414383
+
+✖ failing tests:
+
+test at scripts/github-overlap.test.mjs:103:1
+✖ empty planned paths fail before querying GitHub instead of hiding file overlaps (0.544296ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-1834/scripts/github-overlap.test.mjs:105:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /planned path/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

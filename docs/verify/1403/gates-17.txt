@@ -1,0 +1,111 @@
+# Gates at 81d5ef1 (round 17 of #1414; tracked tree clean, only the untracked docs/verify/1403 files of this
+# round present). NO_COLOR=1; ANSI codes stripped.
+# E2E_AFFECTED_PORT=8391: lsof -iTCP:8391 -sTCP:LISTEN showed nothing listening (exit 1) right before the run.
+# The known root-only failure (apps/daemon runner-brief.test.ts "擦除失败") did not appear in any of the three vitest runs.
+# vitest --changed: test-internal log lines are omitted; the summary and any failure are kept.
+# e2e:affected: the changed-path list is omitted; the selection and results are kept.
+
+$ pnpm lint
+$ biome ci .
+(one info-level note on apps/web/src/resources/machines-page.tsx:317, noUselessFragments; not in this diff, the same note as gates-16)
+Checked 785 files in 8s. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (4.5s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (6.7s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+# vitest --changed origin/main ran three times on the same tree. Runs 1 and 2 each failed one test,
+# skill-write.test.ts M5, on its 5 s default timeout; both started at load average ~18 (other lanes on this
+# host; uptime below). The file is the same as on origin/main and on 9ef2a0c (git diff --quiet: exit 0) and
+# this round does not touch the skills path. Alone the file passes 30/30, and M5 alone takes 2041 ms.
+
+$ pnpm exec vitest run --changed origin/main   (run 1)
+(uptime: 13:06:52 load average: 17.03, 19.40, 14.87 (taken during run 1))
+ FAIL  test/skill-write.test.ts > machine-wire 技能清单与按需拉取（GET /api/machine/skills/{stepId}[/file]） > M5：超限文件不再让整包失败——超单文件闸的资产真实 size 入清单、字节完整下发；总量超旧包闸照常出清单
+Error: Test timed out in 5000ms.
+ Test Files  1 failed | 131 passed (132)
+      Tests  1 failed | 1310 passed | 1 skipped (1312)
+   Start at  12:55:54
+   Duration  784.82s (tests 60%, import 40%)
+exit=1
+
+$ pnpm exec vitest run --changed origin/main   (run 2)
+(uptime: 13:10:26 up 12:37,  0 user,  load average: 18.52, 19.51, 15.89 | 13:20:23 up 12:47,  0 user,  load average: 7.74, 15.01, 16.22)
+ FAIL  test/skill-write.test.ts > machine-wire 技能清单与按需拉取（GET /api/machine/skills/{stepId}[/file]） > M5：超限文件不再让整包失败——超单文件闸的资产真实 size 入清单、字节完整下发；总量超旧包闸照常出清单
+Error: Test timed out in 5000ms.
+ Test Files  1 failed | 131 passed (132)
+      Tests  1 failed | 1310 passed | 1 skipped (1312)
+   Start at  13:10:37
+   Duration  585.54s (tests 59%, import 40%)
+exit=1
+
+$ pnpm exec vitest run --changed origin/main   (run 3)
+(uptime: 13:21:05 up 12:47,  0 user,  load average: 8.23, 13.99, 15.81 | 13:28:11 up 12:55,  0 user,  load average: 6.38, 10.46, 13.64)
+ Test Files  132 passed (132)
+      Tests  1311 passed | 1 skipped (1312)
+   Start at  13:21:18
+   Duration  413.41s (tests 64%, import 36%, transform 1%)
+exit=0
+
+$ pnpm exec vitest run apps/server/test/skill-write.test.ts
+ Test Files  1 passed (1)
+      Tests  30 passed (30)
+   Start at  13:09:18
+   Duration  15.89s (tests 49%, transform 40%, import 11%)
+exit=0
+
+$ pnpm exec vitest run --reporter=verbose apps/server/test/skill-write.test.ts -t M5
+✓ test/skill-write.test.ts > machine-wire 技能清单与按需拉取（GET /api/machine/skills/{stepId}[/file]） > M5：超限文件不再让整包失败——超单文件闸的资产真实 size 入清单、字节完整下发；总量超旧包闸照常出清单 2041ms
+ Test Files  1 passed (1)
+      Tests  1 passed | 29 skipped (30)
+   Start at  13:20:47
+   Duration  5.57s (transform 43%, tests 38%, import 19%)
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+$ lsof -iTCP:8391 -sTCP:LISTEN
+exit=1
+
+$ E2E_AFFECTED_PORT=8391 pnpm --filter @pacman/web e2e:affected
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)): (list omitted)
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8391
+  live-server-reap.spec.ts token-gate.spec.ts
+Running 8 tests using 2 workers
+(Node's 'NO_COLOR env is ignored due to FORCE_COLOR' warnings from the worker processes omitted)
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (3.5s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (4.7s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.3s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (675ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (763ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (817ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (742ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (564ms)
+  8 passed (29.2s)
+exit=0

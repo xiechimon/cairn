@@ -1,0 +1,140 @@
+{
+  "probe": "xmon74-permission-loop",
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0006-xmon-74-agent-tab/.claude/verify-run/home/server/server.db",
+    "repo": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0006-xmon-74-agent-tab"
+  },
+  "agentId": "vRKH_Rj6dAOWdhyxOs_SA",
+  "machineId": "Z4PjVT7ZDZjXPBkR5e8AJ",
+  "checks": [
+    {
+      "name": "machine-enrolled-shell-off",
+      "ok": true,
+      "detail": "machineId=Z4PjVT7ZDZjXPBkR5e8AJ shellEnabled=false"
+    },
+    {
+      "name": "agent-default-tools-push-only",
+      "ok": true,
+      "detail": "tools=[\"推送分支\"]（XMON-74 Q1：并非全 off，推送分支默认开）"
+    },
+    {
+      "name": "chief-bound",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "chief-thread-queued",
+      "ok": true,
+      "detail": "status=201"
+    },
+    {
+      "name": "ui-perm-six-switches",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "ui-default-shell-off-push-on",
+      "ok": true,
+      "detail": "远程 shell=false 推送分支=true"
+    },
+    {
+      "name": "claim1-remote-tools-50",
+      "ok": true,
+      "detail": "n=50"
+    },
+    {
+      "name": "claim1-has-set-remote-shell",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "claim1-local-tools-no-shell（机器闸关）",
+      "ok": true,
+      "detail": "localTools=[]"
+    },
+    {
+      "name": "relay-grant-writes-shell-switch",
+      "ok": true,
+      "detail": "text={\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":true,\"tools\":[\"推送分支\",\"远程 shell\"]}"
+    },
+    {
+      "name": "rest-get-sees-chief-write",
+      "ok": true,
+      "detail": "tools=[\"推送分支\",\"远程 shell\"]"
+    },
+    {
+      "name": "sqlite-row-shell-on",
+      "ok": true,
+      "detail": "agent.tools=[\"推送分支\",\"远程 shell\"]"
+    },
+    {
+      "name": "relay-revoke-removes-only-shell",
+      "ok": true,
+      "detail": "text={\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":false,\"tools\":[\"推送分支\"]}"
+    },
+    {
+      "name": "relay-unknown-agent-404-no-write",
+      "ok": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "unknown-agent-left-tools-untouched",
+      "ok": true,
+      "detail": "tools=[\"推送分支\"]"
+    },
+    {
+      "name": "relay-regrant-for-ui",
+      "ok": true,
+      "detail": "text={\"agentId\":\"vRKH_Rj6dAOWdhyxOs_SA\",\"remoteShell\":true,\"tools\":[\"推送分支\",\"远程 shell\"]}"
+    },
+    {
+      "name": "chief-dispatched-two-workers",
+      "ok": true,
+      "detail": "run1=200 run2=200"
+    },
+    {
+      "name": "ui-shell-on-after-chief-grant",
+      "ok": true,
+      "detail": "远程 shell=true"
+    },
+    {
+      "name": "step1-done",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "worker1-claimed",
+      "ok": true,
+      "detail": "kind=build"
+    },
+    {
+      "name": "worker1-no-shell（agent 开 ∩ 机器关 = 闸闭 fail-closed）",
+      "ok": true,
+      "detail": "localTools=[] agentTools=[\"推送分支\",\"远程 shell\"]"
+    },
+    {
+      "name": "worker1-done",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "machine-shell-enabled",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "worker2-has-shell（agent 开 ∩ 机器开 = 双闸齐开）",
+      "ok": true,
+      "detail": "localTools=[\"remote_shell\"] agentTools=[\"推送分支\",\"远程 shell\"]"
+    },
+    {
+      "name": "worker2-done",
+      "ok": true,
+      "detail": "status=200"
+    }
+  ],
+  "passed": 25,
+  "total": 25
+}

@@ -1,0 +1,6 @@
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://example.com/evidence-shot.png (bare URL, line 16)
+FAIL unreachable (HTTP 404): https://example.com/evidence-shot.png (bare URL, line 16)
+pr-evidence: RED (2 problem(s))
+exit=1

@@ -1,0 +1,281 @@
+[
+  {
+    "id": 5938603904,
+    "number": 1394,
+    "title": "web: agent 预合并判定票——ready-for-agent PR 由 pacman 自己的 agent 判定「简单可合」并执行合并（吃自己狗粮）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T08:36:35Z",
+    "updated_at": "2026-10-20T08:36:35Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5949039098,
+    "number": 1401,
+    "title": "docs: 自举闭环 P0 裁决落盘（ADR 0021 自治合并 + spec 28 + 各期开票）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T20:23:10Z",
+    "updated_at": "2026-10-20T23:48:47Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5949044111,
+    "number": 1402,
+    "title": "verify: 自举闭环 P1 验证 CLI 收敛（vp.mjs 子命令 + feature map 到达路径 + archive）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T20:23:28Z",
+    "updated_at": "2026-10-20T20:23:28Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5949047648,
+    "number": 1403,
+    "title": "server: 自举闭环 P2 GitHub PR 面 + 合并对账（merged 回推 done、BEHIND/DIRTY、按 head SHA 读 checks）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T20:23:41Z",
+    "updated_at": "2026-10-20T20:23:41Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5949050791,
+    "number": 1404,
+    "title": "server,shared,daemon: 自举闭环 P3 合并就绪闸（判定绑 patchDigest、自动审核与验证、chief go/no-go、pacman/merge-gate）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T20:23:53Z",
+    "updated_at": "2026-10-21T07:11:23Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5949057029,
+    "number": 1406,
+    "title": "server,daemon: 自举闭环 P5 自主进料与仓规内化（issue 轮询、chief GitHub 读工具、PR 评论回灌）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T20:24:16Z",
+    "updated_at": "2026-10-21T08:29:52Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5949060209,
+    "number": 1407,
+    "title": "skills,server: 自举闭环 P6 纠错回路与园丁（correct skill、纠错票触发、每周园丁定时任务）",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-20T20:24:28Z",
+    "updated_at": "2026-10-20T20:24:28Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5957047825,
+    "number": 1455,
+    "title": "scripts: e2e-affected runs the full e2e suite when only an apps/web unit test changes",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T08:26:50Z",
+    "updated_at": "2026-10-21T08:26:50Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5957120218,
+    "number": 1457,
+    "title": "shared: one rule for which phases can start, so the board cannot offer a drop the server rejects",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T08:31:53Z",
+    "updated_at": "2026-10-21T08:31:53Z",
+    "closed_at": null,
+    "body": "(body removed from fixture)"
+  }
+]

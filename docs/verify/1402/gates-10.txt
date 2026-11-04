@@ -1,0 +1,52 @@
+# Gates at 3ee5842 (round 10 code of #1411, clean tree: 0 changed paths).
+
+$ pnpm lint
+    330 328 │             </div>
+  
+
+Checked 784 files in 1514ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.6s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.5s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+|@pacman/shared| 
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+exit=0
+
+$ pnpm --filter @pacman/web e2e:affected
+  docs/verify/1402/vp-selftest-r7-mutations.txt → none
+  docs/verify/1402/vp-selftest-r7.txt → none
+  docs/verify/1402/vp-selftest-r8.txt → none
+  docs/verify/1402/vp-selftest-r9.txt → none
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 512 test sources, no package-manager spawns.
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+49/49 passed
+exit=0

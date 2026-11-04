@@ -1,0 +1,140 @@
+# #1403 round 16 (pr-gate run 8 on #1414 at deff4b9): red at the tests-only commit 3299f2d, green at bc9c833.
+# 3299f2d changes apps/server/test/pr-reconcile.test.ts and apps/server/test/ci-loop.test.ts only:
+# 'git diff --quiet deff4b9 3299f2d -- apps/server/src apps/daemon/src packages' exits 0, so the red leg runs
+# the deff4b9 sources. The fix is 03d0b20 (ci-loop.ts, builds.ts, spec 02) plus bc9c833 (a builds.ts comment
+# from /code-review). Tracked tree clean at both runs; NO_COLOR=1; per-test durations dropped.
+#
+# The 7 failing cases name the rules 03d0b20 adds:
+#   [67a] x2, [67b] x2   fix 1: a close is confirmed only by the read right after it (a step in flight
+#                         before or during the read, a failed read, or a response without head resets it)
+#   [68]                 fix 2: a verify step's pushed checkpoint counts against the merged head
+#   [59] done            fix 3: the done funnel has no already-done branch; a done card throws like a closed one
+#   [69]                 fix 4: each review candidate is counted in exactly one bucket, every sweep
+# Cases that pass on the old sources by design:
+#   [67c]  guard for fix 1: the anonymous five-minute skip must not reset a close (r16-mutations M1e turns it red).
+#   ㉟     now drives the late merge step through completeStep, the production path. completeStep already
+#          returns early for a done card on deff4b9 (and on main, #1453), so production does the same before
+#          and after the fix; ㉟ pins that (step recorded done, no completion row, card stays done). The old ㉟
+#          called finishTodoDone on a done card directly, which no production caller does.
+#   [49]   keeps its reconcile case; the case that called finishTodoDone on a card already marked done is
+#          removed for the same reason (it cannot pass once the dead branch is gone: done -> done throws).
+#   ㉗ base.ref / default_branch, [61] base.ref / default_branch: item 5 adds coverage for a guard that
+#          already exists, so these pass on both; r16-mutations M5a/M5b are their red legs, and M5a applied
+#          at deff4b9 (old tests) leaves all 125 tests green, which is the gap pr-gate reported.
+#   批量对账 (ci-loop.test.ts): item 6 fixes the test helper; the forced collision below is its red leg.
+
+== red at 3299f2d (deff4b9 sources) ==
+$ pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ ✓ test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base is not taken as a merge into the default branch
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base.ref is not taken as a merge into the default branch
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without default_branch is not taken as a merge into the default branch
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉟ the merge step reports done after a person marked the card done: only the step is recorded, no completion row
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the done funnel on a card a person moved to closed throws before it stops anything
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the done funnel on a card a person moved to done throws before it stops anything
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without base.ref is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without default_branch is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without the base repo id is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (the sweep skips the read): the first read after it does not confirm the close
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (it starts during the read, the sweep drops what it read): the first read after it does not confirm the close
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a network error) between two closed reads: the count starts over
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a response without head) between two closed reads: the count starts over
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67c] anonymous: the sweeps that skip a PR for the five-minute interval do not reset its close
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [68] merged at the last build checkpoint, then a verify step pushed a commit → stays in review with a hint
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the done funnel on a card a person moved to done throws before it stops anything
+AssertionError: expected [Function] to throw an error
+ ❯ test/pr-reconcile.test.ts:1661:66
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (the sweep skips the read): the first read after it does not confirm the close
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (it starts during the read, the sweep drops what it read): the first read after it does not confirm the close
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1961:33
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a network error) between two closed reads: the count starts over
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a response without head) between two closed reads: the count starts over
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1986:33
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [68] merged at the last build checkpoint, then a verify step pushed a commit → stays in review with a hint
+AssertionError: expected 'done' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:2032:31
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+AssertionError: expected 5 to be 4 // Object.is equality
+ ❯ test/pr-reconcile.test.ts:2073:64
+ Test Files  1 failed | 1 passed (2)
+      Tests  7 failed | 128 passed (135)
+exit=1
+
+== green at bc9c833 ==
+$ pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts apps/server/test/close-stops-active-steps.test.ts
+ ✓ test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base is not taken as a merge into the default branch
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without base.ref is not taken as a merge into the default branch
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without default_branch is not taken as a merge into the default branch
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉟ the merge step reports done after a person marked the card done: only the step is recorded, no completion row
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the done funnel on a card a person moved to closed throws before it stops anything
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the done funnel on a card a person moved to done throws before it stops anything
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without base.ref is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without default_branch is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without the base repo id is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (the sweep skips the read): the first read after it does not confirm the close
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (it starts during the read, the sweep drops what it read): the first read after it does not confirm the close
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a network error) between two closed reads: the count starts over
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a response without head) between two closed reads: the count starts over
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67c] anonymous: the sweeps that skip a PR for the five-minute interval do not reset its close
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [68] merged at the last build checkpoint, then a verify step pushed a commit → stays in review with a hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+(the other 143 cases also passed)
+ Test Files  3 passed (3)
+      Tests  163 passed (163)
+exit=0
+
+== item 6: the PR-number collision, forced ==
+# deff4b9's ci-loop.test.ts (addCandidate draws 100 + random(900)) written in place, with the batch test's red
+# and green candidates given the same PR number 500, run three times; the file was written back afterwards
+# (HEAD was 3299f2d at this run, so the check below compares against 3299f2d).
+$ pnpm exec vitest run --reporter=verbose apps/server/test/ci-loop.test.ts -t 批量对账   (x3)
+F6 deff4b9's ci-loop.test.ts (random PR numbers), the batch test's red and green candidates given the same PR number 500
+    run 1: exit=1 Tests  1 failed | 23 skipped (24)
+    × ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+      AssertionError: expected 'building' to be 'review' // Object.is equality
+F6 deff4b9's ci-loop.test.ts (random PR numbers), the batch test's red and green candidates given the same PR number 500
+    run 2: exit=1 Tests  1 failed | 23 skipped (24)
+    × ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+      AssertionError: expected 'building' to be 'review' // Object.is equality
+F6 deff4b9's ci-loop.test.ts (random PR numbers), the batch test's red and green candidates given the same PR number 500
+    run 3: exit=1 Tests  1 failed | 23 skipped (24)
+    × ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+      AssertionError: expected 'building' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/test/ci-loop.test.ts: exit=0)
+# The green candidate sends the red candidate's etag, gets a 304 and reuses the red verdict, so it gets a fix
+# step and stays in building. With the counter in 3299f2d every candidate gets its own number (1000, 1001, 1002 in this test); r16-mutations M6
+# (counter not advancing) reproduces the same failure at bc9c833, and the batch test passed in all 20 runs below.
+
+== 20 runs of pr-reconcile and ci-loop at bc9c833 ==
+$ for i in 1..20: pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+run 1: exit=0 Tests  135 passed (135)
+run 2: exit=0 Tests  135 passed (135)
+run 3: exit=0 Tests  135 passed (135)
+run 4: exit=0 Tests  135 passed (135)
+run 5: exit=0 Tests  135 passed (135)
+run 6: exit=0 Tests  135 passed (135)
+run 7: exit=0 Tests  135 passed (135)
+run 8: exit=0 Tests  135 passed (135)
+run 9: exit=0 Tests  135 passed (135)
+run 10: exit=0 Tests  135 passed (135)
+run 11: exit=0 Tests  135 passed (135)
+run 12: exit=0 Tests  135 passed (135)
+run 13: exit=0 Tests  135 passed (135)
+run 14: exit=0 Tests  135 passed (135)
+run 15: exit=0 Tests  135 passed (135)
+run 16: exit=0 Tests  135 passed (135)
+run 17: exit=0 Tests  135 passed (135)
+run 18: exit=0 Tests  135 passed (135)
+run 19: exit=0 Tests  135 passed (135)
+run 20: exit=0 Tests  135 passed (135)
+passed runs: 20 of 20

@@ -1,0 +1,142 @@
+[
+ {
+  "id": "S1",
+  "desc": "login shape without the EMU underscore segment (the #1496 shape)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;",
+    "replace": "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*$/;"
+   }
+  ],
+  "watch": [
+   "W21 GitHub 认的账号名（alice_acme",
+   "W21 GitHub 认的账号名（mona-cat_octo",
+   "W21 GitHub 认的账号名（octo_admin",
+   "W21 GitHub 认的账号名（aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh"
+  ]
+ },
+ {
+  "id": "S2",
+  "desc": "underscore segment may be empty (a trailing underscore passes)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;",
+    "replace": "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]*)?$/;"
+   }
+  ],
+  "watch": [
+   "W20 sender 的 login 不是 GitHub 账号名（\"alice_\"）"
+  ]
+ },
+ {
+  "id": "S3",
+  "desc": "underscore allowed anywhere after the first character",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;",
+    "replace": "const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;"
+   }
+  ],
+  "watch": [
+   "W20 sender 的 login 不是 GitHub 账号名（\"alice_\"）"
+  ]
+ },
+ {
+  "id": "S4",
+  "desc": "a below-triage answer is logged as permission-unreadable (swap between sender refusals)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);",
+    "replace": "return refuseSender('permission-unreadable', `${sender} is below triage on ${fullName}`);"
+   }
+  ],
+  "watch": [
+   "W1 ",
+   "W2 ",
+   "W12b ",
+   "W20b "
+  ]
+ },
+ {
+  "id": "S5",
+  "desc": "a below-triage answer is logged as rate-limited (swap between sender refusals)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);",
+    "replace": "return refuseSender('rate-limited', `${sender} is below triage on ${fullName}`);"
+   }
+  ],
+  "watch": [
+   "W1 ",
+   "W2 ",
+   "W12b ",
+   "W20b "
+  ]
+ },
+ {
+  "id": "S6",
+  "desc": "length limit 40 instead of 39",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "  return base.length <= 39 && GITHUB_LOGIN_BASE.test(base);",
+    "replace": "  return base.length <= 40 && GITHUB_LOGIN_BASE.test(base);"
+   }
+  ],
+  "watch": [
+   "W20 sender 的 login 不是 GitHub 账号名（\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"）",
+   "W20 sender 的 login 不是 GitHub 账号名（\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh\"）",
+   "W20 sender 的 login 不是 GitHub 账号名（\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]\"）"
+  ]
+ },
+ {
+  "id": "S7",
+  "desc": "no length limit",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "  return base.length <= 39 && GITHUB_LOGIN_BASE.test(base);",
+    "replace": "  return GITHUB_LOGIN_BASE.test(base);"
+   }
+  ],
+  "watch": [
+   "W20 sender 的 login 不是 GitHub 账号名（\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"）",
+   "W20 sender 的 login 不是 GitHub 账号名（\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh\"）",
+   "W20 sender 的 login 不是 GitHub 账号名（\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]\"）"
+  ]
+ },
+ {
+  "id": "S8",
+  "desc": "the [bot] suffix is not stripped (bot logins refused as malformed)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "  const base = login.endsWith('[bot]') ? login.slice(0, -'[bot]'.length) : login;",
+    "replace": "  const base = login;"
+   }
+  ],
+  "watch": [
+   "W20b ",
+   "W21 GitHub 认的账号名（octo-builder[bot]"
+  ]
+ },
+ {
+  "id": "S9",
+  "desc": "a malformed sender is logged in full (no truncation)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login', {\n      sender: sender.slice(0, 64),\n      senderLength: sender.length,\n    });",
+    "replace": "    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login');"
+   }
+  ],
+  "watch": [
+   "W22 "
+  ]
+ }
+]

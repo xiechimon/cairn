@@ -1,0 +1,43 @@
+Loading pi runtime…
+[machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=short settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+[machine] claude binary: /tmp/probe-1307/bin/claude (2.1.299)
+Enrolled in team iCNM4uvO5KQWmNYdePUxj (machine B-WwxC8Drfwi5j0OeOhnF)
+Online (machineId=B-WwxC8Drfwi5j0OeOhnF); polling http://127.0.0.1:8794
+[recover] no pending steps found
+[wake] push channel connected
+claim step=wj6bv_n6QMS3iYrqbgq9F
+step wj6bv_n6QMS3iYrqbgq9F for conv 01a13afc-3f3e-7925-a805-c0fcd7df2eba (1 running)
+Loading claude-code runtime…
+using model claude-code/stub-1307
+[workspace] 准备工作区...
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/probe-1307/home/.agents/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: CLAUDE.md (create)
+new session 01a13afc-3f3e-7925-a805-c0fcd7df2eba
+[step] brief removed (CLAUDE.md)
+finished (0 running)
+claim step=NfkV7ToqTCn6ngMjDCH-k
+step NfkV7ToqTCn6ngMjDCH-k for conv 01a13afc-4344-7280-a07b-e2d10f4e308a (1 running)
+using model claude-code/stub-1307
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/probe-1307/home/.agents/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: CLAUDE.md (create)
+new session 01a13afc-4344-7280-a07b-e2d10f4e308a
+[step] brief removed (CLAUDE.md)
+finished (0 running)
+claim step=FQ8UZfxqwafRGdsjrAdQ5
+step FQ8UZfxqwafRGdsjrAdQ5 for conv 01a13afc-4744-7a1b-81fc-5faf9f5e98bd (1 running)
+using model claude-code/stub-1307
+[workspace] 准备工作区...
+[mcp] loaded from /tmp/probe-1307/home/.claude.json: dummy_alpha
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/probe-1307/home/.agents/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: CLAUDE.md (create)
+new session 01a13afc-4744-7a1b-81fc-5faf9f5e98bd
+[step] brief removed (CLAUDE.md)
+finished (0 running)

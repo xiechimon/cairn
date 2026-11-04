@@ -1,0 +1,23 @@
+{
+  "before": {
+    "fixCiJob": [
+      "aihot"
+    ],
+    "docsPath": [
+      "docs-writer"
+    ],
+    "docsProse": [],
+    "urlAlone": [
+      "be",
+      "fe"
+    ]
+  },
+  "after": {
+    "fixCiJob": [],
+    "docsPath": [],
+    "docsProse": [
+      "docs-writer"
+    ],
+    "urlAlone": []
+  }
+}

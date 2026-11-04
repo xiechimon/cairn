@@ -1,0 +1,2 @@
+{"source": "d84fef50cd4facba2ed254f57107d226f8ab33e5", "counts": {"cases": 64, "results": 30, "errors": 46}}
+historical replay refused: source is not the documented 64-case / 192-turn batch

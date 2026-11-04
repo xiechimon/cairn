@@ -1,0 +1,75 @@
+import type { AgentBackend, StepEvent } from '@pacman/shared';
+import { expect, test } from 'vitest';
+import { PI_CAPABILITIES } from '../src/backend/pi.js';
+import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+
+function gatedBackend() {
+  let openGate: () => void = () => {};
+  const opened = new Promise<void>((r) => {
+    openGate = r;
+  });
+  const probe = { createCalls: 0, stopCalls: 0 };
+  const backend: AgentBackend = {
+    capabilities: PI_CAPABILITIES,
+    async createSession() {
+      probe.createCalls += 1;
+      await opened;
+      return {
+        sessionId: `pi-sess-${probe.createCalls}`,
+        events: (async function* () {
+          yield { type: 'text_delta', text: 'working' } as StepEvent;
+          yield { type: 'done', usage: [] } as StepEvent;
+        })(),
+        async steer() {},
+        async stop() {
+          probe.stopCalls += 1;
+        },
+        usage: () => [],
+      };
+    },
+    async continueSession() {
+      throw new Error('unused');
+    },
+  };
+  return { backend, probe, openGate };
+}
+
+test('P4 daemon half: a stop fetched before the session handle registers is dropped and the step runs to success', async () => {
+  const api = new FakeMachineApi();
+  api.stopResponse = true;
+  const { backend, probe, openGate } = gatedBackend();
+  const { handle, lines } = await boot({ api, backend });
+  await waitFor(() => api.parked !== null);
+  api.parked?.(CLAIMED);
+  await waitFor(() => probe.createCalls === 1);
+  api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+  await waitFor(() => lines.some((l) => l.includes('stop dropped (no live session)')));
+  openGate();
+  await waitFor(() => api.doneBodies.length === 1);
+  console.log('stop fetched from server:', api.calls.includes('stop:s1'));
+  console.log('session stop() calls:', probe.stopCalls);
+  console.log('done status reported:', api.doneBodies[0]?.body.status);
+  await handle.stop();
+  await handle.done;
+});
+
+test('P1 daemon half: the claim loop starts a second runStep for a step id already in flight', async () => {
+  const api = new FakeMachineApi();
+  api.mePatch = { maxConcurrent: 1 };
+  const { backend, probe, openGate } = gatedBackend();
+  const { handle, lines } = await boot({ api, backend });
+  await waitFor(() => api.parked !== null);
+  api.parked?.(CLAIMED);
+  await waitFor(() => probe.createCalls === 1);
+  await waitFor(() => api.parked !== null);
+  api.parked?.(CLAIMED);
+  await waitFor(() => probe.createCalls === 2);
+  console.log('createSession calls for step s1 while run #1 still open:', probe.createCalls);
+  console.log('claim lines:', lines.filter((l) => l.includes('claim step=s1')).length);
+  openGate();
+  await waitFor(() => api.doneBodies.length === 2);
+  console.log('done reports for s1:', api.doneBodies.map((d) => `${d.stepId}:${d.body.status}`).join(', '));
+  expect(probe.createCalls).toBe(2);
+  await handle.stop();
+  await handle.done;
+});

@@ -1,0 +1,10 @@
+test_bare_images_with_punctuation_or_adjacent_markup_fail (__main__.EvidenceGateTests.test_bare_images_with_punctuation_or_adjacent_markup_fail) ... ok
+test_comments_embedding_media_hosts_and_http_failures (__main__.EvidenceGateTests.test_comments_embedding_media_hosts_and_http_failures) ... ok
+test_extensionless_embeds_keep_their_form_and_full_url (__main__.EvidenceGateTests.test_extensionless_embeds_keep_their_form_and_full_url) ... ok
+test_fixture_embeds_fail_for_the_fixture_reason (__main__.EvidenceGateTests.test_fixture_embeds_fail_for_the_fixture_reason) ... ok
+test_references_are_not_images (__main__.EvidenceGateTests.test_references_are_not_images) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.028s
+
+OK

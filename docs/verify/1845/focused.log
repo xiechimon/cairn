@@ -1,0 +1,13 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+
+ Test Files  5 passed (5)
+      Tests  28 passed (28)
+   Start at  10:13:14
+   Duration  22.20s (transform 42%, import 38%, tests 19%)
+
+  Transform  |@xiechimon/cairn| transforming modules took 8.19s · 43% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

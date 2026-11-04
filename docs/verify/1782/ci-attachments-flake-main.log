@@ -1,0 +1,16 @@
+# Deterministic reproduction of the attachments grant-signature flake
+# Extracted tree: git archive origin/main (4713294f) at /tmp/cairn-1782-main-r3,
+# node_modules symlinked to the installed workspace (pnpm-lock.yaml unchanged between 17561d60 and 4713294f)
+# Command: apps/server/node_modules/.bin/tsx /tmp/cairn-1782-flake-repro-main.mts /tmp/cairn-1782-main-r3
+
+repro root: /tmp/cairn-1782-main-r3
+weak-tail grant found after 1827 signed payloads
+sig        : j2UQgFCrPRW5s0oJXBLliostXhGErop9BNqB0M0sgAA
+tampered   : eyJ0ZWFtSWQiOiJqQkUtN21GMFR3c1N2ektTbzJuMlkiLCJrZXkiOiJhdHRhY2htZW50cy9yZXByby9zcGVjLm1kIiwic2l6ZUJ5dGVzIjo4LCJtaW1lVHlwZSI6InRleHQvbWFya2Rvd24iLCJzY29wZSI6Im1lc3NhZ2UiLCJhdHRhY2htZW50SWQiOiJlNHpFOFZwcF9IUk5RTWlQSU5HZU8iLCJleHAiOjE3OTMwNTcwMjI3NjR9.j2UQgFCrPRW5s0oJXBLliostXhGErop9BNqB0M0sgAA
+sig tail   : ...M0sgAA (second-to-last char = A, last char = A)
+tampered decodes to identical MAC bytes: true
+verifyAttachmentGrant(tampered) accepted (no throw)
+upload with tampered grant -> HTTP 409
+body: {"error":"uploaded size 1 ≠ grant 8"}
+second upload with the same tampered grant -> HTTP 409
+body: {"error":"uploaded size 1 ≠ grant 8"}

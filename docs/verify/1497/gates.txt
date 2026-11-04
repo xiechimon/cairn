@@ -1,0 +1,8 @@
+Checked 812 files in 2s. No fixes applied.
+Found 1 info.
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.

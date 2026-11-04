@@ -1,0 +1,35 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1948
+
+ ❯ |@cairn/integration| test/harbor-submission.test.ts (16 tests | 1 failed) 524ms
+   × a rejected build retains the already created todo ID without secrets 31ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cairn/integration| test/harbor-submission.test.ts > a rejected build retains the already created todo ID without secrets
+AssertionError: expected undefined to deeply equal { todoId: 'vttoMFjU1pplQi5eRD5_z' }
+
+- Expected:
+{
+  "todoId": "vttoMFjU1pplQi5eRD5_z",
+}
+
++ Received:
+undefined
+
+ ❯ test/harbor-submission.test.ts:205:26
+    203|   });
+    204|   await expect(client.submit('Task')).rejects.toThrow('HTTP 503');
+    205|   expect(client.created).toEqual({ todoId: s.db.select().from(todo).ge…
+       |                          ^
+    206|   expect(s.db.select().from(build).all()).toEqual([]);
+    207|   const artifact = JSON.stringify(client);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 passed (16)
+   Start at  17:56:30
+   Duration  1.89s (transform 46%, tests 29%, import 25%)
+

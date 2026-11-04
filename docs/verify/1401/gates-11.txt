@@ -1,0 +1,103 @@
+# Gates for round 11 of #1410 (pr-gate run 10 at 9460e04). Run on the working tree that was then committed
+# unchanged as 126f4c1 (pr-gate.js, the self-check, AGENTS.md, docs/pr-review.md, spec 28); the pre-commit hook
+# of 126f4c1 ran lint, typecheck and the spawn gate again and passed. Output trimmed to the last lines of each.
+
+lsof -iTCP:8398 -sTCP:LISTEN -> rc=1 (free)
+
+$ pnpm lint
+    ······· │ 
+    325 324 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    326 325 │                     </>
+    327     │ - ················)}
+    328     │ - ··············</>
+        326 │ + ················)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 785 files in 1434ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/pacman-cli| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@pacman/shared| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+exit=0
+
+$ node scripts/pr-gate-selfcheck.mjs
+PASS  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+PASS  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+PASS  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+PASS  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+PASS  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+PASS  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+PASS  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+PASS  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+PASS  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+PASS  a caller line count larger than the safety reviewer's wins (run 10)
+PASS  a missing safety file list blocks go
+73/73 passed (.claude/workflows/pr-gate.js)
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 512 test sources, no package-manager spawns.
+exit=0
+
+$ pnpm --filter @pacman/web e2e:affected   # port 8398 free (lsof rc=1), so the default port
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  .claude/workflows/pr-gate.js → none
+  AGENTS.md → none
+  docs/pr-review.md → none
+  "docs/spec/28-\350\207\252\344\270\276\351\227\255\347\216\257-\350\207\252\345\206\231\350\207\252\345\220\210.md" → none
+  scripts/pr-gate-selfcheck.mjs → none
+  .github/workflows/ci.yml → none
+  .gitignore → none
+  "docs/adr/0018-\345\244\232agent\345\233\242\351\230\237\344\270\211\345\261\202\344\270\216\346\234\272\345\231\250\350\203\275\345\212\233\351\227\270.md" → none
+  "docs/adr/0021-\350\207\252\346\262\273\345\220\210\345\271\266-\351\241\271\347\233\256\347\272\247\347\255\226\347\225\245\344\270\216\350\241\245\344\270\201\347\273\221\345\256\232\345\210\244\345\256\232.md" → none
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+exit=0
+(25 lines for docs/verify/1401/* files already on the branch, each '→ none', left out above)
+
+== /code-review ==
+Skill code-review, effort low, on the diff from 9460e04 to the working tree committed as 126f4c1
+(pr-gate.js, AGENTS.md, docs/pr-review.md, spec 28; the self-check is a test file and the review skips it).
+Result: no findings. pr-gate.js: no runtime-correctness defects in the globToRegExp dirAlone tail, the
+NO_HOOKS prefix on fetch, update-ref and checkout, the per-skeptic ports, or the seenFiles / safetyListed
+split. The doc files are text only. The one defect of this round (AUTO_MERGE.map passing the index as
+dirAlone) was caught by the self-check before the review; see r11-red-green.txt.

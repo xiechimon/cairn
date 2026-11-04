@@ -1,0 +1,41 @@
+{
+  "id": "N1mv066tca4Anp9-lc4LE",
+  "teamId": "2KY2j82d69YzB1ktkTSXB",
+  "projectId": "d8kXvrd1jmddASckDTdmK",
+  "title": "漂移后俳句",
+  "spec": "写一首俳句，句号收尾。",
+  "phase": "building",
+  "phaseAt": 1792531372977,
+  "seqNum": 1,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": null,
+    "build": {
+      "agentId": "i8lgoZV_7JRswLxWRYpCx"
+    }
+  },
+  "agent": {
+    "id": "i8lgoZV_7JRswLxWRYpCx",
+    "displayName": "重启探针"
+  },
+  "latestBuildId": "01a15b32-1ba3-7de5-af49-f950e37aba5c",
+  "lastRunAt": 1792531372963,
+  "hasChanges": false,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a15b32-1ba3-7de5-af49-f950e37aba5c",
+      "createdAt": 1792531372963
+    }
+  ],
+  "sourceTodo": null,
+  "blockedBy": null,
+  "v": 4,
+  "createdBy": "5fmV1psUeB2TdKi6p4_TN",
+  "ownerId": "5fmV1psUeB2TdKi6p4_TN",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "quotaWait": null
+}

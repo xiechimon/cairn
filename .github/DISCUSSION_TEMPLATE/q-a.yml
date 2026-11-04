@@ -1,0 +1,27 @@
+labels: ["Q&A"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask a question about installing, configuring or using Cairn.
+        Do not paste secrets, API keys, tokens or private repository content.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried
+      description: Commands, settings and the exact error text, with secrets removed.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Cairn version
+      placeholder: "1.3.0"
+    validations:
+      required: false

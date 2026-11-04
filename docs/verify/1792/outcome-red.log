@@ -1,0 +1,31 @@
+...........F                                                             [100%]
+=================================== FAILURES ===================================
+____________ test_collect_outcomes_keeps_normal_source_edits_valid _____________
+
+tmp_path = PosixPath('/mnt/fast/tmp/ai-route-tmp/run-ua97nh6o/pytest-of-ian/pytest-2/test_collect_outcomes_keeps_no0')
+
+    def test_collect_outcomes_keeps_normal_source_edits_valid(tmp_path: Path) -> None:
+        from cairn_harbor.run_baseline import collect_outcomes
+    
+        trial = tmp_path / "job" / "solver__attempt1"
+        (trial / "agent").mkdir(parents=True)
+        (trial / "result.json").write_text(json.dumps({
+            "verifier_result": {"rewards": {"reward": 1.0}}
+        }))
+        (trial / "agent" / "pi.txt").write_text(json.dumps({
+            "message": {"role": "assistant", "content": [{
+                "type": "toolCall", "name": "edit", "arguments": {
+                    "path": "/app/solver.py", "newText": "return 1"
+                }
+            }]}
+        }))
+        outcomes = collect_outcomes(tmp_path, "job", "A")
+        assert len(outcomes) == 1
+>       assert not outcomes[0].voided
+E       AssertionError: assert not True
+E        +  where True = TrialCost(name='solver', dataset='', passed=False, voided=True, infra=False, wall_sec=0, tokens=0, findings=()).voided
+
+tests/test_run_baseline.py:130: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_run_baseline.py::test_collect_outcomes_keeps_normal_source_edits_valid
+1 failed, 11 passed in 0.03s

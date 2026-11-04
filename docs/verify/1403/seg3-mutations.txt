@@ -1,0 +1,192 @@
+# #1403 segment 3: mutations (2026-10-22)
+
+Each mutation is applied alone to one source file in p3a. The script then runs pnpm exec vitest run test/pr-seg3.test.ts test/ci-loop.test.ts test/pr-reconcile.test.ts test/pr-merge-api.test.ts (apps/server) and writes the original file back. Byte identity is checked by md5 at the end. Killed = at least one test fails.
+
+## Run 1
+
+The script's summary column misread vitest's 'Failed Tests N' banner, so the per-line verdicts were wrong; the red-test lines were right. By red lines, 21 of 23 mutations were killed. Two survived:
+- M11 (review: drop isOwnPull from the dirty/behind condition) was equivalent. The block is reached only when the PR is not foreign, and foreign = hasPullFields && !isOwnPull, so with hasPullFields true the clause was redundant. It was removed. M11 now drops hasPullFields instead, and F25b gained a case with no head.ref.
+- M19 (the anonymous required-list read counted once, not twice) survived because F24's per-IP limit of 4 left the review read skipped either way. F24 now uses 5 and asserts that the review PR read is skipped.
+
+## Run 2 (after those two changes; source as committed)
+
+M1 check runs read by branch name, not head SHA	KILLED	19 failed | 335 passed (354)
+    red: [s3-F17b] behind at building: the checks decide
+    red: [s3-F19] a blocked-check hint cleans GitHub text
+    red: [s3-F1] the grind reads the PR, then the check runs of its head SHA (not the branch name)
+    red: [s3-F23] merge-conflict rounds do not count as CI fix rounds
+M2 required list ignored	KILLED	8 failed | 346 passed (354)
+    red: [s3-F28] the verdict follows a refreshed required list even when the check runs answer 304
+    red: [s3-F3] a required check concluding neutral: no advance, no fix round, one hint per round
+    red: [s3-F3] a required check concluding skipped: no advance, no fix round, one hint per round
+    red: [s3-F4] a missing required check is pending; past the empty-checks grace it is a blocked hint (a commit status or a run past page 1 is not read), never green
+M3 blocked counts as green	KILLED	5 failed | 349 passed (354)
+    red: [s3-F19] a blocked-check hint cleans GitHub text
+    red: [s3-F3] a required check concluding cancelled: no advance, no fix round, one hint per round
+    red: [s3-F3] a required check concluding neutral: no advance, no fix round, one hint per round
+    red: [s3-F3] a required check concluding skipped: no advance, no fix round, one hint per round
+M4 dirty at building ignored	KILLED	2 failed | 352 passed (354)
+    red: [s3-F12] dirty at building: one [merge-conflict] step on the same build, no [ci-fix]
+    red: [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+M5 dirty at review ignored	KILLED	3 failed | 351 passed (354)
+    red: [s3-F13] dirty at review: the card goes back to queued with one [merge-conflict] step
+    red: [s3-F13b] dirty at review stops the unclaimed verify step before the card goes back to queued
+    red: [s3-F14b] dirty after two merge-conflict rounds at review: no third step, the card stays, one hint per round
+M6 behind at review ignored	KILLED	1 failed | 353 passed (354)
+    red: [s3-F17] behind at review: one hint per round naming update-branch, no request, phase kept
+M7 merge-conflict round cap removed	KILLED	2 failed | 352 passed (354)
+    red: [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+    red: [s3-F14b] dirty after two merge-conflict rounds at review: no third step, the card stays, one hint per round
+M8 cap at building hints instead of failing	KILLED	1 failed | 353 passed (354)
+    red: [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+M9 review dirty does not stop the unclaimed verify step	KILLED	1 failed | 353 passed (354)
+    red: [s3-F13b] dirty at review stops the unclaimed verify step before the card goes back to queued
+M10 grind skips the own-open-PR check	KILLED	4 failed | 350 passed (354)
+    red: [s3-F25] building, the recorded PR is a PR from another branch: no merge-conflict step; checks are read by the build’s own branch name
+    red: [s3-F25] building, the recorded PR is a closed PR: no merge-conflict step; checks are read by the build’s own branch name
+    red: [s3-F25] building, the recorded PR is a deleted fork (head repo null): no merge-conflict step; checks are read by the build’s own branch name
+    red: [s3-F25] building, the recorded PR is a fork PR with the same branch name: no merge-conflict step; checks are read by the build’s own branch name
+M11 review skips the PR-fields check	KILLED	1 failed | 353 passed (354)
+    red: [s3-F25b] review, the recorded PR is a response without head.ref and dirty: no merge-conflict round
+M12 missing required check stays pending past the grace	KILLED	1 failed | 353 passed (354)
+    red: [s3-F4] a missing required check is pending; past the empty-checks grace it is a blocked hint (a commit status or a run past page 1 is not read), never green
+M13 same-name runs judged one by one	KILLED	1 failed | 353 passed (354)
+    red: [s3-F26] runs that share a name: one success counts, a cancelled or skipped sibling does not block
+M14 rules 403/404 not treated as no rules	KILLED	2 failed | 352 passed (354)
+    red: [s3-F27] the rules read answers 403 (no rulesets on this plan or server): no rules, the classic list decides
+    red: [s3-F27] the rules read answers 404 (no rulesets on this plan or server): no rules, the classic list decides
+M15 rate-limited 403 on rules treated as no rules	KILLED	2 failed | 352 passed (354)
+    red: [s3-F8] the rules read answers 403 with a rate-limit message: no move, no check-runs read
+    red: [s3-F8] the rules read answers 403 with x-ratelimit-remaining 0: no move, no check-runs read
+M16 304 does not reuse the last runs	KILLED	3 failed | 351 passed (354)
+    red: ETag 往返：首轮 200 存 etag，次轮携 if-none-match → 304 → 判据复用（不解析体）
+    red: N-1 轮完成仍红 → 追加第 N 轮；N 轮完成仍红 → 停手标 failed 转人工（不再叠派）
+    red: [s3-F28] the verdict follows a refreshed required list even when the check runs answer 304
+M17 required list never refreshed	KILLED	2 failed | 352 passed (354)
+    red: [s3-F10] the required list is read once per repository and branch for ten minutes
+    red: [s3-F28] the verdict follows a refreshed required list even when the check runs answer 304
+M18 required list not cached	KILLED	1 failed | 353 passed (354)
+    red: [s3-F10] the required list is read once per repository and branch for ten minutes
+M19 anonymous required read counted once	KILLED	1 failed | 353 passed (354)
+    red: [s3-F24] anonymous: the grind’s PR and required-list reads count toward the per-IP total
+M20 cancelled without required list counts as green	KILLED	1 failed | 353 passed (354)
+    red: [s3-F7] no required list: neutral and skipped do not block, cancelled does
+M21 action_required not fixable for required checks	KILLED	1 failed | 353 passed (354)
+    red: [s3-F6] a required check concluding action_required: a [ci-fix] round
+M22 dirty re-read guard at building dropped	KILLED	1 failed | 353 passed (354)
+    red: [s3-F16] the card leaves building during the PR read: no write
+M23 lastPushedCheckpoint ignores finishedAt	KILLED	1 failed | 353 passed (354)
+    red: [s3-F20] completeStep writes finishedAt; the last pushed checkpoint follows it
+restored byte-identical: True
+
+Result: 23 of 23 killed.
+
+## Run 3 (the second /code-review's fixes; targeted set N1-N9, same harness and test files)
+
+N1 action_required fixable again	KILLED	1 failed | 359 passed (360)
+    red: [s3-F6b] a required check concluding action_required (a person must approve): blocked hint, no [ci-fix]
+N2 failed required-list read not remembered in the sweep	KILLED	1 failed | 359 passed (360)
+    red: [s3-F8c] a failed required-list read is not retried by the next candidate in the same sweep
+N3 grind own check ignores the base branch	KILLED	1 failed | 359 passed (360)
+    red: [s3-F25] building, the recorded PR is a PR into another base branch: no merge-conflict step; checks are read by the build’s own branch name
+N4 review dirty ignores the base branch	KILLED	1 failed | 359 passed (360)
+    red: [s3-F25b] review, the recorded PR is a PR into another base branch and dirty: no merge-conflict round
+N5 no re-verify after the merge-conflict round	KILLED	1 failed | 359 passed (360)
+    red: [s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review
+N6 re-verify regardless of the marker	KILLED	1 failed | 359 passed (360)
+    red: [s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review
+N7 marker row not written	KILLED	1 failed | 359 passed (360)
+    red: [s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review
+N8 blocked entries per run, not per name	KILLED	6 failed | 354 passed (360)
+    red: [s3-F19] a blocked-check hint cleans GitHub text
+    red: [s3-F26b] a blocked hint names a check once when several runs share its name
+    red: [s3-F3] a required check concluding cancelled: no advance, no fix round, one hint per round
+    red: [s3-F3] a required check concluding neutral: no advance, no fix round, one hint per round
+N9 reverify slot ignores an active verify	SURVIVED	360 passed (360)
+restored byte-identical: True
+
+N9 survived: no test re-entered review in the same round while the re-queued verify was still queued. F13e was added; rerun:
+
+N9 reverify slot ignores an active verify	KILLED	1 failed | 360 passed (361)
+    red: [s3-F13e] the card reaches review again in the same round while that verify is still queued: no second verify
+restored byte-identical: True
+
+Result: 9 of 9 killed. (N8's mutant also renames the check in the hint, so more tests fail than F26b alone.)
+
+## Run 4 (the third /code-review's fixes; P1-P6, same harness and test files)
+
+P1 SSO 403 on rules treated as no rules	KILLED	1 failed | 365 passed (366)
+    red: [s3-F8] the rules read answers 403 asking for SAML SSO (x-github-sso): no move, no check-runs read
+P2 enforcement_level off ignored	KILLED	1 failed | 365 passed (366)
+    red: [s3-F9b] classic protection with enforcement_level off: its contexts are not required
+P3 re-verify window back to the round start	KILLED	1 failed | 365 passed (366)
+    red: [s3-F13f] the re-verify survives a [ci-fix] round after the merge-conflict round
+P4 re-verify only when the verify was unclaimed	KILLED	1 failed | 365 passed (366)
+    red: [s3-F13g] a verify that already ran on the pre-conflict head is queued again after the merge-conflict round
+P5 stopped AI review not said	KILLED	1 failed | 365 passed (366)
+    red: [s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline
+P6 own PR ignores the base branch (shared predicate)	KILLED	2 failed | 364 passed (366)
+    red: [s3-F25] building, the recorded PR is a PR into another base branch: no merge-conflict step; checks are read by the build’s own branch name
+    red: [s3-F25b] review, the recorded PR is a PR into another base branch and dirty: no merge-conflict round
+restored byte-identical: True
+
+Result: 6 of 6 killed.
+
+## Run 5 (the fourth /code-review's fixes; Q1-Q7)
+
+Q1 grind ignores pushNotSeen	KILLED	1 failed | 371 passed (372)
+    red: [s3-F30] right after pacman pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round
+Q2 review ignores pushNotSeen	KILLED	1 failed | 371 passed (372)
+    red: [s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out
+Q3 pushNotSeen without the grace window	KILLED	1 failed | 371 passed (372)
+    red: [s3-F30b] past the grace the PR head decides (a person may have pushed on top)
+Q4 a failed sibling makes a passed name red	KILLED	1 failed | 371 passed (372)
+    red: [s3-F26c] a name with one success passes although a sibling run of that name failed
+Q5 action_required does not block without a required list	KILLED	1 failed | 371 passed (372)
+    red: [s3-F7b] no required list: action_required (waiting for a person) blocks too
+Q6 re-verify marker only for rounds at review	KILLED	1 failed | 371 passed (372)
+    red: [s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again
+Q7 stopped AI review not detected	KILLED	1 failed | 371 passed (372)
+    red: [s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline
+restored byte-identical: True
+
+Result: 7 of 7 killed.
+
+## Run 6 (the fifth /code-review's fixes; R1-R5)
+
+R1 default branch not quoted in the prompt	KILLED	1 failed | 375 passed (376)
+    red: [s3-F12b] a default branch name with shell characters is quoted in the merge-conflict prompt
+R2 any non-rate-limited 403 on rules means no rules	KILLED	1 failed | 375 passed (376)
+    red: [s3-F27b] the rules read answers 403 for the token’s permissions (not the plan): no move
+R3 pushNotSeen counts only build and merge steps	KILLED	1 failed | 375 passed (376)
+    red: [s3-F30d] a verify step that pushed just now also counts as pacman’s last push
+R4 missing-check anchor cleared on a plain pending	KILLED	1 failed | 375 passed (376)
+    red: [s3-F4c] the missing-check grace keeps its start while another required check re-runs
+R5 anonymous required read counted once	KILLED	1 failed | 375 passed (376)
+    red: [s3-F24] anonymous: the grind’s PR and required-list reads count toward the per-IP total
+restored byte-identical: True
+
+Result: 5 of 5 killed.
+
+## Run 7 (the fixes from the review of the two merges; S1-S3)
+
+S1 pushNotSeen counts steps without a commit	KILLED	1 failed | 407 passed (408)
+    red: [s3-F30e] a later step that pushed nothing does not hide pacman’s last push
+S2 building round keeps unclaimed gate steps	KILLED	1 failed | 407 passed (408)
+    red: [s3-F13j] a merge-conflict round at building stops an unclaimed verify step and queues it again at review
+S3 branch encoded whole (%2F)	KILLED	1 failed | 407 passed (408)
+    red: [s3-F9c] a default branch with a slash keeps the slash in the branch and rules paths
+restored byte-identical: True
+
+Result: 3 of 3 killed.
+
+## Run 8 (the CLOSING_SHAPE title fix; T1)
+
+T1 closing shape tested on the title with " (#n)" appended	KILLED	4 failed | 407 passed (411)
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a keyword at the end, before the appended (#n)) keeps the PR title
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "close") keeps the PR title
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "fix") keeps the PR title
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "resolved") keeps the PR title
+restored byte-identical: True
+
+Result: 1 of 1 killed.

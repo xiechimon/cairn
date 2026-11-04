@@ -1,0 +1,237 @@
+{
+  "step": {
+    "id": "_JO5ilMk33oLI01RBn8b6",
+    "buildId": "01a1239f-46ac-7ee8-9fef-54ae45e166ed",
+    "kind": "build",
+    "machineId": "SkeDpyWvR1kDwmoi2mu_C",
+    "createdAt": 1791599003308
+  },
+  "conversationId": "01a1239f-46ac-7ee8-9fef-54ae45e166ed",
+  "session": {
+    "action": "new",
+    "sessionId": null
+  },
+  "todo": {
+    "id": "BssNaxxFAi5wZxD4ugins",
+    "seqNum": 3,
+    "title": "用 tdd 给购物车模块补测试",
+    "spec": "用 tdd 给购物车模块补测试"
+  },
+  "project": {
+    "id": "qmqw_myqr6ob0U7-jZe91",
+    "name": "probe-1106-1791599003258",
+    "repo": null
+  },
+  "agent": {
+    "id": "wr5GBO05LJAk0QMTYJzi3",
+    "displayName": "probe-1106-builder-1",
+    "description": null,
+    "provider": "stub-gw",
+    "modelId": "stub-model",
+    "thinkingLevel": null,
+    "memories": [],
+    "skills": [
+      "tdd",
+      "better-typography",
+      "better-colors",
+      "better-layout",
+      "diagnosing-bugs",
+      "ask-matt",
+      "great-resume",
+      "offer",
+      "kami",
+      "interview",
+      "wiki",
+      "aihot",
+      "archify",
+      "job-apply",
+      "job-match",
+      "evidence-recap",
+      "project-guide",
+      "writing-dna-skill",
+      "humanizer-zh",
+      "make-resume",
+      "scaffold-exercises"
+    ],
+    "tools": [
+      "推送分支"
+    ]
+  },
+  "remoteTools": [
+    {
+      "name": "save_memory",
+      "description": "Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Short memory title."
+          },
+          "content": {
+            "type": "string",
+            "description": "Memory body."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Optional project id for provenance."
+          },
+          "sourceTodoId": {
+            "type": "string",
+            "description": "Optional source todo id; defaults to the running task."
+          }
+        },
+        "required": [
+          "title",
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "delete_memory",
+      "description": "Delete one of your memory entries by id.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "memoryId": {
+            "type": "string",
+            "description": "Memory id."
+          }
+        },
+        "required": [
+          "memoryId"
+        ]
+      }
+    },
+    {
+      "name": "memories",
+      "description": "List your own memory entries.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "replaySafe": true
+    },
+    {
+      "name": "attachment",
+      "description": "Fetch an attachment referenced by a task spec or message. Spec tokens of the form ![name](attachment:<teamId>/<id>.<ext>) embed an attachment; call with the bare <id> (the part before the extension). Returns the file content (utf8 for text/* / json / xml, base64 for images / pdf).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "description": "Attachment id."
+          }
+        },
+        "required": [
+          "attachmentId"
+        ]
+      },
+      "replaySafe": true
+    },
+    {
+      "name": "set_task_meta",
+      "description": "Set the title and category tag of the task you are currently working on. Call exactly once before starting work: title = a concise summary of the task spec (50 chars max, plain text, no markdown); tag = one name from the fixed tag vocabulary listed in your instructions (omit it when none fits).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Task title, 50 chars max."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Optional tag name from the fixed vocabulary."
+          }
+        },
+        "required": [
+          "title"
+        ]
+      }
+    },
+    {
+      "name": "create_skill",
+      "description": "Create a team skill as a folder in the team skills directory. Requires the 「创建技能」permission switch on your agent row. The SKILL.md frontmatter name and description must match the declared values.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Skill name; also the folder name and the SKILL.md frontmatter name."
+          },
+          "description": {
+            "type": "string",
+            "description": "One-line skill description; must match the SKILL.md frontmatter."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "File path inside the skill folder."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "File text."
+                }
+              }
+            },
+            "description": "Skill files; must include SKILL.md."
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "files"
+        ]
+      }
+    },
+    {
+      "name": "update_skill",
+      "description": "Update an existing team skill by id. Requires the「更新技能」permission switch on your agent row. Listed files are overwritten, unlisted files are kept; include a new SKILL.md to change the frontmatter (including renaming).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "description": "Skill id to update."
+          },
+          "name": {
+            "type": "string",
+            "description": "Declared skill name; must match the SKILL.md frontmatter."
+          },
+          "description": {
+            "type": "string",
+            "description": "Declared description; must match the SKILL.md frontmatter."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "File path inside the skill folder."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "File text."
+                }
+              }
+            },
+            "description": "Files to overwrite; include SKILL.md to change frontmatter."
+          }
+        },
+        "required": [
+          "skillId",
+          "name",
+          "description",
+          "files"
+        ]
+      }
+    }
+  ],
+  "localTools": []
+}

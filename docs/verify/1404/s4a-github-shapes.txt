@@ -1,0 +1,224 @@
+# #1404 S4a: live GitHub response shapes for every read endpoint of the gate transport, captured read-only
+# with gh api from this container on 2026-10-22, the run ending at 11:29:39 UTC, against xiechimon/pacman.
+# Request headers as the server sends them (lib/github.ts API_HEADERS): Accept: application/vnd.github+json,
+# X-GitHub-Api-Version: 2022-11-28; gh adds its own Authorization. Each response's header block is trimmed to
+# the status line plus Content-Type, Etag, Link, Last-Modified, X-Accepted-Github-Permissions,
+# X-Accepted-Oauth-Scopes and X-Ratelimit-Resource (no token, client id or expiry headers are kept).
+# The capture script lived outside the repository (an executable under docs/verify/ is itself a gate blocker);
+# every command it ran is printed below with its exit code (gh exits 1 on any non-2xx, 304 included).
+# No write was made: the status POST (githubCreateCommitStatus) is tested against a stub only.
+#
+# Bodies kept verbatim (re-indented with 2 spaces, key order and values unchanged) as test fixtures:
+#   pull-1479             -> apps/server/test/fixtures/github/gate-pull-1479.json
+#   pull-missing          -> apps/server/test/fixtures/github/gate-pull-not-found.json
+#   branch-main           -> apps/server/test/fixtures/github/gate-branch-main.json
+#   rules-main            -> apps/server/test/fixtures/github/gate-rules-main.json
+#   compare-1439-p1 / p2  -> apps/server/test/fixtures/github/gate-compare-1439-page1.json / -page2.json
+#   check-runs-1479       -> apps/server/test/fixtures/github/gate-check-runs-39a108e.json
+#   status-1479           -> apps/server/test/fixtures/github/gate-status-39a108e.json
+#   contents-1490         -> apps/server/test/fixtures/github/gate-contents-1490.json
+# Test T12 in apps/server/test/github-gate-transport.test.ts serves each fixture with the Etag and Link captured
+# here and checks the transport returns the body deep-equal and the headers verbatim.
+#
+# Resources: PR #1479 (open, head 39a108e80bcd5d82e980599abf32d059b2fbad8c); PR #1439 (merged, base
+# a6c0865edea6cc95d86b32eb33f6a265c0f20d21, head f9c4f852292592395e882e1d900ca215a1aafce5, 3 commits, 2 files);
+# main at 93b9ce215b5ee101cf5e511ddd2cb8d212d04e71.
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/pulls/1479'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: "30c25f67a3a39aae53a6877d7c7f7a2de5c8f9cef211a9e1fb150b7d32db7372"
+  Last-Modified: Thu, 22 Oct 2026 11:10:57 GMT
+  X-Accepted-Github-Permissions: pull_requests=read; contents=read
+  X-Accepted-Oauth-Scopes: repo
+  X-Ratelimit-Resource: core
+  body: 32104 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' -H 'If-None-Match: "30c25f67a3a39aae53a6877d7c7f7a2de5c8f9cef211a9e1fb150b7d32db7372"' 'repos/xiechimon/pacman/pulls/1479'
+exit 1
+HTTP/1.1 304 Not Modified
+  Etag: "30c25f67a3a39aae53a6877d7c7f7a2de5c8f9cef211a9e1fb150b7d32db7372"
+  Last-Modified: Thu, 22 Oct 2026 11:10:57 GMT
+  X-Ratelimit-Resource: core
+  body: empty
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/pulls/999999'
+exit 1
+HTTP/1.1 404 Not Found
+  Content-Type: application/json; charset=utf-8
+  X-Accepted-Github-Permissions: pull_requests=read; contents=read
+  X-Accepted-Oauth-Scopes: repo
+  X-Ratelimit-Resource: core
+  body: 120 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/branches/main'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"769d6e1639736f14e3e671819081b9bf067c611cd09fd7ea22bec6ec97a3eace"
+  X-Accepted-Github-Permissions: contents=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 8980 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' -H 'If-None-Match: W/"769d6e1639736f14e3e671819081b9bf067c611cd09fd7ea22bec6ec97a3eace"' 'repos/xiechimon/pacman/branches/main'
+exit 1
+HTTP/1.1 304 Not Modified
+  Etag: "769d6e1639736f14e3e671819081b9bf067c611cd09fd7ea22bec6ec97a3eace"
+  X-Ratelimit-Resource: core
+  body: empty
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/rules/branches/main?per_page=100&page=1'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: "82b4537a197d92fd0108f1172dcf6ca8f21c3d95fd500d36edb863a1f86e9b82"
+  X-Accepted-Github-Permissions: metadata=read
+  X-Accepted-Oauth-Scopes: repo
+  X-Ratelimit-Resource: core
+  body: 2 bytes as received; JSON list
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/rules/branches/s4a-no-such-branch?per_page=100&page=1'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: "82b4537a197d92fd0108f1172dcf6ca8f21c3d95fd500d36edb863a1f86e9b82"
+  X-Accepted-Github-Permissions: metadata=read
+  X-Accepted-Oauth-Scopes: repo
+  X-Ratelimit-Resource: core
+  body: 2 bytes as received; JSON list
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=1'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"2a78863742d2dd751e5cb6a4c0dc9aa1cd58472a688a9d45a70ab3a521acda58"
+  Last-Modified: Wed, 21 Oct 2026 04:06:44 GMT
+  Link: <https://api.github.com/repositories/1361226985/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=2>; rel="last", <https://api.github.com/repositories/1361226985/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=2>; rel="next", <https://api.github.com/repositories/1361226985/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=1>; rel="first"
+  X-Accepted-Github-Permissions: contents=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 26731 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=2'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"08761c3d304ffe39c1fcc5977ec6859450f4e97308966ac7fcd9b99d51d70f96"
+  Last-Modified: Wed, 21 Oct 2026 04:06:44 GMT
+  Link: <https://api.github.com/repositories/1361226985/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=2>; rel="last", <https://api.github.com/repositories/1361226985/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=1>; rel="first", <https://api.github.com/repositories/1361226985/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5?per_page=2&page=1>; rel="prev"
+  X-Accepted-Github-Permissions: contents=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 18718 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...0000000000000000000000000000000000000000?per_page=2&page=1'
+exit 1
+HTTP/1.1 404 Not Found
+  Content-Type: application/json; charset=utf-8
+  X-Accepted-Github-Permissions: contents=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 125 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=100&page=1'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"3656c01e96c9ccc8070ecbc75c4a3f878a00685268a822a7ad2bdf99c97c9017"
+  X-Accepted-Github-Permissions: checks=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 48967 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' -H 'If-None-Match: W/"3656c01e96c9ccc8070ecbc75c4a3f878a00685268a822a7ad2bdf99c97c9017"' 'repos/xiechimon/pacman/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=100&page=1'
+exit 1
+HTTP/1.1 304 Not Modified
+  Etag: "3656c01e96c9ccc8070ecbc75c4a3f878a00685268a822a7ad2bdf99c97c9017"
+  X-Ratelimit-Resource: core
+  body: empty
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=5&page=2'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"66e654418aedac649bad79807bf955755ab29ff5dc2420d3b7ac68973ac9d074"
+  Link: <https://api.github.com/repositories/1361226985/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=5&page=1>; rel="prev", <https://api.github.com/repositories/1361226985/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=5&page=3>; rel="next", <https://api.github.com/repositories/1361226985/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=5&page=3>; rel="last", <https://api.github.com/repositories/1361226985/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=latest&per_page=5&page=1>; rel="first"
+  X-Accepted-Github-Permissions: checks=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 17482 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/check-runs?filter=all&per_page=100&page=1'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"3656c01e96c9ccc8070ecbc75c4a3f878a00685268a822a7ad2bdf99c97c9017"
+  X-Accepted-Github-Permissions: checks=read
+  X-Accepted-Oauth-Scopes: 
+  X-Ratelimit-Resource: core
+  body: 48967 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/status?per_page=100&page=1'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: W/"ee101784f2b5ce9b04969705edc84e75c64e8b927adc787bc79f383693858ba6"
+  X-Accepted-Github-Permissions: statuses=read
+  X-Accepted-Oauth-Scopes: repo, repo:status
+  X-Ratelimit-Resource: core
+  body: 4467 bytes as received; JSON dict
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' -H 'If-None-Match: W/"ee101784f2b5ce9b04969705edc84e75c64e8b927adc787bc79f383693858ba6"' 'repos/xiechimon/pacman/commits/39a108e80bcd5d82e980599abf32d059b2fbad8c/status?per_page=100&page=1'
+exit 1
+HTTP/1.1 304 Not Modified
+  Etag: "ee101784f2b5ce9b04969705edc84e75c64e8b927adc787bc79f383693858ba6"
+  X-Ratelimit-Resource: core
+  body: empty
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/contents/docs/verify/1490?ref=93b9ce215b5ee101cf5e511ddd2cb8d212d04e71'
+exit 0
+HTTP/1.1 200 OK
+  Content-Type: application/json; charset=utf-8
+  Etag: "222cb186b9067ec0c1c7c6f6286ba3aa01e25a84"
+  Last-Modified: Thu, 22 Oct 2026 11:07:01 GMT
+  X-Accepted-Github-Permissions: contents=read
+  X-Accepted-Oauth-Scopes: repo
+  X-Ratelimit-Resource: core
+  body: 6260 bytes as received; JSON list
+
+$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' 'repos/xiechimon/pacman/contents/docs/verify/s4a-no-such-dir?ref=93b9ce215b5ee101cf5e511ddd2cb8d212d04e71'
+exit 1
+HTTP/1.1 404 Not Found
+  Content-Type: application/json; charset=utf-8
+  X-Accepted-Github-Permissions: contents=read
+  X-Accepted-Oauth-Scopes: repo
+  X-Ratelimit-Resource: core
+  body: 127 bytes as received; JSON dict
+
+== Readings (what S4b may rely on, and what it must not) ==
+
+1. Conditional reads work through gh with If-None-Match on pulls, branches, check-runs and the combined
+   status: each answered 304 with an empty body. The 304 echoes the ETag in strong form ("...") even when the
+   200 had sent the weak form (W/"..."), so a cache must keep the ETag it got from the 200.
+2. Permissions GitHub states per endpoint (X-Accepted-Github-Permissions / X-Accepted-Oauth-Scopes):
+   pulls: pull_requests=read; contents=read / repo. branches: contents=read. rules/branches: metadata=read / repo.
+   compare: contents=read. check-runs: checks=read. commits/{sha}/status: statuses=read / repo, repo:status.
+   contents: contents=read / repo. The team connection's `read:user repo` covers all of them.
+3. rules/branches/{branch} for a branch that does not exist answers 200 [] with the same ETag as main: an empty
+   rule list does not show that the branch exists (S4b reads the base branch separately).
+4. compare, per_page=2, 3 commits: page 1 has 2 commits and the files; page 2 has 1 commit and no "files" key at
+   all (not an empty list). total_commits is 3 on both pages. Link uses the /repositories/{id}/ form, not the
+   requested /repos/{owner}/{repo}/ form, which is one more reason the transport returns Link and never
+   follows it.
+5. check-runs at 39a108e under filter=latest: total_count 14; pr-evidence twice from github-actions in two
+   check suites (107778555113 and 107777805272); "e2e (3)" was in_progress at capture time. filter=all returned
+   the same ETag at this SHA (no re-run happened). per_page=5&page=2 returns 5 runs with prev/next/last/first
+   Links.
+6. Combined status at 39a108e: sha present, state pending, total_count 0, statuses [] (this repository's CI
+   reports through check runs only).
+7. 404 bodies are JSON: {"message": "Not Found", "documentation_url": ..., "status": "404"}, for a missing PR,
+   a compare with an unknown head SHA and a missing contents path alike.
+8. contents of a directory at a SHA: a JSON list, one object per entry (6 entries, all type "file", for
+   docs/verify/1490 at 93b9ce2).

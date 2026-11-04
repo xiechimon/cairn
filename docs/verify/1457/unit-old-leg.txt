@@ -1,0 +1,13 @@
+## apps/web: pnpm exec vitest run test/columns.test.ts
+     × 执行中 落点 ⊆ shared canOrchestrate（#1457） 6ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/columns.test.ts > canDropOnColumn（#753 per-source 矩阵） > 执行中 落点 ⊆ shared canOrchestrate（#1457）
+TypeError: canOrchestrate is not a function
+      Tests  1 failed | 29 passed (30)
+
+## packages/shared: pnpm exec vitest run test/vocabulary.test.ts
+     × canBoardDrop → building only for phases orchestrate accepts (#1457) 7ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > canBoardDrop → building only for phases orchestrate accepts (#1457)
+AssertionError: expected undefined to deeply equal [ 'todo', 'failed' ]
+      Tests  1 failed | 38 passed (39)

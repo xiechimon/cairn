@@ -1,0 +1,133 @@
+# #1466 round 3 gates, run at the round 3 code head (sources = e6291e93; only docs/verify/1466 files untracked).
+# Summary (exit codes):
+#   pnpm lint                          0 (one info-level noUselessFragments note in apps/web/src/resources/machines-page.tsx, untouched by this branch)
+#   pnpm typecheck                     0
+#   pnpm spec:parse                    0
+#   node scripts/test-spawn-gate.mjs   0
+#   pnpm exec vitest run --changed origin/main   1: 244 files, 2500 passed, 1 skipped, 1 failed = the known root-only case
+#       apps/daemon/test/runner-brief.test.ts "擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）"
+#       (the test makes the workspace non-writable with chmod, which does not stop root; this container runs as uid 0, `id -u` = 0).
+#       This branch does not touch apps/daemon/src or that test file; the same case is recorded in gates.txt (round 1) and gates-2.txt (round 2).
+#       Passed count is round 2's 2498 plus the two new R7b cases.
+#   lsof -iTCP:8396                    1 (nothing holds the port; no other playwright process running)
+#   E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected   0: 2/169 specs, 8 passed
+# Output below is trimmed with tail and ANSI colour codes are stripped (biome ignores NO_COLOR); the e2e section drops Node's repeated "NO_COLOR is ignored due to FORCE_COLOR" warning lines.
+
+# git: e6291e936950814bf724d29d8b6f83f7390c1e06
+# working tree during the gate runs: ?? docs/verify/1466/r3-green.txt ?? docs/verify/1466/r3-mutate.mjs ?? docs/verify/1466/r3-mutations.txt
+
+$ pnpm lint
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 788 files in 1779ms. No fixes applied.
+Found 1 info.
+# exit: 0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+# exit: 0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.1s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+# exit: 0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 515 test sources, no package-manager spawns.
+# exit: 0
+
+$ pnpm exec vitest run --changed origin/main
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 12ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 243 passed (244)
+      Tests  1 failed | 2500 passed | 1 skipped (2502)
+   Duration  312.89s (tests 56%, import 43%, transform 1%)
+# exit: 1
+
+# failure detail of the one failing case:
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ ❯ test/runner-brief.test.ts:411:23
+    409|     const { client } = await run({ claimed, backend, workspace: ws });
+    410|     chmodSync(cwdForWs, 0o700); // 还原，免得影响后续用例
+    411|     expect(calls).not.toContain('commitAll');
+       |                       ^
+    412|     expect(calls).not.toContain('push');
+    413|     expect(client.doneBodies[0]?.body.status).toBe('failed');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+
+$ lsof -iTCP:8396
+# exit: 1 (1 = nothing holds the port)
+
+$ E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  docs/verify/1466/r3-green.txt → none
+  docs/verify/1466/r3-mutate.mjs → none
+  docs/verify/1466/r3-mutations.txt → none
+  apps/daemon/test/github-probe.test.ts → none
+  apps/server/src/services/builds.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief-tools.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/ci-loop.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/git.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-issues.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/mcp-face.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/todos.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-repo-dot-segments.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/project-team-guard.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  docs/verify/1466/gates-2.txt → none
+  docs/verify/1466/gates.txt → none
+  docs/verify/1466/green.txt → none
+  docs/verify/1466/live.txt → none
+  docs/verify/1466/mutate.mjs → none
+  docs/verify/1466/mutations.txt → none
+  docs/verify/1466/pr-gate-1468-run1-e87699c.json → none
+  docs/verify/1466/r2-mutate.mjs → none
+  docs/verify/1466/r2-mutations.txt → none
+  docs/verify/1466/r2-red-green.txt → none
+  docs/verify/1466/red.txt → none
+  docs/verify/1466/reviews.txt → none
+  docs/verify/1466/security-review.txt → none
+  packages/shared/src/records/project.ts → none
+  packages/shared/src/records/todo.ts → none
+  packages/shared/test/github-repo-ref.test.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8396
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 2 workers
+
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (1.9s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (2.8s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (896ms)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (503ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (534ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (494ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (444ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (407ms)
+
+  8 passed (11.5s)
+# exit: 0

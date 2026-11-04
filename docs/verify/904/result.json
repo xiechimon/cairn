@@ -1,0 +1,124 @@
+{
+  "probe": "drive-904-plan-chain",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0226-904-plan-md/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-904-daemon-home-r2",
+  "passed": 20,
+  "total": 20,
+  "checks": [
+    {
+      "name": "真 daemon 上线（--server 指本栈）",
+      "ok": true,
+      "detail": "/tmp/pacman-904-daemon-home-r2"
+    },
+    {
+      "name": "A1：withPlan build 首步入队即 kind=plan（build 步不先行）",
+      "ok": true,
+      "detail": "kind=plan withPlan=1"
+    },
+    {
+      "name": "A2：plan 步被真 daemon 认领且 done 收尾",
+      "ok": true,
+      "detail": "machineId=_59a1k0MbuXV7Gq_P3tjh status=done"
+    },
+    {
+      "name": "A3：plan 表落行 v1 且 content 与 agent 所写逐字节等值 + build.planDocId 指向该行",
+      "ok": true,
+      "detail": "rows=1 byteEqual=true planDocId=true"
+    },
+    {
+      "name": "A4：phase=confirm 且 hasPlan 置位（#703 闸 1 过闸必有产物）",
+      "ok": true,
+      "detail": "phase=confirm hasPlan=1"
+    },
+    {
+      "name": "A5：REST /api/builds/:id/plans 200 且恰一版、content 字节等值",
+      "ok": true,
+      "detail": "status=200 rows=1"
+    },
+    {
+      "name": "A：web confirm 卡「方案 · v1」上屏（#666 断口面正向）",
+      "ok": true,
+      "detail": "方案 · v1"
+    },
+    {
+      "name": "A：confirm 卡 preview = plan.md 首个有效行",
+      "ok": true,
+      "detail": "方案：#904 全链探针（A 腿）"
+    },
+    {
+      "name": "A：右栏方案面全文含 marker（confirm 有物可看）",
+      "ok": true,
+      "detail": "PLAN-904-MARKER-A-muyezftm in 127 chars"
+    },
+    {
+      "name": "A：「打开方案」点击后方案面仍持全文",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "B1：无 repo 形 plan 表照样落行（#703：裸目录收集上传，此前恒无方案）",
+      "ok": true,
+      "detail": "rows=1 byteEqual=true"
+    },
+    {
+      "name": "B2：无 repo 形 phase=confirm + hasPlan 置位",
+      "ok": true,
+      "detail": "phase=confirm hasPlan=1"
+    },
+    {
+      "name": "B3：无 repo 形 REST plans 读面 200 恰一版",
+      "ok": true,
+      "detail": "status=200 rows=1"
+    },
+    {
+      "name": "B：web confirm 卡「方案 · v1」上屏（#666 断口面正向）",
+      "ok": true,
+      "detail": "方案 · v1"
+    },
+    {
+      "name": "B：confirm 卡 preview = plan.md 首个有效行",
+      "ok": true,
+      "detail": "方案：#904 全链探针（B 腿）"
+    },
+    {
+      "name": "B：右栏方案面全文含 marker（confirm 有物可看）",
+      "ok": true,
+      "detail": "PLAN-904-MARKER-B-muyezftm in 127 chars"
+    },
+    {
+      "name": "B：「打开方案」点击后方案面仍持全文",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C1：首轮无 plan.md → #113 自动补写轮入队（第二个 plan 步，prompt 含 plan.md）",
+      "ok": true,
+      "detail": "planSteps=2 rewritePromptHasPlanFile=true"
+    },
+    {
+      "name": "C2：补写轮仍无 plan.md → #703 闸 1 失败收尾（phase=failed、plan 行 0、errorMessage=规划未产出方案）",
+      "ok": true,
+      "detail": "phase=failed planRows=0 errorMessage=规划未产出方案"
+    },
+    {
+      "name": "C3：缺物不放行——chip 非「确认」且零方案卡（假绿排除）",
+      "ok": true,
+      "detail": "chip=失败 cards=0"
+    }
+  ],
+  "legA": {
+    "todoId": "ZU231AL-GeV_e5Wqk8wal",
+    "buildId": "01a11787-3b2e-7a1f-befd-c264c0e42194"
+  },
+  "legB": {
+    "todoId": "OIqZBbHqph7-2bpJDqHaN",
+    "buildId": "01a11789-95ec-7e4f-a410-81c05b8a4f2d"
+  },
+  "legC": {
+    "todoId": "0g3jQOx8xnr0OdlO4EkLp",
+    "buildId": "01a11789-a458-7b2a-8aef-99e0b21f5c5e"
+  },
+  "runTag": "muyezftm"
+}

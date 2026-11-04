@@ -1,0 +1,17 @@
+{
+  "variant": "B-on-button-with-fix",
+  "comfortable": {
+    "buttonClassHasTextMeta": true,
+    "buttonClassHasTextXs": false,
+    "buttonFontSize": "12px",
+    "labelFontSize": "12px",
+    "labelHost": "button"
+  },
+  "compact": {
+    "buttonClassHasTextMeta": true,
+    "buttonClassHasTextXs": false,
+    "buttonFontSize": "11.9531px",
+    "labelFontSize": "11.9531px",
+    "labelHost": "button"
+  }
+}

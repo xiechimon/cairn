@@ -1,0 +1,48 @@
+39540474920 event=pull_request head=f49f918f failure 2026-10-21T03:47:08Z
+    2026-10-21T03:47:24.2420299Z pr-decision: GREEN (no needs-decision label)
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	- Review findings left as is: the `gh pr edit --add-label` command in the process text is verified live on this PR (the repo's classic-projects GraphQL error is known for `gh pr edit --body-file`); the shape gate reads indentation, not YAML, by design (zero dependencies, pre-install).
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:47:24.2881123Z pr-evidence: sections: 2/2 answered
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:47:24.2881433Z pr-evidence: scanned 0 image link(s)
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:47:24.2881676Z pr-evidence: GREEN
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	- Review findings left as is: the `gh pr edit --add-label` command in the process text is verified live on this PR (the repo's classic-projects GraphQL error is known for `gh pr edit --body-file`); the shape gate reads indentation, not YAML, by design (zero dependencies, pre-install).
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:47:24.3231874Z FAIL unchecked-task: line 37: Live on this PR: the first run adds `needs-decision` on this
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:47:24.3232185Z pr-tasks: RED (1 problem(s))
+    pr-evidence	Mark the decision pending and disarm auto-merge	﻿2026-10-21T03:47:24.3308891Z ##[group]Run if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:47:25.1961366Z pr-decision: needs-decision label added (unchecked Acceptance item)
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:47:26.4538003Z GraphQL: Resource not accessible by integration (disablePullRequestAutoMerge)
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:47:26.4538548Z pr-decision: auto-merge was not armed
+39540555968 event=pull_request head=f49f918f failure 2026-10-21T03:48:02Z
+    2026-10-21T03:48:13.4461888Z FAIL needs-decision: a person has to remove the needs-decision label before this PR can merge
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	- Review findings left as is: the `gh pr edit --add-label` command in the process text is verified live on this PR (the repo's classic-projects GraphQL error is known for `gh pr edit --body-file`); the shape gate reads indentation, not YAML, by design (zero dependencies, pre-install).
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:48:13.5025232Z pr-evidence: sections: 2/2 answered
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:48:13.5025718Z pr-evidence: scanned 0 image link(s)
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:48:13.5026062Z pr-evidence: GREEN
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	- Review findings left as is: the `gh pr edit --add-label` command in the process text is verified live on this PR (the repo's classic-projects GraphQL error is known for `gh pr edit --body-file`); the shape gate reads indentation, not YAML, by design (zero dependencies, pre-install).
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:48:13.5470643Z FAIL unchecked-task: line 37: Live on this PR: the first run adds `needs-decision` on this
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:48:13.5471576Z pr-tasks: RED (1 problem(s))
+    pr-evidence	Mark the decision pending and disarm auto-merge	﻿2026-10-21T03:48:13.5554596Z ##[group]Run if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:48:14.3595555Z pr-decision: needs-decision label added (unchecked Acceptance item)
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:48:15.7818723Z GraphQL: Resource not accessible by integration (disablePullRequestAutoMerge)
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:48:15.7819594Z pr-decision: auto-merge was not armed
+39540637872 event=pull_request head=c3a99aae failure 2026-10-21T03:48:59Z
+    2026-10-21T03:49:16.8964987Z FAIL needs-decision: a person has to remove the needs-decision label before this PR can merge
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	- Review findings left as is: the `gh pr edit --add-label` command in the process text is verified live on this PR (the repo's classic-projects GraphQL error is known for `gh pr edit --body-file`); the shape gate reads indentation, not YAML, by design (zero dependencies, pre-install).
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:49:16.9620667Z pr-evidence: sections: 2/2 answered
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:49:16.9621244Z pr-evidence: scanned 0 image link(s)
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:49:16.9621724Z pr-evidence: GREEN
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	- Review findings left as is: the `gh pr edit --add-label` command in the process text is verified live on this PR (the repo's classic-projects GraphQL error is known for `gh pr edit --body-file`); the shape gate reads indentation, not YAML, by design (zero dependencies, pre-install).
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:49:17.0079910Z FAIL unchecked-task: line 37: Live on this PR: the first run adds `needs-decision` on this
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:49:17.0080804Z pr-tasks: RED (1 problem(s))
+    pr-evidence	Mark the decision pending and disarm auto-merge	﻿2026-10-21T03:49:17.0166579Z ##[group]Run if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:49:17.7620988Z pr-decision: needs-decision label added (unchecked Acceptance item)
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:49:19.2523260Z pr-decision: auto-merge disarmed
+39540818194 event=pull_request head=ddbad604 failure 2026-10-21T03:50:58Z
+    2026-10-21T03:51:15.1636702Z FAIL needs-decision: a person has to remove the needs-decision label before this PR can merge
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:51:15.2213582Z pr-evidence: sections: 2/2 answered
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:51:15.2214125Z pr-evidence: scanned 0 image link(s)
+    pr-evidence	Check PR body evidence (sections + links embedded + reachable)	2026-10-21T03:51:15.2214547Z pr-evidence: GREEN
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:51:15.2661483Z FAIL unchecked-task: line 37: Live on this PR: the first run adds `needs-decision` on this
+    pr-evidence	Check PR body tasks (Acceptance checklist exists and is fully checked)	2026-10-21T03:51:15.2662395Z pr-tasks: RED (1 problem(s))
+    pr-evidence	Mark the decision pending and disarm auto-merge	﻿2026-10-21T03:51:15.2748827Z ##[group]Run if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:51:16.1220279Z pr-decision: needs-decision label added (unchecked Acceptance item)
+    pr-evidence	Mark the decision pending and disarm auto-merge	2026-10-21T03:51:17.1811130Z pr-decision: auto-merge disarmed

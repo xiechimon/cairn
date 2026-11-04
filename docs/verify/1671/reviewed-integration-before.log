@@ -1,0 +1,57 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1928-image-repair/cairn
+
+ ❯ |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts (18 tests | 2 failed | 16 skipped) 2025ms
+   ❯ image fallback integration with current runner recovery (2)
+     × a missing continued session resolves task images and can retry their rejection 10ms
+     × network recovery does not erase the progress guard for image rejection 2014ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > image fallback integration with current runner recovery > a missing continued session resolves task images and can retry their rejection
+AssertionError: expected [ { opts: { …(8) } } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ test/runner-image-degrade.test.ts:599:21
+    597|     };
+    598|     const { client } = await runImageStep(claimed, backend);
+    599|     expect(created).toHaveLength(2);
+       |                     ^
+    600|     expect(created[0]?.opts.promptImages).toHaveLength(1);
+    601|     expect(created[1]?.opts.promptImages).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/runner-image-degrade.test.ts > image fallback integration with current runner recovery > network recovery does not erase the progress guard for image rejection
+AssertionError: expected [ 'create', 'continue', 'create' ] to deeply equal [ 'create', 'continue' ]
+
+- Expected
++ Received
+
+  [
+    "create",
+    "continue",
++   "create",
+  ]
+
+ ❯ test/runner-image-degrade.test.ts:622:21
+    620|     const { backend, created, actions } = scriptingBackend(script);
+    621|     const { client } = await runImageStep(claimed, backend);
+    622|     expect(actions).toEqual(['create', 'continue']);
+       |                     ^
+    623|     expect(created).toHaveLength(2);
+    624|     expect(script.rememberNoVisionCalls).toHaveLength(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 skipped (18)
+   Start at  18:19:40
+   Duration  3.09s (tests 67%, import 22%, transform 10%)
+

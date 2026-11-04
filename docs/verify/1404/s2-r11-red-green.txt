@@ -1,0 +1,350 @@
+# #1404 S2 round 11 (pr-gate run 2 on #1479 at 1174ebf: no-go; verdict committed as pr-gate-1479-run2-1174ebf.json), after merging origin/main
+# (5db8382) into the branch as 469c6d4. Tests first for every rule change: each red leg ran with the new or changed test in the worktree on top
+# of the named source commit, and that test was then committed unchanged as the tests-only commit named (the pre-commit hook typechecked it).
+# Pins (tests for rules the source already had) are shown red under the mutation they pin, and green on the source.
+#
+# Legs, oldest first:
+#   red 1   8e7b11b  tests only (new apps/server/test/merge-gate-imports.test.ts), source as at 469c6d4: 1 failed | 2 passed (3), the finding
+#                    "readiness.ts: ../../lib/github.js" (pr-gate run 2 blocking finding, suggestion 7).
+#   green 1 fa669a5  readiness.ts only (the SHA predicate defined in the gate's own source; lib/github.ts untouched): 225 passed (225).
+#   red 2   a2da1cb  the shared vocabulary snapshot only (new labels for pr-unreadable and compare-malformed), source as at fa669a5:
+#                    1 failed | 224 passed (225) (suggestion 3).
+#   green 2 99d11fa  packages/shared/src/records/merge-gate.ts only (the two labels): 225 passed (225).
+#   pins    3886bb1  two pins and the paging contract comment (suggestions 5, 6 and 1), no rule change: 226 passed (226). Each pin is shown red
+#                    under the mutation pr-gate run 2 used: before the pins those mutations passed 222 of 222; with them, 1 failed each.
+#   (afd9f3b: the two verdict JSONs; then /code-review pass 1 on 469c6d4..afd9f3b, see s2-r11-reviews.txt)
+#   25a5d3a          the import test closes the barrel, symlink and records holes (pass 1 findings 1, 2, 7); the gate already complied: 229 passed.
+#   163a582          the SHA regex compiled once (pass 1 finding 8), no behaviour change: 229 passed (229).
+#   (/code-review pass 2 on afd9f3b..163a582)
+#   42582c6          the import test reads esbuild's output and checks names by value identity (pass 2 findings): 229 passed (229).
+#   (/code-review pass 3 on 163a582..42582c6)
+#   red 3   d73c3f1  tests only (records data must be deep-frozen, plus test hardening), source as at 42582c6: 1 failed | 229 passed (230),
+#                    ten unfrozen exports (pass 3 finding 2).
+#   green 3 35a8233  records/merge-gate.ts only (data exports frozen in place): 230 passed (230); the six merge-gate test files 364 of 364.
+#   (/code-review pass 4 on 42582c6..35a8233)
+#   81ef6ec          import-test self-checks tightened, MERGE_BLOCKER_CODES typed readonly (pass 4 findings), no rule change: 230 passed (230).
+#   (/code-review pass 5 on 35a8233..81ef6ec: no correctness bug)
+# Each check in the import test is also shown red under a planted violation in s2-mutations-11.txt (lib/github.ts imported again, an unused
+# import, a non-gate shared value, one hidden behind a comment, a namespace import, node:module, Function, a barrel override, a records import,
+# unfrozen data, freeze-table gaps); the symlink check is shown red below with a symlink planted by hand.
+
+== red 1: tests 8e7b11b on source 469c6d4 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-imports.test.ts (3 tests | 1 failed) 17ms
+   ❯ merge-gate 源码只从闸自己的源码 import (3)
+     × 每个模块只从 '@pacman/shared'、'node:*' 或 merge-gate/ 里的相对路径 import 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > 每个模块只从 '@pacman/shared'、'node:*' 或 merge-gate/ 里的相对路径 import
+AssertionError: expected [ 'readiness.ts: ../../lib/github.js' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "readiness.ts: ../../lib/github.js",
++ ]
+
+ ❯ test/merge-gate-imports.test.ts:84:21
+     82|         .map((spec) => `${relative(GATE_DIR, file)}: ${spec}`),
+     83|     );
+     84|     expect(outside).toEqual([]);
+       |                     ^
+     85|   });
+     86| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  10:25:12
+   Duration  249ms (transform 50%, tests 22%, import 21%, worker 7%)
+exit 1
+
+== green 1: fa669a5 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  225 passed (225)
+   Start at  10:25:50
+   Duration  1.23s (transform 75%, import 18%, tests 7%, worker 1%)
+exit 0
+
+== red 2: snapshot a2da1cb on source fa669a5 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@pacman/shared| test/snapshot.test.ts (80 tests | 1 failed) 62ms
+   ❯ 协议词表快照（02 §5/§6 canonical） (16)
+     × 合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述） 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述）
+Error: Snapshot `协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述） 1` mismatched
+
+- Expected
++ Received
+
+@@ -3,11 +3,11 @@
+    "autonomy-paused: policy, 自治合并已暂停",
+    "not-applicable: policy, 不是 GitHub PR 形态的构建",
+    "not-current-build: transient, 不是任务的当前构建",
+    "phase-not-review: transient, 任务不在审核关口",
+    "work-in-flight: transient, 还有步骤在跑",
+-   "pr-unreadable: transient, 读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA",
++   "pr-unreadable: transient, 读不到 PR 或仓库默认分支",
+    "pr-not-open: human, PR 已合并或已关闭",
+    "pr-draft: transient, PR 是草稿",
+    "pr-from-fork: human, PR 来自 fork",
+    "base-not-default: human, PR 的目标分支不是默认分支",
+    "mergeable-state: transient, GitHub 判定暂不可合并",
+@@ -17,11 +17,11 @@
+    "required-check-missing: transient, 必需检查在当前 head 上缺席",
+    "required-check-pending: transient, 必需检查还在跑",
+    "required-check-failed: transient, 必需检查未通过",
+    "pr-evidence-not-green: transient, pr-evidence 未通过",
+    "patch-unavailable: transient, 读不到当前 head 的 compare，补丁摘要暂不可得",
+-   "compare-malformed: human, compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错",
++   "compare-malformed: human, 读到了 compare，响应形状不对",
+    "compare-truncated: human, compare 文件列表被截断",
+    "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
+    "size-cap: human, 补丁超过 800 行或 40 个文件",
+    "protected-path: human, 改动命中 D4 保护路径",
+    "outside-auto-merge: human, 改动在可自动合并集之外",
+
+ ❯ test/snapshot.test.ts:253:76
+    251|
+    252|   it('合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 stat…
+    253|     expect(MERGE_BLOCKERS.map((b) => `${b.code}: ${b.class}, ${b.label…
+       |                                                                            ^
+    254|   });
+    255| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+  Snapshots  1 failed
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 224 passed (225)
+   Start at  10:26:24
+   Duration  1.08s (transform 74%, import 17%, tests 8%, worker 1%)
+exit 1
+
+== green 2: 99d11fa ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  225 passed (225)
+   Start at  10:26:41
+   Duration  1.31s (transform 75%, import 18%, tests 6%, worker 1%)
+exit 0
+
+== 3886bb1 (pins, contract comment) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  226 passed (226)
+   Start at  10:27:38
+   Duration  1.40s (transform 78%, import 16%, tests 6%)
+exit 0
+
+== the pins under the mutations pr-gate run 2 named (each run at 3886bb1's source with the mutation applied; the test file swapped
+   between 99d11fa's and 3886bb1's, both restored from scratchpad copies after) ==
+== mutation: compareHead takes the last tip (pr-gate run 2 suggestion 5); tests at 99d11fa (before the pins)
+$ CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+      Tests  222 passed (222)
+exit 0
+
+== mutation: compareHead takes the last tip (pr-gate run 2 suggestion 5); tests with the pins
+$ CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+     × compare 的提交条数对、没有重复，却混进了别的提交顶替没读到的：响应自己的 head 不止一个，同样按没在 head 上读处理 13ms
+      Tests  1 failed | 222 passed (223)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+exit 1
+
+== mutation: an empty commit list skips the head binding (pr-gate run 2 suggestion 6); tests at 99d11fa (before the pins)
+$ CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+      Tests  222 passed (222)
+exit 0
+
+== mutation: an empty commit list skips the head binding (pr-gate run 2 suggestion 6); tests with the pins
+$ CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+     × compare 的提交列表为空（total_commits 也是 0）：响应没有自己的 head，按没在 head 上读处理，不只凭外壳填的 head 12ms
+      Tests  1 failed | 222 passed (223)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+exit 1
+
+== 25a5d3a (import test: barrel, symlink, records) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  229 passed (229)
+   Start at  10:32:03
+   Duration  1.23s (transform 78%, import 15%, tests 7%, worker 1%)
+exit 0
+
+== 163a582 (regex compiled once) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  229 passed (229)
+   Start at  10:32:47
+   Duration  1.32s (transform 77%, import 16%, tests 6%, worker 1%)
+exit 0
+
+== 42582c6 (import test on esbuild output, identity) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  229 passed (229)
+   Start at  10:37:00
+   Duration  1.29s (transform 76%, import 19%, tests 5%)
+exit 0
+
+== red 3: tests d73c3f1 on source 42582c6 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-imports.test.ts (7 tests | 1 failed) 38ms
+   ❯ merge-gate 源码只从闸自己的源码 import (7)
+     × records/merge-gate.ts 导出的数组与对象都冻住了（别的 shared 模块改不了闸的清单与上限） 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > records/merge-gate.ts 导出的数组与对象都冻住了（别的 shared 模块改不了闸的清单与上限）
+AssertionError: expected [ 'MERGE_POLICIES', …(9) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "MERGE_POLICIES",
++   "GATE_LIMITS",
++   "EVIDENCE_EXECUTABLE_EXTENSIONS",
++   "AUTO_MERGE_PATH_GLOBS",
++   "PROTECTED_PATH_GLOBS",
++   "MERGE_GATE_SOURCE_GLOBS",
++   "COMPARE_FILE_STATUSES",
++   "BLOCKER_CLASSES",
++   "MERGE_BLOCKERS",
++   "MERGE_BLOCKER_CODES",
++ ]
+
+ ❯ test/merge-gate-imports.test.ts:241:20
+    239|       .filter(([, value]) => !deepFrozen(value))
+    240|       .map(([name]) => name);
+    241|     expect(thawed).toEqual([]);
+       |                    ^
+    242|     // 检查确实看到了数据常量（不是全被当成类实例跳过）
+    243|     expect(Array.isArray(recordValues.PROTECTED_PATH_GLOBS)).toBe(true…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 229 passed (230)
+   Start at  10:41:14
+   Duration  1.39s (transform 76%, import 18%, tests 6%)
+exit 1
+
+== green 3: 35a8233 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  230 passed (230)
+   Start at  10:42:23
+   Duration  1.33s (transform 75%, import 19%, tests 6%)
+exit 0
+
+== green 3: 35a8233, the six merge-gate test files ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  6 passed (6)
+      Tests  364 passed (364)
+   Start at  10:42:09
+   Duration  1.74s (transform 64%, import 28%, tests 7%, worker 1%)
+exit 0
+
+== 81ef6ec (self-checks, readonly codes) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  3 passed (3)
+      Tests  230 passed (230)
+   Start at  10:45:13
+   Duration  1.68s (transform 75%, import 18%, tests 7%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.10s · 73% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             on CI this only helps when the cache directory is persisted between runs
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+exit 0
+
+== planted violation: a symlink merge-gate/sha.json -> ../../lib/github.ts (created by hand at 81ef6ec, removed after; git status clean) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && ln -s ../../lib/github.ts apps/server/src/services/merge-gate/sha.json
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-imports.test.ts apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-imports.test.ts (7 tests | 1 failed) 51ms
+   ❯ merge-gate 源码只从闸自己的源码 import (7)
+     × merge-gate/ 里没有指向别处的符号链接（任何扩展名，目录也算） 17ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > merge-gate/ 里没有指向别处的符号链接（任何扩展名，目录也算）
+AssertionError: expected [ 'sha.json' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "sha.json",
++ ]
+
+ ❯ test/merge-gate-imports.test.ts:245:56
+    243|     const real = realpathSync(GATE_DIR);
+    244|     const escaping = entries.filter((f) => !realpathSync(f).startsWith…
+    245|     expect(escaping.map((f) => relative(GATE_DIR, f))).toEqual([]);
+       |                                                        ^
+    246|   });
+    247|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 229 passed (230)
+   Start at  10:49:42
+   Duration  2.46s (transform 73%, import 22%, tests 4%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 3.04s · 73% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             on CI this only helps when the cache directory is persisted between runs
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+exit 1
+$ rm apps/server/src/services/merge-gate/sha.json

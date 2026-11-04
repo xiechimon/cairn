@@ -1,0 +1,249 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "results": [
+    {
+      "group": "S1 结构",
+      "name": "scroller 四件套 data-slot 在位",
+      "actual": {
+        "root": 1,
+        "viewport": 1,
+        "content": 1,
+        "items": 4
+      },
+      "expected": {
+        "root": 1,
+        "viewport": 1,
+        "content": 1,
+        "items": 4
+      },
+      "ok": true
+    },
+    {
+      "group": "S1 结构",
+      "name": "chief-body = Viewport（overflowY auto 载体随迁，F-R6/R8）",
+      "actual": {
+        "slot": "message-scroller-viewport",
+        "overflowY": "auto"
+      },
+      "expected": {
+        "slot": "message-scroller-viewport",
+        "overflowY": "auto"
+      },
+      "ok": true
+    },
+    {
+      "group": "S1 结构",
+      "name": "chief-stream = Content（block 中和，行距留行 margin）",
+      "actual": {
+        "slot": "message-scroller-content",
+        "display": "block",
+        "rowGap": "0px"
+      },
+      "expected": {
+        "slot": "message-scroller-content",
+        "display": "block",
+        "rowGap": "0px"
+      },
+      "ok": true
+    },
+    {
+      "group": "S2 中和",
+      "name": "Item content-visibility 钉回 visible（探针/e2e 确定性）",
+      "actual": [
+        "visible",
+        "visible",
+        "visible",
+        "visible"
+      ],
+      "expected": [
+        "visible",
+        "visible",
+        "visible",
+        "visible"
+      ],
+      "ok": true
+    },
+    {
+      "group": "S3 Bubble 皮",
+      "name": "user 行底 = --secondary 槽（原 BUBBLE_CLS 等值）",
+      "actual": "rgb(234, 228, 224)",
+      "expected": "(predicate)",
+      "ok": true
+    },
+    {
+      "group": "S3 Bubble 皮",
+      "name": "user 行零边框（F-R16 44px 药丸 canon 前提）",
+      "actual": "0px",
+      "expected": "0px",
+      "ok": true
+    },
+    {
+      "group": "S3 Bubble 皮",
+      "name": "user 行节奏 14px/24px + 10/12 内垫",
+      "actual": [
+        "14px",
+        "24px",
+        "10px/12px"
+      ],
+      "expected": [
+        "14px",
+        "24px",
+        "10px/12px"
+      ],
+      "ok": true
+    },
+    {
+      "group": "S3 Bubble 皮",
+      "name": "robot 行 ghost 档裸文本（bg 透明 + 零 padding）",
+      "actual": [
+        "rgba(0, 0, 0, 0)",
+        "0px"
+      ],
+      "expected": [
+        "rgba(0, 0, 0, 0)",
+        "0px"
+      ],
+      "ok": true
+    },
+    {
+      "group": "S4 Marker",
+      "name": "note 行 = Marker 原语，居中 12px，机器名下划线在位",
+      "actual": {
+        "count": 2,
+        "justify": "center",
+        "font": "12px",
+        "underline": 1
+      },
+      "expected": {
+        "count": 2,
+        "justify": "center",
+        "font": "12px",
+        "underline": 1
+      },
+      "ok": true
+    },
+    {
+      "group": "S9 载体守恒",
+      "name": "chief-msg 联合计数 + col/foot/tools + 复制/恢复钮",
+      "actual": {
+        "msgs": 2,
+        "cols": 2,
+        "foot": 1,
+        "tools": 1,
+        "copy": 2,
+        "rewind": 1
+      },
+      "expected": {
+        "msgs": 2,
+        "cols": 2,
+        "foot": 1,
+        "tools": 1,
+        "copy": 2,
+        "rewind": 1
+      },
+      "ok": true
+    },
+    {
+      "group": "S10 id 贯通",
+      "name": "fixture 捕获形 Item 无 messageId（live 面 id 归 e2e live-mock pin）",
+      "actual": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "expected": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "ok": true
+    },
+    {
+      "group": "S6 滚动律",
+      "name": "面溢出前提（scrollHeight > clientHeight）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S6 滚动律",
+      "name": "打开即落底（defaultScrollPosition=end）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S7 jump",
+      "name": "上翻后 jump-to-latest 浮出（data-active=true）",
+      "actual": "true",
+      "expected": "true",
+      "ok": true
+    },
+    {
+      "group": "S7 jump",
+      "name": "点击后落底",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S7 jump",
+      "name": "落底后按钮退场（data-active=false）",
+      "actual": "false",
+      "expected": "false",
+      "ok": true
+    },
+    {
+      "group": "S8 重开落底",
+      "name": "最小化重开 = 落底看最新（chat 通行律；滚动位随 display:none 丢弃）",
+      "actual": true,
+      "expected": true,
+      "ok": true
+    },
+    {
+      "group": "S5 hero",
+      "name": "examples 在位、流零行",
+      "actual": {
+        "examples": 4,
+        "items": 0
+      },
+      "expected": {
+        "examples": 4,
+        "items": 0
+      },
+      "ok": true
+    },
+    {
+      "group": "S5 hero",
+      "name": "composer 草稿面 = #860 grow 律顶格（XMON-102 固定轨已被取代；盒内滚动保留）",
+      "actual": {
+        "h": "120px",
+        "ov": "auto"
+      },
+      "expected": {
+        "h": "120px",
+        "ov": "auto"
+      },
+      "ok": true
+    },
+    {
+      "group": "S5b 空面",
+      "name": "composer 空草稿面 = 3 行基座轨（读数以本行为准，非理论常数）",
+      "actual": {
+        "h": "60px",
+        "ov": "auto"
+      },
+      "expected": {
+        "h": "60px",
+        "ov": "auto"
+      },
+      "ok": true
+    }
+  ],
+  "failures": 0
+}

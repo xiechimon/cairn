@@ -1,0 +1,3 @@
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Duration  1.12s (import 50%, transform 36%, tests 13%)

@@ -1,0 +1,126 @@
+# P5a-1 gates, round 4, on 5cf6e92e (5cf6e92ef1aa87b58bcf8d239a10c422d6f11f80)
+# date: 2026-10-21T14:08:44Z; user: root (uid 0); origin/main dabef481 is merged (18c6dded); git status clean
+# apart from this round's evidence files in docs/verify/1406/.
+
+## pnpm lint
+  
+
+Checked 796 files in 2s. No fixes applied.
+Found 1 info.
+exit=0
+
+## pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+## pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.6s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (5.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+## node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 517 test sources, no package-manager spawns.
+exit=0
+
+## pnpm exec vitest run --changed origin/main
+ Test Files  252 passed (252)
+      Tests  2819 passed | 1 skipped (2820)
+   Duration  360.32s (tests 58%, import 41%, transform 1%)
+exit=0
+-> all green. The root-only runner-brief case (apps/daemon/test/runner-brief.test.ts '擦除失败 → 不 commitAll ...',
+   red as root in gates-p5a1-2..5 because chmod does not stop root) is not in this selection: --changed compares the
+   tree with origin/main, which now contains #1458's container-safe version of that test, and this branch does not
+   touch apps/daemon. Run directly as root on this tree:
+   $ pnpm exec vitest run apps/daemon/test/runner-brief.test.ts
+    Test Files  1 passed (1)
+         Tests  11 passed (11)
+   exit=0
+
+## E2E_AFFECTED_PORT=8398 pnpm --filter @pacman/web e2e:affected
+lsof -iTCP:8398 exit=1   (1 = nothing listening; checked immediately before the run)
+playwright processes already running in this container before the run: 0
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  docs/verify/1406/pr-gate-1461-run3-69722cc.json → none
+  README.md → none
+  README.zh.md → none
+  apps/server/src/config.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/index.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/lib/github.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief-tools.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-issues.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/issue-intake.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/scheduler.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/events-1406.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/events-1450.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/issue-1445-closed.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/issues-open-with-pr.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/issues-ready-for-agent.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/issue-intake/permission-admin.docs-example.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-issues.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/issue-intake.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/webhook.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  "docs/spec/28-\350\207\252\344\270\276\351\227\255\347\216\257-\350\207\252\345\206\231\350\207\252\345\220\210.md" → none
+  docs/verify/1406/api-notes.txt → none
+  docs/verify/1406/fixtures/events-1406.json → none
+  docs/verify/1406/fixtures/events-1450.json → none
+  docs/verify/1406/fixtures/issue-1445-closed.json → none
+  docs/verify/1406/fixtures/issues-open-with-pr.json → none
+  docs/verify/1406/fixtures/issues-ready-for-agent.json → none
+  docs/verify/1406/fixtures/permission-admin.docs-example.json → none
+  docs/verify/1406/gates-p5a1-2.txt → none
+  docs/verify/1406/gates-p5a1-3.txt → none
+  docs/verify/1406/gates-p5a1-4.txt → none
+  docs/verify/1406/gates-p5a1-5.txt → none
+  docs/verify/1406/gates-p5a1.txt → none
+  docs/verify/1406/p5a1-green.txt → none
+  docs/verify/1406/p5a1-mutations.txt → none
+  docs/verify/1406/p5a1-optin-green.txt → none
+  docs/verify/1406/p5a1-optin-live.txt → none
+  docs/verify/1406/p5a1-optin-red.txt → none
+  docs/verify/1406/p5a1-r2-live.txt → none
+  docs/verify/1406/p5a1-r2-mutations.txt → none
+  docs/verify/1406/p5a1-r2-red-green.txt → none
+  docs/verify/1406/p5a1-r3-mutations.txt → none
+  docs/verify/1406/p5a1-r3-red-green.txt → none
+  docs/verify/1406/p5a1-r3-reviews.txt → none
+  docs/verify/1406/p5a1-r3b-mutations.txt → none
+  docs/verify/1406/p5a1-r3b-red-green.txt → none
+  docs/verify/1406/p5a1-red.txt → none
+  docs/verify/1406/p5a1-reviews.txt → none
+  docs/verify/1406/pr-gate-1461-run1-f911447.json → none
+  docs/verify/1406/pr-gate-1461-run2-a313966.json → none
+  packages/shared/src/brand.ts → none
+  packages/shared/test/__snapshots__/snapshot.test.ts.snap → none
+  packages/shared/test/vocabulary.test.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8398
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+Running 8 tests using 2 workers
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (3.2s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.1s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (4.5s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (951ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (966ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (646ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (666ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (537ms)
+  8 passed (17.2s)
+exit=0

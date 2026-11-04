@@ -1,0 +1,82 @@
+{
+  "probe": "drive-920-skills-manifest/wire",
+  "expect": "new",
+  "server": "http://127.0.0.1:8791",
+  "skillsDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/skills",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-920-daemon-home",
+  "passed": 14,
+  "total": 14,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（5 技能 / 13 文件）",
+      "ok": true,
+      "detail": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/skills"
+    },
+    {
+      "name": "enroll 机器凭证",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "claim 到 build 步",
+      "ok": true,
+      "detail": "todo=Ar1-jVX49ayT46-hJjwmU build=01a1156b-4182-79c8-bd9c-4cbaab109873"
+    },
+    {
+      "name": "清单端点 200（旧闸已撤）",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "selection=whitelist",
+      "ok": true,
+      "detail": "\"whitelist\""
+    },
+    {
+      "name": "白名单交集出清单（4 技能，beta 不列）",
+      "ok": true,
+      "detail": "[\"alpha\",\"bin\",\"fat\",\"heavy\"]"
+    },
+    {
+      "name": "超限文件（727,976B > 512,000）真实 size 入清单",
+      "ok": true,
+      "detail": "{\"path\":\"assets/template.html\",\"sizeBytes\":727976,\"sha256\":\"9f8a3c0a4b000a98b6b2047b4f648bdddfa8b3fee39d06cebef19b92c7775f44\"}"
+    },
+    {
+      "name": "库总量 > 旧整包闸 2,000,000 且清单完整",
+      "ok": true,
+      "detail": "total=2979505"
+    },
+    {
+      "name": "清单文件数 = 12（alpha2+bin2+fat2+heavy6）",
+      "ok": true,
+      "detail": "count=12"
+    },
+    {
+      "name": "逐文件 sizeBytes/sha256 = 盘上真值",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "name": "file 端点 12/12 字节级校验通过",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "name": "二进制资产逐字节诚实（非 utf8 不损坏）",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "file 响应 content-type = application/octet-stream",
+      "ok": true,
+      "detail": "application/octet-stream"
+    },
+    {
+      "name": "负面 8 面全部 404",
+      "ok": true,
+      "detail": "[404,404,404,404,404,404,404,404]"
+    }
+  ]
+}

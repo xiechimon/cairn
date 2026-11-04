@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cairn.local/eval/harness-page-bench/run-record.schema.json",
+  "title": "Harness page benchmark run record",
+  "version": "1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "questionBankVersion",
+    "questionId",
+    "requirements",
+    "buildOk",
+    "consoleErrors",
+    "screenshots",
+    "model",
+    "harnessVersion",
+    "budgets",
+    "elapsedMs",
+    "tokenUsage",
+    "retries"
+  ],
+  "properties": {
+    "questionBankVersion": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Must match questions.json version for the bank used in the run."
+    },
+    "questionId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Must match a questions.json question id."
+    },
+    "requirements": {
+      "type": "object",
+      "description": "Per-requirement pass/fail keyed by the authoritative requirement id from questions.json. Missing keys are incomplete evidence, not failed requirements.",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "buildOk": { "type": "boolean" },
+    "consoleErrors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "screenshots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["viewport", "path", "sha256"],
+        "properties": {
+          "viewport": { "type": "string", "enum": ["desktop", "mobile"] },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "model": { "type": "string", "minLength": 1 },
+    "harnessVersion": { "type": "string", "minLength": 1 },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wallMs", "inputTokens", "outputTokens"],
+      "properties": {
+        "wallMs": { "type": "number", "minimum": 0 },
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "elapsedMs": { "type": "number", "minimum": 0 },
+    "tokenUsage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output", "cacheRead", "cacheWrite"],
+      "properties": {
+        "input": { "type": "integer", "minimum": 0 },
+        "output": { "type": "integer", "minimum": 0 },
+        "cacheRead": { "type": "integer", "minimum": 0 },
+        "cacheWrite": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "retries": { "type": "integer", "minimum": 0 }
+  }
+}

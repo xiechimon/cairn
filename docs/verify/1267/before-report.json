@@ -1,0 +1,72 @@
+{
+  "closed": {
+    "present": true,
+    "open": false,
+    "hidden": true,
+    "keydowns": [
+      {
+        "target": "DIV"
+      },
+      {
+        "target": "DIV"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "document"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "window"
+      },
+      {
+        "target": "document"
+      },
+      {
+        "target": "BODY"
+      },
+      {
+        "target": "BODY"
+      },
+      {
+        "target": "DIV"
+      },
+      {
+        "target": "DIV"
+      }
+    ]
+  },
+  "opened": {
+    "open": true,
+    "hidden": false,
+    "text": "新主题\nn/a\n请先为总管选择一个 Agent。\n设置\n选择一个主题开始\n帮我组建 Agent 团队\n帮我创建一个新项目\n总结一下我所有项目现在的进展\n查一下这"
+  },
+  "second": {
+    "open": false,
+    "hidden": true,
+    "opacityTransitions": 0,
+    "sameNode": true
+  },
+  "afterEsc": {
+    "open": true,
+    "hidden": false
+  }
+}

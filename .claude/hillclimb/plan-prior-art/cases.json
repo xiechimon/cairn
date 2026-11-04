@@ -1,0 +1,16 @@
+{
+  "flow": "plan-prior-art",
+  "note": "Cron-style todo scheduling, where the maintained library croner already exists. A plan that hand-rolls a parser without citations scores lower than one that reuses croner and cites sources.",
+  "cases": [
+    {
+      "id": "cron-hand-roll",
+      "task": "Add cron-style scheduling for todos",
+      "plan": "## Context\nKind: feature\nAdd cron-style scheduling for todos, a new user-facing capability.\n\n## Changes\n- new module apps/server/src/services/cron-schedule.ts with a hand-written parser\n\n## Edge cases\n- an empty expression is rejected\n\n## Verification\n- `pnpm exec vitest run apps/server/test/cron-schedule.test.ts` passes\n"
+    },
+    {
+      "id": "cron-reuse",
+      "task": "Add cron-style scheduling for todos",
+      "plan": "## Context\nKind: feature\nAdd cron-style scheduling for todos, a new user-facing capability.\n\n## Prior art\n- croner repository: https://github.com/Hexagon/croner\n- croner package: https://www.npmjs.com/package/croner\n- a request for a maintained parser: https://github.com/Hexagon/croner/issues/206\n- Decision: reuse `croner` (maintained, 0 deps) instead of a hand-written parser.\n\n## Changes\n- new module apps/server/src/services/cron-schedule.ts calling croner\n\n## Edge cases\n- an empty expression is rejected\n\n## Verification\n- `pnpm exec vitest run apps/server/test/cron-schedule.test.ts` passes\n"
+    }
+  ]
+}

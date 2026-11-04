@@ -1,0 +1,36 @@
+# red leg: harness against pr-gate.js at 7f0b544 (before the run-2 fixes)
+$ git show 7f0b544:.claude/workflows/pr-gate.js > pr-gate-7f0b544.js
+$ node docs/verify/1401/pr-gate-harness.mjs pr-gate-7f0b544.js
+PASS  clean change: go, auto-merge
+FAIL  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+FAIL  CI-called script outside the *gate* glob routes to the user
+FAIL  rename out of a protected path (list built without --no-renames) is caught
+FAIL  deletedFiles and linesChanged are required
+FAIL  deleted test file routes to the user
+FAIL  over 800 lines routes to the user
+FAIL  over 40 files routes to the user
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  a dead skeptic keeps the finding
+FAIL  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+FAIL  a missing safety file list blocks go
+5/14 passed (pr-gate-7f0b544.js)
+
+# green leg: same harness against the fixed script
+$ node docs/verify/1401/pr-gate-harness.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a missing safety file list blocks go
+14/14 passed (.claude/workflows/pr-gate.js)

@@ -1,0 +1,85 @@
+{
+  "probe": "drive-1025-plan-first-round",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0242-1025-plan-md/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-1025-daemon-home",
+  "passed": 13,
+  "total": 13,
+  "checks": [
+    {
+      "name": "真 daemon 上线（--server 指本栈）",
+      "ok": true,
+      "detail": "/tmp/pacman-1025-daemon-home"
+    },
+    {
+      "name": "A0：withPlan build 首步 kind=plan 且 claim 前零 prompt（server 不动，注入归 daemon）",
+      "ok": true,
+      "detail": "kind=plan prompt=null"
+    },
+    {
+      "name": "A1：首轮会话 prompt = 任务文本 + 契约指令组合串（compose 单源形状，指令殿后）",
+      "ok": true,
+      "detail": "len=153 prefixOk=true"
+    },
+    {
+      "name": "A2：契约段在位（plan.md 文件名 + 四段名逐字）",
+      "ok": true,
+      "detail": "file=true sections=true"
+    },
+    {
+      "name": "A3：plan 行 v1 首轮落库 + build.planDocId 指向该行（#904 A 腿同面，对照「首次规划即落 v1」）",
+      "ok": true,
+      "detail": "rows=1 byteEqual=true"
+    },
+    {
+      "name": "A4：恰一个 plan 步且 done（首轮产出方案，无补写轮——契约在正典提示词里就不需要它）",
+      "ok": true,
+      "detail": "planSteps=1 status=done"
+    },
+    {
+      "name": "A5：transcript wire 行 user-<stepId> = 同一组合串（呈现层与对账面看到的就是 agent 收到的）",
+      "ok": true,
+      "detail": "len=153 equal=true"
+    },
+    {
+      "name": "A6a：web confirm 卡「方案 · v1」上屏（首轮方案有物可看）",
+      "ok": true,
+      "detail": "方案 · v1"
+    },
+    {
+      "name": "A6b：首轮契约组合行退场——任务原文/契约段都不成用户气泡（套娃负例）",
+      "ok": true,
+      "detail": "taskBubble=0 contractBubble=0"
+    },
+    {
+      "name": "A6c：右栏方案面全文含 marker（confirm 有物可看）",
+      "ok": true,
+      "detail": "PLAN-1025-MARKER-A-muzlxw40 in 126 chars"
+    },
+    {
+      "name": "B1：负对照成立前提——首轮请求同样携带契约（agent 是「被告知后仍不写」，不是没被告知）",
+      "ok": true,
+      "detail": "equal=true"
+    },
+    {
+      "name": "B2：首轮不写 → #113 补写轮入队（第二个 plan 步，prompt = 补写指令，含 plan.md）",
+      "ok": true,
+      "detail": "planSteps=2 rewritePrompt=\"规划步未产出 plan.md 交接文件。请将方案写入工作区根目录的 plan.md（覆盖 Context/Changes/Edge cases/Verific"
+    },
+    {
+      "name": "B3：补写轮仍无物 → #703 闸 1 失败收尾（phase=failed、plan 行 0、errorMessage=规划未产出方案）",
+      "ok": true,
+      "detail": "phase=failed planRows=0 errorMessage=规划未产出方案"
+    }
+  ],
+  "legA": {
+    "todoId": "6YnoMfoPWaScMXosYKQgt",
+    "buildId": "01a11bd4-2ee4-7501-af3a-50438b461628"
+  },
+  "legB": {
+    "todoId": "9gQxH53PQcm2hqO3Jiatw",
+    "buildId": "01a11bd4-3d21-7bf6-8c90-4bf5cd699329"
+  },
+  "runTag": "muzlxw40"
+}

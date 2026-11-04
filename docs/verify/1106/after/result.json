@@ -1,0 +1,96 @@
+{
+  "probe": "drive-1106-skill-inject/claim",
+  "server": "http://127.0.0.1:8791",
+  "webUrl": "http://127.0.0.1:5273",
+  "skillsDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0271-1106-description/.claude/verify-run/home/skills",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0271-1106-description/.claude/verify-run/home/server/server.db",
+  "passed": 17,
+  "total": 17,
+  "checks": [
+    {
+      "name": "enroll 机器凭证",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "明确域任务 claim 成功（正常派发）",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "claim 载荷携带授权全集（agent.skills = 21，授权不收窄）",
+      "ok": true,
+      "detail": "skills=21"
+    },
+    {
+      "name": "验收 1：注入只含相关技能（非空、求职/知识库族零注入）",
+      "ok": true,
+      "detail": "injected=[\"better-colors\",\"better-layout\",\"better-typography\",\"kami\"]"
+    },
+    {
+      "name": "注入 ⊆ 授予（选择不越权）",
+      "ok": true,
+      "detail": "injected=4/granted=21"
+    },
+    {
+      "name": "验收 4：steps REST 透出选择记录（条数 = 载荷 ids，逐条含规则与原因）",
+      "ok": true,
+      "detail": "hits=4"
+    },
+    {
+      "name": "steps REST hits 与 claim 载荷 ids 一致（持久正本 = 投递事实）",
+      "ok": true,
+      "detail": "rest=[\"better-colors\",\"better-layout\",\"better-typography\",\"kami\"]"
+    },
+    {
+      "name": "SQLite step 行 skillInjection 与 REST 一致（正本落库）",
+      "ok": true,
+      "detail": "db=[\"better-colors\",\"better-layout\",\"better-typography\",\"kami\"]"
+    },
+    {
+      "name": "命中原因含域与关键词（可解释性：至少规则命中原因一条）",
+      "ok": true,
+      "detail": "[\"任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「颜色」）\",\"任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「布局」）\",\"任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「ui」）\",\"任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「排版」）\"]"
+    },
+    {
+      "name": "验收 3：零命中任务 claim 成功（不报错）",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "验收 3：零命中 → injectedSkills=[]（已计算零命中，不保底全量）",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "验收 3：零命中任务授权集仍全量（零注入 ≠ 收权）",
+      "ok": true,
+      "detail": "skills=21"
+    },
+    {
+      "name": "验收 3：零命中 step 行 hits=[]（配置事实落库）",
+      "ok": true,
+      "detail": "{\"hits\":[]}"
+    },
+    {
+      "name": "显式点名：任务文本点名 tdd → 注入含 tdd",
+      "ok": true,
+      "detail": "injected=[\"tdd\"]"
+    },
+    {
+      "name": "显式点名：tdd 命中 rule=explicit-mention 且原因点名任务文本",
+      "ok": true,
+      "detail": "{\"id\":\"tdd\",\"rule\":\"explicit-mention\",\"reason\":\"任务文本显式点名「tdd」\"}"
+    },
+    {
+      "name": "验收 4（详情面）：injected-skills 行渲染且含注入技能与原因",
+      "ok": true,
+      "detail": "注入技能：better-colors（任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「颜色」））better-layout（任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「布局」））better-typography（任务文本与技能同域「前端界面」（任务命中「字号」，技能描述命中「ui」"
+    },
+    {
+      "name": "验收 4（详情面）：零命中任务显示「未注入技能」占位",
+      "ok": true,
+      "detail": "未注入技能（任务文本未命中任何技能）"
+    }
+  ]
+}

@@ -1,0 +1,4842 @@
+{
+  "harborVersion": "0.25.0",
+  "target": 30,
+  "complete": false,
+  "partitionRule": "issue-parity-v1: even=optimize, odd=holdout; persist at conversion",
+  "tasks": [],
+  "candidates": [
+    {
+      "pr": 2045,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 2043,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 2042,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 2034,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 2030,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 2026,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 2025,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 2022,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 2020,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 2018,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 2016,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 2014,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 2013,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 2011,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 2010,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1992,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1991,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1990,
+      "mergedAt": "2026-10-27T12:54:22Z",
+      "baseSha": "b80e55d85a4b320e05bfbf12084aa3fb8540d2ea",
+      "headSha": "f341757813db16bc6d9f10c8bb8fa149d59de9ad",
+      "issues": [
+        1947
+      ],
+      "paths": [
+        "docs/lessons/1947-node-test-child-context.md",
+        "scripts/test-tmpdir.mjs",
+        "scripts/test-tmpdir.test.mjs"
+      ],
+      "productLines": 73,
+      "reason": null
+    },
+    {
+      "pr": 1989,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1988,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1972,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1934,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1933,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1930,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1929,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1924,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1923,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1914,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1912,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1907,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1906,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1905,
+      "mergedAt": "2026-10-27T04:56:01Z",
+      "baseSha": "c42ce40df30846aa88fcfbf1e5ae13c311308e8e",
+      "headSha": "130fd98b7451d673b7cf79b6da50448245bb1c1a",
+      "issues": [
+        1833
+      ],
+      "paths": [
+        "apps/server/src/lib/github.ts",
+        "apps/server/test/ci-loop.test.ts",
+        "apps/server/test/github-create-throttle.test.ts",
+        "apps/server/test/github-writeback.test.ts",
+        "apps/server/test/orchestration-source.test.ts",
+        "docs/lessons.md",
+        "docs/ops/agent-bot-identity.md",
+        "docs/verify/1833/lock-red.log",
+        "docs/verify/1833/red.log",
+        "docs/verify/1833/typecheck.log",
+        "packages/shared/package.json",
+        "packages/shared/src/brand.ts",
+        "packages/shared/src/github-create-gate.ts",
+        "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+        "packages/shared/test/github-create-gate.test.ts",
+        "packages/shared/test/vocabulary.test.ts",
+        "scripts/lib/github-create-gate.mjs"
+      ],
+      "productLines": 277,
+      "reason": null
+    },
+    {
+      "pr": 1904,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1899,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1887,
+      "mergedAt": "2026-10-26T19:59:19Z",
+      "baseSha": "0117480ad956c1b0bc6b1f5cef149fdd11a9802f",
+      "headSha": "2ca0e7cd145b81e6eed080e6e3fdbb08a0a85c19",
+      "issues": [
+        1798
+      ],
+      "paths": [
+        "apps/server/src/index.ts",
+        "apps/server/src/services/merge-gate/model-roster-data.ts",
+        "apps/server/src/services/scheduler.ts",
+        "apps/server/test/issue-intake.test.ts",
+        "apps/server/test/trajectory-export.test.ts",
+        "apps/server/test/trajectory-outcome-backfill.test.ts",
+        "docs/lessons.md"
+      ],
+      "productLines": 75,
+      "reason": null
+    },
+    {
+      "pr": 1883,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1882,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1881,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1878,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1877,
+      "mergedAt": "2026-10-26T20:53:14Z",
+      "baseSha": "e03f60d4e67d0a0dded892c1e5c5d7506d5b495e",
+      "headSha": "d9db04a10aba69e112927a052167b03ffa67c9a0",
+      "issues": [
+        1802
+      ],
+      "paths": [
+        "apps/server/src/services/retry-lessons.ts",
+        "apps/server/test/retry-lessons.test.ts",
+        "docs/lessons.md"
+      ],
+      "productLines": 167,
+      "reason": null
+    },
+    {
+      "pr": 1875,
+      "mergedAt": "2026-10-26T21:17:58Z",
+      "baseSha": "d9db04a10aba69e112927a052167b03ffa67c9a0",
+      "headSha": "9822ae0e246b62b1c54d485cbd03885e221ebb80",
+      "issues": [
+        1745
+      ],
+      "paths": [
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/machine-finish-step.ts",
+        "apps/server/test/artifact-gate.test.ts"
+      ],
+      "productLines": 60,
+      "reason": null
+    },
+    {
+      "pr": 1873,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1871,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1863,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1861,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1857,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1856,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1842,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1840,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1835,
+      "mergedAt": "2026-10-26T20:13:47Z",
+      "baseSha": "2ca0e7cd145b81e6eed080e6e3fdbb08a0a85c19",
+      "headSha": "510e414658516c96e658628ec1de4286ee379dc9",
+      "issues": [
+        1829
+      ],
+      "paths": [
+        "apps/daemon/src/git.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/test/git.test.ts",
+        "apps/daemon/test/runner-delivery.test.ts",
+        "apps/server/src/lib/github.ts",
+        "apps/server/src/services/ci-loop.ts",
+        "apps/server/src/services/machine-finish-step.ts",
+        "apps/server/test/ci-loop.test.ts",
+        "docs/lessons.md",
+        "packages/shared/src/protocol/machine-wire.ts",
+        "packages/shared/test/__snapshots__/snapshot.test.ts.snap"
+      ],
+      "productLines": 180,
+      "reason": null
+    },
+    {
+      "pr": 1828,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1827,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1826,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1824,
+      "mergedAt": "2026-10-26T12:32:06Z",
+      "baseSha": "3320db98ef3218adea4bda81e675204313769a5c",
+      "headSha": "241205d7735d15ac1b7ad9a7c1bc958e05a41562",
+      "issues": [
+        1808
+      ],
+      "paths": [
+        "apps/daemon/package.json",
+        "apps/daemon/src/backend/pi.ts",
+        "apps/daemon/test/pi-compaction-ceiling.test.ts",
+        "docs/spec/26-pi-session-runtime-and-trust-surface.md",
+        "pnpm-lock.yaml"
+      ],
+      "productLines": 149,
+      "reason": null
+    },
+    {
+      "pr": 1823,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1822,
+      "mergedAt": "2026-10-26T09:55:34Z",
+      "baseSha": "4b36dee08f65301ef59915fc85d35d9b6d72d881",
+      "headSha": "260b8a4c9581324429eedbe2a5379450390429f0",
+      "issues": [
+        1800
+      ],
+      "paths": [
+        "apps/server/src/routes-todos.ts",
+        "apps/server/src/services/needs-you.ts",
+        "apps/server/src/services/scheduler.ts",
+        "apps/server/test/needs-you.test.ts",
+        "apps/server/test/token-auth.test.ts",
+        "apps/server/test/wire.test.ts",
+        "packages/shared/src/records/index.ts",
+        "packages/shared/src/records/needs-you.ts"
+      ],
+      "productLines": 152,
+      "reason": null
+    },
+    {
+      "pr": 1820,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1818,
+      "mergedAt": "2026-10-26T15:38:52Z",
+      "baseSha": "10a26f29167264ab22dba8a01158d27f1b592011",
+      "headSha": "0117480ad956c1b0bc6b1f5cef149fdd11a9802f",
+      "issues": [
+        1774
+      ],
+      "paths": [
+        "apps/server/src/services/merge-gate/model-identity.ts",
+        "apps/server/src/services/merge-gate/model-roster-data.ts",
+        "apps/server/src/services/merge-gate/model-roster.ts",
+        "apps/server/src/services/merge-gate/readiness.ts",
+        "apps/server/test/merge-gate-model-roster.test.ts",
+        "apps/server/test/merge-gate-readiness.test.ts",
+        "docs/adr/0027-independent-review-requires-a-different-vendor.md",
+        "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md"
+      ],
+      "productLines": 397,
+      "reason": null
+    },
+    {
+      "pr": 1817,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1815,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1814,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1813,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1812,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1807,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1806,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1805,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1804,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1803,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1790,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1789,
+      "mergedAt": "2026-10-27T08:04:52Z",
+      "baseSha": "130fd98b7451d673b7cf79b6da50448245bb1c1a",
+      "headSha": "5b345399d3286ac3068e8c646516b84ebab255e9",
+      "issues": [
+        1781
+      ],
+      "paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/feature-map-daily-check.yml",
+        "docs/feature-map.md",
+        "scripts/eval-capabilities.json",
+        "scripts/eval-coverage.mjs",
+        "scripts/eval-coverage.test.mjs",
+        "scripts/feature-map-staleness-gate.mjs",
+        "scripts/generate-feature-map.mjs"
+      ],
+      "productLines": 324,
+      "reason": null
+    },
+    {
+      "pr": 1788,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1785,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1776,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1772,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1771,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1770,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1767,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1766,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1765,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1764,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1763,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1761,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1760,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1756,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1754,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1752,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1751,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1750,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1748,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1747,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1746,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1743,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1742,
+      "mergedAt": "2026-10-25T23:54:50Z",
+      "baseSha": "38ed61f8a783c27dd84092dffb9adfc0205c9d60",
+      "headSha": "83abad59df510087bb0d71e3be087632247eb1a8",
+      "issues": [
+        1739
+      ],
+      "paths": [
+        "apps/daemon/src/git.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/src/workspace.ts",
+        "apps/daemon/test/runner-stream-timeout.test.ts",
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/machines.ts",
+        "docs/lessons.md",
+        "integration/test/build-failure-preservation.test.ts",
+        "packages/shared/src/git-ops.ts",
+        "packages/shared/src/protocol/machine-wire.ts",
+        "packages/shared/src/records/build.ts",
+        "packages/shared/test/__snapshots__/snapshot.test.ts.snap"
+      ],
+      "productLines": 124,
+      "reason": null
+    },
+    {
+      "pr": 1741,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1740,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1738,
+      "mergedAt": "2026-10-25T18:23:46Z",
+      "baseSha": "ae640ff0e42c4494e691024c131e6aed681105c7",
+      "headSha": "99a3dfa8f790d7cb2e6318de4d030269aac312c1",
+      "issues": [
+        1510
+      ],
+      "paths": [
+        ".claude/workflows/pr-gate.js",
+        "apps/server/test/merge-gate-paths.test.ts",
+        "docs/adr/0025-eval-surface-into-d4-protected-paths.md",
+        "docs/spec/29-\u8bc4\u6d4b\u4e0e\u6570\u636e\u95ed\u73af.md",
+        "packages/shared/src/records/merge-gate.ts",
+        "scripts/pr-gate-selfcheck.mjs"
+      ],
+      "productLines": 184,
+      "reason": null
+    },
+    {
+      "pr": 1737,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1736,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1735,
+      "mergedAt": "2026-10-25T19:49:33Z",
+      "baseSha": "0fc75c53075c8a8ff84a9660adcc1b5578236c05",
+      "headSha": "0099f952afe8d35a78cec79c848fa0cf1c158a5b",
+      "issues": [
+        1732
+      ],
+      "paths": [
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/chief.ts",
+        "apps/server/src/services/conversation-page.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/test/chief-gate-budget.test.ts",
+        "apps/server/test/team-ownership-1470.test.ts",
+        "docs/lessons.md",
+        "packages/shared/src/protocol/chief-tools.ts"
+      ],
+      "productLines": 283,
+      "reason": null
+    },
+    {
+      "pr": 1734,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1733,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1729,
+      "mergedAt": "2026-10-25T16:20:31Z",
+      "baseSha": "0e8d0efa8b26e37c6d5713432d78d1687b42a1c7",
+      "headSha": "f210960c13bfa06ffdf7cf8c7c27615c34086a1c",
+      "issues": [
+        1728
+      ],
+      "paths": [
+        "packages/shared/src/records/plan.ts",
+        "packages/shared/test/fixtures.d.ts",
+        "packages/shared/test/fixtures/plan1606-verification.md",
+        "packages/shared/test/plan-contract.test.ts"
+      ],
+      "productLines": 28,
+      "reason": null
+    },
+    {
+      "pr": 1726,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1725,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1724,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1723,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1722,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1721,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1720,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1719,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1718,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1716,
+      "mergedAt": "2026-10-25T11:33:43Z",
+      "baseSha": "7014464c084a614eebea50c1e469549de18badf5",
+      "headSha": "1dc3cadb023da0b833312311dfe147448febcf6d",
+      "issues": [
+        1692
+      ],
+      "paths": [
+        "apps/daemon/package.json",
+        "apps/daemon/src/backend/acp.ts",
+        "apps/daemon/test/published-deps.test.ts",
+        "docs/lessons.md",
+        "packages/shared/src/brand.ts",
+        "packages/shared/test/vocabulary.test.ts",
+        "pnpm-lock.yaml"
+      ],
+      "productLines": 28,
+      "reason": null
+    },
+    {
+      "pr": 1715,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1714,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1713,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1712,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1711,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1709,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1707,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1706,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1705,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1704,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1701,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1699,
+      "mergedAt": "2026-10-25T09:37:39Z",
+      "baseSha": "75df40162073c3232467d8232191f71e2fad65cc",
+      "headSha": "695e5691e4dced44d857c7bfc35fce66014b84cd",
+      "issues": [
+        1694
+      ],
+      "paths": [
+        "scripts/heavy-slots.test.mjs",
+        "scripts/prepush.mjs",
+        "scripts/prepush.test.mjs"
+      ],
+      "productLines": 34,
+      "reason": null
+    },
+    {
+      "pr": 1698,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1697,
+      "mergedAt": "2026-10-25T09:35:12Z",
+      "baseSha": "5a96377f4f9e3dbb31fc1f8f0ca61b4e2b1301d5",
+      "headSha": "75df40162073c3232467d8232191f71e2fad65cc",
+      "issues": [
+        1693
+      ],
+      "paths": [
+        ".github/ISSUE_TEMPLATE/config.yml",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "apps/daemon/test/runner-session-upload.test.ts",
+        "apps/daemon/test/session-jsonl.test.ts",
+        "scripts/migrate-pacman-to-cairn.sh",
+        "scripts/npm-command-gate.test.mjs"
+      ],
+      "productLines": 268,
+      "reason": null
+    },
+    {
+      "pr": 1695,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1691,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1690,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1689,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1680,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1679,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1678,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1677,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1674,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1669,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1668,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1665,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1664,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1663,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1662,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1661,
+      "mergedAt": "2026-10-24T22:53:30Z",
+      "baseSha": "d43b2a73b8d81a00fb30e90ec5afb201d69d01e9",
+      "headSha": "1df25eac6991c35e223c30116d2f1aded7371360",
+      "issues": [
+        1659
+      ],
+      "paths": [
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/ci-loop.ts",
+        "apps/server/src/services/delivery-rows.ts",
+        "apps/server/src/trajectory-export-cli.ts",
+        "apps/server/src/trajectory-export.ts",
+        "apps/server/src/trajectory-outcome.ts",
+        "apps/server/test/pr-merge-api.test.ts",
+        "apps/server/test/pr-reconcile.test.ts",
+        "apps/server/test/trajectory-outcome.test.ts",
+        "docs/lessons.md",
+        "docs/verify/1511/field-sources.md"
+      ],
+      "productLines": 105,
+      "reason": null
+    },
+    {
+      "pr": 1660,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1657,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1655,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1653,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1652,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1650,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1649,
+      "mergedAt": "2026-10-24T18:20:19Z",
+      "baseSha": "6562793ac35eec2945ee933afe0d71ef08a6ac6e",
+      "headSha": "0f809859313ff366b0ea2bfed36fd93b0ba97f1d",
+      "issues": [
+        1615
+      ],
+      "paths": [
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/ci-loop.ts",
+        "apps/server/src/services/dispatch-eligibility.ts",
+        "apps/server/src/services/retry-lessons.ts",
+        "apps/server/test/retry-lessons.test.ts",
+        "docs/lessons.md",
+        "packages/shared/src/records/prompts.ts"
+      ],
+      "productLines": 247,
+      "reason": null
+    },
+    {
+      "pr": 1648,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1647,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1646,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1645,
+      "mergedAt": "2026-10-24T17:56:35Z",
+      "baseSha": "b6fda75c72c306fbea4748120620c15ce52f8b18",
+      "headSha": "6562793ac35eec2945ee933afe0d71ef08a6ac6e",
+      "issues": [
+        1635
+      ],
+      "paths": [
+        "apps/daemon/src/git.ts",
+        "apps/daemon/test/git-loopback-proxy.test.ts",
+        "docs/lessons.md",
+        "scripts/comment-discipline-allowlist.json",
+        "scripts/prepush-known-red.json"
+      ],
+      "productLines": 48,
+      "reason": null
+    },
+    {
+      "pr": 1644,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1643,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1642,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1641,
+      "mergedAt": "2026-10-24T21:26:56Z",
+      "baseSha": "37034505984ba3a3d03b5ec5f05fc9c11e47e976",
+      "headSha": "d9e6d9e468ea19d294f4383e655863d9dc943bba",
+      "issues": [
+        1514
+      ],
+      "paths": [
+        "apps/server/src/trajectory-export-cli.ts",
+        "apps/server/src/trajectory-export.ts",
+        "apps/server/test/trajectory-export.test.ts",
+        "docs/lessons.md",
+        "package.json",
+        "packages/shared/src/index.ts",
+        "packages/shared/src/secret-redaction.ts",
+        "packages/shared/src/trajectory-pack.ts",
+        "packages/shared/test/secret-redaction.test.ts",
+        "packages/shared/test/trajectory-pack.test.ts"
+      ],
+      "productLines": 378,
+      "reason": null
+    },
+    {
+      "pr": 1640,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1639,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1638,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1637,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1636,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1634,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1633,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1632,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1631,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1629,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1627,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1622,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1620,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1619,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1613,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1610,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1609,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1608,
+      "mergedAt": "2026-10-24T17:54:16Z",
+      "baseSha": "f48114421c03a6a3b5893eb12fc353b700cb3aab",
+      "headSha": "b6fda75c72c306fbea4748120620c15ce52f8b18",
+      "issues": [
+        1599
+      ],
+      "paths": [
+        "docs/lessons.md",
+        "scripts/e2e-affected.mjs",
+        "scripts/prepush.mjs",
+        "scripts/prepush.test.mjs"
+      ],
+      "productLines": 117,
+      "reason": null
+    },
+    {
+      "pr": 1604,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1603,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1602,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1601,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1600,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1598,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1597,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1596,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1594,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1593,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1592,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1590,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1589,
+      "mergedAt": "2026-10-24T10:58:42Z",
+      "baseSha": "85faa99610fb3b49ea41becfec1c13bf53556777",
+      "headSha": "be9358dc616cdb93f1cccd0894c5b5ecc3a8cd95",
+      "issues": [
+        1557
+      ],
+      "paths": [
+        ".github/workflows/ci.yml",
+        "docs/lessons.md",
+        "scripts/ci-job-structure-baseline.json",
+        "scripts/ci-job-structure-gate.mjs",
+        "scripts/ci-job-structure-gate.test.mjs",
+        "scripts/prepush.mjs",
+        "scripts/prepush.test.mjs"
+      ],
+      "productLines": 130,
+      "reason": null
+    },
+    {
+      "pr": 1588,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1587,
+      "mergedAt": "2026-10-23T15:01:20Z",
+      "baseSha": "15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+      "headSha": "9d8cf2b140abac5078cfc7d795b26d3a75a08b04",
+      "issues": [
+        1556
+      ],
+      "paths": [
+        ".claude/workflow.md",
+        ".github/workflows/ci.yml",
+        "docs/agent-dispatch-prompts.md",
+        "docs/lessons.md",
+        "scripts/dispatch-agent.mjs",
+        "scripts/dispatch-agent.test.mjs"
+      ],
+      "productLines": 138,
+      "reason": null
+    },
+    {
+      "pr": 1585,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1584,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1582,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1581,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1580,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1568,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1567,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1566,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1565,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1564,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1563,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1562,
+      "mergedAt": "2026-10-23T03:19:30Z",
+      "baseSha": "77e7da2b95b9dfa28569268ba3e415c4d5be101f",
+      "headSha": "f0835bbc4d9b2033a348f8c6ac90268e119e8a23",
+      "issues": [
+        1561
+      ],
+      "paths": [
+        "docs/verify/1561/gate-before-after.txt",
+        "scripts/single-use-helper-gate.mjs",
+        "scripts/single-use-helper-gate.test.mjs"
+      ],
+      "productLines": 39,
+      "reason": null
+    },
+    {
+      "pr": 1560,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1559,
+      "mergedAt": "2026-10-23T02:40:01Z",
+      "baseSha": "db952fefa77c75add272a6da37ded6de46b51f06",
+      "headSha": "77e7da2b95b9dfa28569268ba3e415c4d5be101f",
+      "issues": [
+        1511
+      ],
+      "paths": [
+        "docs/lessons.md",
+        "docs/verify/1511/field-sources.md",
+        "docs/verify/1511/unit.txt",
+        "packages/shared/src/index.ts",
+        "packages/shared/src/trajectory-pack.ts",
+        "packages/shared/test/trajectory-pack.test.ts"
+      ],
+      "productLines": 107,
+      "reason": null
+    },
+    {
+      "pr": 1558,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1554,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1553,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1552,
+      "mergedAt": "2026-10-23T01:35:45Z",
+      "baseSha": "6cc663494dd6fa25e33c284891180ca53314c131",
+      "headSha": "6292480107c47294d50454af7f23052b413ecea5",
+      "issues": [
+        1533
+      ],
+      "paths": [
+        ".github/workflows/ci.yml",
+        "AGENTS.md",
+        "apps/server/src/lib/github.ts",
+        "apps/server/src/services/ci-corrections.ts",
+        "apps/server/src/services/ci-loop.ts",
+        "apps/server/test/ci-loop.test.ts",
+        "docs/agent-dispatch-prompts.md",
+        "docs/lessons.md",
+        "docs/spec/28-\u81ea\u4e3e\u95ed\u73af-\u81ea\u5199\u81ea\u5408.md",
+        "docs/verify/1533/prepush.txt",
+        "package.json",
+        "scripts/prepush.mjs",
+        "scripts/prepush.test.mjs"
+      ],
+      "productLines": 318,
+      "reason": null
+    },
+    {
+      "pr": 1551,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1550,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1548,
+      "mergedAt": "2026-10-23T02:21:40Z",
+      "baseSha": "bc433d10bb4b153798ca3268c82ece72a9b51dbe",
+      "headSha": "10397639ca7ac1956eaa3119110b22816760a729",
+      "issues": [
+        1542
+      ],
+      "paths": [
+        ".claude/skills/verify-pacman/scripts/vp-registry-gate.mjs",
+        ".github/workflows/ci.yml",
+        "docs/verify/1542/README.md",
+        "docs/verify/1542/reach.test.mjs",
+        "docs/verify/1542/tests.txt",
+        "docs/verify/1542/vp-selftest.txt",
+        "scripts/e2e-affected.mjs"
+      ],
+      "productLines": 175,
+      "reason": null
+    },
+    {
+      "pr": 1547,
+      "mergedAt": "2026-10-23T01:44:05Z",
+      "baseSha": "6292480107c47294d50454af7f23052b413ecea5",
+      "headSha": "e1224fcd4b4ef624e3f8863692cd1241e4ddc664",
+      "issues": [
+        1543
+      ],
+      "paths": [
+        ".github/workflows/ci.yml",
+        "docs/verify/1543/README.md",
+        "docs/verify/1543/tests.txt",
+        "scripts/single-use-helper-allowlist.json",
+        "scripts/single-use-helper-gate.mjs",
+        "scripts/single-use-helper-gate.test.mjs"
+      ],
+      "productLines": 228,
+      "reason": null
+    },
+    {
+      "pr": 1546,
+      "mergedAt": "2026-10-22T18:20:08Z",
+      "baseSha": "4f71b16d24c487537ab8c8d67d04d2a5362210db",
+      "headSha": "51a218231fc40a4430b2c414248af6eaa76b3582",
+      "issues": [
+        1541
+      ],
+      "paths": [
+        ".github/workflows/ci.yml",
+        "docs/verify/1541/test-output.txt",
+        "scripts/check-closing-keyword.mjs",
+        "scripts/check-closing-keyword.test.mjs"
+      ],
+      "productLines": 60,
+      "reason": null
+    },
+    {
+      "pr": 1545,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1544,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1540,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1539,
+      "mergedAt": "2026-10-22T17:57:07Z",
+      "baseSha": "9aa48542d2101558cb402d09ff779be9dbb7436d",
+      "headSha": "e5b6a5caef77c484cf084b63b700e784dd909a08",
+      "issues": [
+        1520
+      ],
+      "paths": [
+        ".github/workflows/ci.yml",
+        "AGENTS.md",
+        "docs/agent-dispatch-prompts.md",
+        "docs/verify/1520/clean-passes.txt",
+        "docs/verify/1520/new-code.txt",
+        "docs/verify/1520/violation-fails.txt",
+        "scripts/comment-discipline-allowlist.json",
+        "scripts/comment-discipline-gate.mjs",
+        "scripts/comment-discipline-gate.test.mjs"
+      ],
+      "productLines": 118,
+      "reason": null
+    },
+    {
+      "pr": 1538,
+      "mergedAt": "2026-10-22T17:57:26Z",
+      "baseSha": "e5b6a5caef77c484cf084b63b700e784dd909a08",
+      "headSha": "a3badef1af1eee0585b3bb121357eea70ce0ce14",
+      "issues": [
+        1526
+      ],
+      "paths": [
+        "apps/daemon/src/backend/pi.ts",
+        "apps/daemon/test/pi-config-effect.test.ts",
+        "docs/spec/11-\u6a21\u578b\u670d\u52a1\u4e0e\u673a\u5668\u672c\u5730\u5316.md",
+        "docs/verify/1526/new-code.txt",
+        "docs/verify/1526/old-code.txt",
+        "packages/shared/src/records/provider.ts",
+        "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+        "packages/shared/test/records.test.ts"
+      ],
+      "productLines": 44,
+      "reason": null
+    },
+    {
+      "pr": 1537,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1536,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1531,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1530,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1525,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1523,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1509,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1508,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1507,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1506,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1505,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1504,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1503,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1502,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1501,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1500,
+      "mergedAt": "2026-10-22T13:12:07Z",
+      "baseSha": "d4f5f18f7eed603adecd5770884c4a550122f297",
+      "headSha": "92d34d4ec8ca384fa31f673e98adb5f85e0f16d7",
+      "issues": [
+        1497
+      ],
+      "paths": [
+        "apps/server/src/routes-builds.ts",
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/ci-loop.ts",
+        "apps/server/src/services/git.ts",
+        "apps/server/src/services/machine-relay.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/scheduler.ts",
+        "apps/server/src/services/schedules.ts",
+        "apps/server/src/services/todos.ts",
+        "apps/server/test/team-ownership-1497.test.ts",
+        "docs/verify/1497/affected.txt",
+        "docs/verify/1497/gates.txt",
+        "docs/verify/1497/green.txt",
+        "docs/verify/1497/red.txt"
+      ],
+      "productLines": 198,
+      "reason": null
+    },
+    {
+      "pr": 1499,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1498,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1496,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1495,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1489,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1483,
+      "mergedAt": "2026-10-22T09:19:50Z",
+      "baseSha": "bc1d99f8b4a2f658e5638eb8a6f394f69179ff73",
+      "headSha": "659d8cb55345041f98765303f260f677735cfa04",
+      "issues": [
+        1473
+      ],
+      "paths": [
+        ".claude/skills/verify-step-claim/SKILL.md",
+        ".claude/skills/verify-step-claim/expected.txt",
+        ".claude/skills/verify-step-claim/model/StepClaim.tla",
+        "apps/daemon/src/machine-loop.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/test/step-reclaim.test.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/test/step-claim-report.test.ts",
+        "docs/verify/1473/after-fix-tests.txt",
+        "docs/verify/1473/before-fix-tests.txt",
+        "docs/verify/1473/full-suites.txt",
+        "docs/verify/1473/run-full.txt"
+      ],
+      "productLines": 358,
+      "reason": null
+    },
+    {
+      "pr": 1482,
+      "mergedAt": "2026-10-22T10:23:06Z",
+      "baseSha": "50a55000797c066c7e28065adcf8c41ff53ddf42",
+      "headSha": "5db8382e595bc6d90acf50977d8b09a64b7d8a51",
+      "issues": [
+        1470
+      ],
+      "paths": [
+        "apps/server/src/routes-builds.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/chief.ts",
+        "apps/server/src/services/git.ts",
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/test/m4b-memory.test.ts",
+        "apps/server/test/team-ownership-1470.test.ts",
+        "docs/verify/1470/affected.txt",
+        "docs/verify/1470/gates.txt",
+        "docs/verify/1470/green.txt",
+        "docs/verify/1470/red.txt"
+      ],
+      "productLines": 174,
+      "reason": null
+    },
+    {
+      "pr": 1480,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1479,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1477,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1476,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1475,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1474,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1469,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1468,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1467,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1465,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1464,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1461,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1456,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1454,
+      "mergedAt": "2026-10-21T07:54:00Z",
+      "baseSha": "66d5022e374da641ed37ca59ec4fa1c089cb1fac",
+      "headSha": "23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458",
+      "issues": [
+        1453
+      ],
+      "paths": [
+        "apps/server/src/services/builds.ts",
+        "apps/server/test/close-stops-active-steps.test.ts",
+        "docs/verify/1453/README.md",
+        "docs/verify/1453/server-suite.txt",
+        "docs/verify/1453/server-test-new-leg.txt",
+        "docs/verify/1453/server-test-old-leg.txt",
+        "docs/verify/1453/server-test-review-old-leg.txt"
+      ],
+      "productLines": 339,
+      "reason": null
+    },
+    {
+      "pr": 1452,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1450,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1449,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1444,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1443,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1441,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1439,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1438,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1437,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1436,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1435,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1433,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1426,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1425,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1424,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1422,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1421,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1420,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1419,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1418,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1417,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1415,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1414,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1413,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1412,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1411,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1410,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1399,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1395,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1393,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1392,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1391,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1390,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1389,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1388,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1387,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1386,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1385,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1384,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1383,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1382,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1381,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1380,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1379,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1378,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1377,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1376,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1375,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1374,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1373,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1372,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1371,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1370,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1369,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1368,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1367,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1366,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1365,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1364,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1363,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1362,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1361,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1360,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1359,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1358,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1357,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1356,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1355,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1354,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1352,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1351,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1350,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1349,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1348,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1347,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1346,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1345,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1344,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1343,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1342,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1341,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1340,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1339,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1338,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1337,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1336,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1334,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1333,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1332,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1330,
+      "mergedAt": "2026-10-14T19:28:56Z",
+      "baseSha": "15cefc521da568bfe002472760bb2f7775d78393",
+      "headSha": "9b027a5c7f8e63632f6a496a85b61f23ba1c2b78",
+      "issues": [
+        1316
+      ],
+      "paths": [
+        "apps/daemon/src/git.ts",
+        "apps/daemon/test/git.test.ts",
+        "docs/verify/1316/after-reset.txt",
+        "docs/verify/1316/after-vitest.txt",
+        "docs/verify/1316/before-reset.txt"
+      ],
+      "productLines": 60,
+      "reason": null
+    },
+    {
+      "pr": 1328,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1327,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1326,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1325,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1323,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1322,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1321,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1320,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1319,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1318,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1317,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1315,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1314,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1311,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1310,
+      "mergedAt": "2026-10-13T13:04:36Z",
+      "baseSha": "ca7de929394eeed30b479105d61c6db14d5cc256",
+      "headSha": "6909f67d20c4882bdd43474042eca25d080e39a6",
+      "issues": [
+        1309
+      ],
+      "paths": [
+        "apps/server/src/services/git.ts",
+        "apps/server/test/project-local.test.ts"
+      ],
+      "productLines": 26,
+      "reason": null
+    },
+    {
+      "pr": 1305,
+      "mergedAt": "2026-10-13T08:03:25Z",
+      "baseSha": "9d6d7235aea3562e001fe593b3095bc9b368d2b8",
+      "headSha": "6c1b419a7f3c3e678f39818510805acc51f9cca5",
+      "issues": [
+        1299
+      ],
+      "paths": [
+        "apps/daemon/src/backend/pi.ts",
+        "apps/daemon/src/backend/skills.ts",
+        "apps/daemon/src/machine-loop.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/src/skill-tool.ts",
+        "apps/daemon/test/skill-tool.test.ts",
+        "apps/daemon/test/skills-worktree.test.ts",
+        "docs/verify/1299/README.md",
+        "docs/verify/1299/mock-transcript.md"
+      ],
+      "productLines": 400,
+      "reason": null
+    },
+    {
+      "pr": 1304,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1298,
+      "mergedAt": "2026-10-13T06:12:22Z",
+      "baseSha": "9420aa3b6eb48074727fd9450f039d9acbf6657f",
+      "headSha": "0664c43aed92de5f3d2457fcc321551b46631ce1",
+      "issues": [
+        1254
+      ],
+      "paths": [
+        "apps/server/src/services/chief.ts",
+        "apps/server/test/chief-auto-confirm.test.ts",
+        "apps/server/test/chief-watch.test.ts"
+      ],
+      "productLines": 35,
+      "reason": null
+    },
+    {
+      "pr": 1297,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1296,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1295,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1294,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1293,
+      "mergedAt": "2026-10-13T05:42:11Z",
+      "baseSha": "23e38d29e97a78b30d27cbdd19a4eca9260f5c9b",
+      "headSha": "9420aa3b6eb48074727fd9450f039d9acbf6657f",
+      "issues": [
+        1286
+      ],
+      "paths": [
+        "apps/daemon/src/backend/errors.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/test/runner-recover-degrade.test.ts",
+        "docs/verify/1286/README.md",
+        "docs/verify/1286/output.log",
+        "docs/verify/1286/recover-degrade.sh"
+      ],
+      "productLines": 167,
+      "reason": null
+    },
+    {
+      "pr": 1292,
+      "mergedAt": "2026-10-13T05:11:23Z",
+      "baseSha": "549bbcea3486fb3a2be5e3dda5f7b89694d06b7c",
+      "headSha": "26765535e77d0a0e25b2a4b58d4bb3edbe345821",
+      "issues": [
+        1290
+      ],
+      "paths": [
+        "apps/daemon/launchd/README.md",
+        "apps/daemon/launchd/com.xiechimon.pacman-daemon.plist.template",
+        "apps/daemon/src/claude-code-bin.ts",
+        "apps/daemon/src/machine-loop.ts",
+        "apps/daemon/test/claude-code-bin.test.ts",
+        "docs/verify/1290/README.md",
+        "docs/verify/1290/plist-render-lint.log",
+        "docs/verify/1290/probe-narrow-path-old-code.json",
+        "docs/verify/1290/probe-narrow-path.json"
+      ],
+      "productLines": 117,
+      "reason": null
+    },
+    {
+      "pr": 1291,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1289,
+      "mergedAt": "2026-10-13T04:20:33Z",
+      "baseSha": "3c1b777061020425f1b6a6939fd5bbe89758c029",
+      "headSha": "5f33c84772640d974b4b55b55035baaeea7402f5",
+      "issues": [
+        1287
+      ],
+      "paths": [
+        "packages/shared/src/records/model-source.ts",
+        "packages/shared/test/model-source.test.ts"
+      ],
+      "productLines": 40,
+      "reason": null
+    },
+    {
+      "pr": 1283,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1282,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1281,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1280,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1278,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1276,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1275,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1274,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1273,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1272,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1271,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1270,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1269,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1264,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1252,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1249,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1239,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 1237,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1235,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1234,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1233,
+      "mergedAt": "2026-10-11T18:52:00Z",
+      "baseSha": "71ca7f23fabd5c0267006715a6a92d5e11f4509c",
+      "headSha": "df6419eeeebd231f851a048d58417e29d9407513",
+      "issues": [
+        1217
+      ],
+      "paths": [
+        "apps/server/src/lib/github.ts",
+        "apps/server/src/routes-builds.ts",
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/machine-wake-hub.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/test/machine-wire.test.ts",
+        "apps/server/test/second-pr-guard.test.ts",
+        "packages/shared/src/records/message.ts",
+        "packages/shared/src/records/prompts.ts"
+      ],
+      "productLines": 349,
+      "reason": null
+    },
+    {
+      "pr": 1232,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1231,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1230,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1229,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1228,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1227,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1224,
+      "mergedAt": "2026-10-11T16:34:24Z",
+      "baseSha": "39d2b85a1802f99716fe0cea5be6930abd296620",
+      "headSha": "acc4c4c105c86bccc132e3348a989a1731ca1f0f",
+      "issues": [
+        1130
+      ],
+      "paths": [
+        "apps/server/src/context.ts",
+        "apps/server/src/index.ts",
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/chief.ts",
+        "apps/server/src/services/machine-wake-hub.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/todos.ts",
+        "apps/server/test/helpers.ts",
+        "apps/server/test/steer.test.ts",
+        "integration/test/helpers.ts"
+      ],
+      "productLines": 346,
+      "reason": null
+    },
+    {
+      "pr": 1223,
+      "mergedAt": "2026-10-11T16:06:20Z",
+      "baseSha": "be6f776c5a75d309c3c4fd6f322cbff4503d7f70",
+      "headSha": "3f571ea680214729a45a8f67a6ba64e20ad54b37",
+      "issues": [
+        1211
+      ],
+      "paths": [
+        ".claude/skills/verify-pacman/changelog/2026-10-11-1211.md",
+        ".claude/skills/verify-pacman/features/README.md",
+        ".claude/skills/verify-pacman/features/local-daemon-executor.md",
+        "apps/daemon/src/git.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/src/workspace.ts",
+        "apps/daemon/test/local-executor.test.ts",
+        "apps/daemon/test/runner-brief.test.ts",
+        "apps/daemon/test/runner-create-tag.test.ts",
+        "apps/daemon/test/runner-delivery.test.ts",
+        "apps/daemon/test/runner-local.test.ts",
+        "apps/daemon/test/runner-resume-note.test.ts",
+        "apps/daemon/test/runner-review.test.ts",
+        "apps/daemon/test/runner-stop.test.ts",
+        "apps/daemon/test/runner-stream-timeout.test.ts",
+        "docs/adr/0003-\u672c\u5730\u6587\u4ef6\u5939\u7cfb\u7edf\u539f\u751f\u9009\u53d6\u5bf9\u8bdd\u6846.md",
+        "docs/research/machine-execution-plane.md",
+        "docs/spec/12-\u65b0\u5efa\u9879\u76ee\u672c\u5730\u4ed3\u5e93\u4e0eGitHub\u8ba4\u8bc1\u9009\u4ed3.md",
+        "docs/verify/1211/README.md",
+        "docs/verify/1211/after-daemon-full.txt",
+        "docs/verify/1211/after-g2t2-integration.txt",
+        "docs/verify/1211/after-g2t2-m3b-integration.txt",
+        "docs/verify/1211/after-green-vitest.txt",
+        "docs/verify/1211/before-red-vitest.txt",
+        "integration/test/g2t2-local-lifecycle.test.ts",
+        "packages/shared/src/git-ops.ts"
+      ],
+      "productLines": 374,
+      "reason": null
+    },
+    {
+      "pr": 1222,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1221,
+      "mergedAt": "2026-10-11T15:36:02Z",
+      "baseSha": "b909d1dd8dc31ac910aa2ef37496038abc1778df",
+      "headSha": "be6f776c5a75d309c3c4fd6f322cbff4503d7f70",
+      "issues": [
+        1219
+      ],
+      "paths": [
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/dispatch-eligibility.ts",
+        "apps/server/src/services/dispatch-timeouts.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/src/services/scheduler.ts",
+        "apps/server/test/build-abandoned-sweep.test.ts",
+        "apps/server/test/queued-cancel-release.test.ts"
+      ],
+      "productLines": 226,
+      "reason": null
+    },
+    {
+      "pr": 1220,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1218,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1212,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1209,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1207,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1206,
+      "mergedAt": "2026-10-11T14:01:09Z",
+      "baseSha": "fb71347c871d6156709be0fd82b4b42b706fb8e7",
+      "headSha": "149f97d2937c9138fa450c5781635d9862869b5f",
+      "issues": [
+        1204
+      ],
+      "paths": [
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/test/runner-rework-context.test.ts",
+        "apps/server/src/services/dispatch-eligibility.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/test/rework-plan-fallback.test.ts",
+        "packages/shared/src/protocol/machine-wire.ts",
+        "packages/shared/src/records/prompts.ts",
+        "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+        "packages/shared/test/rework-fallback-prompt.test.ts"
+      ],
+      "productLines": 171,
+      "reason": null
+    },
+    {
+      "pr": 1205,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1202,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1201,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1200,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1198,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1190,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1189,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1188,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1187,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1184,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1183,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1182,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1180,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1179,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1177,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1176,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1168,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1167,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1165,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1164,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1163,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1162,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1161,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1159,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1158,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1155,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1146,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1145,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1144,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1143,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1142,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1140,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1139,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1135,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1124,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1122,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1120,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1119,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1118,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1117,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1115,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1111,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1109,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1105,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1103,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1100,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1099,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1098,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1096,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1093,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1092,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1090,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1089,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1088,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1086,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1085,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1083,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1082,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1081,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1078,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1075,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1074,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1073,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1072,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1071,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1070,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1069,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1068,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1066,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1064,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1063,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1062,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1061,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1060,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1059,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1058,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1057,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1053,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1047,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1046,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1045,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1044,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1043,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1042,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1041,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1040,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1038,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1024,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1023,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1022,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1021,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 1020,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 1019,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1018,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1017,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 1016,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 1015,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1014,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 1001,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1000,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 999,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 998,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 996,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 995,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 993,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 992,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 979,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 978,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 977,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 976,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 975,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 974,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 973,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 972,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 971,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 970,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 969,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 968,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 967,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 965,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 964,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 963,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 962,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 961,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 960,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 959,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 957,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 954,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 941,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 937,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 936,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 935,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 934,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 928,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 924,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 922,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 916,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 914,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 907,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 906,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 899,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 897,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 896,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 891,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 890,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 889,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 879,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 878,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 877,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 876,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 875,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 874,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 871,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 870,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 869,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 868,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 859,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 858,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 856,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 852,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 850,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 847,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 846,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 845,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 843,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 842,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 839,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 838,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 834,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 833,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 832,
+      "mergedAt": "2026-10-04T06:52:30Z",
+      "baseSha": "344518ed4fdd1fa6036d38b84055aa2b938d7278",
+      "headSha": "a837715293f00a3b0e7823037cf3cf54e9874703",
+      "issues": [
+        808
+      ],
+      "paths": [
+        "apps/daemon/src/review-findings.ts",
+        "apps/daemon/test/review-findings.test.ts",
+        "docs/verify/808/README.md",
+        "packages/shared/src/records/review.ts"
+      ],
+      "productLines": 134,
+      "reason": null
+    },
+    {
+      "pr": 831,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 830,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 829,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 826,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 825,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 824,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 820,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 819,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 818,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 817,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 815,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 810,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 809,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 807,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 806,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 805,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 804,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 803,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 802,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 800,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 799,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 798,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 797,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 796,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 795,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 794,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 786,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 785,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 784,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 783,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 781,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 780,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 779,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 776,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 769,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 768,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 767,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 766,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 764,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 761,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 756,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 749,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 748,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 745,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 744,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 743,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 738,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 737,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 736,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 735,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 734,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 733,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 726,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 725,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 724,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 723,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 722,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 721,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 719,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 718,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 716,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 714,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 713,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 712,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 711,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 710,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 697,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 696,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 695,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 694,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 689,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 687,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 686,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 685,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 683,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 680,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 678,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 677,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 676,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 674,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 673,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 671,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 669,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 668,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 664,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 663,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 662,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 661,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 657,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 655,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 653,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 652,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 649,
+      "mergedAt": "2026-10-02T15:37:18Z",
+      "baseSha": "e013656fc75e9c9609995d2099f952193a790443",
+      "headSha": "165bda824ad25c52f1694d7ccb36837f341526c8",
+      "issues": [
+        627
+      ],
+      "paths": [
+        "apps/server/src/context.ts",
+        "apps/server/src/routes-machine.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/chief.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/test/chief.test.ts",
+        "apps/server/test/helpers.ts",
+        "apps/server/test/m4a-chief-loop.test.ts",
+        "apps/server/test/m4b-memory.test.ts",
+        "apps/web/src/api/mappers.ts",
+        "apps/web/src/routes/api-key-create-dialog.tsx",
+        "packages/shared/src/protocol/chief-tools.ts",
+        "packages/shared/src/protocol/machine-wire.ts",
+        "packages/shared/src/records/chief.ts",
+        "packages/shared/src/records/model-source.ts",
+        "packages/shared/test/chief-tools.test.ts"
+      ],
+      "productLines": 151,
+      "reason": null
+    },
+    {
+      "pr": 648,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 646,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 643,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 642,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 641,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 639,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 637,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 635,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 633,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 632,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 630,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 628,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 623,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 621,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 620,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 619,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 618,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 617,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 614,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 611,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 609,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 608,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 607,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 606,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 604,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 603,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 602,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 601,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 600,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 599,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 598,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 597,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 596,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 595,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 594,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 593,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 592,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 591,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 590,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 589,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 588,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 587,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 586,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 585,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 584,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 583,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 582,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 580,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 579,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 577,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 576,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 575,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 574,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 572,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 571,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 570,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 568,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 567,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 566,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 565,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 564,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 563,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 560,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 559,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 558,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 555,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 554,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 553,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 551,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 550,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 549,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 548,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 547,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 546,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 545,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 544,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 540,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 539,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 538,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 537,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 536,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 535,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 534,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 532,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 531,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 530,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 529,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 528,
+      "mergedAt": "2026-09-30T15:44:23Z",
+      "baseSha": "1a7bfc30d1bed8f7f13db99ffa321e769e600b0a",
+      "headSha": "6b7598e970605a8936abc728a48aa6f4f43f659c",
+      "issues": [
+        509
+      ],
+      "paths": [
+        "apps/server/test/review.test.ts",
+        "apps/web/src/detail/overlays.css",
+        "apps/web/src/detail/review-default.ts",
+        "apps/web/src/detail/review-dialog.tsx",
+        "apps/web/src/i18n/en.ts",
+        "apps/web/src/routes/todo-detail-page.tsx",
+        "apps/web/test/review-default.test.ts"
+      ],
+      "productLines": 225,
+      "reason": null
+    },
+    {
+      "pr": 527,
+      "mergedAt": "2026-09-30T16:12:44Z",
+      "baseSha": "8e555337ae4cbb890e0b198a6c755382bca5bb87",
+      "headSha": "142c6cbfaa956e9267fbd98f084643735389759f",
+      "issues": [
+        508
+      ],
+      "paths": [
+        "CONTEXT.md",
+        "apps/daemon/src/backend/pi.ts",
+        "apps/daemon/src/credentials.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/src/secret-channel.ts",
+        "apps/daemon/test/machine-loop.test.ts",
+        "apps/daemon/test/runner-local.test.ts",
+        "apps/daemon/test/runner-review.test.ts",
+        "apps/daemon/test/runner-stop.test.ts",
+        "apps/daemon/test/secret-channel.test.ts",
+        "apps/server/README.md",
+        "apps/server/src/services/credentials.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/secrets.ts",
+        "apps/server/test/credentials.test.ts",
+        "apps/server/test/m4a-chief-loop.test.ts",
+        "apps/server/test/machine-wire.test.ts",
+        "apps/web/src/i18n/en.ts",
+        "apps/web/src/resources/secrets-page.tsx",
+        "docs/spec/02-\u67b6\u6784\u5e73\u4ef7.md",
+        "packages/shared/src/agent-backend.ts",
+        "packages/shared/src/protocol/machine-wire.ts",
+        "packages/shared/src/records/agent.ts",
+        "packages/shared/src/records/secret.ts",
+        "packages/shared/src/records/step.ts",
+        "packages/shared/test/__snapshots__/snapshot.test.ts.snap"
+      ],
+      "productLines": 333,
+      "reason": null
+    },
+    {
+      "pr": 526,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 525,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 524,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 523,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 522,
+      "reason": "Only documentation or tests change"
+    },
+    {
+      "pr": 514,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 513,
+      "mergedAt": "2026-09-30T11:40:56Z",
+      "baseSha": "06f7ef98c2e6f8a0171ec8985de1166cf400ebdc",
+      "headSha": "c95ee5f7ad10df8a00dd6c5733dcc16f50620f7d",
+      "issues": [
+        511
+      ],
+      "paths": [
+        "apps/daemon/src/backend/pi.ts",
+        "apps/daemon/src/runner.ts",
+        "apps/daemon/test/runner-review.test.ts",
+        "apps/server/src/routes.ts",
+        "apps/server/src/services/builds.ts",
+        "apps/server/src/services/chief-tools.ts",
+        "apps/server/src/services/git.ts",
+        "apps/server/src/services/machines.ts",
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/test/review.test.ts",
+        "packages/shared/src/agent-backend.ts",
+        "packages/shared/src/records/review.ts",
+        "packages/shared/test/review-prompt.test.ts"
+      ],
+      "productLines": 354,
+      "reason": null
+    },
+    {
+      "pr": 507,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 506,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 505,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 502,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 501,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 498,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 497,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 496,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 495,
+      "reason": "No added or changed regression tests"
+    },
+    {
+      "pr": 493,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 492,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 491,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 489,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 484,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 481,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 480,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 479,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 478,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 477,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 475,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 474,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 467,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 465,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 464,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 463,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 461,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 460,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 459,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 458,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 457,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 456,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 455,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 454,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 451,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 450,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 449,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 439,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 437,
+      "reason": "Touches the evaluation surface"
+    },
+    {
+      "pr": 436,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 433,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 429,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 428,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 427,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 424,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 416,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 415,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 402,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 401,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 400,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 399,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 397,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 396,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 395,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 392,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 384,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 383,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 382,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 381,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 380,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 379,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 378,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 377,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 376,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 375,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 374,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 373,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 369,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 364,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 343,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 342,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 341,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 340,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 339,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 338,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 337,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 336,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 332,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 331,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 329,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 328,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 327,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 325,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 324,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 323,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 322,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 321,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 317,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 316,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 315,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 314,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 313,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 300,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 296,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 295,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 294,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 293,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 292,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 291,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 283,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 282,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 281,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 275,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 274,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 273,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 269,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 268,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 267,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 259,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 258,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 257,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 256,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 255,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 254,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 246,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 245,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 242,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 241,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 240,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 239,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 237,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 236,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 233,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 228,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 227,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 226,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 220,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 217,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 215,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 214,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 213,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 212,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 211,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 210,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 206,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 205,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 192,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 191,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 190,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 188,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 187,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 185,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 184,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 183,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 171,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 169,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 167,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 166,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 165,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 164,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 162,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 158,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 157,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 156,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 155,
+      "reason": "Contains Playwright or e2e tests"
+    },
+    {
+      "pr": 145,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 144,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 143,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 142,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 141,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 140,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 132,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 131,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 130,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 126,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 125,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 124,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 120,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 119,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 118,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 117,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 116,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 115,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 112,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 110,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 108,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 103,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 102,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 101,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 100,
+      "reason": "Non-test diff outside 20-400 lines"
+    },
+    {
+      "pr": 99,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 98,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 97,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 96,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 95,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 94,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 93,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 92,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 91,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 90,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 88,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 87,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 86,
+      "reason": "Binary non-test diff"
+    },
+    {
+      "pr": 85,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 84,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 63,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 62,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 61,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 60,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 59,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 47,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 4,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 3,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 2,
+      "reason": "Requires exactly one closes #N issue reference"
+    },
+    {
+      "pr": 1,
+      "reason": "Requires exactly one closes #N issue reference"
+    }
+  ],
+  "blockers": [
+    "Independent vendor labeling is blocked: ai-route pick review cannot write /home/ian/.cache/ai-route/codex.json in this sandbox. No labels have been fabricated.",
+    "The real PR 1990 oracle/nop pair both failed in Docker build setup because /home/ian/.docker/buildx/activity is read only. No runtime control passed."
+  ],
+  "scanned": 972,
+  "eligible": 53,
+  "proposedSpotChecks": [
+    1559,
+    1538,
+    1905,
+    1645,
+    1735
+  ],
+  "spotCheckStatus": "Proposals only; no validated task is ready for owner acceptance",
+  "controlAttempts": [
+    {
+      "pr": 1990,
+      "oracle": {
+        "status": "infrastructure",
+        "log": "../../../docs/verify/1517/1990-oracle-infrastructure.log"
+      },
+      "nop": {
+        "status": "infrastructure",
+        "log": "../../../docs/verify/1517/1990-nop-infrastructure.log"
+      }
+    }
+  ]
+}

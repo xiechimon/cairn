@@ -1,0 +1,18 @@
+✔ prunes evidence folders older than the window and records their last commit (225.523779ms)
+✔ the last commit touching any file in the folder decides its age (199.322259ms)
+✔ keeps folders that code, CI or scripts reference, matching whole folder names (175.962067ms)
+✔ dry run reports without touching the tree or the ledger (167.938498ms)
+✔ merges into an existing ledger with sorted keys and honours --days (311.655857ms)
+✔ nothing due leaves the tree unchanged (100.377001ms)
+✔ refuses a shallow clone, where every folder looks freshly committed (146.41427ms)
+✔ a staged folder that has no commit yet is left alone (253.412897ms)
+✔ capture --video finalizes a real WebM and reports it beside the screenshot (2602.779752ms)
+✔ archive rejects oversized recordings before copying evidence (360.86968ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3070.873613

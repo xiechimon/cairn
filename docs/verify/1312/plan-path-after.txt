@@ -1,0 +1,65 @@
+
+ RUN  v5.0.1 /workspace
+
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > 注记组装（失败方式 6） > 注记形状：head 标记 + 分支名 + 硬约束 tail 1ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > 注记组装（失败方式 6） > 追加 = 单换行拼接（prompt 尾部一行） 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > 注记组装（失败方式 6） > 追加幂等：注记已在场（recover 面 resume prompt）→ 原文返回不双注 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > 注记组装（失败方式 6） > strip 还原：尾行注记剥除后余段原文返回；非注记收尾零触碰 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 任务文本 + 注记 → task-prompt（build 步新会话投递形，不双渲染） 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 续轮占位句 + 注记 → synthetic（CONTINUE_PROMPTS.build 形） 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 失败重启组合行 + 注记 → synthetic（#720 组合形叠注记） 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 任务前缀 + 用户自己话语 → user（不误杀真话，无注记负例不回归） 0ms
+ ✓ |@pacman/shared| test/work-branch-note.test.ts > classifyUserText 注记行识别（失败方式 1/3/4/5） > 注记形尾行但余段是用户话语 → user（strip 只放行模板比对，不是合成判定） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > buildRestartPrompt 截断（失败方式 2/3） > 短反馈基形不变（HEAD + 原文 + TAIL，既有契约零回归） 1ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > buildRestartPrompt 截断（失败方式 2/3） > 超长反馈截到上界：内嵌副本 ≤ 4000 + 截断标记，HEAD/TAIL 保形 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > buildRestartPrompt 截断（失败方式 2/3） > 截断不从中间撕开代理字符对（emoji 落界处回退一单位） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > composeTaskPromptWithInstruction（失败方式 1） > 任务文本在前、指令殿后，空行分隔（裁决形状单源） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 裸任务文本 → task-prompt（既有契约回归钉） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 裸重启指令 → synthetic（既有契约回归钉） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 组合行（任务前缀 + 重启指令余段）→ synthetic 整行退场 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 组合行（截断后的重启指令余段）→ synthetic（截断不破识别） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 组合行（任务前缀 + CONTINUE 指令余段）→ synthetic（通用合成面） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 任务前缀 + 用户自己话语 → user（不误杀真话） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 反馈原文 → user（真实用户行不受组合识别影响） 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 组合行（任务标题已漂移）→ synthetic 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 组合行（spec 已漂移）→ synthetic 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 漂移组合行尾部的工作分支注记 / plan 交接注记仍 synthetic 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 漂移后的裸任务文本（无重启指令）仍是 user 0ms
+ ✓ |@pacman/shared| test/restart-prompt.test.ts > classifyUserText 组合行识别（失败方式 4/5） > 用户话语含重启头但不成模板 → user 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > 契约文本位置无关化（失败方式 1） > 首轮契约含文件名 + 四段名 + 交接位置引用；不再指向工作区根目录 1ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > 契约文本位置无关化（失败方式 1） > 补写指令同律（纠错轮模板不残留工作区根目录） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > 交接位置行（#1203 组装/追加单源） > 位置行形状：head 标记 + 路径 + 出仓约束（过滤侧 strip 的锚点） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > 交接位置行（#1203 组装/追加单源） > 追加 = 单换行拼接（prompt 尾部一行） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > 交接位置行（#1203 组装/追加单源） > 追加幂等：注记已在场（recover 面 resume prompt）→ 原文返回不双注 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > 契约组合形状（失败方式 6） > 任务文本在前、契约殿后，空行分隔（compose 单源形状） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 组合行 + 注记 → synthetic 整行退场（首轮 plan 步投递形） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 裸契约指令 + 注记 → synthetic 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 补写指令 + 注记 → synthetic（续轮指令单行形） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 续轮占位句 + 注记 → synthetic（CONTINUE_PROMPTS.plan 形） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 驳回重规划 + 注记 → synthetic（wrappedBy 族叠注记） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 失败重启组合行 + 注记 → synthetic（#720 组合形叠注记） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 任务前缀 + 用户自己话语 → user（不误杀真话，无注记负例不回归） 0ms
+ ✓ |@pacman/shared| test/plan-first-round-prompt.test.ts > classifyUserText 注记行识别（失败方式 2/4/5） > 注记形尾行但余段是用户话语 → user（strip 只放行模板比对，不是合成判定） 0ms
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > 注记组装 > 形状：头标记 + 绝对路径 + 尾约束 2ms
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > 注记组装 > 追加 = 单换行，且幂等 0ms
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 任务文本 + 位置行 → task-prompt 0ms
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 位置行叠工作分支注记 → task-prompt 0ms
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 续轮占位句 + 位置行 → synthetic 0ms
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 用户话语带位置行尾 → user 0ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug 修复） 7ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 2. recover + .jsonl 在 → 正常 continue，不触发降级 3ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 3. 非 recover（无 opts.resume）→ continue 失败降级 new session，步成功（#1312） 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 4. journal.prompt 为 null + .jsonl 缺失 → 显式失败带可读文案（不静默空重发） 1ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 5. chief 步 recover + .jsonl 缺失 → 降级 new session，同律 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 6. 执行期会话在另一台机器 → 降级，注记点名异机（#1312） 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 7. 本机交接位有非空 plan.md → 降级 prompt 指向该文件，wire 行不是用户气泡 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 8. 换机且本机没有 plan.md → 降级 prompt 不指向交接路径 4ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 9. 空白 plan.md 不当成交接物 3ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 10. 开会话前 journal 换成原任务，不再留续轮占位句 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 11. 降级 prompt 展开附件 token，不沿用续轮图片 2ms
+
+ Test Files  5 passed (5)
+      Tests  56 passed (56)
+   Start at  17:16:43
+   Duration  1.31s (transform 49%, import 47%, tests 3%, worker 1%)
+

@@ -1,0 +1,63 @@
+{
+  "probe": "drive-919-skills-routing/deny-ui",
+  "server": "http://127.0.0.1:8795",
+  "web": "http://127.0.0.1:5277",
+  "db": "/tmp/pacman-919-run2/home/server/server.db",
+  "daemonHome": "/tmp/pacman-919-daemon-home2",
+  "localSkills": "/tmp/pacman-919-local-skills",
+  "model": "stub-model",
+  "passed": 10,
+  "total": 10,
+  "checks": [
+    {
+      "name": "stub 步 done",
+      "ok": true,
+      "detail": "{\"id\":\"g9Vln9dmiMUubiPntiSZ4\",\"kind\":\"build\",\"status\":\"done\"}"
+    },
+    {
+      "name": "拒绝文案落库（not in the agent allowlist）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "白名单外技能正文 marker 不落库",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "授权本机技能正文 marker 落库",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "daemon.log denied-read 行（带路径）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "daemon.log 目录行 entries=2（haiku-helper + haiku-local）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "LLM 输入面含 <available_skills> 目录",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "目录含点名技能 haiku-helper 与 haiku-local",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "目录不含白名单外 secret-local",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "详情页汇总行挡下列点名被拒技能（截图 deny-detail-skills-summary.png）",
+      "ok": true,
+      "detail": "技能：haiku-local·挡下：secret-local"
+    }
+  ]
+}

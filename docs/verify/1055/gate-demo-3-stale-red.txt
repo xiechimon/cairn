@@ -1,0 +1,4 @@
+=== demo 3b: site FIXED but ledger entry kept (expect STALE RED, exit 1) ===
+[ui-drift-gate] G6 STALE apps/web/src/__gate-demo.tsx (demo-brand-label): ledger entry matches no brand-ink text line — drop or re-anchor it in the same PR.
+[ui-drift-gate] FAIL: 1 drift site(s). See header for gate intent.
+gate exit code: 1

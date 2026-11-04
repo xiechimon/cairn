@@ -1,0 +1,25 @@
++ Received
+
+  {
+-   "contextWindow": 1000000,
++   "contextWindow": 128000,
+    "id": "big",
+    "maxTokens": 16384,
+  }
+
+ ❯ test/pi-config-effect.test.ts:205:23
+    203|     );
+    204|     const models = loadModels(path, 'ctx-mixed');
+    205|     expect(models[0]).toMatchObject({ id: 'big', contextWindow: 1_000_…
+       |                       ^
+    206|     expect(models[1]).toMatchObject({ id: 'small', contextWindow: 128_…
+    207|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  01:36:44
+   Duration  1.02s (import 71%, transform 27%, tests 2%)
+

@@ -1,0 +1,11 @@
+✖ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (5.188621ms)
+✖ docs/ops/agent-bot-identity.md separates bot rebase from human squash (0.413156ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (24.147639ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69.82794

@@ -1,0 +1,1 @@
+ALTER TABLE `machine` DROP COLUMN `maxConcurrent`;

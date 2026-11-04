@@ -1,0 +1,201 @@
+{
+  "probe": "drive-948-overlay",
+  "ticket": "#948",
+  "stack": {
+    "API": "http://127.0.0.1:8797",
+    "WEB": "http://127.0.0.1:5279"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "A1 新建任务 dialog 开面（role+name 载体）"
+    },
+    {
+      "ok": true,
+      "label": "A2 开门 autofocus 落正文 textarea（testid 实物）"
+    },
+    {
+      "ok": true,
+      "label": "B1 close 钮 28×28 实物（实测 28×28）"
+    },
+    {
+      "ok": true,
+      "label": "B2 close 钮贴 head 右缘 4px（#574 欠账回归钉的 live 面）"
+    },
+    {
+      "ok": true,
+      "label": "A3 净表单 X 直关（无确认层）"
+    },
+    {
+      "ok": true,
+      "label": "A4 脏表单 X 先过未保存闸（r9 §3.4 copy 逐字）"
+    },
+    {
+      "ok": true,
+      "label": "A5 继续编辑收闸留草稿"
+    },
+    {
+      "ok": true,
+      "label": "A6 放弃并关闭 = 关面 + 重开净面"
+    },
+    {
+      "ok": true,
+      "label": "A7 保存 → 卡片上板"
+    },
+    {
+      "ok": true,
+      "label": "A8 GET /api/todos 行真值"
+    },
+    {
+      "ok": true,
+      "label": "A9 SQLite todo 行真值"
+    },
+    {
+      "ok": true,
+      "label": "C1 项目 popover 开行集（1 行）"
+    },
+    {
+      "ok": true,
+      "label": "C2 popover 壳实物 220/12px/z30（{\"width\":\"220px\",\"padding\":\"12px\",\"zIndex\":\"30\",\"radius\":\"0px\"}）"
+    },
+    {
+      "ok": true,
+      "label": "C3 选行回填 chip（「默默认项目Tab」）"
+    },
+    {
+      "ok": true,
+      "label": "C4 chip 项目名 13px 字实物（13px）"
+    },
+    {
+      "ok": true,
+      "label": "C5 机器 popover 自动行（live 无机器降级面）"
+    },
+    {
+      "ok": true,
+      "label": "C6 机器 popover 向上开实物（菜单底 534.5999755859375 ≤ chip 顶 543.5）"
+    },
+    {
+      "ok": true,
+      "label": "C7 picker 400 宽居中 + transform none（{\"width\":400,\"x\":520,\"transform\":\"none\",\"ml\":\"-200px\"}）"
+    },
+    {
+      "ok": true,
+      "label": "C8 首层五类目行（5）"
+    },
+    {
+      "ok": true,
+      "label": "C9 钻取层搜索输入在场"
+    },
+    {
+      "ok": true,
+      "label": "C10 钻取层实体行 ≥1（1，钩子类存活面）"
+    },
+    {
+      "ok": true,
+      "label": "C11 Esc 分层：只收 picker，dialog 留"
+    },
+    {
+      "ok": true,
+      "label": "D1 more-menu frozen-anchor 实物（{\"top\":\"39.5px\",\"right\":\"96.5px\",\"width\":\"220px\"}）"
+    },
+    {
+      "ok": true,
+      "label": "D2 行带 40/37/41/45 实物（[40,37,41,45]）"
+    },
+    {
+      "ok": true,
+      "label": "D3 todo 相位 完成 禁用（#318 相位闸）"
+    },
+    {
+      "ok": true,
+      "label": "D4 todo→closed 现有边 关闭 放行"
+    },
+    {
+      "ok": true,
+      "label": "D5 删除确认层 canon 文案"
+    },
+    {
+      "ok": true,
+      "label": "D6 .overlay-backdrop z 档实物 = 40（app.css 机制残段，实测 40）"
+    },
+    {
+      "ok": true,
+      "label": "D7 取消收层（卡片保留）"
+    },
+    {
+      "ok": true,
+      "label": "E1 四张退役 CSS 从未加载（[]）"
+    },
+    {
+      "ok": true,
+      "label": "E2 退役选择器规则零驻留非 carrier 层（offenders 0）"
+    },
+    {
+      "ok": true,
+      "label": "F1 亮模根类落地"
+    },
+    {
+      "ok": true,
+      "label": "E3 DOM 钩子类存活面（.new-task-dialog 别名残留合法，#910）"
+    },
+    {
+      "ok": true,
+      "label": "F2 亮模 dialog + picker 走查（截图为证）"
+    }
+  ],
+  "passed": 34,
+  "total": 34,
+  "artifacts": [
+    "01-dialog-dark.png",
+    "02-discard-gate-dark.png",
+    "03-project-popover-dark.png",
+    "04-machine-popover-dark.png",
+    "05-mention-picker-dark.png",
+    "06-mention-drill-dark.png",
+    "07-more-menu-dark.png",
+    "08-delete-confirm-dark.png",
+    "09-dialog-light.png",
+    "10-mention-picker-light.png"
+  ],
+  "extra": {
+    "apiTodo": {
+      "id": "P39SgZvylkXqmgBJ0fkkL",
+      "teamId": "cKJkZowukeiUePIyybz-q",
+      "projectId": "Csd-F9pDcThxMgmNY4KVQ",
+      "title": "948 探针任务",
+      "spec": "948 探针任务",
+      "phase": "todo",
+      "phaseAt": 1791243034379,
+      "seqNum": 1,
+      "orderIndex": 0,
+      "tagIds": [],
+      "assignment": null,
+      "agent": null,
+      "latestBuildId": null,
+      "lastRunAt": null,
+      "hasChanges": false,
+      "hasPlan": false,
+      "buildHistory": [],
+      "sourceTodo": null,
+      "v": 1,
+      "createdBy": "mG1tLAobF6hn-ajUSze3J",
+      "ownerId": "mG1tLAobF6hn-ajUSze3J",
+      "sourceBuildId": null,
+      "sourceKind": null,
+      "sourceRef": null,
+      "machineId": null
+    },
+    "sqliteTodo": {
+      "ok": true,
+      "row": {
+        "id": "P39SgZvylkXqmgBJ0fkkL",
+        "title": "948 探针任务",
+        "phase": "todo"
+      }
+    },
+    "cssFacts": {
+      "retiredLoaded": [],
+      "offenders": []
+    }
+  }
+}

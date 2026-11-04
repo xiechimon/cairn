@@ -1,0 +1,55 @@
+{
+  "providerMode": "local stub",
+  "declared": 1000000,
+  "materializedModels": [
+    {
+      "id": "qwen3.8-max",
+      "name": "qwen3.8-max",
+      "reasoning": false,
+      "input": [
+        "text"
+      ],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 128000,
+      "maxTokens": 16384
+    },
+    {
+      "id": "glm-5.3",
+      "name": "glm-5.3",
+      "reasoning": false,
+      "input": [
+        "text"
+      ],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 1000000,
+      "maxTokens": 16384
+    },
+    {
+      "id": "kimi-k3",
+      "name": "kimi-k3",
+      "reasoning": false,
+      "input": [
+        "text"
+      ],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 128000,
+      "maxTokens": 16384
+    }
+  ],
+  "recordedWindow": 1000000
+}

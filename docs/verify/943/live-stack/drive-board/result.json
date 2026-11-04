@@ -1,0 +1,56 @@
+{
+  "probe": "board",
+  "ok": true,
+  "at": "2026-10-05T19:43:13.478Z",
+  "stack": {
+    "api": "http://127.0.0.1:8795",
+    "web": "http://127.0.0.1:5277",
+    "homeDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0202-943-board-sidebar/.claude/verify-run/home",
+    "root": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0202-943-board-sidebar"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "顶栏标题 = 工作台(实测 工作台)"
+    },
+    {
+      "ok": true,
+      "label": "工作台渲染 4 列(实测 4)"
+    },
+    {
+      "ok": true,
+      "label": "列序 id↔名对拍(实测 todo:待开始 building:执行中 pending:待处理 done:已完成)"
+    },
+    {
+      "ok": true,
+      "label": "退役列名不渲染(实测 无)"
+    },
+    {
+      "ok": true,
+      "label": "列收起族已删除(实测 0 个残留节点)"
+    },
+    {
+      "ok": true,
+      "label": "4 列等宽(实测 281/281/281/281)"
+    },
+    {
+      "ok": true,
+      "label": "桌面无横向滚动"
+    },
+    {
+      "ok": true,
+      "label": "窄窗兜底 overflow-x = auto(实测 auto)"
+    },
+    {
+      "ok": true,
+      "label": "待处理空态文案(实测 没有等你处理的任务)"
+    },
+    {
+      "ok": true,
+      "label": "侧栏「新任务」行可见"
+    }
+  ],
+  "artifacts": [
+    "01-board.png"
+  ]
+}

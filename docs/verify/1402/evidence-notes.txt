@@ -1,0 +1,14 @@
+# Notes on earlier #1402 evidence files (docs/verify is add-only, so corrections go here).
+
+vp-cli-6.txt, the stale refusal of unassigned-build after the fix: the line is cut and followed by exit=0.
+  The output went through a pipe and exit=0 is the pipe's status. vp.mjs exits 2 for a stale case without
+  --force: the same file further down, and the self-test case "a stale case needs --force".
+
+20261021-012912-glass-journeys-all/: glass.mjs run directly (not through vp.mjs) on a stack it started,
+  as vp-cli-6.txt says ("run directly (not through vp.mjs)"). The directory name follows vp.mjs's
+  <stamp>-<feature>-<case> pattern only because it was archived under that name. Through vp.mjs, the glass
+  journeys were driven with create-task (vp-cli-7.txt) and the dispatch rules are covered by the self-test.
+
+negative-control-2.txt, attempt B: the seed keeps the #N prefix and cuts the title,
+  '#{todo.seqNum} {todo.title}' to '#{todo.seqNum} {todo.title.slice(0, 4)}'. The PR body said otherwise until
+  pr-gate run 5 on #1411 pointed it out.

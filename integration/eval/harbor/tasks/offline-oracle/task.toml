@@ -1,0 +1,17 @@
+schema_version = "1.4"
+
+[metadata]
+
+[environment]
+docker_image = "cairn-harbor-offline-oracle:1681"
+build_timeout_sec = 900.0
+
+[agent]
+timeout_sec = 120.0
+
+[verifier]
+timeout_sec = 180.0
+
+[verifier.env]
+UV_OFFLINE = "1"
+UV_PYTHON_PREFERENCE = "only-system"

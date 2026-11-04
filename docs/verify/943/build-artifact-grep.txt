@@ -1,0 +1,19 @@
+# 编译产物机制实物（#943）
+# 来源: vite build --mode fixture 的 dist CSS（终版代码全量 e2e 809/809 绿后同一构建），css 文件: index-BGSsrTL2.css
+# 判读: 「规则」行 = CSS 规则选择器命中次数,退役面必须 0;载体行 = 新工具类/新机制律,必须在场(>0)。
+   0  .board-notify-banner 规则
+   2  .project-avatar 规则
+   0  .board-drag-card 规则
+   0  .board-scroller 规则
+   1  .board-shell 规则
+   0  body.board-dragging 类形态
+   1  body[data-board-dragging] 律
+   1  .chief-fab 规则(chief.css 份,#950 域)
+   1  --board-col-min 轨道工具类
+  12  drop-tint 工具类
+   1  drag-shadow 工具类
+
+# 命中选择器上下文（合法形态核验）:
+.project-avatar @201070 选择器: .\[\&\>\.project-avatar\]\:relative>.project-avatar
+.project-avatar @201098 选择器: .\[\&\>\.project-avatar\]\:relative>.project-avatar
+.board-shell @26780 选择器: .board-shell>[data-base-ui-portal],.page-main>[data-base-ui-portal],.res-main>[data-base-ui-portal],.secondary-main>[data-base-ui-portal],.detail-body>[data-bas

@@ -1,0 +1,8 @@
+$ biome ci .   # at 9ef30291 (the pushed round-3 head)
+  ℹ Unused parameters might be the result of an incomplete refactoring.
+  ℹ Unsafe fix: If this is intentional, prepend todoId with an underscore.
+  ℹ Unused imports might be the result of an incomplete refactoring.
+  ℹ Unsafe fix: Remove the unused imports.
+Checked 1062 files in 468ms. No fixes applied.
+warnings: 2 (unused todoId parameter in apps/server/src/services/first-pr-report.ts, unused seed import in apps/server/test/machine-pin.test.ts); errors: 0; exit code: 0
+$ node scripts/lint-warning-cap.mjs   # cap is maxWarnings 0, so 2 warnings is a local prepush failure

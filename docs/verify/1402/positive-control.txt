@@ -1,0 +1,16 @@
+vp: search/search needs the stack, running doctor first
+PASS  server 进程组存活(pid 8914) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 8915) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: search/search -> node .claude/skills/verify-pacman/scripts/drive.mjs search
+PASS  搜索面板打开(⌘K)
+PASS  结果行命中「搜索目标 8612」
+shot  02-search-results.png
+drive search:PASS
+evidence:<worktree>/.claude/verify-evidence/20261020-204008-search
+rc=0

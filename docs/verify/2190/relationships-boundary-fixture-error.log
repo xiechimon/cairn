@@ -1,0 +1,68 @@
+✔ clean backup passes fixture in-process checkout API and never reports key or plaintext (2888.920375ms)
+✔ one attachment byte changed names its storage key (196.609833ms)
+✔ message content edited names table and id (144.744541ms)
+✔ deleted row in backupDb fails (134.120666ms)
+✔ deleted row in db fails (138.701375ms)
+✔ scratch inside live directory is refused (104.075042ms)
+✔ scratch through symlink is refused (95.408292ms)
+✔ existing scratch is refused without overwriting it (174.495792ms)
+✔ report cannot overwrite live DB or key (161.835584ms)
+✔ invalid gzip fails and publishes failure status (193.121792ms)
+✔ foreign key violation fails (312.163625ms)
+✔ wrong key fails without leaking bytes (774.568792ms)
+✔ no encrypted sample fails (354.59225ms)
+✔ missing relationship sample fails (161.555959ms)
+✔ post-backup timestamped updates and inserts are allowed (965.691458ms)
+✔ missing attachment and unsafe attachment key fail (145.764125ms)
+✔ default backup directory selects the newest timestamp (1625.313833ms)
+✔ migration ledger rows with null declared ids are compared rather than skipped (145.7115ms)
+✔ machine heartbeat allowlist is reported while machine name remains strict (1022.421375ms)
+✔ missing ready attachment names its storage key (310.378708ms)
+✔ weekly units isolate scratch and do not install themselves (1.547541ms)
+✔ production shell requires a real HTTP listener and reports sandbox refusal (1260.276459ms)
+✔ invalid SQLite fails integrity checking (137.378875ms)
+✔ ready attachment size mismatch fails (132.225666ms)
+✔ scratch equal to live DB is refused (92.210208ms)
+✔ missing key fails without creating a replacement (98.606333ms)
+✔ non-allowlisted machine field changes fail (175.264167ms)
+✔ missing selected todo names the relationship sample (134.52075ms)
+✔ missing selected build names the relationship sample (229.472792ms)
+✔ missing selected step names the relationship sample (357.652584ms)
+✔ missing selected message names the relationship sample (251.994416ms)
+✔ missing selected chief_thread names the relationship sample (261.447375ms)
+✔ missing selected chief_message names the relationship sample (224.696333ms)
+✔ newest eligible build wins over todo activity and step-less builds (932.510916ms)
+✔ partial step loss names selected sample (137.309833ms)
+✔ partial message loss names selected sample (141.47975ms)
+✔ partial chief_message loss names selected sample (131.3875ms)
+✖ post-backup relationships are excluded while boundary rows are required (2367.015834ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 37
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17301.06225
+
+✖ failing tests:
+
+test at scripts/ops/restore-drill.test.mjs:345:1
+✖ post-backup relationships are excluded while boundary rows are required (2367.015834ms)
+  AssertionError [ERR_ASSERTION]: PASS restore-drill; decrypt ok
+  
+      at fails (file://<worktree>/scripts/ops/restore-drill.test.mjs:101:10)
+      at TestContext.<anonymous> (file://<worktree>/scripts/ops/restore-drill.test.mjs:360:3)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }

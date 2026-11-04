@@ -1,0 +1,32 @@
+[
+  {
+    "url": "/api/machines/-W1jblw19MA7bi5puJWEc",
+    "body": {
+      "maxConcurrent": 7
+    }
+  },
+  {
+    "url": "/api/machines/-W1jblw19MA7bi5puJWEc",
+    "body": {
+      "maxConcurrent": null
+    }
+  },
+  {
+    "url": "/api/machines/-W1jblw19MA7bi5puJWEc",
+    "body": {
+      "maxConcurrent": 7
+    }
+  },
+  {
+    "url": "/api/machines/-W1jblw19MA7bi5puJWEc",
+    "body": {
+      "maxConcurrent": 8
+    }
+  },
+  {
+    "url": "/api/machines/32sQVesFrfaOwxhe54Jo1",
+    "body": {
+      "maxConcurrent": 8
+    }
+  }
+]

@@ -1,0 +1,7 @@
+Running 4 tests using 1 worker
+
+[1/4] e2e/agent-detail.spec.ts:200:1 › 概览：思考强度空值是「未设置」下拉
+[2/4] e2e/agent-detail.spec.ts:426:1 › 思考强度：空值是下拉的「未设置」，选档 PATCH thinkingLevel，刷新后仍是该档
+[3/4] e2e/agent-detail.spec.ts:452:1 › 思考强度：claude-code 菜单含 off，不含 minimal
+[4/4] e2e/agent-detail.spec.ts:466:1 › 思考强度：切到 claude-code 时非法档随模型清空，合法档保留
+  4 passed (4.6s)

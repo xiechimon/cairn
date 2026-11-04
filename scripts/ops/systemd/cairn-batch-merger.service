@@ -1,0 +1,10 @@
+[Unit]
+Description=Cairn single batch PR merger
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/cairn/batch-merger.env
+Environment=GITHUB_REPOSITORY=xiechimon/cairn
+ExecStart=/bin/bash -c 'cd "$${CAIRN_CHECKOUT}" && exec "$${NODE_BIN}" scripts/batch-merger.mjs --daily-cap "$${BATCH_DAILY_CAP}"'
+TimeoutStartSec=4min
+UMask=0077

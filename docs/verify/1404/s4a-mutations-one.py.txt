@@ -1,0 +1,16 @@
+# Run only the named mutations. Usage: one.py <repo> <backup> <id>...
+import os, shutil, subprocess, sys
+repo, backup, ids = sys.argv[1], sys.argv[2], set(sys.argv[3:])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mutations import M
+t = os.path.join(repo, 'apps/server/src/lib/github.ts'); src = open(backup, encoding='utf-8').read()
+try:
+    for m in M:
+        if m[0] not in ids: continue
+        assert src.count(m[3]) == 1
+        open(t, 'w', encoding='utf-8').write(src.replace(m[3], m[4]))
+        r = subprocess.run(['pnpm','exec','vitest','run','apps/server/test/github-gate-transport.test.ts'], cwd=repo, capture_output=True, text=True)
+        tail = [l.strip() for l in (r.stdout+r.stderr).splitlines() if l.strip().startswith('Tests ')]
+        print('\t'.join([m[0], m[1], m[2], 'caught' if r.returncode else 'SURVIVED', tail[-1] if tail else '']))
+finally:
+    shutil.copyfile(backup, t)

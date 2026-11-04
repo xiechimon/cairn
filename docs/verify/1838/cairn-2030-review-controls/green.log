@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.codex/worktrees/pr-1839-reviewed-delivery/cairn
+
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  04:49:30
+   Duration  406ms (transform 62%, import 34%, tests 3%, worker 1%)
+

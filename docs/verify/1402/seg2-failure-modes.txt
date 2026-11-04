@@ -1,0 +1,93 @@
+# #1402 segment 2: failure modes, listed before any test or code (CLAUDE.md "先列失败方式").
+# Each line names how the part can fail and what pins it. G = registry gate, A = add-only
+# guard, B = CI order, C = probe headers and spec 28, D = docs/verify/1402/README.md,
+# E = self-test pins, F = cases whose verdict depends on stack state, M = feature maps,
+# L = live run.
+
+G1  A new drive-<n>.mjs lands under scripts/ with no registry entry; CI stays green, as #1412's
+    drive-1400-chip-word.mjs did while #1411 was open. Pin: the gate names the file, exit 1.
+G2  A new drive-<n>.mjs lands and is registered as a case: an "unregistered file" check passes,
+    and the per-ticket script the ticket wants gone comes back. Pin: a ticket-named script not in
+    the gate's frozen list of the 61 existing ones is red even when registered.
+G3  A new helper (seed, stub) lands with no registry entry. Pin: unregistered is red for any name.
+G4  False red on what exists: doctor.mjs, launch.mjs, cleanup.mjs, seed and stub scripts, vp.mjs,
+    vp-selftest.mjs, the gate itself, the 61 ticket-named probes (.mjs and .mts), probes named by
+    feature (drive-hotkeys.mjs). Pin: a fake skill holding each kind is green; this checkout is green.
+G5  An empty registry (no features or no cases) passes vacuously. Pin: red, "no cases".
+G6  The registry names a script that is gone (renamed or deleted); today only drive notices, at
+    run time. Pin: red, names the case and the path. Same for a support entry with no file.
+G7  A recipe names a feature map that does not exist. Pin: red.
+G8  A status or need outside the known set, e.g. the typo rewrite-evidence for rewrites-evidence,
+    silently drops the --force guard. Pin: red, names the value.
+G9  The gate depends on node_modules or on the caller's cwd: it then scans the wrong directory or
+    cannot run. Pin: stdlib only; paths come from the gate's own location; the self-test runs it from
+    another cwd.
+
+A1  Reproduction from pr-gate run 9: cwd is sibling worktree p2, vp.mjs is the main checkout's,
+    VERIFY_EVIDENCE_DIR=docs/verify/T/run-a resolves into p2/docs/verify and the stub overwrites p2's
+    archived result.json. Pin: exit 2 before anything runs, p2/docs/verify unchanged.
+A2  An absolute path into a third worktree's docs/verify (not the caller's, not vp.mjs's). Pin: every
+    `git worktree list` entry counts.
+A3  The probe output option after -- (`--out <dir>`) into a sibling's docs/verify. Pin: refused.
+A4  capture with VERIFY_EVIDENCE_DIR in a sibling's docs/verify. Pin: refused.
+A5  cwd outside any git repository, or git missing: the guard must not crash. Pin: the three roots
+    from segment 1 still apply; git failures add nothing.
+A6  False refusal for a path beside docs/verify in a sibling (docs/verify-notes/...). Pin: dry-run exit 0.
+A7  Every vp.mjs call (--help, list) now runs git several times. Pin: the roots are computed only
+    when an evidence directory is checked.
+
+B1  The self-test step sits between install and Spec parse gate (#1052), so the #1052 comment
+    ("install 后 3s") is false and the spec signal waits for the self-test (about a minute).
+    Pin: step order in ci.yml, spec parse right after install, self-test before chromium install.
+B2  Moving the self-test after chromium install changes the capture case (a browser is then
+    present). Pin: keep it before Install Playwright chromium.
+
+C1  Probe headers still say evidence is copied into docs/verify with cp; a reader copies by hand and
+    overwrites archived evidence. Four headers: drive-project-new-form.mjs, probe-github-oauth.mjs,
+    probe-local-repos.mjs, and drive.mjs (also says cp, not named by pr-gate run 9). Pin: grep.
+C2  Spec 28 §4 P1 says archive prints the raw links; vp.mjs links does. Pin: text.
+
+D1  The index labels a pre-fix leg as post-fix (or the reverse) and a reader cites the wrong run.
+    Pin: each directory is checked against the commit that added it (refs/pull/1411/head) and the
+    transcript that names it.
+D2  The index rewrites an existing evidence file. Pin: one new file, no existing path touched.
+
+E1  A case writing into docs/verify (evidence.writes) without rewrites-evidence runs without
+    --force and rewrites committed evidence. Pin: gate rule, fake registry red, green with the need.
+E2  VERIFY_WEB_PORT different from the stack's web port is accepted and the probe drives another
+    lane's vite. Pin: refused (exit 2), as VERIFY_PORT already is.
+E3  The seed check skips a whole current case when its usage says "optional" anywhere, e.g.
+    "--expect=old optional": a probe that itself calls a broken seed then passes. Pin: only a seed
+    the usage marks optional, inside its parenthesized optional clause, is exempt; a seed the
+    script calls, or one named outside that clause, still counts.
+
+F1  api-keys/create after any other drive on the same stack: the empty state is gone, the probe
+    FAILs, and a reader of --help sees a red that is not a product bug.
+F2  machine-stale-sweep on a stack another drive has used (a machine enrolled earlier): check A
+    failed once in #1411.
+F3  A glass case while a vp stack is up in VERIFY_RUN_DIR: glass's own launch refuses, the run FAILs.
+F4  False refusal: the first drive after launch is refused as "not fresh". Pin: the record starts
+    empty after launch (launch deletes VERIFY_RUN_DIR).
+F5  A probe that fails half way still changed the stack; it must count as a drive. Pin: the record is
+    written after doctor passes, before the probe runs.
+F6  A --dry-run, doctor or capture counts as a drive. Pin: only a real drive of a stack case records.
+F7  The record goes to another run directory than the stack doctor checked. Pin: it lives in the
+    VERIFY_RUN_DIR the drive used.
+F8  --force cannot override a refusal the user knows to be wrong (they drove only theme first).
+    Pin: fresh-stack is one more --force reason, listed with the others. own-stack is a plain
+    refusal: with a stack up, glass's launch fails whatever the flag.
+
+M1  A feature map names `vp.mjs drive <feature> <case>` for a case that does not exist, or goes stale
+    when a case is renamed. Pin: gate rule, each drive line resolves in the registry.
+M2  A map with registered cases carries no drive line (the ticket's "each map names the drive
+    subcommand"). Pin: gate rule, every registry feature with a recipe is named in that recipe.
+M3  A map presents a stale case as the way to drive the feature. Pin: maps list current cases as the
+    drive line and name stale cases as stale (drive refuses them without --force anyway).
+M4  New backtick spans trip feature-map-staleness-gate (a `.class`, a path that is not there).
+    Pin: run the gate; drive commands are written as spans with spaces, which it does not parse.
+M5  A map with no registered case gets an invented one. Pin: skills-page.md says none is registered.
+
+L1  8791 / 5273 held by another lane. Pin: lsof first, VERIFY_PORT / VERIFY_WEB_PORT to free ports,
+    never kill another process.
+L2  Archive lands in the main checkout instead of this branch. Pin: run vp.mjs from the worktree, so
+    archive's root is the worktree.

@@ -1,0 +1,93 @@
+{
+  "probe": "hotkeys",
+  "ok": true,
+  "at": "2026-10-11T11:11:09.165Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/Users/xmon/.pacman/workspaces/01a12aa3-7bc8-7de0-95f7-ab62d50d12e2/.claude/verify-run/home"
+  },
+  "checks": [
+    {
+      "name": "board-ready",
+      "ok": true,
+      "detail": "看板 shell 就绪"
+    },
+    {
+      "name": "sidebar-row-badge",
+      "ok": true,
+      "detail": "侧栏新任务行角标=C"
+    },
+    {
+      "name": "row-click-opens",
+      "ok": true,
+      "detail": "行点击开 dialog"
+    },
+    {
+      "name": "c-opens-focused",
+      "ok": true,
+      "detail": "C 开 dialog 且正文框持焦（#394 单字段面）"
+    },
+    {
+      "name": "board-save",
+      "ok": true,
+      "detail": "board 面 C 开 → 保存"
+    },
+    {
+      "name": "fab-tooltip-rest-hidden",
+      "ok": true,
+      "detail": "静息 tooltip 数=0（未挂载=隐藏）"
+    },
+    {
+      "name": "fab-tooltip-hover-reveals",
+      "ok": true,
+      "detail": "悬浮浮出，键帽=\"⌘J\"（registry Tooltip+Kbd）"
+    },
+    {
+      "name": "editable-guard",
+      "ok": true,
+      "detail": "输入态:dialog=0 drawer开=false 入框=\"c \""
+    },
+    {
+      "name": "cmdj-wakes-focused",
+      "ok": true,
+      "detail": "⌘J 开抽屉且草稿框持焦"
+    },
+    {
+      "name": "schedules-c-opens",
+      "ok": true,
+      "detail": "schedules 页原地开 dialog"
+    },
+    {
+      "name": "api-todo-board",
+      "ok": true,
+      "detail": "board 面 todo 入 API(id=iuVL2p619Di-DIW1nBucu)"
+    },
+    {
+      "name": "api-todo-schedules",
+      "ok": true,
+      "detail": "schedules 全局面 todo 入 API(id=uJYoL6sz1RQZmEX0TRHRM)"
+    },
+    {
+      "name": "db-todo-board",
+      "ok": true,
+      "detail": "SQLite todo 表有 board 面行"
+    },
+    {
+      "name": "db-todo-schedules",
+      "ok": true,
+      "detail": "SQLite todo 表有 schedules 面行"
+    }
+  ],
+  "artifacts": [
+    "01-sidebar-row.png",
+    "02-board-saved.png",
+    "02b-fab-tooltip.png",
+    "03-chief-drawer.png",
+    "04-schedules-saved.png"
+  ],
+  "titles": {
+    "board": "热键验证任务-board 64038",
+    "schedules": "热键验证任务-sched 64038"
+  }
+}

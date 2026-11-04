@@ -1,0 +1,43 @@
+{
+  "id": "L1Dt6nObNJzZpEpbGYl3B",
+  "teamId": "V-woS_24cg6KhxUQoO_cs",
+  "projectId": "u3h9FZd9mkD8skkmto1hO",
+  "title": "空提交收口",
+  "spec": "空提交收口：review 收口探针",
+  "phase": "review",
+  "phaseAt": 1792539134523,
+  "seqNum": 1,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": {
+      "agentId": "z-jIbpcMzUALivrVyURtV"
+    },
+    "build": {
+      "agentId": "z-jIbpcMzUALivrVyURtV"
+    }
+  },
+  "agent": {
+    "id": "z-jIbpcMzUALivrVyURtV",
+    "displayName": "empty-review-builder"
+  },
+  "latestBuildId": "01a15ba8-8a21-724f-ab52-3cf8925da046",
+  "lastRunAt": 1792539134497,
+  "hasChanges": true,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a15ba8-8a21-724f-ab52-3cf8925da046",
+      "createdAt": 1792539134497
+    }
+  ],
+  "sourceTodo": null,
+  "blockedBy": null,
+  "v": 4,
+  "createdBy": "UQkxsT-gvHIa4n9N9ZxXZ",
+  "ownerId": "UQkxsT-gvHIa4n9N9ZxXZ",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "quotaWait": null
+}

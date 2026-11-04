@@ -1,0 +1,362 @@
+# #1404 S2 round 10: live GitHub response shapes for xiechimon/pacman, captured 2026-10-21T16:03Z (read-only gh api GETs).
+# Each response is trimmed by a script to the fields readiness and its contract rely on; sections 1, 3 and 4 print the full key lists
+# first, so what was dropped is visible. Commits are trimmed to sha and parents[].sha, check runs to name, head_sha, status, conclusion and
+# app.slug, the combined status to sha, state, total_count and statuses[].context/state.
+# base = dcf839e377cd96355d147986e132e5f5b2c77037 (merge base of #1479 and main before round 10), head = b65f00d46e06419edd20699c0d127b25946633ed (#1479 head before round 10).
+# The trimming is done by a Python script kept outside the repository (an executable file under docs/verify/ is itself a gate blocker);
+# every command it ran is printed below with its exit code, and the printed values are the response fields named, unedited.
+# Section 2c is the evidence for the paging claim in /code-review pass 5 finding 2 (s2-r10-reviews.txt): it is refuted.
+
+== 1. compare by SHA, first page of 3 commits ==
+$ gh api 'repos/xiechimon/pacman/compare/dcf839e377cd96355d147986e132e5f5b2c77037...b65f00d46e06419edd20699c0d127b25946633ed?per_page=3'
+exit 0
+top-level keys: ahead_by, base_commit, behind_by, commits, diff_url, files, html_url, merge_base_commit, patch_url, permalink_url, status, total_commits, url
+commit keys: author, comments_url, commit, committer, html_url, node_id, parents, sha, url; parent keys: html_url, sha, url
+{
+  "status": "ahead",
+  "ahead_by": 6,
+  "behind_by": 0,
+  "total_commits": 6,
+  "base_commit.sha": "dcf839e377cd96355d147986e132e5f5b2c77037",
+  "merge_base_commit.sha": "dcf839e377cd96355d147986e132e5f5b2c77037",
+  "html_url": "https://github.com/xiechimon/pacman/compare/dcf839e377cd96355d147986e132e5f5b2c77037...b65f00d46e06419edd20699c0d127b25946633ed",
+  "permalink_url": "https://github.com/xiechimon/pacman/compare/xiechimon:dcf839e...xiechimon:b65f00d",
+  "commits": [
+    {
+      "sha": "2d89de37902524d74f5fd59a9779fb454ade5289",
+      "parents": [
+        "dcf839e377cd96355d147986e132e5f5b2c77037"
+      ]
+    },
+    {
+      "sha": "a5bdec77a14c05582196632c1b33896d80a440ee",
+      "parents": [
+        "2d89de37902524d74f5fd59a9779fb454ade5289"
+      ]
+    },
+    {
+      "sha": "34f888c02ca0ac728ec6ccc72d968db563413537",
+      "parents": [
+        "a5bdec77a14c05582196632c1b33896d80a440ee"
+      ]
+    }
+  ],
+  "files (count)": 11
+}
+
+Reading: commits come oldest first and page by per_page; with 3 of total_commits 6 on this page, the head is not among them. No field names
+the head commit: base_commit and merge_base_commit are the base side, permalink_url carries abbreviated SHAs, html_url echoes the request.
+Every commit carries its parents[].sha.
+
+== 2. the same compare, all commits (per_page=100, one page) ==
+$ gh api 'repos/xiechimon/pacman/compare/dcf839e377cd96355d147986e132e5f5b2c77037...b65f00d46e06419edd20699c0d127b25946633ed?per_page=100'
+exit 0
+{
+  "total_commits": 6,
+  "commits": [
+    {
+      "sha": "2d89de37902524d74f5fd59a9779fb454ade5289",
+      "parents": [
+        "dcf839e377cd96355d147986e132e5f5b2c77037"
+      ]
+    },
+    {
+      "sha": "a5bdec77a14c05582196632c1b33896d80a440ee",
+      "parents": [
+        "2d89de37902524d74f5fd59a9779fb454ade5289"
+      ]
+    },
+    {
+      "sha": "34f888c02ca0ac728ec6ccc72d968db563413537",
+      "parents": [
+        "a5bdec77a14c05582196632c1b33896d80a440ee"
+      ]
+    },
+    {
+      "sha": "a06ad0ab9c667619e01bd3efae544dc9d07ed52f",
+      "parents": [
+        "34f888c02ca0ac728ec6ccc72d968db563413537"
+      ]
+    },
+    {
+      "sha": "2edf68edd2348524d4b2cd6e00e8cd52fe74b957",
+      "parents": [
+        "a06ad0ab9c667619e01bd3efae544dc9d07ed52f"
+      ]
+    },
+    {
+      "sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "parents": [
+        "2edf68edd2348524d4b2cd6e00e8cd52fe74b957"
+      ]
+    }
+  ]
+}
+
+Reading: 6 commits = total_commits 6. The one listed commit that no listed commit names as a parent is ['b65f00d46e06419edd20699c0d127b25946633ed'] (the requested head).
+If a PR's head were a06ad0ab9c667619e01bd3efae544dc9d07ed52f (the 4th commit here) and this compare, read at the descendant b65f00d46e06419edd20699c0d127b25946633ed, were labelled with it: a06ad0ab9c667619e01bd3efae544dc9d07ed52f is
+listed (the round 9 commits clause passes), and ['2edf68edd2348524d4b2cd6e00e8cd52fe74b957'] lists a06ad0ab9c667619e01bd3efae544dc9d07ed52f among its parents. That child is the signal round 10 checks: a compare
+read at the head lists only the head and its ancestors, and no ancestor of the head has the head as a parent.
+
+== 2b. a diverged compare (main moved on), paged: per_page=4, pages 1 and 2 ==
+$ gh api 'repos/xiechimon/pacman/compare/e410e82684a5cd825c5c1d7d67f80886fb35fc43...b65f00d46e06419edd20699c0d127b25946633ed?per_page=4&page=1'
+exit 0
+{
+  "status": "diverged",
+  "ahead_by": 6,
+  "behind_by": 2,
+  "total_commits": 6,
+  "merge_base_commit.sha": "dcf839e377cd96355d147986e132e5f5b2c77037",
+  "commits": [
+    {
+      "sha": "2d89de37902524d74f5fd59a9779fb454ade5289",
+      "parents": [
+        "dcf839e377cd96355d147986e132e5f5b2c77037"
+      ]
+    },
+    {
+      "sha": "a5bdec77a14c05582196632c1b33896d80a440ee",
+      "parents": [
+        "2d89de37902524d74f5fd59a9779fb454ade5289"
+      ]
+    },
+    {
+      "sha": "34f888c02ca0ac728ec6ccc72d968db563413537",
+      "parents": [
+        "a5bdec77a14c05582196632c1b33896d80a440ee"
+      ]
+    },
+    {
+      "sha": "a06ad0ab9c667619e01bd3efae544dc9d07ed52f",
+      "parents": [
+        "34f888c02ca0ac728ec6ccc72d968db563413537"
+      ]
+    }
+  ],
+  "files (count)": 11
+}
+
+$ gh api 'repos/xiechimon/pacman/compare/e410e82684a5cd825c5c1d7d67f80886fb35fc43...b65f00d46e06419edd20699c0d127b25946633ed?per_page=4&page=2'
+exit 0
+{
+  "status": "diverged",
+  "ahead_by": 6,
+  "behind_by": 2,
+  "total_commits": 6,
+  "merge_base_commit.sha": "dcf839e377cd96355d147986e132e5f5b2c77037",
+  "commits": [
+    {
+      "sha": "2edf68edd2348524d4b2cd6e00e8cd52fe74b957",
+      "parents": [
+        "a06ad0ab9c667619e01bd3efae544dc9d07ed52f"
+      ]
+    },
+    {
+      "sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "parents": [
+        "2edf68edd2348524d4b2cd6e00e8cd52fe74b957"
+      ]
+    }
+  ],
+  "files (count)": 0
+}
+
+Reading: base = main at e410e82684a5cd825c5c1d7d67f80886fb35fc43 (2 commits past the merge base), so status diverged; total_commits counts the head side only (= ahead_by),
+the commits across both pages add up to it, the head is the last commit of the last page, and files appear only on page 1.
+
+== 2c. a long range, paged past 250 commits: per_page=100, pages 1 to 4 (commits trimmed to the count and the first and last sha) ==
+$ gh api 'repos/xiechimon/pacman/commits?sha=e410e82684a5cd825c5c1d7d67f80886fb35fc43&per_page=100&page=4'
+exit 0
+(the base is the last commit listed on that page: cbe867881597b492eba6efd4954dc3f35062aab4)
+$ gh api 'repos/xiechimon/pacman/compare/cbe867881597b492eba6efd4954dc3f35062aab4...e410e82684a5cd825c5c1d7d67f80886fb35fc43?per_page=100&page=1'
+exit 0
+{
+  "page": 1,
+  "status": "ahead",
+  "total_commits": 399,
+  "commits (count)": 100,
+  "first": "448c4c9b50bf033ef2ea15a4af0658643407f9dd",
+  "last": "84f2a82d207dd25f08569ce3cdbd32cdb8f3124a",
+  "files (count)": 300
+}
+
+$ gh api 'repos/xiechimon/pacman/compare/cbe867881597b492eba6efd4954dc3f35062aab4...e410e82684a5cd825c5c1d7d67f80886fb35fc43?per_page=100&page=2'
+exit 0
+{
+  "page": 2,
+  "status": "ahead",
+  "total_commits": 399,
+  "commits (count)": 100,
+  "first": "7f90b261a17736010590b1fe973f8e3e918983ba",
+  "last": "c32091212ada441e4c76fc9fd7bdc30e4e45dbd0",
+  "files (count)": 0
+}
+
+$ gh api 'repos/xiechimon/pacman/compare/cbe867881597b492eba6efd4954dc3f35062aab4...e410e82684a5cd825c5c1d7d67f80886fb35fc43?per_page=100&page=3'
+exit 0
+{
+  "page": 3,
+  "status": "ahead",
+  "total_commits": 399,
+  "commits (count)": 100,
+  "first": "fdb191efd14892e22d5f61bf33de5ec65a6a2ba1",
+  "last": "11c9594d7f1fa69d22fc3191f383db11e2899ae1",
+  "files (count)": 0
+}
+
+$ gh api 'repos/xiechimon/pacman/compare/cbe867881597b492eba6efd4954dc3f35062aab4...e410e82684a5cd825c5c1d7d67f80886fb35fc43?per_page=100&page=4'
+exit 0
+{
+  "page": 4,
+  "status": "ahead",
+  "total_commits": 399,
+  "commits (count)": 99,
+  "first": "7c6420c0ffa1b6b6beab3a31c7280b446914cfe7",
+  "last": "e410e82684a5cd825c5c1d7d67f80886fb35fc43",
+  "files (count)": 0
+}
+
+Reading: 399 commits listed over four pages = total_commits; paging goes past 250 commits and the last page ends at the requested head.
+So 'commits read in full' is checkable from the response: the number listed equals total_commits. Files stop at 300 on page 1
+(the compare-truncated case readiness already handles through the PR's changed_files).
+
+== 3. check runs for one SHA ==
+$ gh api 'repos/xiechimon/pacman/commits/b65f00d46e06419edd20699c0d127b25946633ed/check-runs?per_page=100'
+exit 0
+top-level keys: check_runs, total_count; check run keys: app, check_suite, completed_at, conclusion, details_url, external_id, head_sha, html_url, id, name, node_id, output, pull_requests, started_at, status, url
+{
+  "total_count": 15,
+  "check_runs": [
+    {
+      "name": "Cursor Approval Agent: Pull Request Router",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "cursor"
+    },
+    {
+      "name": "Cursor Security Agent: Security Reviewer",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "cursor"
+    },
+    {
+      "name": "e2e-gate",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "pr-evidence",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "diagram-text-fit",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "e2e (3)",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "e2e (1)",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "feature-map-gate",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "e2e (2)",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "issue-label-gate",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "e2e (4)",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "dead-class-gate",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "check",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "pack-smoke",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    },
+    {
+      "name": "pr-evidence",
+      "head_sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+      "status": "completed",
+      "conclusion": "success",
+      "app.slug": "github-actions"
+    }
+  ]
+}
+
+Reading: every check run carries head_sha. pr-evidence appears 2 times from the same app (two check suites), started_at in listed order: 2026-10-21T15:09:17Z, 2026-10-21T15:08:54Z.
+
+== 4. combined status for one SHA ==
+$ gh api 'repos/xiechimon/pacman/commits/b65f00d46e06419edd20699c0d127b25946633ed/status?per_page=100'
+exit 0
+top-level keys: commit_url, repository, sha, state, statuses, total_count, url
+{
+  "sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+  "state": "pending",
+  "total_count": 0,
+  "statuses": []
+}
+
+Reading: the combined status carries the commit's sha even with no statuses (state pending, total_count 0 here).
+
+== 5. combined status read by branch name ==
+$ gh api 'repos/xiechimon/pacman/commits/claude/bootstrap-p3-s2r9/status?per_page=100'
+exit 0
+{
+  "sha": "b65f00d46e06419edd20699c0d127b25946633ed",
+  "state": "pending",
+  "total_count": 0
+}
+
+Reading: read by branch name, sha is the commit the branch pointed at when read, so a read at another commit is visible in the response.

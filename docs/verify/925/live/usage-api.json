@@ -1,0 +1,18 @@
+{
+  "status": 200,
+  "body": [
+    {
+      "buildId": "01a1177c-7645-7ae3-a6f3-c5efa19999a3",
+      "model": "stub-gw/stub-model",
+      "input": 0,
+      "output": 1960,
+      "cacheRead": 200,
+      "cacheWrite": 0,
+      "costInput": 0,
+      "costOutput": 3920,
+      "costCacheRead": 100,
+      "costCacheWrite": 0,
+      "costTotal": 4020
+    }
+  ]
+}

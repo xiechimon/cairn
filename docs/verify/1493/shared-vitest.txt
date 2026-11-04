@@ -1,0 +1,37 @@
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 1：quota 桶 4ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 2：capacity 桶 1ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 3：network 桶 1ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 4：other 桶（auth / 上下文 / 5xx / 空） 0ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 4a：model_unavailable 桶（/v1/messages 404 / model not found） 0ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 5：桶序 quota > capacity > network 0ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 失败方式 6：数字边界（402913 / 15290ms / 4030 不误触） 1ms
+ ✓ test/task-failure.test.ts > classifyStepFailure（#1257 三桶分类） > 词表封闭（枚举单源） 1ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > quota：402（含 #882 诊断行形态） 1ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > quota：usage limit / 余额 / 欠费文案（中英） 0ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > capacity：429/529/限流文案 1ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > provider_network：连接重置 / 上游流断（#1257 家族） 1ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > other：协议错 / 工具失败 / 空串不误报（F1/F6） 0ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > 优先级：quota 先于 capacity（同文并见 402+429 时） 0ms
+ ✓ test/task-failure.test.ts > classifyAgentFailure（#1261 四桶，F1-F4） > 词表封闭（枚举单源） 0ms
+ ✓ test/task-failure.test.ts > parseRetryAfterMs（#1261 F5） > 裸秒数 / 冒号形态 / with 单位 1ms
+ ✓ test/task-failure.test.ts > parseRetryAfterMs（#1261 F5） > HTTP 日期 / 非法值 → null（不造数值） 0ms
+ ✓ test/task-failure.test.ts > parseRetryAfterMs（#1261 F5） > 数值上限：过大的秒数收口（防 bogus relay 值把探测排到数年后） 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 命中：401 Unauthorized: missing or bad api key 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 命中：Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}} 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 命中：Invalid API key provided 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 命中：incorrect api key 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 命中：invalid_api_key 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 命中：API key expired 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中： 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：402: quota exceeded 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：429 rate limited 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：request took 4013ms 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：400: bad protocol 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：Error: 403 usage limit reached 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：Not logged in · Please run /login 3ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：remote: Unauthorized
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：401 Unauthorized 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：gh: Bad credentials (HTTP 401) 0ms
+ ✓ test/task-failure.test.ts > isProviderAuthFailure（#1493 降级链触发：认证失败） > 不命中：see PR #401 0ms
+ Test Files  1 passed (1)
+      Tests  35 passed (35)

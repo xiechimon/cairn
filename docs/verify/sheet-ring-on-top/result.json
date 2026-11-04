@@ -1,0 +1,28 @@
+{
+  "before": {
+    "sheetShadow": "rgb(236, 229, 218) 0px 0px 0px 1px inset",
+    "ringLayer": "none",
+    "ringZ": "auto",
+    "opaqueChildrenOnEdge": [
+      "300:board-scroller",
+      "700:board-scroller"
+    ],
+    "detailNarrowRing": {
+      "self": "none",
+      "after": "block"
+    }
+  },
+  "after": {
+    "sheetShadow": "none",
+    "ringLayer": "rgb(236, 229, 218) 0px 0px 0px 1px inset",
+    "ringZ": "10",
+    "opaqueChildrenOnEdge": [
+      "300:board-scroller",
+      "700:board-scroller"
+    ],
+    "detailNarrowRing": {
+      "self": "none",
+      "after": "none"
+    }
+  }
+}

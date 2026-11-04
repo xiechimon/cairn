@@ -1,0 +1,2 @@
+pnpm --filter @cairn/integration exec tsc -p verify/tsconfig.json
+PASS: strict standalone harness typecheck exited 0.

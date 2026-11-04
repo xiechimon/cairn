@@ -1,0 +1,81 @@
+{
+  "probe": "manual live-stack probe (verify-pacman stack, ports 8797/5279, scratch PACMAN_HOME)",
+  "issue": 634,
+  "stack": {
+    "server": "http://127.0.0.1:8797",
+    "web": "http://127.0.0.1:5279",
+    "data": "seeded todo-echo / build-echo carrying the measured live-DB echo shape (toolcall row + role=system result echo)"
+  },
+  "checks": [
+    {
+      "id": "before-tool-echo",
+      "ok": true,
+      "label": "before: expanded tool group shows the raw JSON output slab and the centered JSON echo note (reproduces the user report)"
+    },
+    {
+      "id": "before-chip-chevron",
+      "ok": true,
+      "label": "before: clicking .detail-chip-chevron opens nothing (popover stays hidden)"
+    },
+    {
+      "id": "before-esc",
+      "ok": true,
+      "label": "before: ESC on the detail page does nothing (URL unchanged)"
+    },
+    {
+      "id": "after-tool-echo",
+      "ok": true,
+      "label": "after: expanded group = footer + slim pill + collapse; 0 .chat-tool-output slabs, 0 JSON notes (probe: outputSlabs=0, noteTexts=[])"
+    },
+    {
+      "id": "after-chip-popover",
+      "ok": true,
+      "label": "after: chevron click opens the popover (popOpen=true)"
+    },
+    {
+      "id": "after-esc-layered",
+      "ok": true,
+      "label": "after: ESC with popover open closes only the popover (URL stays /todo/); second clean ESC leaves to /app"
+    },
+    {
+      "id": "after-mention-inline",
+      "ok": true,
+      "label": "after: ESC with the mention inline open closes only the inline (inlineOpen=true -> inlineAfter=false, URL stays /todo/)"
+    },
+    {
+      "id": "vitest-transcript-tool-echo",
+      "ok": true,
+      "label": "apps/web vitest transcript-tool-echo: 5/5 pass (red 4/5 before the mapper change)"
+    },
+    {
+      "id": "e2e-chip-hotzone-detail-esc",
+      "ok": true,
+      "label": "playwright chip-hotzone + detail-esc: 5/5 pass (H1/H2/E1 red before the fixes); E1 uses the ESC-delivery retry law after CI's mount race"
+    },
+    {
+      "id": "e2e-neighbors",
+      "ok": true,
+      "label": "chip-assign + escape-wiring + collapse-family: 9/9 pass unchanged"
+    },
+    {
+      "id": "after-footer-copy",
+      "ok": true,
+      "label": "follow-up: tools-row copy button writes the pill text to the clipboard (payload 'set_task_meta'); chevron counts plan=0 agent=0 tools=1 (expander only)"
+    },
+    {
+      "id": "e2e-footer-copy",
+      "ok": true,
+      "label": "playwright footer-copy C1-C4 4/4 pass (C1-C3 red before the copy wiring)"
+    },
+    {
+      "id": "e2e-full-suite",
+      "ok": true,
+      "label": "apps/web full e2e 601/601 pass after the footer ruling"
+    },
+    {
+      "id": "ci-board-dnd-flake",
+      "ok": true,
+      "label": "CI run 36998441370 failed board-dnd.spec.ts:371 once, same-sha rerun green = flake outside this diff"
+    }
+  ]
+}

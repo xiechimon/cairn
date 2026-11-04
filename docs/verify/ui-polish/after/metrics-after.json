@@ -1,0 +1,9 @@
+{
+  "composerRadius": "14px",
+  "bubbleRadius": "10px",
+  "agentFont": "sourceSerif4, Georgia, \"Songti SC\", \"Noto Serif CJK SC\", serif",
+  "easeOut": "cubic-bezier(0.165, 0.84, 0.44, 1)",
+  "radiusComposer": "14px",
+  "radiusBubble": "10px",
+  "fontSerif": "\"sourceSerif4\", Georgia, \"Songti SC\", \"Noto Serif CJK SC\", serif"
+}

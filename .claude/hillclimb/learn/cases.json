@@ -1,0 +1,192 @@
+{
+  "flow": "learn",
+  "note": "Learn-from-correction cases. round1 asks for a task whose spec needs a project fact. correction is a follow-up chat message that states the fact. round2 is a new chief thread with different wording and must not name the fact. expect.include groups are aliases of the corrected fact; exclude markers are the mistake. The oracle memory is seeded by hand for the oracle arm and is scoped to eval-project. Facts here are absent from the chief-dispatch repo seed, so a model cannot pass the no-memory arm by reading the repo.",
+  "roster": [
+    {
+      "key": "exec-glm-5.3",
+      "displayName": "Exec 1",
+      "modelId": "glm-5.3",
+      "description": "Roster label for the learn eval. The chief turn is the only turn that runs."
+    },
+    {
+      "key": "exec-kimi-k3",
+      "displayName": "Exec 2",
+      "modelId": "kimi-k3",
+      "description": "Roster label for the learn eval. The chief turn is the only turn that runs."
+    },
+    {
+      "key": "exec-qwen3.8-max",
+      "displayName": "Exec 3",
+      "modelId": "qwen3.8-max",
+      "description": "Roster label for the learn eval. The chief turn is the only turn that runs."
+    },
+    {
+      "key": "exec-deepseek-v4-pro",
+      "displayName": "Exec 4",
+      "modelId": "deepseek-v4-pro",
+      "description": "Roster label for the learn eval. The chief turn is the only turn that runs."
+    }
+  ],
+  "cases": [
+    {
+      "id": "k01",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: prepare the 0.6 release cut. The spec must name the branch pattern.",
+      "correction": "The release cut branch pattern is rel-x.y, for example rel-0.6. A release/ prefix is wrong.",
+      "round2": "Create a task for eval-project: write the checklist a release manager follows. The spec must name the branch pattern used for the cut.",
+      "expect": {
+        "include": [["rel-x.y", "rel-"]],
+        "exclude": ["release/"]
+      },
+      "oracle": {
+        "title": "Release branch pattern",
+        "content": "Release cuts use rel-x.y, for example rel-0.6."
+      }
+    },
+    {
+      "id": "k02",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document the error response of POST /api/tasks/delete. The spec must name the response fields.",
+      "correction": "The error response body is {error, detail}. The old code/msg shape is wrong.",
+      "round2": "Create a task for eval-project: add an error-response section to the API notes for deleting tasks. The spec must name each field in the body.",
+      "expect": {
+        "include": [["{error, detail}", "error, detail"]],
+        "exclude": ["code/msg", "{code, msg}"]
+      },
+      "oracle": {
+        "title": "Error response body",
+        "content": "The error response body is {error, detail}."
+      }
+    },
+    {
+      "id": "k03",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document the timestamp fields on the task search API. The spec must state the value format.",
+      "correction": "Timestamp fields are epoch milliseconds. ISO 8601 strings are wrong.",
+      "round2": "Create a task for eval-project: write a short note for client authors about how time values are encoded in search results. The spec must state the encoding.",
+      "expect": {
+        "include": [["epoch milliseconds", "milliseconds since"]],
+        "exclude": ["iso 8601", "iso-8601", "iso8601"]
+      },
+      "oracle": {
+        "title": "Timestamp format",
+        "content": "Timestamp fields are epoch milliseconds."
+      }
+    },
+    {
+      "id": "k04",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: schedule review for the task export feature. The spec must name the default reviewer.",
+      "correction": "The default reviewer is @lane-qa.",
+      "round2": "Create a task for eval-project: write the review rota for export changes. The spec must name who is assigned by default.",
+      "expect": {
+        "include": [["@lane-qa"]],
+        "exclude": []
+      },
+      "oracle": {
+        "title": "Default reviewer",
+        "content": "Export changes are reviewed by @lane-qa by default."
+      }
+    },
+    {
+      "id": "k05",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document how a client authenticates to the HTTP API. The spec must name the header.",
+      "correction": "Clients authenticate with the header X-Eval-Token. A bearer token is the wrong header.",
+      "round2": "Create a task for eval-project: write the client setup note for API access. The spec must name the header the client sends.",
+      "expect": {
+        "include": [["x-eval-token"]],
+        "exclude": ["bearer"]
+      },
+      "oracle": {
+        "title": "API auth header",
+        "content": "Clients send the header X-Eval-Token."
+      }
+    },
+    {
+      "id": "k06",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document where service settings live. The spec must name the file.",
+      "correction": "Service settings live in eval.config.toml. A .env file is the wrong file.",
+      "round2": "Create a task for eval-project: add a setup note that tells a new teammate which file to edit for service settings. The spec must name that file.",
+      "expect": {
+        "include": [["eval.config.toml"]],
+        "exclude": [".env"]
+      },
+      "oracle": {
+        "title": "Settings file",
+        "content": "Service settings live in eval.config.toml."
+      }
+    },
+    {
+      "id": "k07",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document how to apply database migrations. The spec must name the command.",
+      "correction": "Apply migrations with pnpm migrate:eval. drizzle-kit is the wrong command.",
+      "round2": "Create a task for eval-project: write the database setup steps for a new machine. The spec must name the command that applies migrations.",
+      "expect": {
+        "include": [["migrate:eval"]],
+        "exclude": ["drizzle-kit"]
+      },
+      "oracle": {
+        "title": "Migration command",
+        "content": "Apply database migrations with pnpm migrate:eval."
+      }
+    },
+    {
+      "id": "k08",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document the process-supervisor probe. The spec must name the HTTP path.",
+      "correction": "The probe path is /readyz. /health is the wrong path.",
+      "round2": "Create a task for eval-project: write the supervisor note for this service. The spec must name the path a probe requests.",
+      "expect": {
+        "include": [["/readyz"]],
+        "exclude": ["/health"]
+      },
+      "oracle": {
+        "title": "Probe path",
+        "content": "The process supervisor probes /readyz."
+      }
+    },
+    {
+      "id": "k09",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document the on-disk database. The spec must name the file path relative to the repo root.",
+      "correction": "The sqlite file path is var/eval.sqlite. dev.db is the wrong path.",
+      "round2": "Create a task for eval-project: write the backup note for the local database. The spec must name the file path relative to the repo root.",
+      "expect": {
+        "include": [["var/eval.sqlite"]],
+        "exclude": ["dev.db"]
+      },
+      "oracle": {
+        "title": "Database file",
+        "content": "The sqlite database file is var/eval.sqlite."
+      }
+    },
+    {
+      "id": "k10",
+      "tags": ["learn", "chat"],
+      "family": "learn",
+      "round1": "Create a task for eval-project: document the commit message rule. The spec must name the required trailer.",
+      "correction": "Every commit message must include the trailer Eval-Ticket. Signed-off-by is not the required trailer.",
+      "round2": "Create a task for eval-project: write the contributor note about commit messages. The spec must name the trailer that has to be present.",
+      "expect": {
+        "include": [["eval-ticket"]],
+        "exclude": ["signed-off-by"]
+      },
+      "oracle": {
+        "title": "Commit trailer",
+        "content": "Commit messages must include the trailer Eval-Ticket."
+      }
+    }
+  ]
+}

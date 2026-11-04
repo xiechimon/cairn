@@ -1,0 +1,31 @@
+{
+  "machines": [
+    {
+      "machineId": "1JIps7eD-bJBtlMpexmVJ",
+      "name": "cap-legacy",
+      "online": false,
+      "runtimeOk": true,
+      "missing": null,
+      "mcpGaps": null,
+      "canRun": true
+    },
+    {
+      "machineId": "eoEwVl5DkirL5oqVGGAsm",
+      "name": "cap-mbp",
+      "online": true,
+      "runtimeOk": true,
+      "missing": [],
+      "mcpGaps": [],
+      "canRun": true
+    },
+    {
+      "machineId": "JMhtAsBf8BOUqEprpHyfO",
+      "name": "xmonsMac-3574.local",
+      "online": false,
+      "runtimeOk": true,
+      "missing": null,
+      "mcpGaps": null,
+      "canRun": true
+    }
+  ]
+}

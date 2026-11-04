@@ -1,0 +1,205 @@
+[
+  {
+    "number": 1474,
+    "state": "closed",
+    "title": "daemon(1460): per-step git credentials keep the machine's own GIT_CONFIG_*",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1474",
+    "created_at": "2026-10-21T13:06:43Z",
+    "closed_at": "2026-10-21T14:22:13Z",
+    "merged_at": "2026-10-21T14:22:13Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "ac3729c73ec8514f11552efd354ec534d555c34d",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "dabef4819314cbf3bb18b2301c8978edec343874",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  },
+  {
+    "number": 1456,
+    "state": "closed",
+    "title": "Local test loop and a shared start rule: e2e-affected, canOrchestrate, container-safe daemon tests (#1455, #1457, #1458)",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1456",
+    "created_at": "2026-10-21T08:31:11Z",
+    "closed_at": "2026-10-21T12:49:23Z",
+    "merged_at": "2026-10-21T12:49:23Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "ea6bddaea90d92dbfdd3dea5f8ac65c20a1beeda",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "290f3c1476199d0c5afb355b14fdca687099f39a",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  },
+  {
+    "number": 1454,
+    "state": "closed",
+    "title": "server(1453): a step that finishes before its stop lands leaves an exited card alone",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1454",
+    "created_at": "2026-10-21T07:45:01Z",
+    "closed_at": "2026-10-21T07:54:00Z",
+    "merged_at": "2026-10-21T07:54:00Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "815d5b73f70829d44d6895e1a7a51e13bc6a0555",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "66d5022e374da641ed37ca59ec4fa1c089cb1fac",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  },
+  {
+    "number": 1452,
+    "state": "closed",
+    "title": "server(1451): marking an in-progress task done stops its active step",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1452",
+    "created_at": "2026-10-21T06:51:26Z",
+    "closed_at": "2026-10-21T07:18:09Z",
+    "merged_at": "2026-10-21T07:18:09Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "0608a6b8eefae4ae00e50cfd020b3c1831659750",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "e9d6d456ac8ff06ecd02211ce700d984716e4f7b",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  },
+  {
+    "number": 1449,
+    "state": "closed",
+    "title": "queued tasks: closing stops the step, stop/close from detail, queued cards in 执行中 (#1445, #1446, #1447)",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1449",
+    "created_at": "2026-10-21T05:40:57Z",
+    "closed_at": "2026-10-21T06:28:40Z",
+    "merged_at": "2026-10-21T06:28:40Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "eff13d4a7d18bef46c9b56f3aba455a2f3178368",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "38dacbff2e32897ebc113454f0a2fa300252a29f",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  },
+  {
+    "number": 1436,
+    "state": "closed",
+    "title": "web(1434): a queued card does not drop into 执行中",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1436",
+    "created_at": "2026-10-21T02:11:58Z",
+    "closed_at": "2026-10-21T03:28:44Z",
+    "merged_at": "2026-10-21T03:28:44Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "05c5244d16c3d59515f1673af8651370021958c8",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "81bc4e17b9307cbac700f8180311917f35553f84",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  },
+  {
+    "number": 1425,
+    "state": "closed",
+    "title": "web(1423): a queued task has no primary action",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1425",
+    "created_at": "2026-10-21T00:58:50Z",
+    "closed_at": "2026-10-21T01:48:57Z",
+    "merged_at": "2026-10-21T01:48:57Z",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "50aa1ae31f61b5ac25a311490d0f64d5bd59eb34",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "3a4e2df28886eeeaa1f14f062ba86a0605bed380",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman",
+        "default_branch": "main"
+      }
+    }
+  }
+]

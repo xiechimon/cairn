@@ -1,0 +1,508 @@
+{
+  "label": "after",
+  "catalogNote": "provisional two-skill catalog; #1967 replay.mts --snapshot not on main",
+  "totals": {
+    "precision": 0.8666666666666667,
+    "recall": 0.7647058823529411,
+    "forbiddenHits": 2
+  },
+  "rows": [
+    {
+      "id": "sr-01",
+      "task": "fix the flaky board drag test",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-02",
+      "task": "review the new dashboard layout for visual polish",
+      "predicted": [
+        "design-review"
+      ],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-03",
+      "task": "add a unit test for the token usage cost helper",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 0,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 0,
+        "forbiddenHits": 1
+      }
+    },
+    {
+      "id": "sr-04",
+      "task": "debug why the playwright spec times out on CI",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-05",
+      "task": "implement the settings page redesign",
+      "predicted": [],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 0,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-06",
+      "task": "refactor the machine claim service",
+      "predicted": [],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-07",
+      "task": "fix failing e2e assertion in login flow",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-08",
+      "task": "improve button spacing on mobile",
+      "predicted": [
+        "design-review"
+      ],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-09",
+      "task": "write a migration for push subscriptions",
+      "predicted": [],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-10",
+      "task": "investigate flaky sidebar focus ring test",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-11",
+      "task": "audit color contrast on the board",
+      "predicted": [
+        "design-review"
+      ],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-12",
+      "task": "add REST endpoint for machines",
+      "predicted": [],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-13",
+      "task": "repair broken playwright selector",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-14",
+      "task": "polish the chief drawer animation",
+      "predicted": [
+        "design-review"
+      ],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-15",
+      "task": "fix typecheck error in shared records",
+      "predicted": [],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-16",
+      "task": "stabilize the board dnd e2e",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-17",
+      "task": "redesign the empty state illustration",
+      "predicted": [],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 0,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-18",
+      "task": "update the drizzle schema",
+      "predicted": [],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-19",
+      "task": "debug intermittent test failure in CI shard",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-20",
+      "task": "review typography on the detail page",
+      "predicted": [
+        "design-review"
+      ],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-21",
+      "task": "add integration test for skill routing",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 0,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 1,
+        "falseNegatives": 0,
+        "forbiddenHits": 1
+      }
+    },
+    {
+      "id": "sr-22",
+      "task": "fix spec parse error after merge",
+      "predicted": [],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 0,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-23",
+      "task": "improve dialog spacing and radius",
+      "predicted": [],
+      "expected": [
+        "design-review"
+      ],
+      "forbidden": [
+        "e2e-debugging"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 0,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 1,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-24",
+      "task": "refactor the daemon runner loop",
+      "predicted": [],
+      "expected": [],
+      "forbidden": [
+        "e2e-debugging",
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 0,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    },
+    {
+      "id": "sr-25",
+      "task": "make the e2e suite green again",
+      "predicted": [
+        "e2e-debugging"
+      ],
+      "expected": [
+        "e2e-debugging"
+      ],
+      "forbidden": [
+        "design-review"
+      ],
+      "score": {
+        "precision": 1,
+        "recall": 1,
+        "truePositives": 1,
+        "falsePositives": 0,
+        "falseNegatives": 0,
+        "forbiddenHits": 0
+      }
+    }
+  ]
+}

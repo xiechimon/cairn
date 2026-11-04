@@ -1,0 +1,56 @@
+[WebServer] (node:44611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:44613) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "<checkout>/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:44620) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:44622) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:44629) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44630) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:44630) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/split-autostart.spec.ts:190:1 › rejected split proposal stays reviewable, refuses confirmation, and accepts a corrected chief resubmission without losing history (357ms)
+
+
+  1) e2e/split-autostart.spec.ts:190:1 › rejected split proposal stays reviewable, refuses confirmation, and accepts a corrected chief resubmission without losing history
+
+    Error: POST /api/machine/tool/4f7lc7c20_r3hw7rqSBxS → {"error":"agent ghost（不在本团队，或 id 抄错了）"}
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 300
+    Received:   404
+
+      35 |   });
+      36 |   const text = await res.text();
+    > 37 |   expect(res.status, `${method} ${path} → ${text}`).toBeLessThan(300);
+         |                                                     ^
+      38 |   return (text === '' ? null : JSON.parse(text)) as T;
+      39 | }
+      40 |
+        at ok (<checkout>/apps/web/e2e/split-autostart.spec.ts:37:53)
+        at <checkout>/apps/web/e2e/split-autostart.spec.ts:198:21
+
+    Error Context: test-results/split-autostart-rejected-s-874ea-sion-without-losing-history/error-context.md
+
+    Error Context: test-results/split-autostart-rejected-s-874ea-sion-without-losing-history/error-context.md
+
+  1 failed
+    e2e/split-autostart.spec.ts:190:1 › rejected split proposal stays reviewable, refuses confirmation, and accepts a corrected chief resubmission without losing history
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/xmon/.codex/worktrees/pr-1654-
+  │ split-repair/cairn/apps/web
+

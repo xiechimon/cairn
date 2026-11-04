@@ -1,0 +1,31 @@
+# #1404 S1 gates (branch claude/bootstrap-p3a from origin/main e658294).
+
+$ pnpm lint
+Checked 788 files in 1299ms. No fixes applied.
+Found 1 info.
+lint=0
+
+$ pnpm typecheck
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+typecheck=0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+$ pnpm exec vitest run --changed
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 240 passed (241)
+      Tests  1 failed | 2450 passed | 1 skipped (2452)
+runner-brief.test.ts 擦除失败 fails here because this container runs as root: the case makes the
+brief file unremovable with permissions, which root ignores. The same file fails the same way on
+/home/user/pacman (claude/nice-faraday-o329b3, whose apps/daemon equals origin/main). CI runs it as
+a normal user.
+
+$ pnpm --filter @pacman/web e2e:affected
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 1/158 specs on the standard fixture-build config, E2E_PORT=8398
+  6 passed (12.1s)
+
+lint info: apps/web/src/resources/machines-page.tsx:317 noUselessFragments, present on main.

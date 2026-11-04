@@ -1,0 +1,27 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686
+
+ ❯ |@xiechimon/cairn| test/push.test.ts (38 tests | 1 failed | 37 skipped) 66ms
+   ❯ digest sweep job (8)
+     × scheduler delivers at both local slots without overlapping sweeps 65ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest sweep job > scheduler delivers at both local slots without overlapping sweeps
+AssertionError: expected "bound " to be called 1 times, but got 2 times
+ ❯ test/push.test.ts:982:20
+    980|       expect(send).toHaveBeenCalledTimes(1);
+    981|       scheduler.tick(new Date(2026, 0, 2, 18, 0).getTime());
+    982|       expect(send).toHaveBeenCalledTimes(1);
+       |                    ^
+    983|       release?.();
+    984|       await expect.poll(() => s.db.select().from(pushDigestItem).all()…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  12:53:47
+   Duration  2.51s (transform 73%, import 25%, tests 3%)
+

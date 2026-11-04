@@ -1,0 +1,52 @@
+{
+  "probe": "drive-920-skills-manifest/daemon-fail",
+  "expect": "new",
+  "server": "http://127.0.0.1:8793",
+  "skillsDir": "/tmp/pacman-before-920-run/home/skills",
+  "db": "/tmp/pacman-before-920-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-920-daemon-home-d1",
+  "passed": 8,
+  "total": 8,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（5 技能 / 13 文件）",
+      "ok": true,
+      "detail": "/tmp/pacman-before-920-run/home/skills"
+    },
+    {
+      "name": "旧 server 400 → 步按 failed 收尾（不再静默降级）",
+      "ok": true,
+      "detail": "{\"id\":\"99LwWOP9z_BeN4ARw5-U6\",\"kind\":\"build\",\"status\":\"failed\",\"buildErrorMessage\":\"team skills distribution failed: machine api 400: {\\\"error\\\":\\\"skill file too large: assets/template.html is 727976 bytes (limit 512000)\\\"}\"}"
+    },
+    {
+      "name": "errorMessage 点名 team skills 分发失败",
+      "ok": true,
+      "detail": "team skills distribution failed: machine api 400: {\"error\":\"skill file too large: assets/template.html is 727976 bytes (limit 512000)\"}"
+    },
+    {
+      "name": "errorMessage 带旧闸根因（skill file too large / 512000）",
+      "ok": true,
+      "detail": "team skills distribution failed: machine api 400: {\"error\":\"skill file too large: assets/template.html is 727976 bytes (limit 512000)\"}"
+    },
+    {
+      "name": "daemon.log 出现 team-skills-failed 行",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "零物化（无 materialized 行）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "[step] failed 根因直报行（failStep 路径）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "SQLite step/build 行 = failed + 根因在库（UI 可观测）",
+      "ok": true,
+      "detail": null
+    }
+  ]
+}

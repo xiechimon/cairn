@@ -1,0 +1,34 @@
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > 阈值常量与票面一致 2ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > 未见过的 provider = healthy 且可选 1ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H1：2 连败仍 healthy，3 连败 degraded（仍可选），5 连败 open（不可选） 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > provider 之间互不影响 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H2：open 满 30 秒 → half_open，可选一次 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H3：half_open 探测位被占时不再放行 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > half_open 探测成功 → healthy，连败清零 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H4：half_open 探测失败 → 回 open 并重新计时 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H5：中间一次成功清零连败 1ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H6：探测位租期过后释放，下一个步可再试 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > H7：探测步以与 provider 无关的结局收尾（404 / 停止 / 普通失败）→ 释放探测位、状态不变 0ms
+ ✓ test/provider-health.test.ts > provider 熔断器（#1493） > reset 清空全部状态（重启语义：内存态，从 healthy 开始） 0ms
+ ✓ test/quota-wait.test.ts > quota 挂起（#1261） > W1+W2+W3：quota done → waiting_quota 挂起 + 通知 + 读面投影 199ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X1+X6+X9：主模型额度用完 → 换第一个备选重派（新会话、凭证跟着换、可见） 253ms
+ ✓ test/quota-wait.test.ts > quota 挂起（#1261） > W4：probeAt 到期 → 释放回 pending + machineId 清空（额度恢复自动续跑） 127ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X2：备选全挂 → 回落 waiting_quota，不死循环 137ms
+ ✓ test/quota-wait.test.ts > quota 挂起（#1261） > W5：连续挂起退避递增（间隔 ×2），首见时刻保持 105ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X12：降级后的步挂起等额度、释放重领时续它自己在备选上的会话 140ms
+ ✓ test/quota-wait.test.ts > quota 挂起（#1261） > W6：waiting_quota 步可停（停止钮 = server 侧即时取消面） 78ms
+ ✓ test/quota-wait.test.ts > quota 挂起（#1261） > W7：非配额 done(failed) → 旧失败漏斗零回归（todo failed、无 quota 通知） 78ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X3：review 步禁止降级——额度用完只等不换（负对照） 91ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X3：merge 步禁止降级——额度用完只等不换（负对照） 80ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X4：agent 没配备选 → 旧行为（waiting_quota） 78ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X5：限流（capacity）不换模型 93ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X7：open 的 provider 不被选为备选 76ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X8：归属机没开对应 runtime 的备选直接跳过 89ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > X10：模型 404 与认证失败也换 117ms
+ ✓ test/model-fallback.test.ts > 模型降级链（#1493） > 熔断计数：额度用完记 provider 连败，成功清零 70ms
+ ✓ test/model-fallback.test.ts > 0 token 静默失败（#1493） > X11：成功但 0 token 且无输出 → 同模型重试一次，再来一次按失败收尾 65ms
+ ✓ test/model-fallback.test.ts > 0 token 静默失败（#1493） > X11 负对照：0 token 但 daemon 没说无输出（不回 usage 的 relay）不判 58ms
+ ✓ test/model-fallback.test.ts > 0 token 静默失败（#1493） > X11 负对照：没上报 usage（老 daemon）不判 68ms
+ ✓ test/model-fallback.test.ts > agent 写面（#1493） > PATCH fallbackModels：落库 + 记录投影 + 超过 5 个 400 + null 清空 48ms
+ Test Files  3 passed (3)
+      Tests  32 passed (32)

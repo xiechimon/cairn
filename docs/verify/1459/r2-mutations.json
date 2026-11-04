@@ -1,0 +1,169 @@
+[
+ {
+  "id": "R1",
+  "desc": "webhook splits full_name again when githubRepoOfProject refuses the stored repo (pre-round-2 behavior)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "  const repoRef = githubRepoOfProject(repoRow);\n",
+    "replace": "  const slash0 = fullName.indexOf('/');\n  const repoRef = githubRepoOfProject(repoRow) ?? {\n    owner: fullName.slice(0, slash0),\n    repo: fullName.slice(slash0 + 1),\n  };\n"
+   }
+  ],
+  "watch": [
+   "W17 项目存的 githubRepo 是 ../user",
+   "W17 项目存的 githubRepo 是 owner/.."
+  ]
+ },
+ {
+  "id": "R2",
+  "desc": "the 'import accepted' audit line is written after orchestrateTodo again",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "  logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');\n",
+    "replace": ""
+   },
+   {
+    "find": "  const orchestration = orchestrateTodo(deps, todoId);\n",
+    "replace": "  const orchestration = orchestrateTodo(deps, todoId);\n  logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');\n"
+   }
+  ],
+  "watch": [
+   "W18 "
+  ]
+ },
+ {
+  "id": "R3",
+  "desc": "the poller's in-flight count goes back to database rows only (the webhook's count unchanged)",
+  "file": "apps/server/src/services/issue-intake.ts",
+  "edits": [
+   {
+    "find": "export function projectAtInFlightCap(db: Db, projectId: string): boolean {",
+    "replace": "export function projectAtInFlightCap(db: Db, projectId: string, countImports = true): boolean {"
+   },
+   {
+    "find": "  return inFlight + importsInFlightFor(projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;",
+    "replace": "  return inFlight + (countImports ? importsInFlightFor(projectId) : 0) >= ISSUE_INTAKE_IN_FLIGHT_CAP;"
+   },
+   {
+    "find": "projectAtInFlightCap(deps.db, row.id)",
+    "replace": "projectAtInFlightCap(deps.db, row.id, false)",
+    "all": true
+   }
+  ],
+  "watch": [
+   "W15 ",
+   "W8 "
+  ]
+ },
+ {
+  "id": "R4",
+  "desc": "the webhook's mapping of the import's own 404 to 202 misconfigured is removed",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "    if (err instanceof HttpError && err.status === 404) {\n      if ('reason' in teamGithubToken(deps, tokenRow.teamId)) {\n        return refuse('no-github-connection', 'misconfigured', 'github connection not found');\n      }\n      return refuse(\n        'issue-not-found',\n        'misconfigured',\n        `issue ${fullName}#${issueNumber} not found on GitHub (or not visible to the team token)`,\n      );\n    }\n",
+    "replace": ""
+   }
+  ],
+  "watch": [
+   "W16 ",
+   "W19 ",
+   "D2 "
+  ]
+ },
+ {
+  "id": "R5",
+  "desc": "every refusal answers its specific detail in the 202 again (login and permission verdict to the URL-token holder)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "    return respond(logger, { result, deliveryId, detail: answer });",
+    "replace": "    return respond(logger, { result, deliveryId, detail });"
+   }
+  ],
+  "watch": [
+   "W1 ",
+   "W2 ",
+   "W4 permission 读失败",
+   "W4b ",
+   "W12b "
+  ]
+ },
+ {
+  "id": "R5b",
+  "desc": "only sender-below-triage answers its specific detail (one of the three cases told apart)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "    return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);",
+    "replace": "    return refuse('sender-below-triage', 'ignored', `${sender} is below triage on ${fullName}`);"
+   }
+  ],
+  "watch": [
+   "W1 ",
+   "W2 ",
+   "W4 permission 读失败",
+   "W4b ",
+   "W12b "
+  ]
+ },
+ {
+  "id": "R6",
+  "desc": "GithubRateLimitedError.retryAt prefers x-ratelimit-reset over retry-after again",
+  "file": "apps/server/src/lib/github.ts",
+  "edits": [
+   {
+    "find": "    if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;\n    return this.resetAt;",
+    "replace": "    if (this.resetAt !== null) return this.resetAt;\n    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;"
+   }
+  ],
+  "watch": [
+   "（二级限流，retry-after 60 与 x-ratelimit-reset 都在）"
+  ]
+ },
+ {
+  "id": "R7",
+  "desc": "the sender login-shape check is skipped (`..`, `.`, `a/b` reach the permission URL)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "  if (!GITHUB_LOGIN.test(sender)) {",
+    "replace": "  if (false && !GITHUB_LOGIN.test(sender)) {"
+   }
+  ],
+  "watch": [
+   "W20 ",
+   "W20b "
+  ]
+ },
+ {
+  "id": "R8",
+  "desc": "every import 404 is answered 'github connection not found' again (no split by re-reading the team token)",
+  "file": "apps/server/src/services/webhook.ts",
+  "edits": [
+   {
+    "find": "      if ('reason' in teamGithubToken(deps, tokenRow.teamId)) {",
+    "replace": "      if (true || 'reason' in teamGithubToken(deps, tokenRow.teamId)) {"
+   }
+  ],
+  "watch": [
+   "W19 ",
+   "W16 "
+  ]
+ },
+ {
+  "id": "R9",
+  "desc": "rate-limit headers parsed with Number() again (an empty retry-after becomes 0 seconds)",
+  "file": "apps/server/src/lib/github.ts",
+  "edits": [
+   {
+    "find": "        return /^\\d+$/.test(v) ? Number(v) : null;",
+    "replace": "        return res.headers.get(name) === null ? null : Number(v);"
+   }
+  ],
+  "watch": [
+   "（retry-after 是空串，x-ratelimit-remaining 0 带 reset）"
+  ]
+ }
+]

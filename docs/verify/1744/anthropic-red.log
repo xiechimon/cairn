@@ -1,0 +1,36 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1744
+
+ ❯ |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts (19 tests | 2 failed) 71ms
+   ❯ #1744 compaction at the context ceiling (18)
+     × an Anthropic top-level summary system recovers output room 6ms
+     × an Anthropic top-level summary system recovers output room 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts > #1744 compaction at the context ceiling > an Anthropic top-level summary system recovers output room
+ FAIL  |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts > #1744 compaction at the context ceiling > an Anthropic top-level summary system recovers output room
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ❯ test/pi-compaction-ceiling.test.ts:63:29
+     61|       }),
+     62|     });
+     63|     expect(response.status).toBe(200);
+       |                             ^
+     64|     expect(calls).toBe(2);
+     65|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 17 passed (19)
+   Start at  09:59:10
+   Duration  3.20s (transform 57%, import 39%, tests 3%, worker 1%)
+

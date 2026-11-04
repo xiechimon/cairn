@@ -1,0 +1,58 @@
+$ biome ci .
+apps/server/test/codeowners.test.ts:10:39 lint/complexity/noUselessEscapeInRegex  FIXABLE  ━━━━━━━━━━
+
+  ℹ The character doesn't need to be escaped.
+  
+     8 │ const OWNER = '@xiechimon';
+     9 │ const EVAL_ROOTS = ['integration/eval/', '.claude/hillclimb/'];
+  > 10 │ const GITHUB_UNSUPPORTED_PATTERN = /[!\[\]\\]|^#/;
+       │                                       ^^
+    11 │ const TOKEN_SHAPES = [/gh[pousr]_[A-Za-z0-9]{20,}/, /github_pat_[A-Za-z0-9_]{20,}/];
+    12 │ 
+  
+  ℹ The character should only be escaped if it is outside a character class or under the `v` flag.
+  
+  ℹ Safe fix: Unescape the character.
+  
+    10 │ const·GITHUB_UNSUPPORTED_PATTERN·=·/[!\[\]\\]|^#/;
+       │                                       -           
+
+apps/web/src/resources/machines-page.tsx:257:15 lint/complexity/noUselessFragments  FIXABLE  ━━━━━━━━━━
+
+  ℹ This fragment is unnecessary.
+  
+    255 │             ) : null}
+    256 │             {estimate ? null : (
+  > 257 │               <>
+        │               ^^
+  > 258 │                 {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
+         ...
+  > 267 │                 )}
+  > 268 │               </>
+        │               ^^^
+    269 │             )}
+    270 │           </div>
+  
+  ℹ A fragment is redundant if it contains only one child, or if it is the child of a html element, and is not a keyed fragment.
+  
+  ℹ Unsafe fix: Remove the Fragment
+  
+    255 255 │               ) : null}
+    256 256 │               {estimate ? null : (
+    257     │ - ··············<>
+    258     │ - ················{hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+        257 │ + ··············hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+    259 258 │                     <>
+    260 259 │                       <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+    ······· │ 
+    265 264 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    266 265 │                     </>
+    267     │ - ················)}
+    268     │ - ··············</>
+        266 │ + ················)
+    269 267 │               )}
+    270 268 │             </div>
+  
+
+Checked 984 files in 416ms. No fixes applied.
+Found 2 infos.

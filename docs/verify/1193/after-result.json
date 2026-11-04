@@ -1,0 +1,57 @@
+{
+  "expect": "Create tags",
+  "passes": [
+    {
+      "pass": 1,
+      "lang": "en",
+      "url": "http://127.0.0.1:5273/app/resources/agents/Psesx8nSyHS5NlOjFgapa",
+      "accountTitle": "Pacman\nSearch\n⌘K\nNew task\nC\nWorkbench\nSchedules\nProject\nNew project\nResources\nSkills\nMCP\nSecrets\nMachines\nProviders\nOwner\nAccount\nName\nOwner\nLanguage\nEnglish\nPush notifications",
+      "switchNames": [
+        "Remote shell",
+        "Merge branches",
+        "Create tags",
+        "Push branches",
+        "Create skills",
+        "Update skills",
+        "Unrestricted"
+      ],
+      "hints": [
+        "Allow this Agent to run commands on machines where shell access is enabled for the team.",
+        "Let this Agent publish by merging branches (for example develop into main).",
+        "Let this Agent create git tags, which may trigger a release pipeline.",
+        "Let this Agent commit and push its working branch at any time (needed when it merges release changes itself).",
+        "Let this Agent add new skills to the team skill library.",
+        "Let this Agent modify skills already in the team skill library.",
+        "Offline"
+      ],
+      "expectedVisible": true,
+      "otherCount": 0
+    },
+    {
+      "pass": 2,
+      "lang": "en",
+      "url": "http://127.0.0.1:5273/app/resources/agents/Psesx8nSyHS5NlOjFgapa",
+      "accountTitle": "Pacman\nSearch\n⌘K\nNew task\nC\nWorkbench\nSchedules\nProject\nNew project\nResources\nSkills\nMCP\nSecrets\nMachines\nProviders\nOwner\nAccount\nName\nOwner\nLanguage\nEnglish\nPush notifications",
+      "switchNames": [
+        "Remote shell",
+        "Merge branches",
+        "Create tags",
+        "Push branches",
+        "Create skills",
+        "Update skills",
+        "Unrestricted"
+      ],
+      "hints": [
+        "Allow this Agent to run commands on machines where shell access is enabled for the team.",
+        "Let this Agent publish by merging branches (for example develop into main).",
+        "Let this Agent create git tags, which may trigger a release pipeline.",
+        "Let this Agent commit and push its working branch at any time (needed when it merges release changes itself).",
+        "Let this Agent add new skills to the team skill library.",
+        "Let this Agent modify skills already in the team skill library.",
+        "Offline"
+      ],
+      "expectedVisible": true,
+      "otherCount": 0
+    }
+  ]
+}

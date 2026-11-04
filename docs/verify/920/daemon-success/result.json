@@ -1,0 +1,67 @@
+{
+  "probe": "drive-920-skills-manifest/daemon-success",
+  "expect": "new",
+  "server": "http://127.0.0.1:8791",
+  "skillsDir": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/skills",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-920-daemon-home-c1",
+  "passed": 11,
+  "total": 11,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（5 技能 / 13 文件）",
+      "ok": true,
+      "detail": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0215-920/.claude/verify-run/home/skills"
+    },
+    {
+      "name": "daemon 步会话完整跑完（stub LLM；产物闸「构建零改动」不算阻断）",
+      "ok": true,
+      "detail": "{\"id\":\"wRQdrAJTF8DVakbAIT2p8\",\"kind\":\"build\",\"status\":\"failed\",\"buildErrorMessage\":\"构建零改动\"}"
+    },
+    {
+      "name": "daemon.log 出现 materialized 行",
+      "ok": true,
+      "detail": "1 行"
+    },
+    {
+      "name": "catalog loaded 行指向物化视图（运行时读得到）",
+      "ok": true,
+      "detail": "2026-10-07 16:20:54 [skills] loaded: 4 skills from /tmp/pacman-920-daemon-home-c1/team-skills/views/3bb2dcdcf54936d1c9bd6cd628314750891a6dbbea12203611a7b3553af1434b + /Users/xmon/.agents/skills"
+    },
+    {
+      "name": "materialized 行计数 = 4 技能 / 12 文件",
+      "ok": true,
+      "detail": "4/12"
+    },
+    {
+      "name": "首拉 fetched=8（唯一内容） / reused=4（同内容去重）",
+      "ok": true,
+      "detail": "fetched=8 reused=4"
+    },
+    {
+      "name": "视图目录在 daemon home team-skills/views 下",
+      "ok": true,
+      "detail": "/tmp/pacman-920-daemon-home-c1/team-skills/views/3bb2dcdcf54936d1c9bd6cd628314750891a6dbbea12203611a7b3553af1434b"
+    },
+    {
+      "name": "落盘文件数与清单一致（12）",
+      "ok": true,
+      "detail": "tree=12"
+    },
+    {
+      "name": "落盘内容逐字节 = server 侧真值（12/12）",
+      "ok": true,
+      "detail": "12/12}"
+    },
+    {
+      "name": "运行时可读：alpha/SKILL.md frontmatter 完整",
+      "ok": true,
+      "detail": "---\nname: alpha\ndescription: 基础技能（#920 探"
+    },
+    {
+      "name": "blobs 内容库 = 唯一内容数（文件级内容寻址去重）",
+      "ok": true,
+      "detail": "blobs=8 uniq=8"
+    }
+  ]
+}

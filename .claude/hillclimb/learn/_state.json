@@ -1,0 +1,61 @@
+{
+  "schema": "hillclimb/v2",
+  "metrics": [
+    {
+      "id": "decision_ok",
+      "label": "Round 2 uses the corrected fact",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "memory_saved_ok",
+      "label": "Correction stored on the project",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "no_memory_ok",
+      "label": "Round 2 with empty memory",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "oracle_ok",
+      "label": "Round 2 with the seeded fact",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "reflect_fact_ok",
+      "label": "A reflection candidate states the corrected fact",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "reflect_wrong",
+      "label": "A reflection candidate states the wrong fact",
+      "kind": "binary",
+      "better": "lower"
+    }
+  ],
+  "perf_fields": [
+    { "id": "in_tokens", "label": "in tok" },
+    { "id": "out_tokens", "label": "out tok" },
+    { "id": "cache_read_tokens", "label": "cache rd" },
+    { "id": "tool_calls", "label": "tools" },
+    { "id": "cost_usd", "label": "cost $", "unit": "usd" },
+    { "id": "latency_s", "label": "latency", "unit": "s" }
+  ],
+  "harness_paths": [
+    "integration/eval/chief-dispatch/run-eval.mts",
+    "integration/eval/chief-dispatch/stack.mts",
+    "integration/eval/learn/grade.mts",
+    "integration/eval/learn/pack.mts",
+    "integration/eval/learn/run.mts",
+    "integration/eval/learn/memory.mts",
+    ".claude/hillclimb/learn/cases.json",
+    "apps/server/src/trajectory-reflect.ts",
+    "apps/server/src/services/chief.ts",
+    "apps/server/src/services/memory.ts"
+  ]
+}

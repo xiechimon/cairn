@@ -1,0 +1,115 @@
+✔ .claude/skills/pr-cairn/SKILL.md separates bot rebase from human squash (2.139045ms)
+✔ docs/ops/agent-bot-identity.md separates bot rebase from human squash (1.527142ms)
+✔ the workflow rejects bot authors and accepts Cairnwright and human authors (91.088427ms)
+✔ PR validation reads the explicit head without executing PR code (1.473433ms)
+✔ a bot-authored commit beneath a human tip is rejected (66.385575ms)
+✔ a squash commit authored by the bot is rejected (27.73763ms)
+✖ main push checks bot squash (27.240972ms)
+✖ main push checks bot beneath human tip (22.242425ms)
+✔ main push checks historical bot (25.574859ms)
+✖ main push checks missing before (18.320628ms)
+✖ main push checks zero before (15.841066ms)
+✔ every commit in a clean human range passes (26.516704ms)
+✔ author cairnwright[bot] <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (15.722375ms)
+✔ author Human <347615582+cairnwright[bot]@users.noreply.github.com> exits 1 with a bot committer (15.495294ms)
+✔ author cairnwright[bot] <other@example.com> exits 1 with a bot committer (27.382831ms)
+✔ author Human <human@example.com> exits 0 with a bot committer (36.181048ms)
+✔ author Cairnwright <cairnwright@example.com> exits 0 with a bot committer (13.054241ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 13
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 420.463192
+
+✖ failing tests:
+
+test at scripts/commit-author.test.mjs:92:3
+✖ main push checks bot squash (27.240972ms)
+  AssertionError [ERR_ASSERTION]: author: Human <human@example.com>
+  
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2028/scripts/commit-author.test.mjs:112:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/commit-author.test.mjs:92:3
+✖ main push checks bot beneath human tip (22.242425ms)
+  AssertionError [ERR_ASSERTION]: author: Human <human@example.com>
+  
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2028/scripts/commit-author.test.mjs:112:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/commit-author.test.mjs:92:3
+✖ main push checks missing before (18.320628ms)
+  AssertionError [ERR_ASSERTION]: author: Human <human@example.com>
+  
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2028/scripts/commit-author.test.mjs:112:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/commit-author.test.mjs:92:3
+✖ main push checks zero before (15.841066ms)
+  AssertionError [ERR_ASSERTION]: author: Human <human@example.com>
+  
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2028/scripts/commit-author.test.mjs:112:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

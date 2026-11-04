@@ -1,0 +1,21 @@
+# pr-gate by name, second probe (2026-10-20, same session, after 2953b40 was committed). Both calls pass invalid args,
+# so the script stops at its args check with 0 agents; the persisted script of each named run is hashed below.
+
+# 1) cwd = /home/user/pacman/.claude/worktrees/p2a (branch claude/bootstrap-p2, which has no .claude/workflows/)
+$ Workflow({name: "pr-gate", args: {probe: "..."}})
+Workflow "pr-gate" not found. Available: deep-research
+
+# 2) cwd = /home/user/pacman (branch claude/nice-faraday-o329b3 at 2953b40, file on disk = HEAD)
+$ Workflow({name: "pr-gate", args: {probe: "..."}})
+status: failed  agent_count: 0  error: pr-gate args: {pr: number, ... linesChanged: number, the sum of both columns of ...}
+
+# sha256 (first 16 hex) of the persisted script of each named run and of the committed copies
+named run, first probe (pr-gate-named-probe.txt)  1cf4ce8d5fe89df3
+named run, this probe                              d217872f15b8c9ea
+git show 7f0b544:.claude/workflows/pr-gate.js          1cf4ce8d5fe89df3
+git show 4c27770:.claude/workflows/pr-gate.js          d5cbfb45ded83401
+git show 2953b40:.claude/workflows/pr-gate.js          d217872f15b8c9ea
+
+# reading: the name resolves against .claude/workflows/ under the session's current working directory. The first
+# probe got the 7f0b544 copy while the working tree already held uncommitted edits, so the content can lag the
+# file on disk. spec 28 §7.5 keeps scriptPath on the origin/main copy.

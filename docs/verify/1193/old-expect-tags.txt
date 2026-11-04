@@ -1,0 +1,64 @@
+locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for getByRole('switch', { name: 'Create tags', exact: true }) to be visible
+
+    at /workspace/.claude/verify-evidence/drive-1193.mjs:50:16
+
+Pacman
+Search
+⌘K
+New task
+C
+Workbench
+Schedules
+Project
+New project
+Resources
+Skills
+MCP
+Secrets
+Machines
+Providers
+Owner
+verify-1193
+Overview
+Memory
+Permissions
+Tools
+Remote shell
+Allow this Agent to run commands on machines where shell access is enabled for the team.
+Merge branches
+Let this Agent publish by merging branches (for example develop into main).
+Create labels
+Let this Agent create git tags, which may trigger a release pipeline.
+Push branches
+Let this Agent commit and push its working branch at any time (needed when it merges release changes itself).
+Create skills
+Let this Agent add new skills to the team skill library.
+Update skills
+Let this Agent modify skills already in the team skill library.
+Skill access
+
+Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.
+
+Unrestricted
+Secrets
+
+No team secrets yet.
+
+Add a secret
+MCP Servers
+
+Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.
+
+No MCP servers yet.
+
+Machine fit
+
+Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); old daemons that never reported a snapshot are let through.
+
+No MCP servers yet.
+
+cursor
+Offline
+Runnable

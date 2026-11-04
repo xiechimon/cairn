@@ -1,0 +1,6 @@
+$ E2E_PORT=8408 pnpm --filter @pacman/web exec playwright test e2e/storage-unavailable.spec.ts
+# on this branch (fixed)
+
+  ✓  1 e2e/storage-unavailable.spec.ts:76:1 › sandboxed iframe without allow-same-origin renders /app (no white screen) (392ms)
+  ✓  2 e2e/storage-unavailable.spec.ts:101:1 › sandboxed boot survives a persistence interaction (writes silently dropped) (303ms)
+  2 passed (3.2s)

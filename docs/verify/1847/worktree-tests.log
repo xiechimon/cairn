@@ -1,0 +1,71 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1847
+
+ ❯ |@xiechimon/cairn| test/merge-gate-model-roster.test.ts (2 tests | 1 failed) 24ms
+   ❯ merge-gate model roster (2)
+     × the checked-in snapshot matches the installed pi model catalogs 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/merge-gate-model-roster.test.ts > merge-gate model roster > the checked-in snapshot matches the installed pi model catalogs
+AssertionError: expected { vendors: { …(162) }, …(1) } to deeply equal { vendors: { …(158) }, …(1) }
+
+- Expected
++ Received
+
+@@ -9,10 +9,11 @@
+      "cheap": "DeepSeek",
+      "claude-fable-5": "Anthropic",
+      "claude-fable-5-1": "Anthropic",
+      "claude-haiku-4-5": "Anthropic",
+      "claude-haiku-4-5-20251001": "Anthropic",
++     "claude-haiku-5-5": "Anthropic",
+      "claude-opus-4-5": "Anthropic",
+      "claude-opus-4-5-20251101": "Anthropic",
+      "claude-opus-4-6": "Anthropic",
+      "claude-opus-4-7": "Anthropic",
+      "claude-opus-4-8": "Anthropic",
+@@ -21,10 +22,11 @@
+      "claude-sonnet-4-5": "Anthropic",
+      "claude-sonnet-4-5-20250929": "Anthropic",
+      "claude-sonnet-4-6": "Anthropic",
+      "claude-sonnet-5": "Anthropic",
+      "claude-sonnet-5-5": "Anthropic",
++     "codestral-2508": "Mistral",
+      "codestral-latest": "Mistral",
+      "deep-research-max-preview-04-2026": "Google",
+      "deep-research-preview-04-2026": "Google",
+      "deepseek-flash": "DeepSeek",
+      "deepseek-v4-pro": "DeepSeek",
+@@ -49,12 +51,14 @@
+      "gemini-3.5-flash": "Google",
+      "gemini-3.5-flash-lite": "Google",
+      "gemini-3.6-flash": "Google",
+      "gemini-3.7-flash": "Google",
+      "gemini-3.8-flash": "Google",
++     "gemini-4-argon": "Google",
+      "gemini-flash-latest": "Google",
+      "gemini-flash-lite-latest": "Google",
++     "gemini-pro-latest": "Google",
+      "gemma-4-26b-a4b-it": "Google",
+      "gemma-4-31b-it": "Google",
+      "glm-4.6v": "Z.ai",
+      "glm-4.7": "Z.ai",
+      "glm-5-2": "Mistral",
+
+ ❯ test/merge-gate-model-roster.test.ts:35:41
+     33|         return { provider: name.slice(0, -'.json'.length), models };
+     34|       });
+     35|     expect(deriveModelRoster(catalogs)).toEqual({
+       |                                         ^
+     36|       vendors: MODEL_VENDORS,
+     37|       aliases: MODEL_ALIASES,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 5 passed (6)
+   Start at  10:38:11
+   Duration  1.59s (transform 56%, import 28%, tests 16%)
+

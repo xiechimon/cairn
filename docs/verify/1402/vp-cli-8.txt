@@ -1,0 +1,38 @@
+# #1402: search/project-line, the probe #1418 added on main, registered in this PR and driven through vp.mjs on a fresh stack at d5f0111.
+# Archived run: 20261021-041833-search-project-line/.
+
+$ vp.mjs launch
+verify stack ready
+exit=0
+$ vp.mjs drive search
+feature search has 2 cases, name one: search, project-line
+exit=2
+$ vp.mjs drive search project-line
+vp: search/project-line usage: env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR
+vp: search/project-line needs the stack, running doctor first
+PASS  server 进程组存活(pid 22992) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 22993) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+doctor:all PASS
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-041833-search-project-line
+vp: search/project-line -> node .claude/skills/verify-pacman/scripts/drive-search-project-line.mjs
+PASS  N +72ms 帧在 /api/search 回包前(回包于 +321ms)
+PASS  N +72ms 每行副行 = 自己的项目(#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas),面板无 r3-lifecycle
+PASS  N +506ms 每行副行 = 自己的项目(#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas),面板无 r3-lifecycle
+PASS  N +3009ms 每行副行 = 自己的项目(#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas),面板无 r3-lifecycle
+PASS  H /api/search 请求已发出并被扣住(1 条)
+PASS  H 回包前帧:#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas,面板无 r3-lifecycle
+PASS  H 服务端帧:#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas
+PASS  H 回包前帧与服务端帧逐行相同(副行不跳变)
+PASS  P /api/projects(1)与 /api/search(1)均在途
+PASS  P 项目读面在途帧:#1 副行探针 alpha→null | #2 副行探针 beta→null(无副行,无 r3-lifecycle)
+PASS  API /api/search 每行 projectName = 自己的项目(副行探针 alpha→verify-1400 | 副行探针 beta→atlas)
+PASS  SQLite todo.projectId → project.name 与期望一致(副行探针 alpha→verify-1400 | 副行探针 beta→atlas)
+evidence  /home/user/pacman/.claude/verify-evidence/20261021-041833-search-project-line
+12/12 checks passed
+exit=0
+$ vp.mjs cleanup
+exit=0

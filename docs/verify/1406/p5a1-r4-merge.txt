@@ -1,0 +1,76 @@
+# P5a-1 round 4, step 1: merge origin/main into claude/bootstrap-p5
+# date: 2026-10-21T13:55:44Z; user: root (uid 0); worktree /home/user/pacman/.claude/worktrees/p5
+
+## Merge
+$ git fetch origin main   (origin/main = dabef4819314cbf3bb18b2301c8978edec343874)
+$ git merge --no-ff --no-commit origin/main
+Auto-merging apps/server/src/lib/github.ts
+Auto-merging apps/server/src/services/chief-tools.ts
+Auto-merging packages/shared/test/vocabulary.test.ts
+Automatic merge went well; stopped before committing as requested
+
+merge commit: 18c6dded5e9028f9a1224f88fbcbee3f65ff2ff3 Merge origin/main (dabef48) into claude/bootstrap-p5
+parents:      69722cc9fea398bf085e89ceda44ad781081cb61 dabef4819314cbf3bb18b2301c8978edec343874   (69722cc9 = PR head before round 4, dabef481 = origin/main)
+brings in (merge-base 1f61c793..dabef481): #1467 chief/MCP GitHub reads (49af6f28), #1411 vp.mjs (e1b051a8),
+  #1420 merge gate S1 (9eefe881), #1456 canOrchestrate / orchestrate phase guard (dabef481), #1465, #1464 and others;
+  311 files from main's side.
+
+Conflicts: none. git merge-tree --write-tree HEAD origin/main gave a clean tree before the merge; the three files
+changed on both sides auto-merged:
+- apps/server/src/lib/github.ts: main adds githubListIssues / githubListPulls / githubListWorkflowRuns with getListPage
+  and isAbort; this branch adds the intake reads (intakeGet ... githubIssueState). Different top-level names, no
+  duplicate declarations (typecheck below). Both sides kept.
+- apps/server/src/services/chief-tools.ts: main's #1467 read-tool changes and this branch's transitionTodos Pick type.
+- packages/shared/test/vocabulary.test.ts: main's ORCHESTRATE_PHASES / canOrchestrate pins and this branch's
+  PACMAN_ISSUE_INTAKE env-var pin.
+#1456's canOrchestrate guard in orchestrate.ts is now on the intake's orchestrateTodo path; the intake imports only
+into todo, which canOrchestrate accepts (orchestrate tests and issue-intake group 16 below).
+
+Pre-commit hook on the merge commit: the comment-discipline gate matched one line, inside main's own file
+docs/verify/1404/pr-gate-1420-run5-1892662.json (blob a6f5b55c, byte-identical to origin/main, landed in #1420; the
+match is the word quoted in "`todos.ts` does not match the case-sensitive ..."). No line this branch adds matches.
+The merge was committed with the gate's sanctioned exit PACMAN_ALLOW_BANNED_VOCAB=1 for that main-side file only;
+the rest of the hook (biome ci, pnpm -r typecheck, test-spawn-gate) ran and passed.
+
+## pnpm typecheck (on 18c6dded)
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+## pnpm spec:parse (on 18c6dded)
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (4.8s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (12.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+## intake, github-issues, webhook, orchestrate tests (on 18c6dded)
+$ pnpm exec vitest run --reporter=verbose apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts \
+    apps/server/test/webhook.test.ts apps/server/test/orchestration-source.test.ts apps/server/test/machine-pin.test.ts \
+    apps/server/test/github-reads.test.ts apps/server/test/chief-tools.test.ts apps/server/test/phase.test.ts \
+    packages/shared/test/vocabulary.test.ts packages/shared/test/chief-tools.test.ts
+(orchestration-source and machine-pin drive POST /todos/:id/orchestrate; phase.test and vocabulary.test hold the
+ #1456 canOrchestrate / ORCHESTRATE_PHASES pins; github-reads and chief-tools are #1467's, sharing lib/github.ts)
+per file (passed):
+       18 |@pacman/shared| test/chief-tools.test.ts
+       39 |@pacman/shared| test/vocabulary.test.ts
+       11 |@xiechimon/pacman| test/chief-tools.test.ts
+       28 |@xiechimon/pacman| test/github-issues.test.ts
+       39 |@xiechimon/pacman| test/github-reads.test.ts
+      119 |@xiechimon/pacman| test/issue-intake.test.ts
+       11 |@xiechimon/pacman| test/machine-pin.test.ts
+       10 |@xiechimon/pacman| test/orchestration-source.test.ts
+        8 |@xiechimon/pacman| test/phase.test.ts
+       19 |@xiechimon/pacman| test/webhook.test.ts
+ Test Files  10 passed (10)
+      Tests  302 passed (302)
+exit=0

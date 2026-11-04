@@ -1,0 +1,154 @@
+[
+  {
+    "id": 4949486002,
+    "number": 1461,
+    "title": "server(1406): issue intake poller for ready-for-agent issues, opt-in",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [],
+    "state": "open",
+    "draft": false,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T09:36:35Z",
+    "updated_at": "2026-10-21T09:37:20Z",
+    "closed_at": null,
+    "merged_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/pull/1461",
+    "body": "(body removed from fixture)",
+    "head": {
+      "label": "xiechimon:claude/bootstrap-p5",
+      "ref": "claude/bootstrap-p5",
+      "sha": "f9114471a47ab384eed15be62306575c387d3e55",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    }
+  },
+  {
+    "id": 4948706318,
+    "number": 1456,
+    "title": "Local test loop and a shared start rule: e2e-affected, canOrchestrate, container-safe daemon tests (#1455, #1457, #1458)",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [],
+    "state": "open",
+    "draft": false,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T08:31:11Z",
+    "updated_at": "2026-10-21T09:14:51Z",
+    "closed_at": null,
+    "merged_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/pull/1456",
+    "body": "(body removed from fixture)",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "72646d7d3b5b51a0399631faeee21c234907dc44",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    }
+  },
+  {
+    "id": 4948179059,
+    "number": 1454,
+    "title": "server(1453): a step that finishes before its stop lands leaves an exited card alone",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [],
+    "state": "closed",
+    "draft": false,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T07:45:01Z",
+    "updated_at": "2026-10-21T07:54:02Z",
+    "closed_at": "2026-10-21T07:54:00Z",
+    "merged_at": "2026-10-21T07:54:00Z",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1454",
+    "body": "(body removed from fixture)",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "815d5b73f70829d44d6895e1a7a51e13bc6a0555",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "66d5022e374da641ed37ca59ec4fa1c089cb1fac",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    }
+  },
+  {
+    "id": 4947604303,
+    "number": 1452,
+    "title": "server(1451): marking an in-progress task done stops its active step",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [],
+    "state": "closed",
+    "draft": false,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T06:51:26Z",
+    "updated_at": "2026-10-21T07:18:13Z",
+    "closed_at": "2026-10-21T07:18:09Z",
+    "merged_at": "2026-10-21T07:18:09Z",
+    "html_url": "https://github.com/xiechimon/pacman/pull/1452",
+    "body": "(body removed from fixture)",
+    "head": {
+      "label": "xiechimon:claude/optimistic-albattani-r5pmfn",
+      "ref": "claude/optimistic-albattani-r5pmfn",
+      "sha": "0608a6b8eefae4ae00e50cfd020b3c1831659750",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    },
+    "base": {
+      "label": "xiechimon:main",
+      "ref": "main",
+      "sha": "e9d6d456ac8ff06ecd02211ce700d984716e4f7b",
+      "repo": {
+        "id": 1361226985,
+        "full_name": "xiechimon/pacman"
+      }
+    }
+  }
+]

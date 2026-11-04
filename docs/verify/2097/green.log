@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: weekly CLI stratifies failures, blinds packs, preserves reviews and reports agreement
+ok 1 - weekly CLI stratifies failures, blinds packs, preserves reviews and reports agreement
+  ---
+  duration_ms: 151.658769
+  type: 'test'
+  ...
+# Subtest: reports reject conflicting hand labels for a build across weekly reviews
+ok 2 - reports reject conflicting hand labels for a build across weekly reviews
+  ---
+  duration_ms: 29.120641
+  type: 'test'
+  ...
+# Subtest: same-day re-run exits before flows when the review directory already exists
+ok 3 - same-day re-run exits before flows when the review directory already exists
+  ---
+  duration_ms: 7.860933
+  type: 'test'
+  ...
+# Subtest: labeler environment unset fails before a zero-pack review
+ok 4 - labeler environment unset fails before a zero-pack review
+  ---
+  duration_ms: 6.417873
+  type: 'test'
+  ...
+# Subtest: weekly script exports packs by default and echoes sampler trace hit counts
+ok 5 - weekly script exports packs by default and echoes sampler trace hit counts
+  ---
+  duration_ms: 0.262373
+  type: 'test'
+  ...
+# Subtest: week window uses portable UTC arithmetic without GNU date -d
+ok 6 - week window uses portable UTC arithmetic without GNU date -d
+  ---
+  duration_ms: 46.461485
+  type: 'test'
+  ...
+# Subtest: export success then label failure leaves no stuck artifacts that block retry
+ok 7 - export success then label failure leaves no stuck artifacts that block retry
+  ---
+  duration_ms: 89.818902
+  type: 'test'
+  ...
+# Subtest: pack helper stdout is only the labeled path when CLI prints summaries
+ok 8 - pack helper stdout is only the labeled path when CLI prints summaries
+  ---
+  duration_ms: 93.001053
+  type: 'test'
+  ...
+# Subtest: weekly script does not capture pack helper stdout into PACKS_LABELED
+ok 9 - weekly script does not capture pack helper stdout into PACKS_LABELED
+  ---
+  duration_ms: 0.26355
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 286.751836

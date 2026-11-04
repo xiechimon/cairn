@@ -1,0 +1,134 @@
+{
+  "epic": "B-UI",
+  "items": [
+    {
+      "id": "gallery",
+      "issue": 2319,
+      "dependsOn": [],
+      "humanHeld": true
+    },
+    {
+      "id": "shell-sidebar",
+      "issue": 2320,
+      "dependsOn": [
+        "gallery"
+      ]
+    },
+    {
+      "id": "sidebar-threads",
+      "issue": 2224,
+      "dependsOn": [
+        "gallery"
+      ]
+    },
+    {
+      "id": "unread",
+      "issue": 2225,
+      "dependsOn": [
+        "gallery"
+      ]
+    },
+    {
+      "id": "snooze",
+      "issue": 2229,
+      "dependsOn": [
+        "gallery"
+      ]
+    },
+    {
+      "id": "sidebar-groups",
+      "issue": 2230,
+      "dependsOn": [
+        "gallery"
+      ]
+    },
+    {
+      "id": "snooze-ends",
+      "issue": 2242,
+      "dependsOn": [
+        "gallery"
+      ]
+    },
+    {
+      "id": "project-home",
+      "issue": 2321,
+      "dependsOn": [
+        "shell-sidebar"
+      ]
+    },
+    {
+      "id": "home-layout",
+      "issue": 2226,
+      "dependsOn": [
+        "shell-sidebar"
+      ]
+    },
+    {
+      "id": "threads-inbox",
+      "issue": 2322,
+      "dependsOn": [
+        "shell-sidebar"
+      ]
+    },
+    {
+      "id": "thread-detail",
+      "issue": 2323,
+      "dependsOn": [
+        "project-home",
+        "threads-inbox"
+      ]
+    },
+    {
+      "id": "turn-folding",
+      "issue": 2235,
+      "dependsOn": [
+        "project-home",
+        "threads-inbox"
+      ]
+    },
+    {
+      "id": "library-scheduled",
+      "issue": 2324,
+      "dependsOn": [
+        "thread-detail"
+      ]
+    },
+    {
+      "id": "schedule-ui",
+      "issue": 2241,
+      "dependsOn": [
+        "thread-detail"
+      ]
+    },
+    {
+      "id": "settings",
+      "issue": 2325,
+      "dependsOn": [
+        "library-scheduled"
+      ]
+    },
+    {
+      "id": "cmdk-activity",
+      "issue": 2326,
+      "dependsOn": [
+        "settings"
+      ]
+    }
+  ],
+  "requiredChecks": [
+    "check",
+    "pack-smoke",
+    "e2e-gate"
+  ],
+  "checks": [
+    {
+      "name": "checker tests pass",
+      "run": [
+        "node",
+        "--test",
+        "scripts/epic-done.test.mjs"
+      ]
+    }
+  ],
+  "maxHours": 120
+}

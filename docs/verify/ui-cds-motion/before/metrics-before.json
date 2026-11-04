@@ -1,0 +1,10 @@
+{
+  "springBouncy": "",
+  "springSnappyDur": "",
+  "springGentleDur": "",
+  "springHeavyDur": "",
+  "scrollFadeSize": "28px",
+  "background": "#f6f1ec",
+  "card": "#f0ebe6",
+  "note": "origin/main pre-PR-2: spring tokens absent; scroll-fade-size already from PR-1"
+}

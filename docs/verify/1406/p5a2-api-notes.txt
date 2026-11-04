@@ -1,0 +1,127 @@
+#1406 P5a-2 chief / MCP GitHub read tools: GitHub REST facts relied on
+Read 2026-10-21 from docs.github.com (markdown bodies via
+https://docs.github.com/api/article/body?pathname=/en/<page>). Captures below
+were taken the same day from this container through its outbound proxy.
+
+== 1. List repository issues: GET /repos/{owner}/{repo}/issues
+URL: https://docs.github.com/en/rest/issues/issues#list-repository-issues
+- "GitHub's REST API considers every pull request an issue, but not every
+  issue is a pull request. For this reason, "Issues" endpoints may return
+  both issues and pull requests in the response. You can identify pull
+  requests by the pull_request key."
+  -> the tool reuses projectIssue (lib/github.ts), which drops entries with
+  a pull_request key; a page can therefore hold fewer than perPage issues.
+- state: default open, one of open | closed | all. sort: default created.
+  direction: default desc (so the list is newest first). per_page: "The
+  number of results per page (max 100)", default 30. page: default 1.
+- Status codes: 200, 301, 404, 422.
+- Response = array of Issue (schema under "List issues assigned to the
+  authenticated user"): number, title, state, body, user (null or Simple
+  User with login), labels (array of string or object with name/color),
+  author_association (enum COLLABORATOR, CONTRIBUTOR, FIRST_TIMER,
+  FIRST_TIME_CONTRIBUTOR, MANNEQUIN, MEMBER, NONE, OWNER), created_at,
+  updated_at, html_url, pull_request {merged_at, html_url, ...}.
+- Fine-grained token: "Repository permissions for Issues", GET
+  /repos/{owner}/{repo}/issues = read. Captured header
+  X-Accepted-Github-Permissions: issues=read, X-Accepted-Oauth-Scopes: repo.
+
+== 2. List pull requests: GET /repos/{owner}/{repo}/pulls
+URL: https://docs.github.com/en/rest/pulls/pulls#list-pull-requests
+- state: "Either open, closed, or all to filter by state." default open.
+  sort default created; direction "Default: desc when sort is created or
+  sort is not specified" (newest first). per_page max 100, default 30;
+  page default 1.
+- Status codes: 200, 304, 422.
+- Response = array of Pull Request Simple: number, state, title, user (null
+  or Simple User), body, created_at, updated_at, closed_at, merged_at
+  (string or null), head {label, ref, repo, sha, user}, base {label, ref,
+  repo, sha, user}, author_association, draft (boolean), html_url.
+  merged_at null = not merged; mergeable / mergeable_state are not in the
+  list response (they need GET /pulls/{n}), so the tool reports mergedAt only.
+- Fine-grained token: "Repository permissions for Pull requests", GET
+  /repos/{owner}/{repo}/pulls = read. Captured header
+  X-Accepted-Github-Permissions: pull_requests=read.
+
+== 3. List workflow runs for a repository: GET /repos/{owner}/{repo}/actions/runs
+URL: https://docs.github.com/en/rest/actions/workflow-runs#list-workflow-runs-for-a-repository
+- "Anyone with read access to the repository can use this endpoint. OAuth
+  app tokens and personal access tokens (classic) need the repo scope to use
+  this endpoint with a private repository."
+- "This endpoint will return up to 1,000 results for each search when using
+  the following parameters: actor, branch, check_suite_id, created, event,
+  head_sha, status."
+- branch: "Returns workflow runs associated with a branch. Use the name of
+  the branch of the push." status: "Returns workflow runs with the check run
+  status or conclusion that you specify." Can be one of: completed,
+  action_required, cancelled, failure, neutral, skipped, stale, success,
+  timed_out, in_progress, queued, requested, waiting, pending
+  -> shared GITHUB_WORKFLOW_RUN_STATUSES, validated before any read.
+- exclude_pull_requests: "If true pull requests are omitted from the
+  response (empty array)." default false -> the tool sends true (it does
+  not use the per-run pull_requests array).
+- per_page max 100, default 30; page default 1. Status codes: 200.
+- Response: total_count, workflow_runs[]: id, name (string or null),
+  head_branch (string or null), head_sha, path, run_number, event, status
+  (string or null), conclusion (string or null), html_url, created_at,
+  updated_at, actor, pull_requests.
+- The docs do not state an order; the captures below are newest first
+  (created_at descending), which is what the description says.
+- Fine-grained token: "Repository permissions for Actions", GET
+  /repos/{owner}/{repo}/actions/runs = read. Captured header
+  X-Accepted-Github-Permissions: actions=read.
+
+== 4. Pagination, rate limits, timeouts
+URLs: https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api
+      https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+      https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api
+- Pagination: "The URL for the next page is followed by rel="next"" in the
+  link header -> hasMore = link header contains rel="next".
+- Rate limits: "If you exceed your primary rate limit, you will receive a
+  403 or 429 response, and the x-ratelimit-remaining header will be 0."
+  "If you exceed a secondary rate limit, you will receive a 403 or 429
+  response and an error message that indicates that you exceeded a
+  secondary rate limit. If the retry-after response header is present, you
+  should not retry your request until after that many seconds has elapsed."
+  -> rate limited = 429, or 403 with x-ratelimit-remaining 0, or 403 with
+  retry-after, or 403 whose body says "rate limit" (the secondary case can
+  come without either header). Mapped to a 429 tool error, which the daemon
+  does not retry.
+- Timeouts: "If GitHub takes more than 10 seconds to process an API
+  request, GitHub will terminate the request ... For example, if you are
+  requesting 100 items on a page, you can try requesting fewer items."
+  -> the tool reads at most 30 items per page and gives up after 6000 ms,
+  below the daemon relay tool timeout REMOTE_TOOL_TIMEOUT_MS = 10000 ms
+  (packages/shared/src/protocol/machine-api.ts), so the server answers
+  before the relay abandons the call and no retry overlaps a live request.
+
+== Captures (xiechimon/pacman, 2026-10-21, through the container proxy)
+The proxy authenticates GitHub API requests itself (responses carry
+Github-Authentication-Token-Expiration and X-Ratelimit-Limit: 15000), so
+these are authenticated reads, not anonymous ones.
+- GET /issues?state=open&page=1&per_page=6 -> 200; entries #1461 (PR,
+  pull_request key), #1460, #1459, #1458, #1457, #1456 (PR); Link rel="next"
+  (the next URL uses an after= cursor, but page=2 without the cursor also
+  returned the next six: #1455, #1432, #1431, #1429, #1421 PR, #1420 PR)
+  -> fixture issues-open-page1.json.
+- GET /pulls?state=all&page=1&per_page=4 -> 200; #1461 open, #1456 open,
+  #1454 closed merged_at 2026-10-21T07:54:00Z, #1452 closed merged; Link
+  rel="next" and rel="last" (page 187) -> fixture pulls-all-page1.json.
+- GET /actions/runs?per_page=3&page=1&exclude_pull_requests=true -> 200,
+  total_count 3815, three runs newest first, pull_requests [] on each
+  -> fixture runs-page1.json.
+- GET /actions/runs?branch=main&status=success&per_page=2&page=1
+  &exclude_pull_requests=true -> 200, total_count 693, two "ci" push runs
+  on main, both completed / success -> fixture runs-main-success.json.
+- GET /actions/runs?status=bogus&per_page=1 -> 200 {"total_count":0,
+  "workflow_runs":[]}: an unknown status is not rejected upstream, it
+  silently returns nothing, so the tool rejects it locally (400).
+- GET /pulls?state=bogus&per_page=1 -> 200 with a PR list (the value is not
+  rejected upstream either); the tool rejects it locally (400).
+- GET /repos/xiechimon/no-such-repo-p5a2/issues -> 403 from the proxy
+  ("GitHub access to this repository is not enabled for this session"):
+  a proxy refusal, not a GitHub 404, so no real 404 body was recorded; the
+  404 test uses GitHub's documented {"message":"Not Found"} shape.
+Fixtures keep the fields the tools read plus html_url (the tests check that
+the htmlUrl the tool builds from owner/repo and the number equals GitHub's
+html_url); other URL fields are dropped and bodies are replaced with
+"(body removed from fixture)". Copies are in docs/verify/1406/fixtures-p5a2/.

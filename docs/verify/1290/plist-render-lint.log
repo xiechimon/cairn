@@ -1,0 +1,9 @@
+# render via install.sh sed pipeline (placeholders baked), then plutil -lint
+--- rendered PATH entry:
+    <key>PATH</key>
+    <!-- homebrew 两槽进模板 PATH（#1290）：launchd 不给 login shell 的 PATH，
+         claude 等 homebrew 装的二进制要靠这里可见；探测侧另有 well-known
+         回落（claude-code-bin.ts），这里是第一道。 -->
+    <string>/Users/xmon/.local/share/fnm/node-versions/v24.14.0/installation/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+--- plutil -lint:
+/tmp/1290-rendered.plist: OK

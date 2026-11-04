@@ -1,0 +1,2 @@
+2026-10-07 16:23:50 [skills] team-skills-failed: machine api 400: {"error":"skill file too large: assets/template.html is 727976 bytes (limit 512000)"}
+2026-10-07 16:23:50 [step] failed: team skills distribution failed: machine api 400: {"error":"skill file too large: assets/template.html is 727976 bytes (limit 512000)"}

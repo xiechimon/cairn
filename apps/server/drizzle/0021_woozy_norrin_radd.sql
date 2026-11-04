@@ -1,0 +1,1 @@
+ALTER TABLE `chief` ADD `model` text;

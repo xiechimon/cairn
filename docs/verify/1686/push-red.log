@@ -1,0 +1,91 @@
+
+ RUN  v5.0.1 /mnt/fast/lanes/cairn-1686
+
+(node:141) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+web push delivery failed
+web push delivery failed
+ ❯ |@xiechimon/cairn| test/push.test.ts (37 tests | 4 failed) 2417ms
+   ❯ delivery: only decisions push immediately (4)
+     × approval-needed chief question sends exactly one push whose body carries the question and every option 31ms
+   ❯ digest sweep job (7)
+     × preserves events queued while a digest is being delivered 31ms
+     × keeps queued events when every delivery fails transiently 29ms
+     × rejects invalid, duplicate, or non-paired digest times 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > delivery: only decisions push immediately > approval-needed chief question sends exactly one push whose body carries the question and every option
+AssertionError: expected 'Decision context. Decision context. D…' to contain 'Decision context. Decision context. D…'
+
+Expected: "Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Choose A or B?"
+Received: "Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. Decision context. De"
+
+ ❯ test/push.test.ts:653:41
+    651|         notification: { title: string; body: string; navigate: string …
+    652|       };
+    653|       expect(payload.notification.body).toContain(questions[0]?.questi…
+       |                                         ^
+    654|       expect(payload.notification.body).toContain('方案 A');
+    655|       expect(payload.notification.body).toContain('方案 B');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest sweep job > preserves events queued while a digest is being delivered
+AssertionError: expected [] to deeply equal [ 'New event' ]
+
+- Expected
++ Received
+
+- [
+-   "New event",
+- ]
++ []
+
+ ❯ test/push.test.ts:926:79
+    924|       queuePushDigest(s.db, s.user.id, s.team.id, message);
+    925|       await sweepPushDigest(s.db, s.vapidKeys);
+    926|       expect(s.db.select().from(pushDigestItem).all().map((row) => row…
+       |                                                                               ^
+    927|     } finally {
+    928|       send.mockRestore();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest sweep job > keeps queued events when every delivery fails transiently
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/push.test.ts:940:56
+    938|       queuePushDigest(s.db, s.user.id, s.team.id, { title: 'Failed', b…
+    939|       await sweepPushDigest(s.db, s.vapidKeys);
+    940|       expect(s.db.select().from(pushDigestItem).all()).toHaveLength(1);
+       |                                                        ^
+    941|     } finally {
+    942|       send.mockRestore();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/cairn| test/push.test.ts > digest sweep job > rejects invalid, duplicate, or non-paired digest times
+AssertionError: expected [Function] to throw an error
+ ❯ test/push.test.ts:950:60
+    948|     expect(loadConfig().pushDigestTimes).toEqual(['09:00', '18:00']);
+    949|     for (const times of [['25:00', '18:00'], ['09:60', '18:00'], ['09:…
+    950|       expect(() => loadConfig({ pushDigestTimes: times })).toThrow();
+       |                                                            ^
+    951|     }
+    952|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 33 passed (37)
+   Start at  12:53:04
+   Duration  4.01s (tests 62%, transform 27%, import 12%)
+

@@ -1,0 +1,5 @@
+harness approved: sha256 870c302585d7 over 42 file(s) recorded in /tmp/cairn-verify-pass-VrH5HM/_state.json
+[baseline] 1 of 1 (id,rep) to run
+[baseline] 1/1 done (1 ok, 0 failed), 1s elapsed, ~0s left
+[baseline] done - 1 ok, 0 failed -> /tmp/cairn-verify-pass-VrH5HM/baseline/results.jsonl
+[baseline] 收尾清掉 2 个残留 scratch 目录

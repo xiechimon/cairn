@@ -1,0 +1,35 @@
+name: schema-glance
+
+on:
+  pull_request:
+    paths:
+      - 'apps/server/drizzle/**'
+
+permissions:
+  contents: read
+
+jobs:
+  schema-glance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Render schema diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git show "$BASE_SHA:scripts/schema-glance.mjs" > "$RUNNER_TEMP/schema-glance.mjs" 2>/dev/null || cp scripts/schema-glance.mjs "$RUNNER_TEMP/schema-glance.mjs"
+          node "$RUNNER_TEMP/schema-glance.mjs" --base "$BASE_SHA" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
+          cat "$RUNNER_TEMP/schema-glance.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: schema-glance
+          path: ${{ runner.temp }}/schema-glance.md
+          if-no-files-found: error

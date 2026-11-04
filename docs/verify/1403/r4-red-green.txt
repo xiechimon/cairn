@@ -1,0 +1,35 @@
+# #1403 round 4 (pr-gate run 3 on #1414): new tests first, run against the code at 6792b0c (red), then against the fix (green).
+# Red leg: the round 4 pr-reconcile.test.ts copied into a checkout of 6792b0c and run there.
+
+== red, code at 6792b0c ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts
+     × ⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in review with a hint
+     × ⑳ merged: unclaimed verify / review steps are stopped when the reconcile finishes
+     × ⑳ closed: unclaimed verify / review steps are stopped when the reconcile finishes
+     × ⑱a reopened done→review after the reconcile finished it → not finished again
+     × ⑱b merged before the card entered review → left to the person, nothing written
+     × ⑱d closed→review drag after the reconcile failed it → stays in review, errorMessage kept
+     × ⑲ merged into a branch other than the default branch → stays in review, one hint
+     × ㉑ the hint path reads compare once per (checkpoint, head) and writes the hint once
+     × ㉕ a checkpoint that is not a 40-hex sha is not put into a request URL
+     × ㉖ requestMerge: the reconcile finishes the card during the PR probe → no merge step
+     × ㉖b AI review: the reconcile finishes the card while the changes are read → no review step
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  11 failed | 31 passed (42)
+
+first assertion of each failure:
+  ⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays i   AssertionError: expected 'PR #201 已在 GitHub 合并（合并时 head fffffff…' to contain 'GitHub 上找不到'
+  ⑳ merged: unclaimed verify / review steps are stopped when the reconci   AssertionError: expected [ { kind: 'review', …(1) }, …(1) ] to deeply equal [ { kind: 'review', …(1) }, …(1) ]
+  ⑱a reopened done→review after the reconcile finished it → not finished   AssertionError: expected 'done' to be 'review' // Object.is equality
+  ⑱b merged before the card entered review → left to the person, nothing   AssertionError: expected 'done' to be 'review' // Object.is equality
+  ⑱d closed→review drag after the reconcile failed it → stays in review,   AssertionError: expected 'failed' to be 'review' // Object.is equality
+  ⑲ merged into a branch other than the default branch → stays in review   AssertionError: expected 'done' to be 'review' // Object.is equality
+  ㉑ the hint path reads compare once per (checkpoint, head) and writes t   AssertionError: expected [ …(3) ] to have a length of 1 but got 3
+  ㉕ a checkpoint that is not a 40-hex sha is not put into a request URL    AssertionError: expected true to be false // Object.is equality
+  ㉖ requestMerge: the reconcile finishes the card during the PR probe →    AssertionError: promise resolved "{ delegated: true }" instead of rejecting
+  ㉖b AI review: the reconcile finishes the card while the changes are re   AssertionError: promise resolved "undefined" instead of rejecting
+
+== green, this commit ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  63 passed (63)

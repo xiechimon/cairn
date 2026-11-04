@@ -1,0 +1,18 @@
+[
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "save_memory",
+  "delete_memory",
+  "memories",
+  "attachment",
+  "set_task_meta",
+  "create_skill",
+  "update_skill",
+  "get_secret",
+  "mcp__demo__echo",
+  "list_mcp_resources",
+  "list_mcp_resource_templates",
+  "read_mcp_resource"
+]

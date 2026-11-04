@@ -1,0 +1,713 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790095861882,
+      "tag": "0000_glamorous_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790099946447,
+      "tag": "0001_lush_steel_serpent",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790106954287,
+      "tag": "0002_shiny_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790108858374,
+      "tag": "0003_gray_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790116068782,
+      "tag": "0004_opposite_chimera",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790126858242,
+      "tag": "0005_mcp_server_internal",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790271240183,
+      "tag": "0006_wise_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790354230587,
+      "tag": "0007_useful_pet_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790444294506,
+      "tag": "0008_lame_swordsman",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790443581795,
+      "tag": "0009_tidy_adam_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790437429589,
+      "tag": "0010_wild_puppet_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790444294507,
+      "tag": "0011_smiling_odin",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790606594218,
+      "tag": "0012_local_repo_github_connection",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1790650436447,
+      "tag": "0013_brave_spot",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1790651946719,
+      "tag": "0014_cold_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1790654091290,
+      "tag": "0015_far_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1790703559796,
+      "tag": "0016_nebulous_dreadnoughts",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1790758498442,
+      "tag": "0017_small_brother_voodoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1790845093203,
+      "tag": "0018_agent_push_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1790857998064,
+      "tag": "0019_chubby_green_goblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1790867829395,
+      "tag": "0020_funny_thor",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1790895762842,
+      "tag": "0021_woozy_norrin_radd",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1791014387948,
+      "tag": "0022_adorable_abomination",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1791036874716,
+      "tag": "0023_red_jimmy_woo",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1791071039682,
+      "tag": "0024_happy_marvel_zombies",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1791188274518,
+      "tag": "0025_curved_changeling",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1791211256602,
+      "tag": "0026_last_captain_flint",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1791389383640,
+      "tag": "0027_fluffy_reavers",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1791417457211,
+      "tag": "0028_living_next_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1791474128167,
+      "tag": "0029_fuzzy_alex_wilder",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1791508410957,
+      "tag": "0030_kind_callisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1791595692095,
+      "tag": "0031_majestic_colonel_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1791596758278,
+      "tag": "0032_perfect_bushwacker",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1791617953233,
+      "tag": "0033_messy_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1791638263071,
+      "tag": "0034_agent_skills_split",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1791728456778,
+      "tag": "0035_awesome_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1791810165779,
+      "tag": "0036_persona_and_todo_edges",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1791819779869,
+      "tag": "0037_aspiring_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1791821412358,
+      "tag": "0038_quota_wait_step",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1791824013461,
+      "tag": "0039_broken_living_tribunal",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1791820139046,
+      "tag": "0040_new_ma_gnuci",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1791769027948,
+      "tag": "0041_lovely_stepford_cuckoos",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1791853077454,
+      "tag": "0042_project_identity_edit",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1792002303068,
+      "tag": "0043_machine_concurrency_recommendation",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1792586626268,
+      "tag": "0044_merge_gate_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1792671132751,
+      "tag": "0045_model_fallback_chain",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "6",
+      "when": 1792683877630,
+      "tag": "0046_autonomy_gates",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1792688838285,
+      "tag": "0047_step_finished_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1792722730010,
+      "tag": "0048_acoustic_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1792856589735,
+      "tag": "0049_step_blocker_handoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1792869494055,
+      "tag": "0050_info_todo_output",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1792884864892,
+      "tag": "0051_memory_dedupe",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1792886621484,
+      "tag": "0052_memory_invalidation",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1792888794929,
+      "tag": "0053_memory_candidate",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1792923570660,
+      "tag": "0054_scheduler_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1792945729621,
+      "tag": "0055_build_outcome_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1792961081633,
+      "tag": "0056_user_attachment_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1792988595997,
+      "tag": "0057_github_connection_refresh",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1793005785278,
+      "tag": "0058_token_usage_cost_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1793033753026,
+      "tag": "0059_retire_zero_use",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1793117981309,
+      "tag": "0060_chief_message_project",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1793122059750,
+      "tag": "0061_first_pr_report",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1793152384663,
+      "tag": "0062_feishu_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "6",
+      "when": 1793184849099,
+      "tag": "0063_split_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "6",
+      "when": 1793200000000,
+      "tag": "0064_claude_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "6",
+      "when": 1793200000001,
+      "tag": "0065_push_subscription",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "6",
+      "when": 1793208746037,
+      "tag": "0066_harness_eval_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "6",
+      "when": 1793243586719,
+      "tag": "0067_schedule_report",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1793248354710,
+      "tag": "0068_odd_cloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1793338063207,
+      "tag": "0069_push_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "6",
+      "when": 1793356354579,
+      "tag": "0070_magical_abomination",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "6",
+      "when": 1793372156449,
+      "tag": "0071_schedule_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1793374421099,
+      "tag": "0072_todo_archive",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "6",
+      "when": 1793379420141,
+      "tag": "0073_project_base_branch",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "6",
+      "when": 1793383884169,
+      "tag": "0074_build_schedule_creator",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1793385661835,
+      "tag": "0075_agent_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "6",
+      "when": 1793386640593,
+      "tag": "0076_claude_subscription",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1793387626578,
+      "tag": "0077_queued_message",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "6",
+      "when": 1793395348078,
+      "tag": "0078_schedule_continue",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "6",
+      "when": 1793396260275,
+      "tag": "0079_schedule_retry_floor",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "6",
+      "when": 1793419783192,
+      "tag": "0080_team_claude_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "6",
+      "when": 1793445334854,
+      "tag": "0081_todo_snooze",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "6",
+      "when": 1793461817647,
+      "tag": "0082_project_avatar",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "6",
+      "when": 1793471349417,
+      "tag": "0083_team_named_prompts",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "6",
+      "when": 1793534925906,
+      "tag": "0084_project_coordinator",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "6",
+      "when": 1793548572691,
+      "tag": "0085_global_coordinator",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "6",
+      "when": 1793620361538,
+      "tag": "0086_chief_daily_report",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "6",
+      "when": 1793626614011,
+      "tag": "0087_routing_rule",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "6",
+      "when": 1793629870576,
+      "tag": "0088_chief_turn_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "6",
+      "when": 1793631308839,
+      "tag": "0089_chief_summary",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "6",
+      "when": 1793679978614,
+      "tag": "0090_routing_rule_capabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "6",
+      "when": 1793692487379,
+      "tag": "0091_step_scope_project",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "6",
+      "when": 1793696302904,
+      "tag": "0092_todo_route_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "6",
+      "when": 1793696885996,
+      "tag": "0093_routing_rule_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "6",
+      "when": 1793697916012,
+      "tag": "0094_routing_rule_adopted_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "6",
+      "when": 1793699843949,
+      "tag": "0095_project_instructions",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "6",
+      "when": 1793701240504,
+      "tag": "0096_computer",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "6",
+      "when": 1793713855206,
+      "tag": "0097_project_concurrency",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "6",
+      "when": 1793720358012,
+      "tag": "0098_project_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "6",
+      "when": 1793757585388,
+      "tag": "0099_work_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "6",
+      "when": 1793768070087,
+      "tag": "0100_feature_flag",
+      "breakpoints": true
+    }
+  ]
+}

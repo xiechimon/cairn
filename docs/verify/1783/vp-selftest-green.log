@@ -1,0 +1,72 @@
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  drive refuses an evidence directory inside committed docs/verify before anything runs
+PASS  capture refuses an evidence directory inside committed docs/verify before anything runs
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  the seed check's optional exemption covers only the seed the usage marks optional
+PASS  cleanup reports the evidence root drive writes to
+PASS  with the temp dir inside a git repository, a fake skill writes nothing outside its own root
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own <time>-<feature>-<case> directory under the checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stale case that also has a forced need names both in its refusal, and --force names them before running
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory and leaves the archive as it was
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+PASS  a VERIFY_WEB_PORT other than the stack's web port is refused
+PASS  drive and capture refuse an evidence directory inside docs/verify of any worktree of the repository
+PASS  a fresh-stack case runs only on a stack nothing was driven on since launch
+PASS  an own-stack case is refused while a stack is up in the run directory, also with --force
+PASS  cases whose usage asks for a fresh stack need fresh-stack; cases that start their own stack need own-stack
+PASS  stale ticket-named probes are archived under docs/verify, not in scripts/
+PASS  the registry gate passes on this checkout
+PASS  the registry gate keeps support scripts, seeds and the existing ticket-named probes green
+PASS  a new drive-<number> script turns the registry gate red, registered or not
+PASS  the registry gate refuses a registry without cases
+PASS  the registry gate: a case that writes into docs/verify needs rewrites-evidence
+PASS  the registry gate checks script paths, recipes, statuses and needs
+PASS  the registry gate: drive lines in feature maps name registered cases, and each mapped feature has one
+PASS  the registry gate counts tracked files only: a .DS_Store or probe output left in scripts/ is not a script
+PASS  the registry gate refuses a feature-only drive line for a feature with more than one case
+PASS  the registry gate allows an archived ticket script only at docs/verify/<ticket>/<script>
+PASS  the registry gate refuses --force inside a copy-paste drive line
+71/71 passed

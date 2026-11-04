@@ -1,0 +1,63 @@
+{
+  "probe": "drive-1308-thinking-delta",
+  "expect": "new",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "buildId": "01a13b57-11d7-7f3f-8175-f1a23df8c32e",
+  "stepId": "-ul4SY8u6BtS-jCD3W9c0",
+  "todoId": "pdWxhQDUNc7MJlBKCM52H",
+  "passed": 10,
+  "total": 10,
+  "checks": [
+    {
+      "name": "activity thinking 上报 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "new：thinking_delta 机器体 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "会话流有 activity thinking",
+      "ok": true,
+      "detail": "ping,step,activity,thinking_delta"
+    },
+    {
+      "name": "new：流上有 thinking_delta 且正文等于标记",
+      "ok": true,
+      "detail": "[{\"type\":\"thinking_delta\",\"text\":\"REASONING-MARKER-1308\"}]"
+    },
+    {
+      "name": "thinking_delta 不落库",
+      "ok": true,
+      "detail": "false"
+    },
+    {
+      "name": "页面有思考相位标签",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "new：页面思考行带出正文",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "thinking 段行落库 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "落定后标记只出现一次",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "name": "库里只有段行一份标记",
+      "ok": true,
+      "detail": "1"
+    }
+  ]
+}

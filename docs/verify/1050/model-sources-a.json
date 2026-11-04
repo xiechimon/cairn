@@ -1,0 +1,51 @@
+{
+  "sources": [
+    {
+      "runtime": "pi",
+      "installed": true,
+      "hostname": "xmonsMac-3574.local",
+      "models": []
+    },
+    {
+      "runtime": "claude-code",
+      "installed": true,
+      "hostname": "xmonsMac-3574.local",
+      "models": [
+        {
+          "id": "haiku",
+          "name": "haiku",
+          "slot": "default"
+        },
+        {
+          "id": "kimi-k3[1M]",
+          "name": "kimi-k3[1M]",
+          "slot": "default-fable"
+        },
+        {
+          "id": "deepseek-v4.1-flash[1M]",
+          "name": "deepseek-v4.1-flash[1M]",
+          "slot": "default-haiku"
+        },
+        {
+          "id": "glm-5.3-flash[1M]",
+          "name": "glm-5.3-flash[1M]",
+          "slot": "default-opus"
+        },
+        {
+          "id": "qwen3.8-max-0902[1M]",
+          "name": "qwen3.8-max-0902[1M]",
+          "slot": "default-sonnet"
+        }
+      ],
+      "bin": {
+        "path": "/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1050-dG172X/bin/claude",
+        "version": "9.9.9-probe"
+      },
+      "auth": {
+        "state": "logged-in",
+        "method": "oauth_token",
+        "provider": "firstParty"
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "revision": "3aea99f2 + EmptyState fix",
+  "results": [
+    {
+      "theme": "light",
+      "viewportWidth": 1440,
+      "gap": 4,
+      "overlap": 12,
+      "lines": 2,
+      "width": 384,
+      "maxWidth": 442,
+      "overflow": false
+    },
+    {
+      "theme": "light",
+      "viewportWidth": 390,
+      "gap": 4,
+      "overlap": 12,
+      "lines": 2,
+      "width": 310,
+      "maxWidth": 442,
+      "overflow": false
+    },
+    {
+      "theme": "dark",
+      "viewportWidth": 1440,
+      "gap": 4,
+      "overlap": 12,
+      "lines": 2,
+      "width": 384,
+      "maxWidth": 442,
+      "overflow": false
+    },
+    {
+      "theme": "dark",
+      "viewportWidth": 390,
+      "gap": 4,
+      "overlap": 12,
+      "lines": 2,
+      "width": 310,
+      "maxWidth": 442,
+      "overflow": false
+    }
+  ],
+  "outcome": "4 passed"
+}

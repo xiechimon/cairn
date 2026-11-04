@@ -1,0 +1,36 @@
+== gate sweep (the #989-era surface + the two #851 gates kept by ruling) ==
+PASS  scripts/ui-registry-gate.mjs
+PASS  scripts/ui-debt-gate.mjs
+PASS  scripts/ui-drift-gate.mjs
+PASS  scripts/ui-consumer-shape-gate.mjs
+PASS  scripts/ui-dead-class-gate.mjs
+
+== hash ledger terminal counts (#989 gate face) ==
+PASS  ledger: 33 = 26 registry (19 pristine / 7 deviated) + 7 adapters
+
+== debt baseline at the floor ==
+perFaceCss entries=0 rawControls.total=3
+PASS  debt baseline: 0 per-face css files, 3 bare controls (all deliberate-native)
+
+== canon annotations (#1013 / ADR 0012 / spec-22 face) ==
+PASS  spec/22 superseded-in-part header (ADR 0012 / #980)
+PASS  ADR 0009 D3(ii) superseded-in-part header (#1013)
+PASS  ADR 0012 revision section present
+PASS  ADR 0012 revision closes #991 Q9 + Q10
+PASS  spec/06 superseded-in-part header (#1013)
+PASS  spec/11 stacked superseded header (#1013)
+PASS  spec/18 audit-closure header (#1013)
+
+== #851 gate ruling landed in CI config (#1012) ==
+PASS  ci.yml debt-gate comment carries the #1012 keep ruling
+PASS  ci.yml drift-gate comment carries the #1012 keep ruling
+PASS  ui-debt-gate.mjs header carries the sealed status
+
+== hand-written shells stay retired (#983 verdict table + #1010) ==
+PASS  components/ui/floating-shell.tsx absent
+PASS  components/ui/kbd-hint.tsx absent
+PASS  ClickCatcher absent from apps/web/src
+registry=26 adapters=['alert-dialog-shell.tsx', 'dialog-shell.tsx', 'panel.tsx', 'seeded-avatar.tsx', 'status-chip.tsx', 'tag-chip.tsx', 'toaster.tsx']
+PASS  ledger: 33 files = 26 registry + the 7 frozen zero-skin adapters
+
+ALL CHECKS PASS

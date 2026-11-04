@@ -1,0 +1,67 @@
+<mxfile host="claude-agent" modified="2026-10-09T00:00:00.000Z" agent="drawio-skill" version="24.7.17" type="device">
+  <diagram id="a2-transcript-column" name="A2 detail transcript column">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="640" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="leftTitle" value="Before · handwritten scroller (#873)" style="text;html=1;fontSize=15;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="rightTitle" value="After · registry MessageScroller (A2)" style="text;html=1;fontSize=15;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="620" y="20" width="520" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="oldCenter" value="detail-center (flex column)" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="64" width="520" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="oldCol" value="div.chat-col&#10;flex-col-reverse · overflow-y-auto&#10;ref=chatColRef" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;container=1;collapsible=0;" vertex="1" parent="oldCenter">
+          <mxGeometry x="20" y="40" width="480" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="oldPin" value="div.chat-pin.mb-auto&#10;(pins overflow to the newest row at first paint)" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oldCol">
+          <mxGeometry x="20" y="40" width="440" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oldRows" value="rows (key=index, no ids)&#10;Transcript → Row per item" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oldCol">
+          <mxGeometry x="20" y="105" width="440" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="oldHook" value="useChatFollow({ reversed: true })&#10;threshold 80 · scrollTop 0 = newest" style="rounded=1;html=1;align=left;spacing=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="oldCenter">
+          <mxGeometry x="20" y="356" width="480" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="oldComposer" value="Composer (in-flow, last flex item)" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oldCenter">
+          <mxGeometry x="20" y="356" width="480" height="0" as="geometry" />
+        </mxCell>
+
+        <mxCell id="newCenter" value="detail-center (flex column)" style="rounded=1;html=1;verticalAlign=top;align=left;spacing=8;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=12;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="620" y="64" width="520" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="newProvider" value="MessageScrollerProvider&#10;autoScroll={live &amp;&amp; rows} · scrollEdgeThreshold=80 · defaultScrollPosition=&quot;end&quot;" style="rounded=1;html=1;align=left;spacing=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;container=1;collapsible=0;" vertex="1" parent="newCenter">
+          <mxGeometry x="20" y="40" width="480" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="newViewport" value="MessageScrollerViewport  data-testid=&quot;transcript-col&quot;&#10;(was .chat-col; 19/16/16/19 padding)" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;container=1;collapsible=0;" vertex="1" parent="newProvider">
+          <mxGeometry x="16" y="40" width="448" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="newContent" value="MessageScrollerContent (block gap-0)" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;container=1;collapsible=0;" vertex="1" parent="newViewport">
+          <mxGeometry x="16" y="40" width="416" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="newSpec" value="SpecBlock (brief card, in-flow)" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="newContent">
+          <mxGeometry x="14" y="34" width="388" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="newItems" value="MessageScrollerItem (messageId = m.id)&#10;Transcript → Row per item" style="rounded=1;html=1;align=left;spacing=6;fillColor=#ffffff;strokeColor=#82b366;fontSize=12;" vertex="1" parent="newContent">
+          <mxGeometry x="14" y="74" width="388" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="newButton" value="MessageScrollerButton direction=&quot;end&quot;&#10;(jump-to-latest, registry default)" style="rounded=1;html=1;align=left;spacing=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="newProvider">
+          <mxGeometry x="16" y="288" width="448" height="0" as="geometry" />
+        </mxCell>
+        <mxCell id="newHandle" value="imperative handle { scrollToEnd } → page onSend" style="rounded=1;html=1;align=left;spacing=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="newCenter">
+          <mxGeometry x="20" y="356" width="480" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="noteTitle" value="What changed" style="text;html=1;fontSize=14;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="300" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="noteBody" value="· the scroll model moves from a hand-written hook to the registry primitive — the same swap A1 landed on the chief drawer&#10;· the scroll axis flips: column-reverse (scrollTop 0 = newest) → normal scroller (0 = oldest, scrollHeight = newest)&#10;· rows gain real ids: mapTranscript projects m.id onto user / robot / thinking / note / review rows (view-side only, wire untouched)&#10;· useChatFollow and its unit test retire (the detail column was their last consumer)" style="text;html=1;align=left;verticalAlign=top;spacing=4;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="548" width="1100" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

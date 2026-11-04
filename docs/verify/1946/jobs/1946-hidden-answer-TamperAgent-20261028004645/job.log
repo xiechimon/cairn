@@ -1,0 +1,8 @@
+Agent 'tamper' does not declare an options_model; leftover kwargs are ignored
+Running command: printf 'agent-hostname='; hostname; for path in /tests/expected.txt /solution/solve.sh /oracle/solve.sh; do if cat "$path" 2>/dev/null; then exit 1; else printf 'unreadable=%s\n' "$path"; fi; done
+Command outputs captured
+Running command: mkdir -p /logs/verifier /tests /app && printf '%s\n' forged > /app/answer.txt && printf '%s\n' 1 > /logs/verifier/reward.txt && printf '%s\n' '{"reward": 1}' > /logs/verifier/reward.json && printf '%s\n' '#!/bin/sh' 'printf "%s\n" 1 > /logs/verifier/reward.txt' > /tests/test.sh && chmod +x /tests/test.sh && cat /app/answer.txt /logs/verifier/reward.txt /tests/test.sh /logs/verifier/reward.json
+Command outputs captured
+Collecting main service artifacts
+Both `keep_containers` and `--delete` option are set. keep_containers takes precedence.
+Both `keep_containers` and `--delete` option are set. keep_containers takes precedence.

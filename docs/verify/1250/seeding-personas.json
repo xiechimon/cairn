@@ -1,0 +1,57 @@
+{
+  "seeded": [
+    {
+      "role": "planner",
+      "displayName": "Planner",
+      "thinkingLevel": "xhigh",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "tools": []
+    },
+    {
+      "role": "implementer",
+      "displayName": "Implementer",
+      "thinkingLevel": "high",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "tools": [
+        "推送分支",
+        "合并分支"
+      ]
+    },
+    {
+      "role": "code_reviewer",
+      "displayName": "CodeReviewer",
+      "thinkingLevel": "medium",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "tools": []
+    },
+    {
+      "role": "security_auditor",
+      "displayName": "SecurityAuditor",
+      "thinkingLevel": "medium",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "tools": []
+    },
+    {
+      "role": "test_engineer",
+      "displayName": "TestEngineer",
+      "thinkingLevel": "medium",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "tools": []
+    },
+    {
+      "role": "verifier",
+      "displayName": "Verifier",
+      "thinkingLevel": "medium",
+      "provider": "stub-gw",
+      "modelId": "stub-model",
+      "tools": [
+        "推送分支"
+      ]
+    }
+  ]
+}

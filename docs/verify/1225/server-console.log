@@ -1,0 +1,17 @@
+[17:26:39] INFO (2045709): attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed
+    pending: 0
+    orphan: 0
+    reclaimedBytes: 0
+[17:26:39] INFO (2045709): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    appended: 0
+    advanced: 0
+    failed: 0
+    skipped: 0
+    unreadable: 0
+    errors: 0
+[17:26:39] INFO (2045709): pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>
+    port: 8791
+    dataDir: "/tmp/pacman-1225-server-home-1791739597311/server"
+    teamId: "oHXk77RRcc49VMncDPsmf"

@@ -1,0 +1,47 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1744
+
+ ❯ |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts (17 tests | 2 failed) 476ms
+   ❯ #1744 compaction at the context ceiling (16)
+     × a non-summary JSON body null is forwarded unchanged 18ms
+     × a non-summary JSON body {"messages":[null,17,"ordinary"]} is forwarded unchanged 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts > #1744 compaction at the context ceiling > a non-summary JSON body null is forwarded unchanged
+TypeError: Cannot read properties of null (reading 'messages')
+ ❯ src/backend/compaction-ceiling.ts:157:32
+    155|       return inner(input, init);
+    156|     }
+    157|     if (!Array.isArray(current.messages)) return inner(input, init);
+       |                                ^
+    158|     const summarySystemMessage = current.messages.some((message) => {
+    159|       if (message.role !== 'system' && message.role !== 'developer') r…
+ ❯ test/pi-compaction-ceiling.test.ts:53:30
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/cairn-cli| test/pi-compaction-ceiling.test.ts > #1744 compaction at the context ceiling > a non-summary JSON body {"messages":[null,17,"ordinary"]} is forwarded unchanged
+TypeError: Cannot read properties of null (reading 'role')
+ ❯ src/backend/compaction-ceiling.ts:159:19
+    157|     if (!Array.isArray(current.messages)) return inner(input, init);
+    158|     const summarySystemMessage = current.messages.some((message) => {
+    159|       if (message.role !== 'system' && message.role !== 'developer') r…
+       |                   ^
+    160|       if (typeof message.content === 'string') return message.content.…
+    161|       if (!Array.isArray(message.content)) return false;
+ ❯ src/backend/compaction-ceiling.ts:158:51
+ ❯ test/pi-compaction-ceiling.test.ts:53:30
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 15 passed (17)
+   Start at  09:25:14
+   Duration  7.76s (transform 52%, import 41%, tests 6%)
+
+  Transform  |@xiechimon/cairn-cli| transforming modules took 3.82s · 52% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

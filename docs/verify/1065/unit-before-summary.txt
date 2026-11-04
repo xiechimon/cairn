@@ -1,0 +1,8 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/machine-zombie-claim.test.ts > #1065 僵尸认领（service 面：claimStep 绑请求存活态） > hold 中 abort → 新步入队 wake：死机不领，步留 pending，活机照领
+ FAIL  test/machine-zombie-claim.test.ts > #1065 僵尸认领（service 面：claimStep 绑请求存活态） > wake 先醒、abort 后到：claimStep 出口复查拦截，死机不领
+ FAIL  test/machine-zombie-claim.test.ts > #1065 僵尸认领（service 面：claimStep 绑请求存活态） > 请求到达时已死（首领窗口）：不 tryClaim，直接空手
+ FAIL  test/machine-zombie-claim.test.ts > #1065 路由接线（claim 路由透传请求 signal） > hold 中连接断 → 新步入队：死机路由不领，活机路由照领
+ Test Files  1 failed (1)
+      Tests  4 failed | 2 passed (6)
+   Duration  1.43s (import 43%, transform 40%, tests 17%)

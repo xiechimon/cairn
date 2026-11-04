@@ -1,0 +1,205 @@
+# P5a-1 round 3 mutations at 8eb20fe6 (8eb20fe67312c20ee0949306b1663e5add26c0a8): undo one rule at a time in the working tree,
+# run pnpm exec vitest run apps/server/test/issue-intake.test.ts (109 tests), write the file back from its saved content.
+# git status was clean after the run. Runner: a Python script that applies each before/after pair once (each 'before' occurs exactly once).
+# M7 = item 7 pins (pr-gate run 2 suggestions 7-10); M1 = item 1 delivered-PR rule; M2 = item 2 orchestrate retry; M4 = item 4 viaApp.
+# 20 mutations, 20 RED.
+
+## M7a  item 7: newest closed event -> first closed event
+file: apps/server/src/services/issue-intake.ts
+- before:
+    const closed = newestOf(history.events, (e) => e.event === 'closed');
+- after:
+    const closed = history.events.find((e) => e.event === 'closed') ?? null;
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 关闭人只看最新一条 closed：早先仓主关过又重开，这次外人关 → 不关 68ms
+
+## M7b  item 7: unlabeled filter -> any unlabeled event
+file: apps/server/src/services/issue-intake.ts
+- before:
+    const unlabeled = newestOf(data.events, forLabel('unlabeled'));
+- after:
+    const unlabeled = newestOf(data.events, (e) => e.event === 'unlabeled');
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 打上 ready-for-agent 之后摘的是别的标签（needs-decision）→ 照领 51ms
+
+## M7c  item 7: same-second tie-break on id removed
+file: apps/server/src/services/issue-intake.ts
+- before:
+    return a.at > b.at || (a.at === b.at && a.id > b.id);
+- after:
+    return a.at > b.at;
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 同一秒的 labeled 与 unlabeled 按 id 定先后：unlabeled 的 id 大 → 不领；labeled 的 id 大 → 领 60ms
+
+## M7d  item 7: seenOpen prune loop removed
+file: apps/server/src/services/issue-intake.ts
+- before:
+        for (const key of seenOpen) {
+          if (key.startsWith(teamPrefix) && !keep.has(key)) seenOpen.delete(key);
+        }
+- after:
+    (removed)
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 人在 issue 仍 open 时关了卡、仓主随后关 issue、人再重开卡 → 不再关 56ms
+
+## M7e1  item 7: composeChiefSystemPrompt lists the team's todo specs
+file: apps/server/src/services/chief.ts
+- before:
+        '## 记忆（与绑定 Agent 共用同一份存储）',
+- after:
+        `## 任务\n${deps.db.select().from(todo).where(eq(todo.teamId, teamId)).all().map((t) => t.spec).join('\n')}`,
+        '## 记忆（与绑定 Agent 共用同一份存储）',
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 失败方式 5：正文只进 chief 线程的 user 消息，不进 system 消息与 chief system prompt 55ms
+
+## M7e2  item 7: sendChiefMessage stores the request with role system
+file: apps/server/src/services/chief.ts
+- before:
+          threadId: threadRow.id,
+          role: 'user',
+          content: body.content,
+- after:
+          threadId: threadRow.id,
+          role: 'system',
+          content: body.content,
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 失败方式 5：正文只进 chief 线程的 user 消息，不进 system 消息与 chief system prompt 50ms
+
+## M1a  item 1: delivered-PR filter removed from the reconcile query
+file: apps/server/src/services/issue-intake.ts
+- before:
+                noDeliveredPr(),
+- after:
+    (removed)
+result: RED  exit=1  Tests  2 failed | 107 passed (109)
+  × 轮询器领的卡在 building、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态 74ms
+  × 轮询器领的卡在 failed、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态 67ms
+
+## M1b  item 1: delivered-PR check removed from the write-time re-read
+file: apps/server/src/services/issue-intake.ts
+- before:
+    .where(and(eq(todo.id, t.id), noDeliveredPr()))
+- after:
+    .where(eq(todo.id, t.id))
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 读期间 build 交付了 PR → 写前重读，跳过 63ms
+
+## M1c  item 1 / code-review: prUrl-only builds not counted
+file: apps/server/src/services/issue-intake.ts
+- before:
+    or(isNotNull(build.prNumber), isNotNull(build.prUrl))
+- after:
+    isNotNull(build.prNumber)
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × build 只记了 prUrl（prNumber 缺位的存量形）同样算交付过 PR → 卡不关 58ms
+
+## M1d  item 1: correlation build.todoId = todo.id dropped
+file: apps/server/src/services/issue-intake.ts
+- before:
+    and(eq(build.todoId, todo.id), or(isNotNull(build.prNumber), isNotNull(build.prUrl)))
+- after:
+    and(or(isNotNull(build.prNumber), isNotNull(build.prUrl)))
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 只看这张卡自己的 build：同队另一张卡交付过 PR，不影响没交付的卡照常关闭 46ms
+
+## M1e  code-review: latest build only (build.id = todo.latestBuildId)
+file: apps/server/src/services/issue-intake.ts
+- before:
+    and(eq(build.todoId, todo.id), or(isNotNull(build.prNumber), isNotNull(build.prUrl)))
+- after:
+    and(eq(build.id, todo.latestBuildId), or(isNotNull(build.prNumber), isNotNull(build.prUrl)))
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关 76ms
+
+## M2a  item 2: retry call removed from sweepTeam
+file: apps/server/src/services/issue-intake.ts
+- before:
+        retryOrchestration(teamId, tally);
+- after:
+    (removed)
+result: RED  exit=1  Tests  6 failed | 103 passed (109)
+  × 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复 62ms
+  × 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试 77ms
+  × 重试前有人已手动开始（已有编排线程）→ 不再重试 63ms
+  × 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试 72ms
+  × 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试 57ms
+  × 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试 96ms
+
+## M2b  item 2: attempt bound removed (never gives up)
+file: apps/server/src/services/issue-intake.ts
+- before:
+    if (entry.attempts < ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS) {
+- after:
+    if (entry.attempts > 0) {
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试 85ms
+
+## M2c  item 2: thread check removed (never sees a manual start)
+file: apps/server/src/services/issue-intake.ts
+- before:
+    : startedSince(teamId, row.seqNum, entry.importedAt)
+- after:
+    : false
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 重试前有人已手动开始（已有编排线程）→ 不再重试 68ms
+
+## M2d  code-review: thread age check removed (old thread of a reused seqNum counts)
+file: apps/server/src/services/issue-intake.ts
+- before:
+              gte(chiefThread.createdAt, importedAt),
+- after:
+    (removed)
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试 65ms
+
+## M2e  code-review 2: chief-step check removed (empty thread counts as a start)
+file: apps/server/src/services/issue-intake.ts
+- before:
+              exists(
+                deps.db
+                  .select({ id: step.id })
+                  .from(step)
+                  .where(and(eq(step.buildId, chiefThread.id), eq(step.kind, 'chief'))),
+              ),
+- after:
+    (removed)
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试 90ms
+
+## M2f  code-review 2: retry read error rethrown (ends the team sweep)
+file: apps/server/src/services/issue-intake.ts
+- before:
+            log({ todoId, err: errText(err) }, 'issue intake orchestrate retry failed');
+            continue;
+- after:
+            throw err;
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试 73ms
+
+## M2g  code-review: dropped retry not logged
+file: apps/server/src/services/issue-intake.ts
+- before:
+            log({ todoId, reason: dropped }, 'issue intake orchestrate retry dropped');
+- after:
+    (removed)
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 重试前有人已手动开始（已有编排线程）→ 不再重试 56ms
+
+## M4a  item 4: projection drops performed_via_github_app
+file: apps/server/src/lib/github.ts
+- before:
+    viaApp: typeof app?.slug === 'string' ? app.slug : null,
+- after:
+    viaApp: null,
+result: RED  exit=1  Tests  2 failed | 107 passed (109)
+  × githubIssueEvents 投影 performed_via_github_app.slug；不经 app 或缺 slug = null 14ms
+  × 领取日志一行带打标人与 app（经 app = slug，不经 = null）；D5 照旧 69ms
+
+## M4b  item 4: candidate-taken line without viaApp
+file: apps/server/src/services/issue-intake.ts
+- before:
+            viaApp: verdict.viaApp,
+- after:
+    (removed)
+result: RED  exit=1  Tests  1 failed | 108 passed (109)
+  × 领取日志一行带打标人与 app（经 app = slug，不经 = null）；D5 照旧 73ms

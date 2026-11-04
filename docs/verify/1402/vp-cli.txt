@@ -1,0 +1,38 @@
+$ node .claude/skills/verify-pacman/scripts/vp.mjs --help
+verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <command>
+
+  launch                         start the isolated stack (scripts/launch.mjs)
+  doctor                         read-only health check of the stack (scripts/doctor.mjs)
+  list [feature]                 registered features and their cases
+  drive <feature> [case] [--force] [-- <args>]
+                                 run a registered case; cases that need the stack run doctor first;
+                                 stale and host-bound cases need --force
+  capture <path> [--name <label>] [--wait <ms>]
+                                 screenshot a live route, record console errors and failed requests
+  archive <ticket> [--from <dir>]... [--latest <n>]
+                                 copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites)
+  links <ticket> [--sha <sha>]   raw.githubusercontent.com links for docs/verify/<ticket>/ at a pushed SHA
+  cleanup                        stop the stack (scripts/cleanup.mjs)
+
+Feature recipes: .claude/skills/verify-pacman/features/<feature>.md
+Registry: .claude/skills/verify-pacman/vp-registry.json
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs list search
+search  (features/search.md)
+  search                       stack                        Sidebar search panel: Cmd+K, type the title, the matching task row shows.
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive theme
+feature theme has 2 cases, name one: persist, sealed-tokens-audit
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive stop-button
+stop-button/stop-chain is stale: static spot-check by the #1402 inventory, not executed: It starts the build with the UI Start button, which now calls POST /orchestrate (409 when no chief is bound, and the chief turn never dispatches through the stub). drive-951 and features/stop-button.md both record this UI start path as stale. Re-run with --force to drive it anyway.
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive agent-detail edit-and-create
+agent-detail/edit-and-create is stale: executed 2026-10-20 in #1402: the seeding POST /api/teams/:id/agents returns 400 "invalid body at machineId"; the probe predates the home-machine binding (ADR 0019) and sends no machineId. Re-run with --force to drive it anyway.
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs archive 1402 --from <already archived dir>
+refusing to overwrite <worktree>/docs/verify/1402/20261020-203718-api-key: docs/verify is add-only (ADR 0015)
+exit=1

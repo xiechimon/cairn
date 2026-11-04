@@ -1,0 +1,32 @@
+=== docs/verify/1335/fixture-control-bare.md ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://example.com/evidence-shot.png (bare URL, line 22)
+FAIL unreachable (HTTP 404): https://example.com/evidence-shot.png (bare URL, line 22)
+pr-evidence: RED (2 problem(s))
+exit=1
+
+=== docs/verify/1335/fixture-html-comments-ignored.md (finding 3: <!-- ... --> not scanned) ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://img.shields.io/badge/comment-control.svg (bare URL, line 26)
+pr-evidence: RED (1 problem(s))
+exit=1
+
+=== docs/verify/1335/fixture-srcset-descriptors.md (finding 2: `2x`/`100w` descriptor) ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 3 image link(s)
+pr-evidence: GREEN
+exit=0
+
+=== docs/verify/1335/fixture-srcset-spaced-commas.md (finding 1: comma+space in srcset) ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 3 image link(s)
+pr-evidence: GREEN
+exit=0
+
+=== docs/verify/1335/fixture-html-query-string.md (finding 4: ?query/#fragment on embedded URL) ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 3 image link(s)
+pr-evidence: GREEN
+exit=0

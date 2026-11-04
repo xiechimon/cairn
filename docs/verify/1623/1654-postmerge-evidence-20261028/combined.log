@@ -1,0 +1,89 @@
+[heavy-slots] acquired slot 1/1
+$ biome ci .
+apps/server/test/feishu-config.test.ts:144:7 lint/complexity/useFlatMap  FIXABLE  ━━━━━━━━━━━━━━━━━━
+
+  ℹ The call chain .map().flat() can be replaced with a single .flatMap() call.
+
+    142 │       { db: s.db, box: s.secretBox },
+    143 │       s.team.id,
+  > 144 │       s.db
+        │       ^^^^
+  > 145 │         .select()
+  > 146 │         .from(feishuBinding)
+  > 147 │         .all()
+  > 148 │         .map((row) => [row.appIdCipher, row.appSecretCipher])
+  > 149 │         .flat(),
+        │         ^^^^^^^
+    150 │     ),
+    151 │   ).toEqual({});
+
+  ℹ Using .flatMap() avoids the creation of an intermediate array.
+
+  ℹ Safe fix: Replace the chain with .flatMap().
+
+    146 146 │           .from(feishuBinding)
+    147 147 │           .all()
+    148     │ - ········.map((row)·=>·[row.appIdCipher,·row.appSecretCipher])
+    149     │ - ········.flat(),
+        148 │ + ········.flatMap((row)·=>·[row.appIdCipher,·row.appSecretCipher]),
+    150 149 │       ),
+    151 150 │     ).toEqual({});
+
+
+Checked 1116 files in 958ms. No fixes applied.
+Found 1 info.
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1371 tests in 193 files collected, disk count matches (1.3s)
+[spec-parse-gate] integration/test: 50 test files parsed clean by tsc (1.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+ RUN  v5.0.1 <checkout>
+
+
+ Test Files  27 passed (27)
+      Tests  345 passed (345)
+   Start at  20:00:15
+   Duration  22.15s (tests 50%, import 45%, transform 4%)
+
+    Isolate  27 workers spawned · ~58ms startup each (spawn + environment, per file)
+             at least ~1.51s faster with isolate: false — reuses workers across files instead of one per file
+
+[WebServer] (node:2252) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:2254) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "<checkout>/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:2270) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:2277) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:2284) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/split-autostart.spec.ts:149:1 › auto project: split starts without human confirmation; blocked children start once their blockers are done (687ms)
+  ✓  2 e2e/split-autostart.spec.ts:179:1 › default human project: split still stops at the parent confirm gate; children stay put (286ms)
+  ✓  3 e2e/split-autostart.spec.ts:190:1 › rejected split proposal stays reviewable, refuses confirmation, and accepts a corrected chief resubmission without losing history (332ms)
+
+  3 passed (5.3s)

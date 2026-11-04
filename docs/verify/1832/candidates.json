@@ -1,0 +1,215 @@
+[
+  {
+    "followUpSha": "d1bd843080a5894421950f045df1d7b49feaced0",
+    "timestamp": "2026-10-15T07:03:50.000Z",
+    "message": "fix(web): sort done by completion time and confirm pending drops (#1247) (#1323)\n\nfix(web): disambiguate done-gate dismiss and i18n get<T> scan (#1247)\n\nDismiss is 关闭; canceled outcome is 已取消 so Playwright name match\nno longer collides. api.get<WireTodo> became a GetKeyword JSX false\npositive for i18n-coverage — use type assertion instead.",
+    "paths": [
+      "apps/server/src/routes-todos.ts",
+      "apps/server/src/services/builds.ts",
+      "apps/server/src/services/phase.ts",
+      "apps/server/src/services/todos.ts",
+      "apps/server/test/manual-drop-matrix.test.ts",
+      "apps/server/test/persona-split-verify.test.ts",
+      "apps/server/test/phase.test.ts",
+      "apps/server/test/stop-and-done-1247.test.ts",
+      "apps/server/test/wire.test.ts",
+      "apps/web/e2e/board-dnd-live.spec.ts",
+      "apps/web/e2e/board-dnd.spec.ts",
+      "apps/web/src/board/board.tsx",
+      "apps/web/src/board/columns.ts",
+      "apps/web/src/board/dnd.ts",
+      "apps/web/src/board/done-confirm-dialog.tsx",
+      "apps/web/src/board/todo-card.tsx",
+      "apps/web/src/fixtures/board.ts",
+      "apps/web/src/i18n/en.ts",
+      "apps/web/src/phase.ts",
+      "apps/web/src/routes/board-page.tsx",
+      "apps/web/test/columns.test.ts",
+      "apps/web/test/dnd.test.ts",
+      "docs/verify/1247/1247-after-canceled-in-done.png",
+      "docs/verify/1247/1247-after-confirm-dialog.png",
+      "docs/verify/1247/1247-after-done-column-mixed.png",
+      "docs/verify/1247/1247-after-done-order.png",
+      "docs/verify/1247/1247-after-drag-failed-dialog.png",
+      "docs/verify/1247/1247-after-failed-landed.png",
+      "docs/verify/1247/1247-after-inflight-dialog.png",
+      "docs/verify/1247/1247-after-inflight-still-running.png",
+      "docs/verify/1247/1247-after-inflight-stop-dialog.png",
+      "docs/verify/1247/1247-after-outcome-dialog-confirm.png",
+      "docs/verify/1247/1247-after-outcome-dialog.png",
+      "docs/verify/1247/1247-after-sibling-stays-waiting.png",
+      "docs/verify/1247/1247-before-confirm-drop.png",
+      "docs/verify/1247/1247-before-done-order.png",
+      "docs/verify/1247/1247-before-drag-failed-into-done.png",
+      "docs/verify/1247/1247-before-inflight-dialog.png",
+      "docs/verify/1247/1247-before-inflight-still-running.png",
+      "docs/verify/1247/1247-before-sibling-waiting.png",
+      "docs/verify/1247/1247-before-sibling-wave-started.png",
+      "docs/verify/1247/1247-before-stop-yanks-done.png",
+      "docs/verify/1247/1247-mon-decisions.txt",
+      "docs/verify/1247/README.md",
+      "docs/verify/1247/sse.txt",
+      "packages/shared/src/phase.ts",
+      "packages/shared/test/vocabulary.test.ts"
+    ],
+    "fixingPr": 1323
+  },
+  {
+    "followUpSha": "0048134ec35ac67d67e14431a1a021cc0f945bd7",
+    "timestamp": "2026-10-15T13:38:09.000Z",
+    "message": "fix(shared): stream thinking_delta into the session (#1308) (#1328)\n\nfix(1308): make resetLive a one-shot clear\n\nBugbot: resetLive stayed on the activity report and in hub\nlastActivity, so the 5s noteEvent resend and catch-up could replay it\nand wipe thinking that had already started streaming after the retry.\n\nDaemon strips resetLive from base/current right after the emit.\nHub still publishes the live event with the bit (client clears once),\nbut stores lastActivity without it so catch-up cannot clear again.",
+    "paths": [
+      ".claude/skills/verify-pacman/SKILL.md",
+      ".claude/skills/verify-pacman/changelog/2026-10-14-1308.md",
+      ".claude/skills/verify-pacman/scripts/drive-1308-thinking-delta.mjs",
+      "apps/daemon/src/activity.ts",
+      "apps/daemon/src/machine-client.ts",
+      "apps/daemon/src/runner.ts",
+      "apps/daemon/test/runner-thinking-delta.test.ts",
+      "apps/server/src/routes-machine.ts",
+      "apps/server/src/services/events.ts",
+      "apps/server/src/services/machines.ts",
+      "apps/server/test/conv-stream-catchup.test.ts",
+      "apps/server/test/thinking-delta.test.ts",
+      "apps/web/src/api/live-thinking.ts",
+      "apps/web/src/api/mappers.ts",
+      "apps/web/src/api/sse.ts",
+      "apps/web/src/chief/use-chief-surface.ts",
+      "apps/web/src/routes/todo-detail-page.tsx",
+      "apps/web/test/sse-conversation-stream.test.ts",
+      "apps/web/test/thinking-live-row.test.ts",
+      "docs/verify/1308/README.md",
+      "docs/verify/1308/after-detail.png",
+      "docs/verify/1308/after-page-settled.txt",
+      "docs/verify/1308/after-page.txt",
+      "docs/verify/1308/after-post.json",
+      "docs/verify/1308/after-result.json",
+      "docs/verify/1308/after-settled.png",
+      "docs/verify/1308/after-sqlite.json",
+      "docs/verify/1308/after-sse-frames.json",
+      "docs/verify/1308/after-sse-summary.json",
+      "docs/verify/1308/before-detail.png",
+      "docs/verify/1308/before-page.txt",
+      "docs/verify/1308/before-post.json",
+      "docs/verify/1308/before-result.json",
+      "docs/verify/1308/before-sse-summary.json",
+      "packages/shared/src/protocol/machine-wire.ts",
+      "packages/shared/src/protocol/sse.ts",
+      "packages/shared/src/records/step.ts",
+      "packages/shared/test/__snapshots__/snapshot.test.ts.snap",
+      "packages/shared/test/snapshot.test.ts",
+      "packages/shared/test/thinking-delta-stream.test.ts"
+    ],
+    "fixingPr": 1328
+  },
+  {
+    "followUpSha": "f0835bbc4d9b2033a348f8c6ac90268e119e8a23",
+    "timestamp": "2026-10-23T03:19:30.000Z",
+    "message": "fix(ci): single-use helper gate 只标新增函数，白名单按名字匹配 (#1562)\n\n* fix(ci): single-use helper gate flags only newly declared functions, allowlist by path and name\n\ncloses #1561\n\n* docs(verify): 1561 before/after gate output",
+    "paths": [
+      "docs/verify/1561/gate-before-after.txt",
+      "scripts/single-use-helper-gate.mjs",
+      "scripts/single-use-helper-gate.test.mjs"
+    ],
+    "fixingPr": 1562
+  },
+  {
+    "followUpSha": "32a9adc37f101ade4c0f55fbf690b2377c9ccddb",
+    "timestamp": "2026-10-23T10:59:57.000Z",
+    "message": "fix: 测试清掉 git 钩子注入的环境变量，防止改写真实仓库配置 (#1581)\n\nfix: 测试启动前清掉 git 钩子注入的 GIT_DIR 等变量，防止测试改写真实仓库配置\n\nCo-authored-by: t <t@example.com>",
+    "paths": [
+      "scripts/scrub-git-env.mjs",
+      "scripts/scrub-git-env.test.mjs",
+      "vitest.config.ts"
+    ],
+    "fixingPr": 1581
+  },
+  {
+    "followUpSha": "e0c3961d78941fbe61d78a71a5a2475625b6e6fd",
+    "timestamp": "2026-10-23T11:00:23.000Z",
+    "message": "fix(site): install command uses a published package, CI checks npx package names (#1582)\n\nfix(site): 官网安装命令改回 npm 上真实存在的 @xiechimon/pacman，CI 加包名存在性检查\n\n- site/index.html：`npx @xiechimon/cairn` 在 npm 上 404，改回 `npx @xiechimon/pacman`\n- scripts/npm-command-gate.mjs：扫 README、site/、apps/web/src 里 npx / npm i 用到的包名，查 npm registry，404 即失败；CI 新增 npm-command-gate 任务\n- docs/lessons.md 记一行\n\n\nClaude-Session: https://claude.ai/code/session_017XQMwtQ5TAZ8oufw7C4PKa\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+    "paths": [
+      ".github/workflows/ci.yml",
+      "docs/lessons.md",
+      "scripts/npm-command-gate.mjs",
+      "scripts/npm-command-gate.test.mjs",
+      "site/index.html"
+    ],
+    "fixingPr": 1582
+  },
+  {
+    "followUpSha": "d3d7814f0924757a592cbf1ca97848cde350c097",
+    "timestamp": "2026-10-23T14:00:50.000Z",
+    "message": "fix(web): tool-result echo pairing trims both sides (#1584)\n\n* fix(web): tool-result echo pairing trims both sides\n\npi uploads each tool result as a role=system row. The transcript mapper pairs\nthat row with its toolcall to hide it, but trimmed only the lookup side, so any\noutput ending in a newline missed the pair and rendered in full as a centered\nnote. On build 01a16843 (todo #82) 38 of 45 echoes leaked this way.\n\n* docs(verify): before screenshot of the leaked tool echoes on todo #82",
+    "paths": [
+      "apps/web/src/api/mappers.ts",
+      "apps/web/test/transcript-tool-echo.test.ts",
+      "docs/verify/transcript-echo-trim/before-live-82.png"
+    ],
+    "fixingPr": 1584
+  },
+  {
+    "followUpSha": "15d6f98f4c6b78f7e2b62cf99583641d4d4274b3",
+    "timestamp": "2026-10-23T14:51:54.000Z",
+    "message": "fix(ci): npm-command-gate checks PUBLISHED_PACKAGES table (#1585)\n\n* fix(ci): npm-command-gate checks PUBLISHED_PACKAGES; dialog comment drops unpublished package name\n\n* fix(web): drop create-machine-dialog header comment instead of rewriting it",
+    "paths": [
+      "apps/web/src/resources/create-machine-dialog.tsx",
+      "scripts/npm-command-gate.mjs",
+      "scripts/npm-command-gate.test.mjs"
+    ],
+    "fixingPr": 1585
+  },
+  {
+    "followUpSha": "06a6bfc6216baec53dcdf44445a598e0962a1651",
+    "timestamp": "2026-10-23T15:31:39.000Z",
+    "message": "fix(scripts): migrate script restores a dirty pnpm-lock.yaml before checkout (#1592)",
+    "paths": [
+      "scripts/migrate-pacman-to-cairn.sh"
+    ],
+    "fixingPr": 1592
+  },
+  {
+    "followUpSha": "8757f6e663cbedce5e761286c7a1e00e6f10c768",
+    "timestamp": "2026-10-23T15:59:20.000Z",
+    "message": "fix(daemon): worktree add/remove get a checkout-sized timeout (#1593)\n\nworktree add and remove write every tracked file (8507 here) but ran under the\n30s metadata budget. On a loaded Mac the checkout measured 45s, so todo #82's\nbuilds were SIGTERMed with 'Could not write new index file'.",
+    "paths": [
+      "apps/daemon/src/git.ts"
+    ],
+    "fixingPr": 1593
+  },
+  {
+    "followUpSha": "d60df992c5726b3f75a7248febe805c56eae59c2",
+    "timestamp": "2026-10-24T05:43:49.000Z",
+    "message": "fix(scripts): migrate script stops each systemd unit separately (#1597)\n\nfix(scripts): migrate script stops each systemd unit separately and fails if the old daemon survives",
+    "paths": [
+      "scripts/migrate-pacman-to-cairn.sh"
+    ],
+    "fixingPr": 1597
+  },
+  {
+    "followUpSha": "3aa782e106579d97404dc376a2d607b76a1826e1",
+    "timestamp": "2026-10-24T05:49:36.000Z",
+    "message": "fix(scripts): migrate script rebuilds apps/web on the Mac (#1598)",
+    "paths": [
+      "scripts/migrate-pacman-to-cairn.sh"
+    ],
+    "fixingPr": 1598
+  },
+  {
+    "followUpSha": "05d0dd12e3e9eab720bfd7c4afeb097ed4c0615e",
+    "timestamp": "2026-10-28T03:48:55.000Z",
+    "message": "fix(prepush): take a heavy slot when prepush-vitest runs directly (#1703)\n\nDirect runs of scripts/prepush-vitest.mjs acquire a machine-wide heavy\nslot before starting vitest and release it when the child finishes; runs\nnested under pnpm prepush keep reusing the inherited CAIRN_HEAVY_SLOT /\nCAIRN_HEAVY_SLOT_OWNER lease, and CI keeps its queue exemption.\ndocs/spec/19 documents the covered entry point and\ndocs/lessons/1703-direct-vitest-skipped-slot.md records the incident\nwith its negative control.\n\nRebased onto 5adc14e4 (origin/main). The base movement since the\nreviewed head is main's 1786/1828/2009 commits; the reviewed patch is\nunchanged, and both sides' lesson entries are kept as separate files:\ndocs/lessons/1626-single-use-helper-gate-red.md and the 1786/1828\nentries from main, docs/lessons/1703-direct-vitest-skipped-slot.md from\nthis PR.\n\nBlocking findings in the latest review-gate comment (595a1367): none, a\ncarried-over PASS for the same patch. Failing required checks: none,\ncheck / pack-smoke / e2e-gate / pr-evidence all pass on run 40549699217.\n\nEvidence: docs/verify/1703/cairn-1703-reconcile-evidence/ — original\nscript negative control (red.log), direct and inherited-lease focus\ntests (green.log), 44-test regression run (regression.log), full\nprepush (prepush.log).\nEvidence: post-rebase re-verification on 5adc14e4 — node --test\nscripts/heavy-slots.test.mjs scripts/prepush.test.mjs\nscripts/english-only-gate.test.mjs: 44 pass, 0 fail; node\nscripts/lessons-ledger-gate.mjs, node scripts/english-only-gate.mjs,\npnpm lint, pnpm typecheck, pnpm spec:parse: pass; direct\nnode scripts/prepush-vitest.mjs logs \"[heavy-slots] acquired slot 1/2\"\nand exits 0.\n\nCo-authored-by: xiechimon <157263579+xiechimon@users.noreply.github.com>\n",
+    "paths": [
+      "docs/lessons/1703-direct-vitest-skipped-slot.md",
+      "docs/spec/19-test-layering-and-blast-radius.md",
+      "docs/verify/1703/cairn-1703-reconcile-evidence/README.md",
+      "docs/verify/1703/cairn-1703-reconcile-evidence/green.log",
+      "docs/verify/1703/cairn-1703-reconcile-evidence/prepush.log",
+      "docs/verify/1703/cairn-1703-reconcile-evidence/red.log",
+      "docs/verify/1703/cairn-1703-reconcile-evidence/regression.log",
+      "scripts/heavy-slots.test.mjs",
+      "scripts/prepush-vitest.mjs"
+    ],
+    "fixingPr": 1703
+  }
+]

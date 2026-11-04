@@ -1,0 +1,5 @@
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        dry
+warn: git fetch --prune failed (continuing; remote truth comes from ls-remote)
+error: git ls-remote --heads origin failed (network/auth); refusing to proceed without live remote refs
+exit=2

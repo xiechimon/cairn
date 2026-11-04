@@ -1,0 +1,15 @@
+{
+  "api": {
+    "state": "recorded",
+    "status": {
+      "host": "omarchy",
+      "lastRunAt": 1793286776000,
+      "lastRunResult": "success",
+      "lastRunExitStatus": "0",
+      "lastSuccessAt": 1793286776000
+    }
+  },
+  "bannerCount": 0,
+  "kind": null,
+  "text": null
+}

@@ -1,0 +1,3 @@
+2026-10-08 01:49:54 Loading pi runtime…
+2026-10-08 01:49:54 [machine] pi policy: trust=deny telemetry=off version-check=off cache-retention=long settings=in-memory (bypass list: PI_SETTINGS_BYPASS, spec 26)
+2026-10-08 01:49:55 [trust] denied: .pi/SYSTEM.md present in worktree — project trust is denied by policy, protected resources are not loaded (spec 26)

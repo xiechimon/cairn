@@ -1,0 +1,8 @@
+repo:        /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0222-938-github-merged
+mode:        dry
+criterion:   466 merged PRs from GitHub (default branch: main)
+
+KEEP        hp/pacman/t-0222-938-negfixture (not in the GitHub merged-PR list)
+
+---
+nothing to clean (no merged-PR residue in scope); kept=1

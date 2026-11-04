@@ -1,0 +1,25 @@
+from pathlib import Path
+import sys
+
+prompts = Path('docs/agent-dispatch-prompts.md').read_text()
+skill = Path('.claude/skills/verify-cairn/SKILL.md').read_text()
+checks = []
+for executor in ('Codex', 'Grok', 'pi'):
+    section = prompts.split('## ' + executor + '\n', 1)[1].split('\n## ', 1)[0]
+    checks.append((executor + ' incorporates shared checklist', '[Evidence limits checklist](#evidence-limits-checklist)' in section))
+for label, phrase in (
+    ('fixture scope', 'Fixture screenshots cannot establish real-app behavior'),
+    ('stub scope', 'Stub-only runs cannot establish real-provider behavior'),
+    ('delivery scope', 'Local-only evidence cannot support a delivered verification claim'),
+    ('mechanism artifact', 'compiled or runtime evidence'),
+    ('review boundary', 'machine-readable provenance'),
+    ('parent scope', '#1810 remains incomplete'),
+):
+    checks.append((label + ' in dispatch', phrase in prompts))
+    checks.append((label + ' in skill', phrase in skill))
+checks.append(('stub workflow preserved', 'real daemon + stub LLM gated wheel' in skill))
+checks.append(('fixture workflow preserved', 'Fixture-face regression' in skill))
+for label, ok in checks:
+    print(('PASS ' if ok else 'FAIL ') + label)
+print(f'{sum(ok for _, ok in checks)}/{len(checks)} checks passed')
+sys.exit(0 if all(ok for _, ok in checks) else 1)

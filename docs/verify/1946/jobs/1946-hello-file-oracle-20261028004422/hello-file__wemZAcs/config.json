@@ -1,0 +1,14 @@
+{
+    "task": {
+        "path": "/mnt/fast/lanes/cairn-1946/integration/eval/harbor/tasks/hello-file"
+    },
+    "trial_name": "hello-file__wemZAcs",
+    "trials_dir": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs/1946-hello-file-oracle-20261028004422",
+    "environment": {
+        "type": "docker",
+        "kwargs": {
+            "keep_containers": true
+        }
+    },
+    "job_id": "ab5d9db9-d09c-4911-a7aa-a5aa2f1c6904"
+}

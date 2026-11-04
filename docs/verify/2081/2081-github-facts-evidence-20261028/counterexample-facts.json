@@ -1,0 +1,29 @@
+{
+  "head": "60aaf07a741186378cf027d635462157ee9ad755",
+  "base": "6237fcb562bd159e82105ce8b9da680106e020bc",
+  "capturedFiles": 84,
+  "localPatchDigest": "pd2:9666f694a30ef17f2e6051df8ab0c95b4a97a62b29ea91384faeb0ec52ef3763",
+  "githubPatchDigest": "pd2:cf55062632e67915d21d1d9848543ce603966234994037855835a58b7ec88b41",
+  "patchRepresentationDifferences": [
+    {
+      "filename": "apps/server/drizzle/meta/0063_snapshot.json",
+      "localPatchSha": "64bd1fb506a67b72d2a6ec247fe65355b32e399d1703b2c747976007c1af86ea",
+      "githubPatchSha": null
+    },
+    {
+      "filename": "apps/server/src/services/projects.ts",
+      "localPatchSha": "a24c631d0b13c3f8ad90c5ba03e8858a7935db9a6e89910226b934299ab652b9",
+      "githubPatchSha": "a6c0aa4d94ee3c3a9d465c6aec317ce4405fb1a38961f5860a1db9dba9055dab"
+    },
+    {
+      "filename": "apps/server/src/services/todo-split.ts",
+      "localPatchSha": "52f57325dcafb12f30418ee207096851009d827baf58159c0f2aa74789b8b7b8",
+      "githubPatchSha": "ddcc064e7400f8f4725d87583c3c9cd36cfe8a5864ac3672a218068218e3afbf"
+    },
+    {
+      "filename": "packages/shared/src/records/project.ts",
+      "localPatchSha": "1ce2f61b8d83e185d1b2852aba6e167dbf5996cbd1fe7222547edee4cd06d0f1",
+      "githubPatchSha": "7a068d1d79af5274f5e7926466992a8ab17e258b3e4d24189f2f598611597760"
+    }
+  ]
+}

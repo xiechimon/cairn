@@ -1,0 +1,91 @@
+# P5a-1 round 4: /code-review (low) and the list of earlier review findings not fixed
+
+## /code-review (low) on 6c51cd9c..HEAD, HEAD = 5cf6e92e
+Skill args (verbatim):
+  low 6c51cd9c..HEAD -- Repository is the git worktree /home/user/pacman/.claude/worktrees/p5 (branch claude/bootstrap-p5,
+  HEAD 5cf6e92e). The session cwd is a different worktree (p5d, another branch), so run every git command as
+  `cd /home/user/pacman/.claude/worktrees/p5 && git ...`. The range 6c51cd9c..HEAD contains merge 18c6dded, which brought
+  311 files from origin/main with no conflicts; review only this branch's own changes in the range: `git diff 6c51cd9c
+  69722cc9` (round 3 tail: chief.ts, issue-intake.ts, tests) and `git diff 18c6dded HEAD` (round 4: lib/github.ts,
+  services/issue-intake.ts, services/github-issues.ts, tests, README rows, spec 28).
+Why not the plain two-dot diff: git diff 6c51cd9c..HEAD includes main's side of the merge:
+  $ git diff --shortstat 6c51cd9c..HEAD
+   322 files changed, 27703 insertions(+), 223 deletions(-)
+This branch's own parts of the range (what was reviewed):
+  $ git diff --shortstat 6c51cd9c 69722cc9
+   6 files changed, 445 insertions(+), 42 deletions(-)   (3 outside docs/verify: chief.ts, issue-intake.ts, issue-intake.test.ts)
+  $ git diff --shortstat 18c6dded HEAD
+   8 files changed, 694 insertions(+), 112 deletions(-)
+Pre-run check (same Bash call as the cd): pwd = /home/user/pacman/.claude/worktrees/p5, branch claude/bootstrap-p5, HEAD
+5cf6e92ef1aa87b58bcf8d239a10c422d6f11f80; commits 6c51cd9c..HEAD not on origin/main: dc60bf07 4cb207ee 69722cc9 18c6dded
+68d6dbca fb1f23d5 5cf6e92e. The review's answer names chiefBinding (chief.ts, 4cb207ee), GithubRateLimitedError and
+claimedSourceRefs (round 4), so it read this branch's diff, not p5d's.
+
+Result: no findings.
+Reviewer's notes (no action needed):
+- chiefBinding keeps the old checks (missing chief row or unbound agent -> null; requireBoundAgent's 409 -> cannot
+  orchestrate).
+- GithubRateLimitedError is re-thrown from the per-card and per-project catches; the per-team catch handles it, so a
+  rate limit stops the team for the run and is not counted as an error.
+- claimedSourceRefs returns a lowercased set and its three lookups lowercase their key.
+Below the reviewer's bar, not changed: an empty x-ratelimit-reset or retry-after header gives Number('') = 0, so
+the logged reset time would read as the epoch or 'now'. Reason not fixed: it changes one log field only (the stop
+itself does not depend on it), and GitHub sends integers in both headers.
+
+/simplify: not run this round; round 4 adds about 180 source lines (half of them comments) on existing functions, no
+new module. /security-review: not needed, no file on the AGENTS.md security list is touched (round 4 touches
+apps/server/src/lib/github.ts, apps/server/src/services/{issue-intake,github-issues}.ts, tests, README.md,
+README.zh.md, docs/spec/28).
+
+## Earlier /code-review findings judged not to fix (for the PR body's Risk section)
+Sources: p5a1-r3-reviews.txt (round 3 passes 1 and 2), gates-p5a1-5.txt (round 3b passes 1 and 2). p5a1-reviews.txt
+(rounds 1-2) has no unfixed /code-review finding; its kept /simplify item (intakeGet overlapping #1414's
+conditionalGetJson) is already in Risk. Round 3 pass 1 #6 (D5 trusts a label applied through a GitHub App) is no
+longer open: fixed in round 4 (5cf6e92e).
+
+From p5a1-r3-reviews.txt:
+- r3 p1 #1  A delivered-PR task (failed with an open PR) is left to the PR reconcile (#1414, not on main), never closes
+            here and keeps a cap slot. Reason: requested design (round 3 item 1); review tasks already work this way.
+- r3 p1 #5  Orchestrate retries live in memory and are lost on restart. Reason: requested design; README says a restart
+            forgets pending retries.
+- r3 p1 #7  Altitude: use the closed event's commit_id instead of excluding delivered-PR tasks. Reason: round 3 asked
+            for the prNumber rule; recorded as an option.
+- r3 p1 #8  The retry does not re-check that the issue is still open and labeled. Reason: an imported task is not
+            withdrawn on unlabel (failure mode 3, group 10), and the close reconcile runs before the retry each sweep,
+            so a trusted close moves the task out of todo first.
+- r3 p1 #9 / p2 #6  Retry entries for a team that loses its token, projects or chief stay in memory and never reach
+            "given up". Reason: one small entry per failed import; nothing can orchestrate for that team meanwhile; the
+            entry is visited again once the team is usable.
+- r3 p1 #14 The chief_thread lookup by title has no index. Reason: it runs only for pending retries (at most 3 tries per
+            failed import).
+- r3 p2 #3  A task a person moved out of todo and back while the chief was unbound is still orchestrated later.
+            Reason: the person put it back in todo and the import's D5 check stands; low likelihood.
+- r3 p2 #4  A backward wall-clock step could make a person's start look older than the import. Reason: both times come
+            from the same nowMs(); not a case guarded elsewhere either.
+- r3 p2 #5  If orchestrateTodo throws after the step is queued, the tally counts an error and the next sweep logs
+            thread-exists. Reason: no second orchestration happens; only the counts read off.
+- r3 p2 #7  Altitude: make sendChiefMessage transactional. Reason: chief.ts is outside this ticket; the chief-step check
+            covers the intake's case.
+- r3 p2 #8  Altitude: link threads to todos structurally instead of by title. Reason: needs a schema change; the title
+            rule is the one the web already uses (#1216).
+- r3 p2 #9  noDeliveredPr repeats builds.ts latestPrBuild's predicate. Reason: sharing it means editing builds.ts in this
+            PR; the comment names the source.
+- r3 p2 #10 No index on build.todoId for the correlated NOT EXISTS. Reason: it runs once per open github-issue task per
+            5-minute sweep. (Round 4's noOpenChildren adds a second correlated NOT EXISTS on todo.sourceTodo, also
+            unindexed, same cadence and same reason.)
+
+From gates-p5a1-5.txt:
+- r3b p1 #2 The per-project cap counts hand and webhook github-issue tasks, which the reconcile does not close, so they
+            can hold the poller's slots. Reason: a cap rule change, left for a user decision.
+- r3b p1 #8 The createdBy filter could be a SQL join. Reason: it filters rows already loaded per team; a join would not
+            remove the per-team chief read.
+- r3b p2 #2 Tasks of an older agent drop out of the reconcile without a log line. Reason: the rebind rule is decided; a
+            per-sweep line would repeat until a person closes them.
+- r3b p2 #3 The skip line repeats every sweep while the chief stays unbound. Reason: one line per sweep is the requested
+            behavior.
+- r3b p2 #4 While unbound, no pruning runs for that team. Reason: the price of keeping the seen-open marks; nothing is
+            added while unbound.
+- r3b p2 #5 Two chief reads per team; a rebind during the reconcile tags new imports with the new agent. Reason: kept on
+            purpose (new imports go to the agent bound at import time).
+- r3b p2 #6 An issue closed between the list read and the import is still imported. Reason: present since round 1 and
+            outside this segment; a follow-up (segment 3 binds the issue text to the label time).

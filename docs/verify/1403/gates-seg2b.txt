@@ -1,0 +1,71 @@
+#1403 segment 2b: gates on 3645d7b4 (claude/bootstrap-p2-seg2b, contains origin/main 4eac63d5)
+Run 2026-10-22 in /home/user/pacman/.claude/worktrees/p5d.
+
+$ pnpm lint                                  exit 0
+  Checked 816 files in 2s. No fixes applied.
+  Found 1 info.
+  (the info is the existing noUselessFragments note in apps/web/src/resources/machines-page.tsx, not in this diff)
+
+$ pnpm typecheck                             exit 0
+  packages/shared, apps/web, apps/daemon, apps/server, integration: Done
+
+$ pnpm spec:parse                            exit 0
+  [spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+  [spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.0s)
+  [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+$ pnpm exec vitest run --changed origin/main   exit 0   (origin/main = 4eac63d5)
+   Test Files  151 passed (151)
+        Tests  1899 passed | 1 skipped (1900)
+     Duration  312.18s
+
+$ lsof -iTCP:8404 -sTCP:LISTEN                exit 1 (no listener)
+$ E2E_AFFECTED_PORT=8404 pnpm --filter @pacman/web e2e:affected   exit 0
+  apps/web/src/i18n/en.ts → FULL (shared surface)
+  [e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard
+  fixture-build config, E2E_PORT=8404
+  Running 1181 tests using 2 workers
+    1181 passed (9.7m)
+
+Also on this head: the full server suite passed at each code commit (last full run at
+86690452: 125 files, 2002 passed, 1 skipped); the three target files pass at 3645d7b4
+(275 passed, seg2b-red-green.txt).
+Not run: integration/test/done-dialog-e2e.test.ts (its toast text changed with the web copy;
+spec:parse covers its parse; it runs in CI). Live leg against GitHub: not run (fake GitHub
+only, by decision); the host leg stays 待宿主.
+
+Final gates on 9ffafdeb (after the rate-limited merge change; contains origin/main d4f5f18f)
+Run 2026-10-22 in /home/user/pacman/.claude/worktrees/p5d.
+
+$ pnpm lint                                  exit 0
+  Checked 816 files in 1840ms. No fixes applied. Found 1 info (the existing machines-page.tsx note).
+$ pnpm typecheck                             exit 0
+$ pnpm spec:parse                            exit 0
+  [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+$ pnpm exec vitest run --changed origin/main   exit 0   (origin/main = d4f5f18f)
+   Test Files  151 passed (151)
+        Tests  1918 passed | 1 skipped (1919)
+$ lsof -iTCP:8404 -sTCP:LISTEN                exit 1 (no listener)
+$ E2E_AFFECTED_PORT=8404 pnpm --filter @pacman/web e2e:affected   exit 0
+  apps/web/src/i18n/en.ts → FULL (shared surface); 169/169 specs, E2E_PORT=8404
+  Running 1181 tests using 2 workers
+    1181 passed (9.8m)
+Full server suite at 9ffafdeb: 126 files, 2082 passed, 1 skipped.
+
+Gates on 0f8ad77a, 2026-10-22 (merge of origin/main b57b4a0d: #1500, #1505)
+Run in /home/user/pacman/.claude/worktrees/p5d. Resolution: seg2b-merge-main.txt.
+
+$ pnpm lint                                  exit 0
+  Checked 818 files in 2s. No fixes applied. Found 1 info (the existing machines-page.tsx note).
+$ pnpm typecheck                             exit 0
+$ pnpm spec:parse                            exit 0
+  [spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches
+  [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+$ pnpm exec vitest run --changed origin/main   exit 0   (origin/main = b57b4a0d)
+   Test Files  153 passed (153)
+        Tests  1952 passed | 1 skipped (1953)
+$ lsof -iTCP:8404 -sTCP:LISTEN                exit 1 (no listener)
+$ E2E_AFFECTED_PORT=8404 pnpm --filter @pacman/web e2e:affected   exit 0
+  apps/web/src/i18n/en.ts → FULL (shared surface); 169/169 specs, E2E_PORT=8404
+    1181 passed (11.0m)
+Full server suite on 0f8ad77a: 128 files, 2116 passed, 1 skipped.

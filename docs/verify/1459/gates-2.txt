@@ -1,0 +1,56 @@
+#1459 gates at 70601915, after the merge of #1461 round 4 (worktree .claude/worktrees/p5e, branch
+claude/bootstrap-p5-1459; origin/main = dabef481; origin/claude/bootstrap-p5 = 22cf8db1)
+commits since 29e16537: a7e97074 (merge), 2d0a4a2a (tests), 70601915 (fix); details in merge-p5-r4.txt
+
+== pnpm lint -> exit 0
+Checked 796 files in 3s. No fixes applied.
+Found 1 info.
+(the 1 info is the existing noUselessFragments note in apps/web/src/resources/machines-page.tsx:317, not in this diff)
+
+== pnpm typecheck -> exit 0
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+
+== pnpm spec:parse -> exit 0
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.6s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.4s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+== node scripts/test-spawn-gate.mjs -> exit 0
+[test-spawn-gate] PASS: 517 test sources, no package-manager spawns.
+
+== pnpm exec vitest run --changed origin/main -> exit 0
+ Test Files  252 passed (252)
+      Tests  2847 passed | 1 skipped (2848)
+   Duration  475.72s (tests 53%, import 46%, transform 1%)
+(no failures; the root-only runner-brief case noted in gates.txt passes now that main's #1458 container-safe
+daemon tests arrived through round 4's merge of origin/main)
+
+== the three files the merge touched, apps/server (pnpm exec vitest run <file>...) -> exit 0
+test/webhook.test.ts 47, test/issue-intake.test.ts 141, test/github-issues.test.ts 29
+ Test Files  3 passed (3)
+      Tests  217 passed (217)
+
+== E2E_AFFECTED_PORT=8393 pnpm --filter @pacman/web e2e:affected -> exit 0
+(lsof -iTCP:8393 and -iTCP:8398: no process on either; no playwright running; 8393 picked to stay off the
+shared default)
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8393
+  live-server-reap.spec.ts token-gate.spec.ts
+  ok  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (3.4s)
+  ok  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.2s)
+  ok  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (5.3s)
+  ok  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (613ms)
+  ok  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (679ms)
+  ok  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (662ms)
+  ok  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (744ms)
+  ok  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (604ms)
+  8 passed (18.9s)
+
+== pre-commit hook on each commit: biome ci, pnpm -r typecheck, test-spawn-gate passed on a7e97074,
+2d0a4a2a and 70601915; on a7e97074 only after PACMAN_ALLOW_BANNED_VOCAB=1 for main's
+docs/verify/1404/pr-gate-1420-run5-1892662.json (see merge-p5-r4.txt).

@@ -1,0 +1,22 @@
+# Captured before the routes-machine confirm owner-auth change (same test file).
+# Command: pnpm exec vitest run apps/server/test/enroll-confirm-auth.test.ts
+
+ FAIL  |@xiechimon/cairn| test/enroll-confirm-auth.test.ts > enroll confirm owner auth (#2053) > anonymous confirmation with auth enabled returns 401
+AssertionError: expected 200 to be 401 // Object.is equality
+
+- Expected
++ Received
+
+- 401
++ 200
+
+ ❯ test/enroll-confirm-auth.test.ts:36:28
+     34|
+     35|     const confirm = await reqWith(s, 'POST', '/api/machine/enroll/confirm', {}, { enrollId });
+     36|     expect(confirm.status).toBe(401);
+       |                            ^
+     37|
+     38|     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)

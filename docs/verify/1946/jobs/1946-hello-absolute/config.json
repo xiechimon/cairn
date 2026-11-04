@@ -1,0 +1,10 @@
+{
+    "job_name": "1946-hello-absolute",
+    "jobs_dir": "/mnt/fast/lanes/cairn-1946/docs/verify/1946/jobs",
+    "n_concurrent_trials": 1,
+    "tasks": [
+        {
+            "path": "integration/eval/harbor/tasks/hello-file"
+        }
+    ]
+}

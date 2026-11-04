@@ -1,0 +1,39 @@
+{
+  "relayResult": {
+    "builds": [
+      {
+        "id": "01a11a55-74ea-75ad-8d0a-d121c6a29139",
+        "todoId": "4eb5Ncq2TcFIN6Srqgka5",
+        "withPlan": true,
+        "prevPhase": "todo",
+        "triggerSource": "chief",
+        "pinnedMachineId": null,
+        "planDocId": null,
+        "errorMessage": null,
+        "prUrl": null,
+        "prNumber": null,
+        "diffHash": null,
+        "createdAt": 1791443170538
+      }
+    ],
+    "withPlan": true,
+    "dispatchReason": null,
+    "triggerSource": "chief"
+  },
+  "sqlite": {
+    "builds": [
+      {
+        "id": "01a11a55-74ea-75ad-8d0a-d121c6a29139",
+        "withPlan": 1,
+        "triggerSource": "chief"
+      }
+    ],
+    "steps": [
+      {
+        "buildId": "01a11a55-74ea-75ad-8d0a-d121c6a29139",
+        "kind": "plan",
+        "status": "pending"
+      }
+    ]
+  }
+}

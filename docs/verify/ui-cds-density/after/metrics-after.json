@@ -1,0 +1,12 @@
+{
+  "comfortable": {
+    "density": null,
+    "remScale": "calc(16 / 17)",
+    "padCard": "16px"
+  },
+  "compact": {
+    "density": "compact",
+    "remScale": ".9375",
+    "padCard": "8px"
+  }
+}

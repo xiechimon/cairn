@@ -1,0 +1,57 @@
+{
+  "schema": "hillclimb/v2",
+  "metrics": [
+    {
+      "id": "decision_ok",
+      "label": "决策正确",
+      "kind": "binary",
+      "better": "higher"
+    },
+    {
+      "id": "memory_write_ok",
+      "label": "记忆修正",
+      "kind": "binary",
+      "better": "higher"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "in_tokens",
+      "label": "in tok"
+    },
+    {
+      "id": "out_tokens",
+      "label": "out tok"
+    },
+    {
+      "id": "cache_read_tokens",
+      "label": "cache rd"
+    },
+    {
+      "id": "tool_calls",
+      "label": "tools"
+    },
+    {
+      "id": "cost_usd",
+      "label": "cost $",
+      "unit": "usd"
+    },
+    {
+      "id": "latency_s",
+      "label": "latency",
+      "unit": "s"
+    }
+  ],
+  "harness_paths": [
+    "integration/eval/chief-dispatch/stack.mts",
+    "integration/eval/chief-dispatch/repo-seed/README.md",
+    "integration/eval/memory-regression/grade.mts",
+    "integration/eval/memory-regression/seed.mts",
+    ".claude/hillclimb/memory-regression/cases.json",
+    "apps/server/src/services/chief.ts",
+    "apps/server/src/services/memory.ts",
+    "apps/server/src/services/chief-tools.ts",
+    "packages/shared/src/protocol/chief-tools.ts",
+    "apps/daemon/src/backend/pi.ts"
+  ]
+}

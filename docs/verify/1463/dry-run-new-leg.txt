@@ -1,0 +1,25 @@
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/helpers.ts
+  apps/web/e2e/helpers.ts → imported by 17 specs
+[e2e:affected] 17/169 specs on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-desc-overflow.spec.ts avatar-dicebear.spec.ts cds-dialogs.spec.ts escape-wiring.spec.ts hotkeys.spec.ts notify-banner.spec.ts overlay-focus.spec.ts phase-chip-words.spec.ts registry-focus-ring.spec.ts search-close-flash.s
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/probe-dump.mjs
+  apps/web/e2e/probe-dump.mjs → FULL (the playwright config or package.json names probe-dump.mjs)
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts agent-detail.spec.ts agent-identity-chip.spec.ts agent-model-width.spec.ts attachment-strip.spec.ts attachment-title.spec.ts avatar
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/palette-c.css
+  apps/web/e2e/palette-c.css → FULL (palette-c.css is not a top-level e2e module)
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts agent-detail.spec.ts agent-identity-chip.spec.ts agent-model-width.spec.ts attachment-strip.spec.ts attachment-title.spec.ts avatar
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/evidence.ts
+  apps/web/e2e/evidence.ts → FULL (shared surface)
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts agent-detail.spec.ts agent-identity-chip.spec.ts agent-model-width.spec.ts attachment-strip.spec.ts attachment-title.spec.ts avatar
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/live-server-tether.mjs
+  apps/web/e2e/live-server-tether.mjs → file map
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8398
+  live-server-reap.spec.ts token-gate.spec.ts
+

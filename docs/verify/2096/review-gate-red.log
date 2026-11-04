@@ -1,0 +1,117 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/eval-review-score.test.ts (14 tests | 5 failed) 17ms
+   × null where or why labels are rejected and cannot establish agreement 5ms
+   × invalid where or why enum labels are rejected 1ms
+   × empty reader.vendor cannot bypass same-vendor rejection when model maps to the labeler 1ms
+   × wrong-cased reader.vendor Anthropic cannot bypass same-vendor rejection 2ms
+   × unresolved reader.model vendor is rejected 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/eval-review-score.test.ts > null where or why labels are rejected and cannot establish agreement
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/eval-review-score.test.ts:172:5
+    170|       },
+    171|     ]),
+    172|   ).toThrow(/invalid where/i);
+       |     ^
+    173|   expect(() =>
+    174|     scoreReviewWeeks([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/eval-review-score.test.ts > invalid where or why enum labels are rejected
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/eval-review-score.test.ts:199:5
+    197|       },
+    198|     ]),
+    199|   ).toThrow(/invalid where/i);
+       |     ^
+    200|   expect(() =>
+    201|     scoreReviewWeeks([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/eval-review-score.test.ts > empty reader.vendor cannot bypass same-vendor rejection when model maps to the labeler
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/eval-review-score.test.ts:224:76
+    222|     items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+    223|   };
+    224|   expect(() => scoreReviewWeeks([{ week: '2026-W44', records, answers …
+       |                                                                            ^
+    225|     /reader vendor equals the labeler vendor/i,
+    226|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/eval-review-score.test.ts > wrong-cased reader.vendor Anthropic cannot bypass same-vendor rejection
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/eval-review-score.test.ts:242:76
+    240|     items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+    241|   };
+    242|   expect(() => scoreReviewWeeks([{ week: '2026-W44', records, answers …
+       |                                                                            ^
+    243|     /reader vendor equals the labeler vendor/i,
+    244|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/eval-review-score.test.ts > unresolved reader.model vendor is rejected
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ test/eval-review-score.test.ts:260:76
+    258|     items: { 'item-1': { where: 'prompt', why: 'wrong_tool' } },
+    259|   };
+    260|   expect(() => scoreReviewWeeks([{ week: '2026-W44', records, answers …
+       |                                                                            ^
+    261|     /unresolved reader vendor/i,
+    262|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 9 passed (14)
+   Start at  03:41:05
+   Duration  207ms (transform 63%, tests 20%, import 13%, worker 3%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /workspace/apps/server
+

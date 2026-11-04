@@ -1,0 +1,76 @@
+# #1459 round 2 reviews
+# Worktree /home/user/pacman/.claude/worktrees/p5, branch claude/bootstrap-p5 (pushed as claude/bootstrap-p5-r5).
+
+## /code-review (medium) on the round 2 diff
+Target: git -c core.quotePath=false diff 0c4b6489 0250b1a7 (45b87f1b tests, bfa8b01f server fixes, 766e77d9 probe,
+0250b1a7 docs), branch confirmed with git rev-parse --abbrev-ref HEAD in the worktree. 13 findings.
+
+Fixed (tests first in 022c6a11, fixes in b9f6d92f, 1c6bb65c, 2ef0d9ab):
+1. The generic detail does not close the permission oracle: outcomes after the permission check (created, duplicate,
+   issue not found) still differ. README, README.zh, spec 28 P5a and the webhook header said the 202 cannot be used to
+   learn someone's permission; they now say it keeps the verdict out of the answer text only, and revoking a leaked
+   token remains the remedy (2ef0d9ab; failure-modes.txt second note corrects F19). Closing it is left open (below).
+2. Every import 404 was answered "github connection not found", also when GitHub reports the issue missing. The 404
+   is now told apart by reading the team token again: issue-not-found vs no-github-connection, both 202
+   misconfigured with a refusal log line (b9f6d92f; W19, W16; mutations R4, R8).
+3. The sender login went straight into the permission URL: `..` / `.` are normalized into another API path for the
+   team token, `a/b` reads the wrong resource. A sender that is not a GitHub login shape is refused as
+   sender-malformed before any read (b9f6d92f; W20 x3, W20b keeps `[bot]` logins; mutation R7).
+4. The probe's K2 could not tell sender-below-triage from the other two sender refusals. L1-L3 check the reason codes
+   in server.log; the saved log slice keeps the reason line; J1 expects all 8 deliveries (1c6bb65c).
+6. An empty retry-after header was read as 0 seconds and overrode x-ratelimit-reset. Headers are taken only as
+   non-negative integers (b9f6d92f; issue-intake group 24 x4; mutation R9).
+9. SENDER_REFUSED_DETAIL was exported and unused; now module-private (the test keeps its own literal as the wire pin).
+10. refuseSender() always answers the generic detail, replacing three call sites that passed `{}` placeholders.
+11. deliverDirect uses captureLogger instead of a second copy of the logger setup.
+12. The one-call project insert helper is inlined into W17 (CLAUDE.md: single-line helper, one call site).
+
+Not fixed, with reasons (for the PR's Risk; the coordinator writes the body):
+1 (rest). Closing the oracle needs the answers after the permission check to be uniform, or the sender-independent
+   checks (duplicate, issue existence) moved before the permission read; the issue-existence check would add a
+   GitHub read for every outside sender. Out of this round.
+5. The poller passes the sweep-start time to retryAt, so with retry-after the logged reset can be late by the time
+   the sweep has run. Log only; the next sweep reads regardless.
+7. When orchestrateTodo throws after the import (W18 path), the task stays in to-do holding a cap slot and nothing
+   retries it; the delivery got 409. A chief-binding check before the import (as the poller does) would avoid it.
+8. The duplicate check (claimed sourceRef) runs after the permission read, so a redelivery spends a permission read
+   (or a cache hit) before ending duplicate.
+13. No webhook test sends retry-after together with x-ratelimit-reset; the retry-after-first rule is pinned through
+   issue-intake group 24 (mutation R6), and the webhook's W4b retry-after case only checks an ISO time.
+
+## /security-review
+Required: webhook.ts is the service behind apps/server/src/routes-webhook.ts (AGENTS.md / CLAUDE.md security list).
+
+Run 1 and run 2: the skill built its git status and diff from the session's primary working directory, not from the
+target worktree, both times.
+- Run 1 picked up /home/user/pacman (branch claude/nice-faraday-o329b3, the pr-gate workflow files).
+- Run 2 was started right after confirming in the target worktree, in one Bash call,
+  `cd /home/user/pacman/.claude/worktrees/p5 && git rev-parse --abbrev-ref HEAD` = claude/bootstrap-p5 and
+  `git diff --stat origin/main...HEAD` = this branch's 19 files; it still picked up
+  /home/user/pacman/.claude/worktrees/p5d (branch claude/bootstrap-p2-seg2b, #1403 segment 2 files).
+Why it could not be pointed at the worktree: the skill collects its context when it launches, from the session's
+primary working directory, which a Bash `cd` does not change and a subagent cannot set; switching it with
+EnterWorktree would create a new worktree, which the disk limit rules out.
+
+Manual review instead, same rules (HIGH / MEDIUM only, confidence 8 or more, the skill's exclusions), on
+`git diff origin/main...HEAD` limited to apps/server/src/services/webhook.ts, apps/server/src/lib/github.ts,
+apps/server/src/services/issue-intake.ts (checked: comment-only changes), packages/shared/src/webhook.ts,
+.claude/skills/verify-pacman/scripts/drive-1137-webhook-tracer.mjs and vp-registry.json.
+
+Result: no vulnerability at confidence 8 or above.
+- Request paths toward api.github.com: owner and repo now come from githubRepoOfProject (`.` / `..` segments and
+  malformed names refused, zero outbound); the sender login must match ^[A-Za-z0-9][A-Za-z0-9-]{0,38}(\[bot\])?$
+  before it is put into the permission URL, so the rewrites through `..` / `.` / `/` are closed; the issue number is
+  a positive integer (zod). Nothing from the payload controls host or scheme.
+- 202 bodies: the three sender-permission refusals answer one fixed sentence; login, repo and verdict go to the log
+  only. The remaining inference through later outcomes existed before this PR and is narrowed (documented).
+  issue-not-found echoes the caller's own repo name and issue number.
+- Logs: reason, sender login, repo, issue, detail; no secrets or tokens.
+- Shared permission cache: keys are team x repo x login, lower-case; the login-shape check now runs before any
+  cache entry can be written for a webhook sender.
+- Probe: GH_WEBHOOK_VERIFY_TOKEN handling unchanged (connection row only, never in evidence). The saved server.log
+  slice now keeps 8 lines after each delivery id; the server has no request logger (app.ts, routes), so the
+  webhook URL token cannot land in it. The rows it inserts go into the verify stack's scratch database.
+Considered and dropped: the post-check permission inference (pre-existing, confidence 3); `[bot]` logins
+(encodeURIComponent encodes the brackets, 2); the 404 split revealing whether a connection exists (already
+revealed by the earlier no-github-connection refusal, 2).

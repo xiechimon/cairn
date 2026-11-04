@@ -1,0 +1,14 @@
+{
+  "snoozedResponse": {
+    "id": "6m4P4hsgSyXugZ0NabQoM",
+    "snoozeMode": "until",
+    "snoozedUntil": 1793449877699
+  },
+  "returnedAfterMs": 18059,
+  "after": {
+    "id": "6m4P4hsgSyXugZ0NabQoM",
+    "snoozeMode": null,
+    "snoozedUntil": null
+  },
+  "unread": true
+}

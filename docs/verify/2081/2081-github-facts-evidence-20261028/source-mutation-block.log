@@ -1,0 +1,4 @@
+[heavy-slots] acquired slot 1/1
+$ python3 docs/verify/2081/review-preflight.py /tmp/2081-mutated-record.json --head 60aaf07a741186378cf027d635462157ee9ad755 --digest pd2:cf55062632e67915d21d1d9848543ce603966234994037855835a58b7ec88b41 --writer-family GPT --bundle /tmp/2081-mutated-bundle.txt --source-root <checkout> --github-pr /tmp/cairn-2084-rest-current.json --github-files /tmp/cairn-2084-files.json
+BLOCK: Source bytes differ or are missing: docs/verify/1623/1654-review-response-20261028/README.md
+exit=1

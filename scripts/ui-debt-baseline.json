@@ -1,0 +1,53 @@
+{
+  "frozenFrom": {
+    "sha": "c005d70a8fedbd6b7c41b779f8837f1f3a14bc34",
+    "date": "2026-10-31"
+  },
+  "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
+  "perFaceCss": {},
+  "rawControls": {
+    "total": 2,
+    "files": {
+      "chief/chief-conversation.tsx": 1,
+      "overlay/search-panel.tsx": 1
+    }
+  },
+  "arbitraryValues": {
+    "textTotal": 5,
+    "spacingTotal": 11,
+    "files": {
+      "board/board.tsx": {
+        "text": 0,
+        "spacing": 3
+      },
+      "board/filter-panel.tsx": {
+        "text": 1,
+        "spacing": 2
+      },
+      "components/chat/live-row.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "components/model-select-core.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
+      "overlay/more-menu.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "overlay/token-gate.tsx": {
+        "text": 2,
+        "spacing": 1
+      },
+      "pages/project-new-page.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "routes/machine-authorize-page.tsx": {
+        "text": 1,
+        "spacing": 1
+      }
+    }
+  }
+}

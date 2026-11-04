@@ -1,0 +1,18 @@
+[
+  {
+    "id": "fB3IXn8lDJuWdo8xEktbw",
+    "name": "verify-1400",
+    "teamId": "vJFF2kB201sXLfURQDnFU",
+    "repoKind": "hosted",
+    "repoName": "verify-1400",
+    "cloneUrl": "http://127.0.0.1:8791/git/vJFF2kB201sXLfURQDnFU/verify-1400"
+  },
+  {
+    "id": "jdFHoiNEIhGSr2WiSe-ja",
+    "name": "atlas",
+    "teamId": "vJFF2kB201sXLfURQDnFU",
+    "repoKind": "hosted",
+    "repoName": "atlas",
+    "cloneUrl": "http://127.0.0.1:8791/git/vJFF2kB201sXLfURQDnFU/atlas"
+  }
+]

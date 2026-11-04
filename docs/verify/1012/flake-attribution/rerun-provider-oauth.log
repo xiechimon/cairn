@@ -1,0 +1,17 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 7 tests using 1 worker
+
+  ✓  1 e2e/provider-oauth.spec.ts:32:1 › OAuth 徽标只骑已接线族(GitHub Copilot),codex 未接线行无徽标,xai 无徽标 (285ms)
+  ✓  2 e2e/provider-oauth.spec.ts:54:1 › codex 未接线行点击零动作:不关窗、不进表单 (235ms)
+  ✓  3 e2e/provider-oauth.spec.ts:63:1 › fixture 面点已接线徽标行 = accept 律(关窗),重开列表仍在 (650ms)
+  ✓  4 e2e/provider-oauth.spec.ts:72:1 › 着陆参 oauth=error&reason=denied 自动重开弹窗 + 文案 + 清参 (265ms)
+  ✓  5 e2e/provider-oauth.spec.ts:83:1 › 着陆参 oauth=error&reason=exchange 走交换失败文案 (198ms)
+  ✓  6 e2e/provider-oauth.spec.ts:92:1 › 着陆参 oauth=error&reason=state 走过期文案 + 重开弹窗 (194ms)
+  ✓  7 e2e/provider-oauth.spec.ts:99:1 › 着陆参 oauth=connected 静默：不弹窗、无错误行 (1.7s)
+
+  7 passed (5.8s)

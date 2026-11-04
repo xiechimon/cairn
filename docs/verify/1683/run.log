@@ -1,0 +1,50 @@
+# 1683 container verification (omarchy, docker 29.9.1, x86_64, node:24-bookworm)
+# docker build -t cairn-1683:test .  ->  exit 0 (build log: build.log)
+
+## image
+size=518387176 user=node cmd=[node dist/index.mjs] exposed=map[8787/tcp:{}]
+
+## 1. run without CAIRN_TOKEN
+{"level":60,"time":1792910579669,"pid":1,"hostname":"4905f6432e95","msg":"CAIRN_REQUIRE_TOKEN 已开但 CAIRN_TOKEN 未设或为空——拒绝启动；设 CAIRN_TOKEN=<随机长串>（例如 openssl rand -hex 32）后重启"}
+container exit code: 1
+
+## 1b. run with empty CAIRN_TOKEN
+{"level":60,"time":1792910649092,"pid":1,"hostname":"35349ad4f636","msg":"CAIRN_REQUIRE_TOKEN 已开但 CAIRN_TOKEN 未设或为空——拒绝启动；设 CAIRN_TOKEN=<随机长串>（例如 openssl rand -hex 32）后重启"}
+container exit code: 1
+
+## 2. run with token (host port bound to 127.0.0.1:18787 only)
+GET /app                         -> 200
+GET /api/user/me (no token)      -> 401
+GET /api/user/me (wrong token)   -> 401
+GET /api/user/me (right token)   -> 200
+PATCH display name -> {"type":"user","id":"hFytn1AGT6MF99t5tn_ut","displayName":"persist-check-1683","avatarUrl":null}
+
+## 3. container listens / runs as
+uid=1000(node) gid=1000(node) groups=1000(node)
+00000000:2253
+healthcheck: starting
+files in /data:
+/data
+/data/server
+/data/server/server.db
+/data/server/server.db-wal
+/data/server/server.db-shm
+/data/server/secretbox.key
+/data/server/repos
+/data/server/attachments
+
+## 4. restart keeps data
+after restart /api/user/me -> {"type":"user","id":"hFytn1AGT6MF99t5tn_ut","displayName":"persist-check-1683","avatarUrl":null}
+
+## 5. remove container, new container on same volume
+new container /api/user/me -> {"type":"user","id":"hFytn1AGT6MF99t5tn_ut","displayName":"persist-check-1683","avatarUrl":null}
+
+## 6. token never in logs
+token not present in container logs
+log tail:
+{"level":30,"time":1792910776644,"pid":1,"hostname":"4b4658c7b10a","pending":0,"orphan":0,"reclaimedBytes":0,"msg":"attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed"}
+{"level":30,"time":1792910776646,"pid":1,"hostname":"4b4658c7b10a","candidates":0,"pending":0,"appended":0,"advanced":0,"failed":0,"skipped":0,"unreadable":0,"errors":0,"reviewCandidates":0,"reviewPending":0,"reviewSkipped":0,"reviewUnreadable":0,"reviewForeign":0,"merged":0,"closedUnmerged":0,"hint
+{"level":30,"time":1792910776649,"pid":1,"hostname":"4b4658c7b10a","port":8787,"dataDir":"/data/server","teamId":"7Ejmu-rAWCdy_EmM59Z3O","msg":"cairn-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 cairn start --api-key <key> --team <teamId>"}
+
+## cleanup
+removed container, volume, image

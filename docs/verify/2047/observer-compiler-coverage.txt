@@ -1,0 +1,3 @@
+Command: pnpm --filter @cairn/integration exec tsc --listFilesOnly
+Extracted matching compiler input:
+/Users/xmon/.codex/worktrees/pr-2047-contained-push/cairn/integration/eval/git-push-proof/observe.mts

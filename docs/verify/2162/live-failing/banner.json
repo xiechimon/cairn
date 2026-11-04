@@ -1,0 +1,15 @@
+{
+  "api": {
+    "state": "recorded",
+    "status": {
+      "host": "omarchy",
+      "lastRunAt": 1793286790000,
+      "lastRunResult": "exit-code",
+      "lastRunExitStatus": "255",
+      "lastSuccessAt": 1793286790000
+    }
+  },
+  "bannerCount": 1,
+  "kind": "failing",
+  "text": "!\n\nThe latest server database backup run on omarchy failed (exit-code 255); the last successful backup was less than an hour ago. On that machine run `systemctl --user status cairn-db-backup.service` to see why."
+}

@@ -1,0 +1,94 @@
+{
+  "checkedAt": "2026-10-26T15:28:03.656Z",
+  "terms": [
+    "overlap",
+    "silent revert"
+  ],
+  "paths": [
+    "packages/shared/src/records/prompts.ts",
+    "apps/server/src/services/chief.ts",
+    ".claude/skills/pr-cairn/SKILL.md",
+    "AGENTS.md"
+  ],
+  "openIssues": [
+    {
+      "number": 1834,
+      "title": "agents: check open and recent issues and PRs before creating work, and catch silent reverts of recently merged lines"
+    },
+    {
+      "number": 1773,
+      "title": "eval(memory): add adjacent and irrelevant case families to memory-regression"
+    },
+    {
+      "number": 1717,
+      "title": "Cairn 排期（自动更新）"
+    }
+  ],
+  "openPulls": [
+    {
+      "number": 1776,
+      "title": "web: snap icon buttons to the 24/28/32 tiers"
+    },
+    {
+      "number": 1828,
+      "title": "web,daemon: show agent work step by step on the task detail page"
+    }
+  ],
+  "recentPulls": [
+    {
+      "number": 1646,
+      "title": "server(1574): save_memory checks for overlapping memories first, update_memory keeps history"
+    },
+    {
+      "number": 1664,
+      "title": "server(1577): reflect on trajectory packs into memory, skill and guard candidates; curate promotes on confirmation or a successful reuse"
+    },
+    {
+      "number": 1566,
+      "title": "docs(readme): Cairn 首屏改版，加真实界面截图与核心亮点"
+    },
+    {
+      "number": 1638,
+      "title": "web(1521): agent detail edits fallback models"
+    },
+    {
+      "number": 1461,
+      "title": "server(1406): issue intake poller for ready-for-agent issues, opt-in"
+    },
+    {
+      "number": 1414,
+      "title": "server(1403): reconcile review-phase PRs merged or closed on GitHub"
+    },
+    {
+      "number": 1420,
+      "title": "server(1404): merge gate S1, patch digest, D4 path classes, raw evidence links"
+    }
+  ],
+  "filePulls": [
+    {
+      "number": 1839,
+      "title": "shared(1838): require cited prior art before a feature plan",
+      "branch": "lane/1838",
+      "files": [
+        "apps/server/src/services/chief.ts",
+        "packages/shared/src/records/prompts.ts"
+      ]
+    },
+    {
+      "number": 1812,
+      "title": "server(1618): reproduce-first intake path with replay evidence",
+      "branch": "cairn/conv-01a17648-7bfb-7f06-8281-9ad845d03e30",
+      "files": [
+        "packages/shared/src/records/prompts.ts"
+      ]
+    },
+    {
+      "number": 1658,
+      "title": "scripts(1656): one ledger file per entry under docs/lessons, table generated on demand",
+      "branch": "lane/1656",
+      "files": [
+        "AGENTS.md"
+      ]
+    }
+  ]
+}

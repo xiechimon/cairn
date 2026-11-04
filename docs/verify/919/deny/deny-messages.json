@@ -1,0 +1,141 @@
+[
+  {
+    "id": "call-stub-kxwextnz-1",
+    "role": "assistant",
+    "content": {
+      "kind": "toolcall",
+      "call": {
+        "id": "call-stub-kxwextnz-1",
+        "name": "read",
+        "arguments": {
+          "path": "/tmp/pacman-919-local-skills/secret-local/SKILL.md"
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "read denied: skill 'secret-local' is not in the agent allowlist"
+            }
+          ],
+          "details": {}
+        },
+        "isError": true,
+        "endedAt": 1791375898292
+      }
+    },
+    "createdAt": 1791375898300
+  },
+  {
+    "id": "call-stub-kxwextnz-2",
+    "role": "assistant",
+    "content": {
+      "kind": "toolcall",
+      "call": {
+        "id": "call-stub-kxwextnz-2",
+        "name": "read",
+        "arguments": {
+          "path": "/tmp/pacman-919-local-skills/haiku-local/SKILL.md"
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "---\nname: haiku-local\ndescription: 本机俳句对照技能（#919 探针放侧）。\n---\n\n本机俳句技能正文。\n\nHAIKU-LOCAL-BODY-919\n"
+            }
+          ],
+          "structuredContent": "---\nname: haiku-local\ndescription: 本机俳句对照技能（#919 探针放侧）。\n---\n\n本机俳句技能正文。\n\nHAIKU-LOCAL-BODY-919\n"
+        },
+        "isError": false,
+        "endedAt": 1791375898301
+      }
+    },
+    "createdAt": 1791375898304
+  },
+  {
+    "id": "call-stub-kxwextnz-3",
+    "role": "assistant",
+    "content": {
+      "kind": "toolcall",
+      "call": {
+        "id": "call-stub-kxwextnz-3",
+        "name": "bash",
+        "arguments": {
+          "command": "printf \"deny-ui probe\\n\" >> README.md"
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "(no output)"
+            }
+          ],
+          "structuredContent": {
+            "output": "",
+            "truncated": false,
+            "exit_code": 0,
+            "wall_time_seconds": 0
+          }
+        },
+        "isError": false,
+        "endedAt": 1791375898310
+      }
+    },
+    "createdAt": 1791375898311
+  },
+  {
+    "id": "msg-g9Vln9dmiMUubiPntiSZ4-5",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "两轮读取已完成。"
+      }
+    ],
+    "createdAt": 1791375898317
+  },
+  {
+    "id": "user-g9Vln9dmiMUubiPntiSZ4",
+    "role": "user",
+    "content": "deny 可见面探针\n\n按指令读取文件并汇报。",
+    "createdAt": 1791375898065
+  },
+  {
+    "id": "msg-g9Vln9dmiMUubiPntiSZ4-1",
+    "role": "system",
+    "content": "",
+    "createdAt": 1791375898097
+  },
+  {
+    "id": "msg-g9Vln9dmiMUubiPntiSZ4-2",
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "read denied: skill 'secret-local' is not in the agent allowlist"
+      }
+    ],
+    "createdAt": 1791375898301
+  },
+  {
+    "id": "msg-g9Vln9dmiMUubiPntiSZ4-3",
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "---\nname: haiku-local\ndescription: 本机俳句对照技能（#919 探针放侧）。\n---\n\n本机俳句技能正文。\n\nHAIKU-LOCAL-BODY-919\n"
+      }
+    ],
+    "createdAt": 1791375898307
+  },
+  {
+    "id": "msg-g9Vln9dmiMUubiPntiSZ4-4",
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "(no output)"
+      }
+    ],
+    "createdAt": 1791375898314
+  }
+]

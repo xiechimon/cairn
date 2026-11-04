@@ -1,0 +1,4 @@
+  ✘   371 e2e/chief-home-backup.spec.ts:8:1 › home warns when the server backup went stale (5.5s)
+  ✘   403 e2e/chief-home-backup.spec.ts:32:1 › home warns when the latest server backup run failed, even before any chat (5.7s)
+  2 failed
+  1389 passed (5.2m)

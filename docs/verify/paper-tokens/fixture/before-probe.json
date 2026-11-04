@@ -1,0 +1,57 @@
+{
+  "mode": "fixture",
+  "base": "http://127.0.0.1:8396",
+  "board": {
+    "theme": "light",
+    "tokens": {
+      "background": "rgb(246, 241, 236)",
+      "foreground": "rgb(18, 15, 11)",
+      "card": "rgb(240, 235, 230)",
+      "popover": "rgb(240, 235, 230)",
+      "primary": "rgb(18, 15, 11)",
+      "primary-foreground": "rgb(250, 250, 250)",
+      "secondary": "rgb(234, 228, 224)",
+      "muted": "rgb(234, 228, 224)",
+      "muted-foreground": "rgb(54, 50, 46)",
+      "accent": "rgb(234, 228, 224)",
+      "border": "rgb(234, 228, 224)",
+      "input": "rgb(203, 197, 193)",
+      "ring": "rgb(143, 137, 133)",
+      "text-secondary": "rgb(54, 50, 46)",
+      "text-tertiary": "rgb(89, 84, 80)",
+      "text-dim": "rgb(143, 137, 133)",
+      "card-button": "rgb(151, 34, 126)",
+      "focus-ring": "rgb(151, 34, 126)",
+      "spot-soft": "color(srgb 0.892314 0.811216 0.844863)",
+      "spot-text-on-tint": "rgb(102, 25, 85)",
+      "surface-1": "oklab(0.951594 0.00330357 0.00797668)",
+      "canvas": "rgba(0, 0, 0, 0)",
+      "running": "rgba(0, 0, 0, 0)",
+      "running-text": "rgba(0, 0, 0, 0)",
+      "running-bar": "rgba(0, 0, 0, 0)",
+      "running-track": "rgba(0, 0, 0, 0)",
+      "accent-hover": "rgba(0, 0, 0, 0)",
+      "project-tile-1": "rgba(0, 0, 0, 0)",
+      "project-tile-6": "rgba(0, 0, 0, 0)"
+    },
+    "painted": {
+      "sidebar": "oklab(0.951594 0.00330357 0.00797668)",
+      "boardMain": "rgb(246, 241, 236)",
+      "boardColumn": "rgb(246, 241, 236)",
+      "todoCard": "rgb(240, 235, 230)",
+      "body": "rgb(240, 235, 230)"
+    }
+  },
+  "focused": {
+    "tag": "A",
+    "cls": "sidebar-team-name relative top-px ml-[11px] truncate text-sm leading-6 text-fore",
+    "outline": "solid 2px rgb(151, 34, 126)",
+    "boxShadow": "none",
+    "rect": {
+      "x": 46,
+      "y": 10.5,
+      "w": 53.203125,
+      "h": 24
+    }
+  }
+}

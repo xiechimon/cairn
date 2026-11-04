@@ -1,0 +1,55 @@
+[
+  {
+    "id": "CpytCzJtDyNfQUCefCqa4",
+    "teamId": "JhaGSxspTwCjiECPKGQwV",
+    "name": "grok-bot-vm-481311088",
+    "online": 0,
+    "tokenHash": null,
+    "latestCliVersion": null,
+    "apiKeyId": null,
+    "kind": "local",
+    "enabledRuntimes": "[\"pi\"]",
+    "shellEnabled": 0,
+    "claudeCodeReport": null,
+    "maxConcurrent": 3,
+    "lastSeenAt": null,
+    "capabilities": null
+  },
+  {
+    "id": "ThhV9Fs8bDqZBnWMKvTtJ",
+    "teamId": "JhaGSxspTwCjiECPKGQwV",
+    "name": "verify-1241-estimate",
+    "online": 1,
+    "tokenHash": "a2e34b87a0a0abf226372bfa712da30adb0e6fcdd653f2ab6d2608ce3824e5b2",
+    "latestCliVersion": "0.1.0",
+    "apiKeyId": "_dFKIrOtmDZULza0MVlXJ",
+    "kind": "remote",
+    "enabledRuntimes": "[\"pi\"]",
+    "shellEnabled": 0,
+    "claudeCodeReport": null,
+    "maxConcurrent": 3,
+    "lastSeenAt": 1792009475408,
+    "capabilities": null
+  },
+  {
+    "id": "49KiLpQ2AwbX0XqR3edOL",
+    "teamId": "JhaGSxspTwCjiECPKGQwV",
+    "name": "verify-1241-real",
+    "online": 1,
+    "tokenHash": "e8c80f3be4391b9863b84b17978ff12cce50a73b6325d99150aa2972c9c984be",
+    "latestCliVersion": "0.2.0",
+    "apiKeyId": "tjmJ29VGgL2L33-JMXQIE",
+    "kind": "remote",
+    "enabledRuntimes": "[\"pi\"]",
+    "shellEnabled": 0,
+    "claudeCodeReport": "{\"installed\":true,\"hostname\":\"grok-bot-vm-481311088\",\"models\":[{\"id\":\"deepseek-v4-pro[1M]\",\"name\":\"deepseek-v4-pro[1M]\",\"slot\":\"default-fable\"},{\"id\":\"qwen3.8-max-0902[1M]\",\"name\":\"qwen3.8-max-0902[1M]\",\"slot\":\"default-haiku\"},{\"id\":\"glm-5.3[1M]\",\"name\":\"glm-5.3[1M]\",\"slot\":\"default-opus\"},{\"id\":\"MiniMax-M3[1M]\",\"name\":\"MiniMax-M3[1M]\",\"slot\":\"default-sonnet\"}],\"bin\":{\"path\":\"/home/box/.local/bin/claude\",\"version\":\"2.1.299\"},\"auth\":{\"state\":\"logged-in\",\"method\":\"oauth_token\",\"provider\":\"firstParty\"}}",
+    "maxConcurrent": 3,
+    "lastSeenAt": 1792009475093,
+    "capabilities": {
+      "mcpServers": [
+        "rea"
+      ],
+      "skills": []
+    }
+  }
+]

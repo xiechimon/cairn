@@ -1,0 +1,40 @@
+# #948 build-artifact grep（机制生效实物判据，#746 纪律）
+# 命令：pnpm --filter @pacman/web build && grep <特征选择器> apps/web/dist/assets/*.css
+# 期望：四张退役 per-face 文件的特征规则选择器 0 命中；carrier 层（motion.css 家族 hover 律 / app.css backdrop z 档）在册命中如实列出。
+
+.new-task-project-menu       css-hits=0
+.new-task-machine            css-hits=0
+.new-task-head               css-hits=0
+.new-task-discard            css-hits=0
+.more-menu-catcher           css-hits=0
+.delete-confirm-summary      css-hits=0
+.delete-confirm-prompt       css-hits=0
+.delete-confirm-input        css-hits=0
+.mention-picker-head         css-hits=0
+.mention-row-icon            css-hits=0
+.mention-inline-row          css-hits=0
+.mention-chip                css-hits=0
+.slash-menu-row              css-hits=0
+.slash-help-title            css-hits=0
+.attachment-pending-badge    css-hits=0
+.attachment-preview-body     css-hits=0
+.composer-float              css-hits=0
+.spec-chip--preview          css-hits=0
+.new-task-spec               css-hits=0
+.mention-picker-search-input css-hits=0
+
+--- carrier 层在册命中（预期非零，白名单文件） ---
+.overlay-backdrop{z-index:var(--z-modal-scrim)}
+.more-menu-item,.plan-dropdown-row,.search-row,.chip-popover-row,.new-task-project-row,.todo-card-branch,.dlg-close,.new-task-close,.delete-confirm-close{transition:background-color var(--dur-fast) var(--ease-standard)}
+.more-menu-item:hover,.plan-dropdown-row:hover,.search-row:hover,.chip-popover-row:hover,.new-task-project-row:hover,.todo-card-branch:hover,.dlg-close:hover,.new-task-close:hover,.delete-confirm-close:hover{background-color:var(--accent-soft)}
+.more-menu-item[data-action=delete]:hover{background-color:var(--danger-soft)}
+1
+
+--- 关键 utility 编译进产物正向验证（机制生效，同轮 build） ---
+field-sizing-fixed(new-task-spec)  1 hit
+data-[on=false] 变体(machine dot)   2 hits
+static!（composer-float 过渡 important） in 10 !important total
+[&_.spec-chip-img] 后代变体          5 hits
+top-[39.5px]（frozen anchor）        1 hit
+clip-path polygon（V2 Arrow）        22 hits
+.overlay-backdrop（app.css z 档）    1 hit

@@ -1,0 +1,47 @@
+# #1404 S2 round 2 gates, worktree on claude/bootstrap-p3b at 13c0171 (clean commit; only the uncommitted evidence files under docs/verify/1404/ differ)
+# E2E_AFFECTED_PORT=8396: lsof -iTCP:8396 showed nothing listening before the run.
+
+$ pnpm lint
+Checked 792 files in 3s. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+[spec-parse-gate] apps/web/e2e: 1173 tests in 167 files collected, disk count matches (3.3s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/claude/bootstrap-p3a
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 12ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 241 passed (242)
+      Tests  1 failed | 2543 passed | 1 skipped (2545)
+exit=1
+
+$ E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (1.9s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (3.2s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (972ms)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (472ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (521ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (682ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (598ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (465ms)
+  8 passed (14.6s)
+exit=0
+
+The lint info is noUselessFragments in apps/web/src/resources/machines-page.tsx, a file this branch does not touch (git diff origin/main...HEAD does not list it).
+runner-brief.test.ts "擦除失败" is the root-only case described in gates-s1.txt (chmodSync(cwd, 0o500) does nothing for root); it is the only failure in the run.

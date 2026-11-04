@@ -1,0 +1,60 @@
+{
+  "todo1": {
+    "id": "sKuOA44u6Sr_PPRvZxT2H",
+    "teamId": "OOuRqKAkaNw6kd6zpJVvf",
+    "projectId": "XN7UmrOcV_6U7RcQ-MoJv",
+    "title": "xmon74 双闸验证一",
+    "spec": "XMON-74 双闸验证：README 补一行说明。",
+    "phase": "todo",
+    "phaseAt": 1790881854813,
+    "seqNum": 1,
+    "orderIndex": 0,
+    "tagIds": [],
+    "assignment": null,
+    "agent": null,
+    "latestBuildId": null,
+    "lastRunAt": null,
+    "hasChanges": false,
+    "hasPlan": false,
+    "buildHistory": [],
+    "sourceTodo": null,
+    "v": 1,
+    "createdBy": "vRKH_Rj6dAOWdhyxOs_SA",
+    "ownerId": "dNEnHWvc3GJyRJKIX0Rbe",
+    "sourceBuildId": "chief-dNEnHWvc3GJyRJKIX0Rbe-OOuRqKAkaNw6kd6zpJVvf",
+    "sourceKind": null,
+    "sourceRef": null
+  },
+  "todo2": {
+    "id": "pditSBkrMmj9hfxin6bQH",
+    "teamId": "OOuRqKAkaNw6kd6zpJVvf",
+    "projectId": "XN7UmrOcV_6U7RcQ-MoJv",
+    "title": "xmon74 双闸验证二",
+    "spec": "XMON-74 双闸验证：README 补一行说明。",
+    "phase": "todo",
+    "phaseAt": 1790881854816,
+    "seqNum": 2,
+    "orderIndex": 1,
+    "tagIds": [],
+    "assignment": null,
+    "agent": null,
+    "latestBuildId": null,
+    "lastRunAt": null,
+    "hasChanges": false,
+    "hasPlan": false,
+    "buildHistory": [],
+    "sourceTodo": null,
+    "v": 1,
+    "createdBy": "vRKH_Rj6dAOWdhyxOs_SA",
+    "ownerId": "dNEnHWvc3GJyRJKIX0Rbe",
+    "sourceBuildId": "chief-dNEnHWvc3GJyRJKIX0Rbe-OOuRqKAkaNw6kd6zpJVvf",
+    "sourceKind": null,
+    "sourceRef": null
+  },
+  "run1": {
+    "text": "{\"builds\":[{\"id\":\"01a0f8e0-7563-7e59-8fea-dfec8783477b\",\"todoId\":\"sKuOA44u6Sr_PPRvZxT2H\",\"withPlan\":false,\"prevPhase\":\"todo\",\"triggerSource\":\"chief\",\"pinnedMachineId\":null,\"planDocId\":null,\"errorMessage\":null,\"prUrl\":null,\"prNumber\":null,\"diffHash\":null,\"createdAt\":1790881854819}],\"withPlan\":false,\"triggerSource\":\"chief\"}"
+  },
+  "run2": {
+    "text": "{\"builds\":[{\"id\":\"01a0f8e0-7567-7d28-973e-193734022990\",\"todoId\":\"pditSBkrMmj9hfxin6bQH\",\"withPlan\":false,\"prevPhase\":\"todo\",\"triggerSource\":\"chief\",\"pinnedMachineId\":null,\"planDocId\":null,\"errorMessage\":null,\"prUrl\":null,\"prNumber\":null,\"diffHash\":null,\"createdAt\":1790881854823}],\"withPlan\":false,\"triggerSource\":\"chief\"}"
+  }
+}

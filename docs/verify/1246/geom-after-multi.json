@@ -1,0 +1,35 @@
+{
+  "nodes": 6,
+  "names": [
+    "Planner",
+    "Implementer",
+    "CodeReviewer",
+    "SecurityAuditor",
+    "TestEngineer",
+    "Verifier"
+  ],
+  "link": {
+    "x": 677,
+    "y": 287,
+    "w": 44,
+    "h": 1
+  },
+  "bracket": {
+    "x": 721,
+    "y": 127,
+    "w": 28,
+    "h": 320
+  },
+  "childrenRow": {
+    "x": 721,
+    "y": 99,
+    "w": 248,
+    "h": 376
+  },
+  "createSlot": {
+    "x": 749,
+    "y": 419,
+    "w": 220,
+    "h": 56
+  }
+}

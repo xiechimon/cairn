@@ -1,0 +1,23 @@
+     × 失败方式 5：停止钮在位 → 不重试（用户意图优先于续跑） 16ms
+     × 失败方式 5b：停止在两轮之间到达 → 续跑会话一开即中断，报 stopped 8ms
+     × 重启前已接收停止、会话没跑完 → recover 报 stopped，不开会话 23ms
+     × 失败方式 1：准备期拉到的停止 → 落 journal、不开会话、报 stopped 39ms
+     × 失败方式 2：会话开启途中拉到的停止 → 会话一开即中断、报 stopped 36ms
+     × 失败方式 7：收尾中（会话已跑完、终稿上传在途）拉到的停止 → 丢弃、不落 journal、照报原结果 35ms
+     × 失败方式 1：discard=true → rewind 到步起点 + done(stopped) + 无 commit/push 5007ms
+     × 失败方式 2：discard=false → 不 rewind（本轮改动保留）+ done(stopped) 5002ms
+     × 失败方式 3：plan 步停止 → plan.md 不上传，transcript.json 照传 5002ms
+     × 失败方式 4：停止后 journal 清账 + 注册表注销 5002ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected { stepId: 's1', body: { …(4) } } to match object { stepId: 's1', body: { …(2) } }
+AssertionError: expected true to be false // Object.is equality
+AssertionError: expected true to be false // Object.is equality
+AssertionError: expected false to be true // Object.is equality
+AssertionError: expected [ { kind: 'new', …(1) }, …(1) ] to have a length of 1 but got 2
+AssertionError: expected 'success' to be 'stopped' // Object.is equality
+ Test Files  4 failed (4)
+      Tests  10 failed | 16 passed (26)
+
+# 失败方式 5c (runner-network-retry.test.ts), added in e8c45630, run against 996daa64 src:
+     × 失败方式 5c：停止在末次重试的退避等待中到达 → 不开末轮，报 stopped
+AssertionError: expected 'failed' to be 'stopped' // Object.is equality

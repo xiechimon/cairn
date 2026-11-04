@@ -1,0 +1,39 @@
+{
+  "relayResult": {
+    "builds": [
+      {
+        "id": "01a11a55-750c-74c5-a6c4-190f76e2daf3",
+        "todoId": "0t7oF0xfCanCexZNOZZ0k",
+        "withPlan": true,
+        "prevPhase": "todo",
+        "triggerSource": "chief",
+        "pinnedMachineId": null,
+        "planDocId": null,
+        "errorMessage": null,
+        "prUrl": null,
+        "prNumber": null,
+        "diffHash": null,
+        "createdAt": 1791443170572
+      }
+    ],
+    "withPlan": true,
+    "dispatchReason": "引入新能力（信号二）→ 先规划",
+    "triggerSource": "chief"
+  },
+  "sqlite": {
+    "builds": [
+      {
+        "id": "01a11a55-750c-74c5-a6c4-190f76e2daf3",
+        "withPlan": 1,
+        "triggerSource": "chief"
+      }
+    ],
+    "steps": [
+      {
+        "buildId": "01a11a55-750c-74c5-a6c4-190f76e2daf3",
+        "kind": "plan",
+        "status": "pending"
+      }
+    ]
+  }
+}

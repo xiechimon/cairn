@@ -1,0 +1,35 @@
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/zz-chain-leaf.ts
+  apps/web/e2e/zz-chain-leaf.ts → imported by 2 specs
+[e2e:affected] 2/172 specs on the standard fixture-build config, E2E_PORT=8398
+  zz-chain-a.spec.ts zz-chain-b.spec.ts
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/zz-spawned.mjs
+  apps/web/e2e/zz-spawned.mjs → FULL (zz-spawn.spec.ts names zz-spawned.mjs outside an import)
+[e2e:affected] 172/172 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts a
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/zz-shot.png
+  apps/web/e2e/zz-shot.png → FULL (zz-shot.png is not a top-level e2e module)
+[e2e:affected] 172/172 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts a
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/zz-sub/zz-deep.ts
+  apps/web/e2e/zz-sub/zz-deep.ts → FULL (zz-sub/zz-deep.ts is not a top-level e2e module)
+[e2e:affected] 172/172 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts a
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/.zz-dotfile
+  apps/web/e2e/.zz-dotfile → FULL (.zz-dotfile is not a top-level e2e module)
+[e2e:affected] 172/172 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts a
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/zz-newdir/
+  apps/web/e2e/zz-newdir/ → FULL (zz-newdir/ is not a top-level e2e module)
+[e2e:affected] 172/172 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts a
+
+$ node scripts/e2e-affected.mjs --dry-run -- apps/web/e2e/zz-config-probe.ts
+  apps/web/e2e/zz-config-probe.ts → FULL (the playwright config or package.json names zz-config-probe.ts)
+[e2e:affected] 172/172 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts accent-typo.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-create-model.spec.ts agent-delete.spec.ts agent-desc-overflow.spec.ts a
+

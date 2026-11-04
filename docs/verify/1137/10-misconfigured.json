@@ -1,0 +1,9 @@
+{
+  "deliveryId": "ffa7e72a-0c7b-41a6-93cd-a33ffc66ba20",
+  "status": 202,
+  "body": {
+    "result": "misconfigured",
+    "deliveryId": "ffa7e72a-0c7b-41a6-93cd-a33ffc66ba20",
+    "detail": "no github project for xiechimon/no-such-verify-repo"
+  }
+}

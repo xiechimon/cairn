@@ -1,0 +1,5 @@
+# Open-PR sweep (ticket acceptance 3)
+
+Fetched 2026-10-12T02:37:18Z: 0 open PR(s).
+
+No open PR to scan; the sweep is trivially clean, nothing to fix retroactively.

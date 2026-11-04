@@ -1,0 +1,10 @@
+systemd: systemd 262 (262-1-arch)
+--- success: systemd-run exit 0
+{"host":"omarchy","lastRunAt":1793286510000,"lastRunResult":"success","lastRunExitStatus":"0","lastSuccessAt":1793286510000}
+--- failure: systemd-run exit 23
+{"host":"omarchy","lastRunAt":1793286510000,"lastRunResult":"exit-code","lastRunExitStatus":"23","lastSuccessAt":1793286510000}
+--- timeout: systemd-run exit 1
+{"host":"omarchy","lastRunAt":1793286512000,"lastRunResult":"timeout","lastRunExitStatus":"TERM","lastSuccessAt":1793286510000}
+--- recovered: systemd-run exit 0
+{"host":"omarchy","lastRunAt":1793286512000,"lastRunResult":"success","lastRunExitStatus":"0","lastSuccessAt":1793286512000}
+-rw------- 1 ian ian 125 Oct 29 08:08 /tmp/backup-status-2162.MZnbTv/backup-status.json

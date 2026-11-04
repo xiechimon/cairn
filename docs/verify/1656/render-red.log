@@ -1,0 +1,45 @@
+✔ every migrated entry passes and the old table is gone (18.963795ms)
+✔ level 5 entry without a reason is rejected (0.203188ms)
+✔ level outside 1 to 5 is rejected (0.32444ms)
+✔ pending upgrade without a ticket is rejected, with a ticket passes (0.150378ms)
+✔ the real bad note that sat on main without a ticket is rejected (0.16511ms)
+✔ file name without a ticket number is rejected (0.119451ms)
+✔ missing, reordered or malformed fields are rejected (0.279122ms)
+✔ a resurrected docs/lessons.md table is rejected (0.649513ms)
+✔ two parallel branches each adding an entry merge without conflict (191.251295ms)
+✔ the old single table does conflict when two branches append a row (97.462998ms)
+✔ both upgrade-pending word orders and the original Chinese marker require a ticket (1.069237ms)
+✔ table generation rejects malformed entries with the ledger diagnostic (0.314244ms)
+✖ generated table keeps existing escaped pipes inside their cell (43.40235ms)
+✔ the CLI can validate and render entries from a checkout path containing spaces (220.112816ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 706.548177
+
+✖ failing tests:
+
+test at scripts/lessons-ledger-gate.test.mjs:191:1
+✖ generated table keeps existing escaped pipes inside their cell (43.40235ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(renderTable([{ name: gateEntry, text }]).includes(String.raw`git commit \| tail`))
+  
+      at TestContext.<anonymous> (file:///workspace/cairn/.claude/worktrees/ledger-1656/scripts/lessons-ledger-gate.test.mjs:193:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

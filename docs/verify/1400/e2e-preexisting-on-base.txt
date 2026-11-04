@@ -1,0 +1,231 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 96 tests using 2 workers
+
+  1) e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light 
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "rgb(43, 38, 32)"
+
+      29 |   const rest = await ink(idle);
+      30 |   const target = await ink(selected);
+    > 31 |   expect(rest).not.toBe(target);
+         |                    ^
+      32 |   expect(await bg(idle)).toBe(CLEAR);
+      33 |   await idle.hover();
+      34 |   await expect.poll(() => ink(idle)).toBe(target);
+        at expectInkStep (/home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:31:20)
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:50:3
+
+    Error Context: test-results/segmented-controls-page-ta-ae049-s-the-chip-ink-—-dark-light/error-context.md
+
+
+  2) e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask
+      85 |     expect(m.maskImage).toContain('/logo.svg');
+    > 86 |     expect(m.maskSize).toBe('100% auto');
+         |                        ^
+      87 |     expect(m.markPaint).toBe(m.rowInk);
+      88 |     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+      89 |     expect(m.markText).toBe('');
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/accent-typo.spec.ts:86:24
+
+    Error Context: test-results/accent-typo-sidebar-header-7b760-cman-pixel-mark-name-light-/error-context.md
+
+
+  3) e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "rgb(43, 38, 32)"
+
+      29 |   const rest = await ink(idle);
+      30 |   const target = await ink(selected);
+    > 31 |   expect(rest).not.toBe(target);
+         |                    ^
+      32 |   expect(await bg(idle)).toBe(CLEAR);
+      33 |   await idle.hover();
+      34 |   await expect.poll(() => ink(idle)).toBe(target);
+        at expectInkStep (/home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:31:20)
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:144:3
+
+    Error Context: test-results/segmented-controls-sched-f-59cf4-ck-hover-steps-the-rest-ink/error-context.md
+
+
+  4) e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ─────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask
+      85 |     expect(m.maskImage).toContain('/logo.svg');
+    > 86 |     expect(m.maskSize).toBe('100% auto');
+         |                        ^
+      87 |     expect(m.markPaint).toBe(m.rowInk);
+      88 |     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+      89 |     expect(m.markText).toBe('');
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/accent-typo.spec.ts:86:24
+
+    Error Context: test-results/accent-typo-sidebar-header-a2a11-acman-pixel-mark-name-dark-/error-context.md
+
+
+  5) e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask
+      85 |     expect(m.maskImage).toContain('/logo.svg');
+    > 86 |     expect(m.maskSize).toBe('100% auto');
+         |                        ^
+      87 |     expect(m.markPaint).toBe(m.rowInk);
+      88 |     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+      89 |     expect(m.markText).toBe('');
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/accent-typo.spec.ts:86:24
+
+    Error Context: test-results/accent-typo-sidebar-header-7b760-cman-pixel-mark-name-light--repeat1/error-context.md
+
+
+  6) e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light 
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "rgb(43, 38, 32)"
+
+      29 |   const rest = await ink(idle);
+      30 |   const target = await ink(selected);
+    > 31 |   expect(rest).not.toBe(target);
+         |                    ^
+      32 |   expect(await bg(idle)).toBe(CLEAR);
+      33 |   await idle.hover();
+      34 |   await expect.poll(() => ink(idle)).toBe(target);
+        at expectInkStep (/home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:31:20)
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:50:3
+
+    Error Context: test-results/segmented-controls-page-ta-ae049-s-the-chip-ink-—-dark-light-repeat1/error-context.md
+
+
+  7) e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ─────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask
+      85 |     expect(m.maskImage).toContain('/logo.svg');
+    > 86 |     expect(m.maskSize).toBe('100% auto');
+         |                        ^
+      87 |     expect(m.markPaint).toBe(m.rowInk);
+      88 |     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+      89 |     expect(m.markText).toBe('');
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/accent-typo.spec.ts:86:24
+
+    Error Context: test-results/accent-typo-sidebar-header-a2a11-acman-pixel-mark-name-dark--repeat1/error-context.md
+
+
+  8) e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "rgb(43, 38, 32)"
+
+      29 |   const rest = await ink(idle);
+      30 |   const target = await ink(selected);
+    > 31 |   expect(rest).not.toBe(target);
+         |                    ^
+      32 |   expect(await bg(idle)).toBe(CLEAR);
+      33 |   await idle.hover();
+      34 |   await expect.poll(() => ink(idle)).toBe(target);
+        at expectInkStep (/home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:31:20)
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:144:3
+
+    Error Context: test-results/segmented-controls-sched-f-59cf4-ck-hover-steps-the-rest-ink-repeat1/error-context.md
+
+
+  9) e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask
+      85 |     expect(m.maskImage).toContain('/logo.svg');
+    > 86 |     expect(m.maskSize).toBe('100% auto');
+         |                        ^
+      87 |     expect(m.markPaint).toBe(m.rowInk);
+      88 |     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+      89 |     expect(m.markText).toBe('');
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/accent-typo.spec.ts:86:24
+
+    Error Context: test-results/accent-typo-sidebar-header-7b760-cman-pixel-mark-name-light--repeat2/error-context.md
+
+
+  10) e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "rgb(43, 38, 32)"
+
+      29 |   const rest = await ink(idle);
+      30 |   const target = await ink(selected);
+    > 31 |   expect(rest).not.toBe(target);
+         |                    ^
+      32 |   expect(await bg(idle)).toBe(CLEAR);
+      33 |   await idle.hover();
+      34 |   await expect.poll(() => ink(idle)).toBe(target);
+        at expectInkStep (/home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:31:20)
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/segmented-controls.spec.ts:144:3
+
+    Error Context: test-results/segmented-controls-sched-f-59cf4-ck-hover-steps-the-rest-ink-repeat2/error-context.md
+
+
+  11) e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "100% auto"
+    Received: "100%"
+
+      84 |     // CSS pixel, painted in the row ink through the mask
+      85 |     expect(m.maskImage).toContain('/logo.svg');
+    > 86 |     expect(m.maskSize).toBe('100% auto');
+         |                        ^
+      87 |     expect(m.markPaint).toBe(m.rowInk);
+      88 |     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+      89 |     expect(m.markText).toBe('');
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/accent-typo.spec.ts:86:24
+
+    Error Context: test-results/accent-typo-sidebar-header-a2a11-acman-pixel-mark-name-dark--repeat2/error-context.md
+
+
+  11 failed
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ─────
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ──────
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ─────
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ──────
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (light) ─────
+    e2e/accent-typo.spec.ts:61:3 › sidebar header carries the Pacman pixel mark + name (dark) ──────
+    e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light 
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+    e2e/segmented-controls.spec.ts:43:1 › page-tab: unselected hover steps the chip ink — dark + light 
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+  85 passed (50.3s)

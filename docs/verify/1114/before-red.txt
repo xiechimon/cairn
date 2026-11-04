@@ -1,0 +1,40 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 e2e/board-dnd.spec.ts:844:1 › committed drop never flashes the card back to the source column (1.7s)
+
+
+  1) e2e/board-dnd.spec.ts:844:1 › committed drop never flashes the card back to the source column ─
+
+    Error: frames with the card back in 待开始: [{"t":1,"col":"todo"},{"t":2,"col":"todo"}]
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "col": "todo",
+    +     "t": 1,
+    +   },
+    +   Object {
+    +     "col": "todo",
+    +     "t": 2,
+    +   },
+    + ]
+
+      881 |   // no post-up frame may render the committed card back in the source column
+      882 |   const homeFrames = trace.filter((s) => s.col === 'todo');
+    > 883 |   expect(homeFrames, `frames with the card back in 待开始: ${JSON.stringify(homeFrames)}`).toEqual([]);
+          |                                                                                         ^
+      884 |   // and it ends in the target column
+      885 |   await expect(
+      886 |     page.locator(`[data-column="done"] [data-todo-id="${PROBE_ID}"]`),
+        at /home/measure/.pacman-chief/workspaces/01a12b93-9afd-7ef4-aadd-962b503ec875/apps/web/e2e/board-dnd.spec.ts:883:89
+
+    Error Context: test-results/board-dnd-committed-drop-n-392f0-d-back-to-the-source-column/error-context.md
+
+  1 failed
+    e2e/board-dnd.spec.ts:844:1 › committed drop never flashes the card back to the source column ──

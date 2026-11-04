@@ -1,0 +1,48 @@
+=== BEFORE (origin/main: module missing) ===
+fatal: path 'apps/server/src/trajectory-reflect-curate.ts' exists on disk, but not in 'origin/main'
+
+=== BEFORE (origin/main index lacks reflectCurate slot) ===
+29:  trajectoryExportRunOf,
+30:  trajectoryOutcomeRunOf,
+132:  trajectoryOutcomeRunOf(config, { logger }),
+133:  trajectoryExportRunOf(config, { logger }),
+
+=== AFTER: vitest reflect-curate + export + outcome slot tests ===
+
+ RUN  v5.0.1 /workspace/apps/server
+
+
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+   Start at  16:39:35
+   Duration  23.24s (tests 86%, transform 9%, import 6%)
+
+
+=== AFTER: vocabulary + lint + typecheck ===
+
+ RUN  v5.0.1 /workspace/packages/shared
+
+
+ Test Files  1 passed (1)
+      Tests  40 passed (40)
+   Start at  16:39:58
+   Duration  533ms (transform 71%, import 25%, tests 3%, worker 1%)
+
+lint exit=0
+[0m[0m  [0m[0m  [0m[0m[1m151[0m[0m [0m[0m[1m150[0m[0m[1m │ [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m)[0m[0m.[0m[0mt[0m[0mo[0m[0mE[0m[0mq[0m[0mu[0m[0ma[0m[0ml[0m[0m([0m[0m{[0m[0m}[0m[0m)[0m[0m;[0m[0m
+[0m[0m  [0m[0m
+[0m
+[0m[34mChecked 1156 files in 1433[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[34mFound [0m[0m[34m1[0m[0m[34m info.[0m
+typecheck exit=0
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done

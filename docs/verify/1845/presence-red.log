@@ -1,0 +1,40 @@
+
+ RUN  v5.0.1 /workspace/cairn/.claude/worktrees/codex-1845-auth
+
+ ❯ |@xiechimon/cairn| test/claude-login-claim.test.ts (9 tests | 1 failed) 499ms
+   ❯ presence stores Claude Code login and the machine record exposes it (2)
+     × online login changes notify the team without repeating unchanged heartbeats 27ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/cairn| test/claude-login-claim.test.ts > presence stores Claude Code login and the machine record exposes it > online login changes notify the team without repeating unchanged heartbeats
+AssertionError: expected [] to deeply equal [ { type: 'machine_presence', …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "machineId": "machine-online-login",
+-     "online": true,
+-     "type": "machine_presence",
+-   },
+- ]
++ []
+
+ ❯ test/claude-login-claim.test.ts:287:20
+    285|     const expiresAt = Date.now() + 1000;
+    286|     markPresence(deps, machineId, { claudeCode: report({ state: 'expir…
+    287|     expect(events).toEqual([{ type: 'machine_presence', machineId, onl…
+       |                    ^
+    288|     markPresence(deps, machineId, { claudeCode: report({ state: 'expir…
+    289|     markPresence(deps, machineId, {});
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  10:33:36
+   Duration  3.08s (transform 52%, import 31%, tests 17%)
+

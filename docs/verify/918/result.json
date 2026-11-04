@@ -1,0 +1,85 @@
+{
+  "probe": "drive-918-skill-facts",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0216-918-deny/.claude/verify-run/home/server/server.db",
+  "skillsDir": "/tmp/pacman-918-skills",
+  "daemonHome": "/tmp/pacman-918-daemon-home",
+  "passed": 13,
+  "total": 13,
+  "checks": [
+    {
+      "name": "fixture 技能库落盘（1 授权 + 1 白名单外）",
+      "ok": true,
+      "detail": "/tmp/pacman-918-skills"
+    },
+    {
+      "name": "真 daemon 上线（--server 指本栈，PACMAN_SKILLS_DIR 指 fixture）",
+      "ok": true,
+      "detail": "/tmp/pacman-918-daemon-home"
+    },
+    {
+      "name": "活行披露面出现「▶ skill: demo-skill」（运行中，实时）",
+      "ok": true,
+      "detail": "[\"✕ skill: extra-skill（已挡下）\",\"▶ skill: demo-skill\"]"
+    },
+    {
+      "name": "deny 事件同线可见「✕ skill: extra-skill（已挡下）」",
+      "ok": true,
+      "detail": "[\"✕ skill: extra-skill（已挡下）\",\"▶ skill: demo-skill\"]"
+    },
+    {
+      "name": "wire：activity 事件 skills 累计集 = 读到 + 挡下双事实",
+      "ok": true,
+      "detail": "[{\"name\":\"extra-skill\",\"denied\":true},{\"name\":\"demo-skill\",\"denied\":false}]"
+    },
+    {
+      "name": "wire：技能入口调用的 tool 相位显示名带 skill: 前缀",
+      "ok": true,
+      "detail": "{\"phase\":\"tool\",\"tool\":\"skill: extra-skill\",\"stepId\":\"vHJGOptjB0NGbNEVx497m\",\"at\":1791369256006}"
+    },
+    {
+      "name": "任务 A 步以 done 收尾（产物闸被 bash 写改动满足）",
+      "ok": true,
+      "detail": "{\"id\":\"vHJGOptjB0NGbNEVx497m\",\"kind\":\"build\",\"status\":\"done\",\"buildErrorMessage\":null}"
+    },
+    {
+      "name": "步终态后详情页汇总行在位：技能：demo-skill · 挡下：extra-skill",
+      "ok": true,
+      "detail": "技能：demo-skill\n·\n挡下：extra-skill"
+    },
+    {
+      "name": "SQLite：拒绝文案落库（not in the agent allowlist）且授权正文 marker 落库",
+      "ok": true,
+      "detail": "messages=9"
+    },
+    {
+      "name": "对照任务步以 done 收尾",
+      "ok": true,
+      "detail": "{\"id\":\"RXSEi635m5r_VsF3klRe7\",\"kind\":\"build\",\"status\":\"done\",\"buildErrorMessage\":null}"
+    },
+    {
+      "name": "对照组：详情页无技能汇总行",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "对照组：详情页无技能条目行",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "对照组：wire 有 activity 事件但零事件携带 skills 字段",
+      "ok": true,
+      "detail": "events=5"
+    }
+  ],
+  "taskA": {
+    "todoId": "drkB6nFz2A_AAOKEVG3Zd",
+    "buildId": "01a115ed-8b42-74b3-9440-eca0d415f165"
+  },
+  "taskB": {
+    "todoId": "qTmrWkJ0WLsibohv2RJ2v",
+    "buildId": "01a115ee-2244-79be-997b-8c6c8bd1226b"
+  }
+}

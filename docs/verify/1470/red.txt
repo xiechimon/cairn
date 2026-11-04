@@ -1,0 +1,20 @@
+     × U1 run_builds：本队任务指向他队项目 → 404 project，一个 build 都不建 115ms
+     × U1 run_builds 混合列表：排在前面的本队任务也不先派出 56ms
+     × U8 run_builds：指派他队 Agent → 404 agent，一个 build 都不建 51ms
+     × U2 schedule_todo：本队任务指向他队项目 → 404 project，不建定时 52ms
+     × U3 build 对话：他队 id 404，文案与不存在 id 同形 47ms
+     × U3 chief 对话：他队 id 404，文案与不存在 id 同形 55ms
+     × U4 全量：不含他队 build / 他队 chief 回合 42ms
+     × U4 按 buildId：他队 build 回 []，本队 build 照回 40ms
+     × U9 他队 chief 回合不进读数 39ms
+     × U5 chief projectId 他队 → 404，不落库 53ms
+     × U5 chief projectId 不存在 → 404，不落库 43ms
+     × U5 chief sourceTodoId 他队 → 404，不落库 43ms
+     × U5 worker projectId 他队 → 404，不落库 43ms
+     × U5 worker sourceTodoId 他队 → 404，不落库 43ms
+     × U6 ../user：无 clone URL、无 repo 绑定 46ms
+     × U6 a/..：无 clone URL、无 repo 绑定 43ms
+     × U6 no-slash：无 clone URL、无 repo 绑定 36ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 17 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  17 failed | 4 passed (21)

@@ -1,0 +1,89 @@
+✔ committed ci.yml matches the pinned job structure (24.035396ms)
+✔ PR #1540 misplaced freshness step goes red (22.326194ms)
+✔ a pinned step relocated to another job names both jobs (21.892257ms)
+✔ a pinned step deleted from ci.yml goes red (23.557508ms)
+✔ a step copied into another job while its pinned job keeps it goes red (21.800159ms)
+✔ a step pasted twice into one job goes red (23.415867ms)
+✔ a job absent from the baseline goes red (21.996279ms)
+✔ a baseline job gone from ci.yml goes red (23.937714ms)
+✖ site deployment applies the project root directory exactly once (3.476542ms)
+✖ site deployment limits uploads and retains main-only guarded triggers (0.474382ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 8
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 235.136513
+
+✖ failing tests:
+
+test at scripts/ci-job-structure-gate.test.mjs:142:1
+✖ site deployment applies the project root directory exactly once (3.476542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/mnt/fast/lanes/cairn-2109/site/site'
+  - '/mnt/fast/lanes/cairn-2109/site'
+                                    ^
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2109/scripts/ci-job-structure-gate.test.mjs:165:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/mnt/fast/lanes/cairn-2109/site/site',
+    expected: '/mnt/fast/lanes/cairn-2109/site',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/ci-job-structure-gate.test.mjs:177:1
+✖ site deployment limits uploads and retains main-only guarded triggers (0.474382ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /paths:.*'site\/\*\*'.*'\.github\/workflows\/site-deploy.yml'.*'\.vercelignore'/. Input:
+  
+  'name: site-deploy\n' +
+    '\n' +
+    'on:\n' +
+    '  push:\n' +
+    '    branches: [main]\n' +
+    "    paths: ['site/**']\n" +
+    '  workflow_dispatch:\n' +
+    '\n' +
+    'concurrency:\n' +
+    '  group: site-deploy\n' +
+    '  cancel-in-progress: true\n' +
+    '\n' +
+    'permissions:\n' +
+    '  contents: read\n' +
+    '\n' +
+    'jobs:\n' +
+    '  deploy:\n' +
+    '    runs-on: ubuntu-latest\n' +
+    "    if: ${{ vars.VERCEL_DEPLOY == 'on' }}\n" +
+    '    env:\n' +
+    '      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}\n' +
+    '      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}\n' +
+    '    steps:\n' +
+    '      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n' +
+    '      - run: npx --yes vercel@latest deploy site/ --prod --yes --archive=tgz --token "${{ secrets.VERCEL_TOKEN }}"\n'
+  
+      at TestContext.<anonymous> (file:///mnt/fast/lanes/cairn-2109/scripts/ci-job-structure-gate.test.mjs:181:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'name: site-deploy\n\non:\n  push:\n    branches: [main]\n    paths: [\'site/**\']\n  workflow_dispatch:\n\nconcurrency:\n  group: site-deploy\n  cancel-in-progress: true\n\npermissions:\n  contents: read\n\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    if: ${{ vars.VERCEL_DEPLOY == \'on\' }}\n    env:\n      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}\n      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}\n    steps:\n      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n      - run: npx --yes vercel@latest deploy site/ --prod --yes --archive=tgz --token "${{ secrets.VERCEL_TOKEN }}"\n',
+    expected: /paths:.*'site\/\*\*'.*'\.github\/workflows\/site-deploy.yml'.*'\.vercelignore'/,
+    operator: 'match',
+    diff: 'simple'
+  }

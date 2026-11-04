@@ -1,0 +1,85 @@
+# #1403 round 15 (pr-gate run 7 on #1414): red against the sources of 9fa4ed9, green after the fix.
+# Test files as committed in 2fb9857 (apps/server/test/pr-reconcile.test.ts and
+# apps/server/test/fixtures/github/*.json; unchanged in c6cf10b).
+# The 9 failing cases are the rules this round adds: ownership by repo id ([62c] renamed and
+# transferred, [61] missing base repo id), a deleted fork counted as foreign and cached ([62d]),
+# bounded GitHub text ([65a], [65b]) and the live-shape parse of head/base repo ids ([66a], [66b]).
+# The other listed cases pass on the old sources by design: they pin behavior that already holds
+# (⑭a behind, ㉚ and [61] head sha now reaching the head-sha guard, [59] the error text, [62a] fork,
+# [62b], [64] split waves, [66c] compare parse). Their mutations are in r15-mutations.txt.
+
+== red ==
+# ran against the sources of 9fa4ed9 (apps/server/src/lib/github.ts, apps/server/src/services/ci-loop.ts,
+# apps/server/src/services/builds.ts written from 'git show 9fa4ed9:<path>'), test files from 2fb9857;
+# sources written back from HEAD afterwards ('git status --short' empty)
+$ pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑭a merged, but compare says behind: the checkpoint is not in the merged head → stays in review with a hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑭a merged, but compare says diverged: the checkpoint is not in the merged head → stays in review with a hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉚ merged, the response has no head sha, the build has a checkpoint → not finished
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [54] a second merge step in the same round writes its completion row again
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the merge step finishing a card a person closed meanwhile throws before it stops anything
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without base is read again on a later sweep; the complete one finishes the card
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without the base repo id is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62b] a PR from another branch of the target repo → not finished
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62c] the repo was renamed on GitHub (head and base both octo/demo2, the project still says octo/demo) → done
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62c] the repo was transferred on GitHub (head and base both neworg/demo, the project still says octo/demo) → done
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [64] the reconcile finishing a split child advances the waves: the unblocked sibling starts
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65a] an over-long base branch name with control characters is cut to 100 characters in the hint
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65b] the merger login and the merge commit in the merge row lose control characters and are bounded
+ × test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+ × test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+ ✓ test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66c] compare between two commits on main reads ahead
+ ✓ test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66c] compare between two commits on main reads behind
+AssertionError: expected 'done' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1671:33
+AssertionError: expected 'review' to be 'done' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1744:33
+AssertionError: expected [] to have a length of 1 but got +0
+ ❯ test/pr-reconcile.test.ts:1767:20
+AssertionError: expected 'PR #201 合并进了分支「release-xxxxxxxxxxxxxx…' to contain '「release-xxxxxxxxxxxxxxxxxxxxxxxxxxxx…'
+ ❯ test/pr-reconcile.test.ts:1858:22
+AssertionError: expected 'PR #201 已在 GitHub 合并（合并提交 \u001babc12…' to contain '合并提交 abc1234，'
+ ❯ test/pr-reconcile.test.ts:1878:17
+AssertionError: expected { state: 'open', merged: false, …(7) } to deeply equal { state: 'open', merged: false, …(8) }
+ ❯ test/pr-reconcile.test.ts:1924:24
+AssertionError: expected { state: 'closed', merged: true, …(7) } to deeply equal { state: 'closed', merged: true, …(8) }
+ ❯ test/pr-reconcile.test.ts:1941:24
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 1 passed (2)
+      Tests  9 failed | 116 passed (125)
+exit=1
+
+== green at c6cf10b (2fb9857 plus the spec 02 and builds.ts comment commit) ==
+$ pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts apps/server/test/close-stops-active-steps.test.ts
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑭a merged, but compare says behind: the checkpoint is not in the merged head → stays in review with a hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑭a merged, but compare says diverged: the checkpoint is not in the merged head → stays in review with a hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉚ merged, the response has no head sha, the build has a checkpoint → not finished
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [54] a second merge step in the same round writes its completion row again
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the merge step finishing a card a person closed meanwhile throws before it stops anything
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without base is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without the base repo id is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62b] a PR from another branch of the target repo → not finished
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62c] the repo was renamed on GitHub (head and base both octo/demo2, the project still says octo/demo) → done
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62c] the repo was transferred on GitHub (head and base both neworg/demo, the project still says octo/demo) → done
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a merged PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [64] the reconcile finishing a split child advances the waves: the unblocked sibling starts
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65a] an over-long base branch name with control characters is cut to 100 characters in the hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [65b] the merger login and the merge commit in the merge row lose control characters and are bounded
+ ✓ test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+ ✓ test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+ ✓ test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66c] compare between two commits on main reads ahead
+ ✓ test/pr-reconcile.test.ts > #1403 [66] live GitHub response shapes (captured over REST, see docs/verify/1403) > [66c] compare between two commits on main reads behind
+ Test Files  3 passed (3)
+      Tests  153 passed (153)
+exit=0

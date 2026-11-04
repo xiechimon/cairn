@@ -1,0 +1,148 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 38 tests using 1 worker
+
+  1) e2e/a11y-axe.spec.ts:92:5 › axe: detail confirm (light) ───────────────────────────────────────
+
+    Error: axe violations on detail confirm (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 9
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "serious",
+    +     "rule": "color-contrast",
+    +     "targets": Array [
+    +       ".composer-placeholder",
+    +     ],
+    +   },
+    + ]
+
+      104 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      105 |       }));
+    > 106 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      107 |     });
+      108 |   }
+      109 | }
+        at apps/web/e2e/a11y-axe.spec.ts:106:63
+
+    Error Context: test-results/a11y-axe-axe-detail-confirm-light-/error-context.md
+
+
+  2) e2e/a11y-axe.spec.ts:92:5 › axe: detail review (light) ────────────────────────────────────────
+
+    Error: axe violations on detail review (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "serious",
+    +     "rule": "color-contrast",
+    +     "targets": Array [
+    +       ".composer-placeholder",
+    +       ".diff-hunk-head",
+    +     ],
+    +   },
+    + ]
+
+      104 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      105 |       }));
+    > 106 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      107 |     });
+      108 |   }
+      109 | }
+        at apps/web/e2e/a11y-axe.spec.ts:106:63
+
+    Error Context: test-results/a11y-axe-axe-detail-review-light-/error-context.md
+
+
+  3) e2e/a11y-axe.spec.ts:92:5 › axe: agent detail (light) ─────────────────────────────────────────
+
+    Error: axe violations on agent detail (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 11
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "critical",
+    +     "rule": "button-name",
+    +     "targets": Array [
+    +       "#base-ui-_r_d_",
+    +       "#base-ui-_r_g_",
+    +       "#base-ui-_r_j_",
+    +     ],
+    +   },
+    + ]
+
+      104 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      105 |       }));
+    > 106 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      107 |     });
+      108 |   }
+      109 | }
+        at apps/web/e2e/a11y-axe.spec.ts:106:63
+
+    Error Context: test-results/a11y-axe-axe-agent-detail-light-/error-context.md
+
+
+  4) e2e/a11y-axe.spec.ts:92:5 › axe: agent detail (dark) ──────────────────────────────────────────
+
+    Error: axe violations on agent detail (dark)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 11
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "critical",
+    +     "rule": "button-name",
+    +     "targets": Array [
+    +       "#base-ui-_r_d_",
+    +       "#base-ui-_r_g_",
+    +       "#base-ui-_r_j_",
+    +     ],
+    +   },
+    + ]
+
+      104 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      105 |       }));
+    > 106 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      107 |     });
+      108 |   }
+      109 | }
+        at apps/web/e2e/a11y-axe.spec.ts:106:63
+
+    Error Context: test-results/a11y-axe-axe-agent-detail-dark-/error-context.md
+
+
+  4 failed
+    e2e/a11y-axe.spec.ts:92:5 › axe: detail confirm (light) ────────────────────────────────────────
+    e2e/a11y-axe.spec.ts:92:5 › axe: detail review (light) ─────────────────────────────────────────
+    e2e/a11y-axe.spec.ts:92:5 › axe: agent detail (light) ──────────────────────────────────────────
+    e2e/a11y-axe.spec.ts:92:5 › axe: agent detail (dark) ───────────────────────────────────────────
+  34 passed (52.1s)

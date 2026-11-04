@@ -1,0 +1,23 @@
+[
+  {
+    "name": "bf-legacy-fingerprinted",
+    "maxConcurrent": 12,
+    "maxConcurrentOverridden": false,
+    "recommendedConcurrent": 12,
+    "concurrencySource": "measured"
+  },
+  {
+    "name": "bf-legacy-blank",
+    "maxConcurrent": 3,
+    "maxConcurrentOverridden": false,
+    "recommendedConcurrent": 3,
+    "concurrencySource": "estimate"
+  },
+  {
+    "name": "bf-manual-5",
+    "maxConcurrent": 5,
+    "maxConcurrentOverridden": true,
+    "recommendedConcurrent": 3,
+    "concurrencySource": "manual"
+  }
+]

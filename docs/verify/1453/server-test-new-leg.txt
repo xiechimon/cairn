@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  07:43:24
+   Duration  4.05s (transform 49%, tests 32%, import 19%)
+

@@ -1,0 +1,50 @@
+[heavy-slots] acquired slot 1/2
+[WebServer] (node:299) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/mnt/fast/lanes/cairn-1974/packages/shared/src/otel.ts". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[WebServer] (node:421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:469) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret (5.3s)
+
+
+  1) e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('form', { name: '飞书机器人' }).getByRole('status')
+    Expected: "未配置"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" getByRole('form', { name: '飞书机器人' }).getByRole('status') with timeout 5000ms
+      - waiting for getByRole('form', { name: '飞书机器人' }).getByRole('status')
+
+
+      29 |   await expect(page.getByRole('heading', { name: 'Unexpected Application Error!' })).toHaveCount(0);
+      30 |   const form = page.getByRole('form', { name: '飞书机器人' });
+    > 31 |   await expect(form.getByRole('status')).toHaveText('未配置');
+         |                                          ^
+      32 |   await form.getByLabel('App ID', { exact: true }).fill('cli_example123');
+      33 |   await form.getByLabel('App Secret', { exact: true }).fill('test-secret-one');
+      34 |   await form.getByLabel('接收者 Open ID').fill('ou_owner123');
+        at /mnt/fast/lanes/cairn-1974/apps/web/e2e/account-feishu.spec.ts:31:42
+
+    Error Context: test-results/account-feishu-Feishu-sett-e9d24-thout-disclosing-the-secret/error-context.md
+
+  1 failed
+    e2e/account-feishu.spec.ts:4:1 › Feishu settings configure, reload, update and unbind without disclosing the secret 
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /mnt/fast/lanes/cairn-1974/apps/web
+

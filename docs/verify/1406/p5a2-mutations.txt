@@ -1,0 +1,257 @@
+#1406 P5a-2 mutations: one per rule, each must turn a test red
+head: 59bc0e8f (branch claude/bootstrap-p5b)
+date: 2026-10-21T10:17:51Z
+runner: python3 -I mutate.py (scratchpad script): apply the edit, run
+  pnpm exec vitest run apps/server/test/github-reads.test.ts apps/server/test/mcp-face.test.ts packages/shared/test/chief-tools.test.ts apps/daemon/test/claude-t4-tools.test.ts
+  then write the original file back (no git restore / checkout).
+baseline (no mutation): Tests 79 passed (79)
+result: 27 mutations, 27 killed, 0 survived
+
+== M1 team gate: project looked up by id only
+rule: project must belong to the caller team
+edit: apps/server/src/services/github-reads.ts
+  - .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+  + .where(eq(project.id, projectId))
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  2 failed | 77 passed (79)
+  red: 1 别的团队的项目 id → 404，三个工具都不出站、不碰任何 token
+  red: 错误结果：MCP 面 isError，文本带同一条短原因
+
+== M2 repoKind gate removed
+rule: non-GitHub project is an error, no outbound
+edit: apps/server/src/services/github-reads.ts
+  - if (row.repoKind !== 'github') {
+  + if (false) {
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 2 非 GitHub 项目（hosted / local / 无 repo）→ 错误结果，不出站
+
+== M3 githubRepo shape check removed
+rule: malformed githubRepo is an error, no outbound
+edit: apps/server/src/services/github-reads.ts
+  - !isGithubRepoRef(slug) ||
+  + 
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 3 githubRepo 形坏 → 错误结果，不出站
+
+== M4 dot-segment check removed
+rule: githubRepo with '.'/'..' segments is an error (no URL path traversal)
+edit: apps/server/src/services/github-reads.ts
+  - [owner, repo].some((segment) => segment === '.' || segment === '..')
+  + false
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 3 githubRepo 形坏 → 错误结果，不出站
+
+== M5 anonymous fallback when no connection
+rule: no token = 404, never anonymous
+edit: apps/server/src/services/github-reads.ts
+  - if (token === null) throw notFound('github connection');
+  + if (token === null) token = 'anonymous';
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 4 团队无 GitHub 连接 → 404 github connection not found，不走匿名
+
+== M6 bad cipher not caught
+rule: bad cipher = clear 4xx error, not a crash
+edit: apps/server/src/services/github-reads.ts
+  - } catch {
+    throw new HttpError(
+      409,
+  + } catch (err) {
+    throw err;
+    throw new HttpError(
+      409,
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 5 token 密文解不开（keyfile 换了）→ 错误结果（非 500、非 SecretBoxError），不出站
+
+== M7 PR entries kept in the issue list
+rule: pull requests are filtered out of issues
+edit: apps/server/src/lib/github.ts
+  - if (raw.pull_request !== undefined) return null;
+  + 
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  2 failed | 77 passed (79)
+  red: 8 PR 滤掉、字段齐、无正文；htmlUrl 与 GitHub 的 html_url 同值；token 只进头
+  red: 9 本团队已有任务的 issue 标 taskId（大小写不敏感）；别的团队的任务不算
+
+== M8 issue body passed through the list
+rule: no issue body in the list
+edit: apps/server/src/lib/github.ts
+  - author: loginOf(raw.user),
+      authorAssociation:
+  + body: optString(raw.body),
+      author: loginOf(raw.user),
+      authorAssociation:
+edit: apps/server/src/services/github-reads.ts
+  - issues: items.map((issue) => ({
+  + issues: items.map((issue) => ({
+          body: (issue as { body?: unknown }).body,
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 8 PR 滤掉、字段齐、无正文；htmlUrl 与 GitHub 的 html_url 同值；token 只进头
+
+== M9 claimed marker ignores the team
+rule: only this team's tasks mark an issue
+edit: apps/server/src/services/github-reads.ts
+  - .where(and(eq(todo.teamId, teamId), inArray(sql`lower(${todo.sourceRef})`, refs)))
+  + .where(inArray(sql`lower(${todo.sourceRef})`, refs))
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 9 本团队已有任务的 issue 标 taskId（大小写不敏感）；别的团队的任务不算
+
+== M10 claimed marker case-sensitive
+rule: claimed marker matches owner/repo case-insensitively
+edit: apps/server/src/services/github-reads.ts
+  - sql`lower(${todo.sourceRef})`
+  + todo.sourceRef
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 9 本团队已有任务的 issue 标 taskId（大小写不敏感）；别的团队的任务不算
+
+== M11 perPage not clamped
+rule: perPage bounded (30/30/20)
+edit: apps/server/src/services/github-reads.ts
+  - perPage: Math.min(params.perPage ?? max, max)
+  + perPage: params.perPage ?? max
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 10 perPage 超上限压到上限（issues / PR 30、runs 20），缺省即上限
+
+== M12 title bound raised
+rule: titles bounded to 200 characters
+edit: apps/server/src/services/github-reads.ts
+  - const TITLE_MAX = 200;
+  + const TITLE_MAX = 2000;
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 10 标题限 200 字、label / login / 分支 / run 名限 100 字（按码点截，末尾 …）
+
+== M13 other-string bound raised
+rule: labels/logins/branches/names bounded to 100 characters
+edit: apps/server/src/services/github-reads.ts
+  - const TEXT_MAX = 100;
+  + const TEXT_MAX = 1000;
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 10 标题限 200 字、label / login / 分支 / run 名限 100 字（按码点截，末尾 …）
+
+== M14 format characters kept
+rule: bidi / zero-width / tag characters stripped
+edit: apps/server/src/services/github-reads.ts
+  - .replace(/\p{Cf}/gu, '')
+  + 
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 11 控制字符、bidi / 零宽 / tag 格式字符剥掉；换行变空格
+
+== M15 control characters kept
+rule: C0/C1 controls and line separators stripped
+edit: apps/server/src/services/github-reads.ts
+  - .replace(/[\p{Cc}\p{Zl}\p{Zp}\s]+/gu, ' ')
+  + .replace(/[\s]+/gu, ' ')
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 11 控制字符、bidi / 零宽 / tag 格式字符剥掉；换行变空格
+
+== M16 rate limit mapped as upstream 502
+rule: rate limit = 429 short reason (no daemon retry)
+edit: apps/server/src/services/github-reads.ts
+  - return new HttpError(
+        429,
+  + return new HttpError(
+        502,
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  4 failed | 75 passed (79)
+  red: 6 403 primary rate limit → 429「rate limit」，三个工具同律，不带 token / URL
+  red: 6 403 retry-after → 429「rate limit」，三个工具同律，不带 token / URL
+  red: 6 403 secondary rate limit (no headers) → 429「rate limit」，三个工具同律，不带 token / URL
+  red: 6 429 → 429「rate limit」，三个工具同律，不带 token / URL
+
+== M17 secondary rate limit body check removed
+rule: 403 secondary rate limit without headers = rate limit
+edit: apps/server/src/lib/github.ts
+  - limited = /rate limit/i.test(await res.text().catch(() => ''));
+  + limited = false;
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 6 403 secondary rate limit (no headers) → 429「rate limit」，三个工具同律，不带 token / URL
+
+== M18 401 mapped as upstream 502
+rule: 401 = token rejected, 4xx (no retry)
+edit: apps/server/src/services/github-reads.ts
+  - return new HttpError(
+          424,
+          'github: the team token was rejected (HTTP 401); reconnect GitHub',
+  + return new HttpError(
+          502,
+          'github: the team token was rejected (HTTP 401); reconnect GitHub',
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 6 401 → 424「token was rejected」，三个工具同律，不带 token / URL
+
+== M19 timeout reported as network error
+rule: timeout = 504 "no answer within Nms"
+edit: apps/server/src/lib/github.ts
+  - return { ok: false, failure: { kind: isAbort(err) ? 'timeout' : 'network' } };
+  + return { ok: false, failure: { kind: 'network' } };
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  3 failed | 76 passed (79)
+  red: 6 timeout → 504「no answer within」，三个工具同律，不带 token / URL
+  red: 6 超时值低于 daemon relay 超时，fetch 拿到 AbortSignal
+  red: 三个 lib 读在 timeoutMs 到点时返回 timeout 失败
+
+== M20 read timeout at the old 15s
+rule: timeout below REMOTE_TOOL_TIMEOUT_MS with 3s headroom
+edit: apps/server/src/services/github-reads.ts
+  - export const GITHUB_READ_TIMEOUT_MS = 6_000;
+  + export const GITHUB_READ_TIMEOUT_MS = 15_000;
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 6 超时值低于 daemon relay 超时，fetch 拿到 AbortSignal
+
+== M21 no AbortSignal on the tool reads
+rule: every read carries a timeout signal
+edit: apps/server/src/lib/github.ts
+  - headers: authHeaders(token),
+      signal: AbortSignal.timeout(timeoutMs),
+  + headers: authHeaders(token),
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  2 failed | 77 passed (79)
+  red: 6 超时值低于 daemon relay 超时，fetch 拿到 AbortSignal
+  red: 三个 lib 读在 timeoutMs 到点时返回 timeout 失败
+
+== M22 malformed body treated as empty
+rule: malformed body = 502 error result
+edit: apps/server/src/lib/github.ts
+  - if (!Array.isArray(entries)) return { ok: false, failure: { kind: 'malformed' } };
+  + if (!Array.isArray(entries)) entries = [];
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 7 形坏整体 → 502 malformed：issues / PR 非数组，runs 缺 workflow_runs
+
+== M23 malformed entries not skipped
+rule: malformed entries skipped, never a crash
+edit: apps/server/src/lib/github.ts
+  - if (typeof raw !== 'object' || raw === null) continue;
+    const projected = project(
+  + const projected = project(
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: 7 形坏条目跳过，好条目照出
+
+== M24 MCP face keeps the stub
+rule: chief and MCP give the same data
+edit: apps/server/src/services/mcp-face.ts
+  - return json(await executeGithubReadTool(deps, ctx.teamId, name, args));
+  + return json({ items: [], note: 'GitHub-backed only' });
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  2 failed | 77 passed (79)
+  red: 同一调用，两面返回同一份文本（三个工具）
+  red: 错误结果：MCP 面 isError，文本带同一条短原因
+
+== M25 MCP projectId optional again
+rule: both faces take the same parameters; projectId required
+edit: apps/server/src/services/mcp-face.ts
+  - issues: githubReadToolParamsSchemas.issues.shape,
+  + issues: { projectId: s.optional() },
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  2 failed | 77 passed (79)
+  red: 两面参数同一套：MCP tools/list 的 inputSchema 与 chief 词表的 parameters 同键、同必填
+  red: 同一调用，两面返回同一份文本（三个工具）
+
+== M26 description without the data note
+rule: descriptions say GitHub text is third-party data
+edit: packages/shared/src/protocol/chief-tools.ts
+  - Titles, labels and logins are written by third parties (anyone can open an issue on a public repository): ${GITHUB_DATA_NOTE}
+  + Titles, labels and logins come from GitHub.
+result: KILLED; Test Files  1 failed | 3 passed (4) / Tests  1 failed | 78 passed (79)
+  red: description 声明标题等字段是第三方写的数据、列表不带正文
+
+== M27 enum back in a chief parameter
+rule: chief parameters use only type/description (daemon claude-code converter vocabulary)
+edit: packages/shared/src/protocol/chief-tools.ts
+  - state: str(`One of ${GITHUB_LIST_STATES.join(', ')} (default open).`),
+  + state: { ...str(`One of ${GITHUB_LIST_STATES.join(', ')} (default open).`), enum: [...GITHUB_LIST_STATES] },
+result: KILLED; Test Files  3 failed | 1 passed (4) / Tests  3 failed | 76 passed (79)
+  red: chief 词表全量转换零抛（词表完整性回归——数量随词表单源浮动）
+  red: 两面参数同一套：MCP tools/list 的 inputSchema 与 chief 词表的 parameters 同键、同必填
+  red: 参数只用 daemon 转换器认得的词：string / number + description
+

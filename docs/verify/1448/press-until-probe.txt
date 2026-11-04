@@ -1,0 +1,20 @@
+
+
+Running 6 tests using 1 worker
+
+e2e/zz-press-until-probe.spec.ts:4:1 › visible: a key that opens nothing throws
+visible -> Error: F9 never made getByRole('dialog', { name: '搜索' }) visible
+
+e2e/zz-press-until-probe.spec.ts:12:1 › hidden: a key that closes nothing throws while the target stays up
+hidden -> Error: F9 never made getByRole('dialog', { name: '搜索' }) hidden
+
+e2e/zz-press-until-probe.spec.ts:28:1 › a non-timeout wait error (strict mode) is rethrown before any press
+strict -> Error: locator('[data-testid]') before F9 | presses: 0
+
+e2e/zz-press-until-probe.spec.ts:46:1 › hidden on a target that has not rendered waits for it, then closes it
+hidden-after-click -> closed
+
+e2e/zz-press-until-probe.spec.ts:56:1 › visible on a panel that is already open fails before pressing
+already-open -> Error: getByRole('dialog', { name: '搜索' }) before Meta+k
+
+  6 passed (24.3s)
