@@ -12,8 +12,8 @@ Accepted: function once() {} export { once as publicName }; once();
 Accepted: const once = () => 1; export default once;
 Accepted: function unused() {}
 Accepted: const text = "function once() {} once()";
-✔ checks added helpers with symbol references and named exemptions (1652.698502ms)
-✔ does not flag an existing large function when a parameter or body changes (186.406777ms)
+✔ checks added helpers with symbol references and named exemptions (1568.465317ms)
+✔ does not flag an existing large function when a parameter or body changes (178.242486ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 2
@@ -21,4 +21,4 @@ Accepted: const text = "function once() {} once()";
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1906.036085
+ℹ duration_ms 1782.272488

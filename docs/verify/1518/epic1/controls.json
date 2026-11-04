@@ -1,50 +1,50 @@
 {
   "oracle": {
     "status": "pass",
-    "log": "~/cairn-eval/controls-e1-c/oracle.log",
+    "log": "~/cairn-eval/controls-e2/oracle.log",
     "exitCode": 0,
     "timing": {
       "lockWaitSeconds": 0.0,
-      "harborWallSeconds": 74.348,
-      "imageBuildSeconds": 17.391,
+      "harborWallSeconds": 74.333,
+      "imageBuildSeconds": 20.095,
       "agentSeconds": 0.209,
-      "verifierSeconds": 36.268,
-      "cpuSeconds": 3.770499
+      "verifierSeconds": 35.313,
+      "cpuSeconds": 3.628972
     },
     "isolation": [
       {
-        "id": "9483251d3d15811ffa23b7f20b2fc6b8ee1ff067898dbd996bd5ca818b9dd636",
-        "name": "task-1562-e1__wwyz8th__env-main-1",
+        "id": "b5734dbc9041641cccc346042298f984716ec4adfa7b01c2f33f2697552c7595",
+        "name": "task-1562-e2__3ousx8i__env-main-1",
         "networkMode": "none"
       },
       {
-        "id": "012d9130e7ae06b1bd059493d1cb83b15bdc500fd7b01fad0f5c88620d3a20fd",
-        "name": "task-1562-e1__wwyz8th__verifier__trial-main-1",
+        "id": "5159713cf762c8c3649ce78f7ae79c94519ce63266f94514328d4160d76c4eec",
+        "name": "task-1562-e2__3ousx8i__verifier__trial-main-1",
         "networkMode": "none"
       }
     ]
   },
   "nop": {
     "status": "fail",
-    "log": "~/cairn-eval/controls-e1-c/nop.log",
+    "log": "~/cairn-eval/controls-e2/nop.log",
     "exitCode": 0,
     "timing": {
-      "lockWaitSeconds": 24.23,
-      "harborWallSeconds": 89.185,
-      "imageBuildSeconds": 18.439,
-      "agentSeconds": 0.001,
-      "verifierSeconds": 47.977,
-      "cpuSeconds": 2.258992
+      "lockWaitSeconds": 0.0,
+      "harborWallSeconds": 73.369,
+      "imageBuildSeconds": 17.584,
+      "agentSeconds": 0.0,
+      "verifierSeconds": 37.284,
+      "cpuSeconds": 2.043698
     },
     "isolation": [
       {
-        "id": "f54dfd2792315ab34befe6b496d43c5076dedc2b91e6d131c62a16b52524922b",
-        "name": "task-1562-e1__e3k9vo3__env-main-1",
+        "id": "d732daab9ab773282e06a967e0f2ef623389e656124ba06677982503e6646a80",
+        "name": "task-1562-e2__ynsvmxv__env-main-1",
         "networkMode": "none"
       },
       {
-        "id": "9c2b8c1ca4ba8b163a1779862d8f1704655148d1e4ecf40afda8d1f07a74f7e3",
-        "name": "task-1562-e1__e3k9vo3__verifier__trial-main-1",
+        "id": "bb68fb95233a9b5b254efcaa400a4bb046ec5f40689b9927072f0cb473544373",
+        "name": "task-1562-e2__ynsvmxv__verifier__trial-main-1",
         "networkMode": "none"
       }
     ],

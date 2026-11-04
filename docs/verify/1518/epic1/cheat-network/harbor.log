@@ -1,4 +1,4 @@
-  1/1 Mean: 0.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:01:27 0:00:00
+  1/1 Mean: 0.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:01:09 0:00:00
 adhoc • cheat
 ┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┓
 ┃ Trials ┃ Exceptions ┃  Mean ┃
@@ -13,11 +13,11 @@ adhoc • cheat
 └────────┴───────┘
 
 Job Info
-Total runtime: 1m 27s
+Total runtime: 1m 9s
 Results written to 
-~/cairn-eval/cheats-e1-c/cheatnetwork/2026-11-03__21-35-51/result.json
+~/cairn-eval/cheats-e2/cheatnetwork/2026-11-03__23-24-39/result.json
 Inspect results by running `harbor view 
-~/cairn-eval/cheats-e1-c/cheatnetwork`
+~/cairn-eval/cheats-e2/cheatnetwork`
 Share results by running `harbor upload 
-~/cairn-eval/cheats-e1-c/cheatnetwork/2026-11-03__21-35-51`
+~/cairn-eval/cheats-e2/cheatnetwork/2026-11-03__23-24-39`
 

@@ -138,7 +138,7 @@ python3 integration/eval/harbor/pr-to-task.py --check /tmp/task-1562 \
   --output /tmp/controls-1562-e1
 ```
 
-Evidence: `docs/verify/1518/epic1/` (recorded before the protected-pattern restore and the config and setup tampering in the `bash` cheat; it needs a re-run), including a counterfactual: the same `bash` cheat (runtime replaced, no test edit) against the earlier shared-verifier task scores reward 1, and against the separate verifier scores 0. The task stays unaccepted; Epic 1 proves the
+Evidence: `docs/verify/1518/epic1/`, recorded on the head with the protected test-infrastructure restore, including a counterfactual: the same `bash` cheat (runtime replaced, no test edit) against the earlier shared-verifier task scores reward 1, and against the separate verifier scores 0. The task stays unaccepted; Epic 1 proves the
 ruler resists these four cheats, not that PR #1562 is a kept benchmark task.
 
 ## Candidate counts

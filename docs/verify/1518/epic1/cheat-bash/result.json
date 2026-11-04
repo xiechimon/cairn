@@ -1,16 +1,16 @@
 {
-    "id": "34e2757b-eb0f-44d2-bb3c-9161a7126da0",
-    "task_name": "task-1562-e1",
-    "trial_name": "task-1562-e1__sZ9Gy4o",
-    "trial_uri": "file://~/cairn-eval/cheats-e1-c/cheatbash/2026-11-03__21-32-59/task-1562-e1__sZ9Gy4o",
+    "id": "68f4e185-7465-45b8-a419-d972b40486ab",
+    "task_name": "task-1562-e2",
+    "trial_name": "task-1562-e2__UEruVdJ",
+    "trial_uri": "file://~/cairn-eval/cheats-e2/cheatbash/2026-11-03__23-21-40/task-1562-e2__UEruVdJ",
     "task_id": {
-        "path": "~/cairn-eval/tasks/task-1562-e1"
+        "path": "~/cairn-eval/tasks/task-1562-e2"
     },
     "source": null,
-    "task_checksum": "3d13798af2cb397e61b2098061be9e36efdfa937229af6701c4daaa02e691a90",
+    "task_checksum": "bd2c65af19f553aa447a1f251169ebcbe47e48b3b8b7741dee26c187add54323",
     "config": {
         "task": {
-            "path": "~/cairn-eval/tasks/task-1562-e1",
+            "path": "~/cairn-eval/tasks/task-1562-e2",
             "git_url": null,
             "git_commit_id": null,
             "name": null,
@@ -19,8 +19,8 @@
             "download_dir": null,
             "source": null
         },
-        "trial_name": "task-1562-e1__sZ9Gy4o",
-        "trials_dir": "~/cairn-eval/cheats-e1-c/cheatbash/2026-11-03__21-32-59",
+        "trial_name": "task-1562-e2__UEruVdJ",
+        "trials_dir": "~/cairn-eval/cheats-e2/cheatbash/2026-11-03__23-21-40",
         "install_only": false,
         "timeout_multiplier": 1.0,
         "agent_timeout_multiplier": null,
@@ -79,7 +79,7 @@
         "artifacts": [],
         "extra_instruction_paths": [],
         "extra_instructions": [],
-        "job_id": "c0877d1d-18b2-4acc-bc90-4777997a527e",
+        "job_id": "3af80929-b1e7-4b5c-8df6-819944e544cf",
         "source_trial": null
     },
     "agent_info": {
@@ -103,23 +103,23 @@
     },
     "verifier_environment_mode": "separate",
     "exception_info": null,
-    "started_at": "2026-11-04T05:33:00.415568Z",
-    "finished_at": "2026-11-04T05:34:16.528315Z",
+    "started_at": "2026-11-04T07:21:42.090220Z",
+    "finished_at": "2026-11-04T07:23:12.889044Z",
     "environment_setup": {
-        "started_at": "2026-11-04T05:33:00.655625Z",
-        "finished_at": "2026-11-04T05:33:18.994115Z"
+        "started_at": "2026-11-04T07:21:42.456805Z",
+        "finished_at": "2026-11-04T07:22:16.645699Z"
     },
     "agent_setup": {
-        "started_at": "2026-11-04T05:33:18.994181Z",
-        "finished_at": "2026-11-04T05:33:18.994259Z"
+        "started_at": "2026-11-04T07:22:16.645813Z",
+        "finished_at": "2026-11-04T07:22:16.645940Z"
     },
     "agent_execution": {
-        "started_at": "2026-11-04T05:33:18.994359Z",
-        "finished_at": "2026-11-04T05:33:19.094377Z"
+        "started_at": "2026-11-04T07:22:16.646127Z",
+        "finished_at": "2026-11-04T07:22:16.976856Z"
     },
     "verifier": {
-        "started_at": "2026-11-04T05:33:36.035385Z",
-        "finished_at": "2026-11-04T05:34:16.528302Z"
+        "started_at": "2026-11-04T07:22:35.794813Z",
+        "finished_at": "2026-11-04T07:23:12.889028Z"
     },
     "step_results": null
 }

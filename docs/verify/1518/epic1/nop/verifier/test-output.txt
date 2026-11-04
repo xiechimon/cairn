@@ -1,5 +1,5 @@
-✖ checks added helpers with symbol references and named exemptions (191.198867ms)
-✖ does not flag an existing large function when a parameter or body changes (202.626385ms)
+✖ checks added helpers with symbol references and named exemptions (130.453024ms)
+✖ does not flag an existing large function when a parameter or body changes (120.325675ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 0
@@ -7,12 +7,12 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 435.592198
+ℹ duration_ms 290.089793
 
 ✖ failing tests:
 
 test at scripts/single-use-helper-gate.test.mjs:10:1
-✖ checks added helpers with symbol references and named exemptions (191.198867ms)
+✖ checks added helpers with symbol references and named exemptions (130.453024ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
   
   2 !== 0
@@ -31,7 +31,7 @@ test at scripts/single-use-helper-gate.test.mjs:10:1
   }
 
 test at scripts/single-use-helper-gate.test.mjs:110:1
-✖ does not flag an existing large function when a parameter or body changes (202.626385ms)
+✖ does not flag an existing large function when a parameter or body changes (120.325675ms)
   AssertionError [ERR_ASSERTION]: apps/daemon/src/runner.ts:469: single-use non-exported function runClaimedStep; inline it or add an exact allowlist entry
   
   
