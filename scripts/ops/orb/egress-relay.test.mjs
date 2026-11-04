@@ -17,7 +17,13 @@ import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { createRelay, listenOnUnixSocket, relayDefaults } from './egress-relay.mjs';
+import {
+  createRelay,
+  identityFromCgroup,
+  listenOnUnixSocket,
+  relayDefaults,
+  unixClientIdentity,
+} from './egress-relay.mjs';
 
 const relayScript = new URL('./egress-relay.mjs', import.meta.url).pathname;
 
@@ -227,6 +233,8 @@ test('DNS rebinding never performs a second resolution or connects to private se
 test('relay defaults bind only the bridge and accept only the container subnet', async (t) => {
   assert.equal(relayDefaults.host, '10.203.0.1');
   assert.equal(relayDefaults.subnet, '10.203.0.0/24');
+  assert.equal(relayDefaults.maxConnections, 128);
+  assert.equal(relayDefaults.maxConnectionsPerClient, 32);
   const f = await fixture(t, { subnet: relayDefaults.subnet });
   assert.match(
     await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\n'),
@@ -563,6 +571,73 @@ test('unix mode skips the client subnet check that TCP mode still enforces', asy
   assert.deepEqual(tcp.targets, []);
 });
 
+test('container cgroup text becomes an orb quota identity', () => {
+  const id = 'a'.repeat(64);
+  assert.equal(identityFromCgroup(`0::/user.slice/libpod-${id}.scope/container\n`), `orb:${id}`);
+  assert.equal(identityFromCgroup('0::/user.slice/user-1000.slice\n'), 'unknown');
+});
+
+test('one unix client cannot spend another client connection quota', async (t) => {
+  let identity = 'orb:aaaaaaaaaaaa';
+  const f = await fixture(
+    t,
+    {
+      idleTimeout: 1000,
+      maxConnections: 4,
+      maxConnectionsPerClient: 1,
+      clientIdentity: () => identity,
+    },
+    { unix: true },
+  );
+  const held = connect(f.socketPath);
+  await once(held, 'connect');
+  assert.match(
+    await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\n'),
+    /^HTTP\/1.1 503/,
+  );
+  identity = 'orb:bbbbbbbbbbbb';
+  assert.match(
+    await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\nping'),
+    /^HTTP\/1.1 200/,
+  );
+  const closed = once(held, 'close');
+  held.destroy();
+  await closed;
+  identity = 'orb:aaaaaaaaaaaa';
+  assert.match(
+    await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\nping'),
+    /^HTTP\/1.1 200/,
+  );
+});
+
+test('unix peers outside a container share one unknown quota', async (t) => {
+  const seen = [];
+  const f = await fixture(
+    t,
+    {
+      idleTimeout: 1000,
+      maxConnections: 4,
+      maxConnectionsPerClient: 1,
+      clientIdentity: (socket) => {
+        const id = unixClientIdentity(socket);
+        seen.push(id);
+        return id;
+      },
+    },
+    { unix: true },
+  );
+  const held = connect(f.socketPath);
+  await once(held, 'connect');
+  assert.deepEqual(seen, ['unknown']);
+  assert.match(
+    await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\n'),
+    /^HTTP\/1.1 503/,
+  );
+  const closed = once(held, 'close');
+  held.destroy();
+  await closed;
+});
+
 test('unix connection limit and header cap apply to socket clients', async (t) => {
   const f = await fixture(
     t,
@@ -764,3 +839,49 @@ test('unix mode still rejects invalid destination port allowlists before listeni
   assert.match(result.stderr, /Invalid destination port allowlist/);
   assert.equal(existsSync(socketPath), false);
 });
+
+for (const [name, activation] of [
+  ['missing descriptor metadata', {}],
+  [
+    'foreign listener pid',
+    { LISTEN_PID: '1', LISTEN_FDS: '1', LISTEN_FDNAMES: 'cairn-orb-egress' },
+  ],
+  [
+    'extra listener descriptors',
+    { LISTEN_PID: 'self', LISTEN_FDS: '2', LISTEN_FDNAMES: 'cairn-orb-egress:extra' },
+  ],
+  ['wrong named descriptor', { LISTEN_PID: 'self', LISTEN_FDS: '1', LISTEN_FDNAMES: 'foreign' }],
+]) {
+  test(`socket activation refuses ${name} before creating a listener`, (t) => {
+    const socketPath = join(privateDirectory(t), 'egress.sock');
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+      import { pathToFileURL } from 'node:url';
+      if (process.env.LISTEN_PID === 'self') process.env.LISTEN_PID = String(process.pid);
+      process.argv[1] = ${JSON.stringify(relayScript)};
+      await import(pathToFileURL(process.argv[1]));
+    `,
+      ],
+      {
+        env: {
+          ...process.env,
+          LISTEN_PID: '',
+          LISTEN_FDS: '',
+          LISTEN_FDNAMES: '',
+          ...activation,
+          CAIRN_ORB_SOCKET_ACTIVATION: '1',
+          CAIRN_ORB_EGRESS_SOCKET: socketPath,
+        },
+        encoding: 'utf8',
+        timeout: 1500,
+      },
+    );
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /activation/i);
+    assert.equal(existsSync(socketPath), false);
+  });
+}

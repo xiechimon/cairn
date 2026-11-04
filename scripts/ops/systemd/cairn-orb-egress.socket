@@ -1,0 +1,12 @@
+[Unit]
+Description=Cairn Orb stable egress socket
+
+[Socket]
+ListenStream=%t/cairn-orb-egress/egress.sock
+SocketMode=0600
+DirectoryMode=0700
+FileDescriptorName=cairn-orb-egress
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target
