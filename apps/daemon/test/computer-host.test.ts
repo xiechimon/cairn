@@ -162,6 +162,14 @@ describe('host computer execute', () => {
     expect(result.stdout.trim()).toBe('token=[] call=[set]');
   });
 
+  test('a command that exits before its timeout keeps its exit code while output drains', async () => {
+    const result = await run(provider({ streamDrainMs: 1_500 }), 'echo completed; exit 0', {
+      timeoutMs: 700,
+    });
+    expect(result.stdout).toBe('completed\n');
+    expect(result.exit).toEqual({ kind: 'exit', code: 0 });
+  });
+
   test('kills the whole process tree when the timeout passes', async () => {
     const pidFile = path.join(home, 'pids');
     const script = `for i in 1 2 3; do sleep 60 & echo $! >> ${pidFile}; done; (sleep 60 & echo $! >> ${pidFile}); sleep 60`;

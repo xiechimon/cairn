@@ -62,6 +62,7 @@ export interface HostComputerOptions {
   home?: string;
   env?: NodeJS.ProcessEnv;
   killGraceMs?: number;
+  streamDrainMs?: number;
   maxFileBytes?: number;
 }
 
@@ -131,6 +132,7 @@ export class HostComputerProvider implements ComputerProvider {
   private readonly home: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly killGraceMs: number;
+  private readonly streamDrainMs: number;
   private readonly maxFileBytes: number;
   private readonly running = new Set<{ stop: () => Promise<void> }>();
 
@@ -138,6 +140,7 @@ export class HostComputerProvider implements ComputerProvider {
     this.home = path.resolve(options.home ?? homedir());
     this.env = options.env ?? process.env;
     this.killGraceMs = options.killGraceMs ?? HOST_KILL_GRACE_MS;
+    this.streamDrainMs = options.streamDrainMs ?? STREAM_DRAIN_MS;
     this.maxFileBytes = options.maxFileBytes ?? HOST_MAX_FILE_BYTES;
   }
 
@@ -266,10 +269,11 @@ export class HostComputerProvider implements ComputerProvider {
       finish(1);
     });
     child.on('exit', (code, signal) => {
+      clearTimeout(timeout);
       setTimeout(() => {
         if (stopping) return;
         finish(code ?? 1, undefined, signal ? `command terminated by ${signal}` : undefined);
-      }, STREAM_DRAIN_MS).unref();
+      }, this.streamDrainMs).unref();
     });
     return queue;
   }
