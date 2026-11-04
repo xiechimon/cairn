@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { HISTORY, mockLive } from './chief-home-mock';
+import { HISTORY, mockLive, TEAM } from './chief-home-mock';
 
 const SHOTS = process.env.D75_SHOTS;
 const FAKE_TOKEN = `ghp_${'a1B2c3D4e5'.repeat(3)}`;
@@ -336,6 +336,70 @@ test('reconnect replaces an old live result with the current persisted history',
   });
   await expect(output).toHaveText('current persisted output');
   await expect(entries(panel)).toHaveCount(1);
+});
+
+test('private REST history disappears at the auth gate and a late old response cannot replace the next scope', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => localStorage.setItem('cairn.token', 'scope-first'));
+  let rejectFirst = false;
+  let holdFirstHistory = false;
+  let historyStarted = false;
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await mockLive(page, { threads: [], messages: HISTORY, machines: [] }, (path, route, json) => {
+    const authorization = route.request().headers().authorization;
+    const first = authorization === 'Bearer scope-first';
+    if (path === '/api/teams') {
+      return ['Bearer scope-first', 'Bearer scope-second'].includes(authorization ?? '')
+        ? json([TEAM])
+        : json({ error: 'Unauthorized' }, 401);
+    }
+    if (path === '/api/computers') {
+      return first && rejectFirst
+        ? json({ error: 'Unauthorized' }, 401)
+        : json({ computers: [computer()] });
+    }
+    if (path === '/api/computers/comp-1/commands') {
+      if (first && holdFirstHistory) {
+        historyStarted = true;
+        return held.then(() => json({ commands: [command(1, { command: 'first-owner-only' })] }));
+      }
+      return json({ commands: [command(first ? 1 : 2, { command: first ? 'first-owner-only' : 'second-owner-only' })] });
+    }
+    return undefined;
+  });
+  await page.route('**/src/**', (route) => route.continue());
+  try {
+    await page.goto('/app?pane=machines');
+    const panel = page.getByRole('complementary', { name: '电脑' });
+    await expect(entries(panel)).toContainText(['first-owner-only']);
+    holdFirstHistory = true;
+    await emit(page, { type: 'ping', seq: 1 });
+    await emit(page, { type: 'ping', seq: 3 });
+    await expect.poll(() => historyStarted).toBe(true);
+    rejectFirst = true;
+    await emit(page, { type: 'machine_presence', machineId: 'm1', online: true });
+    await expect(page.locator('.token-gate')).toBeVisible();
+    await expect(page.getByTestId('computer-command')).toHaveCount(0);
+    await expect(page.getByTestId('computer-state')).toHaveCount(0);
+    await shot(page, 'auth-gate-private-cleared');
+    await page.locator('.token-gate-input').fill('scope-second');
+    await page.locator('.token-gate-submit').click();
+    await expect(page.locator('.token-gate')).toHaveCount(0);
+    await expect(entries(panel)).toContainText(['second-owner-only']);
+    const late = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/computers/comp-1/commands' && response.request().headers().authorization === 'Bearer scope-first');
+    release();
+    await late;
+    await expect(entries(panel)).toContainText(['second-owner-only']);
+    await expect(page.locator('body')).not.toContainText('first-owner-only');
+    await shot(page, 'auth-next-scope-after-late');
+  } catch (error) {
+    await testInfo.attach('browser-errors', { body: JSON.stringify(errors), contentType: 'application/json' });
+    throw error;
+  } finally {
+    release();
+  }
 });
 
 test('very long output is a scrollable tail inside the panel and never widens it', async ({

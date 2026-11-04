@@ -82,7 +82,9 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
+import { useAuth } from './auth.js';
 import { api } from './client.js';
+import { computerQueryKeys } from './computer-query-scope.js';
 
 const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
@@ -338,22 +340,26 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
-export const useComputers = (teamId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['computers', teamId],
+export function useComputers(teamId: string | undefined, enabled: boolean) {
+  const auth = useAuth();
+  return useQuery({
+    queryKey: computerQueryKeys(teamId, auth.generation).computers,
     queryFn: async () =>
       (await api.get<{ computers: ComputerRecord[] }>('/api/computers')).computers,
-    enabled: enabled && teamId !== undefined,
+    enabled: enabled && teamId !== undefined && !auth.gateOpen,
   });
+}
 
-export const useComputerCommands = (computerId: string | undefined) =>
-  useQuery({
-    queryKey: ['computer-commands', computerId],
+export function useComputerCommands(teamId: string | undefined, computerId: string | undefined) {
+  const auth = useAuth();
+  return useQuery({
+    queryKey: [...computerQueryKeys(teamId, auth.generation).commands, computerId],
     queryFn: async () =>
       (await api.get<ComputerCommandsResponse>(`/api/computers/${computerId}/commands?limit=50`))
         .commands,
-    enabled: computerId !== undefined,
+    enabled: teamId !== undefined && computerId !== undefined && !auth.gateOpen,
   });
+}
 
 export const useBackupNotice = (enabled: boolean) =>
   useQuery({
