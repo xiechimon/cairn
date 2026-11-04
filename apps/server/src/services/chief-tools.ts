@@ -1314,6 +1314,7 @@ export interface WorkerMemoryCtx {
   projectId: string | null;
   buildId: string;
   attachmentsDir: string;
+  teamScoped?: boolean;
 }
 
 export async function executeWorkerMemoryTool(
@@ -1341,6 +1342,7 @@ export async function executeWorkerMemoryTool(
         source: agentSourceName(db, ctx.sourceAgentId ?? ctx.agentId),
         layer,
         threadId: layer === 'scratchpad' ? ctx.todoId : null,
+        teamScoped: ctx.teamScoped,
       });
       return json(row);
     }
@@ -1352,6 +1354,7 @@ export async function executeWorkerMemoryTool(
           teamId: ctx.teamId,
           threadId: ctx.todoId,
           content: str(params, 'content'),
+          teamScoped: ctx.teamScoped,
         }),
       );
     }
@@ -1362,6 +1365,7 @@ export async function executeWorkerMemoryTool(
         agentId: ctx.agentId,
         teamId: ctx.teamId,
         threadId: ctx.todoId,
+        teamScoped: ctx.teamScoped,
       });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
@@ -1370,7 +1374,12 @@ export async function executeWorkerMemoryTool(
       return json(
         listMemoryEntries(
           db,
-          { agentId: ctx.agentId, teamId: ctx.teamId, threadId: ctx.todoId },
+          {
+            agentId: ctx.agentId,
+            teamId: ctx.teamId,
+            threadId: ctx.todoId,
+            teamScoped: ctx.teamScoped,
+          },
           bool(params, 'includeInvalid', false),
         ),
       );

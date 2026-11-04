@@ -49,8 +49,8 @@ function notAdoptedDuplicate() {
   return isNull(agentMemory.adoptedFrom);
 }
 
-function ownerWhere(scope: { agentId: string; teamId: string }) {
-  return routingRulesEnabled()
+function ownerWhere(scope: { agentId: string; teamId: string; teamScoped?: boolean }) {
+  return routingRulesEnabled() && scope.teamScoped !== false
     ? and(eq(agentMemory.teamId, scope.teamId), notAdoptedDuplicate())
     : and(eq(agentMemory.agentId, scope.agentId), eq(agentMemory.teamId, scope.teamId));
 }
@@ -76,7 +76,7 @@ function scratchpadVisible(threadId?: string) {
 
 export function listMemoryEntries(
   db: Db | MemoryTx,
-  scope: { agentId: string; teamId: string; threadId?: string },
+  scope: { agentId: string; teamId: string; threadId?: string; teamScoped?: boolean },
   includeInvalid = false,
 ) {
   return db
@@ -161,6 +161,7 @@ export function memoriesInScope(
     projectId: string | null;
     layer?: MemoryLayer;
     threadId?: string | null;
+    teamScoped?: boolean;
   },
   everyProject = false,
 ) {
@@ -197,12 +198,14 @@ export function saveMemoryEntry(
     layer?: MemoryLayer;
     threadId?: string | null;
     force?: boolean;
+    teamScoped?: boolean;
   },
 ) {
   validateMemoryText(input.title, input.content);
   return db.transaction((tx) => {
-    const quota = routingRulesEnabled() ? MEMORY_QUOTA_PER_TEAM : MEMORY_QUOTA_PER_AGENT;
-    const quotaLabel = routingRulesEnabled() ? 'team' : 'agent';
+    const teamQuota = routingRulesEnabled() && input.teamScoped !== false;
+    const quota = teamQuota ? MEMORY_QUOTA_PER_TEAM : MEMORY_QUOTA_PER_AGENT;
+    const quotaLabel = teamQuota ? 'team' : 'agent';
     const used = tx
       .select({ id: agentMemory.id })
       .from(agentMemory)
@@ -262,7 +265,7 @@ export function saveMemoryEntry(
       };
     }
     tx.delete(memorySaveConflict).where(eq(memorySaveConflict.id, id)).run();
-    const { force: _force, source, layer, threadId, ...entry } = input;
+    const { force: _force, source, layer, threadId, teamScoped: _teamScoped, ...entry } = input;
     const now = nowMs();
     return tx
       .insert(agentMemory)
@@ -282,7 +285,14 @@ export function saveMemoryEntry(
 
 export function updateMemoryEntry(
   db: Db,
-  input: { memoryId: string; agentId: string; teamId: string; content: string; threadId?: string },
+  input: {
+    memoryId: string;
+    agentId: string;
+    teamId: string;
+    content: string;
+    threadId?: string;
+    teamScoped?: boolean;
+  },
 ) {
   return db.transaction((tx) => {
     const row = tx
@@ -291,7 +301,7 @@ export function updateMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere({ agentId: input.agentId, teamId: input.teamId }),
+          ownerWhere(input),
           scratchpadVisible(input.threadId),
         ),
       )
@@ -348,11 +358,17 @@ export function updateMemoryEntry(
 
 export function promoteMemoryEntry(
   db: Db,
-  input: { memoryId: string; agentId: string; teamId: string; threadId?: string },
+  input: {
+    memoryId: string;
+    agentId: string;
+    teamId: string;
+    threadId?: string;
+    teamScoped?: boolean;
+  },
 ): typeof agentMemory.$inferSelect | null {
   const where = and(
     eq(agentMemory.id, input.memoryId),
-    ownerWhere({ agentId: input.agentId, teamId: input.teamId }),
+    ownerWhere(input),
     scratchpadVisible(input.threadId),
   );
   const row = db.select().from(agentMemory).where(where).get();
@@ -365,7 +381,13 @@ export function promoteMemoryEntry(
 
 export function deleteMemoryEntry(
   db: Db,
-  input: { memoryId: string; agentId: string; teamId: string; threadId?: string },
+  input: {
+    memoryId: string;
+    agentId: string;
+    teamId: string;
+    threadId?: string;
+    teamScoped?: boolean;
+  },
 ) {
   return db.transaction((tx) => {
     const removed = tx
@@ -373,7 +395,7 @@ export function deleteMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere({ agentId: input.agentId, teamId: input.teamId }),
+          ownerWhere(input),
           scratchpadVisible(input.threadId),
         ),
       )

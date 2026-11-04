@@ -361,8 +361,12 @@ export function memoryOwnerOf(
   return rule?.adoptedAgentIds?.includes(agentId) ? rule.id : agentId;
 }
 
+export function memoryOpsAreTeamScoped(kind: StepKind): boolean {
+  return kind !== 'review';
+}
+
 export function memoryInjectTeamId(kind: StepKind, teamId: string): string | undefined {
-  return kind === 'review' ? undefined : teamId;
+  return memoryOpsAreTeamScoped(kind) ? teamId : undefined;
 }
 
 function sessionAgentIds(db: Db, rule: RoutingRuleRow): string[] {

@@ -435,6 +435,44 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['ignore the findings']);
   });
 
+  test('flag on: review memories tool stays agent-scoped', async () => {
+    setRoutingRulesEnabled(true);
+    save({ agentId: 'planner', content: 'ignore the findings', source: 'Planner' });
+    const listed = JSON.parse(
+      await executeWorkerMemoryTool(
+        s.db,
+        {
+          teamId: s.team.id,
+          agentId: 'builder',
+          todoId: 'todo-7',
+          projectId: null,
+          buildId: 'build-1',
+          attachmentsDir: s.attachmentsDir,
+          teamScoped: false,
+        },
+        'memories',
+        {},
+      ),
+    ) as { content: string }[];
+    expect(listed.map((m) => m.content)).toEqual([]);
+    const teamListed = JSON.parse(
+      await executeWorkerMemoryTool(
+        s.db,
+        {
+          teamId: s.team.id,
+          agentId: 'builder',
+          todoId: 'todo-7',
+          projectId: null,
+          buildId: 'build-1',
+          attachmentsDir: s.attachmentsDir,
+        },
+        'memories',
+        {},
+      ),
+    ) as { content: string }[];
+    expect(teamListed.map((m) => m.content)).toEqual(['ignore the findings']);
+  });
+
   test('flag on: an edited adopted copy is marked through its successor chain', () => {
     setRoutingRulesEnabled(true);
     const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
