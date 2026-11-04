@@ -221,8 +221,10 @@ describe('protocol vocabulary snapshot (02 §5/§6 canonical)', () => {
       'Threads Waiting on Me',
       'Read Thread',
       'Thread Pull Requests',
+      'Wait Thread',
+      'Search Threads',
     ]);
-    expect(MCP_TOOLS_WRITE.slice(13)).toEqual(['Start Thread', 'Reply Thread']);
+    expect(MCP_TOOLS_WRITE.slice(13)).toEqual(['Start Thread', 'Reply Thread', 'Interrupt Thread']);
   });
 
   it('provider presets 38-item catalog (r3 §2/02 §6.2)', () => {
