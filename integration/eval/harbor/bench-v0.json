@@ -4813,8 +4813,8 @@
     }
   ],
   "blockers": [
-    "Independent vendor labeling is blocked: ai-route pick review cannot write /home/ian/.cache/ai-route/codex.json in this sandbox. No labels have been fabricated.",
-    "The real PR 1990 oracle/nop pair both failed in Docker build setup because /home/ian/.docker/buildx/activity is read only. No runtime control passed."
+    "Only PR 1562 has valid paired controls and one openai label; no task is kept because each kept task needs two accepting labels from different vendors.",
+    "PR 1990 controls were not rerun: its tests import a module the base lacks, so nop cannot fail on an assertion."
   ],
   "scanned": 972,
   "eligible": 53,
@@ -4837,6 +4837,68 @@
         "status": "infrastructure",
         "log": "../../../docs/verify/1517/1990-nop-infrastructure.log"
       }
+    },
+    {
+      "pr": 1562,
+      "issue": 1561,
+      "host": "omarchy",
+      "harborVersion": "0.25.0",
+      "oracle": {
+        "status": "pass",
+        "log": "../../../docs/verify/1518/epic0/controls-1562/oracle.log",
+        "timing": {
+          "lockWaitSeconds": 0.0,
+          "harborWallSeconds": 155.54,
+          "imageBuildSeconds": 135.198,
+          "agentSeconds": 0.218,
+          "verifierSeconds": 2.086,
+          "cpuSeconds": 2.336718
+        }
+      },
+      "nop": {
+        "status": "fail",
+        "failureKind": "assertion",
+        "log": "../../../docs/verify/1518/epic0/controls-1562/nop.log",
+        "timing": {
+          "lockWaitSeconds": 0.0,
+          "harborWallSeconds": 33.266,
+          "imageBuildSeconds": 17.08,
+          "agentSeconds": 0.0,
+          "verifierSeconds": 0.555,
+          "cpuSeconds": 0.4721
+        }
+      },
+      "isolation": [
+        {
+          "id": "37bfd373962d955ad91cec4e472f86c8a6d35bd68be7011b54f9b9b6ddb3a449",
+          "name": "task-1562__nrpkx3z__env-main-1",
+          "networkMode": "none"
+        },
+        {
+          "id": "10832eae2ab2dbcc6a12bf3c30d3e0e6ef6f1cd1cb46ddfaa44a7a73b88ba589",
+          "name": "task-1562__cvwxviz__env-main-1",
+          "networkMode": "none"
+        }
+      ],
+      "probe": {
+        "passed": true,
+        "reasons": []
+      },
+      "outcomeWriter": "host-parent-process",
+      "timingNotes": "imageBuildSeconds is Harbor environment_setup; the nop run reused the oracle run build cache. cpuSeconds is the peak cgroup cpu.stat usage_usec of the trial containers sampled every 0.25 seconds; image build CPU is not included.",
+      "labels": [
+        {
+          "vendor": "openai",
+          "model": "gpt-6.1-sol",
+          "verdict": "accept",
+          "reason": "The tests cover named exemptions without declaration text, required nonblank reasons, rejection of nonexistent names, and parameter/body changes to an existing large function. They also retain the added-helper negative controls, matching the issue\u2019s requirements without imposing unrelated behavior.",
+          "labeledAt": "2026-11-04T03:42:52Z",
+          "promptSha256": "a1df95f19ef2f3d325ea387442ef7b615bc232cdc5f709ceca2d4682e95fee50",
+          "route": "direct-codex-exec"
+        }
+      ],
+      "labelsNote": "One label only (openai, direct codex exec, not ai-route). The task is not kept: two accepting labels from different vendors are required.",
+      "evidence": "../../../docs/verify/1518/epic0/"
     }
   ]
 }
