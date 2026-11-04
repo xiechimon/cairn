@@ -45,6 +45,7 @@ interface ComposerProps {
   queuedMessages?: QueuedCapsule[] | undefined;
   onSendQueuedNow?: ((id: string, content: string) => Promise<unknown>) | undefined;
   onRemoveQueued?: ((id: string, content: string) => Promise<unknown>) | undefined;
+  onEditQueued?: ((id: string, content: string) => Promise<unknown>) | undefined;
 }
 
 export function Composer({
@@ -67,12 +68,14 @@ export function Composer({
   queuedMessages,
   onSendQueuedNow,
   onRemoveQueued,
+  onEditQueued,
 }: ComposerProps) {
   const { t } = useI18n();
   const tick = useLiveSeconds(streaming ? workingFor?.startedAt : null);
   const elapsed = tick ?? workingFor?.seconds ?? null;
   const {
     draft,
+    setDraft,
     tokens,
     removeToken,
     send,
@@ -143,6 +146,10 @@ export function Composer({
             messages={queuedMessages ?? []}
             onSendNow={onSendQueuedNow}
             onRemove={onRemoveQueued}
+            onEdit={onEditQueued}
+            onEditSent={(content) =>
+              setDraft((current) => (current.trim() === '' ? content : `${current}\n${content}`))
+            }
           />
           <ComposerAttachments
             tokens={tokens}
