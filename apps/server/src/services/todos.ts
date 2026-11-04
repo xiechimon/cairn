@@ -597,16 +597,18 @@ export function setTodoPhase(
   }
   assertPhaseTransition(row.phase, to);
   if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
-  db.update(todo)
-    .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
-    .where(eq(todo.id, id))
-    .run();
-  const record = getTodo(deps, id);
-  if (!record) return null;
-  deps.hub.publishTodoDoc(record.teamId, record);
-  notifyPhaseEntry(deps, record, row.phase, to);
-  if (to === 'done') settleSplitOnDone(deps, id);
-  return record;
+  return db.transaction(() => {
+    db.update(todo)
+      .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
+      .where(eq(todo.id, id))
+      .run();
+    const record = getTodo(deps, id);
+    if (!record) return null;
+    deps.hub.publishTodoDoc(record.teamId, record);
+    notifyPhaseEntry(deps, record, row.phase, to);
+    if (to === 'done') settleSplitOnDone(deps, id);
+    return record;
+  });
 }
 
 export function childrenOfTodo(db: Db, parentId: string): TodoRow[] {
