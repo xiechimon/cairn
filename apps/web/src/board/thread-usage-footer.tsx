@@ -40,7 +40,7 @@ export function ThreadUsageDisclosure({
       ? t('正在加载用量…')
       : state === 'error'
         ? t('用量加载失败')
-        : t('{cost} · {tokens} 个 token · — · {models}', {
+        : t('{cost} · Token 数：{tokens} · — · {models}', {
             cost: summary.cost,
             tokens: summary.tokens,
             models: models ?? '—',

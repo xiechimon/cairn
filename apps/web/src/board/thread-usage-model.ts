@@ -1,5 +1,5 @@
-import type { TokenUsage, UsageCost } from '@cairn/shared';
-import { formatUsd, mapTokenUsage, usageCostKnown } from '../api/mappers.js';
+import type { TokenUsage } from '@cairn/shared';
+import { formatUsd, mapTokenUsage } from '../api/mappers.js';
 import type { TodoRecord } from '../fixtures/records.js';
 
 export interface ThreadUsageSummary {
@@ -20,19 +20,13 @@ export function threadUsageBuildIds(
 
 export function threadUsageSummary(
   usage: readonly TokenUsage[] | null,
-  cost: UsageCost | undefined,
   machines: readonly string[],
 ): ThreadUsageSummary {
   const knownUsage = usage !== null && usage.length > 0 ? [...usage] : null;
   const tokenUsage = knownUsage === null ? null : mapTokenUsage(knownUsage);
-  const price =
-    cost !== undefined
-      ? usageCostKnown(cost)
-        ? cost.total
-        : null
-      : knownUsage?.every((row) => row.costTotal !== null)
-        ? knownUsage.reduce((sum, row) => sum + (row.costTotal ?? 0), 0)
-        : null;
+  const price = knownUsage?.every((row) => row.costTotal !== null)
+    ? knownUsage.reduce((sum, row) => sum + (row.costTotal ?? 0), 0)
+    : null;
   return {
     cost: price === null ? '—' : formatUsd(price),
     tokens: tokenUsage?.total ?? '—',

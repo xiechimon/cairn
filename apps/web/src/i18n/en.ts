@@ -1609,5 +1609,5 @@ export const EN: Record<string, string> = {
   缓存命中: 'Cache hit',
   '包含全部运行；总时长暂不可用。': 'Across all runs. Total duration is unavailable.',
   未知机器: 'Unknown machine',
-  '{cost} · {tokens} 个 token · — · {models}': '{cost} · {tokens} tokens · — · {models}',
+  '{cost} · Token 数：{tokens} · — · {models}': '{cost} · Tokens: {tokens} · — · {models}',
 };

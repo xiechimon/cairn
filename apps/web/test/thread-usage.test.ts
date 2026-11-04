@@ -1,8 +1,6 @@
-import type { TokenUsage, UsageCost } from '@cairn/shared';
+import type { TokenUsage } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { threadUsageBuildIds, threadUsageSummary } from '../src/board/thread-usage-model.js';
-
-const FREE: UsageCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, priced: true };
 
 function usage(overrides: Partial<TokenUsage> = {}): TokenUsage {
   return {
@@ -44,34 +42,43 @@ describe('threadUsageSummary', () => {
       usage(),
       usage({ buildId: 'build-2', model: 'provider/model-b', costTotal: 2.5 }),
       usage({ buildId: 'build-3', costTotal: 0.25 }),
-    ], undefined, ['omarchy', 'Mac', 'omarchy']);
+    ], ['omarchy', 'Mac', 'omarchy']);
     expect(result).toMatchObject({ cost: '$4.00', tokens: '3.8k', cached: '90%' });
     expect(result.models).toEqual(['provider/model-a', 'provider/model-b']);
     expect(result.machines).toEqual(['omarchy', 'Mac']);
   });
 
-  test('the explicit whole-thread cost is authoritative', () => {
-    expect(threadUsageSummary([usage()], { ...FREE, total: 7.5 }, []).cost).toBe('$7.50');
-    expect(threadUsageSummary([usage()], { ...FREE, priced: false }, []).cost).toBe('—');
+  test('cost uses the same complete detail rows as tokens', () => {
+    expect(threadUsageSummary([usage()], []).cost).toBe('$1.25');
   });
 
   test('one unpriced model makes the aggregate price unknown', () => {
-    expect(threadUsageSummary([usage(), usage({ costTotal: null })], undefined, []).cost).toBe('—');
+    expect(threadUsageSummary([usage(), usage({ costTotal: null })], []).cost).toBe('—');
   });
 
   test('known free usage is distinct from absent usage', () => {
-    expect(threadUsageSummary([usage({ costTotal: 0 })], undefined, []).cost).toBe('$0.00');
-    expect(threadUsageSummary([], undefined, [])).toMatchObject({ cost: '—', tokens: '—', cached: '—', models: [] });
-    expect(threadUsageSummary([], FREE, []).cost).toBe('$0.00');
+    expect(threadUsageSummary([usage({ costTotal: 0 })], []).cost).toBe('$0.00');
+    expect(threadUsageSummary([], [])).toMatchObject({ cost: '—', tokens: '—', cached: '—', models: [] });
+    expect(threadUsageSummary([], []).cost).toBe('—');
   });
 
-  test('a missing run response never exposes a partial token or model total', () => {
-    expect(threadUsageSummary(null, { ...FREE, total: 5 }, ['omarchy'])).toMatchObject({
-      cost: '$5.00', tokens: '—', cached: '—', models: [],
+  test('a missing run response never exposes an aggregate price or partial usage', () => {
+    expect(threadUsageSummary(null, ['omarchy'])).toMatchObject({
+      cost: '—', tokens: '—', cached: '—', models: [],
     });
   });
 
+  test('mixed pricing keeps tokens but cannot become a partial price', () => {
+    const rows = [usage(), usage({ buildId: 'build-2', costTotal: null })];
+    expect(threadUsageSummary(rows, [])).toMatchObject({ cost: '—', tokens: '2.5k' });
+  });
+
+  test('empty and incomplete detail cannot establish a known-free aggregate', () => {
+    expect(threadUsageSummary(null, []).cost).toBe('—');
+    expect(threadUsageSummary([], []).cost).toBe('—');
+  });
+
   test('zero input tokens has no invented cache hit percentage', () => {
-    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0 })], undefined, []).cached).toBe('—');
+    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0 })], []).cached).toBe('—');
   });
 });

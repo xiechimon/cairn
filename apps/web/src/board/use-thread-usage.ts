@@ -32,7 +32,9 @@ export function useThreadUsage(todo: TodoRecord) {
   const machinesQuery = useMachines(teamId, live && hasRuns);
   const teamUnavailable = teamId === undefined && (teamsQuery.isError || teamsQuery.isSuccess);
   const queries = [...usageQueries, ...stepQueries];
-  const usageComplete = live && usageQueries.every((query) => query.isSuccess);
+  const usageComplete =
+    live &&
+    usageQueries.every((query) => query.isSuccess && !query.isFetching && query.data.length > 0);
   const machinesComplete =
     live && stepQueries.every((query) => query.isSuccess) && machinesQuery.isSuccess;
   const machineIds = machinesComplete
@@ -49,7 +51,6 @@ export function useThreadUsage(todo: TodoRecord) {
   );
   const summary = threadUsageSummary(
     usageComplete ? usageQueries.flatMap((query) => query.data ?? []) : null,
-    todo.usageCost,
     machineNames,
   );
   const state: 'ready' | 'loading' | 'error' =
@@ -57,7 +58,7 @@ export function useThreadUsage(todo: TodoRecord) {
       ? 'ready'
       : teamUnavailable || queries.some((query) => query.isError) || machinesQuery.isError
         ? 'error'
-        : queries.some((query) => query.isPending) || machinesQuery.isPending
+        : queries.some((query) => query.isPending || query.isFetching) || machinesQuery.isPending
           ? 'loading'
           : 'ready';
   return {

@@ -23,7 +23,11 @@ const usageRow = (buildId: string, model: string, costTotal: number | null) => (
 interface SetupOptions {
   error?: boolean;
   unpriced?: boolean;
+  mixedPricing?: boolean;
+  emptyRun?: boolean;
   delay?: Promise<void>;
+  todoDelay?: Promise<void>;
+  free?: boolean;
   multiplier?: number;
   threadTotal?: number;
   currentCost?: number;
@@ -44,7 +48,9 @@ async function setup(page: Page, options: SetupOptions = {}) {
     if (path === '/api/teams' && options.teams === 'error') return json({ error: 'teams failed' }, 500);
     if (path === '/api/teams' && options.teams === 'empty') return json([]);
     if (path.endsWith('/machines') && options.machinesError) return json({ error: 'machines failed' }, 500);
-    if (path === '/api/todos/todo-1') return json({
+    if (path === '/api/todos/todo-1') return (async () => {
+      await options.todoDelay;
+      return json({
       ...TASK_WITH_HISTORY,
       usageCost: {
         ...TASK_WITH_HISTORY.usageCost,
@@ -52,7 +58,8 @@ async function setup(page: Page, options: SetupOptions = {}) {
         total: options.threadTotal ?? 4,
         priced: options.unpriced !== true,
       },
-    });
+      });
+    })();
     if (/^\/api\/builds\/(build-old|build-1)$/.test(path)) return json({ id: path.split('/').at(-1), todoId: 'todo-1', createdAt: NOW - 100_000, triggerSource: 'user' });
     if (/^\/api\/builds\/(build-old|build-1)\/usage$/.test(path)) {
       requested.push(path);
@@ -60,7 +67,8 @@ async function setup(page: Page, options: SetupOptions = {}) {
         await options.delay;
         if (options.error) return json({ error: 'usage failed' }, 500);
         const old = path.includes('build-old');
-        return json([{ ...usageRow(old ? 'build-old' : 'build-1', old ? 'provider/model-a' : 'provider/model-b', options.unpriced ? null : old ? 2 : (options.currentCost ?? 2)), input: 100 * (options.multiplier ?? 1) }]);
+        if (old && options.emptyRun) return json([]);
+        return json([{ ...usageRow(old ? 'build-old' : 'build-1', old ? 'provider/model-a' : 'provider/model-b', options.unpriced || (!old && options.mixedPricing) ? null : options.free ? 0 : old ? 2 : (options.currentCost ?? 2)), input: 100 * (options.multiplier ?? 1) }]);
       })();
     }
     if (/^\/api\/builds\/(build-old|build-1)\/steps$/.test(path)) {
@@ -82,7 +90,7 @@ test(`the footer includes past runs and expands above the composer (${theme})`, 
   const requested = await setup(page);
   await page.goto('/app?thread=todo-1');
   await expect(toggle(page)).toContainText('$4.00');
-  await expect(toggle(page)).toContainText('2.5k');
+  await expect(toggle(page)).toContainText('Tokens: 2.5k');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await evidencePanelShot(page, `thread-usage-quiet-${theme}.png`, page.locator('.side-panel'));
   await toggle(page).focus();
@@ -125,6 +133,20 @@ test('an unpriced thread shows an unknown cost and never a free price', async ({
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
 });
 
+for (const missing of ['unpriced row', 'empty run'] as const) {
+  test(`a priced aggregate stays unknown with an ${missing}`, async ({ page }) => {
+    await setup(page, { mixedPricing: missing === 'unpriced row', emptyRun: missing === 'empty run' });
+    await page.goto('/app?thread=todo-1');
+    await expect(footer(page)).toHaveAttribute('data-state', 'ready');
+    await toggle(page).click();
+    await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
+    await expect(footer(page)).not.toContainText('$4.00');
+    await expect(footer(page)).not.toContainText('$0.00');
+    if (missing === 'empty run') await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').nth(1)).toHaveText('—');
+    else await expect(footer(page)).toContainText('2.5k');
+  });
+}
+
 test('a pending run never appears as a partial thread total', async ({ page }) => {
   let release: () => void = () => {};
   const delay = new Promise<void>((resolve) => { release = resolve; });
@@ -132,20 +154,23 @@ test('a pending run never appears as a partial thread total', async ({ page }) =
   await page.goto('/app?thread=todo-1');
   await expect(footer(page)).toHaveAttribute('data-state', 'loading');
   await expect(toggle(page)).not.toContainText('1.3k');
+  await toggle(page).click();
+  await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
   release();
   await expect(footer(page)).toHaveAttribute('data-state', 'ready');
   await expect(toggle(page)).toContainText('2.5k');
 });
 
 for (const theme of ['light', 'dark'] as const) {
-test(`usage errors offer retry without discarding known cost (${theme})`, async ({ page }) => {
+test(`usage errors offer retry without claiming an unvalidated cost (${theme})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
   const options = { error: true };
   await setup(page, options);
   await page.goto('/app?thread=todo-1');
   await expect(footer(page)).toHaveAttribute('data-state', 'error');
   await toggle(page).click();
-  await expect(footer(page)).toContainText('$4.00');
+  await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
+  await expect(footer(page)).not.toContainText('$4.00');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await evidencePanelShot(page, `thread-usage-error-${theme}.png`, page.locator('.side-panel'));
   options.error = false;
@@ -204,7 +229,7 @@ for (const theme of ['light', 'dark'] as const) {
 
 
 test('finishing a step refreshes whole-thread cost and current-run tokens without reloading', async ({ page }) => {
-  const options = { multiplier: 1, threadTotal: 4, currentCost: 2 };
+  const options: SetupOptions = { multiplier: 1, threadTotal: 4, currentCost: 2 };
   const requested = await setup(page, options);
   await page.goto('/app?thread=todo-1');
   await expect(toggle(page)).toContainText('2.5k');
@@ -212,6 +237,8 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
   options.multiplier = 2;
   options.threadTotal = 7;
   options.currentCost = 5;
+  let release: () => void = () => {};
+  options.delay = new Promise<void>((resolve) => { release = resolve; });
   const event: ConversationStepEvent = {
     type: 'step',
     step: {
@@ -224,12 +251,49 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
     if (stream === undefined) throw new Error('build stream did not connect');
     stream.emit(ev);
   }, event);
+  await expect(footer(page)).toHaveAttribute('data-state', 'loading');
+  await toggle(page).click();
+  await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
+  release();
+  await expect(footer(page)).toHaveAttribute('data-state', 'ready');
   await expect(toggle(page)).toContainText('2.6k');
   await expect(toggle(page)).toContainText('$7.00');
   expect(requested.filter((path) => path.includes('build-old'))).toHaveLength(1);
   expect(requested.filter((path) => path.includes('build-1'))).toHaveLength(2);
 });
 
+
+test('fresh usage determines cost while the todo aggregate refresh is held', async ({ page }) => {
+  const options: SetupOptions = { currentCost: 2 };
+  await setup(page, options);
+  await page.goto('/app?thread=todo-1');
+  await expect(toggle(page)).toContainText('$4.00');
+  options.currentCost = 5;
+  let release: () => void = () => {};
+  options.todoDelay = new Promise<void>((resolve) => { release = resolve; });
+  const event: ConversationStepEvent = {
+    type: 'step',
+    step: {
+      id: 'step-1', buildId: 'build-1', machineId: 'machine-2', kind: 'build',
+      status: 'done', createdAt: NOW - 100_000, checkpointCommit: null, skillInjection: null,
+    },
+  };
+  await page.evaluate((ev) => {
+    const stream = window.__es.find((entry) => entry.url.includes('/api/conversations/build-1/stream'));
+    if (stream === undefined) throw new Error('build stream did not connect');
+    stream.emit(ev);
+  }, event);
+  await expect(toggle(page)).toContainText('$7.00');
+  release();
+  await expect(toggle(page)).toContainText('$7.00');
+});
+
+test('complete priced-zero rows show a known-free total', async ({ page }) => {
+  await setup(page, { free: true, threadTotal: 9 });
+  await page.goto('/app?thread=todo-1');
+  await expect(toggle(page)).toContainText('$0.00');
+  await expect(toggle(page)).toContainText('Tokens: 2.5k');
+});
 
 test('switching threads resets the disclosure and never retains the previous totals', async ({ page }) => {
   await setup(page);
