@@ -95,7 +95,7 @@ const DONE = todo({
   hasPlan: true,
 });
 
-type Sent = { content: string; projectId?: string };
+type Sent = { content: string; projectId?: string; clientMessageId?: string };
 
 async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
   await page.addInitScript(() => {
@@ -215,7 +215,7 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     await input(page).press('Enter');
     await expect
       .poll(() => state.sent)
-      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2' }]);
+      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
     await expect(chip(page)).toHaveText(/cairn-site/);
     await shot(page, 'chip-picked.png');
   });
@@ -233,7 +233,7 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     await expect(chip(page)).toHaveText(/自动/);
     await input(page).fill('早上的摘要没收到');
     await input(page).press('Enter');
-    await expect.poll(() => state.sent).toEqual([{ content: '早上的摘要没收到' }]);
+    await expect.poll(() => state.sent).toEqual([{ content: '早上的摘要没收到', clientMessageId: expect.any(String) }]);
   });
 
   test('typing @ and picking a project sets the chip and leaves no @ text behind', async ({
@@ -253,7 +253,7 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     await input(page).press('Enter');
     await expect
       .poll(() => state.sent)
-      .toEqual([{ content: '修一下链接', projectId: 'proj-2' }]);
+      .toEqual([{ content: '修一下链接', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
   });
 
   test('a team with one project shows no chip', async ({ page }) => {
@@ -276,13 +276,13 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     await homeInput(page).press('Enter');
     await expect
       .poll(() => state.sent)
-      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2' }]);
+      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
     await page.goto('/app');
     await homeInput(page).fill('早上的摘要没收到');
     await homeInput(page).press('Enter');
     await expect
       .poll(() => state.sent.at(-1))
-      .toEqual({ content: '早上的摘要没收到' });
+      .toEqual({ content: '早上的摘要没收到', clientMessageId: expect.any(String) });
   });
 
   test('phone width keeps the composer on screen', async ({ page }) => {

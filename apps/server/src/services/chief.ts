@@ -63,6 +63,12 @@ import {
   settleChiefActiveRun,
   steerChiefMessage,
 } from './chief-turns.js';
+import {
+  claimClientMessage,
+  completeClientMessage,
+  findClientMessage,
+  replayAfterConflict,
+} from './client-message.js';
 import { coordinatorRunsOnPi, lastTurnContext } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -590,15 +596,61 @@ function directThreadMessagesSinceLastTurn(db: Db, threadId: string): string | n
     : `【你上一轮之后，用户直接对这些 thread 说了话（已送达，不用转述）】\n${lines.join('\n')}\n\n`;
 }
 
-export function sendChiefMessage(
-  deps: ChiefDeps,
-  teamId: string,
-  body: { threadId: string | null; content: string; projectId?: string | null | undefined },
-): {
+export interface ChiefSendBody {
+  threadId: string | null;
+  content: string;
+  projectId?: string | null | undefined;
+  clientMessageId?: string | undefined;
+}
+
+export interface ChiefSendResult {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
-} {
+}
+
+interface StoredChiefSend {
+  threadId: string;
+  message: ChiefSendResult['message'];
+}
+
+function chiefSendResult(
+  deps: ChiefDeps,
+  teamId: string,
+  threadRow: ThreadRow,
+  message: ChiefSendResult['message'],
+): ChiefSendResult {
+  return {
+    thread: toChiefThreadRecord(
+      threadRow,
+      stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadRow.id),
+    ),
+    message,
+  };
+}
+
+function replayedChiefSend(
+  deps: ChiefDeps,
+  teamId: string,
+  chiefRow: ChiefRow,
+  body: ChiefSendBody,
+): ChiefSendResult | undefined {
+  const scope =
+    body.threadId === null
+      ? existingCoordinatorThread(deps, chiefRow)
+      : getChiefThread(deps, body.threadId);
+  if (scope === undefined || scope.teamId !== teamId) return undefined;
+  const stored = findClientMessage<StoredChiefSend>(deps.db, scope.id, body.clientMessageId);
+  return stored === undefined ? undefined : chiefSendResult(deps, teamId, scope, stored.message);
+}
+
+export function submitChiefMessage(
+  deps: ChiefDeps,
+  teamId: string,
+  body: ChiefSendBody,
+): { result: ChiefSendResult; replayed: boolean } {
   const chiefRow = ensureChief(deps, teamId);
+  const replay = replayedChiefSend(deps, teamId, chiefRow, body);
+  if (replay !== undefined) return { result: replay, replayed: true };
   requireBoundAgent(deps, chiefRow);
   const picked = pickedProjectOf(deps.db, teamId, body.projectId);
   if (body.projectId != null && picked === null) {
@@ -626,51 +678,81 @@ export function sendChiefMessage(
     content: body.content,
     createdAt: now,
   };
-  deps.db
-    .insert(chiefMessage)
-    .values({
-      id: message.id,
-      threadId: threadRow.id,
-      role: 'user',
-      content: body.content,
-      projectId: picked?.id ?? null,
-      createdAt: now,
-    })
-    .run();
-  deps.db.update(chiefThread).set({ updatedAt: now }).where(eq(chiefThread.id, threadRow.id)).run();
+  try {
+    deps.db.transaction(() => {
+      claimClientMessage(deps.db, threadRow.id, body.clientMessageId);
+      deps.db
+        .insert(chiefMessage)
+        .values({
+          id: message.id,
+          threadId: threadRow.id,
+          role: 'user',
+          content: body.content,
+          projectId: picked?.id ?? null,
+          createdAt: now,
+        })
+        .run();
+      deps.db
+        .update(chiefThread)
+        .set({ updatedAt: now })
+        .where(eq(chiefThread.id, threadRow.id))
+        .run();
+      enqueueChiefStep(deps, threadRow.id, {
+        prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
+        trigger: 'user',
+        id: message.id,
+        scopeProjectId: picked?.id ?? null,
+      });
+      completeClientMessage(deps.db, threadRow.id, body.clientMessageId, {
+        threadId: threadRow.id,
+        message,
+      } satisfies StoredChiefSend);
+    });
+  } catch (error) {
+    const stored = replayAfterConflict<StoredChiefSend>(
+      deps.db,
+      threadRow.id,
+      body.clientMessageId,
+      error,
+    );
+    return {
+      result: chiefSendResult(deps, teamId, threadRow, stored.message),
+      replayed: true,
+    };
+  }
+  return { result: chiefSendResult(deps, teamId, threadRow, message), replayed: false };
+}
 
-  enqueueChiefStep(deps, threadRow.id, {
-    prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
-    trigger: 'user',
-    id: message.id,
-    scopeProjectId: picked?.id ?? null,
-  });
-  return {
-    thread: toChiefThreadRecord(
-      threadRow,
-      stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadRow.id),
-    ),
-    message,
-  };
+export function sendChiefMessage(
+  deps: ChiefDeps,
+  teamId: string,
+  body: ChiefSendBody,
+): ChiefSendResult {
+  return submitChiefMessage(deps, teamId, body).result;
 }
 
 export function sendChiefMessageFromComposer(
   deps: ChiefDeps,
   teamId: string,
-  body: { threadId: string | null; content: string; projectId?: string | null | undefined },
-): ReturnType<typeof sendChiefMessage> {
-  const result = sendChiefMessage(deps, teamId, body);
+  body: ChiefSendBody,
+): { result: ChiefSendResult; replayed: boolean } {
+  const sent = submitChiefMessage(deps, teamId, body);
+  if (sent.replayed) return sent;
   const replying = deps.db
     .select({ prompt: step.prompt })
     .from(step)
     .where(
-      and(eq(step.buildId, result.thread.id), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
+      and(
+        eq(step.buildId, sent.result.thread.id),
+        eq(step.kind, 'chief'),
+        eq(step.status, 'claimed'),
+      ),
     )
     .get();
   if (replying !== undefined && parseChiefTrigger(replying.prompt) === 'user') {
-    steerChiefMessage(deps, teamId, result.thread.id, result.message.id);
+    steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);
   }
-  return result;
+  return sent;
 }
 
 export function answerChiefQuestion(

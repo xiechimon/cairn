@@ -16,6 +16,7 @@ import type {
   ComputerState,
   ComputerTool,
   DocumentDiffFile,
+  INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MemoryCandidateStatus,
   ModelRef,
@@ -899,7 +900,9 @@ export const retroProposal = sqliteTable(
     what: text('what').notNull(),
     why: text('why').notNull(),
     safeguard: text('safeguard').notNull(),
-    sourceKind: text('sourceKind').$type<'coordinator' | 'thread' | 'step'>().notNull(),
+    sourceKind: text('sourceKind')
+      .$type<'coordinator' | 'thread' | 'step' | typeof INTAKE_SOURCE_KIND>()
+      .notNull(),
     sourceId: text('sourceId').notNull(),
     sourceLabel: text('sourceLabel').notNull(),
     sourceTodoId: text('sourceTodoId'),
@@ -1129,3 +1132,14 @@ export const claudeSubscription = sqliteTable('claude_subscription', {
   expiresAt: epochMs('expiresAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const clientMessage = sqliteTable(
+  'client_message',
+  {
+    scopeId: text('scopeId').notNull(),
+    clientMessageId: text('clientMessageId').notNull(),
+    response: json<unknown>('response'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopeId, t.clientMessageId] })],
+);

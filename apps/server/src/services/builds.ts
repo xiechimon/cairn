@@ -113,6 +113,12 @@ import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { claimAutonomousMerge, settleAutonomousMerge } from './autonomous-merge.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { askQuestionContentOf } from './chief-questions.js';
+import {
+  claimClientMessage,
+  completeClientMessage,
+  findClientMessage,
+  replayAfterConflict,
+} from './client-message.js';
 import { assertCorrectionDone } from './correction.js';
 import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
@@ -280,18 +286,22 @@ function continuationTodo(
   return row;
 }
 
-export async function sendBuildSteer(
-  deps: BuildDeps,
-  conversationId: string,
-  body: { content: string; queuedMessageId?: string },
-  options: BuildSteerOptions | boolean = {},
-): Promise<{
+export interface BuildSteerResult {
   conversationId: string;
   message: { id: string; role: 'user'; content: string; createdAt: number };
   delivered: 'steer' | 'new-turn';
-}> {
+}
+
+export async function sendBuildSteer(
+  deps: BuildDeps,
+  conversationId: string,
+  body: { content: string; queuedMessageId?: string; clientMessageId?: string },
+  options: BuildSteerOptions | boolean = {},
+): Promise<BuildSteerResult> {
   const continuationOptions = typeof options === 'boolean' ? { afterTurn: options } : options;
   const { db } = deps;
+  const replay = findClientMessage<BuildSteerResult>(db, conversationId, body.clientMessageId);
+  if (replay !== undefined) return replay;
   const buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
   const running = db
@@ -334,6 +344,12 @@ export async function sendBuildSteer(
     }
     if (githubPrOf(deps, todoRow, buildRow.prNumber) !== null) {
       const outcome = await probeReworkTargetPr(deps, buildRow, todoRow, true);
+      const settledMeanwhile = findClientMessage<BuildSteerResult>(
+        db,
+        conversationId,
+        body.clientMessageId,
+      );
+      if (settledMeanwhile !== undefined) return settledMeanwhile;
       todoRow = continuationTodo(deps, buildRow, continuationOptions);
       if (outcome === 'merged') {
         throw new HttpError(
@@ -353,145 +369,159 @@ export async function sendBuildSteer(
   }
   if (!running && todoRow.assignment !== null)
     requireIntakeAssignment(deps, todoRow.teamId, todoRow.assignment);
-  const sent = db.transaction(() => {
-    if (continuationOptions.human === true) settleWorkerReply(deps, conversationId, body.content);
-    if (continuationOptions.schedule) {
-      const wake = continuationOptions.schedule;
-      const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
-      if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
-        throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
+  let sent: BuildSteerResult;
+  try {
+    sent = db.transaction((): BuildSteerResult => {
+      claimClientMessage(db, conversationId, body.clientMessageId);
+      if (continuationOptions.human === true) settleWorkerReply(deps, conversationId, body.content);
+      if (continuationOptions.schedule) {
+        const wake = continuationOptions.schedule;
+        const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
+        if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
+          throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
+        }
+        if (
+          wake.createdBy.startsWith('worker:') &&
+          ['confirm', 'review'].includes(todoRow?.phase ?? '')
+        ) {
+          throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
+        }
       }
       if (
-        wake.createdBy.startsWith('worker:') &&
-        ['confirm', 'review'].includes(todoRow?.phase ?? '')
-      ) {
-        throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
-      }
-    }
-    if (
-      body.queuedMessageId !== undefined &&
-      !db
-        .select({ id: queuedMessage.id })
-        .from(queuedMessage)
-        .where(
-          and(
-            eq(queuedMessage.id, body.queuedMessageId),
-            eq(queuedMessage.conversationId, conversationId),
-          ),
-        )
-        .get()
-    )
-      throw new HttpError(409, 'Queued message was already delivered');
-    const now = nowMs();
-    const human =
-      continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-    const messageRow = {
-      id: human ? `human-${newRecordId()}` : newRecordId(),
-      actor: human ? deps.user.displayName : null,
-      role: 'user' as const,
-      content: body.content,
-      createdAt: now,
-    };
-    if (targetBuildId !== conversationId) {
-      db.insert(build)
-        .values({
-          id: targetBuildId,
-          todoId: buildRow.todoId,
-          withPlan: false,
-          prevPhase: todoRow?.phase ?? 'done',
-          triggerSource: 'user',
-          createdAt: now,
-        })
-        .run();
-      insertMessageRow(deps, targetBuildId, {
-        id: newRecordId(),
-        role: 'system',
-        content:
-          prClosed === 'closed'
-            ? buildReworkNewBranchNote({
-                prNumber: buildRow.prNumber,
-                prUrl: buildRow.prUrl,
-                branch: conversationBranch(targetBuildId),
-                outcome: 'closed',
-              })
-            : `The previous build was merged locally. Continuing this task on a new branch: ${conversationBranch(targetBuildId)}.`,
-        createdAt: now,
-      });
-    }
-    if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
-    if (running) {
-      db.insert(steerPending)
-        .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
-        .onConflictDoUpdate({
-          target: steerPending.conversationId,
-          set: { stepId: running.id, content: body.content, createdAt: now },
-        })
-        .run();
-    }
-    if (todoRow) {
-      if (!continuationOptions.schedule)
-        addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
-      if (running) {
-        deps.machineHub?.steerSignal(todoRow.teamId, running.id);
-      } else {
-        db.update(build)
-          .set({ errorMessage: null, reportLine: null, prevPhase: todoRow?.phase ?? 'done' })
-          .where(eq(build.id, targetBuildId))
-          .run();
-        const nextPhase =
-          todoRow.phase === 'building' || todoRow.phase === 'planning' ? todoRow.phase : 'queued';
-        setTodoPhase(deps, todoRow.id, nextPhase, { lastRunAt: now, latestBuildId: targetBuildId });
-        const previousWork = db
-          .select({ kind: step.kind })
-          .from(step)
+        body.queuedMessageId !== undefined &&
+        !db
+          .select({ id: queuedMessage.id })
+          .from(queuedMessage)
           .where(
-            and(eq(step.buildId, conversationId), inArray(step.kind, ['plan', 'build', 'session'])),
+            and(
+              eq(queuedMessage.id, body.queuedMessageId),
+              eq(queuedMessage.conversationId, conversationId),
+            ),
           )
-          .orderBy(desc(step.createdAt))
-          .get();
-        const continuedStep = enqueueStep(
-          deps,
-          targetBuildId,
-          continuationOptions.afterTurn && previousWork?.kind === 'plan'
-            ? 'plan'
-            : previousWork?.kind === 'session'
-              ? 'session'
-              : 'build',
-          todoRow.teamId,
-          body.content,
-          false,
-          human && !continuationOptions.schedule,
-        );
-        if (continuationOptions.schedule) {
-          const wake = continuationOptions.schedule;
-          db.update(step)
-            .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
-            .where(eq(step.id, continuedStep.id))
-            .run();
-          insertMessageRow(deps, targetBuildId, {
-            id: `schedule-wake-${continuedStep.id}`,
-            role: 'system',
-            content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
-            createdAt: wake.at,
-          });
-        }
-        const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
-        if (continued) publishBuild(deps, continued);
+          .get()
+      )
+        throw new HttpError(409, 'Queued message was already delivered');
+      const now = nowMs();
+      const human =
+        continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
+      const messageRow = {
+        id: human ? `human-${newRecordId()}` : newRecordId(),
+        actor: human ? deps.user.displayName : null,
+        role: 'user' as const,
+        content: body.content,
+        createdAt: now,
+      };
+      if (targetBuildId !== conversationId) {
+        db.insert(build)
+          .values({
+            id: targetBuildId,
+            todoId: buildRow.todoId,
+            withPlan: false,
+            prevPhase: todoRow?.phase ?? 'done',
+            triggerSource: 'user',
+            createdAt: now,
+          })
+          .run();
+        insertMessageRow(deps, targetBuildId, {
+          id: newRecordId(),
+          role: 'system',
+          content:
+            prClosed === 'closed'
+              ? buildReworkNewBranchNote({
+                  prNumber: buildRow.prNumber,
+                  prUrl: buildRow.prUrl,
+                  branch: conversationBranch(targetBuildId),
+                  outcome: 'closed',
+                })
+              : `The previous build was merged locally. Continuing this task on a new branch: ${conversationBranch(targetBuildId)}.`,
+          createdAt: now,
+        });
       }
-    }
-    if (body.queuedMessageId !== undefined)
-      db.delete(queuedMessage).where(eq(queuedMessage.id, body.queuedMessageId)).run();
-    if (targetBuildId !== conversationId)
-      db.update(queuedMessage)
-        .set({ conversationId: targetBuildId })
-        .where(eq(queuedMessage.conversationId, conversationId))
-        .run();
-    return {
-      conversationId: targetBuildId,
-      message: messageRow,
-      delivered: running ? ('steer' as const) : ('new-turn' as const),
-    };
-  });
+      if (!continuationOptions.schedule) insertMessageRow(deps, targetBuildId, messageRow);
+      if (running) {
+        db.insert(steerPending)
+          .values({ conversationId, stepId: running.id, content: body.content, createdAt: now })
+          .onConflictDoUpdate({
+            target: steerPending.conversationId,
+            set: { stepId: running.id, content: body.content, createdAt: now },
+          })
+          .run();
+      }
+      if (todoRow) {
+        if (!continuationOptions.schedule)
+          addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
+        if (running) {
+          deps.machineHub?.steerSignal(todoRow.teamId, running.id);
+        } else {
+          db.update(build)
+            .set({ errorMessage: null, reportLine: null, prevPhase: todoRow?.phase ?? 'done' })
+            .where(eq(build.id, targetBuildId))
+            .run();
+          const nextPhase =
+            todoRow.phase === 'building' || todoRow.phase === 'planning' ? todoRow.phase : 'queued';
+          setTodoPhase(deps, todoRow.id, nextPhase, {
+            lastRunAt: now,
+            latestBuildId: targetBuildId,
+          });
+          const previousWork = db
+            .select({ kind: step.kind })
+            .from(step)
+            .where(
+              and(
+                eq(step.buildId, conversationId),
+                inArray(step.kind, ['plan', 'build', 'session']),
+              ),
+            )
+            .orderBy(desc(step.createdAt))
+            .get();
+          const continuedStep = enqueueStep(
+            deps,
+            targetBuildId,
+            continuationOptions.afterTurn && previousWork?.kind === 'plan'
+              ? 'plan'
+              : previousWork?.kind === 'session'
+                ? 'session'
+                : 'build',
+            todoRow.teamId,
+            body.content,
+            false,
+            human && !continuationOptions.schedule,
+          );
+          if (continuationOptions.schedule) {
+            const wake = continuationOptions.schedule;
+            db.update(step)
+              .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
+              .where(eq(step.id, continuedStep.id))
+              .run();
+            insertMessageRow(deps, targetBuildId, {
+              id: `schedule-wake-${continuedStep.id}`,
+              role: 'system',
+              content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
+              createdAt: wake.at,
+            });
+          }
+          const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
+          if (continued) publishBuild(deps, continued);
+        }
+      }
+      if (body.queuedMessageId !== undefined)
+        db.delete(queuedMessage).where(eq(queuedMessage.id, body.queuedMessageId)).run();
+      if (targetBuildId !== conversationId)
+        db.update(queuedMessage)
+          .set({ conversationId: targetBuildId })
+          .where(eq(queuedMessage.conversationId, conversationId))
+          .run();
+      const result = {
+        conversationId: targetBuildId,
+        message: messageRow,
+        delivered: running ? ('steer' as const) : ('new-turn' as const),
+      };
+      completeClientMessage(db, conversationId, body.clientMessageId, result);
+      return result;
+    });
+  } catch (error) {
+    return replayAfterConflict<BuildSteerResult>(db, conversationId, body.clientMessageId, error);
+  }
   const fromUser =
     continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
   if (fromUser && !continuationOptions.schedule) endSnoozeOn(deps, buildRow.todoId, 'user-message');

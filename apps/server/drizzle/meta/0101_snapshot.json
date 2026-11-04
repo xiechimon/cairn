@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1d8dc1c8-5670-47db-8f6f-5979d9fd3317",
+  "id": "0ca41eaa-bb87-4e3c-a791-a8f30e673c01",
   "prevId": "3f17f6ec-abb4-4f3f-9b6d-c21c9f2088ee",
   "tables": {
     "agent": {
@@ -898,13 +898,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "reportLine": {
-          "name": "reportLine",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "createdAt": {
           "name": "createdAt",
           "type": "integer",
@@ -1711,6 +1704,52 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "client_message": {
+      "name": "client_message",
+      "columns": {
+        "scopeId": {
+          "name": "scopeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clientMessageId": {
+          "name": "clientMessageId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "response": {
+          "name": "response",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "client_message_scopeId_clientMessageId_pk": {
+          "columns": [
+            "scopeId",
+            "clientMessageId"
+          ],
+          "name": "client_message_scopeId_clientMessageId_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -5313,14 +5352,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'code'"
-        },
-        "awaitingReply": {
-          "name": "awaitingReply",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "userSpecAttachmentIds": {
           "name": "userSpecAttachmentIds",

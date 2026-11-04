@@ -55,6 +55,7 @@ export const DB_TABLES = [
   'computer',
   'computer_call',
   'feature_flag',
+  'client_message',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -96,4 +97,5 @@ export const INTERNAL_ONLY_TABLES = [
   'computer',
   'computer_call',
   'feature_flag',
+  'client_message',
 ] as const;

@@ -5995,6 +5995,8 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "github-issue",
                     "github-issue-self",
                     "orchestration",
+                    "research-intake",
+                    "research-intake-item",
                   ],
                   "type": "string",
                 },
@@ -6826,6 +6828,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "researchIntakeProjectId": "CAIRN_RESEARCH_INTAKE_PROJECT_ID",
     "routingRules": "CAIRN_ROUTING_RULES",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
@@ -7321,6 +7324,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "computer",
   "computer_call",
   "feature_flag",
+  "client_message",
 ]
 `;
 
@@ -7449,7 +7453,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
+    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {
@@ -7522,7 +7526,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, clientMessageId}; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
+    "note": "body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
     "path": "/api/todos/{id}/messages",
   },
   {
@@ -10074,6 +10078,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "github-issue",
             "github-issue-self",
             "orchestration",
+            "research-intake",
+            "research-intake-item",
           ],
           "type": "string",
         },
