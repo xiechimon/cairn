@@ -62,3 +62,54 @@ def test_workflow_path_filters_equal_the_harness_definition() -> None:
 
 def test_paths_file_is_valid_json() -> None:
     assert json.loads(harness.HARNESS_PATHS_FILE.read_text())["paths"]
+
+
+def test_a_ruler_file_under_integration_eval_is_a_ruler_path() -> None:
+    assert harness.is_ruler_path("integration/eval/harbor/public/cairn_harbor/gate.py")
+    assert harness.is_ruler_path("integration/eval/adoption/judge.mts")
+
+
+def test_the_eval_gate_workflow_is_a_ruler_path() -> None:
+    assert harness.is_ruler_path(".github/workflows/eval-gate.yml")
+
+
+def test_harness_paths_are_not_ruler_paths() -> None:
+    for path in [
+        "integration/eval/harbor/public/cairn_harbor/cairn_executor.py",
+        "integration/eval/harbor/public/skills/cairn-worker/SKILL.md",
+    ]:
+        assert not harness.is_ruler_path(path)
+
+
+def test_unrelated_paths_are_not_ruler_paths() -> None:
+    assert not harness.is_ruler_path("apps/daemon/src/backend/pi.ts")
+    assert not harness.is_ruler_path(".github/workflows/ci.yml")
+
+
+def _tree(root: Path, executor: str, gate_source: str, workflow: str) -> None:
+    gate_dir = root / "integration/eval/harbor/public/cairn_harbor"
+    gate_dir.mkdir(parents=True)
+    (gate_dir / "cairn_executor.py").write_text(executor)
+    (gate_dir / "gate.py").write_text(gate_source)
+    (root / ".github/workflows").mkdir(parents=True)
+    (root / ".github/workflows/eval-gate.yml").write_text(workflow)
+
+
+def test_ruler_digest_ignores_harness_files_and_virtualenvs(tmp_path: Path) -> None:
+    _tree(tmp_path, "one", "g", "w")
+    first = harness.ruler_digest(tmp_path)
+    (tmp_path / "integration/eval/harbor/public/cairn_harbor/cairn_executor.py").write_text("two")
+    venv = tmp_path / "integration/eval/harbor/public/.venv"
+    venv.mkdir()
+    (venv / "x.py").write_text("noise")
+    assert harness.ruler_digest(tmp_path) == first
+
+
+def test_ruler_digest_changes_with_a_ruler_file_or_the_workflow(tmp_path: Path) -> None:
+    _tree(tmp_path, "one", "g", "w")
+    first = harness.ruler_digest(tmp_path)
+    (tmp_path / "integration/eval/harbor/public/cairn_harbor/gate.py").write_text("h")
+    second = harness.ruler_digest(tmp_path)
+    assert second != first
+    (tmp_path / ".github/workflows/eval-gate.yml").write_text("v")
+    assert harness.ruler_digest(tmp_path) != second

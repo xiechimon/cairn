@@ -298,3 +298,60 @@ def test_cli_trigger_exits_zero_only_for_harness_diffs(tmp_path: Path) -> None:
     untouching.write_text("README.md\n")
     assert gate.main(["trigger", "--files", str(touching)]) == 0
     assert gate.main(["trigger", "--files", str(untouching)]) == 1
+
+
+def _ruler_tree(root: Path, executor: str = "e", gate_source: str = "g", workflow: str = "w") -> Path:
+    gate_dir = root / "integration/eval/harbor/public/cairn_harbor"
+    gate_dir.mkdir(parents=True)
+    (gate_dir / "cairn_executor.py").write_text(executor)
+    (gate_dir / "gate.py").write_text(gate_source)
+    (root / ".github/workflows").mkdir(parents=True)
+    (root / ".github/workflows/eval-gate.yml").write_text(workflow)
+    return root
+
+
+def _ruler_args(tmp_path: Path, changed: list[str], arms: list[Path]) -> list[str]:
+    files = tmp_path / "changed.txt"
+    files.write_text("\n".join(changed) + "\n")
+    out = tmp_path / "ruler.json"
+    args = ["ruler", "--files", str(files), "--ruler", str(tmp_path / "ruler"), "--out", str(out)]
+    for arm in arms:
+        args += ["--arm", str(arm)]
+    return args
+
+
+def test_ruler_check_proceeds_when_only_harness_paths_changed(tmp_path: Path) -> None:
+    ruler = _ruler_tree(tmp_path / "ruler")
+    arms = [_ruler_tree(tmp_path / "base"), _ruler_tree(tmp_path / "candidate", executor="changed")]
+    args = _ruler_args(
+        tmp_path, ["integration/eval/harbor/public/cairn_harbor/cairn_executor.py"], arms
+    )
+    assert ruler.exists()
+    assert gate.main(args) == 0
+
+
+def test_ruler_check_refuses_when_a_ruler_file_changed_in_the_diff(tmp_path: Path) -> None:
+    _ruler_tree(tmp_path / "ruler")
+    arms = [_ruler_tree(tmp_path / "base"), _ruler_tree(tmp_path / "candidate")]
+    args = _ruler_args(tmp_path, ["integration/eval/harbor/public/cairn_harbor/gate.py"], arms)
+    assert gate.main(args) == 2
+    result = json.loads((tmp_path / "ruler.json").read_text())
+    assert result["verdict"] == "refused"
+    assert result["reason"].startswith("refused: ruler changed")
+
+
+def test_ruler_check_refuses_when_the_workflow_changed_in_the_diff(tmp_path: Path) -> None:
+    _ruler_tree(tmp_path / "ruler")
+    arms = [_ruler_tree(tmp_path / "candidate")]
+    args = _ruler_args(tmp_path, [".github/workflows/eval-gate.yml"], arms)
+    assert gate.main(args) == 2
+
+
+def test_ruler_check_refuses_when_an_arm_ruler_differs_from_the_default_branch(tmp_path: Path) -> None:
+    _ruler_tree(tmp_path / "ruler")
+    arms = [_ruler_tree(tmp_path / "base"), _ruler_tree(tmp_path / "candidate", gate_source="tampered")]
+    args = _ruler_args(
+        tmp_path, ["integration/eval/harbor/public/cairn_harbor/cairn_executor.py"], arms
+    )
+    assert gate.main(args) == 2
+    assert "candidate" in json.loads((tmp_path / "ruler.json").read_text())["reason"]

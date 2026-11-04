@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cairn_harbor import budget
-from cairn_harbor.harness import touches_harness
+from cairn_harbor.harness import is_ruler_path, ruler_digest, touches_harness
 
 MIN_BASE_REPEATS = 5
 MIN_PAIRED_TASKS = 5
@@ -203,6 +203,31 @@ def _trigger(args: argparse.Namespace) -> int:
     return EXIT_PASS if touches_harness(changed) else EXIT_BLOCKED
 
 
+def _ruler(args: argparse.Namespace) -> int:
+    changed = [line.strip() for line in Path(args.files).read_text().splitlines() if line.strip()]
+    touched = sorted(path for path in changed if is_ruler_path(path))
+    reason = ""
+    if touched:
+        reason = f"refused: ruler changed: {', '.join(touched)}"
+    else:
+        expected = ruler_digest(args.ruler)
+        differing = [str(arm.name) for arm in args.arm if ruler_digest(arm) != expected]
+        if differing:
+            reason = (
+                "refused: ruler changed: "
+                f"{', '.join(differing)} differs from the default branch ruler"
+            )
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    if reason:
+        args.out.write_text(
+            json.dumps({"verdict": "refused", "blocked": True, "reason": reason}, indent=2) + "\n"
+        )
+        print(f"eval gate {reason}", file=sys.stderr)
+        return EXIT_REFUSED
+    args.out.write_text(json.dumps({"verdict": "ruler-intact", "blocked": False}, indent=2) + "\n")
+    return EXIT_PASS
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Paired harness regression gate.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -212,8 +237,14 @@ def main(argv: list[str] | None = None) -> int:
     compare.add_argument("--out", type=Path, required=True)
     trigger = subparsers.add_parser("trigger")
     trigger.add_argument("--files", required=True)
+    ruler = subparsers.add_parser("ruler")
+    ruler.add_argument("--files", required=True)
+    ruler.add_argument("--ruler", type=Path, required=True)
+    ruler.add_argument("--arm", type=Path, action="append", default=[])
+    ruler.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
-    return _compare(args) if args.command == "compare" else _trigger(args)
+    handlers = {"compare": _compare, "trigger": _trigger, "ruler": _ruler}
+    return handlers[args.command](args)
 
 
 if __name__ == "__main__":

@@ -37,3 +37,35 @@ def harness_sha(root: Path = REPO_ROOT, patterns: list[str] | None = None) -> st
         digest.update(b"\0")
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
+
+
+RULER_ROOT = "integration/eval/"
+RULER_FILES = (".github/workflows/eval-gate.yml",)
+SKIPPED_DIRECTORIES = frozenset({".venv", "__pycache__", "node_modules", ".pytest_cache"})
+
+
+def is_ruler_path(path: str, patterns: list[str] | None = None) -> bool:
+    active = harness_patterns() if patterns is None else patterns
+    if path in RULER_FILES:
+        return True
+    in_eval = path.startswith(RULER_ROOT) and not SKIPPED_DIRECTORIES.intersection(path.split("/"))
+    return in_eval and not any(_matches(path, pattern) for pattern in active)
+
+
+def ruler_files(root: Path, patterns: list[str] | None = None) -> list[str]:
+    candidates = [
+        path.relative_to(root).as_posix()
+        for path in (root / RULER_ROOT).rglob("*")
+        if path.is_file()
+    ]
+    candidates.extend(name for name in RULER_FILES if (root / name).is_file())
+    return sorted(name for name in candidates if is_ruler_path(name, patterns))
+
+
+def ruler_digest(root: Path, patterns: list[str] | None = None) -> str:
+    digest = hashlib.sha256()
+    for name in ruler_files(root, patterns):
+        digest.update(name.encode())
+        digest.update(b"\0")
+        digest.update(hashlib.sha256((root / name).read_bytes()).digest())
+    return digest.hexdigest()
