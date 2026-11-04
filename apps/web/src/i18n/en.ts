@@ -1666,4 +1666,13 @@ export const EN: Record<string, string> = {
   功能标识: 'Feature key',
   '输入开发者提供的功能标识。': 'Enter the feature key provided by its developer.',
   发布新功能: 'Release feature',
+  'thread 用量': 'Thread usage',
+  '正在加载用量…': 'Loading usage…',
+  用量加载失败: 'Usage could not load',
+  'Token 数': 'Tokens',
+  总时长: 'Total duration',
+  缓存命中: 'Cache hit',
+  '包含全部运行；总时长暂不可用。': 'Across all runs. Total duration is unavailable.',
+  未知机器: 'Unknown machine',
+  '{cost} · Token 数：{tokens} · — · {models}': '{cost} · Tokens: {tokens} · — · {models}',
 };

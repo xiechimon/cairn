@@ -20,6 +20,7 @@ import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import type { ThreadChanges } from './thread-changes.js';
 import { threadCopy, threadTone } from './thread-copy.js';
+import { ThreadUsageFooter } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 
@@ -240,6 +241,7 @@ function ThreadBody({
           />
         </div>
       )}
+      <ThreadUsageFooter key={todo.id} todo={todo} />
       <Composer
         placeholder={
           archived
