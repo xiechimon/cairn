@@ -42,6 +42,7 @@ interface DocPaneProps {
   onToggleExpand?: () => void;
   buildId?: string | null;
   emptyMeta?: ReactNode;
+  hideVersion?: boolean;
 }
 
 const HUNK_RANGE = /^@@ -(\d+)(?:,(\d+))? /;
@@ -388,6 +389,7 @@ export function DocPane({
   onToggleExpand,
   buildId,
   emptyMeta,
+  hideVersion = false,
 }: DocPaneProps) {
   const { t } = useI18n();
   const versionLabel = (): string => {
@@ -414,6 +416,7 @@ export function DocPane({
         <header className={PANE_HEAD}>
           {headStart(mode === 'diff' ? '方案' : '变更')}
           {hasData &&
+            !hideVersion &&
             (mode === 'diff' && planDiff != null ? (
               <VersionControl
                 range={{ from: planDiff.from, to: planDiff.to }}
