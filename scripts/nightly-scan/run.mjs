@@ -59,7 +59,8 @@ function main(argv, env) {
   const stateDir = env.NIGHTLY_SCAN_STATE ?? join(homedir(), '.local/state/cairn-nightly-scan');
   const git = (...args) =>
     execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  const gh = (args) => execFileSync('gh', args, { cwd: root, encoding: 'utf8' });
+  const gh = (args) =>
+    execFileSync('gh', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   git('fetch', 'origin', 'main');
   git('checkout', '--detach', 'origin/main');
   try {
