@@ -320,3 +320,28 @@ def test_a_run_with_no_collected_trials_settles_at_its_reservation() -> None:
     usd, source = budget.settlement([], reserved_usd=4.0)
     assert usd == 4.0
     assert source == budget.UNKNOWN_SETTLED_AT_RESERVATION
+
+
+def test_partially_unpriced_trial_keeps_its_known_step_spend_as_a_floor(
+    tmp_path: Path,
+) -> None:
+    trial_dir = tmp_path / "task__abc"
+    trial_dir.mkdir()
+    (trial_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "step_results": [
+                    {"agent_result": {"n_input_tokens": 10, "cost_usd": 60.0}},
+                    {"agent_result": {"n_input_tokens": 900, "n_output_tokens": 90}},
+                ]
+            }
+        )
+    )
+    trial = summarize_trial(
+        trial_dir, name=trial_dir.name, voided=False, model="claude-unpriced"
+    )
+    assert trial.cost_usd is None
+    assert trial.known_cost_usd == 60.0
+    usd, source = budget.settlement([trial], reserved_usd=4.0)
+    assert usd == 60.0
+    assert source == budget.UNKNOWN_SETTLED_AT_RESERVATION

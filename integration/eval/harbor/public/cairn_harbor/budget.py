@@ -22,6 +22,7 @@ PRICES_USD_PER_MTOK: dict[str, tuple[float, float]] = {}
 class CostedTrial(Protocol):
     cost_usd: float | None
     cost_source: str
+    known_cost_usd: float
 
 
 class BudgetExceeded(Exception):
@@ -188,7 +189,9 @@ def resolve_cost(
 def settlement(
     trials: Sequence[CostedTrial], reserved_usd: float
 ) -> tuple[float, str]:
-    known = sum(trial.cost_usd for trial in trials if trial.cost_usd is not None)
+    known = sum(
+        trial.known_cost_usd if trial.cost_usd is None else trial.cost_usd for trial in trials
+    )
     if not trials or any(trial.cost_usd is None for trial in trials):
         return max(reserved_usd, known), UNKNOWN_SETTLED_AT_RESERVATION
     sources = sorted({trial.cost_source for trial in trials if trial.cost_source})
