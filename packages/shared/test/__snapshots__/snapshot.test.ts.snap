@@ -4945,6 +4945,57 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
       },
       "type": "array",
     },
+    "filters": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "is",
+              "project",
+              "pr",
+              "by",
+              "after",
+              "cost",
+            ],
+            "type": "string",
+          },
+          "negated": {
+            "type": "boolean",
+          },
+          "raw": {
+            "type": "string",
+          },
+          "reason": {
+            "enum": [
+              "empty",
+              "unknown_state",
+              "bad_pr",
+              "bad_date",
+              "bad_cost",
+              "unknown_project",
+              "unknown_person",
+            ],
+            "type": "string",
+          },
+          "valid": {
+            "type": "boolean",
+          },
+          "value": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "key",
+          "raw",
+          "value",
+          "negated",
+          "valid",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "projects": {
       "items": {
         "additionalProperties": false,

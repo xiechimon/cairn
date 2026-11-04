@@ -1,4 +1,5 @@
 import { type SearchResponse, searchResponseSchema } from '@cairn/shared';
+import type Database from 'better-sqlite3';
 import { describe, expect, test, vi } from 'vitest';
 import { agent, build, project, team, todo, tokenUsage, user } from '../src/db/schema.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -154,6 +155,14 @@ describe('search filters: is:', () => {
 });
 
 describe('search filters: project:', () => {
+  test('normalizes Unicode project names consistently', async () => {
+    const { s } = corpus();
+    const unicode = addProject(s, 'Équipe');
+    addThread(s, unicode, 'Unicode project');
+    expect(titles(await run(s, 'project:Équipe'))).toEqual(['Unicode project']);
+    expect(titles(await run(s, 'project:éQUIPE'))).toEqual(['Unicode project']);
+  });
+
   test('matches the project name case-insensitively and exactly', async () => {
     const { s } = corpus();
     expect(titles(await run(s, 'project:API'))).toEqual(['api failed']);
@@ -245,6 +254,21 @@ describe('search filters: after:', () => {
 });
 
 describe('search filters: cost:', () => {
+  test('cost filtering does not rescan build history for each thread', async () => {
+    const { s, web } = corpus();
+    addBuild(s, addThread(s, web, 'paid'), { costs: [2] });
+    const sqlite = (s.db as unknown as { $client: Database.Database }).$client;
+    const spy = vi.spyOn(sqlite, 'prepare');
+    expect(titles(await run(s, 'cost:>1'))).toEqual(['paid']);
+    const statement = spy.mock.calls.find(([query]) => query.includes('token_usage'))?.[0];
+    spy.mockRestore();
+    expect(statement).toBeDefined();
+    const plan = sqlite
+      .prepare(`EXPLAIN QUERY PLAN ${statement}`)
+      .all(...Array.from(statement?.matchAll(/\?/g) ?? [], () => null)) as { detail: string }[];
+    expect(plan.some(({ detail }) => detail.includes('CORRELATED'))).toBe(false);
+  });
+
   test('sums priced token usage across all builds of a thread, in dollars', async () => {
     const { s, web } = corpus();
     const big = addThread(s, web, 'big');

@@ -31,9 +31,6 @@ const IS_CONDITIONS: Record<SearchIsState, SQL> = {
   snoozed: sql`${todo.snoozeMode} IS NOT NULL`,
 };
 
-const THREAD_COST = sql`(SELECT COALESCE(SUM(${tokenUsage.costTotal}), 0) FROM ${tokenUsage} INNER JOIN ${build} ON ${build.id} = ${tokenUsage.buildId} WHERE ${build.todoId} = ${todo.id})`;
-const THREAD_COST_UNPRICED = sql`EXISTS (SELECT 1 FROM ${tokenUsage} INNER JOIN ${build} ON ${build.id} = ${tokenUsage.buildId} WHERE ${build.todoId} = ${todo.id} AND ${tokenUsage.costTotal} IS NULL)`;
-
 interface ResolvedFilter {
   parsed: ParsedSearchFilter;
   condition: SQL | null;
@@ -52,12 +49,11 @@ function resolveFilter(
       return { parsed, condition: IS_CONDITIONS[cond.state], reason: undefined };
     case 'project': {
       const ids = deps.db
-        .select({ id: project.id })
+        .select({ id: project.id, name: project.name })
         .from(project)
-        .where(
-          and(eq(project.teamId, teamId), sql`lower(${project.name}) = ${cond.name.toLowerCase()}`),
-        )
+        .where(eq(project.teamId, teamId))
         .all()
+        .filter((row) => row.name.toLowerCase() === cond.name.toLowerCase())
         .map((row) => row.id);
       return ids.length === 0
         ? { parsed, condition: null, reason: 'unknown_project' }
@@ -96,15 +92,38 @@ function resolveFilter(
     }
     case 'after':
       return { parsed, condition: sql`${todo.phaseAt} >= ${cond.sinceMs}`, reason: undefined };
-    case 'cost':
+    case 'cost': {
+      const totals = deps.db
+        .select({
+          todoId: build.todoId,
+          total: sql<number>`sum(${tokenUsage.costTotal})`.as('total'),
+          unpriced:
+            sql<number>`max(case when ${tokenUsage.buildId} IS NOT NULL AND ${tokenUsage.costTotal} IS NULL then 1 else 0 end)`.as(
+              'unpriced',
+            ),
+        })
+        .from(build)
+        .leftJoin(tokenUsage, eq(build.id, tokenUsage.buildId))
+        .groupBy(build.todoId)
+        .as('thread_costs');
+      const total = sql`COALESCE(${totals.total}, 0)`;
+      const matches = deps.db
+        .select({ id: todo.id })
+        .from(todo)
+        .leftJoin(totals, eq(todo.id, totals.todoId))
+        .where(
+          and(
+            eq(todo.teamId, teamId),
+            sql`COALESCE(${totals.unpriced}, 0) = 0`,
+            cond.op === '>' ? sql`${total} > ${cond.dollars}` : sql`${total} < ${cond.dollars}`,
+          ),
+        );
       return {
         parsed,
-        condition:
-          cond.op === '>'
-            ? sql`NOT ${THREAD_COST_UNPRICED} AND ${THREAD_COST} > ${cond.dollars}`
-            : sql`NOT ${THREAD_COST_UNPRICED} AND ${THREAD_COST} < ${cond.dollars}`,
+        condition: inArray(todo.id, matches),
         reason: undefined,
       };
+    }
   }
 }
 
