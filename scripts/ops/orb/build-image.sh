@@ -89,7 +89,7 @@ daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$'
     printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
   fi
 fi
-printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap socat python\n'
+printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap socat python jq diffutils patch which inetutils rsync lsof ripgrep unzip\n'
 printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version" "$pnpm_version"
 if [[ $filesystem == btrfs ]]; then
   printf 'create a locked staging subvolume under /var/lib/machines\n'
@@ -140,7 +140,7 @@ if [[ $filesystem == btrfs ]]; then
   rmdir -- "$stage"
   btrfs subvolume create "$stage"
 fi
-pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap socat python
+pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap socat python jq diffutils patch which inetutils rsync lsof ripgrep unzip
 printf 'configure image and pinned tools\n'
 arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$pnpm_version" "$node_major" <<'GUEST'
 set -euo pipefail
@@ -156,6 +156,7 @@ useradd --uid "$3" --create-home --shell /bin/bash agent
 runuser -u agent -- /usr/bin/bwrap --version > /dev/null || { printf 'bubblewrap is not runnable by agent\n' >&2; exit 1; }
 runuser -u agent -- /usr/bin/socat -V > /dev/null || { printf 'socat is not runnable by agent\n' >&2; exit 1; }
 runuser -u agent -- /usr/bin/python3 --version > /dev/null || { printf 'python3 is not runnable by agent\n' >&2; exit 1; }
+for tool in jq diff patch which hostname rsync lsof rg unzip; do runuser -u agent -- sh -c 'command -v "$1"' sh "$tool" > /dev/null || { printf '%s is not runnable by agent\n' "$tool" >&2; exit 1; }; done
 install -d -o root -g root -m 755 /var/lib/cairn-claude
 install -d -o root -g agent -m 1770 /var/lib/cairn-claude/config
 printf '%s\n' '{"sandbox": {"enableWeakerNestedSandbox": true}}' > /var/lib/cairn-claude/config/settings.json
