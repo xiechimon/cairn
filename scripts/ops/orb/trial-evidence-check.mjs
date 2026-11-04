@@ -11,6 +11,16 @@ export function conversationBranch(conversationId) {
   return `cairn/conv-${conversationId}`;
 }
 
+function podmanInspectNames(capture) {
+  if (typeof capture !== 'string') return [];
+  try {
+    const parsed = JSON.parse(capture);
+    return Array.isArray(parsed) ? parsed.map((entry) => entry?.Name) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function checkTrialEvidence(evidence, options = {}) {
   const { runner = runGh, env = process.env, fetchImpl = fetch } = options;
   const failures = [];
@@ -24,7 +34,7 @@ export async function checkTrialEvidence(evidence, options = {}) {
   for (const name of ['issue', 'pr']) {
     check(name, Number.isSafeInteger(e[name]) && e[name] > 0, 'expected a positive issue number');
   }
-  for (const name of ['buildId', 'conversationId', 'machinectlStatus']) {
+  for (const name of ['buildId', 'conversationId']) {
     check(
       name,
       typeof e[name] === 'string' && e[name].trim().length > 0,
@@ -32,6 +42,25 @@ export async function checkTrialEvidence(evidence, options = {}) {
     );
   }
   check('orbName', e.orbName === `cairn-orb-${e.conversationId}`, 'must match the conversation ID');
+  const hasMachinectl = e.machinectlStatus !== undefined;
+  const hasPodman = e.podmanInspect !== undefined;
+  check(
+    'orbCapture',
+    hasMachinectl !== hasPodman,
+    'expected exactly one of machinectlStatus or podmanInspect',
+  );
+  if (hasMachinectl)
+    check(
+      'machinectlStatus',
+      typeof e.machinectlStatus === 'string' && e.machinectlStatus.trim().length > 0,
+      'expected a nonempty string',
+    );
+  if (hasPodman)
+    check(
+      'podmanInspect',
+      podmanInspectNames(e.podmanInspect).includes(e.orbName),
+      'expected podman inspect JSON for the trial container',
+    );
   check(
     'mergeCommit',
     typeof e.mergeCommit === 'string' && /^[a-f0-9]{40}$/.test(e.mergeCommit),
