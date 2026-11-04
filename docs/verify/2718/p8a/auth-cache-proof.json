@@ -1,0 +1,25 @@
+{
+  "implementation": "949642219ba49f5b3ca8905615906784b81823c0",
+  "mode": "Actual Vite-rendered client/auth gate, mocked REST and EventSource",
+  "checks": {
+    "targetedWebVitest": 45,
+    "targetedWebTypecheck": "pass",
+    "correctedFocusedPlaywright": "1 passed (2.0s)",
+    "guardedPrepush": "21 passed, including spec parse"
+  },
+  "observed": {
+    "gatedComputerEntries": 0,
+    "gatedComputerStateBadges": 0,
+    "replacementScopeCommand": "second-owner-only",
+    "latePriorScopeCommandAbsent": true
+  },
+  "notVerified": [
+    "real second-user login",
+    "actual computer provider lifecycle",
+    "malicious view-socket enforcement"
+  ],
+  "screenshots": [
+    "auth-gate-private-cleared.png",
+    "auth-next-scope-after-late.png"
+  ]
+}
