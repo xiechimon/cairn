@@ -16,10 +16,17 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { OrbCommandRunner, OrbExecResult } from './provider.js';
 
 const ORB_DEPLOY_TIMEOUT_MS = 600_000;
+
+export function defaultOrbDistSource(): string {
+  return import.meta.url.endsWith('.ts')
+    ? join(dirname(fileURLToPath(import.meta.url)), '../../dist')
+    : dirname(fileURLToPath(import.meta.url));
+}
 
 async function checkoutCommand(runner: OrbCommandRunner, checkout: string, args: string[]) {
   const result = await runner(['git', '-C', checkout, ...args], {
