@@ -1,4 +1,5 @@
-import type { AskUserQuestion, MachineAskResponse } from '@cairn/shared';
+import { existsSync } from 'node:fs';
+import { type AskUserQuestion, type MachineAskResponse, SESSION_FILE_NAME } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
@@ -17,6 +18,7 @@ import {
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';
+import { stepSessionPath } from '../src/services/machine-uploads.js';
 import {
   bindAgentHome,
   bootServer,
@@ -173,6 +175,123 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
       expect(saved?.content).toContain(privateAnswer);
     },
   );
+
+  for (const path of [
+    'presence',
+    'heartbeat',
+    'tool',
+    'session-upload',
+    'transcript-upload',
+  ] as const) {
+    test.each(['valid', 'revoke', 'rotate'] as const)(
+      `a delayed ${path} body revalidates a %s credential before any mutation`,
+      async (change) => {
+        const w = await makeWorld();
+        w.s.db
+          .update(stepTable)
+          .set({ lastHeartbeatAt: 1 })
+          .where(eq(stepTable.id, w.stepId))
+          .run();
+        let url =
+          path === 'presence' ? '/api/machine/presence' : `/api/machine/${path}/${w.stepId}`;
+        if (path.endsWith('upload')) {
+          const response = await call(w.s.app, 'POST', `/api/machine/upload-urls/${w.stepId}`, {
+            cred: w.machineToken,
+            body: {
+              files: [{ name: path === 'session-upload' ? SESSION_FILE_NAME : 'transcript.json' }],
+            },
+          });
+          expect(response.status).toBe(200);
+          const uploaded = (await response.json()) as { uploads: { url: string }[] };
+          url = uploaded.uploads[0]?.url ?? '';
+          expect(url).not.toBe('');
+        }
+        const transcriptRow = {
+          id: 'late-transcript-row',
+          role: 'assistant',
+          content: 'late body',
+          createdAt: 1,
+        };
+        const payloads = {
+          presence: { cliVersion: 'late-body-version' },
+          heartbeat: {},
+          tool: { kind: 'transcript_row', row: transcriptRow },
+          'transcript-upload': { stepId: w.stepId, messages: [transcriptRow] },
+        };
+        const text =
+          path === 'session-upload' ? 'late-session-body' : JSON.stringify(payloads[path]);
+        let reading = false;
+        let released = false;
+        let finishBody = () => {};
+        const body = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              reading = true;
+              return new Promise<void>((resolve) => {
+                finishBody = () => {
+                  if (released) return;
+                  released = true;
+                  controller.enqueue(new TextEncoder().encode(text));
+                  controller.close();
+                  resolve();
+                };
+              });
+            },
+          },
+          { highWaterMark: 0 },
+        );
+        const init: RequestInit & { duplex: 'half' } = {
+          method: path.endsWith('upload') ? 'PUT' : 'POST',
+          headers: {
+            authorization: `Bearer ${w.machineToken}`,
+            'content-type': 'application/json',
+          },
+          body,
+          duplex: 'half',
+        };
+        const waiting = w.s.app.request(new Request(new URL(url, 'http://localhost'), init));
+        try {
+          await vi.waitFor(() => expect(reading).toBe(true));
+          if (change === 'revoke') {
+            expect(
+              (await call(w.s.app, 'POST', `/api/machines/${w.machineId}/revoke`)).status,
+            ).toBe(204);
+          } else if (change === 'rotate') {
+            w.s.db
+              .update(machineTable)
+              .set({ tokenHash: sha256Hex('replacement-machine-token') })
+              .where(eq(machineTable.id, w.machineId))
+              .run();
+          }
+          finishBody();
+          const response = await waiting;
+          expect(response.status).toBe(change === 'valid' ? 200 : 401);
+          const machine = w.s.db
+            .select()
+            .from(machineTable)
+            .where(eq(machineTable.id, w.machineId))
+            .get();
+          const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+          const transcript = w.s.db
+            .select()
+            .from(chiefMessage)
+            .where(eq(chiefMessage.id, 'late-transcript-row'))
+            .get();
+          const written = {
+            presence: machine?.latestCliVersion === 'late-body-version',
+            heartbeat: step?.lastHeartbeatAt !== 1,
+            tool: transcript !== undefined,
+            'transcript-upload': transcript !== undefined,
+            'session-upload': existsSync(stepSessionPath(w.s.attachmentsDir, w.stepId)),
+          }[path];
+          expect(written).toBe(change === 'valid');
+        } finally {
+          finishBody();
+          await waiting;
+        }
+      },
+    );
+  }
 
   test('creating a question: assistant row + content kind + notification; same requestId re-posted idempotently (no stacked card, no duplicate notification)', async () => {
     const w = await makeWorld();

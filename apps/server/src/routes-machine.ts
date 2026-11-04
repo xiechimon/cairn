@@ -200,6 +200,18 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return row;
   };
 
+  const executeMachineCommand = async <T, R>(
+    c: Context,
+    read: () => Promise<T>,
+    execute: (row: MachineRow, body: T) => R,
+  ) => {
+    const token = bearer(c) ?? '';
+    const row = me(c);
+    const body = await read();
+    if (findMachineByToken(ctx.db, token)?.id !== row.id) throw unauthorized();
+    return await execute(row, body);
+  };
+
   app.post('/api/machine/enroll', async (c) => {
     const key = bearer(c);
     const keyRow = key ? findApiKeyByPlain(ctx.db, key) : undefined;
@@ -292,41 +304,56 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       onError: (c) => c.json({ error: 'orb cleanup body too large' }, 413),
     }),
     async (c) => {
-      const row = me(c);
-      const body = parseWith(machineClosedOrbsBodySchema, await jsonBody(c), 'body');
-      if (body.conversationIds.length === 0) return c.json([]);
-      const closed = ctx.db
-        .selectDistinct({ id: build.id })
-        .from(build)
-        .innerJoin(todo, eq(todo.id, build.todoId))
-        .innerJoin(step, eq(step.buildId, build.id))
-        .where(
-          and(
-            inArray(build.id, body.conversationIds),
-            eq(step.machineId, row.id),
-            eq(todo.teamId, row.teamId),
-            or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
-          ),
-        )
-        .all();
-      return c.json(closed.map((conversation) => conversation.id));
+      return executeMachineCommand(
+        c,
+        () => jsonBody(c),
+        async (row, decoded) => {
+          const body = parseWith(machineClosedOrbsBodySchema, decoded, 'body');
+          if (body.conversationIds.length === 0) return c.json([]);
+          const closed = ctx.db
+            .selectDistinct({ id: build.id })
+            .from(build)
+            .innerJoin(todo, eq(todo.id, build.todoId))
+            .innerJoin(step, eq(step.buildId, build.id))
+            .where(
+              and(
+                inArray(build.id, body.conversationIds),
+                eq(step.machineId, row.id),
+                eq(todo.teamId, row.teamId),
+                or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
+              ),
+            )
+            .all();
+          return c.json(closed.map((conversation) => conversation.id));
+        },
+      );
     },
   );
 
   app.post('/api/machine/presence', async (c) => {
-    const row = me(c);
-    const body = parseWith(machinePresenceBodySchema, (await jsonBody(c)) ?? {}, 'body');
-    markPresence(deps, row.id, body);
-    return c.json({ ok: true as const });
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machinePresenceBodySchema, decoded ?? {}, 'body');
+        markPresence(deps, row.id, body);
+        return c.json({ ok: true as const });
+      },
+    );
   });
 
   app.post('/api/machine/rate-limit', async (c) => {
-    const row = me(c);
-    const body = parseWith(claudeRateLimitReportSchema, (await jsonBody(c)) ?? {}, 'body');
-    if (body.machineId !== row.id)
-      throw new HttpError(403, 'rate limit event is for another machine');
-    recordClaudeRateLimit(deps, row, body);
-    return c.json({ ok: true as const });
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(claudeRateLimitReportSchema, decoded ?? {}, 'body');
+        if (body.machineId !== row.id)
+          throw new HttpError(403, 'rate limit event is for another machine');
+        recordClaudeRateLimit(deps, row, body);
+        return c.json({ ok: true as const });
+      },
+    );
   });
 
   app.post('/api/machine/recover', (c) => {
@@ -335,22 +362,27 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/machine/tasks/claim', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineClaimBodySchema, (await jsonBody(c)) ?? {}, 'body');
-    const token = bearer(c) ?? '';
-    const stillAuthorized = () => findMachineByToken(ctx.db, token)?.id === row.id;
-    const step = await claimStep(
-      deps,
-      row.id,
-      row.teamId,
-      ctx.claimHoldMs,
-      originOf(c),
-      c.req.raw.signal,
-      body,
-      stillAuthorized,
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineClaimBodySchema, decoded ?? {}, 'body');
+        const token = bearer(c) ?? '';
+        const stillAuthorized = () => findMachineByToken(ctx.db, token)?.id === row.id;
+        const step = await claimStep(
+          deps,
+          row.id,
+          row.teamId,
+          ctx.claimHoldMs,
+          originOf(c),
+          c.req.raw.signal,
+          body,
+          stillAuthorized,
+        );
+        if (!stillAuthorized()) throw unauthorized();
+        return c.json({ step });
+      },
     );
-    if (!stillAuthorized()) throw unauthorized();
-    return c.json({ step });
   });
 
   app.get('/api/machine/stream', (c) => {
@@ -414,75 +446,90 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/machine/heartbeat/:stepId', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineHeartbeatBodySchema, (await jsonBody(c)) ?? {}, 'body');
-    heartbeatStep(deps, row.id, c.req.param('stepId'));
-    recordBuildProvenance(ctx.db, c.req.param('stepId'), body);
-    return c.json({ ok: true as const });
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineHeartbeatBodySchema, decoded ?? {}, 'body');
+        heartbeatStep(deps, row.id, c.req.param('stepId'));
+        recordBuildProvenance(ctx.db, c.req.param('stepId'), body);
+        return c.json({ ok: true as const });
+      },
+    );
   });
 
   app.post('/api/machine/tool/:stepId', async (c) => {
-    const row = me(c);
-    const raw = await jsonBody(c);
-    if (isDeltaBody(raw)) {
-      const delta = parseWith(machineTranscriptDeltaBodySchema, raw, 'body');
-      reportTranscriptDelta(deps, row.id, c.req.param('stepId'), delta.text);
-      return c.json({ ok: true as const });
-    }
-    if (isThinkingDeltaBody(raw)) {
-      const delta = parseWith(machineThinkingDeltaBodySchema, raw, 'body');
-      reportThinkingDelta(deps, row.id, c.req.param('stepId'), delta.text);
-      return c.json({ ok: true as const });
-    }
-    if (isActivityBody(raw)) {
-      const act = parseWith(machineActivityBodySchema, raw, 'body');
-      reportActivity(deps, row.id, c.req.param('stepId'), act.activity);
-      return c.json({ ok: true as const });
-    }
-    if (isAgentTodoBody(raw)) {
-      const body = parseWith(machineAgentTodoBodySchema, raw, 'body');
-      reportAgentTodo(deps, row.id, c.req.param('stepId'), body.todo);
-      return c.json({ ok: true as const });
-    }
-    if (isTranscriptRowBody(raw)) {
-      const seg = parseWith(machineTranscriptRowBodySchema, raw, 'body');
-      reportTranscriptRow(deps, row.id, c.req.param('stepId'), seg.row);
-      return c.json({ ok: true as const });
-    }
-    if (isComputerRelayBody(raw)) {
-      const relay = parseWith(machineComputerRelayBodySchema, raw, 'body');
-      return c.json(
-        await forwardComputerCall(deps, row.id, c.req.param('stepId'), relay, {
-          signal: c.req.raw.signal,
-        }),
-      );
-    }
-    if (isRelayBody(raw)) {
-      const relay = parseWith(machineToolRelayBodySchema, raw, 'body');
-      const text = await executeRelayToolCall(
-        deps,
-        row.id,
-        c.req.param('stepId'),
-        relay.name,
-        relay.params,
-      );
-      return c.json({ text });
-    }
-    const body = parseWith(machineToolBodySchema, raw, 'body');
-    reportTool(deps, row.id, c.req.param('stepId'), body as ToolCallRecord);
-    return c.json({ ok: true as const });
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, raw) => {
+        if (isDeltaBody(raw)) {
+          const delta = parseWith(machineTranscriptDeltaBodySchema, raw, 'body');
+          reportTranscriptDelta(deps, row.id, c.req.param('stepId'), delta.text);
+          return c.json({ ok: true as const });
+        }
+        if (isThinkingDeltaBody(raw)) {
+          const delta = parseWith(machineThinkingDeltaBodySchema, raw, 'body');
+          reportThinkingDelta(deps, row.id, c.req.param('stepId'), delta.text);
+          return c.json({ ok: true as const });
+        }
+        if (isActivityBody(raw)) {
+          const act = parseWith(machineActivityBodySchema, raw, 'body');
+          reportActivity(deps, row.id, c.req.param('stepId'), act.activity);
+          return c.json({ ok: true as const });
+        }
+        if (isAgentTodoBody(raw)) {
+          const body = parseWith(machineAgentTodoBodySchema, raw, 'body');
+          reportAgentTodo(deps, row.id, c.req.param('stepId'), body.todo);
+          return c.json({ ok: true as const });
+        }
+        if (isTranscriptRowBody(raw)) {
+          const seg = parseWith(machineTranscriptRowBodySchema, raw, 'body');
+          reportTranscriptRow(deps, row.id, c.req.param('stepId'), seg.row);
+          return c.json({ ok: true as const });
+        }
+        if (isComputerRelayBody(raw)) {
+          const relay = parseWith(machineComputerRelayBodySchema, raw, 'body');
+          return c.json(
+            await forwardComputerCall(deps, row.id, c.req.param('stepId'), relay, {
+              signal: c.req.raw.signal,
+            }),
+          );
+        }
+        if (isRelayBody(raw)) {
+          const relay = parseWith(machineToolRelayBodySchema, raw, 'body');
+          const text = await executeRelayToolCall(
+            deps,
+            row.id,
+            c.req.param('stepId'),
+            relay.name,
+            relay.params,
+          );
+          return c.json({ text });
+        }
+        const body = parseWith(machineToolBodySchema, raw, 'body');
+        reportTool(deps, row.id, c.req.param('stepId'), body as ToolCallRecord);
+        return c.json({ ok: true as const });
+      },
+    );
   });
 
   app.post('/api/machine/ask/:stepId', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineAskBodySchema, await jsonBody(c), 'body');
-    const rawHold = Number(c.req.query('holdMs'));
-    const holdMs = Number.isFinite(rawHold) && rawHold >= 0 ? Math.min(rawHold, 70_000) : 70_000;
-    return c.json(
-      await machineAsk(deps, row.id, c.req.param('stepId'), body, {
-        holdMs,
-        signal: c.req.raw.signal,
-      }),
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineAskBodySchema, decoded, 'body');
+        const rawHold = Number(c.req.query('holdMs'));
+        const holdMs =
+          Number.isFinite(rawHold) && rawHold >= 0 ? Math.min(rawHold, 70_000) : 70_000;
+        return c.json(
+          await machineAsk(deps, row.id, c.req.param('stepId'), body, {
+            holdMs,
+            signal: c.req.raw.signal,
+          }),
+        );
+      },
     );
   });
 
@@ -525,10 +572,22 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/machine/upload-urls/:stepId', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineUploadUrlsBodySchema, await jsonBody(c), 'body');
-    return c.json(
-      createUploadUrls(deps, row.id, c.req.param('stepId'), body.files, originOf(c), ctx.uploads),
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineUploadUrlsBodySchema, decoded, 'body');
+        return c.json(
+          createUploadUrls(
+            deps,
+            row.id,
+            c.req.param('stepId'),
+            body.files,
+            originOf(c),
+            ctx.uploads,
+          ),
+        );
+      },
     );
   });
 
@@ -537,16 +596,39 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const uploadId = c.req.param('uploadId');
     const upload = ctx.uploads.get(uploadId);
     if (!upload || upload.machineId !== row.id) throw new HttpError(404, 'upload not found');
+    const completeUpload = () => {
+      ctx.uploads.delete(uploadId);
+      return c.json({ ok: true as const });
+    };
     if (upload.name === PLAN_FILE_NAME) {
-      receivePlanUpload(deps, upload, await c.req.text());
-    } else if (upload.name === SESSION_FILE_NAME) {
-      receiveSessionUpload(deps, upload, await c.req.text());
-    } else {
-      const body = parseWith(transcriptUploadSchema, await jsonBody(c), 'body');
-      receiveUpload(deps, upload, body);
+      return executeMachineCommand(
+        c,
+        () => c.req.text(),
+        (_row, body) => {
+          receivePlanUpload(deps, upload, body);
+          return completeUpload();
+        },
+      );
     }
-    ctx.uploads.delete(uploadId);
-    return c.json({ ok: true as const });
+    if (upload.name === SESSION_FILE_NAME) {
+      return executeMachineCommand(
+        c,
+        () => c.req.text(),
+        (_row, body) => {
+          receiveSessionUpload(deps, upload, body);
+          return completeUpload();
+        },
+      );
+    }
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      (_row, decoded) => {
+        const body = parseWith(transcriptUploadSchema, decoded, 'body');
+        receiveUpload(deps, upload, body);
+        return completeUpload();
+      },
+    );
   });
 
   app.get('/api/machine/session/:stepId', (c) => {
@@ -555,25 +637,35 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/machine/done/:stepId', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineDoneBodySchema, await jsonBody(c), 'body');
-    await finishStep(deps, row.id, c.req.param('stepId'), body);
-    return c.json({ ok: true as const });
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineDoneBodySchema, decoded, 'body');
+        await finishStep(deps, row.id, c.req.param('stepId'), body);
+        return c.json({ ok: true as const });
+      },
+    );
   });
 
   app.post('/api/machine/sync-result/:syncId', async (c) => {
-    const row = me(c);
-    const body = parseWith(machineSyncResultBodySchema, await jsonBody(c), 'body');
-    transitionBranchSync(
-      { db: ctx.db, hub: ctx.hub },
-      {
-        syncId: c.req.param('syncId'),
-        machineId: row.id,
-        status: body.status,
-        ...(body.errorMessage !== undefined ? { errorMessage: body.errorMessage } : {}),
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineSyncResultBodySchema, decoded, 'body');
+        transitionBranchSync(
+          { db: ctx.db, hub: ctx.hub },
+          {
+            syncId: c.req.param('syncId'),
+            machineId: row.id,
+            status: body.status,
+            ...(body.errorMessage !== undefined ? { errorMessage: body.errorMessage } : {}),
+          },
+        );
+        return c.json({ ok: true as const });
       },
     );
-    return c.json({ ok: true as const });
   });
 
   app.post(
@@ -583,10 +675,15 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       onError: (c) => c.json({ error: 'computer frames body too large' }, 413),
     }),
     async (c) => {
-      const row = me(c);
       const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
-      const body = parseWith(machineComputerFramesBodySchema, await jsonBody(c), 'body');
-      return c.json(receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames));
+      return executeMachineCommand(
+        c,
+        () => jsonBody(c),
+        async (row, decoded) => {
+          const body = parseWith(machineComputerFramesBodySchema, decoded, 'body');
+          return c.json(receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames));
+        },
+      );
     },
   );
 }
