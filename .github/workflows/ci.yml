@@ -460,4 +460,4 @@ jobs:
           RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
       - name: Self-deploy and deploy-lag watch fixtures (#2288)
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/deploy-self.test.mjs
+        run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
