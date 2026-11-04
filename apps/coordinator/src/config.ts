@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { ENV_VARS } from '@cairn/shared';
 
 export interface CoordinatorConfig {
   serverUrl: string;
@@ -8,6 +9,7 @@ export interface CoordinatorConfig {
   storageDir: string;
   heartbeatMs: number;
   summaryModelId: string;
+  routerTools: boolean;
 }
 
 export function readMachineToken(path: string): string {
@@ -20,6 +22,11 @@ export function readMachineToken(path: string): string {
   return token;
 }
 
+export function envFlagOn(raw: string | undefined): boolean {
+  const lower = raw?.toLowerCase();
+  return raw === '1' || lower === 'true' || lower === 'yes';
+}
+
 export function readConfig(env: NodeJS.ProcessEnv): CoordinatorConfig {
   const home = env.CAIRN_HOME ?? join(homedir(), '.cairn');
   const dir = join(home, 'coordinator');
@@ -29,5 +36,6 @@ export function readConfig(env: NodeJS.ProcessEnv): CoordinatorConfig {
     storageDir: env.CAIRN_COORDINATOR_STORE_DIR ?? join(dir, 'threads'),
     heartbeatMs: 15_000,
     summaryModelId: env.CAIRN_COORDINATOR_SUMMARY_MODEL ?? 'claude-haiku-5-5',
+    routerTools: envFlagOn(env[ENV_VARS.routingRules]),
   };
 }

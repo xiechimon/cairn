@@ -1,8 +1,8 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { CHIEF_TOOL_COUNT, claimedStepSchema } from '@cairn/shared';
+import { CHIEF_ROUTER_TOOL_NAMES, CHIEF_TOOL_COUNT, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   chief as chiefTable,
@@ -11,6 +11,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { bootServer, issueApiKey, machineIdByName, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-m4a-chief';
@@ -334,5 +335,54 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     };
     expect(typeof body.secrets).toBe('object');
     expect(body.secrets).toEqual({});
+  });
+});
+
+describe('Coordinator router tools over the machine protocol (D60)', () => {
+  afterEach(() => setRoutingRulesEnabled(false));
+
+  test('flag off: the claim carries the 55-tool vocabulary and open_thread is refused', async () => {
+    const w = await setupChiefWorld();
+    const claimed = await w.claim();
+    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT);
+    const names = claimed.remoteTools?.map((t) => t.name) ?? [];
+    for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).not.toContain(name);
+    await expect(w.relay(claimed.step.id, 'open_thread', { todoId: 'x' })).rejects.toThrow(
+      /routing rules are off/,
+    );
+  });
+
+  test('flag on: the claim adds the five router tools, open_thread starts a session, run_builds says removed under D60', async () => {
+    setRoutingRulesEnabled(true);
+    const w = await setupChiefWorld();
+    const claimed = await w.claim();
+    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length);
+    const names = claimed.remoteTools?.map((t) => t.name) ?? [];
+    for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).toContain(name);
+    expect(claimed.chief?.systemPrompt).toContain('open_thread');
+    expect(claimed.chief?.systemPrompt).not.toContain('派发判定');
+    const stepId = claimed.step.id;
+    const created = (await w.relay(stepId, 'create_todo', {
+      projectId: w.projectId,
+      title: 'Export the board',
+      spec: '> Add an export.',
+    })) as { id: string };
+    await expect(
+      w.relay(stepId, 'run_builds', {
+        todoIds: [created.id],
+        assignment: { build: { agentId: AGENT_ID } },
+      }),
+    ).rejects.toThrow(/run_builds was removed under D60/);
+    const opened = (await w.relay(stepId, 'open_thread', { todoId: created.id })) as {
+      buildId: string;
+    };
+    const steps = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, opened.buildId))
+      .all();
+    expect(steps.map((row) => row.kind)).toEqual(['session']);
+    const listed = (await w.relay(stepId, 'threads', {})) as { threads: { id: string }[] };
+    expect(listed.threads.map((t) => t.id)).toEqual([created.id]);
   });
 });
