@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { matchesGlob } from 'node:path';
+
 export const CODEX_LOGIN = 'chatgpt-codex-connector';
 export const ACTIONS_LOGIN = 'github-actions[bot]';
 export const GATE_CHECK = 'review-gate';
@@ -7,6 +10,22 @@ export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;
 export const USAGE_DASHBOARD = 'https://chatgpt.com/codex/cloud/settings/usage';
+
+const gatePaths = JSON.parse(
+  readFileSync(new URL('../../../packages/shared/merge-gate-paths.json', import.meta.url), 'utf8'),
+);
+const securityPatterns = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'].flatMap(
+  (category) => gatePaths.humanQueue[category],
+);
+
+export function requiresSecurityReview(files) {
+  return files.some((file) =>
+    [file.filename, file.previous_filename].some(
+      (path) =>
+        typeof path === 'string' && securityPatterns.some((pattern) => matchesGlob(path, pattern)),
+    ),
+  );
+}
 
 const STATE_RE = /<!-- codex-review-state:v1 (\{.*?\}) -->/s;
 const BADGE_RE = /^\s*\*\*<sub><sub>!\[(P[0-3]) Badge\]/;
@@ -19,13 +38,19 @@ const MERGE_QUEUE_PREFIX = 'mergify/merge-queue/';
 const short = (sha) => sha.slice(0, 7);
 const stripBot = (login) => String(login ?? '').replace(/\[bot\]$/, '');
 
-export function parseState(body) {
+export function parseState(body, kind = 'code_review') {
   const match = STATE_RE.exec(body ?? '');
   if (!match) return null;
   try {
-    const review = JSON.parse(match[1]).code_review;
+    const review = JSON.parse(match[1])[kind];
     if (!review || typeof review !== 'object') return null;
-    return { commitSha: review.commit_sha ?? null, status: review.status ?? null };
+    return {
+      commitSha: review.commit_sha ?? null,
+      status: review.status ?? null,
+      ...(kind === 'security_review'
+        ? { hasUnresolvedFindings: review.has_unresolved_findings ?? null }
+        : {}),
+    };
   } catch {
     return null;
   }
@@ -35,12 +60,14 @@ export function isCodexAuthor(login, type) {
   return type === 'Bot' && stripBot(login) === CODEX_LOGIN;
 }
 
-export function trustedStateComment(comments) {
+export function trustedStateComment(comments, kind = 'code_review') {
   const trusted = comments
     .filter((comment) => isCodexAuthor(comment.user?.login, comment.user?.type))
     .flatMap((comment) => {
-      const state = parseState(comment.body);
-      return state ? [{ comment, state }] : [];
+      const state = parseState(comment.body, kind);
+      return state || (kind === 'security_review' && STATE_RE.test(comment.body ?? ''))
+        ? [{ comment, state }]
+        : [];
     });
   return trusted.reduce(
     (latest, entry) =>
@@ -223,8 +250,31 @@ export function decide(
   limitHit = false,
   wait = null,
   rounds = NO_ROUNDS,
+  security = null,
 ) {
   const sha = pr.head.sha;
+  if (security) {
+    const review = security.state;
+    const clean =
+      review?.commitSha === sha &&
+      review.status === 'completed' &&
+      review.hasUnresolvedFindings === false;
+    if (!clean) {
+      const reason = !review
+        ? 'No trusted security review state is available.'
+        : review.commitSha !== sha
+          ? 'The security review is bound to another head.'
+          : review.status !== 'completed'
+            ? 'The security review has not completed successfully.'
+            : 'The security review does not explicitly report zero unresolved findings.';
+      return {
+        status: 'completed',
+        conclusion: 'failure',
+        title: `Codex security review required for ${short(sha)}`,
+        summary: `Canonical security surfaces require a trusted Codex security review completed on ${sha} with has_unresolved_findings=false. ${reason} Request \`@codex security review\`; resolve every security finding regardless of severity or builtin merge-gate settings.`,
+      };
+    }
+  }
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
   if (limitHit && !reviewedHead)
     return {
@@ -276,7 +326,7 @@ export function decide(
       title: `No open P0/P1 Codex findings for ${short(sha)}`,
       summary: `Codex reviewed this head and no unresolved P0 or P1 thread remains.${
         blockedHeads > 0 ? ` Cycles to pass: ${blockedHeads} blocked head(s) before this one.` : ''
-      }${carried}`,
+      }${security ? ' Codex security reviewed this exact head with no unresolved findings.' : ''}${carried}`,
       removeStall: true,
     };
   const round = rounds.others + 1;

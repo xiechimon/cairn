@@ -8,6 +8,7 @@ import {
   HUMAN_LABEL,
   markPreExisting,
   preExistingThreads,
+  requiresSecurityReview,
   retryStatus,
   reviewRequested,
   STALL_LABEL,
@@ -91,6 +92,21 @@ function loadThreads(repo, number) {
   }
 }
 
+function loadFiles(repo, pr) {
+  const files = listPaged(`repos/${repo}/pulls/${pr.number}/files`);
+  if (
+    (Number.isInteger(pr.changed_files) && files.length !== pr.changed_files) ||
+    !files.every(
+      (file) =>
+        typeof file?.filename === 'string' &&
+        (file.previous_filename === undefined || typeof file.previous_filename === 'string'),
+    )
+  ) {
+    throw new Error('The PR file list is incomplete or malformed');
+  }
+  return files;
+}
+
 function newestOwnCheck(repo, sha) {
   const runs = ghJson([
     'api',
@@ -128,15 +144,29 @@ function evaluate(repo, number) {
     return;
   }
   const sha = pr.head.sha;
+  const check = newestOwnCheck(repo, sha);
+  let files;
+  try {
+    files = loadFiles(repo, pr);
+  } catch (error) {
+    console.error(error.message);
+    writeCheck(repo, sha, check, {
+      status: 'completed',
+      conclusion: 'failure',
+      title: 'Cannot determine the required security review',
+      summary:
+        'The PR file list could not be verified. Re-evaluate after the complete file list is available; a previous successful check cannot qualify this head.',
+    });
+    return;
+  }
   const comments = listPaged(`repos/${repo}/issues/${number}/comments`);
   const stateEntry = trustedStateComment(comments);
   const loaded = loadThreads(repo, number);
   const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
-  const threads = hasFindings
-    ? markPreExisting(loaded, listPaged(`repos/${repo}/pulls/${number}/files`))
-    : loaded;
+  const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
-  const check = newestOwnCheck(repo, sha);
+  const needsSecurity = requiresSecurityReview(files);
+  const securityEntry = needsSecurity ? trustedStateComment(comments, 'security_review') : null;
   const result = decide(
     pr,
     stateEntry?.state ?? null,
@@ -148,6 +178,7 @@ function evaluate(repo, number) {
       requested: reviewRequested(comments, sha),
     },
     blockRounds(comments, sha),
+    needsSecurity ? { state: securityEntry?.state ?? null } : null,
   );
   console.log(
     `PR #${number} ${sha.slice(0, 7)}: ${result.status} ${result.conclusion ?? ''} ${result.title}`,
@@ -181,7 +212,13 @@ function sweep(repo) {
   for (const pr of open) {
     try {
       const check = newestOwnCheck(repo, pr.head.sha);
-      if (check?.status === 'completed' && check.conclusion === 'success') continue;
+      if (check?.status === 'completed' && check.conclusion === 'success') {
+        try {
+          if (!requiresSecurityReview(loadFiles(repo, pr))) continue;
+        } catch (error) {
+          console.error(`PR #${pr.number}: ${error.message}; re-evaluating the check`);
+        }
+      }
       ghWrite('POST', `repos/${repo}/actions/workflows/${GATE_WORKFLOW}/dispatches`, {
         ref: 'main',
         inputs: { pr: String(pr.number) },

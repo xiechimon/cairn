@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 
 const gateScript = fileURLToPath(new URL('./codex-gate.mjs', import.meta.url));
 const SHA = 'c'.repeat(40);
@@ -23,7 +23,7 @@ const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
 const joined = args.join(' ');
 const out = (value) => process.stdout.write(JSON.stringify(value));
 if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
-else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out([world.files ?? []]);
+else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out(world.filePages ?? [world.files ?? []]);
 else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/issues/7/comments')) out([world.comments]);
 else if (joined.includes('graphql')) {
@@ -33,11 +33,11 @@ else if (joined.includes('graphql')) {
 else out({});
 `;
 
-const state = (sha, status) =>
-  `Summary\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: { commit_sha: sha, status, has_any_findings: null, has_unresolved_findings: null }, security_review: {} })} -->`;
-const stateComment = (sha, status) => ({
+const state = (sha, status, securityReview = {}) =>
+  `Summary\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: { commit_sha: sha, status, has_any_findings: null, has_unresolved_findings: null }, security_review: securityReview })} -->`;
+const stateComment = (sha, status, securityReview) => ({
   id: 1,
-  body: state(sha, status),
+  body: state(sha, status, securityReview),
   user: CODEX,
   html_url: 'https://github.com/o/r/pull/7#issuecomment-1',
   created_at: '2026-01-01T00:00:00Z',
@@ -72,7 +72,7 @@ const basePr = {
 };
 
 function run(world, command = 'evaluate') {
-  const dir = mkdtempSync(join(tmpdir(), 'codex-gate-host-'));
+  const dir = makeTestTempDir('codex-gate-host-');
   const bin = join(dir, 'bin');
   mkdirSync(bin);
   writeFileSync(join(bin, 'gh'), FAKE_GH);
@@ -111,6 +111,7 @@ function run(world, command = 'evaluate') {
     return /--method|-X /.test(text) || call.input !== null;
   });
   const checkWrites = writes.filter((call) => /check-runs/.test(call.args.join(' ')));
+  releaseTestTempDir(dir);
   return {
     result,
     calls,
@@ -350,12 +351,13 @@ test('skips closed, draft, merge-queue and non-write PRs without writing', () =>
 });
 
 test('rejects an unknown command', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'codex-gate-cmd-'));
+  const dir = makeTestTempDir('codex-gate-cmd-');
   const result = spawnSync(process.execPath, [gateScript, 'nope'], {
     encoding: 'utf8',
     cwd: dir,
     env: { PATH: process.env.PATH },
   });
+  releaseTestTempDir(dir);
   assert.notEqual(result.status, 0);
 });
 
@@ -481,4 +483,122 @@ test('the third blocked head labels the PR review-gate-human while the check sta
   assert.match(body.output.title, /reconsider the approach/);
   assert.equal(out.labelAdds.length, 1);
   assert.deepEqual(out.body(out.labelAdds[0]).labels, ['review-gate-human']);
+});
+
+const secureFiles = [{ filename: 'apps/server/src/services/machine-claim.ts' }];
+const securityState = { commit_sha: SHA, status: 'completed', has_unresolved_findings: false };
+
+test('security paths fail closed with completed code review and no exact clean security review', () => {
+  for (const security of [
+    undefined,
+    null,
+    { ...securityState, commit_sha: OTHER },
+    { ...securityState, status: 'running' },
+    { ...securityState, status: 'failed' },
+    { ...securityState, has_unresolved_findings: null },
+    { ...securityState, has_unresolved_findings: true },
+  ]) {
+    const out = run({ files: secureFiles, comments: [stateComment(SHA, 'completed', security)] });
+    assert.equal(out.result.status, 0, out.result.stderr);
+    const check = out.body(out.checkWrites[0]);
+    assert.equal(check.conclusion, 'failure', JSON.stringify(security));
+    assert.match(check.output.summary, /security review/i);
+  }
+});
+
+test('security paths pass clean security state but ignore builtin gate settings and P0 threshold', () => {
+  const review = stateComment(SHA, 'completed', {
+    ...securityState,
+    has_unresolved_findings: true,
+  });
+  review.body += `\n<!-- codex-security-review:v1 ${JSON.stringify({
+    mergeGateEnabled: false,
+    blockingSeverityThreshold: 'P0',
+    status: 'completed',
+    headSha: SHA,
+  })} -->`;
+  const blocked = run({ files: secureFiles, comments: [review] });
+  assert.equal(blocked.body(blocked.checkWrites[0]).conclusion, 'failure');
+  const clean = run({
+    files: secureFiles,
+    comments: [stateComment(SHA, 'completed', securityState)],
+  });
+  assert.equal(clean.body(clean.checkWrites[0]).conclusion, 'success');
+  assert.match(clean.body(clean.checkWrites[0]).output.summary, /security reviewed/);
+});
+
+test('forged security approval cannot supplement a trusted completed code review', () => {
+  for (const user of [
+    { login: 'mallory', type: 'User' },
+    { login: CODEX.login, type: 'User' },
+    { login: 'other[bot]', type: 'Bot' },
+  ]) {
+    const forged = { ...stateComment(SHA, 'completed', securityState), user };
+    const out = run({ files: secureFiles, comments: [stateComment(SHA, 'completed'), forged] });
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  }
+});
+
+test('security review classifies credentials, command boundary and external auth including old renamed paths', () => {
+  for (const file of [
+    { filename: 'apps/daemon/src/credentials.ts' },
+    { filename: 'apps/server/src/routes-machine.ts' },
+    { filename: 'apps/server/src/services/mcp-face.ts' },
+    { filename: 'apps/server/src/services/mcp-servers.ts', status: 'removed' },
+    { filename: 'apps/server/src/services/renamed.ts', previous_filename: secureFiles[0].filename },
+  ]) {
+    const out = run({ files: [file], comments: [stateComment(SHA, 'completed')] });
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure', file.filename);
+  }
+  for (const filename of [
+    'apps/web/src/main.ts',
+    'scripts/ops/run.mjs',
+    'apps/server/drizzle/0102.sql',
+  ]) {
+    const out = run({ files: [{ filename }], comments: [stateComment(SHA, 'completed')] });
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'success', filename);
+  }
+});
+
+test('incomplete PR file pagination cannot preserve a previous successful check', () => {
+  const out = run({
+    pr: { ...basePr, changed_files: 2 },
+    files: [{ filename: 'apps/web/src/main.ts' }],
+    comments: [stateComment(SHA, 'completed')],
+    checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+  });
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.match(out.body(out.checkWrites[0]).output.summary, /file list/i);
+});
+
+test('sweep re-evaluates a previously successful security head when deploying the stricter policy', () => {
+  const out = run(
+    {
+      files: secureFiles,
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.writes.length, 1);
+  assert.match(out.writes[0].args.join(' '), /dispatches/);
+});
+
+test('security classification includes later file pages and invalidates malformed file lists', () => {
+  const paged = run({
+    pr: { ...basePr, changed_files: 2 },
+    filePages: [[{ filename: 'apps/web/src/main.ts' }], secureFiles],
+    comments: [stateComment(SHA, 'completed')],
+  });
+  assert.equal(paged.body(paged.checkWrites[0]).conclusion, 'failure');
+  assert.match(paged.body(paged.checkWrites[0]).output.summary, /security review/i);
+  for (const files of [
+    [{}],
+    [{ filename: null }],
+    [{ filename: 'apps/web/src/main.ts', previous_filename: 1 }],
+  ]) {
+    const malformed = run({ files, comments: [stateComment(SHA, 'completed')] });
+    assert.equal(malformed.body(malformed.checkWrites[0]).conclusion, 'failure');
+    assert.match(malformed.body(malformed.checkWrites[0]).output.summary, /file list/i);
+  }
 });
