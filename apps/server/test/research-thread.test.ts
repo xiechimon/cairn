@@ -124,6 +124,23 @@ describe('openResearchThread', () => {
     expect(pick(1)).toBe('agent-sonnet');
   });
 
+  test.each([1, 2] as const)(
+    'tier %i prefers a persona-free agent over a preferred-model reviewer',
+    async (tier) => {
+      const w = await world();
+      addAgent(w.s, 'agent-a-reviewer', { persona: 'test_engineer', modelId: 'claude-opus-5-5' });
+      addAgent(w.s, 'agent-b-reviewer', { persona: 'code_reviewer' });
+      addAgent(w.s, 'agent-researcher');
+      const opened = openResearchThread(w.s.svc, {
+        teamId: w.teamId,
+        projectId: w.projectId,
+        tier,
+        ...base,
+      });
+      expect(opened.agentId).toBe('agent-researcher');
+    },
+  );
+
   test('without the tier model, a sonnet or opus agent beats a haiku agent', async () => {
     const w = await world();
     addAgent(w.s, 'agent-a-haiku', { modelId: 'claude-haiku-5-5' });
