@@ -1,0 +1,15 @@
+{
+  "messages": [
+    {
+      "id": "chief-report-wbJIaBIzvJjYbYVM5j49B",
+      "role": "system",
+      "content": "{\"kind\":\"chief_daily_report\",\"day\":\"2026-11-04\",\"covers\":\"2026-11-03\",\"status\":\"posted\",\"madeAt\":1793752200000,\"yesterday\":{\"finished\":[{\"id\":\"finished-task\",\"seq\":100,\"title\":\"Finished fixture task\"}],\"finishedCount\":1,\"merged\":[],\"mergedCount\":0,\"failed\":[],\"failedCount\":0,\"retries\":0,\"quotaWaits\":0,\"verdicts\":{\"pass\":0,\"block\":0}},\"needsYou\":{\"count\":0,\"todos\":[],\"questions\":0},\"retro\":[],\"intake\":[],\"retroRan\":false,\"truncated\":[]}",
+      "createdAt": 1793752200000
+    }
+  ],
+  "chips": [],
+  "historyEpoch": 0,
+  "steerPending": [],
+  "activeRun": null,
+  "nextCursor": null
+}

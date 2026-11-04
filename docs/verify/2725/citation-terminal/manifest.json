@@ -1,0 +1,27 @@
+{
+  "testedCommit": "85d7ae24208f9cd93c3020849091e62d99be343f",
+  "tool": "Official Swagger UI v5.34.1; actual isolated Cairn GET Execute",
+  "api": "http://127.0.0.1:36725/api/conversations/chief-d63-evidence/messages?limit=1",
+  "providerMode": "Mock source/checker reports; real Hono/SQLite/scheduler restart and report refresh. No real model/auth.",
+  "beforeItems": 0,
+  "supportedCandidates": 7,
+  "afterItems": 5,
+  "errors": [],
+  "implementationPR": "https://github.com/xiechimon/cairn/pull/2908",
+  "sourceRequirement": "https://github.com/xiechimon/cairn/blob/3e1bde9971ce50552be344dd49396e82dbbd0a6c/docs/research/research-loop-plan.md#12-decisions",
+  "fileHashes": {
+    "source-requirement-citations.png": "3215e5816bb4683de68aef481fbb26e939ed1c8fa897c4606fbdfba715b0229f",
+    "source-requirement-decisions.png": "24346d1d920d59cb779907a5897e0b63c7a825f464f2a5fbb54a8a53d1db4ad4",
+    "swagger-before.png": "e4e5a18df143250df88283d185fc52ec0b19947dfe09d1ebb5e25f0808b2d23d",
+    "swagger-after.png": "9983f97aa336671dd669d029bfad9ec14fc603f043a23f67c893c2a229b9395a",
+    "before.json": "982097a012760ece87543a3cfb62b22ab2278475a140237e455edb781635b771",
+    "after.json": "079e555b06972b204b1ddfe1f29bde7a30f7cb8518f8d40fbffc8607e11abbeb",
+    "runtime-result.json": "4034ec0c12469cf66fb1412a40431455af64c37c2ad417262f0f126eea571848"
+  },
+  "checks": {
+    "terminalInvalidReplaced": true,
+    "inflightReplacementReused": true,
+    "originalReportPreserved": true,
+    "repeatedTickStillFive": true
+  }
+}

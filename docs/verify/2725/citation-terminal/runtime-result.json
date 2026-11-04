@@ -1,0 +1,45 @@
+{
+  "surface": "real Hono API + disk SQLite + scheduler restart + persisted delivery + original report card update",
+  "providerMode": "mock source/checker reports; no actual model or auth",
+  "base": "http://127.0.0.1:36725",
+  "apiPath": "/api/conversations/chief-d63-evidence/messages?limit=1",
+  "checks": {
+    "terminalInvalidReplaced": true,
+    "inflightReplacementReused": true,
+    "before": 0,
+    "after": 5,
+    "supportedCandidates": 7,
+    "repeatedTickStillFive": true,
+    "originalReportId": "wbJIaBIzvJjYbYVM5j49B"
+  },
+  "before": {
+    "messages": [
+      {
+        "id": "chief-report-wbJIaBIzvJjYbYVM5j49B",
+        "role": "system",
+        "content": "{\"kind\":\"chief_daily_report\",\"day\":\"2026-11-04\",\"covers\":\"2026-11-03\",\"status\":\"posted\",\"madeAt\":1793752200000,\"yesterday\":{\"finished\":[{\"id\":\"finished-task\",\"seq\":100,\"title\":\"Finished fixture task\"}],\"finishedCount\":1,\"merged\":[],\"mergedCount\":0,\"failed\":[],\"failedCount\":0,\"retries\":0,\"quotaWaits\":0,\"verdicts\":{\"pass\":0,\"block\":0}},\"needsYou\":{\"count\":0,\"todos\":[],\"questions\":0},\"retro\":[],\"intake\":[],\"retroRan\":false,\"truncated\":[]}",
+        "createdAt": 1793752200000
+      }
+    ],
+    "chips": [],
+    "historyEpoch": 0,
+    "steerPending": [],
+    "activeRun": null,
+    "nextCursor": null
+  },
+  "after": {
+    "messages": [
+      {
+        "id": "chief-report-wbJIaBIzvJjYbYVM5j49B",
+        "role": "system",
+        "content": "{\"kind\":\"chief_daily_report\",\"day\":\"2026-11-04\",\"covers\":\"2026-11-03\",\"status\":\"posted\",\"madeAt\":1793752200000,\"yesterday\":{\"finished\":[{\"id\":\"finished-task\",\"seq\":100,\"title\":\"Finished fixture task\"}],\"finishedCount\":1,\"merged\":[],\"mergedCount\":0,\"failed\":[],\"failedCount\":0,\"retries\":0,\"quotaWaits\":0,\"verdicts\":{\"pass\":0,\"block\":0}},\"needsYou\":{\"count\":0,\"todos\":[],\"questions\":0},\"retro\":[],\"intake\":[{\"id\":\"LkKOUBBJttpyJDCwf4B68\",\"url\":\"https://example.com/releases/v2?candidate=1\",\"claim\":\"Version 2 adds cursor paging.\",\"matches\":\"Cursor export\",\"action\":\"Evaluate cursor paging.\",\"projectId\":\"23DBr8ThipE9X0--ZmEoM\",\"status\":\"draft\",\"todoId\":null},{\"id\":\"QGLuaDB49qnZimR5OHBgz\",\"url\":\"https://example.com/releases/v2?candidate=2\",\"claim\":\"Paging capability 2\",\"matches\":\"Cursor export\",\"action\":\"Evaluate cursor paging.\",\"projectId\":\"23DBr8ThipE9X0--ZmEoM\",\"status\":\"draft\",\"todoId\":null},{\"id\":\"B0FDQkJ2m-LK-Dp8POX3C\",\"url\":\"https://example.com/releases/v2?candidate=3\",\"claim\":\"Paging capability 3\",\"matches\":\"Cursor export\",\"action\":\"Evaluate cursor paging.\",\"projectId\":\"23DBr8ThipE9X0--ZmEoM\",\"status\":\"draft\",\"todoId\":null},{\"id\":\"8x0OvLuXtHIbSEVHnZg6U\",\"url\":\"https://example.com/releases/v2?candidate=4\",\"claim\":\"Paging capability 4\",\"matches\":\"Cursor export\",\"action\":\"Evaluate cursor paging.\",\"projectId\":\"23DBr8ThipE9X0--ZmEoM\",\"status\":\"draft\",\"todoId\":null},{\"id\":\"QWMn5I0gnUc1Ihv9GzEpK\",\"url\":\"https://example.com/releases/v2?candidate=5\",\"claim\":\"Paging capability 5\",\"matches\":\"Cursor export\",\"action\":\"Evaluate cursor paging.\",\"projectId\":\"23DBr8ThipE9X0--ZmEoM\",\"status\":\"draft\",\"todoId\":null}],\"retroRan\":false,\"truncated\":[]}",
+        "createdAt": 1793752200000
+      }
+    ],
+    "chips": [],
+    "historyEpoch": 0,
+    "steerPending": [],
+    "activeRun": null,
+    "nextCursor": null
+  }
+}
