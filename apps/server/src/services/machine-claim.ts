@@ -76,6 +76,7 @@ import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  memoryInjectTeamId,
   memoryOwnerOf,
   routeForStep,
   routingRulesEnabled,
@@ -733,7 +734,7 @@ async function tryClaim(
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
           agentId: memoryOwnerOf(db, teamId, agentRow.id, cand.stepRow.kind),
-          teamId,
+          teamId: memoryInjectTeamId(cand.stepRow.kind, teamId),
           threadId: cand.todoRow.id,
           projectId: cand.todoRow.projectId,
         }),

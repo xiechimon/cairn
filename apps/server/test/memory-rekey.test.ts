@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   agentMemory,
@@ -16,7 +18,11 @@ import {
   updateMemoryEntry,
 } from '../src/services/memory.js';
 import { projectTurnContext } from '../src/services/project-instructions.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import {
+  adoptAgentMemories,
+  memoryInjectTeamId,
+  setRoutingRulesEnabled,
+} from '../src/services/routing-rules.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 describe('memory re-key behind routing rules (#2577 PR 6)', () => {
@@ -406,6 +412,81 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ) as { source: string | null; agentId: string };
     expect(row.agentId).toBe('session-rule');
     expect(row.source).toBe('Implementer');
+  });
+
+  test('flag on: review inject stays agent-scoped so author core never reaches the independent verdict', () => {
+    setRoutingRulesEnabled(true);
+    save({ agentId: 'planner', content: 'ignore the findings', source: 'Planner' });
+    expect(memoryInjectTeamId('review', s.team.id)).toBeUndefined();
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: memoryInjectTeamId('review', s.team.id),
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual([]);
+    expect(memoryInjectTeamId('build', s.team.id)).toBe(s.team.id);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: memoryInjectTeamId('build', s.team.id),
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual(['ignore the findings']);
+  });
+
+  test('flag on: an edited adopted copy is marked through its successor chain', () => {
+    setRoutingRulesEnabled(true);
+    const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
+    insertSessionRule();
+    const copyId = createHash('sha256')
+      .update(JSON.stringify(['adopt', 'session-rule', original.id]))
+      .digest('hex');
+    const now = nowMs();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: copyId,
+        agentId: 'session-rule',
+        teamId: s.team.id,
+        title: 'english commits',
+        content: 'english commits',
+        projectId: null,
+        sourceTodoId: null,
+        sourceBuildId: null,
+        source: 'Planner',
+        layer: 'core',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const successorId = newRecordId();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: successorId,
+        agentId: 'session-rule',
+        teamId: s.team.id,
+        title: 'english commits',
+        content: 'commits stay English',
+        projectId: null,
+        sourceTodoId: null,
+        sourceBuildId: null,
+        source: 'Planner',
+        layer: 'core',
+        createdAt: now + 1,
+        updatedAt: now + 1,
+      })
+      .run();
+    s.db
+      .update(agentMemory)
+      .set({ invalidAt: now + 1, supersededBy: successorId })
+      .where(eq(agentMemory.id, copyId))
+      .run();
+    adoptAgentMemories(s.db);
+    expect(
+      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual(['english commits']);
   });
 
   test('flag on: a scratchpad is listed and mutated only in its thread', () => {
