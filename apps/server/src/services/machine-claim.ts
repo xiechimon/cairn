@@ -5,7 +5,6 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
-  CHIEF_REMOTE_TOOLS,
   claudeLoginBlocksClaim,
   claudeRateBlock,
   formatSkillRouteSection,
@@ -75,7 +74,12 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
-import { memoryOwnerOf, routeForStep, routingRulesEnabled } from './routing-rules.js';
+import {
+  chiefRemoteTools,
+  memoryOwnerOf,
+  routeForStep,
+  routingRulesEnabled,
+} from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -332,7 +336,7 @@ function chiefClaimPayload(
       systemPrompt,
       trigger,
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : chiefRemoteTools())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(digest ? { remoteToolsOnly: true as const } : {}),
   };

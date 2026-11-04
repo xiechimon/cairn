@@ -104,7 +104,7 @@ function openQuestion(
   const record = setTodoPhase(deps, todoRow.id, todoRow.phase, { awaitingReply: true });
   if (record !== null) {
     notifyTodoPhase(deps, record, 'review', safeBody(body.questions[0]?.question));
-    postThreadReport(deps, record, 'review', questionReportLine(body.questions[0]?.question));
+    postThreadReport(deps, record, 'needs-you', questionReportLine(body.questions[0]?.question));
     pushWorkerQuestion(
       deps,
       row.buildId,

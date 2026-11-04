@@ -119,7 +119,7 @@ describe('worker ask_user on a session step', () => {
       { holdMs: 0 },
     );
     const [report] = questionReports();
-    expect(report!.phase).toBe('review');
+    expect(report!.phase).toBe('needs-you');
     expect(report!.todoId).toBe(todoId);
     expect(report!.line!.startsWith('Which export format and encoding')).toBe(true);
     expect(report!.line!.length).toBeLessThanOrEqual(200);

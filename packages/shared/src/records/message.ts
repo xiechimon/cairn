@@ -197,7 +197,7 @@ export const THREAD_REPORT_LINE_MAX = 200;
 export const threadReportContentSchema = z.object({
   kind: z.literal('thread-report'),
   todoId: recordId,
-  phase: z.enum(['done', 'failed', 'review']),
+  phase: z.enum(['done', 'failed', 'review', 'needs-you']),
   seqNum: z.number().int().positive(),
   title: z.string(),
   wakeStepId: recordId.optional(),

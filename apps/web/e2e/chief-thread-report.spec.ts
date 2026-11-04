@@ -97,3 +97,62 @@ test('a notify_user notice from an event turn shows in the conversation', async 
   await expect(stream).not.toContainText('Checking machines first.');
   await expect(stream).not.toContainText('Internal failure instructions');
 });
+
+const NEEDS_YOU_ROWS = [
+  { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+  {
+    id: 'report',
+    role: 'system',
+    content: JSON.stringify({
+      kind: 'thread-report',
+      todoId: TASK.id,
+      phase: 'needs-you',
+      seqNum: TASK.seqNum,
+      title: 'Add an export',
+      line: 'Which export format?',
+    }),
+    createdAt: 20,
+  },
+];
+
+test('a needs-you report shows the thread own line and answers the question through the thread message path', async ({
+  page,
+}) => {
+  const sent: Record<string, unknown>[] = [];
+  await mockLive(
+    page,
+    {
+      threads: [THREAD],
+      messages: NEEDS_YOU_ROWS,
+      todos: [{ ...TASK, phase: 'building', awaitingReply: true }],
+    },
+    (path, route, json) => {
+      if (path !== `/api/todos/${TASK.id}/messages` || route.request().method() !== 'POST') return;
+      sent.push(route.request().postDataJSON() as Record<string, unknown>);
+      return json({ todoId: TASK.id, conversationId: 'build-1', delivered: 'steer' }, 201);
+    },
+  );
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  const marker = stream.getByTestId('thread-report-marker');
+  await expect(marker).toHaveAttribute('data-phase', 'needs-you');
+  await expect(marker).toHaveText('任务 #9 Add an export：待你决定Which export format?');
+  await stream.getByTestId('thread-report-reply').getByRole('button', { name: '回复' }).click();
+  await page.getByRole('textbox', { name: '回复 #9' }).fill('JSON please');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => sent).toHaveLength(1);
+  expect(sent[0]).toMatchObject({ content: 'JSON please' });
+  expect(typeof sent[0]?.clientMessageId).toBe('string');
+});
+
+test('a needs-you report offers no reply once the question is answered', async ({ page }) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: NEEDS_YOU_ROWS,
+    todos: [{ ...TASK, phase: 'building' }],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream.getByTestId('thread-report-marker')).toBeVisible();
+  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(0);
+});

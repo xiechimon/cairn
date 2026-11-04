@@ -22,5 +22,7 @@ export function reportStatusWord(
       return STATUS_WORDS.failed;
     case 'review':
       return STATUS_WORDS.inReview;
+    case 'needs-you':
+      return STATUS_WORDS.needsYou;
   }
 }
