@@ -2,7 +2,8 @@ import { SESSION_BRIEF, threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, message, step, todo } from '../src/db/schema.js';
-import { startBuilds } from '../src/services/builds.js';
+import { completeStep, startBuilds } from '../src/services/builds.js';
+import { countMarkedRounds } from '../src/services/ci-loop.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
@@ -350,5 +351,103 @@ describe('D65 report line on every thread', () => {
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     setTodoPhase(deps(), todoId, 'review');
     expect(reports()).toHaveLength(0);
+  });
+});
+
+describe('session steps share the build-step paths', () => {
+  function claim(stepId: string) {
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepId)).run();
+    return H.s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+  }
+
+  test('a session turn that parked on an unanswered ask with no changes parks instead of failing', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    completeStep(deps(), stepRow.id, { hasChanges: false });
+    const record = getTodo(deps(), todoId)!;
+    expect(record.phase).not.toBe('failed');
+    expect(record.awaitingReply).toBe(true);
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+    };
+    expect(content.status).toBe('pending');
+  });
+
+  test('a session turn with no changes and no question still fails the artifact gate', () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    claim(stepRow.id);
+    completeStep(deps(), stepRow.id, { hasChanges: false });
+    expect(getTodo(deps(), todoId)!.phase).toBe('failed');
+  });
+
+  test('session steps count toward the marked repair rounds', () => {
+    const { buildId } = startSession(false);
+    H.s.db
+      .insert(step)
+      .values({
+        id: 'repair-1',
+        buildId,
+        kind: 'session',
+        status: 'done',
+        prompt: '[ci-fix] round 1',
+        createdAt: 5,
+      })
+      .run();
+    expect(countMarkedRounds(H.s.db, buildId, '[ci-fix]')).toBe(1);
+  });
+
+  test('restart reuses the build when a failed session step preserved a checkpoint', async () => {
+    const { todoId, buildId, stepRow } = startSession(false);
+    H.s.db
+      .update(step)
+      .set({ status: 'failed', checkpointCommit: 'c'.repeat(40) })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    H.s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, todoId)).run();
+    const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'Continue from the checkpoint',
+      clientMessageId: 'c-r',
+    });
+    expect(sent.delivered).toBe('restart');
+    expect(sent.conversationId).toBe(buildId);
+  });
+
+  test('a reply that moves a review thread on marks the parked question answered', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    const claimed = claim(stepRow.id);
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      { requestId: REQUEST, questions: QUESTIONS },
+      { holdMs: 0 },
+    );
+    H.s.db
+      .update(step)
+      .set({ status: 'done', sessionId: 'sess-1' })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    setTodoPhase(deps(), todoId, 'review');
+    H.s.db.update(todo).set({ awaitingReply: true }).where(eq(todo.id, todoId)).run();
+    const sent = await messageThreadAsUser(deps(), H.teamId, todoId, {
+      content: 'JSON please',
+      clientMessageId: 'c-q',
+    });
+    expect(sent.delivered).toBe('revision');
+    const content = H.s.db.select().from(message).where(eq(message.id, REQUEST)).get()!.content as {
+      status: string;
+      answers: unknown;
+    };
+    expect(content.status).toBe('answered');
+    expect(content.answers).toEqual([{ header: 'Format', text: 'JSON please' }]);
+    expect(getTodo(deps(), todoId)!.awaitingReply).toBeUndefined();
   });
 });

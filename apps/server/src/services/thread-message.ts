@@ -11,7 +11,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, sendBuildSteer } from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
-import { settleWorkerReply } from './worker-questions.js';
+import { answerWorkerQuestionsById, pendingWorkerQuestionIds } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -115,8 +115,9 @@ export async function messageThreadAsUser(
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
+  const parked = pendingWorkerQuestionIds(deps.db, row.latestBuildId);
   const sent = await deliver(deps, row, row.latestBuildId, body);
-  settleWorkerReply(deps, row.latestBuildId, body.content);
+  answerWorkerQuestionsById(deps, row.latestBuildId, parked, body.content);
   recordInCoordinator(deps, row, body.content, sent);
   return { todoId: row.id, ...sent };
 }

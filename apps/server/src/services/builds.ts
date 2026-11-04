@@ -167,6 +167,7 @@ import {
   splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
+import { pendingWorkerQuestions } from './worker-question-store.js';
 import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
@@ -1352,7 +1353,7 @@ export async function applyBuildStepAction(
       .where(
         and(
           eq(step.buildId, row.id),
-          eq(step.kind, 'build'),
+          inArray(step.kind, ['build', 'session']),
           eq(step.status, 'failed'),
           isNotNull(step.checkpointCommit),
         ),
@@ -2615,6 +2616,9 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (isBuildStepKind(stepRow.kind)) {
+    if (stepRow.kind === 'session' && pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0) {
+      return null;
+    }
     if (outcome.output === 'info') {
       return outcome.report === undefined ? '信息卡未产出报告' : null;
     }

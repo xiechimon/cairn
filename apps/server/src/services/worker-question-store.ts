@@ -76,6 +76,33 @@ function pendingRows(db: Db, buildId: string) {
     });
 }
 
+export function pendingWorkerQuestionIds(db: Db, buildId: string): string[] {
+  return pendingRows(db, buildId).map((row) => row.id);
+}
+
+export function answerWorkerQuestionsById(
+  deps: StoreDeps,
+  buildId: string,
+  ids: string[],
+  text: string,
+): void {
+  for (const id of ids) {
+    const row = deps.db
+      .select()
+      .from(message)
+      .where(and(eq(message.id, id), eq(message.conversationId, buildId)))
+      .get();
+    const content = row === undefined ? null : contentOf(row.content);
+    if (row === undefined || content === null || content.status === 'answered') continue;
+    const answers: AskUserAnswer[] = content.questions.map((question) => ({
+      header: question.header,
+      text,
+    }));
+    const { cancelReason: _cancelled, ...rest } = content;
+    writeWorkerQuestion(deps, buildId, id, { ...rest, status: 'answered', answers }, row.createdAt);
+  }
+}
+
 export function pendingWorkerQuestions(db: Db, buildId: string): AskUserQuestionContent[] {
   return pendingRows(db, buildId).map((row) => row.content);
 }
