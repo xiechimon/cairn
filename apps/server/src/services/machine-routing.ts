@@ -1,5 +1,5 @@
 import { claudeLoginBlocksClaim, claudeRateBlock, isBuildStepKind } from '@cairn/shared';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type agent, type build, type machine, step } from '../db/schema.js';
 import { claudeUsageGatePasses } from './claude-rate-limit.js';
@@ -82,7 +82,7 @@ export function priorSessionOf(
         sql`${step.sessionId} is not null`,
         ...(isBuildStepKind(stepRow.kind) &&
         (buildRow.prevPhase === 'done' || buildRow.prevPhase === 'review')
-          ? [eq(step.kind, stepRow.kind)]
+          ? [inArray(step.kind, ['build', 'session'])]
           : []),
       ),
     )

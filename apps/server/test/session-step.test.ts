@@ -195,4 +195,21 @@ describe('session steps share the build-step paths', () => {
       .find((r) => r.status === 'pending')!;
     expect(priorSessionOf(H.s.db, next, buildRow).priorSessionId).toBe('impl-session');
   });
+
+  test('a build step enqueued inside a session build resumes the session step', async () => {
+    const { buildId, stepRow } = startSession(false);
+    H.s.db
+      .update(step)
+      .set({ status: 'done', sessionId: 'impl-session', createdAt: 1 })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    H.s.db
+      .insert(step)
+      .values({ id: 'fb-build', buildId, kind: 'build', status: 'pending', createdAt: 2 })
+      .run();
+    H.s.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
+    const buildRow = H.s.db.select().from(build).where(eq(build.id, buildId)).get()!;
+    const next = H.s.db.select().from(step).where(eq(step.id, 'fb-build')).get()!;
+    expect(priorSessionOf(H.s.db, next, buildRow).priorSessionId).toBe('impl-session');
+  });
 });

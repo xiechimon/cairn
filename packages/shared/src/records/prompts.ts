@@ -457,6 +457,9 @@ function wrappedBy(text: string, head: string, tail: string): boolean {
 function matchesSyntheticTemplates(text: string): boolean {
   return (
     SYNTHETIC_EXACT.has(text) ||
+    text === SESSION_BRIEF ||
+    text.startsWith(`${SESSION_BRIEF}\n\n`) ||
+    text.startsWith(SESSION_REWORK_BRIEF) ||
     wrappedBy(text, REPLAN_HEAD, REPLAN_TAIL) ||
     wrappedBy(text, REVIEW_REJECT_HEAD, REVIEW_REJECT_TAIL) ||
     wrappedBy(text, RESTART_HEAD, RESTART_TAIL) ||
