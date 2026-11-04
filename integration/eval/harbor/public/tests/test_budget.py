@@ -345,3 +345,14 @@ def test_partially_unpriced_trial_keeps_its_known_step_spend_as_a_floor(
     usd, source = budget.settlement([trial], reserved_usd=4.0)
     assert usd == 60.0
     assert source == budget.UNKNOWN_SETTLED_AT_RESERVATION
+
+
+def test_settled_usd_reports_settled_runs_and_none_for_the_rest(ledger: Path) -> None:
+    budget.reserve("done", 5.0, now=NOV)
+    budget.settle("done", 2.5, "agent-reported total_cost_usd", now=NOV)
+    budget.reserve("open", 5.0, now=NOV)
+    assert budget.settled_usd(["done", "open", "never"]) == {
+        "done": 2.5,
+        "open": None,
+        "never": None,
+    }
