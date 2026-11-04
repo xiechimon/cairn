@@ -441,6 +441,27 @@ test('a completed session execution satisfies the same issue, PR and machine joi
   assert.ok(result.lines.includes('trial-one: ok'));
 });
 
+test('a completed session with an unanswered user question cannot prove trial completion', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'][0].kind = 'session';
+  w.responses['/api/todos/todo-1'].awaitingReply = true;
+
+  const result = await w.run();
+
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.startsWith('server-reply:')));
+  assert.ok(!result.lines.includes('server: checked'));
+  assert.ok(!result.lines.includes('trial-one: ok'));
+});
+
+test('an answered question allows the completed session to satisfy trial evidence', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'][0].kind = 'session';
+  w.responses['/api/todos/todo-1'].awaitingReply = false;
+
+  assert.equal((await w.run()).ok, true);
+});
+
 test('a foreign-machine session cannot hide beside a valid legacy build step', async () => {
   const w = world();
   w.responses['/api/builds/build-1/steps'].push({
@@ -675,6 +696,7 @@ test('CLI returns a named failure for a missing evidence file without node_modul
 for (const scenario of [
   'ok',
   'session',
+  'awaiting reply',
   'missing URL',
   'missing token',
   'missing both',
@@ -684,7 +706,9 @@ for (const scenario of [
     const dir = makeTestTempDir('orb-trial-');
     const w = world();
     const responses = serverWorld().responses;
-    if (scenario === 'session') responses['/api/builds/build-1/steps'][0].kind = 'session';
+    if (['session', 'awaiting reply'].includes(scenario))
+      responses['/api/builds/build-1/steps'][0].kind = 'session';
+    if (scenario === 'awaiting reply') responses['/api/todos/todo-1'].awaitingReply = true;
     const requests = [];
     const server = createServer((req, res) => {
       requests.push(req.url);
@@ -739,6 +763,14 @@ process.stdout.write(JSON.stringify(value));
       if (scenario === 'ok' || scenario === 'session') {
         assert.equal(result.stdout, 'push: ok\ndist: ok\nserver: checked\ntrial-one: ok\n');
         assert.equal(requests.length, 4);
+      } else if (scenario === 'awaiting reply') {
+        assert.equal(result.code, 1);
+        assert.equal(
+          result.stdout,
+          'push: ok\ndist: ok\nserver-reply: trial Thread must not be waiting for a user reply\n',
+        );
+        assert.equal(requests.length, 4);
+        assert.ok(!result.stdout.includes('trial-one: ok'));
       } else {
         assert.equal(result.code, 1);
         assert.equal(

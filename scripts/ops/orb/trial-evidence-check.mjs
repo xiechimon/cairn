@@ -262,6 +262,11 @@ export async function checkTrialEvidence(evidence, options = {}) {
           todo.sourceRef?.toLowerCase() === `github:${repo}#${e.issue}`.toLowerCase(),
         'server build must belong to the trial issue and conversation',
       );
+      check(
+        'server-reply',
+        todo.awaitingReply !== true,
+        'trial Thread must not be waiting for a user reply',
+      );
       const buildSteps = steps.filter(
         (step) =>
           (step.kind === 'build' || step.kind === 'session') &&
