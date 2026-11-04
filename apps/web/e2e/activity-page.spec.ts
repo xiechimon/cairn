@@ -1,0 +1,160 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, type Page, test } from '@playwright/test';
+import { mockLive } from './chief-home-mock';
+
+const ACTIVITY = '/app/activity?scenario=activity';
+
+const groups = (page: Page) => page.getByTestId('activity-group');
+const group = (page: Page, id: string) => page.locator(`[data-testid="activity-group"][data-group="${id}"]`);
+const chips = (page: Page) => page.getByTestId('query-chip');
+const rows = (page: Page) => page.locator('[data-slot="thread-row"]');
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+});
+
+test('threads are grouped by day with a count and the cost of each group', async ({ page }) => {
+  await page.goto(ACTIVITY);
+  await expect(groups(page)).toHaveCount(4);
+  const totals = page.getByTestId('activity-group-total');
+  await expect(totals).toHaveText([
+    '3 threads · $2.23',
+    '2 threads · $4.72',
+    '1 thread · $2.47',
+    '2 threads · $0.95',
+  ]);
+  await expect(group(page, 'today').getByRole('heading')).toHaveText('Today');
+  await expect(group(page, 'yesterday').getByRole('heading')).toHaveText('Yesterday');
+  await expect(group(page, 'week').getByRole('heading')).toHaveText('Earlier this week');
+  await expect(group(page, 'older').getByRole('heading')).toHaveText('Earlier');
+  await expect(page.getByTestId('activity-summary')).toHaveText('8 threads · $10.37');
+});
+
+test('a row shows its state, project, reason, cost and time; unpriced cost is a dash', async ({
+  page,
+}) => {
+  await page.goto(ACTIVITY);
+  const failed = rows(page).filter({ hasText: 'Fold finished turns in the transcript' });
+  await expect(failed).toContainText('Failed');
+  await expect(failed).toContainText('cairn');
+  await expect(failed).toContainText('$1.84');
+  await expect(failed).toContainText('30m ago');
+  await expect(failed).toContainText('Failed. Open it to retry.');
+  const unpriced = rows(page).filter({ hasText: 'Backfill usage rows' });
+  await expect(unpriced.getByTestId('activity-row-cost')).toHaveText('—');
+});
+
+test('a quick filter adds its chip, narrows the list and toggles off again', async ({ page }) => {
+  await page.goto(ACTIVITY);
+  const failed = page.getByRole('button', { name: 'Failed', exact: true });
+  await failed.click();
+  await expect(failed).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips(page)).toHaveText(['is:failed']);
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page).toHaveURL(/q=is%3Afailed/);
+  await page.getByRole('button', { name: 'Over $1' }).click();
+  await expect(chips(page)).toHaveText(['is:failed', 'cost:>1']);
+  await expect(rows(page)).toHaveCount(2);
+  await failed.click();
+  await expect(failed).toHaveAttribute('aria-pressed', 'false');
+  await expect(chips(page)).toHaveText(['cost:>1']);
+  await expect(rows(page)).toHaveCount(3);
+});
+
+test('a link with q opens with the chips and results already applied', async ({ page }) => {
+  await page.goto(`${ACTIVITY}&q=${encodeURIComponent('is:failed project:cairn ')}`);
+  await expect(chips(page)).toHaveText(['is:failed', 'project:cairn']);
+  await expect(rows(page)).toHaveCount(3);
+});
+
+test('an invalid filter is flagged and finds nothing, with a way out', async ({ page }) => {
+  await page.goto(`${ACTIVITY}&q=${encodeURIComponent('cost:lots ')}`);
+  await expect(page.locator('[data-testid="query-chip"][data-invalid]')).toHaveText(['cost:lots']);
+  await expect(page.getByTestId('chip-problems')).toContainText('Use > or < with a number');
+  const empty = page.getByTestId('activity-empty');
+  await expect(empty).toContainText('No threads match all of these filters');
+  await empty.getByRole('button', { name: 'Clear all filters' }).click();
+  await expect(rows(page)).toHaveCount(8);
+});
+
+test('with no threads at all the page says so', async ({ page }) => {
+  await page.goto('/app/activity?scenario=activity-empty');
+  await expect(page.getByTestId('activity-empty')).toContainText('No activity yet');
+});
+
+test('Load more reveals the next page and then goes away', async ({ page }) => {
+  await page.goto('/app/activity?scenario=activity-many');
+  await expect(rows(page)).toHaveCount(25);
+  await expect(page.getByTestId('activity-showing')).toHaveText('Showing 25 of 30');
+  await page.getByTestId('activity-load-more').click();
+  await expect(rows(page)).toHaveCount(30);
+  await expect(page.getByTestId('activity-showing')).toHaveText('Showing 30 of 30');
+  await expect(page.getByTestId('activity-load-more')).toHaveCount(0);
+});
+
+test('a row opens its thread and the sidebar Activity link opens the page', async ({ page }) => {
+  await page.goto('/app?scenario=activity');
+  await page.getByTestId('sidebar-activity').click();
+  await expect(page).toHaveURL(/\/app\/activity/);
+  await expect(groups(page).first()).toBeVisible();
+  await rows(page).filter({ hasText: 'Trim the gallery frame' }).getByRole('button').click();
+  await expect(page).toHaveURL(/thread=act-gallery/);
+});
+
+test('a failed load shows an error with retry', async ({ page }) => {
+  let failures = 2;
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path !== '/api/todos' || failures === 0) return undefined;
+    failures -= 1;
+    return json({ error: 'boom' }, 500);
+  });
+  await page.goto('/app/activity');
+  const error = page.getByTestId('activity-error');
+  await expect(error).toContainText('Activity did not load');
+  await error.getByRole('button', { name: 'Retry' }).click();
+  await expect(groups(page).first()).toBeVisible();
+});
+
+test('live: a filtered query goes to the server and its rows are enriched with cost', async ({
+  page,
+}) => {
+  const queries: string[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path !== '/api/search') return undefined;
+    queries.push(new URL(route.request().url()).searchParams.get('q') ?? '');
+    return json({
+      todos: [{ id: 'todo-1', seqNum: 9, title: 'x', phase: 'building', phaseAt: Date.now(), projectName: 'cairn' }],
+      projects: [],
+      agents: [],
+      filters: [{ key: 'is', raw: 'is:running', value: 'running', negated: false, valid: true }],
+    });
+  });
+  await page.goto('/app/activity?q=is%3Arunning%20');
+  await expect(rows(page)).toHaveCount(1);
+  expect(queries.at(-1)).toBe('is:running');
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`the page has no axe violations (${theme})`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(ACTIVITY);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(groups(page).first()).toBeVisible();
+    const { violations } = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(violations.map((v) => v.id)).toEqual([]);
+  });
+}
+
+test('at 390px nothing overflows sideways and rows stay readable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${ACTIVITY}&q=${encodeURIComponent('is:failed ')}`);
+  await expect(rows(page).first()).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(0);
+  await expect(rows(page).first().getByTestId('activity-row-cost')).toBeVisible();
+});

@@ -1,5 +1,14 @@
 import { BRAND, type ProjectColor, type ProjectIcon } from '@cairn/shared';
-import { ChartColumn, ChevronDown, PanelLeft, Plus, Search, Server, Settings } from 'lucide-react';
+import {
+  Activity,
+  ChartColumn,
+  ChevronDown,
+  PanelLeft,
+  Plus,
+  Search,
+  Server,
+  Settings,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
@@ -15,6 +24,7 @@ import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js'
 import { useI18n } from '../i18n/provider.js';
 import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
+import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
@@ -283,6 +293,12 @@ export function BoardSidebar({
             <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--chip-confirm-fg)" />
           </Link>
         )}
+        <Link
+          {...railLink({ pathname: ACTIVITY_PATH, search: plain }, false, t('活动'))}
+          data-testid="sidebar-activity"
+        >
+          <Activity className={ICON} strokeWidth={STROKE} />
+        </Link>
         <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings">
           <Settings className={ICON} strokeWidth={STROKE} />
         </Link>
@@ -394,6 +410,13 @@ export function BoardSidebar({
       <div data-testid="sidebar-footer" className="flex flex-none items-center gap-0.5 pt-2">
         <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
           <Settings className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        <SidebarFooterIcon
+          label={t('活动')}
+          testId="sidebar-activity"
+          to={{ pathname: ACTIVITY_PATH, search: plain }}
+        >
+          <Activity className={ICON} strokeWidth={STROKE} />
         </SidebarFooterIcon>
         {usageNav && (
           <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
