@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -12,6 +13,7 @@ from cairn_harbor.costs import (
     parse_systemd_show,
     summarize_trial,
 )
+from cairn_harbor.harness import harness_sha
 from cairn_harbor.report import arm_summary, build_report, scan_summary
 from cairn_harbor.scan import scan_trial_dir
 from cairn_harbor.subset import sample_task_names
@@ -114,6 +116,10 @@ def _dataset_for_trial(trial_dir: Path) -> str:
     if TB_DATASET_DIR_NAME in task_path:
         return TB_DATASET_DIR_NAME
     return ""
+
+
+def task_set_sha(tasks_path: Path) -> str:
+    return hashlib.sha256(tasks_path.read_bytes()).hexdigest()
 
 
 def config_model(config_path: Path) -> str | None:
@@ -333,6 +339,10 @@ def main() -> None:
         payload = {
             "arm": args.arm_label,
             "job_name": args.job_name,
+            "run_id": run_id,
+            "model": model,
+            "task_set_sha": task_set_sha(args.tasks),
+            "harness_sha": harness_sha(),
             "n_concurrent": args.n_concurrent,
             "memory_max": args.memory_max,
             "finished_at": datetime.now(timezone.utc).isoformat(),

@@ -1,0 +1,107 @@
+name: eval-gate
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    paths:
+      - 'integration/eval/harbor/public/cairn_harbor/cairn_executor.py'
+      - 'integration/eval/harbor/public/cairn_harbor/constants.py'
+      - 'integration/eval/harbor/public/cairn_harbor/cairn-worker-prompt.md'
+      - 'integration/eval/harbor/public/skills/cairn-worker/**'
+      - 'apps/daemon/src/backend/pi.ts'
+      - 'apps/server/src/services/chief-tools.ts'
+      - 'apps/server/src/services/chief.ts'
+      - 'packages/shared/src/protocol/chief-tools.ts'
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base harness commit
+        required: true
+      candidate_ref:
+        description: Candidate harness commit
+        required: true
+      repeats:
+        description: Runs per arm (at least 5)
+        default: '5'
+      max_run_usd:
+        description: Spend cap per run in USD
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-gate-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'eval-gate') &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, linux, cairn-eval]
+    timeout-minutes: 360
+    env:
+      BASE_REF: ${{ github.event.inputs.base_ref || github.event.pull_request.base.sha }}
+      CANDIDATE_REF: ${{ github.event.inputs.candidate_ref || github.event.pull_request.head.sha }}
+      REPEATS: ${{ github.event.inputs.repeats || '5' }}
+      MAX_RUN_USD: ${{ github.event.inputs.max_run_usd || vars.CAIRN_EVAL_GATE_MAX_RUN_USD }}
+      DATASETS_DIR: ${{ vars.CAIRN_EVAL_DATASETS_DIR }}
+      RESULTS_DIR: ${{ github.workspace }}/eval-gate-results
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ env.CANDIDATE_REF }}
+          fetch-depth: 0
+          path: candidate
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ env.BASE_REF }}
+          path: base
+      - name: Require a harness change
+        run: |
+          git -C candidate diff --name-only "$BASE_REF" "$CANDIDATE_REF" > "$RUNNER_TEMP/changed.txt"
+          (cd candidate/integration/eval/harbor/public && uv run python -m cairn_harbor.gate trigger --files "$RUNNER_TEMP/changed.txt") || {
+            echo "no harness path changed; the gate does not apply"
+            exit 1
+          }
+      - name: Run paired repeats
+        env:
+          CAIRN_EVAL_ANTHROPIC_API_KEY: ${{ secrets.CAIRN_EVAL_ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          test "$REPEATS" -ge 5
+          test -n "$MAX_RUN_USD"
+          mkdir -p "$RESULTS_DIR/base" "$RESULTS_DIR/candidate"
+          for arm in base candidate; do
+            (cd "$arm/integration/eval/harbor/public" && uv sync --frozen)
+          done
+          for i in $(seq 1 "$REPEATS"); do
+            for arm in base candidate; do
+              job="gate-${GITHUB_RUN_ID}-${arm}-${i}"
+              (
+                cd "$arm/integration/eval/harbor/public"
+                uv run python -m cairn_harbor.run_baseline job-config \
+                  --tasks subset-1792.json --datasets-dir "$DATASETS_DIR" \
+                  --arm cairn --job-name "$job" --out "$RUNNER_TEMP/$job.json"
+                uv run python -m cairn_harbor.run_baseline run \
+                  --config "$RUNNER_TEMP/$job.json" --jobs-dir "$RUNNER_TEMP/jobs" \
+                  --arm-label "$arm" --job-name "$job" --tasks subset-1792.json \
+                  --max-run-usd "$MAX_RUN_USD" --out-dir "$RESULTS_DIR/$arm-$i"
+              )
+              cp "$RESULTS_DIR/$arm-$i/$arm.json" "$RESULTS_DIR/$arm/$i.json"
+            done
+          done
+      - name: Judge
+        run: |
+          cd candidate/integration/eval/harbor/public
+          uv run python -m cairn_harbor.gate compare \
+            --base "$RESULTS_DIR"/base/*.json --candidate "$RESULTS_DIR"/candidate/*.json \
+            --out "$RESULTS_DIR/eval-gate-results.json"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eval-gate-results
+          path: ${{ env.RESULTS_DIR }}/eval-gate-results.json

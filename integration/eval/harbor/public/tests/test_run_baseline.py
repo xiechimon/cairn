@@ -215,3 +215,15 @@ def test_run_refuses_a_job_name_that_differs_from_the_config(
         run_baseline.main()
     assert started == []
     assert not (tmp_path / "spend.jsonl").exists()
+
+
+def test_task_set_sha_pins_the_exact_bytes_of_the_tasks_file(tmp_path: Path) -> None:
+    import hashlib
+
+    from cairn_harbor.run_baseline import task_set_sha
+
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text('{"seed": 1}')
+    assert task_set_sha(tasks) == hashlib.sha256(b'{"seed": 1}').hexdigest()
+    tasks.write_text('{"seed": 2}')
+    assert task_set_sha(tasks) != hashlib.sha256(b'{"seed": 1}').hexdigest()
