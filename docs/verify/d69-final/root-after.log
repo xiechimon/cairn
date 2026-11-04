@@ -1,0 +1,406 @@
+TAP version 13
+# Subtest: a host with every container prerequisite passes with the machine-readable record
+ok 1 - a host with every container prerequisite passes with the machine-readable record
+  ---
+  duration_ms: 1.706031
+  type: 'test'
+  ...
+# Subtest: the record carries no nspawn-only fields
+ok 2 - the record carries no nspawn-only fields
+  ---
+  duration_ms: 0.158635
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay export has sibling files
+ok 3 - fails closed when the relay export has sibling files
+  ---
+  duration_ms: 0.129145
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay export boundary is unknown
+ok 4 - fails closed when the relay export boundary is unknown
+  ---
+  duration_ms: 0.104968
+  type: 'test'
+  ...
+# Subtest: fails closed when podman is rootful
+ok 5 - fails closed when podman is rootful
+  ---
+  duration_ms: 0.592062
+  type: 'test'
+  ...
+# Subtest: fails closed when podman is not installed
+ok 6 - fails closed when podman is not installed
+  ---
+  duration_ms: 0.167251
+  type: 'test'
+  ...
+# Subtest: fails closed when the user has no subuid range
+ok 7 - fails closed when the user has no subuid range
+  ---
+  duration_ms: 0.128615
+  type: 'test'
+  ...
+# Subtest: fails closed when the user has no subgid range
+ok 8 - fails closed when the user has no subgid range
+  ---
+  duration_ms: 0.117088
+  type: 'test'
+  ...
+# Subtest: fails closed when memory is not delegated
+ok 9 - fails closed when memory is not delegated
+  ---
+  duration_ms: 0.121669
+  type: 'test'
+  ...
+# Subtest: fails closed when cpu is not delegated
+ok 10 - fails closed when cpu is not delegated
+  ---
+  duration_ms: 0.168563
+  type: 'test'
+  ...
+# Subtest: fails closed when pids is not delegated
+ok 11 - fails closed when pids is not delegated
+  ---
+  duration_ms: 0.084134
+  type: 'test'
+  ...
+# Subtest: fails closed when the delegation file is unreadable
+ok 12 - fails closed when the delegation file is unreadable
+  ---
+  duration_ms: 0.061695
+  type: 'test'
+  ...
+# Subtest: fails closed when the expected image tag is missing
+ok 13 - fails closed when the expected image tag is missing
+  ---
+  duration_ms: 0.045131
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay socket does not exist
+ok 14 - fails closed when the relay socket does not exist
+  ---
+  duration_ms: 0.036488
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay socket mode is wrong
+ok 15 - fails closed when the relay socket mode is wrong
+  ---
+  duration_ms: 0.03304
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay socket is not a socket
+ok 16 - fails closed when the relay socket is not a socket
+  ---
+  duration_ms: 0.035032
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay socket belongs to another user
+ok 17 - fails closed when the relay socket belongs to another user
+  ---
+  duration_ms: 0.031912
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay directory mode is wrong
+ok 18 - fails closed when the relay directory mode is wrong
+  ---
+  duration_ms: 0.032983
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay directory belongs to another user
+ok 19 - fails closed when the relay directory belongs to another user
+  ---
+  duration_ms: 0.032372
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay directory is missing
+ok 20 - fails closed when the relay directory is missing
+  ---
+  duration_ms: 0.039687
+  type: 'test'
+  ...
+# Subtest: fails closed when nothing listens on the relay socket
+ok 21 - fails closed when nothing listens on the relay socket
+  ---
+  duration_ms: 0.033655
+  type: 'test'
+  ...
+# Subtest: fails closed when the probe container could not be spawned
+ok 22 - fails closed when the probe container could not be spawned
+  ---
+  duration_ms: 0.039134
+  type: 'test'
+  ...
+# Subtest: fails closed when the probe result is missing
+ok 23 - fails closed when the probe result is missing
+  ---
+  duration_ms: 0.073288
+  type: 'test'
+  ...
+# Subtest: fails closed when the refusal inventory is incomplete
+ok 24 - fails closed when the refusal inventory is incomplete
+  ---
+  duration_ms: 0.042477
+  type: 'test'
+  ...
+# Subtest: fails closed when the bounding set differs
+ok 25 - fails closed when the bounding set differs
+  ---
+  duration_ms: 0.036258
+  type: 'test'
+  ...
+# Subtest: fails closed when the bounding set is unknown
+ok 26 - fails closed when the bounding set is unknown
+  ---
+  duration_ms: 0.033185
+  type: 'test'
+  ...
+# Subtest: fails closed when the bounding set lacks a capability
+ok 27 - fails closed when the bounding set lacks a capability
+  ---
+  duration_ms: 0.048583
+  type: 'test'
+  ...
+# Subtest: fails closed when the effective set is not empty
+ok 28 - fails closed when the effective set is not empty
+  ---
+  duration_ms: 0.035023
+  type: 'test'
+  ...
+# Subtest: fails closed when the ambient set is not empty
+ok 29 - fails closed when the ambient set is not empty
+  ---
+  duration_ms: 0.042111
+  type: 'test'
+  ...
+# Subtest: fails closed when the effective set is unknown
+ok 30 - fails closed when the effective set is unknown
+  ---
+  duration_ms: 0.033625
+  type: 'test'
+  ...
+# Subtest: fails closed when the ambient set is unknown
+ok 31 - fails closed when the ambient set is unknown
+  ---
+  duration_ms: 0.037362
+  type: 'test'
+  ...
+# Subtest: fails closed when the container user is not uid 1000
+ok 32 - fails closed when the container user is not uid 1000
+  ---
+  duration_ms: 0.035597
+  type: 'test'
+  ...
+# Subtest: fails closed when the container user is unknown
+ok 33 - fails closed when the container user is unknown
+  ---
+  duration_ms: 0.037103
+  type: 'test'
+  ...
+# Subtest: fails closed when a non-lo interface exists
+ok 34 - fails closed when a non-lo interface exists
+  ---
+  duration_ms: 0.053874
+  type: 'test'
+  ...
+# Subtest: fails closed when a tap interface replaces lo
+ok 35 - fails closed when a tap interface replaces lo
+  ---
+  duration_ms: 0.045677
+  type: 'test'
+  ...
+# Subtest: fails closed when no interface is reported
+ok 36 - fails closed when no interface is reported
+  ---
+  duration_ms: 0.475298
+  type: 'test'
+  ...
+# Subtest: fails closed when sudo does not work
+ok 37 - fails closed when sudo does not work
+  ---
+  duration_ms: 0.07128
+  type: 'test'
+  ...
+# Subtest: fails closed when the host home is visible
+ok 38 - fails closed when the host home is visible
+  ---
+  duration_ms: 0.043236
+  type: 'test'
+  ...
+# Subtest: fails closed when the probe is rootful per its own report
+ok 39 - fails closed when the probe is rootful per its own report
+  ---
+  duration_ms: 0.046987
+  type: 'test'
+  ...
+# Subtest: fails closed when the probe container could not be removed
+ok 40 - fails closed when the probe container could not be removed
+  ---
+  duration_ms: 0.058666
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay refuses the public target
+ok 41 - fails closed when the relay refuses the public target
+  ---
+  duration_ms: 0.037768
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay is silent for the public target
+ok 42 - fails closed when the relay is silent for the public target
+  ---
+  duration_ms: 0.046754
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay opens a private target
+ok 43 - fails closed when the relay opens a private target
+  ---
+  duration_ms: 0.0436
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay opens the metadata address
+ok 44 - fails closed when the relay opens the metadata address
+  ---
+  duration_ms: 0.035109
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay opens a disallowed port
+ok 45 - fails closed when the relay opens a disallowed port
+  ---
+  duration_ms: 0.031626
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay is silent for a private target
+ok 46 - fails closed when the relay is silent for a private target
+  ---
+  duration_ms: 0.047365
+  type: 'test'
+  ...
+# Subtest: fails closed when the relay probe results are missing
+ok 47 - fails closed when the relay probe results are missing
+  ---
+  duration_ms: 0.032707
+  type: 'test'
+  ...
+# Subtest: a relay unit that is not running is informational while the socket is live
+ok 48 - a relay unit that is not running is informational while the socket is live
+  ---
+  duration_ms: 0.04697
+  type: 'test'
+  ...
+# Subtest: the collector passes on a fully provisioned host and probes with the expected image
+ok 49 - the collector passes on a fully provisioned host and probes with the expected image
+  ---
+  duration_ms: 0.773781
+  type: 'test'
+  ...
+# Subtest: a missing image fails and never spawns the probe container
+ok 50 - a missing image fails and never spawns the probe container
+  ---
+  duration_ms: 0.23967
+  type: 'test'
+  ...
+# Subtest: a rootful podman fails and never spawns the probe container
+ok 51 - a rootful podman fails and never spawns the probe container
+  ---
+  duration_ms: 0.170576
+  type: 'test'
+  ...
+# Subtest: the collector fails closed on relay socket mode 0644
+ok 52 - the collector fails closed on relay socket mode 0644
+  ---
+  duration_ms: 0.176161
+  type: 'test'
+  ...
+# Subtest: the collector fails closed on relay socket mode 0666
+ok 53 - the collector fails closed on relay socket mode 0666
+  ---
+  duration_ms: 0.091811
+  type: 'test'
+  ...
+# Subtest: the collector fails closed on relay socket mode 0700
+ok 54 - the collector fails closed on relay socket mode 0700
+  ---
+  duration_ms: 0.067238
+  type: 'test'
+  ...
+# Subtest: the collector fails closed on relay directory mode 0755
+ok 55 - the collector fails closed on relay directory mode 0755
+  ---
+  duration_ms: 0.069242
+  type: 'test'
+  ...
+# Subtest: the collector fails closed on relay directory mode 0750
+ok 56 - the collector fails closed on relay directory mode 0750
+  ---
+  duration_ms: 0.072787
+  type: 'test'
+  ...
+# Subtest: the collector fails when the socket is replaced by a symlink or another uid
+ok 57 - the collector fails when the socket is replaced by a symlink or another uid
+  ---
+  duration_ms: 0.189953
+  type: 'test'
+  ...
+# Subtest: the collector fails when the relay does not accept connections
+ok 58 - the collector fails when the relay does not accept connections
+  ---
+  duration_ms: 0.128837
+  type: 'test'
+  ...
+# Subtest: the collector fails without a subuid or subgid entry for the user
+ok 59 - the collector fails without a subuid or subgid entry for the user
+  ---
+  duration_ms: 0.188547
+  type: 'test'
+  ...
+# Subtest: the collector fails when cpu, memory or pids is not delegated
+ok 60 - the collector fails when cpu, memory or pids is not delegated
+  ---
+  duration_ms: 0.180828
+  type: 'test'
+  ...
+# Subtest: the collector refuses root, a missing image setting and unpinned tags
+ok 61 - the collector refuses root, a missing image setting and unpinned tags
+  ---
+  duration_ms: 0.265204
+  type: 'test'
+  ...
+# Subtest: a probe that fails in the helper is reported and fails the check
+ok 62 - a probe that fails in the helper is reported and fails the check
+  ---
+  duration_ms: 0.132143
+  type: 'test'
+  ...
+# Subtest: a throwing probe is reported and fails the check
+ok 63 - a throwing probe is reported and fails the check
+  ---
+  duration_ms: 0.122834
+  type: 'test'
+  ...
+# Subtest: the real filesystem and connect checks accept a live 0600 socket and refuse a wider one
+ok 64 - the real filesystem and connect checks accept a live 0600 socket and refuse a wider one # SKIP
+  ---
+  duration_ms: 0.028976
+  type: 'test'
+  ...
+# Subtest: CAIRN_ORB_RUNTIME=podman switches the CLI to the container check and nspawn stays the default
+ok 65 - CAIRN_ORB_RUNTIME=podman switches the CLI to the container check and nspawn stays the default
+  ---
+  duration_ms: 76.672682
+  type: 'test'
+  ...
+# Subtest: the nspawn check function is untouched by the container runtime
+ok 66 - the nspawn check function is untouched by the container runtime
+  ---
+  duration_ms: 0.990375
+  type: 'test'
+  ...
+1..66
+# tests 66
+# suites 0
+# pass 65
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 155.854362

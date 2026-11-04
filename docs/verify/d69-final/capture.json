@@ -1,0 +1,28 @@
+{
+  "sourceUrl": "https://raw.githubusercontent.com/xiechimon/cairn/3e1bde9971ce50552be344dd49396e82dbbd0a6c/docs/research/orb-container-runtime.md",
+  "sourceSha256": "a157bf4de71e68c27d76def084f34c18ac64b62da176e84fddf056a7b90e509a",
+  "apiMethod": "GET",
+  "apiPath": "/api/builds/01a1a647-e74c-7804-8c38-a0344f4c02c5/steps",
+  "apiStatus": 200,
+  "doneStepObserved": true,
+  "swaggerUi": {
+    "release": "v5.34.1",
+    "commit": "d3296954a6b813898d298815ac3e68daa1cf7408",
+    "files": {
+      "index.html": "84ae62d3dad6004f2ba250cf69b4148eeb7c253d",
+      "swagger-ui.css": "630f8c7cf44a8dfa7c0826b22b70993a9f350e51",
+      "swagger-ui-bundle.js": "ac88a259fa8be74dc92d7ef504f204a9b916d8c8",
+      "swagger-ui-standalone-preset.js": "8432132e2e30f3f49ace50e6d3fd24d3ba9ee0ed",
+      "swagger-initializer.js": "8ea0ea3afc39da4d2cb66232b9c2208cdd821570"
+    }
+  },
+  "scope": {
+    "server": "real isolated Cairn process",
+    "runtime": "real rootless Podman",
+    "model": "scripted response",
+    "production": "not deployed",
+    "cors": "API-tool browser disabled cross-origin enforcement; product CORS not evaluated",
+    "authorization": "ephemeral scratch token injected privately, absent from screenshots"
+  },
+  "candidateHead": "ff9b891de0bc4c2d47a2cce2592f19b2693a69c4"
+}

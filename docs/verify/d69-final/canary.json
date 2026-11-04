@@ -1,0 +1,440 @@
+{
+  "runtime": "podman",
+  "sudo": {
+    "works": true
+  },
+  "routes": {
+    "directRead": [
+      {
+        "target": "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-key",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-key",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.ssh/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.ssh/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.codex/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.codex/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.claude/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.claude/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.cairn/machine.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.cairn/machine.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.cairn/1.pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.cairn/1.pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.ssh",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.ssh",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.codex/auth.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.codex/auth.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.claude",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root~/.claude",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/run/user/1000/cairn-orb-egress-d69pr6/egress.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/proc/1/root/run/user/1000/cairn-orb-egress-d69pr6/egress.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "$HOME enumeration",
+        "blocked": true,
+        "detail": "guest home enumerable; no host sentinels"
+      },
+      {
+        "target": "~ enumeration",
+        "blocked": true,
+        "detail": "ENOENT"
+      }
+    ],
+    "symlinkPush": [
+      {
+        "target": "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-key",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.ssh/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.codex/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.claude/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.cairn/machine.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.cairn/1.pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.ssh",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.codex/auth.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "~/.claude",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/run/user/1000/cairn-orb-egress-d69pr6/egress.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      }
+    ],
+    "socketAndServer": [
+      {
+        "target": "/var/run/docker.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/run/docker.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/run/podman/podman.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/run/user/1000/podman/podman.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "/run/user/1000/docker.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "direct http://127.0.0.1:8787",
+        "blocked": true,
+        "detail": "orb own loopback; ECONNREFUSED"
+      },
+      {
+        "target": "proxy http://127.0.0.1:8787",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://127.0.0.1:37541",
+        "blocked": true,
+        "detail": "orb own loopback; ECONNREFUSED"
+      },
+      {
+        "target": "proxy http://127.0.0.1:37541",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://tailnet-server:37541",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://tailnet-server:37541",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://10.0.0.1:443",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://10.0.0.1:443",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://192.168.1.1:80",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://192.168.1.1:80",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://172.16.0.1:443",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://172.16.0.1:443",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://169.254.169.254:80",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://169.254.169.254:80",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://100.64.0.1:443",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://100.64.0.1:443",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://127.0.0.1:443",
+        "blocked": true,
+        "detail": "ECONNREFUSED"
+      },
+      {
+        "target": "proxy http://127.0.0.1:443",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://1.1.1.1:25",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "proxy http://1.1.1.1:25",
+        "blocked": true,
+        "detail": "proxy HTTP 403"
+      },
+      {
+        "target": "direct http://1.1.1.1:443",
+        "blocked": true,
+        "detail": "ENETUNREACH"
+      },
+      {
+        "target": "direct dns github.com",
+        "blocked": true,
+        "detail": "EAI_AGAIN"
+      }
+    ],
+    "sudoRead": [
+      {
+        "target": "sudo ~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-key",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.ssh/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.codex/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.claude/.cairn-canary-32aa514be8073c1d3cf8aa15",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.cairn/machine.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.cairn/1.pem",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.ssh",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.codex/auth.json",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~/.claude",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo /run/user/1000/cairn-orb-egress-d69pr6/egress.sock",
+        "blocked": true,
+        "detail": "ENOENT"
+      },
+      {
+        "target": "sudo ~ enumeration",
+        "blocked": true,
+        "detail": "ENOENT"
+      }
+    ]
+  },
+  "sentinels": [
+    {
+      "path": "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-pem",
+      "hash": "9579dc531d1b811bd353e4ca3f298fbe8eff1fc36720d581608afa764adf6f2f"
+    },
+    {
+      "path": "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-key",
+      "hash": "d71e4e92d75db04e0df1e0717120924c24e0becd688964f056367a48901cd8e0"
+    },
+    {
+      "path": "~/.ssh/.cairn-canary-32aa514be8073c1d3cf8aa15",
+      "hash": "67b01823a73190fbb1a2fc854ed976b7e691f6db4f9aa53c83ecb7f1139e9f82"
+    },
+    {
+      "path": "~/.codex/.cairn-canary-32aa514be8073c1d3cf8aa15",
+      "hash": "b79c3bdb0f53587e507651f78ea875a4c3b3ae8db762d5650e0377478b0d15dd"
+    },
+    {
+      "path": "~/.claude/.cairn-canary-32aa514be8073c1d3cf8aa15",
+      "hash": "2d9d5f9deba5b61250309c3c4432fce0911779f7eb50edbf185dc484f5cd526c"
+    }
+  ],
+  "pushedObjectsClean": true,
+  "negativeObjectsContainMarker": true,
+  "negativeControl": {
+    "executor": "host",
+    "leaked": [
+      "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-pem",
+      "~/.cairn/.cairn-canary-32aa514be8073c1d3cf8aa15-key",
+      "~/.ssh/.cairn-canary-32aa514be8073c1d3cf8aa15",
+      "~/.codex/.cairn-canary-32aa514be8073c1d3cf8aa15",
+      "~/.claude/.cairn-canary-32aa514be8073c1d3cf8aa15"
+    ],
+    "listeners": [
+      {
+        "target": "direct http://127.0.0.1:37541",
+        "blocked": false,
+        "detail": "connected"
+      },
+      {
+        "target": "direct http://tailnet-server:37541",
+        "blocked": false,
+        "detail": "connected"
+      }
+    ]
+  },
+  "githubReach": {
+    "ok": true,
+    "ms": 1473
+  },
+  "orbName": "cairn-orb-01a1a647-e74c-7804-8c38-a0344f4c02c5",
+  "durationMs": 25937,
+  "ok": true,
+  "sentinelsRemaining": []
+}

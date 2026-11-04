@@ -1,0 +1,25 @@
+{
+  "runtime": "podman",
+  "podman": "6.1.4",
+  "rootless": true,
+  "subuid": "ok",
+  "subgid": "ok",
+  "cgroupControllers": "ok",
+  "image": "cairn-orb-base:eb01c9191591ca17",
+  "relay": "ok",
+  "relayUnit": "unknown",
+  "capBnd": "00000000800000eb",
+  "capEff": "0000000000000000",
+  "capAmb": "0000000000000000",
+  "uid": 1000,
+  "interfaces": [
+    "lo"
+  ],
+  "sudo": true,
+  "homeVisible": false,
+  "egress": "ok",
+  "privateEgress": "denied",
+  "spawnRemove": "ok",
+  "ok": true,
+  "errors": []
+}
