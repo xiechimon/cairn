@@ -1,6 +1,6 @@
 import type { ScheduleRecord } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { schedule, todo } from '../db/schema.js';
+import { project, schedule, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
@@ -14,6 +14,13 @@ export function runScheduleNow(deps: BuildDeps, teamId: string, id: string): Sch
   if (!todoRow) throw new HttpError(404, `schedule ${id} not found`);
   if (todoRow.archivedAt !== null) {
     throw new HttpError(409, 'This schedule belongs to an archived thread');
+  }
+  const projectRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+  if (!projectRow || projectRow.teamId !== teamId) {
+    throw new HttpError(404, `schedule ${id} not found`);
+  }
+  if (projectRow.archivedAt !== null) {
+    throw new HttpError(409, 'This schedule belongs to an archived project');
   }
   if (!row.enabled) throw new HttpError(409, 'This schedule is paused; resume it first');
   if (todoRow.latestBuildId !== null && hasActiveStep(deps, todoRow.latestBuildId)) {

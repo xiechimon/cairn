@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
-import { agent, schedule, step, todo } from '../src/db/schema.js';
+import { agent, project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
 import { runScheduleNow } from '../src/services/schedule-run.js';
 import { createScheduler } from '../src/services/scheduler.js';
@@ -56,7 +56,7 @@ async function world(createdBy?: string) {
   const run = (id = saved.id) => req(s.app, 'POST', `/api/schedules/${id}/run`, {});
   const steps = () => s.db.select().from(step).where(eq(step.buildId, buildId)).all();
   const scheduler = createScheduler(s.svc, { tickMs: 15_000 });
-  return { ...s, scheduler, saved, todoId, buildId, stored, run, steps };
+  return { ...s, scheduler, saved, projectId, todoId, buildId, stored, run, steps };
 }
 
 test('run now on an unknown schedule is 404', async () => {
@@ -118,6 +118,16 @@ test('run now on an archived thread is 409', async () => {
   expect(res.status).toBe(409);
   expect(await res.text()).toContain('archived');
   expect(s.stored().nextRunAt).toBe(s.saved.nextRunAt);
+});
+
+test('run now on an archived project is 409 and leaves the schedule unchanged', async () => {
+  const s = await world();
+  s.db.update(project).set({ archivedAt: Date.now() }).where(eq(project.id, s.projectId)).run();
+  const before = s.stored();
+  const res = await s.run();
+  expect(res.status).toBe(409);
+  expect(await res.text()).toContain('archived project');
+  expect(s.stored()).toEqual(before);
 });
 
 test('run now while the thread is running is 409 and leaves nextRunAt alone', async () => {
