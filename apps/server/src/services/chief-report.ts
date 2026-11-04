@@ -2,6 +2,7 @@ import type {
   ChiefReportContent,
   ChiefReportLedger,
   ChiefReportTodoRef,
+  IntakeItem,
   RetroProposal,
 } from '@cairn/shared';
 import {
@@ -10,6 +11,7 @@ import {
   CHIEF_REPORT_RETRO_MAX,
   CHIEF_REPORT_ROW_ID_PREFIX,
   chiefReportContentSchema,
+  INTAKE_SOURCE_KIND,
   ISSUE_FENCE_OPEN,
   quoteIssueLines,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -35,6 +37,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import type { ConversationStreamHub } from './events.js';
+import { ingestIntake } from './intake-items.js';
 import { listNeedsYou } from './needs-you.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { wallClockParts } from './schedules.js';
@@ -730,13 +733,25 @@ function reportRowId(rec: ReportRow): string {
   return `${CHIEF_REPORT_ROW_ID_PREFIX}${rec.id}`;
 }
 
-function proposalsOf(db: Db, reportId: string): RetroProposal[] {
+type ProposalRow = typeof retroProposal.$inferSelect;
+type RetroRow = ProposalRow & { sourceKind: RetroProposal['source']['kind'] };
+
+function proposalRows(db: Db, reportId: string): ProposalRow[] {
   return db
     .select()
     .from(retroProposal)
     .where(eq(retroProposal.reportId, reportId))
     .orderBy(asc(retroProposal.createdAt), asc(sql`rowid`))
-    .all()
+    .all();
+}
+
+function isRetroRow(row: ProposalRow): row is RetroRow {
+  return row.sourceKind !== INTAKE_SOURCE_KIND;
+}
+
+function proposalsOf(db: Db, reportId: string): RetroProposal[] {
+  return proposalRows(db, reportId)
+    .filter(isRetroRow)
     .map((row) => ({
       id: row.id,
       title: row.title,
@@ -749,6 +764,21 @@ function proposalsOf(db: Db, reportId: string): RetroProposal[] {
         label: row.sourceLabel,
         todoId: row.sourceTodoId,
       },
+      projectId: row.projectId,
+      status: row.status,
+      todoId: row.todoId,
+    }));
+}
+
+function intakeOf(db: Db, reportId: string): IntakeItem[] {
+  return proposalRows(db, reportId)
+    .filter((row) => row.sourceKind === INTAKE_SOURCE_KIND)
+    .map((row) => ({
+      id: row.id,
+      url: row.sourceId,
+      claim: row.what,
+      matches: row.why,
+      action: row.safeguard,
       projectId: row.projectId,
       status: row.status,
       todoId: row.todoId,
@@ -804,6 +834,7 @@ function pushReport(
           `失败 ${y.failedCount}`,
           `等你 ${content.needsYou.count}`,
           ...(content.retro.length > 0 ? [`改进建议 ${content.retro.length}`] : []),
+          ...((content.intake ?? []).length > 0 ? [`外部动态 ${content.intake?.length}`] : []),
         ].join(' · ')
       : '日报没写成，先看昨天的数字';
   effects.push(() =>
@@ -838,6 +869,7 @@ function reportContent(
     yesterday: computeLedger(deps.db, rec.teamId, inputs.coversStart, inputs.coversEnd),
     needsYou: needsYouFacts(deps.db, rec.teamId, rec.threadId, now),
     retro: proposalsOf(deps.db, rec.id),
+    intake: intakeOf(deps.db, rec.id),
     retroRan,
     truncated: inputs.truncated,
   };
@@ -845,7 +877,10 @@ function reportContent(
 
 function isEmptyReport(content: ChiefReportContent): boolean {
   return (
-    ledgerEmpty(content.yesterday) && content.needsYou.count === 0 && content.retro.length === 0
+    ledgerEmpty(content.yesterday) &&
+    content.needsYou.count === 0 &&
+    content.retro.length === 0 &&
+    (content.intake ?? []).length === 0
   );
 }
 
@@ -858,6 +893,7 @@ export function postReportWithoutRun(
   const settled = { ...rec, inputs };
   const effects: Effects = [];
   deps.db.transaction(() => {
+    ingestIntake(deps.db, settled, now);
     const content = reportContent(deps, settled, inputs, 'posted', false, now);
     const empty = isEmptyReport(content);
     if (!empty) {
@@ -945,6 +981,7 @@ export function settleReportRun(
       })
       .run();
   }
+  ingestIntake(db, rec, now);
   const content = reportContent(deps, rec, inputs, 'posted', true, now);
   const alreadyPosted =
     db
@@ -968,7 +1005,7 @@ export function decideRetroProposal(
   teamId: string,
   proposalId: string,
   decision: 'accept' | 'dismiss',
-): RetroProposal {
+): RetroProposal | IntakeItem {
   const { db } = deps;
   const row = db.select().from(retroProposal).where(eq(retroProposal.id, proposalId)).get();
   if (row === undefined || row.teamId !== teamId)
@@ -993,15 +1030,26 @@ export function decideRetroProposal(
       .get();
     if (claimed === undefined) throw new HttpError(409, 'retro proposal is already decided');
     if (decision !== 'accept') return;
-    const spec = [
-      row.what,
-      '',
-      `为什么当时没拦住：${row.why}`,
-      '',
-      `防护：${row.safeguard}`,
-      '',
-      `出处：${row.sourceLabel}（${row.sourceKind} ${row.sourceId}），来自 ${rec.day} 的日报复盘。`,
-    ].join('\n');
+    const spec =
+      row.sourceKind === INTAKE_SOURCE_KIND
+        ? [
+            row.what,
+            '',
+            `来源：${row.sourceId}`,
+            `对应：${row.why}`,
+            `建议动作：${row.safeguard}`,
+            '',
+            `来自 ${rec.day} 日报的外部动态。`,
+          ].join('\n')
+        : [
+            row.what,
+            '',
+            `为什么当时没拦住：${row.why}`,
+            '',
+            `防护：${row.safeguard}`,
+            '',
+            `出处：${row.sourceLabel}（${row.sourceKind} ${row.sourceId}），来自 ${rec.day} 的日报复盘。`,
+          ].join('\n');
     const todoId = createTodo(deps, {
       teamId,
       projectId: row.projectId,
@@ -1025,11 +1073,18 @@ export function decideRetroProposal(
     const content = chiefReportContentSchema.safeParse(parsed);
     if (content.success) {
       const effects: Effects = [];
-      writeReportRow(deps, rec, { ...content.data, retro: proposalsOf(db, rec.id) }, effects);
+      writeReportRow(
+        deps,
+        rec,
+        { ...content.data, retro: proposalsOf(db, rec.id), intake: intakeOf(db, rec.id) },
+        effects,
+      );
       for (const effect of effects) effect();
     }
   }
-  const updated = proposalsOf(db, rec.id).find((proposal) => proposal.id === proposalId);
+  const updated = [...proposalsOf(db, rec.id), ...intakeOf(db, rec.id)].find(
+    (proposal) => proposal.id === proposalId,
+  );
   if (updated === undefined) throw new HttpError(404, `retro proposal ${proposalId}`);
   return updated;
 }
