@@ -18,6 +18,7 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
+import { SidebarUserMenu } from './sidebar-user-menu.js';
 
 export type SidebarSelected =
   | 'board'
@@ -283,6 +284,7 @@ export function BoardSidebar({
             <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--chip-confirm-fg)" />
           </Link>
         )}
+        <SidebarUserMenu collapsed search={plain} />
         <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings">
           <Settings className={ICON} strokeWidth={STROKE} />
         </Link>
@@ -391,25 +393,28 @@ export function BoardSidebar({
           ))}
       </nav>
 
-      <div data-testid="sidebar-footer" className="flex flex-none items-center gap-0.5 pt-2">
-        <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
-          <Settings className={ICON} strokeWidth={STROKE} />
-        </SidebarFooterIcon>
-        {usageNav && (
-          <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
-            <ChartColumn className={ICON} strokeWidth={STROKE} />
+      <div data-testid="sidebar-footer" className="flex flex-none flex-col gap-1 pt-2">
+        <div className="flex w-full items-center gap-0.5">
+          <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
+            <Settings className={ICON} strokeWidth={STROKE} />
           </SidebarFooterIcon>
-        )}
-        {machinesOffline > 0 && (
-          <Link
-            data-testid="sidebar-attention"
-            to={{ pathname: settingsHref('machines'), search: plain }}
-            className={`ml-auto flex h-6 min-w-0 items-center gap-1.5 rounded-full bg-(--chip-confirm-bg) px-2 text-caption font-medium whitespace-nowrap text-(--chip-confirm-fg) no-underline ${FOCUS}`}
-          >
-            <span aria-hidden className="size-1.5 flex-none rounded-full bg-current" />
-            <span className="truncate">{offlineLabel}</span>
-          </Link>
-        )}
+          {usageNav && (
+            <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
+              <ChartColumn className={ICON} strokeWidth={STROKE} />
+            </SidebarFooterIcon>
+          )}
+          {machinesOffline > 0 && (
+            <Link
+              data-testid="sidebar-attention"
+              to={{ pathname: settingsHref('machines'), search: plain }}
+              className={`ml-auto flex h-6 min-w-0 items-center gap-1.5 rounded-full bg-(--chip-confirm-bg) px-2 text-caption font-medium whitespace-nowrap text-(--chip-confirm-fg) no-underline ${FOCUS}`}
+            >
+              <span aria-hidden className="size-1.5 flex-none rounded-full bg-current" />
+              <span className="truncate">{offlineLabel}</span>
+            </Link>
+          )}
+        </div>
+        <SidebarUserMenu collapsed={false} search={plain} />
       </div>
     </aside>
   );

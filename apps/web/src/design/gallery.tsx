@@ -5,6 +5,7 @@ import {
   AvatarSection,
   ConversationSection,
   EmptySection,
+  SearchSyntaxSection,
   SettingsSection,
   TraceSection,
 } from './components-content.js';
@@ -270,6 +271,7 @@ export function Gallery() {
           <DialogSection />
           <ToastSection />
           <EmptySection />
+          <SearchSyntaxSection />
           <SettingsSection />
           <AvatarSection />
           <ConversationSection />
