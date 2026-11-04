@@ -1,13 +1,15 @@
 import type { AskUserQuestion, MachineAskResponse } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   chiefMessage,
+  machine as machineTable,
   notification as notificationTable,
   step as stepTable,
 } from '../src/db/schema.js';
+import { sha256Hex } from '../src/lib/crypto.js';
 import {
   ASK_HOLD_MS,
   answerQuestion,
@@ -15,7 +17,13 @@ import {
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';
-import { bindAgentHome, bootServer, machineIdByName, type TestServer } from './helpers.js';
+import {
+  bindAgentHome,
+  bootServer,
+  issueApiKey,
+  machineIdByName,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-ask-unit';
 
@@ -48,6 +56,7 @@ interface World {
   threadId: string;
   stepId: string;
   machineToken: string;
+  machineId: string;
 }
 
 const QUESTIONS = [
@@ -83,7 +92,7 @@ async function makeWorld(): Promise<World> {
   });
   expect(msgRes.status).toBe(201);
   const { thread } = (await msgRes.json()) as { thread: { id: string } };
-  const key = await import('./helpers.js').then((h) => h.issueApiKey(s));
+  const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId, name: 'ask-mbp', cliVersion: '0.1.0' },
@@ -102,6 +111,7 @@ async function makeWorld(): Promise<World> {
     threadId: thread.id,
     stepId: claimed.step?.step.id ?? '',
     machineToken: token,
+    machineId: machineIdByName(s, 'ask-mbp'),
   };
 }
 
@@ -119,6 +129,51 @@ async function machineAsk(
 }
 
 describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up)', () => {
+  test.each(['valid', 'revoke', 'rotate'] as const)(
+    'a held ask revalidates its %s token before returning a human answer',
+    async (change) => {
+      const w = await makeWorld();
+      const requestId = 'ask-77777777-8888-9999-aaaa-bbbbbbbbbbbb';
+      const waiting = machineAsk(w, requestId, { holdMs: 5_000 });
+      await vi.waitFor(() => {
+        expect(
+          w.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get(),
+        ).toBeDefined();
+      });
+      if (change === 'revoke') {
+        const revoked = await call(w.s.app, 'POST', `/api/machines/${w.machineId}/revoke`);
+        expect(revoked.status).toBe(204);
+      } else if (change === 'rotate') {
+        w.s.db
+          .update(machineTable)
+          .set({ tokenHash: sha256Hex('replacement-machine-token') })
+          .where(eq(machineTable.id, w.machineId))
+          .run();
+      }
+      const privateAnswer = 'answer-created-after-token-change';
+      answerQuestion(
+        { db: w.s.db },
+        {
+          threadId: w.threadId,
+          requestId,
+          answers: [
+            { header: '缩进', choices: ['Tabs'] },
+            { header: '备注', text: privateAnswer },
+          ],
+        },
+      );
+      const result = await waiting;
+      expect(result.status).toBe(change === 'valid' ? 200 : 401);
+      if (change === 'valid') {
+        expect(JSON.stringify(result.body)).toContain(privateAnswer);
+      } else {
+        expect(JSON.stringify(result.body)).not.toContain(privateAnswer);
+      }
+      const saved = w.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get();
+      expect(saved?.content).toContain(privateAnswer);
+    },
+  );
+
   test('creating a question: assistant row + content kind + notification; same requestId re-posted idempotently (no stacked card, no duplicate notification)', async () => {
     const w = await makeWorld();
     const first = await machineAsk(w, 'ask-11111111-2222-3333-4444-555555555555');

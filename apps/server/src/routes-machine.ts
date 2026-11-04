@@ -186,9 +186,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const path = new URL(c.req.url).pathname;
     if (path.startsWith('/api/machine/enroll')) return next();
     const token = bearer(c);
-    const row = token ? findMachineByToken(ctx.db, token) : undefined;
+    if (!token) throw unauthorized();
+    const row = findMachineByToken(ctx.db, token);
     if (!row) throw unauthorized();
     await next();
+    if (findMachineByToken(ctx.db, token)?.id !== row.id) throw unauthorized();
   });
 
   const me = (c: Context): MachineRow => {
