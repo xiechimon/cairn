@@ -30,6 +30,7 @@ import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
+import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { OrbComputerProvider } from './computer/orb.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import type { DaemonConfig } from './config.js';
@@ -77,6 +78,7 @@ export interface MachineLoopOpts {
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
   hostComputer?: ComputerProvider;
+  hostScreen?: HostScreen;
   orbComputer?: ScopedComputerProviders;
   heartbeatIntervalMs?: number;
   idleSleepPrevention?: boolean;
@@ -192,6 +194,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostComputer =
     opts.hostComputer ??
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
+  const hostScreen = opts.hostScreen ?? createHostScreenFromEnv(capEnv);
   const computerOrbs =
     opts.orbComputer === undefined && orbProvider instanceof NspawnOrbProvider
       ? new ComputerOrbs({
@@ -607,6 +610,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     client,
     logger,
     ...(hostComputer ? { host: hostComputer } : {}),
+    ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
   });
   const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
