@@ -15,11 +15,11 @@ export interface QueuedCapsule {
 
 type CapsuleAction = (id: string, content: string) => unknown;
 
-const CAPSULE_CLS =
+export const CAPSULE_CLS =
   'inline-flex h-7 max-w-full items-center gap-1.5 rounded-full pr-1 pl-2.5 text-meta text-foreground inset-ring-1';
-const CAPSULE_QUEUED_CLS = 'bg-background inset-ring-border';
+export const CAPSULE_QUEUED_CLS = 'bg-background inset-ring-border';
 const CAPSULE_FAILED_CLS = 'bg-(--danger-soft) inset-ring-destructive/40';
-const CAPSULE_ICON_BTN = 'size-5 flex-none text-content-tertiary';
+export const CAPSULE_ICON_BTN = 'size-5 flex-none text-content-tertiary';
 
 export function QueuedCapsules({
   messages,

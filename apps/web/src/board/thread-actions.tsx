@@ -46,6 +46,60 @@ const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }>
   unarchive: { reason: '已归档。', primary: '取消归档' },
 };
 
+export function ThreadActionCard({
+  kind,
+  busy,
+  orchestrating,
+  onPrimary,
+  onViewPlan,
+  onFinish,
+  children,
+}: {
+  kind: ThreadActionKind;
+  busy: boolean;
+  orchestrating: boolean;
+  onPrimary: () => void;
+  onViewPlan?: (() => void) | undefined;
+  onFinish?: (() => void) | undefined;
+  children?: ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      data-testid="side-chat-action"
+      data-action={kind}
+      className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-card) bg-card px-3.5 py-2.5 shadow-(--e1)"
+    >
+      <p className="m-0 min-w-0 flex-1 basis-48 text-meta text-content-secondary">
+        {t(ACTION_COPY[kind].reason)}
+      </p>
+      <div className="flex flex-none gap-2">
+        {kind === 'approve' && onViewPlan !== undefined && (
+          <Button size="sm" variant="outline" onClick={onViewPlan} className="h-7 px-2.5">
+            {t('查看计划')}
+          </Button>
+        )}
+        {onFinish !== undefined && (
+          <Button size="sm" variant="outline" onClick={onFinish} className="h-7 px-2.5">
+            {t('完成…')}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          onClick={onPrimary}
+          disabled={busy}
+          data-orchestrating={orchestrating ? 'true' : undefined}
+          className="h-7 px-2.5"
+        >
+          {busy && <Spinner data-icon="inline-start" />}
+          {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export interface ThreadActions {
   card: ReactNode;
   menu: ReactNode;
@@ -191,37 +245,14 @@ export function useThreadActions({
 
   const card =
     kind === null ? null : (
-      <div
-        data-testid="side-chat-action"
-        data-action={kind}
-        className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-card) bg-card px-3.5 py-2.5 shadow-(--e1)"
-      >
-        <p className="m-0 min-w-0 flex-1 basis-48 text-meta text-content-secondary">
-          {t(ACTION_COPY[kind].reason)}
-        </p>
-        <div className="flex flex-none gap-2">
-          {kind === 'approve' && onViewPlan !== undefined && (
-            <Button size="sm" variant="outline" onClick={onViewPlan} className="h-7 px-2.5">
-              {t('查看计划')}
-            </Button>
-          )}
-          {canFinishFailed && (
-            <Button size="sm" variant="outline" onClick={openAccept} className="h-7 px-2.5">
-              {t('完成…')}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={runPrimary[kind]}
-            disabled={pending || orchestrating}
-            data-orchestrating={orchestrating ? 'true' : undefined}
-            className="h-7 px-2.5"
-          >
-            {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
-            {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
-          </Button>
-        </div>
-      </div>
+      <ThreadActionCard
+        kind={kind}
+        busy={pending || orchestrating}
+        orchestrating={orchestrating}
+        onPrimary={runPrimary[kind]}
+        onViewPlan={onViewPlan}
+        onFinish={canFinishFailed ? openAccept : undefined}
+      />
     );
 
   const canComplete =

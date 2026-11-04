@@ -52,6 +52,7 @@ import { ProductOverlaysSection } from './product-overlays.js';
 import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
+import { ThreadDraftSections } from './proposals-thread.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -121,6 +122,15 @@ const NAV = [
       ['side-panel', 'Side panel, title menus'],
       ['routing', 'Model routing'],
       ['accounts', 'Accounts'],
+    ],
+  },
+  {
+    id: 'thread-drafts',
+    title: 'Thread drafts',
+    items: [
+      ['draft-turn-folding', 'Turn folding'],
+      ['draft-automation', 'Automation badge'],
+      ['draft-side-chat', 'Side chat additions'],
     ],
   },
   {
@@ -307,6 +317,14 @@ export function Gallery() {
           <PanelSection />
           <RoutingSection />
           <AccountsSection />
+          <GroupTitle
+            id="thread-drafts"
+            title="Thread drafts"
+            lede="Proposals for review, not shipped components: each option is shown in its states inside a frame that mimics the side chat."
+          />
+          <ProductProviders>
+            <ThreadDraftSections />
+          </ProductProviders>
           <GroupTitle
             id="patterns"
             title="Patterns"
