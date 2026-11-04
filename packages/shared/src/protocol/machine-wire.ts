@@ -23,6 +23,7 @@ import {
   machineComputerFramesBodySchema,
   machineComputerFramesResponseSchema,
 } from './computer.js';
+import { computerPresenceListSchema } from './computer-presence.js';
 import { machineJsonSchema } from './executor.js';
 
 export const MACHINE_AUTH_HEADER = 'authorization';
@@ -79,10 +80,12 @@ export const machineClosedOrbsResponseSchema = z
   .max(MACHINE_ORB_CONVERSATIONS_LIMIT);
 
 export const machinePresenceBodySchema = z.object({
+  computers: computerPresenceListSchema.optional(),
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
 });
+export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });
 
 export const machineRecoverResponseSchema = z.object({
