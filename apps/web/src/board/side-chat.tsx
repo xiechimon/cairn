@@ -1,4 +1,5 @@
-import { X } from 'lucide-react';
+import { cn } from 'cn';
+import { FileDiff, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -17,6 +18,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
+import type { ThreadChanges } from './thread-changes.js';
 import { threadCopy, threadTone } from './thread-copy.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
@@ -102,16 +104,104 @@ function SourceLine({
   );
 }
 
+type ThreadView = 'chat' | 'changes';
+
+function ChangesView({ chat, now }: { chat: ThreadChat; now: number }) {
+  const { t } = useI18n();
+  const [versionMenu, setVersionMenu] = useState<'versions' | 'compare' | undefined>(undefined);
+  const { changes } = chat;
+  if (changes.status === 'loading' || changes.status === 'error') {
+    return (
+      <div
+        data-testid="side-chat-changes-view"
+        data-state={changes.status}
+        className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
+      >
+        <p className="m-0 text-ui text-content-tertiary">
+          {changes.status === 'loading' ? t('加载中…') : t('变更加载失败')}
+        </p>
+        {changes.status === 'error' && (
+          <Button size="sm" onClick={chat.retryChanges}>
+            {t('重试')}
+          </Button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div
+      data-testid="side-chat-changes-view"
+      data-state="ready"
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <DocPane
+        mode="changes"
+        doc={undefined}
+        changes={changes.content}
+        now={now}
+        onDocView={() => undefined}
+        planVersions={chat.planVersions}
+        versionMenu={versionMenu}
+        onVersionMenu={setVersionMenu}
+        onCompare={() => setVersionMenu(undefined)}
+        onBase={() => setVersionMenu(undefined)}
+        onToggleExpand={chat.toggleChangesExpanded}
+        buildId={chat.buildId}
+      />
+    </div>
+  );
+}
+
+function ChangesButton({
+  changes,
+  active,
+  onToggle,
+}: {
+  changes: ThreadChanges;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-pressed={active}
+      aria-label={active ? t('返回对话') : t('查看变更')}
+      data-testid="side-chat-changes"
+      onClick={onToggle}
+      className={cn(
+        'h-7 gap-1 px-1.5 text-meta text-content-secondary max-[640px]:h-8',
+        active && 'bg-(--menu-hover) text-foreground',
+      )}
+    >
+      <FileDiff aria-hidden="true" strokeWidth={1.75} className="size-3.5" />
+      {changes.status === 'ready' && (
+        <>
+          <span className="text-(--diff-add-fg) tabular-nums">+{changes.added}</span>
+          {changes.removed > 0 && (
+            <span className="text-destructive tabular-nums">−{changes.removed}</span>
+          )}
+        </>
+      )}
+    </Button>
+  );
+}
+
 function ThreadBody({
   chat,
   todo,
   actions,
+  view,
+  now,
   onOpenPlan,
   onClose,
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
   actions: ThreadActions;
+  view: ThreadView;
+  now: number;
   onOpenPlan: (() => void) | undefined;
   onClose: () => void;
 }) {
@@ -121,14 +211,18 @@ function ThreadBody({
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
-      <TranscriptColumn
-        transcript={chat.transcript}
-        liveStep={null}
-        agent={null}
-        onOpenPlan={onOpenPlan}
-        spec={todo.spec.trim() !== '' ? todo.spec : undefined}
-        autoScroll={chat.transcript.length > 0}
-      />
+      {view === 'changes' ? (
+        <ChangesView chat={chat} now={now} />
+      ) : (
+        <TranscriptColumn
+          transcript={chat.transcript}
+          liveStep={null}
+          agent={null}
+          onOpenPlan={onOpenPlan}
+          spec={todo.spec.trim() !== '' ? todo.spec : undefined}
+          autoScroll={chat.transcript.length > 0}
+        />
+      )}
       {chat.sendError != null && (
         <p
           data-testid="side-chat-send-error"
@@ -194,6 +288,9 @@ export function SideChat({
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
+  const [chosenView, setView] = useState<ThreadView>('chat');
+  const view = chat.changes.status === 'none' ? 'chat' : chosenView;
+  const showsChanges = view === 'changes';
 
   const panelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -219,16 +316,24 @@ export function SideChat({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (document.querySelector(OPEN_SURFACE) !== null) return;
-      onClose();
+      if (showsChanges) setView('chat');
+      else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, showsChanges]);
 
   return (
     <SidePanel ref={panelRef} label={todo?.title ?? t('任务')} onDismiss={onClose}>
       {todo != null && chat.load === 'ready' ? (
-        <ReadyThread todo={todo} chat={chat} now={now} onClose={onClose} />
+        <ReadyThread
+          todo={todo}
+          chat={chat}
+          now={now}
+          view={view}
+          onView={setView}
+          onClose={onClose}
+        />
       ) : (
         <>
           <Head todoId={todoId} todo={null} onClose={onClose} />
@@ -243,11 +348,15 @@ function ReadyThread({
   todo,
   chat,
   now,
+  view,
+  onView,
   onClose,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   now: number;
+  view: ThreadView;
+  onView: (view: ThreadView) => void;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -256,13 +365,31 @@ function ReadyThread({
   const actions = useThreadActions({ todo, chat, onGone: onClose, onViewPlan: openPlan });
   return (
     <>
-      <Head todoId={todo.id} todo={todo} onClose={onClose} menu={actions.menu}>
+      <Head
+        todoId={todo.id}
+        todo={todo}
+        onClose={onClose}
+        menu={actions.menu}
+        {...(chat.changes.status !== 'none'
+          ? {
+              changesButton: (
+                <ChangesButton
+                  changes={chat.changes}
+                  active={view === 'changes'}
+                  onToggle={() => onView(view === 'changes' ? 'chat' : 'changes')}
+                />
+              ),
+            }
+          : {})}
+      >
         <StatusLine todo={todo} machineName={chat.machineName} now={now} />
       </Head>
       <ThreadBody
         chat={chat}
         todo={todo}
         actions={actions}
+        view={view}
+        now={now}
         onOpenPlan={openPlan}
         onClose={onClose}
       />
@@ -293,12 +420,14 @@ function Head({
   todo,
   onClose,
   menu,
+  changesButton,
   children,
 }: {
   todoId: string;
   todo: TodoRecord | null;
   onClose: () => void;
   menu?: ReactNode;
+  changesButton?: ReactNode;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -321,6 +450,7 @@ function Head({
             t('任务')
           )}
         </h2>
+        {changesButton}
         {menu}
         <Button
           variant="ghost"

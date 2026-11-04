@@ -212,3 +212,81 @@ test('a plan waiting for approval opens in full from the card and from the trans
   await expect(plan).toHaveCount(0);
   await expect(sideChat(page)).toBeVisible();
 });
+
+const changesButton = (page: Page) => page.getByTestId('side-chat-changes');
+
+test('a reviewed thread shows its diff counts in the header and swaps the transcript for the changes', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  const button = changesButton(page);
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await expect(button).toContainText('+1');
+  await expect(page.getByTestId('transcript-col')).toBeVisible();
+
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('side-chat-changes-view').getByTestId('doc-pane')).toBeVisible();
+  await expect(page.getByTestId('side-chat-changes-view')).toContainText('README.md');
+  await expect(page.getByTestId('transcript-col')).toHaveCount(0);
+
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('transcript-col')).toBeVisible();
+  await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
+});
+
+test('a thread without build changes has no changes button', async ({ page }) => {
+  for (const id of ['home-c-idle', 'home-c-working-a', 'home-c-confirm']) {
+    await page.goto(`${HOME}&thread=${id}`);
+    await expect(sideChat(page), id).toBeVisible();
+    await expect(changesButton(page), id).toHaveCount(0);
+  }
+});
+
+test('Escape leaves the changes first and closes the panel on the second press', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await changesButton(page).click();
+  await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
+  await expect(sideChat(page)).toBeVisible();
+  await expect(page.getByTestId('transcript-col')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sideChat(page)).toHaveCount(0);
+});
+
+test('the composer stays usable while the changes show, and switching threads returns to the conversation', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await changesButton(page).click();
+  const input = page.locator('.side-panel textarea');
+  await input.fill('looks good');
+  await expect(input).toHaveValue('looks good');
+  await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
+
+  await page.goto(`${HOME}&thread=home-c-working-a`);
+  await expect(page.getByTestId('transcript-col')).toBeVisible();
+  await expect(page.getByTestId('side-chat-changes-view')).toHaveCount(0);
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await expect(changesButton(page)).toHaveAttribute('aria-pressed', 'false');
+});
+
+test.describe('phone width changes', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('the changes view and header fit the screen', async ({ page }) => {
+    await page.goto(`${HOME}&thread=home-c-review`);
+    await changesButton(page).click();
+    await expect(page.getByTestId('side-chat-changes-view')).toBeVisible();
+    const overflow = await page
+      .locator('aside.side-panel')
+      .evaluate((node) => node.scrollWidth - node.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    const box = await changesButton(page).boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(32);
+  });
+});
