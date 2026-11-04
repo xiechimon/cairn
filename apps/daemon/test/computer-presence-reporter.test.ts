@@ -132,4 +132,26 @@ describe('computer presence transport', () => {
     expect(probeSignal?.aborted).toBe(true);
     await reporter.close();
   });
+
+  test('a change at the drain completion boundary starts another report immediately', async () => {
+    const observed = source();
+    const bodies: MachinePresenceBody[] = [];
+    const reporter = new ComputerPresenceReporter({
+      source: observed,
+      body: () => ({}),
+      send: async (body) => {
+        bodies.push(body);
+      },
+      onSuccess: () => {
+        if (bodies.length === 1)
+          queueMicrotask(() => observed.set({ ...report, state: 'stopped' }));
+      },
+    });
+    try {
+      await reporter.send();
+      expect(bodies.map((body) => body.computers?.[0]?.state)).toEqual(['running', 'stopped']);
+    } finally {
+      await reporter.close();
+    }
+  });
 });

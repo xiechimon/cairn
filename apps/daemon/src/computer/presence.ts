@@ -44,6 +44,7 @@ export class ComputerPresenceReporter {
     if (!this.active) {
       this.active = this.drain().finally(() => {
         this.active = undefined;
+        if (this.requested && !this.closed) return this.send();
       });
     }
     return this.active;
