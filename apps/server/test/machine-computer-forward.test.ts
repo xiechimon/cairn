@@ -598,6 +598,51 @@ describe('leases', () => {
 });
 
 describe('feed and redaction', () => {
+  test('fresh intermediate output reaches the feed redacted before the call finishes', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const feed = watchFeed(ctx.s);
+    const result = forwardComputerCall(
+      ctx.deps,
+      'sidecar',
+      'step-a',
+      shell('long-running-command'),
+    );
+    const id = computerCallId('step-a', 'tc-1');
+    const prefix = FAKE_TOKEN.slice(0, 15);
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: `first line\n${prefix}` },
+    ]);
+    expect(feed).toHaveLength(2);
+    expect(feed.at(-1)).toMatchObject({
+      type: 'computer.command',
+      command: {
+        computerId: callRow(ctx.s, id).computerId,
+        status: 'running',
+        output: 'first line\n',
+      },
+    });
+    expect(JSON.stringify(feed)).not.toContain(prefix);
+    const next: ComputerFrame = {
+      kind: 'output',
+      seq: 2,
+      stream: 'stdout',
+      text: `${FAKE_TOKEN.slice(15)}\nsecond line\n`,
+    };
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [next]);
+    expect(feed).toHaveLength(3);
+    expect(feed.at(-1)).toMatchObject({
+      command: { status: 'running', output: 'first line\n[REDACTED]\nsecond line\n' },
+    });
+    expect(JSON.stringify(feed)).not.toContain(FAKE_TOKEN);
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [next]);
+    expect(feed).toHaveLength(3);
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(3, 'finished')]);
+    expect((await result).text).toBe('finished');
+    expect(feed.at(-1)).toMatchObject({ command: { status: 'done' } });
+  });
+
   test('a token in the command and the output reaches neither the hub event nor the stored rows', async () => {
     const ctx = boot();
     addMachine(ctx.s, 'omarchy', { computer: true });
