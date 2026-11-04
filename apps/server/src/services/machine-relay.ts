@@ -181,6 +181,7 @@ async function executeWorkerMemoryToolCall(
     {
       teamId: todoRow.teamId,
       agentId: memoryOwnerOf(deps.db, todoRow.teamId, agentId, row.kind),
+      sourceAgentId: agentForStep(deps.db, todoRow, row.kind, row.prompt)?.id ?? agentId,
       todoId: todoRow.id,
       projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
       buildId: row.buildId,

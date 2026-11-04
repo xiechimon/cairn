@@ -1111,6 +1111,7 @@ export async function executeChiefTool(
           memoryId,
           agentId: ctx.chiefAgentId,
           teamId: ctx.teamId,
+          threadId: ctx.threadId,
           content: str(params, 'content'),
         }),
       );
@@ -1124,6 +1125,7 @@ export async function executeChiefTool(
               memoryId,
               agentId: ctx.chiefAgentId,
               teamId: ctx.teamId,
+              threadId: ctx.threadId,
             });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
@@ -1133,7 +1135,7 @@ export async function executeChiefTool(
       return json(
         listMemoryEntries(
           db,
-          { agentId: ctx.chiefAgentId, teamId: ctx.teamId },
+          { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
           bool(params, 'includeInvalid', false),
         ),
       );
@@ -1307,6 +1309,7 @@ export async function confirmBuild(
 export interface WorkerMemoryCtx {
   teamId: string;
   agentId: string;
+  sourceAgentId?: string;
   todoId: string;
   projectId: string | null;
   buildId: string;
@@ -1335,7 +1338,7 @@ export async function executeWorkerMemoryTool(
         projectId: projectId ?? ctx.projectId,
         sourceTodoId: sourceTodoId ?? ctx.todoId,
         sourceBuildId: ctx.buildId,
-        source: agentSourceName(db, ctx.agentId),
+        source: agentSourceName(db, ctx.sourceAgentId ?? ctx.agentId),
         layer,
         threadId: layer === 'scratchpad' ? ctx.todoId : null,
       });
@@ -1347,6 +1350,7 @@ export async function executeWorkerMemoryTool(
           memoryId: str(params, 'memoryId'),
           agentId: ctx.agentId,
           teamId: ctx.teamId,
+          threadId: ctx.todoId,
           content: str(params, 'content'),
         }),
       );
@@ -1357,6 +1361,7 @@ export async function executeWorkerMemoryTool(
         memoryId,
         agentId: ctx.agentId,
         teamId: ctx.teamId,
+        threadId: ctx.todoId,
       });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
@@ -1365,7 +1370,7 @@ export async function executeWorkerMemoryTool(
       return json(
         listMemoryEntries(
           db,
-          { agentId: ctx.agentId, teamId: ctx.teamId },
+          { agentId: ctx.agentId, teamId: ctx.teamId, threadId: ctx.todoId },
           bool(params, 'includeInvalid', false),
         ),
       );

@@ -301,6 +301,7 @@ function chiefClaimPayload(
         teamId: threadRow.teamId,
         agentId: agentRow.id,
         projectId: stepScopeProjectId(stepRow),
+        threadId: threadRow.id,
       });
   const instruction =
     stepRow.prompt === null
