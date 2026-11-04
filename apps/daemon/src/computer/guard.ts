@@ -356,6 +356,13 @@ function prepareDesktopGuardCommand(source: string): PreparedDesktopCommand {
       continue;
     }
     if (character === '(' || character === ')') return { reason: 'subshell' };
+    if (
+      character === '{' &&
+      source[index + 1] !== '}' &&
+      !(atWordStart && /[\s;|&]/.test(source[index + 1] ?? ''))
+    ) {
+      return { reason: 'brace expansion' };
+    }
     const multi = ['&&', '||', ';;', '|&', '>>', '>&', '<&', '&>'].find((op) =>
       source.startsWith(op, index),
     );

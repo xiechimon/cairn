@@ -1,3 +1,4 @@
+import { cairnHostRefusal } from './guard-cairn.js';
 import { skipPlainParameter } from './guard-heredoc.js';
 
 function matchingBrace(body: string, openIndex: number): number | undefined {
@@ -222,6 +223,7 @@ function quotedHeredocWords(body: string): string[] | undefined {
 }
 
 function wordsHaveLifecycleHazard(words: readonly string[]): boolean {
+  if (cairnHostRefusal(words)) return true;
   let sawService = false;
   let sawServiceAction = false;
   for (const word of words) {

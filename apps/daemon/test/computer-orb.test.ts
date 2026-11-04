@@ -33,6 +33,7 @@ const SCOPE = 'chief:chief-1';
 const NAME = 'c1';
 const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20 };
 
+let allocatedRoot: string;
 let root: string;
 let runtime: string;
 let home: string;
@@ -44,7 +45,8 @@ let touched: string[];
 let ensured: string[];
 
 beforeEach(() => {
-  root = realpathSync(makeTestTempDir('co-'));
+  allocatedRoot = makeTestTempDir('co-');
+  root = realpathSync(allocatedRoot);
   runtime = path.join(root, 'r');
   mkdirSync(path.join(runtime, NAME), { recursive: true, mode: 0o700 });
   home = path.join(root, 'home');
@@ -61,7 +63,7 @@ afterEach(async () => {
   await provider?.close();
   provider = undefined;
   await Promise.allSettled(guests);
-  releaseTestTempDir(root);
+  expect(releaseTestTempDir(allocatedRoot)).toBe(true);
 });
 
 function makeProvider(overrides: Partial<OrbComputerProviderOptions> = {}) {

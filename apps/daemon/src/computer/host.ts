@@ -62,6 +62,7 @@ export interface HostComputerOptions {
   home?: string;
   env?: NodeJS.ProcessEnv;
   killGraceMs?: number;
+  streamDrainMs?: number;
   maxFileBytes?: number;
 }
 
@@ -138,6 +139,7 @@ export class HostComputerProvider implements ComputerProvider {
   private readonly home: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly killGraceMs: number;
+  private readonly streamDrainMs: number;
   private readonly maxFileBytes: number;
   private readonly running = new Set<{ stop: () => Promise<void> }>();
 
@@ -145,6 +147,7 @@ export class HostComputerProvider implements ComputerProvider {
     this.home = path.resolve(options.home ?? homedir());
     this.env = options.env ?? process.env;
     this.killGraceMs = options.killGraceMs ?? HOST_KILL_GRACE_MS;
+    this.streamDrainMs = options.streamDrainMs ?? STREAM_DRAIN_MS;
     this.maxFileBytes = options.maxFileBytes ?? HOST_MAX_FILE_BYTES;
   }
 
@@ -191,6 +194,8 @@ export class HostComputerProvider implements ComputerProvider {
   }
 
   async execute(request: ComputerExecuteRequest): Promise<AsyncIterable<ComputerProcessEvent>> {
+    const deadlineAt = Date.now() + request.timeoutMs;
+    const timeoutMessage = `command timed out after ${request.timeoutMs} ms; process tree killed`;
     const cwd = await this.resolveInHome(request.cwd, 'cwd');
     const info = await stat(cwd).catch(() => undefined);
     if (!info?.isDirectory()) throw new ComputerRefusal('cwd is not an existing directory');
@@ -200,6 +205,13 @@ export class HostComputerProvider implements ComputerProvider {
       return immediate([
         { kind: 'stderr', text: 'command aborted\n' },
         { kind: 'exit', code: 130, reason: 'aborted' },
+      ]);
+    }
+    const remaining = deadlineAt - Date.now();
+    if (remaining <= 0) {
+      return immediate([
+        { kind: 'stderr', text: `${timeoutMessage}\n` },
+        { kind: 'exit', code: 124, reason: 'timeout' },
       ]);
     }
 
@@ -245,15 +257,7 @@ export class HostComputerProvider implements ComputerProvider {
       finish(code, reason, note);
     };
     const abort = () => void terminate(130, 'aborted', 'command aborted');
-    const timeout = setTimeout(
-      () =>
-        void terminate(
-          124,
-          'timeout',
-          `command timed out after ${request.timeoutMs} ms; process tree killed`,
-        ),
-      request.timeoutMs,
-    );
+    const timeout = setTimeout(() => void terminate(124, 'timeout', timeoutMessage), remaining);
     timeout.unref();
     const handle = { stop: () => terminate(130, 'aborted', 'command stopped') };
     this.running.add(handle);
@@ -273,10 +277,11 @@ export class HostComputerProvider implements ComputerProvider {
       finish(1);
     });
     child.on('exit', (code, signal) => {
+      clearTimeout(timeout);
       setTimeout(() => {
         if (stopping) return;
         finish(code ?? 1, undefined, signal ? `command terminated by ${signal}` : undefined);
-      }, STREAM_DRAIN_MS).unref();
+      }, this.streamDrainMs).unref();
     });
     return queue;
   }

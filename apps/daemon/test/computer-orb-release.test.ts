@@ -14,7 +14,7 @@ const cleanups: Array<() => Promise<unknown>> = [];
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup().catch(() => undefined);
-  for (const root of roots.splice(0)) releaseTestTempDir(root);
+  for (const root of roots.splice(0)) expect(releaseTestTempDir(root)).toBe(true);
 });
 
 async function setup(connectTimeoutMs = 10_000) {
