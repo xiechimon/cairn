@@ -2256,6 +2256,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               },
               "type": "object",
             },
+            "scopeKey": {
+              "minLength": 1,
+              "type": "string",
+            },
             "stepId": {
               "type": "string",
             },
@@ -5983,6 +5987,8 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "github-issue",
                     "github-issue-self",
                     "orchestration",
+                    "research-intake",
+                    "research-intake-item",
                   ],
                   "type": "string",
                 },
@@ -6515,6 +6521,91 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
       ],
       "type": "object",
     },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "callId": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "command": {
+              "type": "string",
+            },
+            "cwd": {
+              "type": "string",
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "output": {
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "running",
+                "done",
+                "error",
+                "interrupted",
+                "cancelled",
+              ],
+              "type": "string",
+            },
+            "stepId": {
+              "type": "string",
+            },
+            "tool": {
+              "enum": [
+                "shell",
+                "user_computer_shell",
+                "write_file",
+                "attach_file",
+                "open_path",
+                "launch_app",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "callId",
+            "stepId",
+            "tool",
+            "command",
+            "cwd",
+            "status",
+            "exitCode",
+            "output",
+            "at",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "computer.command",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "command",
+      ],
+      "type": "object",
+    },
   ],
 }
 `;
@@ -6729,6 +6820,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "researchIntakeProjectId": "CAIRN_RESEARCH_INTAKE_PROJECT_ID",
     "routingRules": "CAIRN_ROUTING_RULES",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
@@ -7223,6 +7315,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_summary",
   "computer",
   "computer_call",
+  "feature_flag",
+  "client_message",
 ]
 `;
 
@@ -7267,6 +7361,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "backup-status.json next to server.db (#2162)",
     "path": "/api/server/backup",
+  },
+  {
+    "method": "POST",
+    "note": "owner releases a feature flag to every user (#2427)",
+    "path": "/api/flags/{key}/release",
   },
   {
     "method": "GET",
@@ -7346,7 +7445,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
+    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {
@@ -7419,7 +7518,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, clientMessageId}; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
+    "note": "body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
     "path": "/api/todos/{id}/messages",
   },
   {
@@ -9967,6 +10066,8 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "github-issue",
             "github-issue-self",
             "orchestration",
+            "research-intake",
+            "research-intake-item",
           ],
           "type": "string",
         },

@@ -701,6 +701,20 @@
       "when": 1793757585388,
       "tag": "0099_work_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "6",
+      "when": 1793768070087,
+      "tag": "0100_feature_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "6",
+      "when": 1793772077239,
+      "tag": "0101_client_message",
+      "breakpoints": true
     }
   ]
 }

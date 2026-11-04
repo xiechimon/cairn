@@ -16,6 +16,7 @@ import type {
   ComputerState,
   ComputerTool,
   DocumentDiffFile,
+  INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MemoryCandidateStatus,
   ModelRef,
@@ -540,6 +541,23 @@ export const workPolicy = sqliteTable(
   (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
 );
 
+export const featureFlag = sqliteTable(
+  'feature_flag',
+  {
+    id: text('id').primaryKey(),
+    key: text('key').notNull(),
+    userId: text('userId').references(() => user.id),
+    enabled: bool('enabled').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('feature_flag_key_global_unique').on(t.key).where(sql`${t.userId} IS NULL`),
+    uniqueIndex('feature_flag_key_user_unique')
+      .on(t.key, t.userId)
+      .where(sql`${t.userId} IS NOT NULL`),
+  ],
+);
+
 export const agentMemory = sqliteTable('agent_memory', {
   id: text('id').primaryKey(),
   agentId: text('agentId').notNull(),
@@ -880,7 +898,9 @@ export const retroProposal = sqliteTable(
     what: text('what').notNull(),
     why: text('why').notNull(),
     safeguard: text('safeguard').notNull(),
-    sourceKind: text('sourceKind').$type<'coordinator' | 'thread' | 'step'>().notNull(),
+    sourceKind: text('sourceKind')
+      .$type<'coordinator' | 'thread' | 'step' | typeof INTAKE_SOURCE_KIND>()
+      .notNull(),
     sourceId: text('sourceId').notNull(),
     sourceLabel: text('sourceLabel').notNull(),
     sourceTodoId: text('sourceTodoId'),
@@ -1110,3 +1130,14 @@ export const claudeSubscription = sqliteTable('claude_subscription', {
   expiresAt: epochMs('expiresAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const clientMessage = sqliteTable(
+  'client_message',
+  {
+    scopeId: text('scopeId').notNull(),
+    clientMessageId: text('clientMessageId').notNull(),
+    response: json<unknown>('response'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopeId, t.clientMessageId] })],
+);

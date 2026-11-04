@@ -851,10 +851,12 @@ export function useApiMutations(teamId: string | undefined) {
         threadId: string | null;
         content: string;
         projectId?: string | null;
+        clientMessageId?: string;
       }) => {
         const body = {
           content: input.content,
           ...(input.projectId != null ? { projectId: input.projectId } : {}),
+          ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
         };
         return input.threadId === null
           ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, body)
@@ -1018,6 +1020,7 @@ export function useApiMutations(teamId: string | undefined) {
         deliverAfterStop?: boolean;
         cancelQueued?: boolean;
         queuedMessageId?: string;
+        clientMessageId?: string;
       }) =>
         api.post<{ message: { id: string } }>(
           `/api/conversations/${input.conversationId}/messages`,
@@ -1027,6 +1030,7 @@ export function useApiMutations(teamId: string | undefined) {
             ...(input.cancelQueued ? { cancelQueued: true } : {}),
             ...(input.mode ? { mode: input.mode } : {}),
             ...(input.queuedMessageId ? { queuedMessageId: input.queuedMessageId } : {}),
+            ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
           },
         ),
       onSuccess: (_data, input) => {
@@ -1037,10 +1041,10 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     messageThread: useMutation({
-      mutationFn: (input: { todoId: string; content: string }) =>
+      mutationFn: (input: { todoId: string; content: string; clientMessageId?: string }) =>
         api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {
           content: input.content,
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: input.clientMessageId ?? crypto.randomUUID(),
         }),
       onSuccess: (result) => {
         void qc.invalidateQueries({ queryKey: ['messages'] });

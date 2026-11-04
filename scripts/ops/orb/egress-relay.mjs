@@ -1,7 +1,8 @@
 import { lookup } from 'node:dns/promises';
+import { chmod, lstat, unlink } from 'node:fs/promises';
 import { Agent, createServer, request } from 'node:http';
-import { BlockList, isIP } from 'node:net';
-import { resolve } from 'node:path';
+import { BlockList, connect, isIP } from 'node:net';
+import { dirname, isAbsolute, resolve } from 'node:path';
 
 export const relayDefaults = {
   host: '10.203.0.1',
@@ -97,7 +98,11 @@ export function createRelay(options = {}) {
   server.requestTimeout = config.idleTimeout;
   server.on('connection', (socket) => {
     socket.on('error', () => socket.destroy());
-    if (!allowed.check(socket.remoteAddress, isIP(socket.remoteAddress) === 4 ? 'ipv4' : 'ipv6')) {
+    const viaSocketFile = typeof server.address() === 'string';
+    if (
+      !viaSocketFile &&
+      !allowed.check(socket.remoteAddress, isIP(socket.remoteAddress) === 4 ? 'ipv4' : 'ipv6')
+    ) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
       return;
     }
@@ -258,14 +263,87 @@ export function createRelay(options = {}) {
   return server;
 }
 
+async function assertPrivateDirectory(directory) {
+  const stats = await lstat(directory);
+  if (!stats.isDirectory() || stats.uid !== process.getuid() || (stats.mode & 0o077) !== 0)
+    throw new Error(`Insecure socket directory ${directory}`);
+}
+
+function socketAcceptsConnections(socketPath) {
+  return new Promise((resolve, reject) => {
+    const probe = connect(socketPath);
+    probe.once('connect', () => {
+      probe.destroy();
+      resolve(true);
+    });
+    probe.once('error', (error) =>
+      error.code === 'ECONNREFUSED' || error.code === 'ENOENT' ? resolve(false) : reject(error),
+    );
+  });
+}
+
+async function removeStaleSocket(socketPath) {
+  let stats;
+  try {
+    stats = await lstat(socketPath);
+  } catch (error) {
+    if (error.code === 'ENOENT') return;
+    throw error;
+  }
+  if (!stats.isSocket() || stats.uid !== process.getuid())
+    throw new Error(`Refusing to replace ${socketPath}: not a socket owned by this user`);
+  if (await socketAcceptsConnections(socketPath))
+    throw new Error(`Socket ${socketPath} is already in use`);
+  try {
+    await unlink(socketPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
+export async function listenOnUnixSocket(server, socketPath) {
+  if (!isAbsolute(socketPath)) throw new Error('Socket path must be absolute');
+  await assertPrivateDirectory(dirname(socketPath));
+  await removeStaleSocket(socketPath);
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(socketPath, () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  try {
+    await chmod(socketPath, 0o600);
+    const stats = await lstat(socketPath);
+    if (!stats.isSocket() || (stats.mode & 0o777) !== 0o600)
+      throw new Error(`Socket ${socketPath} is not mode 0600`);
+  } catch (error) {
+    server.close();
+    throw error;
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const server = createRelay({
     allowedPorts: (process.env.CAIRN_ORB_ALLOWED_PORTS ?? relayDefaults.allowedPorts.join(','))
       .split(',')
       .map(Number),
   });
-  server.listen(relayDefaults.port, relayDefaults.host);
-  server.on('listening', () =>
-    console.log(`Filtering relay listening on ${relayDefaults.host}:${relayDefaults.port}`),
-  );
+  const socketPath = process.env.CAIRN_ORB_EGRESS_SOCKET;
+  if (socketPath === undefined) {
+    server.listen(relayDefaults.port, relayDefaults.host);
+    server.on('listening', () =>
+      console.log(`Filtering relay listening on ${relayDefaults.host}:${relayDefaults.port}`),
+    );
+  } else {
+    try {
+      await listenOnUnixSocket(server, socketPath);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    console.log(`Filtering relay listening on unix socket ${socketPath}`);
+    for (const signal of ['SIGINT', 'SIGTERM'])
+      process.once(signal, () => server.close(() => process.exit(0)));
+  }
 }
