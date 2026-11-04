@@ -364,6 +364,10 @@
     "2892": {
       "destination": "existing-executors",
       "reason": "Open PR #2894 implements the three-family font decision and heading role mapping"
+    },
+    "2912": {
+      "destination": "existing-executors",
+      "reason": "autonomy brake from main CI 41826798704; lane 6 B-UI refreshes gallery baselines for project-not-found, project-not-found-recent and projects-failed-to-load; close when main is stably green"
     }
   }
 }
