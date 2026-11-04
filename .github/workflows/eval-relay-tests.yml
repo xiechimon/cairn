@@ -1,0 +1,53 @@
+name: eval-relay-tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/eval-relay-tests.yml'
+      - 'integration/eval/harbor/relay-bridge.mjs'
+      - 'integration/eval/harbor/relay-probe.mjs'
+      - 'integration/eval/harbor/public/cairn_harbor/budget.py'
+      - 'integration/eval/harbor/public/cairn_harbor/model_relay.py'
+      - 'integration/eval/harbor/public/cairn_harbor/relay_server.py'
+      - 'integration/eval/harbor/public/cairn_harbor/relay_probe.py'
+      - 'integration/eval/harbor/public/tests/test_model_relay.py'
+      - 'integration/eval/harbor/public/tests/test_relay_server.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/eval-relay-tests.yml'
+      - 'integration/eval/harbor/relay-bridge.mjs'
+      - 'integration/eval/harbor/relay-probe.mjs'
+      - 'integration/eval/harbor/public/cairn_harbor/budget.py'
+      - 'integration/eval/harbor/public/cairn_harbor/model_relay.py'
+      - 'integration/eval/harbor/public/cairn_harbor/relay_server.py'
+      - 'integration/eval/harbor/public/cairn_harbor/relay_probe.py'
+      - 'integration/eval/harbor/public/tests/test_model_relay.py'
+      - 'integration/eval/harbor/public/tests/test_relay_server.py'
+
+permissions:
+  contents: read
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24.14.0'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest==9.2.0
+      - name: Parent accounting and Unix relay tests
+        env:
+          PYTHONPATH: integration/eval/harbor/public
+        run: python -m pytest integration/eval/harbor/public/tests/test_model_relay.py integration/eval/harbor/public/tests/test_relay_server.py -q
+      - name: Network-off container probe with fake upstream
+        env:
+          PYTHONPATH: integration/eval/harbor/public
+        run: python -m cairn_harbor.relay_probe --output "$RUNNER_TEMP/relay-proof"

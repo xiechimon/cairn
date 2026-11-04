@@ -1,0 +1,27 @@
+{
+  "nodeVersion": "v24.14.0",
+  "taskCanWriteWorkspace": true,
+  "hostRulerReadable": false,
+  "hostCostReadable": false,
+  "hostRulerWriteAttempt": "ENOENT",
+  "hostCredentialPresent": false,
+  "dockerSocketVisible": false,
+  "interfaces": [
+    "lo"
+  ],
+  "externalNetwork": false,
+  "relayStatus": 200,
+  "relayCompleted": true,
+  "extraRouteStatus": 403,
+  "hostRulerUnchanged": true,
+  "syntheticCostUsd": 0.0004,
+  "realProvider": false,
+  "image": "node:24.14.0-bookworm-slim@sha256:d8e448a56fc63242f70026718378bd4b00f8c82e78d20eefb199224a4d8e33d8",
+  "sourceDigests": {
+    "relay_probe.py": "a56289972be23988c4080f59e5f43955015bffc688757e4974c748a7c7c52f1c",
+    "model_relay.py": "1668a416889ff6c727a269f0252089efcc9b56535eefb6b7cf0607e162576119",
+    "relay_server.py": "7ebb07fc183fee6ab1d328a765b21c49b8df18c49a8ab2373e427d39be9ebc3f",
+    "relay-bridge.mjs": "6123d64eabe15438edb872988c06608d492780ecf4b308c1a90650183e24b3a6",
+    "relay-probe.mjs": "19a7e1ea611543cbd1d7e3b7bea9da2322d9c36194f0525cdca05ab8a2c6aab0"
+  }
+}
