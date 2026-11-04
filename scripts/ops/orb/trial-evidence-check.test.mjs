@@ -36,6 +36,21 @@ const evidence = () => ({
   claimedMachineId: 'omarchy-orb',
 });
 
+function podmanInspect(name) {
+  return JSON.stringify([{ Name: name, State: { Status: 'running', Running: true } }]);
+}
+
+test('a podman inspect capture of the trial container stands in for machinectl status', async () => {
+  const w = world();
+  const result = await w.run({
+    ...evidence(),
+    machinectlStatus: undefined,
+    podmanInspect: podmanInspect('cairn-orb-build-1'),
+  });
+  assert.deepEqual(result.failures, []);
+  assert.ok(result.lines.includes('trial-one: ok'));
+});
+
 function world() {
   const data = {
     pull: {
@@ -203,6 +218,15 @@ for (const [name, patch] of [
   ['conversationId', { conversationId: '' }],
   ['orbName', { orbName: 'other' }],
   ['machinectlStatus', { machinectlStatus: '  ' }],
+  ['orbCapture', { machinectlStatus: undefined }],
+  ['orbCapture', { podmanInspect: podmanInspect('cairn-orb-build-1') }],
+  ['podmanInspect', { machinectlStatus: undefined, podmanInspect: '  ' }],
+  ['podmanInspect', { machinectlStatus: undefined, podmanInspect: 'not json' }],
+  ['podmanInspect', { machinectlStatus: undefined, podmanInspect: '[]' }],
+  [
+    'podmanInspect',
+    { machinectlStatus: undefined, podmanInspect: podmanInspect('cairn-orb-other') },
+  ],
   ['pr', { pr: -1 }],
   ['mergeCommit', { mergeCommit: 'short' }],
   ['labelsBefore', { labelsBefore: null }],
