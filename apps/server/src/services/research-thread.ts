@@ -1,13 +1,12 @@
 import type { Assignment, ResearchTier, TodoSourceKind } from '@cairn/shared';
 import { researchPrompt } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
-import { agent, chief, machine, project, todo } from '../db/schema.js';
+import { agent, chief, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
-import { pinAllows, workerIneligibility } from './machine-routing.js';
-import { mergedCatalogModels } from './model-liveness.js';
-import { applyRoute, policyForStep, routeForStep } from './routing-rules.js';
+import { recordResearchTier } from './research-citations.js';
+import { runnableResearchAgentIds } from './research-dispatch.js';
+import { routeForStep } from './routing-rules.js';
 import { createTodo } from './todos.js';
 
 export const RESEARCH_AGENT_PROVIDER = 'claude-code';
@@ -71,39 +70,7 @@ function chooseResearchAgent(
     .filter(
       (row) => !coordinators.has(row.id) && (route?.modelId ?? row.modelId ?? '').trim().length > 0,
     );
-  const machines = db.select().from(machine).where(eq(machine.teamId, input.teamId)).all();
-  const policy = policyForStep(db, { teamId: input.teamId }, 'build');
-  const localProject =
-    db.select().from(project).where(eq(project.id, input.projectId)).get()?.repoKind === 'local';
-  const catalog = mergedCatalogModels();
-  const now = nowMs();
-  const runnable = new Set(
-    candidates
-      .filter((row) => {
-        const effective = applyRoute(row, route, null, policy);
-        const facts = {
-          agentRow: effective,
-          model: effective,
-          localProject,
-          localMerge: false,
-          routed: route !== null,
-        };
-        return machines.some(
-          (host) =>
-            host.online &&
-            workerIneligibility(db, host, facts, catalog, now) === null &&
-            (route !== null ||
-              pinAllows({
-                machineId: host.id,
-                pinnedId: effective.machineId,
-                pinned: machines.find((candidate) => candidate.id === effective.machineId),
-                model: effective,
-                now,
-              })),
-        );
-      })
-      .map((row) => row.id),
-  );
+  const runnable = runnableResearchAgentIds(db, input, candidates, route);
   const preferred = PREFERRED_MODEL[input.tier];
   const rank = (row: { modelId: string | null }) =>
     row.modelId === preferred
@@ -146,6 +113,7 @@ export function openResearchThread(
           )
           .get();
   if (existing?.latestBuildId != null) {
+    recordResearchTier(deps, existing.latestBuildId, input.tier);
     return {
       todoId: existing.id,
       buildId: existing.latestBuildId,
@@ -183,5 +151,6 @@ export function openResearchThread(
     triggerSource: 'chief',
   });
   if (started === undefined) throw new Error('research build was not created');
+  recordResearchTier(deps, started.id, input.tier);
   return { todoId, buildId: started.id, agentId };
 }
