@@ -30,7 +30,11 @@ export interface OpenedResearchThread {
   agentId: string;
 }
 
-function chooseResearchAgent(deps: BuildDeps, input: OpenResearchThreadInput): string {
+function chooseResearchAgent(
+  deps: BuildDeps,
+  input: OpenResearchThreadInput,
+  routeModelId: string | undefined,
+): string {
   const { db } = deps;
   if (input.agentId !== undefined) {
     const row = db
@@ -61,7 +65,9 @@ function chooseResearchAgent(deps: BuildDeps, input: OpenResearchThreadInput): s
       ),
     )
     .all()
-    .filter((row) => !coordinators.has(row.id));
+    .filter(
+      (row) => !coordinators.has(row.id) && (routeModelId ?? row.modelId ?? '').trim().length > 0,
+    );
   const preferred = PREFERRED_MODEL[input.tier];
   const rank = (row: { modelId: string | null }) =>
     row.modelId === preferred
@@ -116,7 +122,7 @@ export function openResearchThread(
       `Research needs a Claude Code route, but this team's session route runs ${route.provider}/${route.modelId}.`,
     );
   }
-  const agentId = chooseResearchAgent(deps, input);
+  const agentId = chooseResearchAgent(deps, input, route?.modelId);
   const todoId =
     existing?.id ??
     createTodo(deps, {

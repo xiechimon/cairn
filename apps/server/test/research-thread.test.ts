@@ -141,6 +141,51 @@ describe('openResearchThread', () => {
     },
   );
 
+  test.each([null, ''])(
+    'skips a persona-free candidate whose effective model is %j',
+    async (modelId) => {
+      const w = await world();
+      addAgent(w.s, 'agent-general', { modelId });
+      addAgent(w.s, 'agent-reviewer', { persona: 'test_engineer' });
+      const opened = openResearchThread(w.s.svc, {
+        teamId: w.teamId,
+        projectId: w.projectId,
+        tier: 1,
+        ...base,
+      });
+      expect(opened.agentId).toBe('agent-reviewer');
+    },
+  );
+
+  test('a session route supplies the effective model for a model-less agent', async () => {
+    const w = await world();
+    addAgent(w.s, 'agent-general', { modelId: null });
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'session-rule',
+        teamId: w.teamId,
+        use: 'session',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    setRoutingRulesEnabled(true);
+    try {
+      const opened = openResearchThread(w.s.svc, {
+        teamId: w.teamId,
+        projectId: w.projectId,
+        tier: 1,
+        ...base,
+      });
+      expect(opened.agentId).toBe('agent-general');
+    } finally {
+      setRoutingRulesEnabled(false);
+    }
+  });
+
   test('without the tier model, a sonnet or opus agent beats a haiku agent', async () => {
     const w = await world();
     addAgent(w.s, 'agent-a-haiku', { modelId: 'claude-haiku-5-5' });
