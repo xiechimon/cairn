@@ -1,15 +1,22 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import pino from 'pino';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { bootServer, req } from './helpers.js';
 
 const TOKEN =
   'sk-ant-oat01-subscription-test-private-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
 
+const fixtureDirs: string[] = [];
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
+});
+afterAll(() => {
+  for (const dir of fixtureDirs.splice(0)) releaseTestTempDir(dir);
 });
 
 describe('Claude subscription connections', () => {
@@ -45,7 +52,7 @@ describe('Claude subscription connections', () => {
     expect(logs.join('')).not.toContain(TOKEN);
   });
 
-  test('verification makes one minimal stubbed call and hides upstream failures', async () => {
+  test('verification runs the real claude binary once and hides upstream failures', async () => {
     const logs: string[] = [];
     const s = bootServer({
       logger: pino({ level: 'trace' }, { write: (line) => logs.push(line) }),
@@ -54,34 +61,31 @@ describe('Claude subscription connections', () => {
     const created = await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
-    const fetchStub = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ content: [{ type: 'text', text: 'OK' }] }), { status: 200 }),
-      );
+    const dir = makeTestTempDir('claude-subscriptions-');
+    fixtureDirs.push(dir);
+    const runs = join(dir, 'runs');
+    const binary = join(dir, 'claude');
+    const script = (body: string) =>
+      writeFileSync(binary, `#!/bin/sh\necho run >> "${runs}"\n${body}\n`, { mode: 0o755 });
+    vi.stubEnv('CLAUDE_BIN', binary);
+    const fetchStub = vi.fn();
     vi.stubGlobal('fetch', fetchStub);
+    script('exit 0');
     expect(await (await req(s.app, 'POST', `${path}/${id}/verify`)).json()).toEqual({ ok: true });
-    expect(fetchStub).toHaveBeenCalledTimes(1);
-    const [url, options] = fetchStub.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://api.anthropic.com/v1/messages');
-    expect(new Headers(options.headers).get('authorization')).toBe(`Bearer ${TOKEN}`);
-    expect(JSON.parse(String(options.body))).toMatchObject({
-      max_tokens: 1,
-      messages: [{ role: 'user', content: 'Hi' }],
-    });
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
-    fetchStub.mockResolvedValue(new Response(TOKEN, { status: 401 }));
+    script(`echo "401 ${TOKEN}" >&2\nexit 1`);
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await rejected.json()).toEqual({ ok: false });
+    expect(await rejected.json()).toEqual({ ok: false, reason: 'auth' });
     clock.mockReturnValue(Date.now() + 10_000);
-    fetchStub.mockRejectedValue(new Error(`upstream ${TOKEN}`));
+    vi.stubEnv('CLAUDE_BIN', join(dir, 'missing'));
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
-    expect(await failed.json()).toEqual({ ok: false });
+    expect(await failed.json()).toEqual({ ok: false, reason: 'unavailable' });
     expect(logs.join('')).not.toContain(TOKEN);
     expect(
       (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${id}/verify`)).status,
     ).toBe(404);
-    expect(fetchStub).toHaveBeenCalledTimes(3);
+    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(2);
+    expect(fetchStub).not.toHaveBeenCalled();
   });
 
   test('invalid input and foreign connection ids reveal no credentials', async () => {
@@ -168,37 +172,53 @@ test('verification limits concurrent and repeated calls per connection for ten s
     expect(response.status).toBe(201);
     ids.push(((await response.json()) as { id: string }).id);
   }
-  let complete!: (response: Response) => void;
-  const pending = new Promise<Response>((resolve) => {
-    complete = resolve;
-  });
-  const fetchStub = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
-  fetchStub.mockReturnValueOnce(pending);
-  vi.stubGlobal('fetch', fetchStub);
+  const dir = makeTestTempDir('claude-subscriptions-');
+  fixtureDirs.push(dir);
+  const runs = join(dir, 'runs');
+  const hold = join(dir, 'hold');
+  const release = join(dir, 'release');
+  const fail = join(dir, 'fail');
+  const binary = join(dir, 'claude');
+  writeFileSync(
+    binary,
+    [
+      '#!/bin/sh',
+      `echo run >> "${runs}"`,
+      `if [ -f "${hold}" ]; then while [ ! -f "${release}" ]; do sleep 0.05; done; fi`,
+      `if [ -f "${fail}" ]; then echo "401 ${TOKEN}" >&2; exit 1; fi`,
+      'exit 0',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  const runCount = () =>
+    existsSync(runs) ? readFileSync(runs, 'utf8').trim().split('\n').length : 0;
+  vi.stubEnv('CLAUDE_BIN', binary);
+  writeFileSync(hold, '');
   const first = req(s.app, 'POST', `${path}/${ids[0]}/verify`);
-  await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(1));
+  await vi.waitFor(() => expect(runCount()).toBe(1));
+  rmSync(hold);
   const limited = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
   expect(limited.status).toBe(429);
   const message = await limited.text();
   expect(message).toContain('10 seconds');
   expect(message).not.toContain(TOKEN);
-  expect(fetchStub).toHaveBeenCalledTimes(1);
+  expect(runCount()).toBe(1);
   expect((await req(s.app, 'POST', `${path}/${ids[1]}/verify`)).status).toBe(200);
-  complete(new Response(null, { status: 200 }));
+  writeFileSync(release, '');
   expect((await first).status).toBe(200);
   now += 9_999;
   expect((await req(s.app, 'POST', `${path}/${ids[0]}/verify`)).status).toBe(429);
-  expect(fetchStub).toHaveBeenCalledTimes(2);
+  expect(runCount()).toBe(2);
   now += 1;
-  fetchStub.mockResolvedValue(new Response(TOKEN, { status: 401 }));
+  writeFileSync(fail, '');
   const failed = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
   expect(failed.status).toBe(200);
-  expect(await failed.json()).toEqual({ ok: false });
+  expect(await failed.json()).toEqual({ ok: false, reason: 'auth' });
   expect((await req(s.app, 'POST', `${path}/${ids[0]}/verify`)).status).toBe(429);
   expect((await req(s.app, 'POST', `${path}/missing/verify`)).status).toBe(404);
   expect(
     (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${ids[0]}/verify`)).status,
   ).toBe(404);
-  expect(fetchStub).toHaveBeenCalledTimes(3);
+  expect(runCount()).toBe(3);
   expect(logs.join('')).not.toContain(TOKEN);
 });
