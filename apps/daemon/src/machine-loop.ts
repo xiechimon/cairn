@@ -28,7 +28,9 @@ import {
 } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
-import { rejectComputerCall } from './computer/dispatch.js';
+import { createComputerDispatcher } from './computer/dispatch.js';
+import { HostComputerProvider } from './computer/host.js';
+import type { ComputerProvider } from './computer/provider.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -72,6 +74,7 @@ export interface MachineLoopOpts {
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
+  hostComputer?: ComputerProvider;
   heartbeatIntervalMs?: number;
   idleSleepPrevention?: boolean;
   orphanTtlMs?: number;
@@ -183,9 +186,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
+  const hostComputer =
+    opts.hostComputer ??
+    (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
   const capabilitiesReport = (): MachineCapabilities => ({
     ...capabilitiesProbe(),
     executor: orbProvider.kind,
+    ...(hostComputer ? { ownComputer: true as const } : {}),
   });
 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
@@ -562,6 +569,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
+  const computerDispatcher = createComputerDispatcher({
+    client,
+    logger,
+    ...(hostComputer ? { host: hostComputer } : {}),
+  });
   const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
     await performSync({ client, logger }, cmd);
   };
@@ -577,7 +589,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'sync') void deliverSync(ev.sync);
-            if (ev.type === 'computer') void rejectComputerCall(client, ev.call).catch(() => {});
+            if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
           },
           () => {
             if (!announced) {
@@ -712,6 +724,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     streamCtrl.abort();
     claimCtrl.abort();
     caffeinate?.kill();
+    await computerDispatcher.close();
   }
 
   return { machineId, stop, done };
