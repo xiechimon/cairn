@@ -30,6 +30,21 @@ export function flag(db: Db, key: string, userId: string): boolean {
   return isOwner(db, userId);
 }
 
+export function listFlagReleases(db: Db): { key: string; released: boolean }[] {
+  return db
+    .select({
+      key: featureFlag.key,
+      released:
+        sql<number>`max(case when ${featureFlag.userId} is null and ${featureFlag.enabled} = 1 then 1 else 0 end)`.mapWith(
+          Boolean,
+        ),
+    })
+    .from(featureFlag)
+    .groupBy(featureFlag.key)
+    .orderBy(featureFlag.key)
+    .all();
+}
+
 export function setUserFlag(db: Db, key: string, userId: string, enabled: boolean): void {
   const now = nowMs();
   const existing = db
