@@ -402,6 +402,32 @@ describe('ContainerOrbProvider.stop and destroy', () => {
     expect(context.fake.containers.get('cairn-orb-C')?.state).toBe('paused');
   });
 
+  test('stop clears a stale outbox so a recovered step can recreate it', async () => {
+    const context = fixture();
+    const handle = await started(context);
+    const directory = join(context.runtimeRoot, handle.id);
+    const outside = join(context.root, 'outside');
+    writeFileSync(outside, 'keep');
+    mkdirSync(join(directory, 'outbox'), { mode: 0o700 });
+    writeFileSync(join(directory, 'outbox', 'step-1.jsonl'), 'x');
+    symlinkSync(outside, join(directory, 'outbox', 'link'));
+    await context.provider.stop(handle);
+    expect(existsSync(join(directory, 'outbox'))).toBe(false);
+    expect(readFileSync(outside, 'utf8')).toBe('keep');
+    expect(lstatSync(directory).isDirectory()).toBe(true);
+    mkdirSync(join(directory, 'outbox'), { mode: 0o700 });
+  });
+
+  test('a stop that fails to pause leaves the outbox in place', async () => {
+    const context = fixture();
+    const handle = await started(context);
+    const outbox = join(context.runtimeRoot, handle.id, 'outbox');
+    mkdirSync(outbox, { mode: 0o700 });
+    context.fake.pauseLeavesRunning = true;
+    await expect(context.provider.stop(handle)).rejects.toThrow();
+    expect(existsSync(outbox)).toBe(true);
+  });
+
   test('stop of a handle that is not running does nothing', async () => {
     const context = fixture();
     const handle = await context.provider.ensure({ conversationId: 'C', projectId: 'P' });

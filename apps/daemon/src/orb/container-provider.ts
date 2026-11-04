@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { defaultOrbDistSource, publishOrbDist } from './dist.js';
@@ -200,6 +200,7 @@ export class ContainerOrbProvider implements OrbProvider {
     await this.runtime.pause(handle.id);
     const listed = (await this.runtime.list()).find((orb) => orb.orbId === handle.id);
     if (listed?.state === 'running') throw new Error('Orb container is still running after pause');
+    rmSync(join(this.runtimeRoot, handle.id, 'outbox'), { recursive: true, force: true });
     handle.running = false;
     handle.notes.push(orbNote('orb: stopped'));
     this.save();
