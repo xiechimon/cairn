@@ -50,6 +50,12 @@ describe('verifyClaudeSubscription', () => {
     expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: true });
   });
 
+  test('a child that reads stdin receives EOF and verifies the token', async () => {
+    const dir = fixtureDir();
+    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, 'while IFS= read -r line; do :; done\nexit 0'));
+    expect(await verifyClaudeSubscription(TOKEN, { timeoutMs: 1_000 })).toEqual({ ok: true });
+  });
+
   test('an authentication failure is classified without echoing the output', async () => {
     const dir = fixtureDir();
     vi.stubEnv(

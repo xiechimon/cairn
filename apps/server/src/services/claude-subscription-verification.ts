@@ -49,7 +49,7 @@ function runClaude(
   timeoutMs: number,
 ): Promise<ClaudeSubscriptionVerifyResult> {
   return new Promise((resolve) => {
-    execFile(
+    const child = execFile(
       process.env.CLAUDE_BIN || 'claude',
       ['-p', 'Reply with OK', '--output-format', 'json', '--no-session-persistence', '--tools', ''],
       {
@@ -64,6 +64,7 @@ function runClaude(
       (error, stdout, stderr) =>
         resolve(error ? classify(error, { stdout, stderr }) : { ok: true }),
     );
+    child.stdin?.end();
   });
 }
 
