@@ -91,3 +91,23 @@ test('self-deploy authenticates gh with a GitHub App token', () => {
   assert.match(exec, /GH_TOKEN/);
   assert.match(exec, /deploy-watch\.sh/);
 });
+
+test('every unit runs from the dedicated deploy clone, not the lanes checkout', () => {
+  const orb = parseUnit('cairn-daemon-orb');
+  for (const [name, unit] of Object.entries({ ...units, 'cairn-daemon-orb': orb })) {
+    assert.match(
+      unit.entries.get('WorkingDirectory')[0],
+      /^%h\/Code\/AgentProjects\/cairn-exec\/apps\//,
+      name,
+    );
+  }
+  assert.equal(selfDeploy.env.CAIRN_CHECKOUT, '%h/Code/AgentProjects/cairn-exec');
+  for (const script of ['deploy-self.sh', 'deploy-watch.sh']) {
+    const text = readFileSync(new URL(`./${script}`, import.meta.url), 'utf8');
+    assert.match(
+      text,
+      /CHECKOUT="\$\{CAIRN_CHECKOUT:-\$HOME\/Code\/AgentProjects\/cairn-exec\}"/,
+      script,
+    );
+  }
+});

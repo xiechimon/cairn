@@ -444,7 +444,7 @@ The trial uses a second user unit from the main checkout. Install it as the
 checkout owner after the normal daemon deployment has produced `apps/daemon/dist`:
 
 ```sh
-systemctl --user link "$HOME/Code/AgentProjects/cairn/scripts/ops/systemd/cairn-daemon-orb.service"
+systemctl --user link "$HOME/Code/AgentProjects/cairn-exec/scripts/ops/systemd/cairn-daemon-orb.service"
 systemctl --user daemon-reload
 systemctl --user enable --now cairn-daemon-orb.service
 journalctl --user -u cairn-daemon-orb.service -f

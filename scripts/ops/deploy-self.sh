@@ -20,7 +20,7 @@ the target and finishes it or rolls it back before doing anything else.
 Writes the result to $CAIRN_DEPLOY_STATE/deployed.json and $CAIRN_DATA_DIR/deploy.json.
 
 Environment (defaults in brackets):
-  CAIRN_CHECKOUT [~/Code/AgentProjects/cairn]  CAIRN_DATA_DIR [~/.cairn/server]
+  CAIRN_CHECKOUT [~/Code/AgentProjects/cairn-exec]  CAIRN_DATA_DIR [~/.cairn/server]
   CAIRN_DEPLOY_STATE [~/.local/state/cairn-deploy]  CAIRN_DEPLOY_BACKUPS [~/backups/cairn-server/predeploy]
   CAIRN_DEPLOY_SCRATCH [$CAIRN_DEPLOY_STATE/scratch]  CAIRN_REPO [xiechimon/cairn]
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
@@ -30,7 +30,7 @@ EOF
   exit 2
 }
 
-CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn}"
+CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
 DATA_DIR="${CAIRN_DATA_DIR:-$HOME/.cairn/server}"
 STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
 BACKUPS="${CAIRN_DEPLOY_BACKUPS:-$HOME/backups/cairn-server/predeploy}"

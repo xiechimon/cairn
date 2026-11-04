@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Code/AgentProjects/cairn/apps/server
+WorkingDirectory=%h/Code/AgentProjects/cairn-exec/apps/server
 Environment=PATH=%h/.local/share/mise/installs/node/24/bin:%h/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
 Environment=HOST=127.0.0.1
 Environment=PORT=8787

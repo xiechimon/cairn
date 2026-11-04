@@ -2,7 +2,7 @@
 set -uo pipefail
 umask 077
 
-CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn}"
+CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
 STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
 REPO="${CAIRN_REPO:-xiechimon/cairn}"
 REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"

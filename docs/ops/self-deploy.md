@@ -10,7 +10,7 @@ The result goes to `~/.local/state/cairn-deploy/deployed.json` and `~/.cairn/ser
 
 When the oldest undeployed main commit landed more than 2 hours ago, the watcher opens the issue `deploy lag: omarchy is behind main` (or comments on it once per main head) with the reason, and closes it once the deployed SHA equals main.
 
-Install from `scripts/ops/systemd/` into `~/.config/systemd/user/`: `cairn-server.service`, `cairn-daemon.service`, `cairn-coordinator.service`, `cairn-self-deploy.service` and `cairn-self-deploy.timer`. The server binds `127.0.0.1:8787` and is reached through `tailscale serve`; host-specific settings (proxy, secrets) go in `~/.config/cairn/server.env` or unit drop-ins. The self-deploy service mints a GitHub App token with `~/.cairn/tools/app-token/token.mjs` for its `gh` calls. Then:
+Install from `scripts/ops/systemd/` into `~/.config/systemd/user/`: `cairn-server.service`, `cairn-daemon.service`, `cairn-coordinator.service`, `cairn-self-deploy.service` and `cairn-self-deploy.timer`. Every unit runs from the dedicated clone `~/Code/AgentProjects/cairn-exec`, which only deploys move; lanes work in `~/Code/AgentProjects/cairn` and its worktrees, so a deploy never switches a checkout under them. The server binds `127.0.0.1:8787` and is reached through `tailscale serve`; host-specific settings (proxy, secrets) go in `~/.config/cairn/server.env` or unit drop-ins. The self-deploy service mints a GitHub App token with `~/.cairn/tools/app-token/token.mjs` for its `gh` calls. Then:
 
 ```sh
 systemctl --user daemon-reload
