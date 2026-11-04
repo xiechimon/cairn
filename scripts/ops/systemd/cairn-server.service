@@ -1,0 +1,20 @@
+[Unit]
+Description=Cairn server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Code/AgentProjects/cairn/apps/server
+Environment=PATH=%h/.local/share/mise/installs/node/24/bin:%h/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+EnvironmentFile=-%h/.config/cairn/server.env
+ExecStart=%h/.local/share/mise/installs/node/24/bin/node --max-old-space-size=1024 --import tsx src/index.ts
+MemoryMax=1536M
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target
