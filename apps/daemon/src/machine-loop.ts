@@ -30,12 +30,14 @@ import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
-import type { ComputerProvider } from './computer/provider.js';
+import { OrbComputerProvider } from './computer/orb.js';
+import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineClient } from './machine-client.js';
+import { ComputerOrbs } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
@@ -75,6 +77,7 @@ export interface MachineLoopOpts {
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
   hostComputer?: ComputerProvider;
+  orbComputer?: ScopedComputerProviders;
   heartbeatIntervalMs?: number;
   idleSleepPrevention?: boolean;
   orphanTtlMs?: number;
@@ -189,9 +192,31 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostComputer =
     opts.hostComputer ??
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
+  const computerOrbs =
+    opts.orbComputer === undefined && orbProvider instanceof NspawnOrbProvider
+      ? new ComputerOrbs({
+          stateFile: join(paths.home, 'orb-state', 'computers.json'),
+          runtimeRoot: orbProvider.runtimeRoot,
+        })
+      : undefined;
+  const orbComputer =
+    opts.orbComputer ??
+    (computerOrbs && orbProvider instanceof NspawnOrbProvider
+      ? new OrbComputerProvider({
+          orbs: computerOrbs,
+          runtimeRoot: orbProvider.runtimeRoot,
+          release: {
+            publish: () => orbProvider.publishRelease(),
+            authenticated: (machine, release) =>
+              orbProvider.retainComputerRelease(machine, release),
+          },
+          onError: (message) => logger.machine(message),
+        })
+      : undefined);
   const capabilitiesReport = (): MachineCapabilities => ({
     ...capabilitiesProbe(),
     executor: orbProvider.kind,
+    ...(orbComputer ? { computer: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),
   });
 
@@ -450,6 +475,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   closedOrbTimer.unref?.();
   const orbTimer = setInterval(sweepOrbs, 1_000);
   orbTimer.unref?.();
+  const computerSweepTimer = computerOrbs
+    ? setInterval(() => {
+        if (computerOrbs.known().length === 0) return;
+        void computerOrbs
+          .sweep()
+          .catch((error: unknown) => logger.workspace(`computer sweep failed: ${String(error)}`));
+      }, 60_000)
+    : undefined;
+  computerSweepTimer?.unref?.();
 
   const recovered = await client.recover();
   if (recovered.steps.length === 0) {
@@ -573,6 +607,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     client,
     logger,
     ...(hostComputer ? { host: hostComputer } : {}),
+    ...(orbComputer ? { orb: orbComputer } : {}),
   });
   const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
     await performSync({ client, logger }, cmd);
@@ -720,11 +755,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);
     clearInterval(orbTimer);
+    clearInterval(computerSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
     caffeinate?.kill();
     await computerDispatcher.close();
+    if (orbComputer instanceof OrbComputerProvider) await orbComputer.close();
   }
 
   return { machineId, stop, done };

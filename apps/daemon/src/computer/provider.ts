@@ -17,6 +17,10 @@ export interface ComputerFileEntry {
   executable?: true;
 }
 
+export interface ComputerFileOptions {
+  timeoutMs?: number;
+}
+
 export class ComputerRefusal extends Error {
   constructor(message: string) {
     super(message);
@@ -26,8 +30,13 @@ export class ComputerRefusal extends Error {
 
 export interface ComputerProvider {
   execute(request: ComputerExecuteRequest): Promise<AsyncIterable<ComputerProcessEvent>>;
-  listFiles(path: string): Promise<ComputerFileEntry[]>;
-  readFile(path: string): Promise<string>;
-  writeFile(path: string, content: string): Promise<void>;
+  listFiles(path: string, options?: ComputerFileOptions): Promise<ComputerFileEntry[]>;
+  readFile(path: string, options?: ComputerFileOptions): Promise<string>;
+  writeFile(path: string, content: string, options?: ComputerFileOptions): Promise<void>;
+  killAll(): Promise<void>;
+}
+
+export interface ScopedComputerProviders {
+  forScope(scopeKey: string): ComputerProvider;
   killAll(): Promise<void>;
 }

@@ -53,6 +53,7 @@ export const computerCallSchema = z.object({
   tool: computerToolSchema,
   params: z.record(z.string(), z.unknown()),
   deadlineAt: epochMs,
+  scopeKey: z.string().min(1).optional(),
 });
 export type ComputerCall = z.infer<typeof computerCallSchema>;
 

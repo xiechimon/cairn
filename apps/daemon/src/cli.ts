@@ -8,9 +8,11 @@ import {
   statSync,
 } from 'node:fs';
 import process from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
 import { Command } from 'commander';
+import { HostComputerProvider } from './computer/host.js';
+import { runOrbComputerAgent } from './computer/orb-agent.js';
 import {
   type DaemonConfig,
   type DaemonConfigInput,
@@ -19,7 +21,8 @@ import {
 } from './config.js';
 import { createDaemonLogger } from './log.js';
 import { runMachine } from './machine-loop.js';
-import { runOrbWorker } from './orb/worker.js';
+import { orbReleaseFromEntry } from './orb/protocol.js';
+import { ORB_AGENT_HOME, runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
 import { runTokenCommand } from './token-command.js';
@@ -253,6 +256,19 @@ export function buildProgram(): Command {
     .action(async (opts: { socket: string }) => {
       if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
       await runOrbWorker({ socketPath: opts.socket });
+    });
+
+  program
+    .command('orb-computer', { hidden: true })
+    .requiredOption('--socket <path>', 'Computer agent socket')
+    .action(async (opts: { socket: string }) => {
+      if (process.env.CAIRN_ORB !== '1') throw new Error('Orb computer agent requires CAIRN_ORB=1');
+      const exit = await runOrbComputerAgent({
+        socketPath: opts.socket,
+        release: orbReleaseFromEntry(realpathSync(fileURLToPath(import.meta.url))),
+        provider: new HostComputerProvider({ home: ORB_AGENT_HOME }),
+      });
+      process.exitCode = exit === 'stale-release' ? 75 : 1;
     });
 
   return program;

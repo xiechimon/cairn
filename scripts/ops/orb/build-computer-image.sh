@@ -10,6 +10,7 @@ host_root=${CAIRN_ORB_ROOT:-}
 machines_dir=$host_root/var/lib/machines
 base=$machines_dir/cairn-orb-base
 image=$machines_dir/cairn-orb-computer
+daemon_entry=/opt/cairn/daemon/cli.mjs
 packages=(xorg-server-xvfb x11vnc fluxbox xdotool chromium imagemagick)
 if [[ ! -f $base/etc/cairn-orb-image ]]; then
   if $dry_run; then
@@ -57,6 +58,7 @@ printf '%s\n' \
   "install with systemd-nspawn and the host mirrorlist read-only: pacman -Syu ${packages[*]}" \
   "refuse a guest Node major other than $node_major" \
   'install the Chromium managed policy and the cairn-computer-desktop service for agent' \
+  'install the cairn-computer-agent service for agent and disable the inherited cairn-orb-worker service' \
   'remove package caches; clear /etc/machine-id' \
   'write /etc/cairn-orb-computer-image completion marker' \
   'register cairn-orb-computer only after mounts are gone'
@@ -140,7 +142,29 @@ LimitCORE=0
 [Install]
 WantedBy=multi-user.target
 UNIT
-guest systemctl enable cairn-computer-desktop.service
+write_file 644 "$stage/etc/systemd/system/cairn-computer-agent.service" <<UNIT
+[Unit]
+Description=Cairn computer agent
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+User=agent
+Environment=CAIRN_ORB=1
+Environment=DISPLAY=:1
+Restart=always
+RestartSec=1
+ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/computer.sock ]; do sleep 1; done'
+TimeoutStartSec=infinity
+ExecStart=/usr/bin/node $daemon_entry orb-computer --socket /run/cairn/computer.sock
+UMask=0077
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+guest systemctl enable cairn-computer-desktop.service cairn-computer-agent.service
+guest systemctl disable cairn-orb-worker.service
 guest pacman -Scc --noconfirm
 : > "$stage/etc/machine-id"
 printf '%s\n' "$expected" > "$stage/etc/cairn-orb-computer-image"

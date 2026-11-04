@@ -692,6 +692,13 @@ a Chromium managed policy (no password manager, autofill or sync) and the
 x11vnc servers on Unix sockets only: `/run/cairn-computer/vnc.sock` and the
 view-only `/run/cairn-computer/view.sock`. Chromium keeps its own sandbox
 inside the Orb (measured in spike S1), so it runs without `--no-sandbox`.
+The image also installs `cairn-computer-agent.service` (user `agent`,
+`Restart=always`), which waits for `/run/cairn/computer.sock` and runs
+`/usr/bin/node /opt/cairn/daemon/cli.mjs orb-computer --socket /run/cairn/computer.sock`.
+The daemon listens on that socket (mode 0600) and writes `computer.sock.token`
+next to it; the agent authenticates with the token and its release key. The
+inherited `cairn-orb-worker.service` is disabled, because a computer never
+runs worker steps.
 
 Polkit treats `cairn-orb-computer` as a template, like `cairn-orb-base`: `ian`
 cannot remove, rename or start it. Only the template may be cloned to a

@@ -1,0 +1,579 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  closeSync,
+  constants,
+  fchmodSync,
+  lstatSync,
+  openSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { createServer, type Server, type Socket } from 'node:net';
+import { basename, join } from 'node:path';
+import { z } from 'zod';
+import type { ComputerOrbs } from '../orb/computer.js';
+import { ORB_MAX_FRAME_BYTES } from '../orb/protocol.js';
+import { AsyncEventQueue } from './host.js';
+import {
+  decodeOrbComputerFrame,
+  encodeOrbComputerFrame,
+  frameFits,
+  ORB_COMPUTER_AUTH_LINE_MAX_BYTES,
+  ORB_COMPUTER_SOCKET,
+  type OrbComputerRequest,
+  orbComputerAuthSchema,
+  orbComputerEventSchema,
+  orbComputerFileEntriesSchema,
+  orbComputerGuestFrameSchema,
+  readOrbComputerLines,
+  writeOrbComputerFrame,
+} from './orb-protocol.js';
+import {
+  type ComputerExecuteRequest,
+  type ComputerFileEntry,
+  type ComputerFileOptions,
+  type ComputerProcessEvent,
+  type ComputerProvider,
+  ComputerRefusal,
+  type ScopedComputerProviders,
+} from './provider.js';
+
+export const ORB_COMPUTER_CONNECT_TIMEOUT_MS = 90_000;
+export const ORB_COMPUTER_REQUEST_TIMEOUT_MS = 60_000;
+export const ORB_COMPUTER_HEARTBEAT_TIMEOUT_MS = 45_000;
+export const ORB_COMPUTER_TOUCH_MS = 30_000;
+export const ORB_COMPUTER_STOP_GRACE_MS = 10_000;
+const AUTH_TIMEOUT_MS = 5_000;
+const DEFAULT_RUNTIME_ROOT = '/run/cairn-orb';
+
+export class ComputerTransportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ComputerTransportError';
+  }
+}
+
+type FileCall = Omit<Exclude<OrbComputerRequest, { method: 'execute' }>, 'id'>;
+
+interface Pending {
+  value(value: unknown): void;
+  done(): void;
+  error(error: Error): void;
+}
+
+export interface OrbComputerProviderOptions {
+  orbs: Pick<ComputerOrbs, 'ensure' | 'touch'>;
+  runtimeRoot?: string;
+  expectedRelease?: () => string | undefined;
+  release?: {
+    publish(): Promise<string>;
+    authenticated(machine: string, release: string): void;
+  };
+  connectTimeoutMs?: number;
+  requestTimeoutMs?: number;
+  heartbeatTimeoutMs?: number;
+  touchMs?: number;
+  stopGraceMs?: number;
+  onError?: (message: string) => void;
+}
+
+type LinkSettings = Required<
+  Pick<
+    OrbComputerProviderOptions,
+    'heartbeatTimeoutMs' | 'requestTimeoutMs' | 'stopGraceMs' | 'touchMs'
+  >
+> &
+  Pick<OrbComputerProviderOptions, 'expectedRelease'> & {
+    onAuthenticated?: (machine: string, release: string) => void;
+  };
+
+class GuestLink {
+  private server: Server | undefined;
+  private listening: Promise<void> | undefined;
+  private guest: Socket | undefined;
+  private lastSeen = Date.now();
+  private watchdog: NodeJS.Timeout | undefined;
+  private nextId = 0;
+  private closed = false;
+  private ownsFiles = false;
+  private readonly pending = new Map<number, Pending>();
+  private readonly waiters = new Set<() => void>();
+  private readonly sockets = new Set<Socket>();
+  private readonly token = randomBytes(32).toString('hex');
+
+  constructor(
+    readonly directory: string,
+    private readonly settings: LinkSettings,
+  ) {}
+
+  private get socketPath(): string {
+    return join(this.directory, ORB_COMPUTER_SOCKET);
+  }
+
+  listen(): Promise<void> {
+    this.listening ??= this.startListening().catch((error: unknown) => {
+      this.listening = undefined;
+      throw error;
+    });
+    return this.listening;
+  }
+
+  private async startListening(): Promise<void> {
+    const directory = lstatSync(this.directory);
+    if (
+      !directory.isDirectory() ||
+      directory.uid !== process.getuid?.() ||
+      (directory.mode & 0o7777) !== 0o700
+    )
+      throw new ComputerTransportError(
+        'Computer runtime directory must be a 0700 directory owned by the daemon',
+      );
+    const paths = [this.socketPath, `${this.socketPath}.token`];
+    for (const path of paths) {
+      const metadata = lstatSync(path, { throwIfNoEntry: false });
+      if (!metadata) continue;
+      if (!metadata.isFile() && !metadata.isSocket())
+        throw new ComputerTransportError('Computer socket path must be a regular file or socket');
+      unlinkSync(path);
+    }
+    const server = createServer((socket) => this.accept(socket));
+    this.server = server;
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      const mask = process.umask(0o177);
+      try {
+        server.listen(this.socketPath, () => {
+          server.removeListener('error', reject);
+          resolve();
+        });
+      } finally {
+        process.umask(mask);
+      }
+    });
+    this.ownsFiles = true;
+    const descriptor = openSync(
+      `${this.socketPath}.token`,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    try {
+      fchmodSync(descriptor, 0o600);
+      writeFileSync(descriptor, this.token);
+    } finally {
+      closeSync(descriptor);
+    }
+    this.watchdog = setInterval(
+      () => this.checkHeartbeat(),
+      Math.max(10, Math.floor(this.settings.heartbeatTimeoutMs / 3)),
+    );
+    this.watchdog.unref();
+  }
+
+  private accept(socket: Socket): void {
+    socket.on('error', () => {});
+    this.sockets.add(socket);
+    let authenticated = false;
+    let refused = false;
+    const authTimer = setTimeout(() => socket.destroy(), AUTH_TIMEOUT_MS);
+    authTimer.unref();
+    readOrbComputerLines(
+      socket,
+      (line) => {
+        if (refused) return;
+        const frame = decodeOrbComputerFrame(line);
+        if (!authenticated) {
+          const auth = orbComputerAuthSchema.safeParse(frame);
+          if (!auth.success || !this.tokenMatches(auth.data.token)) {
+            socket.destroy();
+            return;
+          }
+          clearTimeout(authTimer);
+          const expected = this.settings.expectedRelease?.();
+          if (this.settings.expectedRelease && auth.data.release !== expected) {
+            refused = true;
+            socket.end(encodeOrbComputerFrame({ type: 'refused', reason: 'stale-release' }));
+            socket.setTimeout(1_000, () => socket.destroy());
+            return;
+          }
+          authenticated = true;
+          this.settings.onAuthenticated?.(basename(this.directory), auth.data.release);
+          this.attach(socket);
+          return;
+        }
+        this.receive(socket, frame);
+      },
+      () => (authenticated ? ORB_MAX_FRAME_BYTES : ORB_COMPUTER_AUTH_LINE_MAX_BYTES),
+    );
+    socket.on('close', () => {
+      clearTimeout(authTimer);
+      this.sockets.delete(socket);
+      if (this.guest === socket) this.detach('The computer disconnected');
+    });
+  }
+
+  private tokenMatches(candidate: string): boolean {
+    return timingSafeEqual(Buffer.from(candidate), Buffer.from(this.token));
+  }
+
+  private attach(socket: Socket): void {
+    if (this.guest && this.guest !== socket) {
+      const previous = this.guest;
+      this.detach('The computer reconnected');
+      previous.destroy();
+    }
+    this.guest = socket;
+    this.lastSeen = Date.now();
+    writeOrbComputerFrame(socket, { type: 'authenticated' });
+    for (const wake of this.waiters) wake();
+    this.waiters.clear();
+  }
+
+  private detach(reason: string): void {
+    this.guest = undefined;
+    const pending = [...this.pending.values()];
+    this.pending.clear();
+    for (const request of pending) request.error(new ComputerTransportError(reason));
+  }
+
+  private receive(socket: Socket, raw: unknown): void {
+    if (this.guest !== socket) return;
+    const parsed = orbComputerGuestFrameSchema.safeParse(raw);
+    if (!parsed.success) {
+      socket.destroy();
+      return;
+    }
+    this.lastSeen = Date.now();
+    const frame = parsed.data;
+    if ('heartbeat' in frame) return;
+    const request = this.pending.get(frame.id);
+    if (!request) return;
+    if ('value' in frame) request.value(frame.value);
+    else if ('done' in frame) {
+      this.pending.delete(frame.id);
+      request.done();
+    } else {
+      this.pending.delete(frame.id);
+      request.error(
+        frame.refusal ? new ComputerRefusal(frame.error) : new ComputerTransportError(frame.error),
+      );
+    }
+  }
+
+  private checkHeartbeat(): void {
+    if (
+      this.guest &&
+      this.pending.size > 0 &&
+      Date.now() - this.lastSeen > this.settings.heartbeatTimeoutMs
+    )
+      this.guest.destroy();
+  }
+
+  connected(timeoutMs: number, signal?: AbortSignal): Promise<void> {
+    if (this.guest) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const finish = (error?: Error) => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        this.waiters.delete(wake);
+        if (error) reject(error);
+        else resolve();
+      };
+      const wake = () => finish();
+      const onAbort = () =>
+        finish(new ComputerRefusal('The call was cancelled before the computer connected'));
+      const timer = setTimeout(
+        () => finish(new ComputerRefusal('The computer did not connect in time, so nothing ran')),
+        timeoutMs,
+      );
+      timer.unref();
+      this.waiters.add(wake);
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  private send(request: OrbComputerRequest | { cancel: number }): void {
+    const guest = this.guest;
+    if (!guest) throw new ComputerTransportError('The computer disconnected');
+    if (!frameFits(request))
+      throw new ComputerRefusal('The request is too large for the computer transport');
+    writeOrbComputerFrame(guest, request);
+  }
+
+  private register(handler: Pending): number {
+    const id = this.nextId++;
+    this.pending.set(id, handler);
+    return id;
+  }
+
+  private cancel(id: number): void {
+    if (this.pending.has(id) && this.guest) writeOrbComputerFrame(this.guest, { cancel: id });
+  }
+
+  call(request: FileCall, timeoutMs: number): Promise<unknown> {
+    return new Promise<unknown>((resolve, reject) => {
+      let result: unknown;
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          reject(new ComputerTransportError('The computer did not answer in time'));
+        },
+        Math.min(this.settings.requestTimeoutMs, timeoutMs),
+      );
+      timer.unref();
+      const id = this.register({
+        value: (value) => {
+          result = value;
+        },
+        done: () => {
+          clearTimeout(timer);
+          resolve(result);
+        },
+        error: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      });
+      try {
+        this.send({ id, ...request } as OrbComputerRequest);
+      } catch (error) {
+        this.pending.delete(id);
+        clearTimeout(timer);
+        reject(error);
+      }
+    });
+  }
+
+  execute(request: ComputerExecuteRequest): AsyncIterable<ComputerProcessEvent> {
+    const queue = new AsyncEventQueue();
+    let finished = false;
+    let stopTimer: NodeJS.Timeout | undefined;
+    let limitTimer: NodeJS.Timeout | undefined;
+    const settle = () => {
+      finished = true;
+      clearTimeout(stopTimer);
+      clearTimeout(limitTimer);
+      request.signal.removeEventListener('abort', onAbort);
+      this.pending.delete(id);
+      queue.end();
+    };
+    const forceExit = (code: number, reason: 'timeout' | 'aborted') => {
+      if (finished) return;
+      queue.push({ kind: 'exit', code, reason });
+      settle();
+    };
+    const onAbort = () => {
+      this.cancel(id);
+      stopTimer ??= setTimeout(() => forceExit(130, 'aborted'), this.settings.stopGraceMs);
+      stopTimer.unref();
+    };
+    const id = this.register({
+      value: (value) => {
+        const event = orbComputerEventSchema.safeParse(value);
+        if (event.success && !finished) queue.push(event.data);
+      },
+      done: () => {
+        if (!finished) settle();
+      },
+      error: (error) => {
+        if (finished) return;
+        queue.fail(error);
+        settle();
+      },
+    });
+    limitTimer = setTimeout(() => {
+      this.cancel(id);
+      forceExit(124, 'timeout');
+    }, request.timeoutMs + this.settings.stopGraceMs);
+    limitTimer.unref();
+    request.signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      this.send({
+        id,
+        method: 'execute',
+        params: {
+          argv: [...request.argv],
+          ...(request.cwd !== undefined ? { cwd: request.cwd } : {}),
+          timeoutMs: request.timeoutMs,
+        },
+      });
+    } catch (error) {
+      settle();
+      throw error;
+    }
+    if (request.signal.aborted) onAbort();
+    return queue;
+  }
+
+  cancelAll(): void {
+    for (const id of this.pending.keys()) this.cancel(id);
+  }
+
+  async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+    clearInterval(this.watchdog);
+    this.detach('The daemon closed the computer link');
+    for (const socket of this.sockets) socket.destroy();
+    const server = this.server;
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (!this.ownsFiles) return;
+    for (const path of [this.socketPath, `${this.socketPath}.token`]) {
+      try {
+        const metadata = lstatSync(path, { throwIfNoEntry: false });
+        if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
+      } catch {}
+    }
+  }
+}
+
+export class OrbComputerProvider implements ScopedComputerProviders {
+  private readonly links = new Map<string, GuestLink>();
+  private readonly settings: LinkSettings;
+  private published: string | undefined;
+  private publishing: Promise<string> | undefined;
+  private readonly connectTimeoutMs: number;
+  private readonly touchMs: number;
+  private readonly runtimeRoot: string;
+
+  constructor(private readonly options: OrbComputerProviderOptions) {
+    this.runtimeRoot = options.runtimeRoot ?? DEFAULT_RUNTIME_ROOT;
+    this.connectTimeoutMs = options.connectTimeoutMs ?? ORB_COMPUTER_CONNECT_TIMEOUT_MS;
+    this.touchMs = options.touchMs ?? ORB_COMPUTER_TOUCH_MS;
+    this.settings = {
+      heartbeatTimeoutMs: options.heartbeatTimeoutMs ?? ORB_COMPUTER_HEARTBEAT_TIMEOUT_MS,
+      requestTimeoutMs: options.requestTimeoutMs ?? ORB_COMPUTER_REQUEST_TIMEOUT_MS,
+      stopGraceMs: options.stopGraceMs ?? ORB_COMPUTER_STOP_GRACE_MS,
+      touchMs: this.touchMs,
+      ...(options.release || options.expectedRelease
+        ? { expectedRelease: () => this.published ?? options.expectedRelease?.() }
+        : {}),
+      ...(options.release
+        ? {
+            onAuthenticated: (machine: string, release: string) =>
+              options.release?.authenticated(machine, release),
+          }
+        : {}),
+    };
+  }
+
+  forScope(scopeKey: string): ComputerProvider {
+    const keepAlive = async <T>(
+      signal: AbortSignal | undefined,
+      run: (link: GuestLink) => Promise<T>,
+    ): Promise<T> => {
+      const link = await this.link(scopeKey, signal);
+      this.options.orbs.touch(scopeKey);
+      return run(link);
+    };
+    const fileCall = async (call: FileCall, options: ComputerFileOptions | undefined) => {
+      const timeoutMs = Math.min(
+        this.settings.requestTimeoutMs,
+        options?.timeoutMs ?? this.settings.requestTimeoutMs,
+      );
+      if (timeoutMs <= 0) throw new ComputerRefusal('No time was left for the file operation');
+      return keepAlive(AbortSignal.timeout(timeoutMs), (link) => link.call(call, timeoutMs));
+    };
+    return {
+      execute: async (request) => {
+        if (request.env && Object.keys(request.env).length > 0)
+          throw new ComputerRefusal('The computer does not accept environment overrides');
+        return keepAlive(request.signal, async (link) => {
+          const timer = setInterval(() => this.options.orbs.touch(scopeKey), this.touchMs);
+          timer.unref();
+          try {
+            return this.touching(link.execute(request), timer, scopeKey);
+          } catch (error) {
+            clearInterval(timer);
+            throw error;
+          }
+        });
+      },
+      listFiles: async (path, options) =>
+        orbComputerFileEntriesSchema.parse(
+          await fileCall({ method: 'listFiles', params: { path } }, options),
+        ) satisfies ComputerFileEntry[],
+      readFile: async (path, options) =>
+        z.string().parse(await fileCall({ method: 'readFile', params: { path } }, options)),
+      writeFile: async (path, content, options) => {
+        await fileCall({ method: 'writeFile', params: { path, content } }, options);
+      },
+      killAll: async () => this.links.get(scopeKey)?.cancelAll(),
+    };
+  }
+
+  private touching(
+    events: AsyncIterable<ComputerProcessEvent>,
+    timer: NodeJS.Timeout,
+    scopeKey: string,
+  ): AsyncIterable<ComputerProcessEvent> {
+    const touch = () => this.options.orbs.touch(scopeKey);
+    return (async function* () {
+      try {
+        yield* events;
+      } finally {
+        clearInterval(timer);
+        touch();
+      }
+    })();
+  }
+
+  private async ensurePublished(): Promise<void> {
+    const release = this.options.release;
+    if (!release || this.published) return;
+    this.publishing ??= release
+      .publish()
+      .then((key) => {
+        this.published = key;
+        return key;
+      })
+      .finally(() => {
+        this.publishing = undefined;
+      });
+    try {
+      await this.publishing;
+    } catch (error) {
+      this.options.onError?.(`computer release could not be published: ${String(error)}`);
+      throw new ComputerRefusal('The computer release could not be published, so nothing ran');
+    }
+  }
+
+  private async link(scopeKey: string, signal?: AbortSignal): Promise<GuestLink> {
+    await this.ensurePublished();
+    let name: string;
+    try {
+      name = await this.options.orbs.ensure(scopeKey);
+    } catch (error) {
+      this.options.onError?.(`computer ${scopeKey} could not start: ${String(error)}`);
+      throw new ComputerRefusal('The computer could not be started, so nothing ran');
+    }
+    const directory = join(this.runtimeRoot, name);
+    let link = this.links.get(scopeKey);
+    if (link && link.directory !== directory) {
+      await link.close();
+      link = undefined;
+    }
+    if (!link) {
+      link = new GuestLink(directory, this.settings);
+      this.links.set(scopeKey, link);
+    }
+    try {
+      await link.listen();
+    } catch (error) {
+      this.options.onError?.(`computer ${scopeKey} socket failed: ${String(error)}`);
+      throw new ComputerRefusal('The computer link could not be opened, so nothing ran');
+    }
+    await link.connected(this.connectTimeoutMs, signal);
+    return link;
+  }
+
+  async killAll(): Promise<void> {
+    for (const link of this.links.values()) link.cancelAll();
+  }
+
+  async close(): Promise<void> {
+    const links = [...this.links.values()];
+    this.links.clear();
+    await Promise.all(links.map((link) => link.close()));
+  }
+}
