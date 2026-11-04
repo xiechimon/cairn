@@ -4,7 +4,7 @@ import { type MachineStreamEvent, machineEnrollResponseSchema } from '@cairn/sha
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import pino from 'pino';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   machine as machineTable,
@@ -15,6 +15,7 @@ import {
 import { createApiKey } from '../src/services/api-keys.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { seedLocalMachine } from '../src/services/machines.js';
+import * as shipGate from '../src/services/ship-gate.js';
 import { bindAllAgents, bootServer, postProject, type TestServer } from './helpers.js';
 
 function issueKey(s: TestServer, name: string): string {
@@ -320,6 +321,62 @@ describe('machine token revocation (#2494)', () => {
     }
   });
 
+  test.each(['valid', 'revoke', 'rotate'] as const)(
+    'a %s credential is checked after claim preparation and before commitment',
+    async (change) => {
+      const w = await setupWorld();
+      let resume = () => {};
+      const prepared = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      let preparing = false;
+      const gate = vi.spyOn(shipGate, 'reverifyShip').mockImplementation(async () => {
+        preparing = true;
+        await prepared;
+        return null;
+      });
+      let waiting: Promise<Response> | undefined;
+      try {
+        const projectId = await postProject(w.s.app);
+        const todoRes = await call(w.s.app, 'POST', `/api/projects/${projectId}/todos`, {
+          body: { title: 'prepared claim', spec: 'claim preparation can wait' },
+        });
+        const todo = (await todoRes.json()) as { id: string };
+        expect(
+          (
+            await call(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {
+              body: {
+                todoIds: [todo.id],
+                withPlan: true,
+                assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
+              },
+            })
+          ).status,
+        ).toBe(201);
+        waiting = call(w.s.app, 'POST', '/api/machine/tasks/claim', { cred: w.a.token, body: {} });
+        await vi.waitFor(() => expect(preparing).toBe(true));
+        if (change === 'revoke') {
+          expect(
+            (await call(w.s.app, 'POST', `/api/machines/${w.a.machineId}/revoke`)).status,
+          ).toBe(204);
+        } else if (change === 'rotate') {
+          const rotated = await enroll(w.s, w.apiKey, 'host-a');
+          expect(rotated.token).not.toBe(w.a.token);
+        }
+        resume();
+        expect((await waiting).status).toBe(change === 'valid' ? 200 : 401);
+        const rows = w.s.db.select().from(stepTable).all();
+        expect(rows.some((row) => row.status === 'claimed')).toBe(change === 'valid');
+        if (change !== 'valid') expect(rows.every((row) => row.machineId === null)).toBe(true);
+      } finally {
+        resume();
+        await waiting;
+        gate.mockRestore();
+        w.s.dispose();
+      }
+    },
+  );
+
   test('revoking machine A leaves machine B stream and token working', async () => {
     const w = await setupWorld();
     try {
@@ -551,6 +608,43 @@ describe('machine token revocation (#2494)', () => {
 });
 
 describe('MachineWakeHub.revokeMachine', () => {
+  test.each(['team-1', 'team-2'])(
+    'replacement on %s closes the previous stream and revocation leaves no orphan broadcast subscriber',
+    (nextTeam) => {
+      const hub = new MachineWakeHub();
+      const oldEvents: MachineStreamEvent[] = [];
+      const newEvents: MachineStreamEvent[] = [];
+      let oldClosed = 0;
+      let newClosed = 0;
+      const releaseOld = hub.subscribeMachine(
+        'team-1',
+        'm-1',
+        (event) => oldEvents.push(event),
+        () => {
+          oldClosed += 1;
+        },
+      );
+      const releaseNew = hub.subscribeMachine(
+        nextTeam,
+        'm-1',
+        (event) => newEvents.push(event),
+        () => {
+          newClosed += 1;
+        },
+      );
+      hub.revokeMachine('m-1');
+      hub.steerSignal('team-1', 'after-revoke');
+      hub.steerSignal('team-2', 'after-revoke');
+      expect(oldEvents).toEqual([{ type: 'shutdown' }]);
+      expect(newEvents).toEqual([{ type: 'shutdown' }]);
+      expect([oldClosed, newClosed]).toEqual([1, 1]);
+      expect(hub.streamCount('team-1') + hub.streamCount('team-2')).toBe(0);
+      releaseOld();
+      releaseNew();
+      expect(hub.isConnected('m-1')).toBe(false);
+    },
+  );
+
   test('sends shutdown, calls close, removes the machine from team and machine maps', () => {
     const hub = new MachineWakeHub();
     const sent: MachineStreamEvent[] = [];

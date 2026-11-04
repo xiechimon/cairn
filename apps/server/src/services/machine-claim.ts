@@ -469,8 +469,10 @@ async function tryClaim(
   machineId: string,
   teamId: string,
   origin: string,
-  maxWorkers?: number,
+  maxWorkers: number | undefined,
+  stillAuthorized: () => boolean,
 ): Promise<ClaimedStep | null> {
+  if (!stillAuthorized()) return null;
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
@@ -495,6 +497,7 @@ async function tryClaim(
 
   for (const cand of workerCands) {
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
+    if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
       continue;
@@ -590,7 +593,9 @@ async function tryClaim(
       cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
+    if (!stillAuthorized()) return null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
+    if (!stillAuthorized()) return null;
     if (localMerge !== null) {
       const currentProject = projectOfTodo(db, cand.todoRow);
       if (!currentProject) continue;
@@ -607,6 +612,7 @@ async function tryClaim(
     let won = false;
     try {
       won = db.transaction((tx) => {
+        if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
         const res = tx
           .update(step)
@@ -770,7 +776,7 @@ export async function claimStep(
   body?: MachineClaimBody,
   stillAuthorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
-  if (signal?.aborted) return null;
+  if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   if (body?.role === 'coordinator') {
     if (machineId !== coordinatorMachineId()) return null;
@@ -780,9 +786,9 @@ export async function claimStep(
     if (signal?.aborted || !stillAuthorized()) return null;
     return claimCoordinatorTurn(deps, machineId, teamId);
   }
-  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
+  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
   if (signal?.aborted || !stillAuthorized()) return null;
-  return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
+  return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
 }

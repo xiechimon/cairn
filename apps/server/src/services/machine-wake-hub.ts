@@ -96,14 +96,8 @@ export class MachineWakeHub {
     send: (ev: MachineStreamEvent) => void,
     close: () => void = () => {},
   ): () => void {
+    this.revokeMachine(machineId);
     const unsubscribeTeam = this.subscribe(teamId, send);
-    const prev = this.streamsByMachine.get(machineId);
-    if (prev) {
-      for (const listener of this.disconnectListeners) listener(machineId);
-      try {
-        prev.send({ type: 'shutdown' });
-      } catch {}
-    }
     let released = false;
     const release = () => {
       if (released) return;
@@ -123,6 +117,7 @@ export class MachineWakeHub {
     const entry = this.streamsByMachine.get(machineId);
     if (!entry) return;
     this.streamsByMachine.delete(machineId);
+    for (const listener of this.disconnectListeners) listener(machineId);
     entry.release();
     try {
       entry.send({ type: 'shutdown' });
