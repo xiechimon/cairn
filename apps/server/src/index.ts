@@ -155,7 +155,11 @@ const scheduler = createScheduler(
     githubFetch,
     oauthClient: config.githubOauth,
   },
-  { tickMs: config.schedulerTickMs, pushDigestTimes: config.pushDigestTimes },
+  {
+    tickMs: config.schedulerTickMs,
+    pushDigestTimes: config.pushDigestTimes,
+    researchIntakeProjectId: config.researchIntakeProjectId,
+  },
   { attachmentsDir, logger },
   { githubFetch, logger },
   issueIntakeRunOf(config, { githubFetch, logger }),

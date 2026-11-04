@@ -22,6 +22,7 @@ import { liveThinkingStore } from '../api/live-thinking.js';
 import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
+import { useSendKey } from '../api/use-send-key.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
@@ -99,6 +100,7 @@ export function useChiefSurface(
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
   const mutations = useApiMutations(teamId);
+  const sendKey = useSendKey();
 
   const chief = fixture.chief;
   const initialChief: ChiefView =
@@ -300,9 +302,15 @@ export function useChiefSurface(
 
   const onSend = live
     ? (text: string, projectId: string | null) => {
+        const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
         return mutations.chiefSend
-          .mutateAsync({ threadId: activeThread?.id ?? null, content: text, projectId })
-          .then(() => undefined)
+          .mutateAsync({
+            threadId: activeThread?.id ?? null,
+            content: text,
+            projectId,
+            clientMessageId: key,
+          })
+          .then(() => sendKey.settle())
           .catch((error: unknown) => {
             toastError(t('发送失败，请重试。'), error);
             throw error;
