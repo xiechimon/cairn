@@ -192,3 +192,38 @@ test('only the newest needs-you report of a thread offers a reply', async ({ pag
   await expect(replyAfter('Which delimiter?')).toHaveCount(1);
   await expect(replyAfter('Which export format?')).toHaveCount(0);
 });
+
+test('a parked question keeps its reply after a later review report', async ({ page }) => {
+  const report = (id: string, phase: string, createdAt: number) => ({
+    id,
+    role: 'system',
+    content: JSON.stringify({
+      kind: 'thread-report',
+      todoId: TASK.id,
+      phase,
+      seqNum: TASK.seqNum,
+      title: 'Add an export',
+      ...(phase === 'needs-you' ? { line: 'Which export format?' } : {}),
+    }),
+    createdAt,
+  });
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'request', role: 'user', content: 'Add an export', createdAt: 10 },
+      report('question', 'needs-you', 20),
+      report('parked', 'review', 30),
+    ],
+    todos: [{ ...TASK, phase: 'review', awaitingReply: true }],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream.getByTestId('thread-report-marker')).toHaveCount(2);
+  await expect(stream.getByTestId('thread-report-reply')).toHaveCount(1);
+  await expect(
+    stream
+      .getByTestId('thread-report-marker')
+      .filter({ hasText: 'Which export format?' })
+      .locator('xpath=following-sibling::*[@data-testid="thread-report-reply"]'),
+  ).toHaveCount(1);
+});
