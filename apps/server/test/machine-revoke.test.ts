@@ -13,6 +13,8 @@ import {
   team as teamTable,
 } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { routeVerdict, targetUnavailable } from '../src/services/machine-routing.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { seedLocalMachine } from '../src/services/machines.js';
 import * as shipGate from '../src/services/ship-gate.js';
@@ -121,6 +123,69 @@ async function waitFor(check: () => boolean, timeoutMs = 3000): Promise<void> {
 
 function tokenHashOf(s: TestServer, machineId: string): string | null | undefined {
   return s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()?.tokenHash;
+}
+
+interface PresenceEvent {
+  type: string;
+  machineId?: string;
+  online?: boolean;
+}
+
+function tapPresence(s: TestServer): PresenceEvent[] {
+  const events: PresenceEvent[] = [];
+  s.hub.subscribe(s.team.id, {
+    nextSeq: () => 1,
+    send: (payload: object) => {
+      events.push(payload as PresenceEvent);
+      return Promise.resolve();
+    },
+  });
+  return events;
+}
+
+function pinnedHold(s: TestServer, machineId: string) {
+  const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get();
+  const now = Date.now();
+  return routeVerdict({
+    machineId: 'other-machine',
+    targets: [{ machineId, session: false }],
+    unavailable: (id) =>
+      id !== machineId ||
+      targetUnavailable(
+        s.db,
+        row,
+        s.team.id,
+        {
+          agentRow: { machineId, requiredCapabilities: null },
+          model: { provider: 'stub-gw', modelId: 'stub-model' },
+          localProject: false,
+          localMerge: true,
+          routed: false,
+        },
+        [],
+        now,
+      ),
+    waitingSince: now,
+    now,
+  });
+}
+
+function watchRevokeOrder(s: TestServer, machineId: string, events: PresenceEvent[]): string[] {
+  const order: string[] = [];
+  const original = s.machineHub.revokeMachine.bind(s.machineHub);
+  vi.spyOn(s.machineHub, 'revokeMachine').mockImplementation((id: string) => {
+    if (id === machineId) {
+      const offlineFirst = events.some(
+        (event) =>
+          event.type === 'machine_presence' &&
+          event.machineId === machineId &&
+          event.online === false,
+      );
+      order.push(offlineFirst ? 'offline-before-revoke' : 'revoke-while-online');
+    }
+    original(id);
+  });
+  return order;
 }
 
 async function setupWorld(
@@ -525,6 +590,121 @@ describe('machine token revocation (#2494)', () => {
       expect((await call(w.s.app, 'GET', '/api/machine/me', { cred: second.token })).status).toBe(
         200,
       );
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('byKey rotation of an already-online machine marks it offline and publishes presence before closing the stream', async () => {
+    const w = await setupWorld({ bindAgents: false });
+    try {
+      const present = await call(w.s.app, 'POST', '/api/machine/presence', {
+        cred: w.a.token,
+        body: {},
+      });
+      expect(present.status).toBe(200);
+      expect(pinnedHold(w.s, w.a.machineId)).toEqual({
+        claim: false,
+        waitingFor: w.a.machineId,
+        fallbackAt: expect.any(Number),
+      });
+      const events = tapPresence(w.s);
+      const stream = await openMachineStream(w.s.app, w.a.token);
+      await waitFor(() => w.s.machineHub.streamCount(w.s.team.id) === 1);
+      const order = watchRevokeOrder(w.s, w.a.machineId, events);
+
+      const rotated = await enroll(w.s, w.apiKey, 'host-a');
+      expect(rotated.machineId).toBe(w.a.machineId);
+      expect(rotated.token).not.toBe(w.a.token);
+      const row = w.s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.id, w.a.machineId))
+        .get();
+      expect({
+        online: row?.online,
+        events,
+        order,
+        hold: pinnedHold(w.s, w.a.machineId),
+        oldToken: (await call(w.s.app, 'GET', '/api/machine/me', { cred: w.a.token })).status,
+        newToken: (await call(w.s.app, 'GET', '/api/machine/me', { cred: rotated.token })).status,
+        streamEnded: await stream.waitEnded(),
+        shutdown: stream.events.at(0),
+      }).toEqual({
+        online: false,
+        events: [{ type: 'machine_presence', machineId: w.a.machineId, online: false }],
+        order: ['offline-before-revoke'],
+        hold: { claim: true },
+        oldToken: 401,
+        newToken: 200,
+        streamEnded: true,
+        shutdown: { type: 'shutdown' },
+      });
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('authorizeEnrollmentMachine rotation of an already-online local machine marks it offline and publishes presence before closing the stream', async () => {
+    const w = await setupWorld({ authToken: OWNER_TOKEN, bindAgents: false });
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const claimLocal = async (): Promise<{ machineId: string; token: string }> => {
+        const start = await call(w.s.app, 'POST', '/api/machine/enroll/start', {
+          body: { name: hostname(), teamId: w.s.team.id },
+        });
+        const { enrollId } = (await start.json()) as { enrollId: string };
+        const confirmed = await call(w.s.app, 'POST', '/api/machine/enroll/confirm', {
+          cred: OWNER_TOKEN,
+          body: { enrollId },
+        });
+        expect(confirmed.status).toBe(200);
+        return ((await confirmed.json()) as { machine: { machineId: string; token: string } })
+          .machine;
+      };
+      const first = await claimLocal();
+      const present = await call(w.s.app, 'POST', '/api/machine/presence', {
+        cred: first.token,
+        body: {},
+      });
+      expect(present.status).toBe(200);
+      expect(pinnedHold(w.s, first.machineId)).toEqual({
+        claim: false,
+        waitingFor: first.machineId,
+        fallbackAt: expect.any(Number),
+      });
+      const events = tapPresence(w.s);
+      const stream = await openMachineStream(w.s.app, first.token);
+      await waitFor(() => w.s.machineHub.streamCount(w.s.team.id) === 1);
+      const order = watchRevokeOrder(w.s, first.machineId, events);
+
+      const second = await claimLocal();
+      expect(second.machineId).toBe(first.machineId);
+      expect(second.token).not.toBe(first.token);
+      const row = w.s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.id, first.machineId))
+        .get();
+      expect({
+        online: row?.online,
+        events,
+        order,
+        hold: pinnedHold(w.s, first.machineId),
+        oldToken: (await call(w.s.app, 'GET', '/api/machine/me', { cred: first.token })).status,
+        newToken: (await call(w.s.app, 'GET', '/api/machine/me', { cred: second.token })).status,
+        streamEnded: await stream.waitEnded(),
+        shutdown: stream.events.at(0),
+      }).toEqual({
+        online: false,
+        events: [{ type: 'machine_presence', machineId: first.machineId, online: false }],
+        order: ['offline-before-revoke'],
+        hold: { claim: true },
+        oldToken: 401,
+        newToken: 200,
+        streamEnded: true,
+        shutdown: { type: 'shutdown' },
+      });
     } finally {
       w.s.dispose();
     }
