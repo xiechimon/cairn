@@ -22,6 +22,26 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'recent computer.command feed entries, newest last (D75 P8a)',
   },
   {
+    method: 'POST',
+    path: '/api/teams/{teamId}/computers/{computerId}/screen',
+    note: 'D75: mint one sealed viewer capability for a screen or controlled terminal',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{teamId}/computers/{computerId}/control',
+    note: 'D75: acquire the user control lease',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/teams/{teamId}/computers/{computerId}/control',
+    note: 'D75: renew the matching live user control lease',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/teams/{teamId}/computers/{computerId}/control',
+    note: 'D75: release user control and close its live channels',
+  },
+  {
     method: 'GET',
     path: '/api/server/backup',
     note: 'backup-status.json next to server.db (#2162)',

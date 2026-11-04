@@ -1,9 +1,15 @@
-import type { ComputerCall, MachineStreamEvent, MachineSyncCommand } from '@cairn/shared';
+import type {
+  ComputerCall,
+  ComputerScreenRequest,
+  MachineStreamEvent,
+  MachineSyncCommand,
+} from '@cairn/shared';
 
 export class MachineWakeHub {
   private readonly waiters = new Map<string, Set<() => void>>();
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
   private readonly stopListeners = new Map<string, Set<() => void>>();
+  private readonly disconnectListeners = new Set<(machineId: string) => void>();
   private readonly wakeSeqs = new Map<string, number>();
   private readonly streamsByMachine = new Map<
     string,
@@ -87,6 +93,7 @@ export class MachineWakeHub {
     const unsubscribeTeam = this.subscribe(teamId, send);
     const prev = this.streamsByMachine.get(machineId);
     if (prev) {
+      for (const listener of this.disconnectListeners) listener(machineId);
       try {
         prev.send({ type: 'shutdown' });
       } catch {}
@@ -98,7 +105,10 @@ export class MachineWakeHub {
       released = true;
       unsubscribeTeam();
       const cur = this.streamsByMachine.get(machineId);
-      if (cur && cur.send === send) this.streamsByMachine.delete(machineId);
+      if (cur && cur.send === send) {
+        this.streamsByMachine.delete(machineId);
+        for (const listener of this.disconnectListeners) listener(machineId);
+      }
     };
   }
 
@@ -141,8 +151,28 @@ export class MachineWakeHub {
     };
   }
 
+  onDisconnect(listener: (machineId: string) => void): () => void {
+    this.disconnectListeners.add(listener);
+    return () => {
+      this.disconnectListeners.delete(listener);
+    };
+  }
+
+  pushComputerScreen(machineId: string, channel: ComputerScreenRequest): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'computer.screen', channel });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   releaseMachine(machineId: string): void {
-    this.streamsByMachine.delete(machineId);
+    if (this.streamsByMachine.delete(machineId)) {
+      for (const listener of this.disconnectListeners) listener(machineId);
+    }
   }
 
   streamCount(teamId: string): number {
