@@ -10,8 +10,8 @@ import {
   MessageSquare,
   Settings2,
 } from 'lucide-react';
-import { type ReactNode, useCallback } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import type { ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
 import { ListCard, ListRow } from '../components/list-card.js';
 import { StatStrip } from '../components/stat-strip.js';
@@ -27,8 +27,7 @@ import { SECRETS_HREF } from '../resources/secrets-page.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { relativeTime } from './rel-time.js';
-import { SideChat } from './side-chat.js';
-import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { threadCopy, threadStatus, threadTone } from './thread-copy.js';
 import { useThreadHref } from './thread-link.js';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -76,18 +75,6 @@ export function ProjectHome({
   const { t } = useI18n();
   const navigate = useNavigate();
   const threadHref = useThreadHref();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const openThreadId = searchParams.get(THREAD_PARAM);
-  const closeThread = useCallback(() => {
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.delete(THREAD_PARAM);
-        return params;
-      },
-      { replace: true },
-    );
-  }, [setSearchParams]);
   const own = todos.filter((todo) => todo.projectId === project.id && todo.archivedAt == null);
   const needsYou = needsYouThreads(own);
   const running = own.filter((todo) => threadStatus(todo) === 'running');
@@ -313,15 +300,6 @@ export function ProjectHome({
           </div>
         </div>
       </section>
-      {openThreadId !== null && (
-        <SideChat
-          key={openThreadId}
-          todoId={openThreadId}
-          listed={todos.find((todo) => todo.id === openThreadId)}
-          now={now}
-          onClose={closeThread}
-        />
-      )}
     </div>
   );
 }
