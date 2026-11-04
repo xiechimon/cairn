@@ -668,3 +668,24 @@ test('D88 host refuses stale, ambiguous or unavailable identity proof and all un
     assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure', `world ${i}`);
   }
 });
+
+test('host blocks explicit-false security approval with open marked, parent-heading or unattributed findings', () => {
+  const marked = thread('P2', { isOutdated: true });
+  marked.comments.nodes[0].body =
+    '<!-- codex-security-review-finding:v1 -->\nMedium security issue';
+  const parent = thread('P2');
+  parent.comments.nodes[0].pullRequestReview = { body: '### 🛡️ Codex Security Review' };
+  const unknown = thread('P2');
+  unknown.comments.nodes[0].author = null;
+  for (const finding of [marked, parent, unknown]) {
+    const out = run({
+      files: secureFiles,
+      comments: [stateComment(SHA, 'completed', securityState)],
+      threads: [finding],
+    });
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+    const ordinary = run({ comments: [stateComment(SHA, 'completed')], threads: [finding] });
+    assert.equal(ordinary.body(ordinary.checkWrites[0]).conclusion, 'success');
+  }
+});

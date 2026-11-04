@@ -714,3 +714,45 @@ test('D88 open security findings block at every severity even outdated or pre-ex
     'in_progress',
   );
 });
+
+test('explicit false also requires every security thread resolved regardless of severity, diff age or parent heading', () => {
+  const cases = [
+    thread('P2', { body: '<!-- codex-security-review-finding:v1 -->\nMedium finding' }),
+    thread('P3', {
+      body: '<!-- codex-security-review-finding:v1 -->\nLow finding',
+      isOutdated: true,
+      preExisting: true,
+    }),
+    thread('P2', {
+      reviewBody: '### 🛡️ Codex Security Review',
+      isOutdated: true,
+      preExisting: true,
+    }),
+    thread('P2', { authorLogin: '' }),
+    thread('P2', { authorType: '' }),
+    thread('P2', { authorType: 'Unknown' }),
+    thread('P2', { body: undefined }),
+    thread('P2', { isResolved: null }),
+  ];
+  for (const [i, finding] of cases.entries()) {
+    const result = decide(pr, done, [finding], noRetries, false, null, undefined, {
+      state: securityDone,
+    });
+    assert.equal(result.conclusion, 'failure', `case ${i}`);
+  }
+  const resolved = thread('P2', {
+    body: '<!-- codex-security-review-finding:v1 -->\nMedium',
+    isResolved: true,
+  });
+  assert.equal(
+    decide(pr, done, [resolved], noRetries, false, null, undefined, { state: securityDone })
+      .conclusion,
+    'success',
+  );
+  assert.equal(
+    decide(pr, done, [thread('P2')], noRetries, false, null, undefined, { state: securityDone })
+      .conclusion,
+    'success',
+  );
+  assert.equal(decide(pr, done, [thread('P2')], noRetries).conclusion, 'success');
+});

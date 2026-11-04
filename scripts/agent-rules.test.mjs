@@ -41,7 +41,11 @@ test('canonical security guidance requires exact-head clean Codex SECURITY state
     agents,
     /D88 permits an explicitly null unresolved field only with a trusted fresh clean SECURITY receipt/,
   );
-  assert.match(agents, /zero unresolved security-review threads at every severity/);
+  assert.match(
+    agents,
+    /Both approval paths require zero unresolved security-review threads at every severity/,
+  );
+  assert.match(agents, /unknown thread attribution blocks/);
   assert.match(agents, /Missing fields, malformed values and explicit true stay blocked/);
   assert.match(agents, /ordinary code review alone is insufficient/);
   assert.doesNotMatch(agents, /Run `\/security-review`|plus `\/security-review`/);

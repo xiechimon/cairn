@@ -287,6 +287,23 @@ export function securityThreads(threads) {
   );
 }
 
+function securityThreadsClear(threads) {
+  return (
+    Array.isArray(threads) &&
+    threads.every(
+      (thread) =>
+        thread &&
+        (thread.isResolved === true ||
+          (thread.isResolved === false &&
+            typeof thread.authorLogin === 'string' &&
+            thread.authorLogin.length > 0 &&
+            ['Bot', 'User'].includes(thread.authorType) &&
+            typeof thread.body === 'string')),
+    ) &&
+    securityThreads(threads).every((thread) => thread.isResolved === true)
+  );
+}
+
 export function cleanSecurityReceipt(pr, evidence, threads) {
   if (
     !evidence ||
@@ -318,12 +335,6 @@ export function cleanSecurityReceipt(pr, evidence, threads) {
     !evidence.refMatches.every(
       (ref) =>
         typeof ref === 'string' && ref !== `refs/heads/${prefix}` && ref !== `refs/tags/${prefix}`,
-    )
-  )
-    return false;
-  if (
-    threads.some(
-      (thread) => thread.isResolved !== true && (!thread.authorLogin || !thread.authorType),
     )
   )
     return false;
@@ -367,7 +378,7 @@ export function cleanSecurityReceipt(pr, evidence, threads) {
     const at = trustedTime(comment.created_at);
     if (!Number.isFinite(at) || at >= createdAt) return false;
   }
-  return securityThreads(threads).every((thread) => thread.isResolved === true);
+  return securityThreadsClear(threads);
 }
 
 const NO_ROUNDS = { others: 0, marked: false };
@@ -386,21 +397,26 @@ export function decide(
   let receiptApproved = false;
   if (security) {
     const review = security.state;
+    const threadsClear = securityThreadsClear(threads);
     receiptApproved =
+      threadsClear &&
       review?.hasUnresolvedFindings === null &&
       cleanSecurityReceipt(pr, security.receiptEvidence, threads);
     const clean =
       review?.commitSha === sha &&
       review.status === 'completed' &&
+      threadsClear &&
       (review.hasUnresolvedFindings === false || receiptApproved);
     if (!clean) {
       const reason = !review
         ? 'No trusted security review state is available.'
         : review.commitSha !== sha
           ? 'The security review is bound to another head.'
-          : review.status !== 'completed'
-            ? 'The security review has not completed successfully.'
-            : 'The security review does not explicitly report zero unresolved findings.';
+          : !threadsClear
+            ? 'Security findings remain unresolved or thread attribution is unknown.'
+            : review.status !== 'completed'
+              ? 'The security review has not completed successfully.'
+              : 'The security review does not explicitly report zero unresolved findings.';
       return {
         status: 'completed',
         conclusion: 'failure',
