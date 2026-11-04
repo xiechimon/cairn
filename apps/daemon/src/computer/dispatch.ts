@@ -171,10 +171,12 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, desktopProtectionGuardMessage(refusal));
       return;
     }
-    const timeoutMs = Math.min(
-      options.commandTimeoutMs ?? COMPUTER_COMMAND_TIMEOUT_MS,
-      Math.max(MIN_COMMAND_TIMEOUT_MS, remaining - FINAL_FRAME_MARGIN_MS),
-    );
+    const budget = remaining - FINAL_FRAME_MARGIN_MS;
+    if (budget < MIN_COMMAND_TIMEOUT_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const timeoutMs = Math.min(options.commandTimeoutMs ?? COMPUTER_COMMAND_TIMEOUT_MS, budget);
     await runShell(call, host, params.data, timeoutMs, controller);
   }
 

@@ -189,6 +189,30 @@ describe('computer dispatcher: refusals post one not-delivered error and run not
     expect(api.frames[0]).toMatchObject({ kind: 'error', delivery: 'not_delivered' });
   });
 
+  test('a call with less time left than the minimum command timeout is refused', async () => {
+    const api = fakeClient();
+    const provider = countingProvider();
+    await createComputerDispatcher({ client: api.client, host: provider, ...FAST }).dispatch(
+      call({ deadlineAt: Date.now() + 3_000 }),
+    );
+    expect(provider.executed).toEqual([]);
+    expect(api.frames).toHaveLength(1);
+    expect(api.frames[0]).toMatchObject({ kind: 'error', delivery: 'not_delivered' });
+  });
+
+  test('a frame post that never settles is abandoned at the call deadline', async () => {
+    const stalled = {
+      computerFrames: () => new Promise<never>(() => {}),
+    };
+    const started = Date.now();
+    await createComputerDispatcher({
+      client: stalled,
+      host: countingProvider(),
+      ...FAST,
+    }).dispatch(call({ deadlineAt: Date.now() + 1_500 }));
+    expect(Date.now() - started).toBeLessThan(3_000);
+  });
+
   test('invalid params are refused', async () => {
     const api = fakeClient();
     const provider = countingProvider();

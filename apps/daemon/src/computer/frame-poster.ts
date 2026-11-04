@@ -6,6 +6,14 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export type ComputerFrameBody = DistributiveOmit<ComputerFrame, 'seq'>;
 
 export const OUTPUT_TRUNCATED_MARKER = '[output truncated]\n';
+export const FRAME_POST_TIMEOUT_MS = 30_000;
+
+export class FramePostTimeoutError extends Error {
+  constructor() {
+    super('computer frame post timed out');
+    this.name = 'FramePostTimeoutError';
+  }
+}
 
 export interface FramePosterOptions {
   client: Pick<MachineApi, 'computerFrames'>;
@@ -18,10 +26,20 @@ export interface FramePosterOptions {
   retryMaxMs: number;
   now: () => number;
   onStop: (reason: 'cancelled' | 'unreachable') => void;
+  postTimeoutMs?: number;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new FramePostTimeoutError()), Math.max(ms, 0));
+    timer.unref();
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function isTerminalPostError(error: unknown): boolean {
@@ -147,9 +165,12 @@ export class FramePoster {
     while (this.queue.length > 0 && !this.gaveUp) {
       const batch = this.queue.slice(0, COMPUTER_FRAMES_PER_POST_MAX);
       try {
-        const response = await this.options.client.computerFrames?.(this.options.callId, {
-          frames: batch,
-        });
+        const post = this.options.client.computerFrames?.(this.options.callId, { frames: batch });
+        const budget = Math.min(
+          this.options.postTimeoutMs ?? FRAME_POST_TIMEOUT_MS,
+          this.options.deadlineAt - this.options.now(),
+        );
+        const response = post && (await withTimeout(post, budget));
         if (!response) return this.giveUp();
         this.queue.splice(0, batch.length);
         this.lastActivity = this.options.now();

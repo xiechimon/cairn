@@ -1,5 +1,6 @@
-Cairn
-Copyright the Cairn authors. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# Third-party notices
+
+Cairn is licensed under the Apache License, Version 2.0 (see `LICENSE`).
 
 This product includes software derived from Rakazo, Apache License 2.0:
 the desktop command guard in apps/daemon/src/computer/guard*.ts and its tests are ported from
