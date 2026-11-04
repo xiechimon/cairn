@@ -1,5 +1,6 @@
 from pathlib import Path
 
+SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills" / "cairn-worker"
 _WORKER_PROMPT_FILE = Path(__file__).with_name("cairn-worker-prompt.md")
 
 BENCHMARK_SITE_HOSTS = (

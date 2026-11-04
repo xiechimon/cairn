@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cairn_harbor import budget
+from cairn_harbor.constants import SKILLS_DIR
+from cairn_harbor.executor_record import RECORD_FILE_NAME
 from cairn_harbor.costs import (
     parse_docker_stats_peak,
     parse_systemd_show,
@@ -25,7 +27,6 @@ API_KEY_NAME = "OPENAI_API_KEY"
 AGENT_MODEL_API = "openai-completions"
 
 CAIRN_IMPORT_PATH = "cairn_harbor.cairn_executor:CairnExecutor"
-SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills" / "cairn-worker"
 
 
 def agent_config(arm: str) -> dict:
@@ -114,6 +115,23 @@ def _dataset_for_trial(trial_dir: Path) -> str:
     if TB_DATASET_DIR_NAME in task_path:
         return TB_DATASET_DIR_NAME
     return ""
+
+
+def collect_executor_records(jobs_dir: Path, job_name: str) -> dict[str, dict | None]:
+    job_dir = jobs_dir / job_name
+    records: dict[str, dict | None] = {}
+    if not job_dir.is_dir():
+        return records
+    for trial_dir in sorted(job_dir.iterdir()):
+        if not trial_dir.is_dir():
+            continue
+        try:
+            records[trial_dir.name] = json.loads(
+                (trial_dir / "agent" / RECORD_FILE_NAME).read_text()
+            )
+        except (OSError, ValueError):
+            records[trial_dir.name] = None
+    return records
 
 
 def config_model(config_path: Path) -> str | None:
@@ -341,6 +359,7 @@ def main() -> None:
             "peak_container_mib": run_info["peak_container_mib"],
             "cgroup_peak_bytes": run_info["cgroup_peak_bytes"],
             "trial_disk_bytes": measure_trial_disk(args.jobs_dir, args.job_name),
+            "executor_records": collect_executor_records(args.jobs_dir, args.job_name),
             "scan": scan_summary(outcomes),
             "trials": [outcome.__dict__ for outcome in outcomes],
         }
