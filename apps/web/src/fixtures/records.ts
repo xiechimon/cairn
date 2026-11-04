@@ -360,7 +360,7 @@ export type TranscriptItem =
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
-  | { kind: 'plan'; title: string; preview: string; seconds?: number }
+  | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
   | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean; createdAt?: number }
   | { kind: 'elapsed'; seconds: number }
   | {
@@ -372,9 +372,10 @@ export type TranscriptItem =
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
-  | { kind: 'fail'; title: string; body: string }
+  | { kind: 'fail'; title: string; body: string; createdAt?: number }
   | {
       kind: 'review';
+      createdAt?: number;
       conclusion: string;
       findings: ReviewFinding[];
       extractionError?: string;
@@ -382,13 +383,14 @@ export type TranscriptItem =
     }
   | {
       kind: 'verify';
+      createdAt?: number;
       passed: boolean;
       conclusion: string;
       evidence: { path: string; note?: string }[];
       extractionError?: string;
       id?: string;
     }
-  | { kind: 'report'; markdown: string; id?: string }
+  | { kind: 'report'; markdown: string; id?: string; createdAt?: number }
   | {
       kind: 'thinking';
       text: string;
@@ -520,7 +522,12 @@ export type ChiefStreamItem =
       createdAt?: number;
       projectId?: string | null;
     }
-  | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
+  | {
+      kind: 'stopped';
+      todos: { id: string; seq: number; title: string }[];
+      id?: string;
+      createdAt?: number;
+    }
   | {
       kind: 'robot';
       paragraphs?: ChiefSegment[][];

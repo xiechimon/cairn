@@ -140,10 +140,7 @@ export const transcriptTurns: TurnAdapter<TranscriptItem> = {
   terminal: (item) => TRANSCRIPT_TERMINALS.has(item.kind),
   failed: (item) => item.kind === 'fail',
   purpose: (item) => (item.kind === 'user' ? purposeOf(item.markdown ?? item.text) : ''),
-  at: (item) =>
-    item.kind === 'user' || item.kind === 'robot' || item.kind === 'work'
-      ? item.createdAt
-      : undefined,
+  at: (item) => ('createdAt' in item ? item.createdAt : undefined),
   id: (item) => (item.kind === 'user' ? item.id : undefined),
 };
 
@@ -173,9 +170,6 @@ export const chiefTurns: TurnAdapter<ChiefRow> = {
     item.kind === 'stopped',
   failed: ({ item }) => item.kind === 'error',
   purpose: ({ item }) => (item.kind === 'user' ? purposeOf(item.markdown ?? item.text) : ''),
-  at: ({ item }) =>
-    item.kind === 'user' || item.kind === 'robot' || item.kind === 'error'
-      ? item.createdAt
-      : undefined,
+  at: ({ item }) => ('createdAt' in item ? item.createdAt : undefined),
   id: ({ item }) => (item.kind === 'user' ? item.id : undefined),
 };

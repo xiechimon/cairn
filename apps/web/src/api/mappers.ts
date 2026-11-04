@@ -668,7 +668,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         }
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'review', ...verdict, id: m.id, createdAt: m.createdAt },
+          });
           continue;
         }
         const report = infoReportMessageSchema.safeParse(JSON.parse(m.content as string));
@@ -679,13 +682,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
               kind: 'report',
               markdown: `${report.data.attachmentToken}\n\n${report.data.content}`,
               id: m.id,
+              createdAt: m.createdAt,
             },
           });
           continue;
         }
         const verifyVerdict = verifyVerdictOfContent(m.content);
         if (verifyVerdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'verify', ...verifyVerdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'verify', ...verifyVerdict, id: m.id, createdAt: m.createdAt },
+          });
         }
         continue;
       }
@@ -728,6 +735,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       item: {
         kind: 'plan',
         title: `方案 · v${p.version}`,
+        createdAt: p.createdAt,
         preview: preview.length > 90 ? `${preview.slice(0, 90)}…` : preview,
       },
     });
@@ -735,7 +743,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   if (build?.withPlan === true) {
     for (const s of steps) {
       if (s.kind === 'build' && !scheduledStepIds.has(s.id)) {
-        entries.push({ at: s.createdAt, item: { kind: 'user', text: '确认' } });
+        entries.push({
+          at: s.createdAt,
+          item: { kind: 'user', text: '确认', createdAt: s.createdAt },
+        });
       }
     }
   }
@@ -844,6 +855,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
+      createdAt: todo.phaseAt,
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
     });
   }
@@ -1504,7 +1516,12 @@ function collectChiefStream(
   }
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
   items.forEach((item, index) => {
-    if (item.kind === 'user' || item.kind === 'robot' || item.kind === 'error')
+    if (
+      item.kind === 'user' ||
+      item.kind === 'robot' ||
+      item.kind === 'error' ||
+      item.kind === 'stopped'
+    )
       item.createdAt = itemsAt[index] ?? lastAt;
   });
   const pending = [...pendingIds.keys()].flatMap((id) => {
