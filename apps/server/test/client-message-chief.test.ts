@@ -1,6 +1,14 @@
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
-import { build, chiefMessage, message, steerPending, step, todo } from '../src/db/schema.js';
+import {
+  build,
+  chiefMessage,
+  clientMessage,
+  message,
+  steerPending,
+  step,
+  todo,
+} from '../src/db/schema.js';
 import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
@@ -194,6 +202,17 @@ describe('POST /api/todos/:id/messages with a client message id', () => {
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
     expect(await second.json()).toEqual(await first.json());
+    expect(steered('build-a')).toHaveLength(1);
+    expect(markers()).toHaveLength(1);
+  });
+
+  test('a retry after a lost Coordinator marker does not deliver the message twice', async () => {
+    seedThread('todo-a', 'build-a');
+    await send('todo-a', { content: 'Use the index', clientMessageId: 'key-1' });
+    H.s.db.delete(clientMessage).where(eq(clientMessage.scopeId, 'todo-a')).run();
+    H.s.db.delete(chiefMessage).where(eq(chiefMessage.role, 'system')).run();
+    const retry = await send('todo-a', { content: 'Use the index', clientMessageId: 'key-1' });
+    expect(retry.status).toBe(201);
     expect(steered('build-a')).toHaveLength(1);
     expect(markers()).toHaveLength(1);
   });

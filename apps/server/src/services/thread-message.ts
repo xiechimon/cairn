@@ -52,7 +52,12 @@ async function deliver(
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
   const running = hasClaimedStep(deps, buildId);
   if (running || row.phase === 'building' || row.phase === 'done') {
-    const sent = await sendBuildSteer(deps, buildId, { content: body.content }, { human: true });
+    const sent = await sendBuildSteer(
+      deps,
+      buildId,
+      { content: body.content, clientMessageId: body.clientMessageId },
+      { human: true },
+    );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
   if (row.phase === 'confirm' || row.phase === 'review') {
