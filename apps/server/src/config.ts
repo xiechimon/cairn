@@ -255,6 +255,10 @@ export function backupStatusPathOf(config: Pick<ServerConfig, 'dbPath'>): string
   return join(dirname(config.dbPath), 'backup-status.json');
 }
 
+export function deployRecordPathOf(config: Pick<ServerConfig, 'dbPath'>): string {
+  return join(dirname(config.dbPath), 'deploy.json');
+}
+
 export function attachmentsDirOf(config: ServerConfig): string {
   return join(config.dataDir, 'attachments');
 }

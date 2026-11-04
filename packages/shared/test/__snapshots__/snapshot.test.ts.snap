@@ -7270,6 +7270,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "note": "deploy.json next to server.db, written by deploy-self.sh (#2427)",
+    "path": "/api/server/deploy",
+  },
+  {
+    "method": "GET",
     "note": "presets[] 38 项原样（r3 §2）",
     "path": "/api/teams/{id}/providers",
   },
