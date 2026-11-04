@@ -226,7 +226,7 @@ interface BuildSteerOptions {
   allowReviewContinuation?: boolean;
   afterTurn?: boolean;
   human?: boolean;
-  schedule?: { id: string; createdBy: string; at: number };
+  schedule?: { id: string; createdBy: string; at: number; manual?: boolean };
 }
 
 function continuationTodo(
@@ -352,7 +352,11 @@ export async function sendBuildSteer(
     if (continuationOptions.schedule) {
       const wake = continuationOptions.schedule;
       const current = db.select().from(schedule).where(eq(schedule.id, wake.id)).get();
-      if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
+      if (
+        !current ||
+        (!wake.manual &&
+          (!current.enabled || current.nextRunAt === null || current.nextRunAt > wake.at))
+      ) {
         throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
       }
       if (

@@ -66,6 +66,7 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
+import { runScheduleNow } from './services/schedule-run.js';
 import { createSchedule, deleteSchedule, listSchedules } from './services/schedules.js';
 import { search } from './services/search.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
@@ -128,6 +129,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     if (!deleteSchedule(svc, id)) throw notFound(`schedule ${id}`);
     return c.body(null, 204);
+  });
+
+  app.post('/api/schedules/:id/run', async (c) => {
+    const record = await runScheduleNow(svc, ctx.team.id, c.req.param('id'));
+    return c.json(record);
   });
 
   app.get('/api/search', (c) =>

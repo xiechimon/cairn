@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { ENV_VARS, type Scheduler } from '@cairn/shared';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ServerConfig } from '../config.js';
-import { build, schedule, step, todo } from '../db/schema.js';
+import { schedule, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { exportTrajectories } from '../trajectory-export.js';
@@ -27,20 +27,16 @@ import {
 import {
   BuildContinuationPhaseError,
   type BuildDeps,
-  sendBuildSteer,
-  startBuilds,
   sweepAbandonedBuildSteps,
   sweepAbandonedShipSteps,
   sweepPlanAutoConfirm,
   sweepZombieQueuedTodos,
-  toBuildRecord,
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { planChiefDigests } from './chief-digest.js';
 import { planChiefSummaries } from './chief-summary.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
-import { projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import {
   createIssueIntake,
@@ -55,23 +51,18 @@ import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from './pr-feedback.j
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
+import { fireDueSchedule, SCHEDULE_GATE_PHASES } from './schedule-run.js';
 import {
-  ARCHIVED_SCHEDULE_PAUSE_REASON,
-  assertWorkerScheduleInterval,
   computeNextRunAt,
   dueSchedules,
   isRecurring,
   isWorkerSchedule,
-  pauseSchedule,
   recordScheduleFailure,
   updateNextRunAt,
   WORKER_SCHEDULE_MIN_INTERVAL_MS,
-  WORKER_SCHEDULE_RUN_LIMIT,
-  workerScheduleRunHistory,
 } from './schedules.js';
 import { createScheduling, SCHEDULE_INTERVAL_MS, type SchedulingRun } from './scheduling/sweep.js';
 import { sweepSnoozeExpiry } from './snooze.js';
-import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 
 export interface SchedulerOptions {
@@ -202,8 +193,6 @@ export function trajectoryReflectCurateRunOf(
   };
 }
 
-const SCHEDULE_GATE_PHASES = new Set(['confirm', 'review']);
-
 export function createScheduler(
   deps: BuildDeps,
   opts: SchedulerOptions,
@@ -270,146 +259,6 @@ export function createScheduler(
     }
   }
 
-  const firing = new Set<string>();
-
-  async function fireSchedule(
-    row: ReturnType<typeof dueSchedules>[number],
-    now: number,
-  ): Promise<void> {
-    const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-    const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
-    if (!todoRow || todoRow.projectId !== row.projectId || !projectRow) {
-      deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
-      return;
-    }
-    if (todoRow.archivedAt !== null) {
-      pauseSchedule(deps, row.id, ARCHIVED_SCHEDULE_PAUSE_REASON);
-      return;
-    }
-    const workerCreated = isWorkerSchedule(row.createdBy);
-    if (workerCreated) {
-      const history = workerScheduleRunHistory(deps, row.todoId);
-      if (history.consecutive >= WORKER_SCHEDULE_RUN_LIMIT) {
-        pauseSchedule(
-          deps,
-          row.id,
-          'Paused after 10 consecutive scheduled runs without a human message',
-        );
-        return;
-      }
-      if (SCHEDULE_GATE_PHASES.has(todoRow.phase)) {
-        try {
-          const next = isRecurring(row.kind)
-            ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
-            : now + WORKER_SCHEDULE_MIN_INTERVAL_MS;
-          updateNextRunAt(deps, row.id, next);
-        } catch (err) {
-          pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
-        }
-        return;
-      }
-      try {
-        assertWorkerScheduleInterval(row, now, false);
-      } catch (err) {
-        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
-        return;
-      }
-      if (history.lastRunAt !== null && now - history.lastRunAt < WORKER_SCHEDULE_MIN_INTERVAL_MS) {
-        updateNextRunAt(deps, row.id, history.lastRunAt + WORKER_SCHEDULE_MIN_INTERVAL_MS);
-        return;
-      }
-    }
-    let nextRunAt: number | null = row.nextRunAt;
-    if (isRecurring(row.kind)) {
-      try {
-        nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
-      } catch (err) {
-        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
-        return;
-      }
-    }
-    if (todoRow.latestBuildId !== null) {
-      const active = deps.db
-        .select({ id: step.id })
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, todoRow.latestBuildId),
-            inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-          ),
-        )
-        .get();
-      if (active) {
-        if (isRecurring(row.kind)) updateNextRunAt(deps, row.id, nextRunAt);
-        return;
-      }
-    }
-    const prompt = workerCreated
-      ? `Scheduled follow-up you set earlier:\n\n${row.prompt}`
-      : row.prompt || 'Continue this task.';
-    let buildId = todoRow.latestBuildId;
-    const freshAtConfirm = !workerCreated && todoRow.phase === 'confirm';
-    if (buildId !== null && !freshAtConfirm) {
-      await sendBuildSteer(
-        deps,
-        buildId,
-        { content: prompt },
-        {
-          afterTurn: true,
-          human: false,
-          schedule: { id: row.id, createdBy: row.createdBy, at: now },
-        },
-      );
-    } else {
-      if (freshAtConfirm && buildId !== null) {
-        deps.db.update(build).set({ errorMessage: 'Cancelled' }).where(eq(build.id, buildId)).run();
-        const cancelled = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-        if (cancelled) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(cancelled));
-      }
-      const [started] = startBuilds(deps, {
-        projectId: row.projectId,
-        todoIds: [row.todoId],
-        assignment: todoRow.assignment ?? { plan: null, build: null },
-        withPlan: false,
-        triggerSource: 'schedule',
-        scheduledBy: row.createdBy,
-        prompt: workerCreated ? prompt : row.prompt || undefined,
-      });
-      buildId = started?.id ?? null;
-    }
-    const fired =
-      buildId === null
-        ? undefined
-        : deps.db
-            .select()
-            .from(step)
-            .where(and(eq(step.buildId, buildId), eq(step.status, 'pending')))
-            .orderBy(desc(step.createdAt))
-            .get();
-    if (!fired) throw new Error('Scheduled continuation did not enqueue a step');
-    deps.db.update(step).set({ scheduleId: row.id }).where(eq(step.id, fired.id)).run();
-    if (todoRow.latestBuildId === null || freshAtConfirm) {
-      insertMessageRow(deps, fired.buildId, {
-        id: `schedule-wake-${fired.id}`,
-        role: 'system',
-        content: JSON.stringify({ kind: 'schedule-wake', stepId: fired.id }),
-        createdAt: fired.createdAt,
-      });
-    }
-    deps.db
-      .update(schedule)
-      .set({
-        lastRunAt: now,
-        lastRunStatus: 'started',
-        lastRunError: null,
-        retryNotBefore: null,
-        lastRunStepId: fired.id,
-      })
-      .where(eq(schedule.id, row.id))
-      .run();
-    updateNextRunAt(deps, row.id, isRecurring(row.kind) ? nextRunAt : null);
-  }
-
   function runTick(now: number): Promise<void> {
     const pending: Promise<void>[] = [];
     if (!alertsSweeping) {
@@ -423,10 +272,8 @@ export function createScheduler(
         });
     }
     for (const row of dueSchedules(deps, now)) {
-      if (firing.has(row.id)) continue;
-      firing.add(row.id);
       pending.push(
-        fireSchedule(row, now)
+        fireDueSchedule(deps, row, now)
           .catch((err: unknown) => {
             const current = deps.db.select().from(schedule).where(eq(schedule.id, row.id)).get();
             if (
@@ -479,8 +326,7 @@ export function createScheduler(
           })
           .catch(() => {
             process.stderr.write(`Schedule ${row.id} failure could not be recorded\n`);
-          })
-          .finally(() => firing.delete(row.id)),
+          }),
       );
     }
     sweepIdleChiefUnread(deps, now);
