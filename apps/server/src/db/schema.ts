@@ -540,6 +540,23 @@ export const workPolicy = sqliteTable(
   (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
 );
 
+export const featureFlag = sqliteTable(
+  'feature_flag',
+  {
+    id: text('id').primaryKey(),
+    key: text('key').notNull(),
+    userId: text('userId').references(() => user.id),
+    enabled: bool('enabled').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('feature_flag_key_global_unique').on(t.key).where(sql`${t.userId} IS NULL`),
+    uniqueIndex('feature_flag_key_user_unique')
+      .on(t.key, t.userId)
+      .where(sql`${t.userId} IS NOT NULL`),
+  ],
+);
+
 export const agentMemory = sqliteTable('agent_memory', {
   id: text('id').primaryKey(),
   agentId: text('agentId').notNull(),

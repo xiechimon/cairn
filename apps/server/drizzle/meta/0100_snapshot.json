@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "dfaa44dd-1385-4848-89f7-d059d78fc45a",
+  "id": "3f17f6ec-abb4-4f3f-9b6d-c21c9f2088ee",
   "prevId": "dd4c4eba-cd08-4b75-96bb-eed85cde7491",
   "tables": {
     "agent": {
@@ -1707,52 +1707,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "client_message": {
-      "name": "client_message",
-      "columns": {
-        "scopeId": {
-          "name": "scopeId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "clientMessageId": {
-          "name": "clientMessageId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "response": {
-          "name": "response",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "client_message_scopeId_clientMessageId_pk": {
-          "columns": [
-            "scopeId",
-            "clientMessageId"
-          ],
-          "name": "client_message_scopeId_clientMessageId_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "computer": {
       "name": "computer",
       "columns": {
@@ -2163,6 +2117,83 @@
             "id"
           ],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "feature_flag": {
+      "name": "feature_flag",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "feature_flag_key_global_unique": {
+          "name": "feature_flag_key_global_unique",
+          "columns": [
+            "key"
+          ],
+          "isUnique": true,
+          "where": "\"feature_flag\".\"userId\" IS NULL"
+        },
+        "feature_flag_key_user_unique": {
+          "name": "feature_flag_key_user_unique",
+          "columns": [
+            "key",
+            "userId"
+          ],
+          "isUnique": true,
+          "where": "\"feature_flag\".\"userId\" IS NOT NULL"
+        }
+      },
+      "foreignKeys": {
+        "feature_flag_userId_user_id_fk": {
+          "name": "feature_flag_userId_user_id_fk",
+          "tableFrom": "feature_flag",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },

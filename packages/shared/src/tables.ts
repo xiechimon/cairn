@@ -54,6 +54,7 @@ export const DB_TABLES = [
   'chief_summary',
   'computer',
   'computer_call',
+  'feature_flag',
   'client_message',
 ] as const;
 
@@ -95,5 +96,6 @@ export const INTERNAL_ONLY_TABLES = [
   'chief_summary',
   'computer',
   'computer_call',
+  'feature_flag',
   'client_message',
 ] as const;

@@ -5,7 +5,8 @@
 The check reads the Codex state comment (`<!-- codex-review-state:v1 ... -->`, trusted only from the Codex bot) and the PR review threads:
 
 - Review not finished for the head: in progress. If Codex has not started a review of the head 10 minutes after the check was created (PRs opened before Codex was enabled get no automatic review on push), the workflow comments `@codex review` once per head (marker `<!-- review-gate-request:<sha> -->`).
-- Completed: success unless an unresolved Codex thread carries a P0 or P1 badge, outdated threads included. P2 and P3 never block.
+- Completed: success unless an unresolved Codex thread carries a P0 or P1 badge, outdated threads included. P2 and P3 never block. A thread on a still-current right-side line range that contains no added line and sits in no hunk that removes lines is pre-existing: it is listed in the check summary and does not block. Outdated threads, left-side threads, files whose diff GitHub omits and threads without a location always block.
+- Convergence: the first evaluation of a head that is blocked by P0/P1 threads comments `<!-- review-gate-block:<sha> -->` once. The marker count is the block round. From round 3 the title and summary tell the author to name the bug class, fix every instance or change the approach, and the PR gets the `review-gate-human` label once per head; the check stays red until the threads are resolved, so the cap never turns a block into a pass. A pass reports how many blocked heads preceded it (cycles to pass).
 - Failed: the workflow comments `@codex review` up to 2 times per head (marker `<!-- review-gate-retry:<sha>:<k> -->`); after that the check fails and the PR gets the `review-stalled` label.
 - Allowance exhausted (the newest Codex comment is the usage-limit notice and is newer than the state comment): the check fails with `Codex allowance exhausted`, the PR gets `review-stalled`, and nothing is retried. Comment `@codex review` after the window resets.
 
