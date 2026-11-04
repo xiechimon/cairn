@@ -3,6 +3,7 @@ import type { AppContext } from './context.js';
 import { registerAgentRoutes } from './routes-agents.js';
 import { registerBuildRoutes } from './routes-builds.js';
 import { registerChiefRoutes } from './routes-chief.js';
+import { registerComputerRoutes } from './routes-computers.js';
 import { registerCoreRoutes } from './routes-core.js';
 import { registerFeishuRoutes } from './routes-feishu.js';
 import { registerFlagRoutes } from './routes-flags.js';
@@ -16,6 +17,7 @@ import { handleMcpRequest } from './services/mcp-face.js';
 
 export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerCoreRoutes(app, ctx);
+  registerComputerRoutes(app, ctx);
   registerFeishuRoutes(app, ctx);
   registerFlagRoutes(app, ctx);
   registerProjectRoutes(app, ctx);

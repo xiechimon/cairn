@@ -16,6 +16,7 @@ import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
 import { readStoredToken, useAuth } from './auth.js';
+import { computerFeedStore } from './computer-feed.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
@@ -33,24 +34,49 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
   const qc = useQueryClient();
   const auth = useAuth();
   useEffect(() => {
-    if (teamId === undefined || !enabled || auth.gateOpen) return;
-    const resync = () => {
-      void invalidateConverged(qc);
-    };
-    return connect(
-      streamUrl(`/api/teams/${teamId}/stream`),
-      (ev) => {
-        for (const queryKey of teamEventInvalidations(ev, teamId)) {
-          void invalidateConverged(qc, { queryKey });
-        }
-        if (ev.type === 'notification') {
-          fireDesktopNotification(ev.notification as NotificationRecord);
-        }
-      },
-      resync,
-      streamGuards(qc),
-    );
+    if (teamId === undefined || !enabled || auth.gateOpen) {
+      computerFeedStore.clear();
+      return;
+    }
+    return startTeamStream(teamId, qc);
   }, [teamId, enabled, qc, auth]);
+}
+
+export function startTeamStream(teamId: string, qc: QueryClient): () => void {
+  computerFeedStore.clear();
+  const resync = () => {
+    computerFeedStore.clear();
+    void invalidateConverged(qc);
+  };
+  const guards = streamGuards(qc);
+  const disconnect = connect(
+    streamUrl(`/api/teams/${teamId}/stream`),
+    (ev) => {
+      for (const queryKey of teamEventInvalidations(ev, teamId)) {
+        void invalidateConverged(qc, { queryKey });
+      }
+      if (ev.type === 'computer.command' && computerFeedStore.push(ev.command)) {
+        void invalidateConverged(qc, { queryKey: ['computers', teamId] });
+      }
+      if (ev.type === 'notification') {
+        fireDesktopNotification(ev.notification as NotificationRecord);
+      }
+    },
+    resync,
+    {
+      ...guards,
+      reconcile: () => {
+        computerFeedStore.clear();
+        guards.reconcile();
+        void invalidateConverged(qc, { queryKey: ['computers', teamId] });
+        void invalidateConverged(qc, { queryKey: ['computer-commands'] });
+      },
+    },
+  );
+  return () => {
+    disconnect();
+    computerFeedStore.clear();
+  };
 }
 
 function notificationHref(record: NotificationRecord): string {

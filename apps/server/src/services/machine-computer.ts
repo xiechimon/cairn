@@ -325,7 +325,7 @@ function resultOfRow(row: CallRow): ComputerRelayResult {
   }
 }
 
-function feedOf(row: CallRow): ComputerCommand | null {
+export function feedOf(row: CallRow): ComputerCommand | null {
   if (!FEED_TOOLS.has(row.tool)) return null;
   const param = (key: string): string => {
     const value = row.params[key];
@@ -350,7 +350,7 @@ function feedOf(row: CallRow): ComputerCommand | null {
     status: isFinalState(row.state) ? (row.state as ComputerCommand['status']) : 'running',
     exitCode: row.exitCode,
     output: redact(output).slice(-COMPUTER_FEED_OUTPUT_CHARS),
-    at: row.finishedAt ?? row.startedAt ?? row.createdAt,
+    at: row.createdAt,
   };
 }
 

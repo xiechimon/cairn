@@ -11,6 +11,8 @@ import type {
   CapabilitiesResponse,
   ChiefGetResponse,
   ChiefThread,
+  ComputerCommandsResponse,
+  ComputerRecord,
   ConversationMessagesResponse,
   CreateAgentBody,
   CreateProjectBody,
@@ -334,6 +336,23 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['machines', teamId],
     queryFn: () => api.get<MachineRecord[]>(`/api/teams/${teamId}/machines`),
     enabled: enabled && teamId !== undefined,
+  });
+
+export const useComputers = (teamId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['computers', teamId],
+    queryFn: async () =>
+      (await api.get<{ computers: ComputerRecord[] }>('/api/computers')).computers,
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useComputerCommands = (computerId: string | undefined) =>
+  useQuery({
+    queryKey: ['computer-commands', computerId],
+    queryFn: async () =>
+      (await api.get<ComputerCommandsResponse>(`/api/computers/${computerId}/commands?limit=50`))
+        .commands,
+    enabled: computerId !== undefined,
   });
 
 export const useBackupNotice = (enabled: boolean) =>
