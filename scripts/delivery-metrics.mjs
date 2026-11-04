@@ -187,6 +187,7 @@ function usageSummary(prs, ledger, field) {
   };
 }
 
+export const REVIEW_BLOCK_MARKERS_SINCE = '2026-11-05T12:00:00Z';
 const GATE_BLOCK_MARKER = /^<!-- review-gate-block:([0-9a-f]+) -->/;
 
 export function blockedHeadsOf(comments) {
@@ -397,12 +398,15 @@ export function fetchPrs({ repo, now, gh }) {
             name: author.name ?? null,
           })),
         ),
-        blockedHeads: blockedHeadsOf(
-          (node.comments?.nodes ?? []).map((comment) => ({
-            author: comment.author?.login ?? null,
-            body: comment.body,
-          })),
-        ),
+        blockedHeads:
+          Date.parse(node.createdAt) >= Date.parse(REVIEW_BLOCK_MARKERS_SINCE)
+            ? blockedHeadsOf(
+                (node.comments?.nodes ?? []).map((comment) => ({
+                  author: comment.author?.login ?? null,
+                  body: comment.body,
+                })),
+              )
+            : null,
         reviews: (node.reviews?.nodes ?? []).map((review) => ({
           state: review.state,
           author: actorOf(

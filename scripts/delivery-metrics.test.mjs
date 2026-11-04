@@ -591,6 +591,7 @@ test('reviewCycles averages blocked heads over PRs with a count and skips unknow
 test('fetchPrs counts the gate block markers on each PR and the report shows them', () => {
   const node = {
     ...prNode(5),
+    createdAt: '2026-11-06T00:00:00Z',
     comments: {
       nodes: [
         { author: { login: 'github-actions' }, body: '<!-- review-gate-block:abc123 -->\nx' },
@@ -607,4 +608,15 @@ test('fetchPrs counts the gate block markers on each PR and the report shows the
   const metrics = computeMetrics({ prs, runs: [], now: NOW });
   assert.deepEqual(metrics.reviewCycles, { prs: 1, known: 1, blocked: 1, max: 2, mean: 2 });
   assert.match(renderReport(metrics), /Blocked review heads per merged PR \| 2 \(1 of 1/);
+});
+
+test('a PR created before the block markers existed keeps an unknown count', () => {
+  const node = { ...prNode(6), createdAt: '2026-10-20T00:00:00Z', comments: { nodes: [] } };
+  const { prs } = fetchPrs({
+    repo: 'o/r',
+    now: NOW,
+    gh: () => JSON.stringify(searchPage([node], null)),
+  });
+  assert.equal(prs[0].blockedHeads, null);
+  assert.deepEqual(computeMetrics({ prs, runs: [], now: NOW }).reviewCycles.known, 0);
 });
