@@ -71,6 +71,7 @@ export interface ThreadChat {
   attach?: (files: File[]) => Promise<string[]>;
   sendQueuedNow?: (id: string, content: string) => Promise<unknown>;
   removeQueued?: (id: string, content: string) => Promise<unknown>;
+  editQueued?: (id: string, content: string) => Promise<unknown>;
 }
 
 const ACTIVE_STEP = new Set(['claimed', 'pending', 'waiting_quota']);
@@ -331,7 +332,9 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError
       ? mutations.messageThread.error?.message || t('发送失败，请重试。')
-      : mutations.sendSteer.isError && mutations.sendSteer.variables?.cancelQueued !== true
+      : mutations.sendSteer.isError &&
+          mutations.sendSteer.variables?.cancelQueued !== true &&
+          mutations.sendSteer.variables?.editQueued !== true
         ? mutations.sendSteer.error?.message || t('发送失败，请重试。')
         : null,
     queuedMessages: live ? messagesQ.data?.queuedMessages : undefined,
@@ -357,6 +360,13 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
               content,
               queuedMessageId,
               cancelQueued: true,
+            }),
+          editQueued: (queuedMessageId: string, content: string) =>
+            mutations.sendSteer.mutateAsync({
+              conversationId: buildId,
+              content,
+              queuedMessageId,
+              editQueued: true,
             }),
         }
       : {}),
