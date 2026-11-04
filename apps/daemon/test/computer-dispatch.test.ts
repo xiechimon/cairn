@@ -27,17 +27,19 @@ type Handler = (
   attempt: number,
 ) => MachineComputerFramesResponse | Promise<MachineComputerFramesResponse>;
 
+let allocatedRoot: string;
 let root: string;
 let home: string;
 
 beforeEach(() => {
-  root = realpathSync(makeTestTempDir('cairn-dispatch-'));
+  allocatedRoot = makeTestTempDir('cairn-dispatch-');
+  root = realpathSync(allocatedRoot);
   home = path.join(root, 'home');
   mkdirSync(home);
 });
 
 afterEach(() => {
-  releaseTestTempDir(root);
+  expect(releaseTestTempDir(allocatedRoot)).toBe(true);
 });
 
 function fakeClient(handler?: Handler) {

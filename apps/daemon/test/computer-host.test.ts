@@ -15,12 +15,14 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { HostComputerProvider } from '../src/computer/host.js';
 import { type ComputerProcessEvent, ComputerRefusal } from '../src/computer/provider.js';
 
+let allocatedRoot: string;
 let root: string;
 let home: string;
 let outside: string;
 
 beforeEach(() => {
-  root = realpathSync(makeTestTempDir('cairn-host-'));
+  allocatedRoot = makeTestTempDir('cairn-host-');
+  root = realpathSync(allocatedRoot);
   home = path.join(root, 'home');
   outside = path.join(root, 'outside');
   mkdirSync(home);
@@ -28,7 +30,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  releaseTestTempDir(root);
+  expect(releaseTestTempDir(allocatedRoot)).toBe(true);
 });
 
 function provider(overrides: ConstructorParameters<typeof HostComputerProvider>[0] = {}) {
