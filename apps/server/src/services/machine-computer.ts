@@ -221,6 +221,10 @@ export function receiveComputerFrames(
   });
   if (result.pending === '') pendingOutput.delete(callId);
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
+  syncObservedComputerState(
+    db,
+    db.select().from(computerCall).where(eq(computerCall.id, callId)).get()?.computerId ?? null,
+  );
   if (result.finished) settleComputerCall(db, callId);
   else if (result.publishOutput) {
     const pending = pendingCalls.get(callId);
@@ -380,6 +384,7 @@ export function settleComputerCall(db: Db, callId: string): void {
   if (!row || !isFinalState(row.state)) return;
   pendingCalls.delete(callId);
   live.dispose();
+  syncObservedComputerState(db, row.computerId);
   publishFeed(db, live.hub, row);
   live.resolve(resultOfRow(row));
 }
@@ -426,6 +431,27 @@ function openPending(
   };
   pendingCalls.set(call.callId, pending);
   return pending;
+}
+
+function syncObservedComputerState(db: Db, computerId: string | null): void {
+  if (!computerId) return;
+  const open = db
+    .select({ state: computerCall.state, startedAt: computerCall.startedAt })
+    .from(computerCall)
+    .where(
+      and(
+        eq(computerCall.computerId, computerId),
+        inArray(computerCall.state, ['dispatched', 'running']),
+      ),
+    )
+    .all();
+  const state =
+    open.length === 0
+      ? 'stopped'
+      : open.some((row) => row.state === 'running' || row.startedAt !== null)
+        ? 'running'
+        : 'starting';
+  db.update(computer).set({ state, updatedAt: nowMs() }).where(eq(computer.id, computerId)).run();
 }
 
 function releaseExecutionLease(db: Db, stepId: string): void {
@@ -519,6 +545,7 @@ function selectTarget(
       scopeKey,
       machineId: chosen.id,
       providerRef: computerMachineName(scopeKey),
+      state: 'starting',
       createdAt: now,
       updatedAt: now,
     })
@@ -699,8 +726,10 @@ export async function forwardComputerCall(
     deadlineAt,
     ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
   };
+  syncObservedComputerState(db, target.computerId);
   if (!deps.machineHub.pushComputer(target.machineId, call)) {
     db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
+    syncObservedComputerState(db, target.computerId);
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
   const pending = openPending(deps, call);

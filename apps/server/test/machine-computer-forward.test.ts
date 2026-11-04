@@ -310,6 +310,18 @@ describe('forwardComputerCall replay', () => {
     return { ...ctx, calls, result, id: computerCallId('step-a', toolCallId) };
   }
 
+  test('a dispatched command reports starting, a live frame reports running, and completion reports stopped', async () => {
+    const { s, result, id } = await started();
+    expect(s.db.select().from(computerTable).get()?.state).toBe('starting');
+    receiveComputerFrames(s.db, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: 'a' },
+    ]);
+    expect(s.db.select().from(computerTable).get()?.state).toBe('running');
+    receiveComputerFrames(s.db, 'omarchy', id, [done(2, 'done', 0)]);
+    await result;
+    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
+  });
+
   test('a finished unsafe call retried with the same toolCallId returns the stored result and dispatches nothing', async () => {
     const { s, deps, calls, result, id } = await started();
     receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'file-a', 0)]);
