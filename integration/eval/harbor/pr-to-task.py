@@ -1,6 +1,9 @@
 import argparse
+import fcntl
 import hashlib
+import importlib.util
 import json
+import os
 from pathlib import Path, PurePosixPath
 import posixpath
 import re
@@ -11,8 +14,14 @@ import time
 
 
 HARBOR_VERSION = "0.25.0"
+HEAVY_LOCK = os.environ.get("CAIRN_HEAVY_LOCK", "/tmp/cairn-heavy.lock")
 ROOT = Path(__file__).resolve().parents[3]
 REPOSITORY = "xiechimon/cairn"
+_PROBE_SPEC = importlib.util.spec_from_file_location(
+    "control_probe", Path(__file__).with_name("control_probe.py")
+)
+probe = importlib.util.module_from_spec(_PROBE_SPEC)
+_PROBE_SPEC.loader.exec_module(probe)
 
 
 def run(*args, cwd=None):
@@ -273,32 +282,42 @@ def check_controls(task, output):
         raise ValueError(f"Expected Harbor {HARBOR_VERSION}, got {version}")
     output.mkdir(parents=True, exist_ok=False)
     controls = {}
+    isolation = []
+    wrote_outcome = False
     for agent in ("oracle", "nop"):
-        started = time.monotonic()
         log = output / f"{agent}.log"
-        with log.open("w") as stream:
-            trial = subprocess.run(
-                [
-                    *prefix,
-                    "run",
-                    "-p",
-                    str(task.resolve()),
-                    "-a",
-                    agent,
-                    "-n",
-                    "1",
-                    "--max-retries",
-                    "0",
-                    "--jobs-dir",
-                    str(output.resolve() / agent),
-                    "--yes",
-                ],
-                stdout=stream,
-                stderr=subprocess.STDOUT,
-                timeout=1800,
-            )
+        state, stop, sampler = probe.start_sampler(task.resolve().name)
+        lock_requested = time.monotonic()
+        with open(HEAVY_LOCK, "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            lock_acquired = time.monotonic()
+            with log.open("w") as stream:
+                trial = subprocess.run(
+                    [
+                        *prefix,
+                        "run",
+                        "-p",
+                        str(task.resolve()),
+                        "-a",
+                        agent,
+                        "-n",
+                        "1",
+                        "--max-retries",
+                        "0",
+                        "--jobs-dir",
+                        str(output.resolve() / agent),
+                        "--yes",
+                    ],
+                    stdout=stream,
+                    stderr=subprocess.STDOUT,
+                    timeout=1800,
+                )
+            harbor_finished = time.monotonic()
+        stop.set()
+        sampler.join()
         results = list((output / agent).glob("*/*/result.json"))
         status = "infrastructure"
+        result = {}
         if len(results) == 1:
             result = json.loads(results[0].read_text())
             logs = list(results[0].parent.glob("verifier/test-output.txt"))
@@ -308,11 +327,22 @@ def check_controls(task, output):
             "status": status,
             "log": str(log),
             "exitCode": trial.returncode,
-            "wallSeconds": round(time.monotonic() - started, 3),
+            "timing": probe.timing_record(
+                lock_requested, lock_acquired, harbor_finished, result, state.cpu_seconds()
+            ),
         }
         if status == "fail":
             controls[agent]["failureKind"] = "assertion"
+        if len(results) == 1:
+            probe.write_outcome(results[0].parent, agent, {"status": status})
+            wrote_outcome = wrote_outcome or probe.agent_wrote_outcome(results[0].parent)
+        isolation += state.isolation()
         (output / "controls.json").write_text(json.dumps(controls, indent=2) + "\n")
+    controls["isolation"] = isolation
+    controls["probe"] = probe.probe_verdict(
+        controls["oracle"], controls["nop"], isolation, wrote_outcome
+    )
+    (output / "controls.json").write_text(json.dumps(controls, indent=2) + "\n")
     return controls
 
 

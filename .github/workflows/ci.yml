@@ -103,6 +103,11 @@ jobs:
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
 
+      - name: Harbor task conversion, probe and labeler tests
+        run: |
+          cd integration/eval/harbor
+          pipx run pytest test_pr_to_task.py test_control_probe.py test_label_task.py
+
       - name: Prepush self-test
         run: pnpm prepush --self-test
 

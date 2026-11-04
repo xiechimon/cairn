@@ -179,3 +179,26 @@ def test_rejects_non_array_test_commands(repository, tmp_path, command):
     repo, base, head = repository
     with pytest.raises(ValueError):
         converter.convert(repo, base, head, "Fixture", tmp_path / "task", command, 42)
+
+
+def test_missing_reward_is_infrastructure_for_both_controls():
+    for agent in ("oracle", "nop"):
+        assert (
+            converter.classify_control(
+                {"verifier_result": None, "exception_info": None},
+                "AssertionError: expected 5",
+                agent,
+            )
+            == "infrastructure"
+        )
+
+
+def test_nop_that_passes_is_not_a_failed_control():
+    assert (
+        converter.classify_control(
+            {"verifier_result": {"rewards": {"reward": 1}}, "exception_info": None},
+            "",
+            "nop",
+        )
+        == "pass"
+    )
