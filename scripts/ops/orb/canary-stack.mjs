@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { connect, createServer } from 'node:net';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -318,6 +318,10 @@ export async function startStack({
       }
       if (!buildId) throw new Error('Scratch step ID did not satisfy the Orb runner contract');
       const orbName = `cairn-orb-${buildId}`;
+      const runtimeNamespace = createHash('sha256')
+        .update(resolve(daemonHome))
+        .digest('hex')
+        .slice(0, 16);
       if (executor === 'orb' && container) {
         const exists = await runCommand('podman', ['container', 'exists', orbName], {
           signal,
@@ -325,9 +329,17 @@ export async function startStack({
           () => true,
           () => false,
         );
-        if (exists || existsSync(join(orbEnv.XDG_RUNTIME_DIR, 'cairn-orb', orbName)))
+        if (
+          exists ||
+          existsSync(join(orbEnv.XDG_RUNTIME_DIR, 'cairn-orb', runtimeNamespace, orbName))
+        )
           throw new Error('Scratch Orb container already exists; refusing to adopt it');
-        record({ kind: 'container', name: orbName });
+        record({
+          kind: 'container',
+          name: orbName,
+          ownerId: registration.machineId,
+          runtimeNamespace,
+        });
       } else if (executor === 'orb') {
         const images = await runCommand(
           'machinectl',

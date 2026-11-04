@@ -65,8 +65,13 @@ function validResource(resource, scratchPrefix) {
       typeof resource.startTime === 'string' &&
       resource.startTime.length > 0
     );
-  if (resource.kind === 'machine' || resource.kind === 'container')
-    return /^cairn-orb-[a-f0-9-]{36}$/.test(resource.name);
+  if (resource.kind === 'container')
+    return (
+      /^cairn-orb-[a-f0-9-]{36}$/.test(resource.name) &&
+      /^[A-Za-z0-9_-]{1,128}$/.test(resource.ownerId ?? '') &&
+      /^[a-f0-9]{16}$/.test(resource.runtimeNamespace ?? '')
+    );
+  if (resource.kind === 'machine') return /^cairn-orb-[a-f0-9-]{36}$/.test(resource.name);
   if (resource.kind === 'seed')
     return (
       typeof resource.path === 'string' &&
@@ -92,7 +97,12 @@ function cleanupResource(resource) {
   if (resource.kind === 'container') {
     const result = spawnSync(
       process.execPath,
-      [join(import.meta.dirname, 'container-cleanup.mjs'), resource.name],
+      [
+        join(import.meta.dirname, 'container-cleanup.mjs'),
+        resource.name,
+        resource.ownerId,
+        resource.runtimeNamespace,
+      ],
       { encoding: 'utf8', timeout: 180000 },
     );
     if (result.status !== 0) throw new Error('Recorded scratch container cleanup failed');

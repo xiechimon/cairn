@@ -537,6 +537,7 @@ test('runCanary under the podman runtime plants sentinels, passes the container 
     runCanary({
       home,
       runtime: 'podman',
+      egressSocketPath: SOCKET,
       preflight: async () => ({ tailnetAddress: '203.0.113.7' }),
       stackFactory: async (input) => {
         seen = input.config;
@@ -553,8 +554,27 @@ test('runCanary under the podman runtime plants sentinels, passes the container 
   );
   assert.equal(seen.runtime, 'podman');
   assert.equal(seen.hostUid, process.getuid());
-  assert.ok(seen.realPaths.includes(`/run/user/${process.getuid()}`));
+  assert.ok(!seen.realPaths.includes(`/run/user/${process.getuid()}`));
+  assert.ok(seen.realPaths.includes(SOCKET));
   assert.ok(sentinels.every(({ path }) => !existsSync(path)));
+});
+
+test('container runtime isolation requires the actual host relay socket path before planting', async (t) => {
+  const home = realpathSync(makeTestTempDir('orb-canary-container-home-'));
+  t.after(() => releaseTestTempDir(home));
+  mkdirSync(join(home, '.cairn'));
+  for (const egressSocketPath of ['', 'relative.sock']) {
+    await assert.rejects(
+      runCanary({
+        home,
+        runtime: 'podman',
+        egressSocketPath,
+        preflight: async () => assert.fail('invalid relay path must fail before preflight'),
+      }),
+      /CAIRN_ORB_EGRESS_SOCKET/,
+    );
+  }
+  assert.deepEqual(readdirSync(join(home, '.cairn')), []);
 });
 
 test('runCanary refuses an unknown runtime before planting anything', async (t) => {
@@ -573,8 +593,18 @@ test('runCanary refuses an unknown runtime before planting anything', async (t) 
 });
 
 const NAME = 'cairn-orb-019a3f00-0000-7000-8000-000000000001';
+const OWNER = 'scratch-machine';
+const NAMESPACE = 'a'.repeat(16);
+const CONTAINER_ID = 'b'.repeat(64);
 
-function fakeCleanup({ label = '1', present = true, rmStatus = 0 } = {}) {
+function fakeCleanup({
+  label = '1',
+  owner = OWNER,
+  conversation = NAME.slice(10),
+  id = CONTAINER_ID,
+  present = true,
+  rmStatus = 0,
+} = {}) {
   const calls = [];
   let exists = present;
   return {
@@ -585,7 +615,23 @@ function fakeCleanup({ label = '1', present = true, rmStatus = 0 } = {}) {
       if (args[0] === 'container' && args[1] === 'exists')
         return { status: exists ? 0 : 1, stdout: '' };
       if (args[0] === 'container' && args[1] === 'inspect')
-        return { status: 0, stdout: `${label}\n` };
+        return {
+          status: 0,
+          stdout: args.includes('--format')
+            ? `${label}\n`
+            : JSON.stringify([
+                {
+                  Id: id,
+                  Config: {
+                    Labels: {
+                      'cairn.orb': label,
+                      'cairn.owner': owner,
+                      'cairn.conversation': conversation,
+                    },
+                  },
+                },
+              ]),
+        };
       if (args[0] === 'rm') {
         if (rmStatus === 0) exists = false;
         return { status: rmStatus, stdout: '', stderr: 'rm failed' };
@@ -598,19 +644,26 @@ function fakeCleanup({ label = '1', present = true, rmStatus = 0 } = {}) {
 test('container cleanup force-removes exactly the labelled scratch container and its runtime directory', (t) => {
   const runtime = makeTestTempDir('orb-container-cleanup-');
   t.after(() => releaseTestTempDir(runtime));
-  const directory = join(runtime, 'cairn-orb', NAME);
+  const directory = join(runtime, 'cairn-orb', NAMESPACE, NAME);
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, 'relay.sock.token'), 'x');
   const { run, calls } = fakeCleanup();
   const errors = [];
   assert.equal(
-    cleanupCanaryContainer({ name: NAME, run, runtimeDirectory: runtime, errors }),
+    cleanupCanaryContainer({
+      name: NAME,
+      ownerId: OWNER,
+      runtimeNamespace: NAMESPACE,
+      run,
+      runtimeDirectory: runtime,
+      errors,
+    }),
     true,
   );
   assert.deepEqual(errors, []);
   assert.deepEqual(
     calls.filter((call) => call[1] === 'rm'),
-    [['podman', 'rm', '--force', '--ignore', '--time', '5', NAME]],
+    [['podman', 'rm', '--force', '--ignore', '--time', '5', CONTAINER_ID]],
   );
   assert.equal(existsSync(directory), false);
 });
@@ -619,7 +672,14 @@ test('container cleanup refuses a container without the cairn.orb label', () => 
   const { run, calls } = fakeCleanup({ label: '' });
   const errors = [];
   assert.equal(
-    cleanupCanaryContainer({ name: NAME, run, runtimeDirectory: '/nonexistent', errors }),
+    cleanupCanaryContainer({
+      name: NAME,
+      ownerId: OWNER,
+      runtimeNamespace: NAMESPACE,
+      run,
+      runtimeDirectory: '/nonexistent',
+      errors,
+    }),
     false,
   );
   assert.ok(!calls.some((call) => call[1] === 'rm'));
@@ -639,6 +699,8 @@ test('container cleanup refuses names other than a scratch Thread container', ()
       () =>
         cleanupCanaryContainer({
           name,
+          ownerId: OWNER,
+          runtimeNamespace: NAMESPACE,
           run: () => assert.fail('no command'),
           runtimeDirectory: '/x',
         }),
@@ -649,12 +711,19 @@ test('container cleanup refuses names other than a scratch Thread container', ()
 test('container cleanup reports a failed removal and leaves the runtime directory', (t) => {
   const runtime = makeTestTempDir('orb-container-cleanup-');
   t.after(() => releaseTestTempDir(runtime));
-  const directory = join(runtime, 'cairn-orb', NAME);
+  const directory = join(runtime, 'cairn-orb', NAMESPACE, NAME);
   mkdirSync(directory, { recursive: true });
   const { run } = fakeCleanup({ rmStatus: 1 });
   const errors = [];
   assert.equal(
-    cleanupCanaryContainer({ name: NAME, run, runtimeDirectory: runtime, errors }),
+    cleanupCanaryContainer({
+      name: NAME,
+      ownerId: OWNER,
+      runtimeNamespace: NAMESPACE,
+      run,
+      runtimeDirectory: runtime,
+      errors,
+    }),
     false,
   );
   assert.ok(errors.length > 0);
@@ -666,7 +735,14 @@ test('container cleanup of an absent container only removes a leftover runtime d
   t.after(() => releaseTestTempDir(runtime));
   const { run, calls } = fakeCleanup({ present: false });
   assert.equal(
-    cleanupCanaryContainer({ name: NAME, run, runtimeDirectory: runtime, errors: [] }),
+    cleanupCanaryContainer({
+      name: NAME,
+      ownerId: OWNER,
+      runtimeNamespace: NAMESPACE,
+      run,
+      runtimeDirectory: runtime,
+      errors: [],
+    }),
     true,
   );
   assert.ok(!calls.some((call) => call[1] === 'rm'));
@@ -692,13 +768,61 @@ test('a recorded container is accepted by the inventory, cleaned through podman,
   process.env.PATH = `${bin}:${saved.PATH}`;
   process.env.XDG_RUNTIME_DIR = bin;
   const planted = plantSentinels(home, 'recovery');
-  planted.record({ kind: 'container', name: NAME });
+  planted.record({ kind: 'container', name: NAME, ownerId: OWNER, runtimeNamespace: NAMESPACE });
   for (const name of ['cairn-orb-base', `${NAME};rm`, 'cairn-orb-check-abcd1234', undefined])
-    assert.throws(() => planted.record({ kind: 'container', name }), /inventory/);
+    assert.throws(
+      () =>
+        planted.record({ kind: 'container', name, ownerId: OWNER, runtimeNamespace: NAMESPACE }),
+      /inventory/,
+    );
   planted.cleanup();
   assert.match(
     readFileSync(join(bin, 'podman.log'), 'utf8'),
     new RegExp(`container exists ${NAME}`),
   );
   assert.deepEqual(readdirSync(join(home, '.cairn')), ['orb-canary-runs']);
+});
+
+for (const mismatch of [
+  { owner: 'foreign-machine' },
+  { owner: '' },
+  { conversation: 'foreign-conversation' },
+  { id: 'invalid' },
+]) {
+  test(`container cleanup preserves foreign or unverifiable container ${JSON.stringify(mismatch)}`, () => {
+    const { run, calls } = fakeCleanup(mismatch);
+    const errors = [];
+    assert.equal(
+      cleanupCanaryContainer({
+        name: NAME,
+        ownerId: OWNER,
+        runtimeNamespace: NAMESPACE,
+        run,
+        errors,
+      }),
+      false,
+    );
+    assert.ok(!calls.some((call) => call[1] === 'rm'));
+  });
+}
+
+test('container cleanup requires owner and bounded transport namespace before commands', () => {
+  for (const invalid of [
+    { ownerId: '' },
+    { ownerId: '../owner' },
+    { runtimeNamespace: '../escape' },
+    { runtimeNamespace: '' },
+  ]) {
+    assert.throws(
+      () =>
+        cleanupCanaryContainer({
+          name: NAME,
+          ownerId: OWNER,
+          runtimeNamespace: NAMESPACE,
+          ...invalid,
+          run: () => assert.fail('no command'),
+        }),
+      /owner|namespace/,
+    );
+  }
 });

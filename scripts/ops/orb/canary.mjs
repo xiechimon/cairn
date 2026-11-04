@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { lstatSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { isIPv4 } from 'node:net';
 import { homedir, tmpdir, userInfo } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { expectedTargets, isContainerConfig, networkTargets } from './canary-attacker.mjs';
 import { runCommand, withCleanup } from './canary-process.mjs';
 import { plantSentinels, recoverSentinels, remainingSentinels } from './canary-sentinels.mjs';
@@ -178,12 +178,15 @@ export async function runCanary({
     return { tailnetAddress };
   },
   home = homedir(),
+  egressSocketPath = process.env.CAIRN_ORB_EGRESS_SOCKET,
   stackFactory = startStack,
   runId = process.env.CAIRN_CANARY_RUN_ID ?? randomBytes(12).toString('hex'),
   timeout = 1800000,
 } = {}) {
   if (!['nspawn', 'podman'].includes(runtime))
     throw new Error(`CAIRN_ORB_RUNTIME must be nspawn or podman for the canary (got ${runtime})`);
+  if (runtime === 'podman' && !isAbsolute(egressSocketPath ?? ''))
+    throw new Error('CAIRN_ORB_EGRESS_SOCKET must name the absolute host relay socket path');
   const started = Date.now();
   signal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeout)]);
   try {
@@ -212,7 +215,7 @@ export async function runCanary({
       const secretbox = join(home, '.cairn/secretbox.key');
       if (lstatSync(secretbox, { throwIfNoEntry: false })) realPaths.push(secretbox);
       const hostUid = process.getuid();
-      if (runtime === 'podman') realPaths.push(`/run/user/${hostUid}`);
+      if (runtime === 'podman') realPaths.push(egressSocketPath);
       const config = {
         hostHome: home,
         sentinels: planted.sentinels,
