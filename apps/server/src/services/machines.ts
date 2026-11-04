@@ -6,6 +6,7 @@ import type {
   ClaudeCodeReport,
   MachineAttachmentResponse,
   MachineCapabilities,
+  MachinePresenceBody,
   MachineSkillsManifestResponse,
   StepActivityReport,
   StepRecord,
@@ -26,6 +27,7 @@ import { NotFoundError } from './builds.js';
 import { ackChiefSteer, takeChiefSteer } from './chief-turns.js';
 import { recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
+import { applyComputerPresence } from './machine-computer-presence.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -392,7 +394,7 @@ export function authorizeEnrollmentMachine(
 export function markPresence(
   deps: MachineDeps,
   machineId: string,
-  body: { cliVersion?: string; claudeCode?: ClaudeCodeReport; capabilities?: unknown },
+  body: MachinePresenceBody,
 ): void {
   const { db, hub } = deps;
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
@@ -415,7 +417,8 @@ export function markPresence(
     })
     .where(eq(machine.id, machineId))
     .run();
-  if (becameOnline || loginChanged) {
+  const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
+  if (becameOnline || loginChanged || computerChanged) {
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: true }));
   }
 }

@@ -28,6 +28,7 @@ import {
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import { rejectComputerCall } from './computer/dispatch.js';
+import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -69,6 +70,7 @@ export interface MachineLoopOpts {
   claimTimeoutMs?: number;
   presenceIntervalMs?: number;
   presenceTimeoutMs?: number;
+  computerPresence?: ComputerPresenceSource;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
@@ -290,11 +292,43 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
 
-  await client.presence({
-    cliVersion: DAEMON_VERSION,
-    claudeCode: claudeReport(),
-    capabilities: capabilitiesReport(),
+  let networkFailures = 0;
+  const presenceReporter = new ComputerPresenceReporter({
+    source: opts.computerPresence,
+    body: () => ({
+      cliVersion: DAEMON_VERSION,
+      claudeCode: claudeReport(),
+      capabilities: capabilitiesReport(),
+    }),
+    timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
+    send: (body, signal) => client.presence(body, signal),
+    onSuccess: () => {
+      networkFailures = 0;
+    },
+    onFailure: (err) => {
+      if (err instanceof MachineApiError) {
+        networkFailures = 0;
+      } else {
+        networkFailures += 1;
+        if (networkFailures >= DISPATCHER_RESET_FAILURE_THRESHOLD) {
+          networkFailures = 0;
+          proxyHandle.reset();
+          logger.machine(
+            `http dispatcher reset after ${DISPATCHER_RESET_FAILURE_THRESHOLD} network failures`,
+          );
+        }
+      }
+    },
+    onError: (err) => {
+      logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
+    },
   });
+  try {
+    await presenceReporter.send();
+  } catch (error) {
+    await presenceReporter.close();
+    throw error;
+  }
   logger.raw(`Online (machineId=${machineId}); polling ${config.serverUrl}`);
 
   let localCap = 1;
@@ -600,48 +634,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   })();
 
-  const presenceTimeoutMs = opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS;
-  let networkFailures = 0;
-  const sendPresence = async () => {
-    let timer: NodeJS.Timeout | undefined;
-    const timedOut = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`presence timed out after ${presenceTimeoutMs}ms`)),
-        presenceTimeoutMs,
-      );
-    });
-    try {
-      await Promise.race([
-        client.presence({
-          cliVersion: DAEMON_VERSION,
-          claudeCode: claudeReport(),
-          capabilities: capabilitiesReport(),
-        }),
-        timedOut,
-      ]);
-      networkFailures = 0;
-    } catch (err) {
-      if (err instanceof MachineApiError) {
-        networkFailures = 0;
-      } else {
-        networkFailures += 1;
-        if (networkFailures >= DISPATCHER_RESET_FAILURE_THRESHOLD) {
-          networkFailures = 0;
-          proxyHandle.reset();
-          logger.machine(
-            `http dispatcher reset after ${DISPATCHER_RESET_FAILURE_THRESHOLD} network failures`,
-          );
-        }
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
-  };
   const presenceTimer = setInterval(() => {
     void refreshCap();
     void probeAuthAndRemember()
-      .then(sendPresence)
+      .then(() => presenceReporter.send())
       .catch((err: unknown) => {
         logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
       });
@@ -750,6 +746,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     streamCtrl.abort();
     claimCtrl.abort();
     caffeinate?.kill();
+    await presenceReporter.close();
   }
 
   return { machineId, stop, done };
