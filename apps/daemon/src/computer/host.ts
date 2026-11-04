@@ -187,6 +187,8 @@ export class HostComputerProvider implements ComputerProvider {
   }
 
   async execute(request: ComputerExecuteRequest): Promise<AsyncIterable<ComputerProcessEvent>> {
+    const deadlineAt = Date.now() + request.timeoutMs;
+    const timeoutMessage = `command timed out after ${request.timeoutMs} ms; process tree killed`;
     const cwd = await this.resolveInHome(request.cwd, 'cwd');
     const info = await stat(cwd).catch(() => undefined);
     if (!info?.isDirectory()) throw new ComputerRefusal('cwd is not an existing directory');
@@ -196,6 +198,13 @@ export class HostComputerProvider implements ComputerProvider {
       return immediate([
         { kind: 'stderr', text: 'command aborted\n' },
         { kind: 'exit', code: 130, reason: 'aborted' },
+      ]);
+    }
+    const remaining = deadlineAt - Date.now();
+    if (remaining <= 0) {
+      return immediate([
+        { kind: 'stderr', text: `${timeoutMessage}\n` },
+        { kind: 'exit', code: 124, reason: 'timeout' },
       ]);
     }
 
@@ -241,15 +250,7 @@ export class HostComputerProvider implements ComputerProvider {
       finish(code, reason, note);
     };
     const abort = () => void terminate(130, 'aborted', 'command aborted');
-    const timeout = setTimeout(
-      () =>
-        void terminate(
-          124,
-          'timeout',
-          `command timed out after ${request.timeoutMs} ms; process tree killed`,
-        ),
-      request.timeoutMs,
-    );
+    const timeout = setTimeout(() => void terminate(124, 'timeout', timeoutMessage), remaining);
     timeout.unref();
     const handle = { stop: () => terminate(130, 'aborted', 'command stopped') };
     this.running.add(handle);

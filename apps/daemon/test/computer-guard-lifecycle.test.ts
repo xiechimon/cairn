@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
+import { createComputerDispatcher } from '../src/computer/dispatch.js';
+import type { ComputerFrameBody } from '../src/computer/frame-poster.js';
 import { protectedComputerLifecycleRefusal } from '../src/computer/guard.js';
 
 describe('host lifecycle guard syntax and actions', () => {
@@ -92,6 +94,16 @@ const lifecycleUnits = [
     'rescue',
     'emergency',
     'ctrl-alt-del',
+    'runlevel0',
+    'runlevel1',
+    'runlevel6',
+    'runlevelS',
+    'final',
+    'umount',
+    'factory-reset',
+    'factory-reset-now',
+    'system-update',
+    'system-update-pre',
   ].map((name) => `${name}.target`),
   ...[
     'systemd-halt',
@@ -104,6 +116,10 @@ const lifecycleUnits = [
     'systemd-hibernate',
     'systemd-hybrid-sleep',
     'systemd-suspend-then-hibernate',
+    'systemd-factory-reset-request',
+    'systemd-factory-reset-reboot',
+    'systemd-factory-reset-complete',
+    'system-update-cleanup',
     'rescue',
     'emergency',
   ].flatMap((name) => [name, `${name}.service`]),
@@ -146,6 +162,7 @@ describe('host lifecycle unit boundary', () => {
     'systemctl start "rebo*.target"',
     'systemctl start "[rp]*.target"',
     'systemctl start "systemd-suspend*"',
+    'systemctl start "runlevel*.target"',
     'systemctl --machine status start reboot.target',
     'systemctl --machine=status start reboot.target',
     'systemctl --host status start reboot.target',
@@ -159,6 +176,20 @@ describe('host lifecycle unit boundary', () => {
     expect(protectedComputerLifecycleRefusal(command)).toBe('host power command');
   });
 
+  test.each(['*', 'x'])('fails closed on an overlength unit operand made of %s', (character) => {
+    const command = `systemctl start "${character.repeat(70000)}"`;
+    expect(protectedComputerLifecycleRefusal(command)).toBe('host power command');
+  });
+
+  test.each(['*', 'x'])(
+    'preserves read-only inspection with an overlength %s operand',
+    (character) => {
+      expect(
+        protectedComputerLifecycleRefusal(`systemctl status "${character.repeat(70000)}"`),
+      ).toBeUndefined();
+    },
+  );
+
   test.each([
     'systemctl --property ActiveState show reboot.target',
     'systemctl --property=ActiveState show reboot.target',
@@ -169,7 +200,66 @@ describe('host lifecycle unit boundary', () => {
     'systemctl start postgresql.service',
     'systemctl enable --now postgresql.service',
     'service postgresql start',
+    'systemctl start runlevel2.target',
+    'systemctl start runlevel3.target',
+    'systemctl start runlevel4.target',
+    'systemctl start runlevel5.target',
+    'systemctl start sigpwr.target',
+    'systemctl start kbrequest.target',
   ])('retains known read-only options and unrelated service activation: %s', (command) => {
     expect(protectedComputerLifecycleRefusal(command)).toBeUndefined();
   });
 });
+
+test.each(['direct', 'nested', 'heredoc'] as const)(
+  'an overlength unit mutation produces one terminal refusal through %s inspection',
+  async (mode) => {
+    const mutation = `systemctl start "${'*'.repeat(70000)}"`;
+    const command =
+      mode === 'nested'
+        ? `bash -c '${mutation}'`
+        : mode === 'heredoc'
+          ? `cat > script <<'EOF'\n${mutation}\nEOF`
+          : mutation;
+    let executed = 0;
+    const frames: ComputerFrameBody[] = [];
+    const dispatcher = createComputerDispatcher({
+      host: {
+        async execute() {
+          executed += 1;
+          return (async function* () {
+            yield { kind: 'exit' as const, code: 0 };
+          })();
+        },
+        async listFiles() {
+          return [];
+        },
+        async readFile() {
+          return '';
+        },
+        async writeFile() {},
+        async killAll() {},
+      },
+      client: {
+        async computerFrames(_callId, body) {
+          frames.push(...body.frames);
+          return { ok: true, cancelled: false };
+        },
+      },
+    });
+    try {
+      await dispatcher.dispatch({
+        callId: 'c'.repeat(64),
+        stepId: 'step',
+        tool: 'user_computer_shell',
+        params: { command },
+        deadlineAt: Date.now() + 60000,
+      });
+      expect(executed).toBe(0);
+      expect(frames).toHaveLength(1);
+      expect(frames[0]).toMatchObject({ kind: 'error', delivery: 'not_delivered' });
+    } finally {
+      await dispatcher.close();
+    }
+  },
+);

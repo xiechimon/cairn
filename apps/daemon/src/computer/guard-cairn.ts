@@ -1,6 +1,7 @@
 import { matchesGlob } from 'node:path';
 
 const SYSTEMCTL_NAMES = /^(?:systemctl|service)$/;
+const MAX_UNIT_PATTERN_CHARS = 65_536;
 const LIFECYCLE_UNITS = [
   ...[
     'halt',
@@ -18,7 +19,17 @@ const LIFECYCLE_UNITS = [
     'rescue',
     'emergency',
     'ctrl-alt-del',
-  ].map((name) => `${name}.target`),
+    'runlevel0',
+    'runlevel1',
+    'runlevel6',
+    'runlevelS',
+    'final',
+    'umount',
+    'factory-reset',
+    'factory-reset-now',
+    'system-update',
+    'system-update-pre',
+  ].map((name) => `${name}.target`.toLowerCase()),
   ...[
     'systemd-halt',
     'systemd-poweroff',
@@ -30,6 +41,10 @@ const LIFECYCLE_UNITS = [
     'systemd-hibernate',
     'systemd-hybrid-sleep',
     'systemd-suspend-then-hibernate',
+    'systemd-factory-reset-request',
+    'systemd-factory-reset-reboot',
+    'systemd-factory-reset-complete',
+    'system-update-cleanup',
     'rescue',
     'emergency',
   ].flatMap((name) => [name, `${name}.service`]),
@@ -57,8 +72,13 @@ function basename(word: string): string {
 }
 
 function isLifecycleUnit(word: string): boolean {
+  if (word.length > MAX_UNIT_PATTERN_CHARS) return true;
   const pattern = basename(word);
-  return LIFECYCLE_UNITS.some((unit) => matchesGlob(unit, pattern));
+  try {
+    return LIFECYCLE_UNITS.some((unit) => matchesGlob(unit, pattern));
+  } catch {
+    return true;
+  }
 }
 
 function isReadOnlySystemctl(words: readonly string[], managerIndex: number): boolean {

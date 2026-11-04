@@ -126,18 +126,18 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (poster.abandoned) return;
     const reason = controller.signal.reason;
-    if (controller.signal.aborted) {
-      const message =
-        reason === 'shutdown'
-          ? 'The daemon shut down while the command ran; its process tree was killed'
-          : 'The call was cancelled and its process tree was killed';
-      await poster.finish({ kind: 'error', message, delivery: 'unknown' });
-    } else if (exit?.reason === 'timeout') {
+    if (reason === 'timeout' || exit?.reason === 'timeout') {
       await poster.finish({
         kind: 'error',
         message: `Command timed out after ${timeoutMs} ms and its process tree was killed`,
         delivery: 'unknown',
       });
+    } else if (controller.signal.aborted) {
+      const message =
+        reason === 'shutdown'
+          ? 'The daemon shut down while the command ran; its process tree was killed'
+          : 'The call was cancelled and its process tree was killed';
+      await poster.finish({ kind: 'error', message, delivery: 'unknown' });
     } else {
       const code = exit?.code ?? null;
       await poster.finish({
@@ -169,13 +169,22 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, desktopProtectionGuardMessage(refusal));
       return;
     }
-    const budget = remaining - FINAL_FRAME_MARGIN_MS;
-    if (budget < MIN_COMMAND_TIMEOUT_MS) {
+    const executionDeadline = Math.min(
+      now() + (options.commandTimeoutMs ?? COMPUTER_COMMAND_TIMEOUT_MS),
+      call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+    );
+    const timeoutMs = Math.max(0, executionDeadline - now());
+    if (call.deadlineAt - FINAL_FRAME_MARGIN_MS - now() < MIN_COMMAND_TIMEOUT_MS) {
       await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
       return;
     }
-    const timeoutMs = Math.min(options.commandTimeoutMs ?? COMPUTER_COMMAND_TIMEOUT_MS, budget);
-    await runShell(call, host, params.data, timeoutMs, controller);
+    const deadlineTimer = setTimeout(() => controller.abort('timeout'), timeoutMs);
+    deadlineTimer.unref();
+    try {
+      await runShell(call, host, params.data, timeoutMs, controller);
+    } finally {
+      clearTimeout(deadlineTimer);
+    }
   }
 
   return {
