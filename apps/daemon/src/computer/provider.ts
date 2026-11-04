@@ -1,6 +1,6 @@
 export type ComputerProcessEvent =
   | { kind: 'stdout' | 'stderr'; text: string }
-  | { kind: 'exit'; code: number; reason?: 'timeout' | 'aborted' };
+  | { kind: 'exit'; code: number; reason?: 'timeout' | 'aborted'; delivery?: 'not_delivered' };
 
 export interface ComputerExecuteRequest {
   argv: readonly string[];

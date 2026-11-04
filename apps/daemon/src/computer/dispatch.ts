@@ -157,20 +157,35 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     host: ComputerProvider,
     params: z.infer<typeof shellParams>,
     timeoutMs: number,
+    executionDeadline: number,
     controller: AbortController,
   ): Promise<void> {
     const poster = posterFor(call, controller);
     let events: AsyncIterable<ComputerProcessEvent>;
+    const setupTimer = setTimeout(
+      () => controller.abort('timeout'),
+      Math.max(0, executionDeadline - now()),
+    );
+    setupTimer.unref();
     try {
-      events = await host.execute({
-        argv: ['bash', '-lc', params.command],
-        ...(params.cwd !== undefined ? { cwd: params.cwd } : {}),
-        timeoutMs,
-        signal: controller.signal,
-      });
+      try {
+        events = await host.execute({
+          argv: ['bash', '-lc', params.command],
+          ...(params.cwd !== undefined ? { cwd: params.cwd } : {}),
+          timeoutMs,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(setupTimer);
+      }
     } catch (error) {
-      const message =
-        error instanceof ComputerRefusal ? error.message : 'The command could not be started';
+      const message = controller.signal.aborted
+        ? controller.signal.reason === 'timeout'
+          ? 'The command timed out before it could be started'
+          : 'The command was cancelled before it could be started'
+        : error instanceof ComputerRefusal
+          ? error.message
+          : 'The command could not be started';
       await poster.finish({ kind: 'error', message, delivery: 'not_delivered' });
       return;
     }
@@ -194,7 +209,16 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (poster.abandoned) return;
     const reason = controller.signal.reason;
-    if (reason === 'timeout' || exit?.reason === 'timeout') {
+    if (exit?.delivery === 'not_delivered') {
+      await poster.finish({
+        kind: 'error',
+        message:
+          exit.reason === 'timeout'
+            ? 'The command timed out before it could be started'
+            : 'The command was cancelled before it could be started',
+        delivery: 'not_delivered',
+      });
+    } else if (reason === 'timeout' || exit?.reason === 'timeout') {
       await poster.finish({
         kind: 'error',
         message: `Command timed out after ${timeoutMs} ms and its process tree was killed`,
@@ -245,13 +269,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
       return;
     }
-    const deadlineTimer = setTimeout(() => controller.abort('timeout'), timeoutMs);
-    deadlineTimer.unref();
-    try {
-      await runShell(call, route.provider, params.data, timeoutMs, controller);
-    } finally {
-      clearTimeout(deadlineTimer);
-    }
+    await runShell(call, route.provider, params.data, timeoutMs, executionDeadline, controller);
   }
 
   async function fileText(
