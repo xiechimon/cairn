@@ -88,7 +88,11 @@ check_lag() {
   open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$LAG_TITLE\" in:title" --json number --jq '.[0].number // empty')"
   if [ "$deployed" = "$head" ]; then
     if [ -n "$open_issue" ]; then
-      gh issue close "$open_issue" -R "$REPO" -c "Caught up: omarchy runs $head." >/dev/null && log "closed lag issue #$open_issue"
+      if ! gh issue close "$open_issue" -R "$REPO" -c "Caught up: omarchy runs $head." >/dev/null; then
+        log "failed to close lag issue #$open_issue"
+        return 1
+      fi
+      log "closed lag issue #$open_issue"
     fi
     return 0
   fi

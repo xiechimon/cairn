@@ -110,7 +110,12 @@ function fixture({ claimed = 0 } = {}) {
   );
   for (let i = 0; i < claimed; i++) sqlite(db, `insert into step values ('s${i}', 'claimed')`);
 
-  fakeTool(bin, 'gh-wrapper', 'exec env GH_TOKEN=fixture-scoped-app-token "$@"');
+  fakeTool(
+    bin,
+    'gh-wrapper',
+    `"${process.execPath}" "${join(import.meta.dirname, 'host/tools/app-token/as-bot-policy.mjs')}" "$@" || exit $?
+exec env GH_TOKEN=fixture-scoped-app-token "$@"`,
+  );
 
   fakeTool(
     bin,
@@ -125,6 +130,7 @@ case "$1 $2" in
     if [[ "$*" == *autonomy-paused* ]]; then cat "${fake}/paused" 2>/dev/null || echo 0
     else cat "${fake}/lag-issue" 2>/dev/null || true; fi ;;
   "issue create") echo "https://github.com/x/y/issues/77" ;;
+  "issue close") [ ! -f "${fake}/lag-close-fail" ] || exit 1 ;;
 esac`,
   );
   fakeTool(
@@ -830,3 +836,14 @@ for (const script of [DEPLOY, WATCH]) {
     );
   });
 }
+
+test('watch reports failed lag recovery when the identified issue cannot be closed', () => {
+  const f = fixture();
+  writeFileSync(join(f.fake, 'lag-issue'), '77\n');
+  writeFileSync(join(f.fake, 'lag-close-fail'), '');
+  const result = f.run(WATCH, [], { CAIRN_DEPLOY_SCRIPT: DEPLOY });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /failed to close lag issue #77/);
+  assert.doesNotMatch(result.stdout, /closed lag issue/);
+  assert.match(f.log('gh.log'), /issue list .*--author @me .*deploy lag/);
+});
