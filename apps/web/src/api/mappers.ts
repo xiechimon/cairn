@@ -649,7 +649,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (classifyUserText(text, todo) !== 'user') continue;
-      entries.push({ at: m.createdAt, item: { kind: 'user', text, markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },
+      });
       continue;
     }
     if (m.role === 'system') {
@@ -698,7 +701,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       continue;
     }
     if (text !== '') {
-      entries.push({ at: m.createdAt, item: { kind: 'robot', markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt },
+      });
       continue;
     }
     const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
@@ -739,8 +745,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const entry of entries) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
-      if (previous?.kind === 'work') previous.steps.push(entry.item.step);
-      else items.push({ kind: 'work', id: entry.item.step.id, steps: [entry.item.step] });
+      if (previous?.kind === 'work') {
+        previous.steps.push(entry.item.step);
+        previous.createdAt = entry.at;
+      } else {
+        items.push({
+          kind: 'work',
+          id: entry.item.step.id,
+          steps: [entry.item.step],
+          createdAt: entry.at,
+        });
+      }
     } else items.push(entry.item);
   }
 
@@ -1488,6 +1503,10 @@ function collectChiefStream(
     pendingTools = [];
   }
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  items.forEach((item, index) => {
+    if (item.kind === 'user' || item.kind === 'robot' || item.kind === 'error')
+      item.createdAt = itemsAt[index] ?? lastAt;
+  });
   const pending = [...pendingIds.keys()].flatMap((id) => {
     const item = pendingById.get(id);
     return item === undefined ? [] : [item];

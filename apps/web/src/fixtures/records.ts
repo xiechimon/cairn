@@ -339,6 +339,7 @@ export type TranscriptItem =
       markdown?: string;
       id?: string;
       at?: string;
+      createdAt?: number;
     }
   | {
       kind: 'robot';
@@ -346,6 +347,7 @@ export type TranscriptItem =
       markdown?: string;
       footer?: RobotFooter;
       id?: string;
+      createdAt?: number;
     }
   | {
       kind: 'streaming';
@@ -359,7 +361,7 @@ export type TranscriptItem =
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
   | { kind: 'plan'; title: string; preview: string; seconds?: number }
-  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean }
+  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean; createdAt?: number }
   | { kind: 'elapsed'; seconds: number }
   | {
       kind: 'note';
@@ -493,7 +495,7 @@ export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
   | (ThreadMessageContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
-  | { kind: 'error'; text: string }
+  | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
   | {
       kind: 'question';
@@ -515,6 +517,7 @@ export type ChiefStreamItem =
       markdown?: string;
       pending?: 'queued' | 'held';
       at?: string;
+      createdAt?: number;
       projectId?: string | null;
     }
   | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
@@ -527,6 +530,7 @@ export type ChiefStreamItem =
       seconds: string;
       tools?: ChiefToolRow[];
       id?: string;
+      createdAt?: number;
       fallbackModel?: string;
       projectId?: string | null;
     }

@@ -86,6 +86,7 @@ const DETAIL = [
   'cds-composer',
   'cds-dialogs',
   'cds-transcript',
+  'turn-folding',
   'checkbox-unified',
   'composer-inline-mention',
   'composer-paste',
