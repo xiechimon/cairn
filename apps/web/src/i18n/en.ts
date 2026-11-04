@@ -1516,6 +1516,7 @@ export const EN: Record<string, string> = {
   '回复 #{seq}': 'Reply to #{seq}',
   '回复 #{seq}…': 'Reply to #{seq}…',
   '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
+  '总管直接对 #{n} 说：{excerpt}': 'The Coordinator told #{n} directly: {excerpt}',
   '对某个 thread 说': 'Talk to a thread',
   '正在对 #{seq} 说': 'Talking to #{seq}',
   发给谁: 'Send to',

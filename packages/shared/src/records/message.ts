@@ -197,7 +197,7 @@ export const THREAD_REPORT_LINE_MAX = 200;
 export const threadReportContentSchema = z.object({
   kind: z.literal('thread-report'),
   todoId: recordId,
-  phase: z.enum(['done', 'failed', 'review']),
+  phase: z.enum(['done', 'failed', 'review', 'needs-you']),
   seqNum: z.number().int().positive(),
   title: z.string(),
   wakeStepId: recordId.optional(),
@@ -219,6 +219,7 @@ export const threadMessageContentSchema = z.object({
   excerpt: z.string().max(THREAD_MESSAGE_EXCERPT_MAX),
   delivered: threadMessageDeliverySchema,
   conversationId: recordId,
+  by: z.enum(['user', 'coordinator']).optional(),
 });
 export type ThreadMessageContent = z.infer<typeof threadMessageContentSchema>;
 

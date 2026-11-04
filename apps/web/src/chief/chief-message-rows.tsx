@@ -26,6 +26,7 @@ import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import { ThreadReportReply } from './thread-report-reply.js';
 
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
@@ -186,6 +187,7 @@ interface ChiefStreamRowProps {
   item: ChiefStreamItem;
   index: number;
   latest: boolean;
+  replyable?: boolean;
   bound: ChiefContent['bound'];
   agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
@@ -235,6 +237,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   latest,
+  replyable = false,
   bound,
   agent,
   runningTool,
@@ -252,7 +255,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'thread-report')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
+        <Marker
+          variant="separator"
+          className={MARKER_NOTE_CLS}
+          data-testid="thread-report-marker"
+          data-phase={item.phase}
+        >
           <MarkerContent className={MARKER_CONTENT_CLS}>
             <ThreadLink todoId={item.todoId} className="hover:underline">
               {t('任务 #{n} {title}：{status}', {
@@ -264,6 +272,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {item.line !== undefined && <span className="ml-1.5">{item.line}</span>}
           </MarkerContent>
         </Marker>
+        {item.phase === 'needs-you' && replyable && <ThreadReportReply todoId={item.todoId} />}
       </MessageScrollerItem>
     );
   if (item.kind === 'thread-message')
@@ -272,7 +281,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-message-marker">
           <MarkerContent className={MARKER_CONTENT_CLS}>
             <ThreadLink todoId={item.todoId} className="hover:underline">
-              {t('你直接对 #{n} 说：{excerpt}', { n: item.seqNum, excerpt: item.excerpt })}
+              {t(
+                item.by === 'coordinator'
+                  ? '总管直接对 #{n} 说：{excerpt}'
+                  : '你直接对 #{n} 说：{excerpt}',
+                { n: item.seqNum, excerpt: item.excerpt },
+              )}
             </ThreadLink>
           </MarkerContent>
         </Marker>

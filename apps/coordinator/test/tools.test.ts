@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ASK_REQUEST_ID_PATTERN, CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { ASK_REQUEST_ID_PATTERN, CHIEF_REMOTE_TOOLS, CHIEF_ROUTER_TOOLS } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -63,6 +63,25 @@ describe('coordinator tools', () => {
     }
     for (const reading of ['todos', 'read_history', 'search_history']) {
       expect(tools.find((t) => t.name === reading)?.replay).toBe('safe');
+    }
+  });
+
+  it('offers the router tools only when asked, with the replay rule of their shared definitions', () => {
+    const plain = coordinatorToolsExtension(fakeMachineApi(), createStepGate()).tools ?? [];
+    for (const def of CHIEF_ROUTER_TOOLS) {
+      expect(plain.map((t) => t.name)).not.toContain(def.name);
+    }
+    const routed =
+      coordinatorToolsExtension(fakeMachineApi(), createStepGate(), { routerTools: true }).tools ??
+      [];
+    expect(routed.map((t) => t.name).sort()).toEqual(
+      [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS].map((t) => t.name).sort(),
+    );
+    for (const def of CHIEF_ROUTER_TOOLS) {
+      expect({ name: def.name, replay: routed.find((t) => t.name === def.name)?.replay }).toEqual({
+        name: def.name,
+        replay: def.replaySafe === true ? 'safe' : 'unsafe',
+      });
     }
   });
 
