@@ -173,6 +173,8 @@ import {
   splitBlockersSatisfied,
 } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
+import { blockingWorkerQuestions, cancelPendingWorkerQuestions } from './worker-question-store.js';
+import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
   intakeAgentAllowlist?: readonly string[];
@@ -263,6 +265,7 @@ function continuationTodo(
   const resumable =
     row?.phase === 'done' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
+    (row?.awaitingReply === true && (row.phase === 'building' || row.phase === 'planning')) ||
     (options.afterTurn === true &&
       row !== undefined &&
       (['planning', 'building', 'confirm', 'review', 'failed'].includes(row.phase) ||
@@ -401,6 +404,7 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
+      if (human) settleWorkerReply(deps, conversationId, body.content);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
         actor: human ? deps.user.displayName : null,
@@ -574,6 +578,22 @@ function hasLeftExecution(phase: Phase): boolean {
   return phase === 'closed' || phase === 'done' || phase === 'todo';
 }
 
+function dropQuestionOnPhaseChange(
+  deps: BuildDeps,
+  todoRow: typeof todo.$inferSelect,
+  to: Phase,
+): { awaitingReply?: false } {
+  if (!todoRow.awaitingReply || to === 'review') return {};
+  if (todoRow.latestBuildId !== null) {
+    cancelPendingWorkerQuestions(
+      deps,
+      todoRow.latestBuildId,
+      'The thread moved on before an answer.',
+    );
+  }
+  return { awaitingReply: false };
+}
+
 function landReservedPhase(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
@@ -582,7 +602,12 @@ function landReservedPhase(
   if (todoRow.phase !== desired) {
     deps.db
       .update(todo)
-      .set({ phase: desired, phaseAt: nowMs(), v: todoRow.v + 1 })
+      .set({
+        ...dropQuestionOnPhaseChange(deps, todoRow, desired),
+        phase: desired,
+        phaseAt: nowMs(),
+        v: todoRow.v + 1,
+      })
       .where(eq(todo.id, todoRow.id))
       .run();
     const record = getTodo(deps, todoRow.id);
@@ -683,7 +708,12 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
-    .set({ phase: target, phaseAt: nowMs(), v: todoRow.v + 1 })
+    .set({
+      ...dropQuestionOnPhaseChange(deps, todoRow, target),
+      phase: target,
+      phaseAt: nowMs(),
+      v: todoRow.v + 1,
+    })
     .where(eq(todo.id, todoRow.id))
     .run();
   const record = getTodo(deps, todoRow.id);
@@ -703,7 +733,12 @@ function releaseZombieQueued(
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
-    .set({ phase: target, phaseAt: nowMs(), v: todoRow.v + 1 })
+    .set({
+      ...dropQuestionOnPhaseChange(deps, todoRow, target),
+      phase: target,
+      phaseAt: nowMs(),
+      v: todoRow.v + 1,
+    })
     .where(eq(todo.id, todoRow.id))
     .run();
   const fresh = db.select().from(build).where(eq(build.id, buildRow.id)).get();
@@ -1103,6 +1138,7 @@ export function maybeEnqueueVerifyStep(
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
   if (verifyAgentId == null) return;
+  if (blockingWorkerQuestions(deps.db, buildId).length > 0) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
@@ -1144,6 +1180,7 @@ export function maybeEnqueueIndependentReview(
   todoRow: TodoRow,
   buildId: string,
 ): void {
+  if (blockingWorkerQuestions(deps.db, buildId).length > 0) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined || githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
   const head = dispatchHeadSha(deps, buildId);
@@ -2651,6 +2688,12 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (isBuildStepKind(stepRow.kind)) {
+    if (
+      stepRow.kind === 'session' &&
+      blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0
+    ) {
+      return null;
+    }
     if (outcome.output === 'info') {
       return outcome.report === undefined ? '信息卡未产出报告' : null;
     }

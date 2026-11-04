@@ -61,6 +61,7 @@ import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
 import { buildVerified } from './verified.js';
+import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -148,6 +149,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     archivedAt: row.archivedAt,
     snoozedUntil: row.snoozedUntil,
     snoozeMode: row.snoozeMode,
+    ...(row.awaitingReply ? { awaitingReply: true } : {}),
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -335,6 +337,7 @@ export function createTodo(
       orderIndex: (orderRow?.n ?? -1) + 1,
       assignment: input.assignment ?? null,
       latestBuildId: null,
+      awaitingReply: false,
       lastRunAt: null,
       hasChanges: false,
       hasPlan: false,
@@ -573,7 +576,13 @@ export function setTodoPhase(
   extra: Partial<
     Pick<
       TodoRow,
-      'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'assignment' | 'routeOverride'
+      | 'hasChanges'
+      | 'hasPlan'
+      | 'latestBuildId'
+      | 'lastRunAt'
+      | 'assignment'
+      | 'routeOverride'
+      | 'awaitingReply'
     >
   > = {},
   options: { landedMerge?: true } = {},
@@ -597,9 +606,23 @@ export function setTodoPhase(
   }
   assertPhaseTransition(row.phase, to);
   if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
+  const leavesQuestion = row.awaitingReply && to !== 'review' && extra.awaitingReply === undefined;
   return db.transaction(() => {
+    if (leavesQuestion && row.latestBuildId !== null) {
+      cancelPendingWorkerQuestions(
+        deps,
+        row.latestBuildId,
+        'The thread moved on before an answer.',
+      );
+    }
     db.update(todo)
-      .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
+      .set({
+        ...extra,
+        ...(leavesQuestion ? { awaitingReply: false } : {}),
+        phase: to,
+        phaseAt: nowMs(),
+        v: row.v + 1,
+      })
       .where(eq(todo.id, id))
       .run();
     const record = getTodo(deps, id);

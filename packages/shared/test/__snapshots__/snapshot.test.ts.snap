@@ -5840,6 +5840,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "awaitingReply": {
+              "type": "boolean",
+            },
             "blockedBy": {
               "anyOf": [
                 {
@@ -9924,6 +9927,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
           "type": "null",
         },
       ],
+    },
+    "awaitingReply": {
+      "type": "boolean",
     },
     "blockedBy": {
       "anyOf": [

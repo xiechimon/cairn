@@ -399,6 +399,7 @@ export const buildSteerBodySchema = z.object({
   mode: z.literal('queue').optional(),
   deliverAfterStop: z.boolean().optional(),
   cancelQueued: z.boolean().optional(),
+  editQueued: z.boolean().optional(),
   queuedMessageId: recordId.optional(),
   clientMessageId: z.string().min(1).max(200).optional(),
 });
