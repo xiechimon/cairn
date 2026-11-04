@@ -1,0 +1,126 @@
+[
+  {
+    "t": "03:21:07.245",
+    "step": "fake machine is running the work Thread",
+    "data": {
+      "stepId": "wYk3l-ybhGXlsROV5Phxe"
+    }
+  },
+  {
+    "t": "03:21:07.558",
+    "step": "search_threads {query:\"WEBHOOK\"}",
+    "data": [
+      {
+        "id": "SV_ADX64aH1ZJMy5EnCsR",
+        "projectId": "bJM5nfH7pAVwbkGeeVXBK",
+        "title": "Rotate the webhook secret",
+        "status": "building",
+        "kind": "work"
+      }
+    ]
+  },
+  {
+    "t": "03:21:10.606",
+    "step": "wait_thread {timeoutSeconds:3} while running",
+    "data": {
+      "status": "building",
+      "waitTimedOut": true,
+      "ms": 3041
+    }
+  },
+  {
+    "t": "03:21:12.192",
+    "step": "interrupt_thread",
+    "data": {
+      "delegated": true
+    }
+  },
+  {
+    "t": "03:21:12.636",
+    "step": "fake machine polled /api/machine/stop",
+    "data": {
+      "discard": false
+    }
+  },
+  {
+    "t": "03:21:14.011",
+    "step": "fake machine reported the step stopped",
+    "data": {}
+  },
+  {
+    "t": "03:21:14.076",
+    "step": "pending wait_thread returned",
+    "data": {
+      "status": "todo",
+      "waitTimedOut": false,
+      "ms": 3465
+    }
+  },
+  {
+    "t": "03:21:16.778",
+    "step": "interrupt_thread again with no active step",
+    "data": {
+      "isError": true,
+      "body": "error: no active step on this build (stop 只对运行中的任务生效)"
+    }
+  },
+  {
+    "t": "03:21:16.947",
+    "step": "fake machine claimed the Coordinator turn",
+    "data": {
+      "kind": "chief",
+      "chiefStep": "s-naLY1oSg-YMNeN77IxV"
+    }
+  },
+  {
+    "t": "03:21:18.986",
+    "step": "wait_thread on the Coordinator {timeoutSeconds:2}",
+    "data": {
+      "status": "working",
+      "waitTimedOut": true,
+      "ms": 2036
+    }
+  },
+  {
+    "t": "03:21:19.061",
+    "step": "interrupt_thread on the Coordinator",
+    "data": {
+      "delegated": true
+    }
+  },
+  {
+    "t": "03:21:19.273",
+    "step": "fake machine polled /api/machine/stop",
+    "data": {
+      "discard": false
+    }
+  },
+  {
+    "t": "03:21:19.551",
+    "step": "pending Coordinator wait_thread returned",
+    "data": {
+      "status": "idle",
+      "waitTimedOut": false
+    }
+  },
+  {
+    "t": "03:21:19.606",
+    "step": "search_threads {query:\"retry\"}",
+    "data": [
+      {
+        "id": "chief-01a1a493-4324-7b6f-9e03-0cf0bd7c0ce5",
+        "kind": "coordinator",
+        "projectId": "bJM5nfH7pAVwbkGeeVXBK",
+        "title": "Coordinator",
+        "status": "idle"
+      },
+      {
+        "id": "SV_ADX64aH1ZJMy5EnCsR",
+        "projectId": "bJM5nfH7pAVwbkGeeVXBK",
+        "title": "Rotate the webhook secret",
+        "status": "todo",
+        "kind": "work"
+      }
+    ]
+  }
+]
