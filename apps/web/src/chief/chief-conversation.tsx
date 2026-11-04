@@ -66,6 +66,7 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
@@ -479,12 +480,14 @@ export function ChiefConversation({
         ]
       : [],
   );
+  const outstandingReports = outstandingReportIds(chief.stream ?? []);
   const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
       item={item}
       index={i}
       latest={i === latestMessage?.i}
+      replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
       bound={chief.bound}
       agent={chief.agent}
       runningTool={chief.runningTool}

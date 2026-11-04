@@ -27,6 +27,14 @@ describe('direct thread messages in the Coordinator conversation', () => {
     ]);
   });
 
+  test('the mapper keeps the sender on a coordinator-origin marker', () => {
+    expect(
+      mapChiefStream([
+        row('m-coord', JSON.stringify({ ...MARKER, by: 'coordinator' }), 'project-1'),
+      ]),
+    ).toEqual([{ ...MARKER, by: 'coordinator', id: 'm-coord', projectId: 'project-1' }]);
+  });
+
   test('malformed rows stay hidden', () => {
     expect(
       mapChiefStream([
@@ -42,6 +50,13 @@ describe('direct thread messages in the Coordinator conversation', () => {
     const vars = { n: 7, excerpt: 'Split it' };
     expect(translate('zh', EN, key, vars)).toBe('你直接对 #7 说：Split it');
     expect(translate('en', EN, key, vars)).toBe('You told #7 directly: Split it');
+  });
+
+  test('a coordinator-origin marker uses the Coordinator label, not the user label', () => {
+    const key = '总管直接对 #{n} 说：{excerpt}';
+    const vars = { n: 7, excerpt: 'Split it' };
+    expect(translate('zh', EN, key, vars)).toBe('总管直接对 #7 说：Split it');
+    expect(translate('en', EN, key, vars)).toBe('The Coordinator told #7 directly: Split it');
   });
 });
 

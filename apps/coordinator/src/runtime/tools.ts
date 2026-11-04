@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import { CHIEF_REMOTE_TOOLS, type MachineAskBody, type RemoteToolDef } from '@cairn/shared';
+import {
+  CHIEF_REMOTE_TOOLS,
+  CHIEF_ROUTER_TOOLS,
+  type MachineAskBody,
+  type RemoteToolDef,
+} from '@cairn/shared';
 import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
 import type { MachineApi } from '../machine-api.js';
 
@@ -97,9 +102,17 @@ export function coordinatorTool(
   });
 }
 
-export function coordinatorToolsExtension(channel: ToolChannel, gate: StepGate) {
+export function coordinatorToolsExtension(
+  channel: ToolChannel,
+  gate: StepGate,
+  options: { routerTools?: boolean } = {},
+) {
+  const defs =
+    options.routerTools === true
+      ? [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS]
+      : CHIEF_REMOTE_TOOLS;
   return defineExtension({
     name: 'cairn-coordinator-tools',
-    tools: CHIEF_REMOTE_TOOLS.map((def) => coordinatorTool(def, channel, gate)),
+    tools: defs.map((def) => coordinatorTool(def, channel, gate)),
   });
 }
