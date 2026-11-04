@@ -252,6 +252,39 @@ test('sudo is passwordless for user and keeps the proxy variables', () => {
   assert.match(dockerfile, /useradd --uid "\$USER_UID"/);
 });
 
+test('the image build fails unless user can run every tool the repo checks call', () => {
+  const check = dockerfile.match(
+    /for tool in ([^;]+); do runuser -u user -- sh -c 'command -v "\$1"' sh "\$tool"/,
+  );
+  assert.ok(check, 'tool check loop missing');
+  const tools = check[1].trim().split(/\s+/);
+  for (const tool of [
+    'jq',
+    'rsync',
+    'lsof',
+    'patch',
+    'diff',
+    'which',
+    'hostname',
+    'rg',
+    'unzip',
+    'sqlite3',
+    'git',
+    'python3',
+    'node',
+    'pnpm',
+    'claude',
+    'codex',
+    'bwrap',
+    'socat',
+    'tmux',
+    'ss',
+    'flock',
+    'timeout',
+  ])
+    assert.ok(tools.includes(tool), tool);
+});
+
 test('the Dockerfile keeps the nspawn recipe packages, lifecycle script rules and marker', () => {
   for (const name of [
     'base',
@@ -265,6 +298,16 @@ test('the Dockerfile keeps the nspawn recipe packages, lifecycle script rules an
     'python',
     'sudo',
     'tmux',
+    'jq',
+    'rsync',
+    'lsof',
+    'patch',
+    'diffutils',
+    'which',
+    'inetutils',
+    'ripgrep',
+    'unzip',
+    'sqlite',
   ])
     assert.match(dockerfile, new RegExp(`\\b${name}\\b`));
   assert.match(dockerfile, /npm install --global --ignore-scripts /);
