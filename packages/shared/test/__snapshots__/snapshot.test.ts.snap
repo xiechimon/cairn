@@ -7223,6 +7223,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief_summary",
   "computer",
   "computer_call",
+  "feature_flag",
 ]
 `;
 
@@ -7267,6 +7268,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "backup-status.json next to server.db (#2162)",
     "path": "/api/server/backup",
+  },
+  {
+    "method": "POST",
+    "note": "owner releases a feature flag to every user (#2427)",
+    "path": "/api/flags/{key}/release",
   },
   {
     "method": "GET",
