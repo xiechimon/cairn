@@ -126,6 +126,23 @@ describe('worker ask_user on a session step', () => {
     expect(report!.line).not.toMatch(/\s{2}|\n/);
   });
 
+  test('invisible format characters in the question never reach the report line', async () => {
+    const { todoId, stepRow } = startSession(false);
+    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+    await askWorkerQuestion(
+      deps(),
+      claim(stepRow.id),
+      {
+        requestId: REQUEST,
+        questions: [{ ...QUESTIONS[0]!, question: '\uFEFFWhich\u202E export\u200B format?' }],
+      },
+      { holdMs: 0 },
+    );
+    const [line] = questionReports().map((r) => r.line);
+    expect(line).not.toMatch(/[\p{Cc}\p{Cf}]/u);
+    expect(line).toBe('Which export format?');
+  });
+
   test('a short question is the report line verbatim', async () => {
     const { todoId, stepRow } = startSession(false);
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();

@@ -2,7 +2,7 @@ import { type ClaimedStep, WORKER_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { agent as agentTable, build as buildTable } from '../src/db/schema.js';
+import { agent as agentTable, build as buildTable, step as stepTable } from '../src/db/schema.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
@@ -97,6 +97,18 @@ describe('thread_report relay tool', () => {
     const { s, token, step } = await world();
     expect((await relay(s.app, token, step.step.id, { line: 'x'.repeat(201) })).status).toBe(400);
     expect((await relay(s.app, token, step.step.id, { line: ' ' })).status).toBe(400);
+    expect(
+      s.db.select().from(buildTable).where(eq(buildTable.id, step.step.buildId)).get()!.reportLine,
+    ).toBeNull();
+    s.dispose();
+  });
+
+  test('a call on a step that is no longer claimed is a 409 and stores nothing', async () => {
+    const { s, token, step } = await world();
+    s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, step.step.id)).run();
+    const res = await relay(s.app, token, step.step.id, { line: 'late word' });
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain('thread_report requires a currently claimed step');
     expect(
       s.db.select().from(buildTable).where(eq(buildTable.id, step.step.buildId)).get()!.reportLine,
     ).toBeNull();

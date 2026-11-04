@@ -69,6 +69,16 @@ function reports(threadId?: string) {
     }));
 }
 
+describe('thread_report line hygiene', () => {
+  test('bidi overrides and zero-width characters are stripped from the stored line', () => {
+    const { buildId, stepRow } = startSession();
+    recordThreadReportLine(deps(), stepRow, '\uFEFFDone\u202E gnp.exe\u200B tested');
+    const stored = reportLineOf(buildId);
+    expect(stored).not.toMatch(/[\p{Cc}\p{Cf}]/u);
+    expect(stored).toBe('Done gnp.exe tested');
+  });
+});
+
 describe('D65 report line on every thread', () => {
   test.each(['review', 'done', 'failed'] as const)(
     'an unwatched thread reaching %s writes a coordinator report with the session own line',

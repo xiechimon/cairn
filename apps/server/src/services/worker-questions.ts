@@ -47,7 +47,7 @@ function safeBody(text: string | undefined): string {
 
 function tidyReportText(text: string): string {
   return text
-    .replace(/\p{Cc}/gu, ' ')
+    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

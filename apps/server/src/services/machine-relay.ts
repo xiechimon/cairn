@@ -162,6 +162,9 @@ async function executeWorkerMemoryToolCall(
     return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
   }
   if (name === 'thread_report' && row.kind === 'session' && routingRulesEnabled()) {
+    if (row.status !== 'claimed') {
+      throw new HttpError(409, 'thread_report requires a currently claimed step');
+    }
     return recordThreadReportLine(deps, row, params.line);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
