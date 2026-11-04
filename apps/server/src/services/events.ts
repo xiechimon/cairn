@@ -15,15 +15,15 @@ export interface TeamStreamConnection {
 }
 
 export class TeamStreamHub {
-  private readonly byTeam = new Map<string, Set<TeamStreamConnection>>();
+  private readonly byTeam = new Map<string, Map<TeamStreamConnection, string | undefined>>();
 
-  subscribe(teamId: string, conn: TeamStreamConnection): () => void {
+  subscribe(teamId: string, conn: TeamStreamConnection, userId?: string): () => void {
     let set = this.byTeam.get(teamId);
     if (!set) {
-      set = new Set();
+      set = new Map();
       this.byTeam.set(teamId, set);
     }
-    set.add(conn);
+    set.set(conn, userId);
     return () => {
       set?.delete(conn);
       if (set && set.size === 0) this.byTeam.delete(teamId);
@@ -50,10 +50,23 @@ export class TeamStreamHub {
     this.publish(teamId, () => ({ type: 'branch_sync', sync: record }));
   }
 
+  publishPrivate(
+    teamId: string,
+    userId: string,
+    frame: (conn: TeamStreamConnection) => object,
+  ): void {
+    if (!userId) return;
+    const set = this.byTeam.get(teamId);
+    if (!set) return;
+    for (const [conn, subscriberUserId] of set) {
+      if (subscriberUserId === userId) void conn.send(frame(conn));
+    }
+  }
+
   publish(teamId: string, frame: (conn: TeamStreamConnection) => object): void {
     const set = this.byTeam.get(teamId);
     if (!set) return;
-    for (const conn of set) {
+    for (const conn of set.keys()) {
       void conn.send(frame(conn));
     }
   }

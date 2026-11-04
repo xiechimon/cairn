@@ -71,12 +71,16 @@ function connect(s: TestServer, machineId: string): ComputerCall[] {
 
 function watchFeed(s: TestServer): Record<string, unknown>[] {
   const events: Record<string, unknown>[] = [];
-  s.hub.subscribe(s.team.id, {
-    nextSeq: () => 1,
-    send: async (payload) => {
-      events.push(payload as Record<string, unknown>);
+  s.hub.subscribe(
+    s.team.id,
+    {
+      nextSeq: () => 1,
+      send: async (payload) => {
+        events.push(payload as Record<string, unknown>);
+      },
     },
-  });
+    s.user.id,
+  );
   return events;
 }
 

@@ -8,6 +8,11 @@ import {
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall, machine } from '../db/schema.js';
+import {
+  computerCallOwnerUserId,
+  ownedPrivateComputer,
+  privateComputerWhere,
+} from './computer-access.js';
 import { feedOf } from './machine-computer.js';
 
 export function clampCommandsLimit(raw: string | undefined): number {
@@ -16,12 +21,12 @@ export function clampCommandsLimit(raw: string | undefined): number {
   return Math.min(asked, COMPUTER_COMMANDS_LIMIT_MAX);
 }
 
-export function listComputers(db: Db, teamId: string): ComputerRecord[] {
+export function listComputers(db: Db, teamId: string, userId: string): ComputerRecord[] {
   return db
     .select({ row: computer, machineName: machine.name, machineOnline: machine.online })
     .from(computer)
     .innerJoin(machine, eq(machine.id, computer.machineId))
-    .where(eq(computer.teamId, teamId))
+    .where(privateComputerWhere(teamId, userId))
     .orderBy(computer.createdAt, computer.id)
     .all()
     .map(({ row, machineName, machineOnline }) => ({
@@ -33,22 +38,14 @@ export function listComputers(db: Db, teamId: string): ComputerRecord[] {
     }));
 }
 
-export function computerInTeam(db: Db, teamId: string, computerId: string): boolean {
-  return (
-    db
-      .select({ id: computer.id })
-      .from(computer)
-      .where(and(eq(computer.id, computerId), eq(computer.teamId, teamId)))
-      .get() !== undefined
-  );
-}
-
 export function recentComputerCommands(
   db: Db,
   teamId: string,
+  userId: string,
   computerId: string,
   limit: number,
 ): ComputerCommand[] {
+  if (!ownedPrivateComputer(db, teamId, userId, computerId)) return [];
   const rows = db
     .select()
     .from(computerCall)
@@ -64,6 +61,7 @@ export function recentComputerCommands(
     .all();
   return rows
     .reverse()
+    .filter((row) => computerCallOwnerUserId(db, row) === userId)
     .map(feedOf)
     .filter((command): command is ComputerCommand => command !== null);
 }

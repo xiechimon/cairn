@@ -150,7 +150,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       const conn = createSerialConnection((payload) =>
         stream.writeSSE({ data: JSON.stringify(payload) }),
       );
-      const unsubscribe = ctx.hub.subscribe(teamId, conn);
+      const unsubscribe = ctx.hub.subscribe(teamId, conn, ctx.user.id);
       const timer = setInterval(() => {
         void conn.send({ type: 'ping', seq: conn.nextSeq() });
       }, ctx.pingIntervalMs);
