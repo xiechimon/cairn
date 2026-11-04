@@ -1,7 +1,7 @@
 import { canOrchestrate } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useBuildChanges, useChiefThreads } from '../api/hooks.js';
+import { useApiMutations, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -75,10 +75,6 @@ export function useThreadActions({
   const missingTools = useMergeGate(live ? chat.buildAgentId : null);
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
-  const changesQ = useBuildChanges(
-    buildId,
-    live && (phase === 'review' || phase === 'failed' || dialog === 'accept'),
-  );
 
   const guard = (run: () => void) => () => {
     setMenuOpen(false);
@@ -286,7 +282,9 @@ export function useThreadActions({
         onClose={() => setDialog(null)}
         rejectReason={acceptError}
         missingTools={missingTools}
-        substantiveChanges={live ? substantiveChangesOf(changesQ.data, changesQ.isSuccess) : null}
+        substantiveChanges={
+          live ? substantiveChangesOf(chat.changes.reported, chat.changes.settled) : null
+        }
         mergeLocked={phase === 'failed'}
         infoOutput={chat.infoOutput}
         confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}

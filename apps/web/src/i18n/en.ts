@@ -1252,6 +1252,9 @@ export const EN: Record<string, string> = {
     'The chief is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':
     'Firing again only queues one more orchestration round; it will not start sooner.',
+  变更加载失败: 'Failed to load the changes',
+  返回对话: 'Back to conversation',
+  查看变更: 'Show changes',
   任务加载失败: 'Failed to load the task',
   任务不存在或已被删除: 'This task does not exist or was deleted',
   '开始后才能回复 #{seq}': 'Start #{seq} to reply',
