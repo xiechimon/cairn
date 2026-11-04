@@ -131,10 +131,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.body(null, 204);
   });
 
-  app.post('/api/schedules/:id/run', async (c) => {
-    const record = await runScheduleNow(svc, ctx.team.id, c.req.param('id'));
-    return c.json(record);
-  });
+  app.post('/api/schedules/:id/run', (c) =>
+    c.json(runScheduleNow(svc, ctx.team.id, c.req.param('id'))),
+  );
 
   app.get('/api/search', (c) =>
     c.json(search(svc, { teamId: ctx.team.id, q: c.req.query('q') ?? null })),
