@@ -19,6 +19,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/server/backup',
     note: 'backup-status.json next to server.db (#2162)',
   },
+  {
+    method: 'POST',
+    path: '/api/flags/{key}/release',
+    note: 'owner releases a feature flag to every user (#2427)',
+  },
   { method: 'GET', path: '/api/teams/{id}/providers', note: 'presets[] 38 项原样（r3 §2）' },
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },
   { method: 'GET', path: '/api/teams/{id}/models' },

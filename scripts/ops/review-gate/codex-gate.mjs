@@ -1,8 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import {
+  blockingThreads,
+  blockRounds,
   decide,
   GATE_CHECK,
+  HUMAN_LABEL,
+  markPreExisting,
+  preExistingThreads,
   retryStatus,
   reviewRequested,
   STALL_LABEL,
@@ -18,6 +23,10 @@ const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cu
         nodes {
           isResolved
           isOutdated
+          path
+          line
+          startLine
+          diffSide
           comments(first: 1) { nodes { author { login __typename } body url } }
         }
         pageInfo { hasNextPage endCursor }
@@ -67,6 +76,10 @@ function loadThreads(repo, number) {
       threads.push({
         isResolved: node.isResolved,
         isOutdated: node.isOutdated,
+        path: node.path,
+        line: node.line,
+        startLine: node.startLine,
+        diffSide: node.diffSide,
         authorLogin: first?.author?.login ?? '',
         authorType: first?.author?.__typename ?? '',
         body: first?.body ?? '',
@@ -117,7 +130,11 @@ function evaluate(repo, number) {
   const sha = pr.head.sha;
   const comments = listPaged(`repos/${repo}/issues/${number}/comments`);
   const stateEntry = trustedStateComment(comments);
-  const threads = loadThreads(repo, number);
+  const loaded = loadThreads(repo, number);
+  const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
+  const threads = hasFindings
+    ? markPreExisting(loaded, listPaged(`repos/${repo}/pulls/${number}/files`))
+    : loaded;
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
   const check = newestOwnCheck(repo, sha);
   const result = decide(
@@ -130,6 +147,7 @@ function evaluate(repo, number) {
       waitedMs: check ? Date.now() - Date.parse(check.started_at) : 0,
       requested: reviewRequested(comments, sha),
     },
+    blockRounds(comments, sha),
   );
   console.log(
     `PR #${number} ${sha.slice(0, 7)}: ${result.status} ${result.conclusion ?? ''} ${result.title}`,
@@ -139,6 +157,12 @@ function evaluate(repo, number) {
   if (marker)
     ghWrite('POST', `repos/${repo}/issues/${number}/comments`, {
       body: `${marker}\n@codex review`,
+    });
+  if (result.addHuman && !pr.labels.some((label) => label.name === HUMAN_LABEL))
+    ghWrite('POST', `repos/${repo}/issues/${number}/labels`, { labels: [HUMAN_LABEL] });
+  if (result.block)
+    ghWrite('POST', `repos/${repo}/issues/${number}/comments`, {
+      body: `${result.block}\nReview-gate: ${result.title}`,
     });
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
 
