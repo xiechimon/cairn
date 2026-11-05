@@ -86,6 +86,7 @@ test('old resource URLs land on their settings section with the query intact', a
   const cases = [
     ['/app/resources/providers', 'providers'],
     ['/app/resources/model-routing', 'routing'],
+    ['/app/resources/routing-settings', 'work-routing'],
     ['/app/resources/machines', 'machines'],
     ['/app/resources/skills', 'skills'],
     ['/app/resources/mcp-servers', 'mcp'],

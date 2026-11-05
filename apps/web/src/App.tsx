@@ -15,6 +15,7 @@ import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './resources/hrefs.js';
 import { MachineDetailPage } from './resources/machine-detail-page.js';
 import { MACHINES_HREF } from './resources/machines-page.js';
 import { MCP_HREF } from './resources/mcp-servers-page.js';
+import { ROUTING_SETTINGS_HREF } from './resources/routing-settings-page.js';
 import { SECRETS_HREF } from './resources/secrets-page.js';
 import { SKILLS_HREF } from './resources/skills-page.js';
 import { ActivityPage } from './routes/activity-page.js';
@@ -57,6 +58,10 @@ export const router = createBrowserRouter([
               { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
               { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
               { path: MODEL_ROUTING_HREF, element: <SettingsRedirect section="routing" /> },
+              {
+                path: ROUTING_SETTINGS_HREF,
+                element: <SettingsRedirect section="work-routing" />,
+              },
               { path: `${SETTINGS_HREF}/:section?`, element: <SettingsPage /> },
               { path: '*', element: <Navigate to="/app" replace /> },
             ],

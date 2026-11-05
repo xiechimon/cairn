@@ -12,6 +12,7 @@ import {
   ShieldEllipsis,
   User,
   Users,
+  Waypoints,
   X,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -28,6 +29,7 @@ import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
 import { ModelRoutingPage } from '../resources/model-routing-page.js';
 import { ProvidersPage } from '../resources/providers-page.js';
+import { RoutingSettingsPage } from '../resources/routing-settings-page.js';
 import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
@@ -92,6 +94,12 @@ const GROUPS: Group[] = [
     sections: [
       { id: 'providers', label: '模型服务', Icon: Layers, element: () => <ProvidersPage /> },
       { id: 'routing', label: '订阅与路由', Icon: Route, element: () => <ModelRoutingPage /> },
+      {
+        id: 'work-routing',
+        label: '工作路由',
+        Icon: Waypoints,
+        element: () => <RoutingSettingsPage />,
+      },
     ],
   },
   {

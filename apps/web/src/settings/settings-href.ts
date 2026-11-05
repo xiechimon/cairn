@@ -5,6 +5,7 @@ export const SETTINGS_SECTION_IDS = [
   'appearance',
   'providers',
   'routing',
+  'work-routing',
   'machines',
   'skills',
   'mcp',
