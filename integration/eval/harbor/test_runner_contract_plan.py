@@ -400,6 +400,91 @@ def test_a_blocked_plan_emits_no_product_or_grader_paths():
     assert record["qualifiedTask"] is False
 
 
+def frozen_instruction(number, base, body):
+    text = body if body.endswith("\n") else body + "\n"
+    return f"# Issue {number}\n\nBase revision: `{base}`\n\n{text}"
+
+
+def frozen_issue(body="The sidebar keeps the selected board.\n", **overrides):
+    base = "d" * 40
+    instruction = frozen_instruction(2417, base, body)
+    issue = {
+        "number": 2417,
+        "baseSha": base,
+        "body": body,
+        "bodySha256": hashlib.sha256(body.encode()).hexdigest(),
+        "labelSha256": "a" * 64,
+        "promptSha256": hashlib.sha256(instruction.encode()).hexdigest(),
+    }
+    issue.update(overrides)
+    return issue
+
+
+def ready_partition():
+    plan = planner.plan_runner_contract(contract())
+    return planner.unverified_partition(mixed_paths(), plan)
+
+
+def test_frozen_issue_body_is_copied_exactly_and_stays_unqualified():
+    body = "The sidebar keeps the selected board.\n"
+    issue = frozen_issue(body)
+    record = planner.bind_frozen_issue(ready_partition(), issue)
+    assert record["blocked"] is False
+    assert record["issueBody"] == body
+    assert record["instruction"] == frozen_instruction(2417, "d" * 40, body)
+    assert record["labelSha256"] == "a" * 64
+    assert record["complete"] is False
+    assert record["qualifiedTask"] is False
+    assert record["qualificationCredit"] == 0
+    assert HELPER not in record["productPaths"]
+    assert SNAPSHOT not in record["productPaths"]
+
+
+def test_rewritten_issue_text_does_not_replace_the_frozen_snapshot():
+    original = "The sidebar keeps the selected board.\n"
+    rewritten = "The sidebar must call setActive exactly once.\n"
+    issue = frozen_issue(original)
+    issue["body"] = rewritten
+    record = planner.bind_frozen_issue(ready_partition(), issue)
+    assert record["blocked"] is True
+    assert record["instruction"] == ""
+    assert record["issueBody"] == ""
+    assert rewritten not in json.dumps(record)
+    assert record["productPaths"] == []
+    assert record["qualifiedTask"] is False
+    assert "frozen snapshot" in record["blockers"][0]
+
+
+def test_latest_issue_text_is_not_a_snapshot():
+    issue = frozen_issue()
+    issue["latestBody"] = "A later edit of the issue."
+    record = planner.bind_frozen_issue(ready_partition(), issue)
+    assert record["blocked"] is True
+    assert record["instruction"] == ""
+    assert "later edit" not in json.dumps(record)
+    assert record["qualifiedTask"] is False
+
+
+def test_missing_label_binding_does_not_count_as_acceptance():
+    issue = frozen_issue()
+    del issue["labelSha256"]
+    record = planner.bind_frozen_issue(ready_partition(), issue)
+    assert record["blocked"] is True
+    assert record["qualifiedTask"] is False
+    assert record["qualificationCredit"] == 0
+    assert "label" in record["blockers"][0]
+
+
+def test_prompt_sha_must_match_the_frozen_instruction():
+    issue = frozen_issue()
+    issue["promptSha256"] = "c" * 64
+    record = planner.bind_frozen_issue(ready_partition(), issue)
+    assert record["blocked"] is True
+    assert record["instruction"] == ""
+    assert "prompt" in record["blockers"][0]
+    assert record["complete"] is False
+
+
 def test_plan_is_deterministic_and_does_not_execute_the_config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     first = planner.plan_runner_contract(contract())
