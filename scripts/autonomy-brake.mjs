@@ -37,10 +37,10 @@ function assertExactRevertTree(dir, { baseSha, headSha, names, history }) {
 
 export const repo = process.env.GITHUB_REPOSITORY;
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) throw new Error('GITHUB_REPOSITORY is required');
-export const api = (path, payload) => {
+export const api = (path, payload, method = 'POST') => {
   const output = execFileSync(
     'gh',
-    ['api', path, ...(payload ? ['--method', 'POST', '--input', '-'] : [])],
+    ['api', path, ...(payload ? ['--method', method, '--input', '-'] : [])],
     {
       encoding: 'utf8',
       maxBuffer: 512 * 1024 * 1024,
@@ -222,6 +222,42 @@ function sweep(paused) {
   if (failed) process.exitCode = 1;
 }
 
+const autoResumeMarker = '<!-- autonomy-brake: auto-resume -->';
+
+function resume() {
+  const open = markers();
+  if (!open.length) {
+    console.log('autonomy: no marker');
+    return;
+  }
+  const main = api(`repos/${repo}/branches/main`).commit.sha;
+  const latest = api(`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=1`)
+    .workflow_runs?.[0];
+  if (
+    latest?.status !== 'completed' ||
+    latest.conclusion !== 'success' ||
+    latest.head_sha !== main
+  ) {
+    console.log(
+      `autonomy: still paused (latest main ci ${latest ? `${latest.conclusion ?? latest.status} at ${latest.head_sha}` : 'missing'}, main ${main})`,
+    );
+    return;
+  }
+  for (const issue of open) {
+    if (!String(issue.body ?? '').includes(autoResumeMarker)) {
+      console.log(`#${issue.number}: manual marker kept`);
+      continue;
+    }
+    api(`repos/${repo}/issues/${issue.number}/comments`, {
+      body: `Main CI is green again at ${main} (${latest.html_url}). Resuming autonomous merging.`,
+    });
+    api(`repos/${repo}/issues/${issue.number}`, { state: 'closed' }, 'PATCH');
+    console.log(`#${issue.number}: resumed`);
+  }
+  sweep(markers().length > 0);
+  console.log(`autonomy: ${markers().length > 0 ? 'paused' : 'resumed'}`);
+}
+
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
@@ -238,20 +274,21 @@ if (
           api(`repos/${repo}/labels`, { name: 'autonomy-paused', color: 'b60205' });
         api(`repos/${repo}/issues`, {
           title: 'Autonomous merging paused',
-          body: `${reason}\n\nClose this issue to resume autonomous merging.`,
+          body: `${reason}\n\n${autoResumeMarker}\n\nClose this issue to resume autonomous merging.`,
           labels: ['autonomy-paused'],
         });
       }
       sweep(true);
       console.log('autonomy: paused');
     } else if (command === 'sweep') sweep(markers().length > 0);
+    else if (command === 'resume') resume();
     else if (command === 'check-pr') {
       if (!/^[1-9]\d*$/.test(args[0] ?? '')) throw new Error('A PR number is required');
       const pr = api(`repos/${repo}/pulls/${args[0]}`);
       if (!checkPull({ ...pr, number: Number(args[0]) }, markers().length > 0))
         throw new Error('autonomy-paused: autonomous merging is paused');
     } else if (command === 'verify-recovery') verifyRecovery(args[0]);
-    else throw new Error('Expected status, pause, sweep, check-pr, or verify-recovery');
+    else throw new Error('Expected status, pause, resume, sweep, check-pr, or verify-recovery');
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
