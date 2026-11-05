@@ -616,23 +616,13 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         modelId: 'stub-model',
       })
       .run();
-    s.db.insert(projectTable).values({ id: 'proj-verify', name: 'one', teamId: s.team.id }).run();
-    s.db
-      .insert(todo)
-      .values({
-        id: 'todo-verify',
-        teamId: s.team.id,
-        projectId: 'proj-verify',
-        title: 'ship',
-        spec: '',
-        phase: 'todo',
-        phaseAt: 1,
-        seqNum: 1,
-        assignment: { plan: null, build: null, verify: { agentId: 'slot-verifier' } },
-      })
-      .run();
     save({ agentId: 'auditor', content: 'security lens', source: 'SecurityAuditor' });
-    save({ agentId: 'slot-verifier', content: 'verify lens', source: 'SlotVerifier' });
+    save({
+      agentId: 'slot-verifier',
+      content: 'verify lens',
+      source: 'SlotVerifier',
+      teamScoped: false,
+    });
     expect(
       listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
     ).toEqual([]);
@@ -643,6 +633,46 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         projectId: null,
       }).map((m) => m.content),
     ).toEqual([]);
+  });
+
+  test('flag on: author core stays team-visible when the same agent later verifies', () => {
+    setRoutingRulesEnabled(true);
+    s.db.insert(projectTable).values({ id: 'proj-dual', name: 'one', teamId: s.team.id }).run();
+    s.db
+      .insert(todo)
+      .values({
+        id: 'todo-dual',
+        teamId: s.team.id,
+        projectId: 'proj-dual',
+        title: 'ship',
+        spec: '',
+        phase: 'todo',
+        phaseAt: 1,
+        seqNum: 1,
+        assignment: {
+          plan: null,
+          build: { agentId: 'builder' },
+          verify: { agentId: 'builder' },
+        },
+      })
+      .run();
+    save({ agentId: 'builder', content: 'build habit', source: 'Implementer' });
+    save({
+      agentId: 'builder',
+      content: 'verify lens',
+      source: 'Implementer',
+      teamScoped: false,
+    });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'planner', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual(['build habit']);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'planner',
+        teamId: s.team.id,
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual(['build habit']);
   });
 
   test('flag on: agent memory API lists the requested reviewer store', async () => {

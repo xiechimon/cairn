@@ -8,13 +8,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import {
-  agentMemory,
-  agent as agentTable,
-  memorySaveConflict,
-  routingRule,
-  todo,
-} from '../db/schema.js';
+import { agentMemory, agent as agentTable, memorySaveConflict, routingRule } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { routingRulesEnabled } from './routing-rules.js';
@@ -80,16 +74,6 @@ function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] 
     .where(and(eq(agentTable.teamId, teamId), inArray(agentTable.persona, INDEPENDENT_PERSONAS)))
     .all()) {
     ids.add(row.id);
-  }
-  for (const row of db
-    .select({ assignment: todo.assignment })
-    .from(todo)
-    .where(eq(todo.teamId, teamId))
-    .all()) {
-    const reviewId = row.assignment?.review?.agentId;
-    const verifyId = row.assignment?.verify?.agentId;
-    if (reviewId) ids.add(reviewId);
-    if (verifyId) ids.add(verifyId);
   }
   return [...ids];
 }
