@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +24,7 @@ import {
 } from '../../../apps/server/src/services/chief.js';
 import { readHistory, searchHistory } from '../../../apps/server/src/services/chief-history.js';
 import { TeamStreamHub } from '../../../apps/server/src/services/events.js';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { assemble, estimateTokens } from './assemble.mts';
 import {
   AGENTS,
@@ -94,7 +94,7 @@ let spentUsd = 0;
 function makeWorld() {
   const db = openMemoryDb();
   const { user, team } = seed(db);
-  const skillsDir = mkdtempSync(join(tmpdir(), 'spike2522-skills-'));
+  const skillsDir = makeTestTempDir('spike2522-skills-');
   const deps = { db, hub: new TeamStreamHub(), user, skillsDir };
   for (const name of PROJECTS)
     db.insert(projectTable)
@@ -161,7 +161,7 @@ function makeWorld() {
       }
     });
   });
-  return { db, system, server, insertTurn, threadId: thread.id };
+  return { db, system, server, insertTurn, threadId: thread.id, skillsDir };
 }
 
 function piUsage(input: number, total: number) {
@@ -439,6 +439,7 @@ async function runArm(spec: ArmSpec) {
     return { spec, rows, summary: null, systemTokens, error: String(err) };
   } finally {
     world.server.close();
+    releaseTestTempDir(world.skillsDir);
   }
 }
 
@@ -446,7 +447,22 @@ async function driveArm(spec: ArmSpec, world: World, rows: Record<string, unknow
   const fixture = buildFixture();
   const address = world.server.address();
   const historyUrl = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}/`;
-  const dir = mkdtempSync(join(tmpdir(), `spike2522-${spec.name}-`));
+  const dir = makeTestTempDir(`spike2522-${spec.name}-`);
+  try {
+    return await driveArmInDir(spec, world, rows, dir, historyUrl, fixture);
+  } finally {
+    releaseTestTempDir(dir);
+  }
+}
+
+async function driveArmInDir(
+  spec: ArmSpec,
+  world: World,
+  rows: Record<string, unknown>[],
+  dir: string,
+  historyUrl: string,
+  fixture: FixtureTurn[],
+) {
   mkdirSync(join(dir, '.pi'));
   writeFileSync(join(dir, '.pi', 'settings.json'), JSON.stringify({ compaction: spec.compaction }));
   const configs = Object.fromEntries(
