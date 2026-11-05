@@ -418,7 +418,7 @@ jobs:
 
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
-        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs
+        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs
 
       - name: Nightly scan self-test (§11.1)
         if: ${{ !cancelled() }}

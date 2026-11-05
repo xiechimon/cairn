@@ -78,6 +78,7 @@ credentials.enc
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/verify-cairn/
+!.claude/skills/maintain-verify-cairn/
 !.claude/skills/pr-cairn/
 !.claude/skills/verify-step-claim/
 !.claude/skills/verify-merge-gate/
