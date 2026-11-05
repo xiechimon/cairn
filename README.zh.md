@@ -27,6 +27,7 @@
   <img alt="手机端的 Cairn：等你拍板的决定、一个 thread、项目主页和全部工作" src="site/img/phones.webp" width="100%">
 </div>
 
+
 - **Coordinator。** 你在任何设备上只跟一个 Coordinator 对话。它负责听、为每件活开一个 thread，并在同一个永不结束的对话里回报。
 - **Thread。** 一件活对应一个 agent 会话：用你订阅的 Claude Code 或 Gemini CLI，或内置的 pi 运行时接任意模型服务。thread 从计划一路做到 PR，也可以在侧边对话里打开它直接插话。
 - **只给你看需要你的事。** 首页置顶等你拍板的决定，并显示进行中的工作。只有需要人动手时才推送。
@@ -59,113 +60,25 @@
 
 ## 快速开始
 
-环境要求：Node.js 22 或 24（LTS 线自带 better-sqlite3 预编译产物；其它版本可能回退源码编译，需要构建工具链）。
+环境要求：Node.js 22 或 24。一条命令下载、启动并托管在 **http://127.0.0.1:8787/app**；首启在 `~/.cairn` 下自动建库并 seed 默认团队。
 
 ```sh
 npx @xiechimon/cairn
 ```
 
-一条命令：下载、启动、托管在 **http://127.0.0.1:8787/app**。首启在 `~/.cairn` 下自动建库 + 迁移 + seed 默认团队。
+要让 agent 在自己的机器上干活，先登记一台机器；用 Docker 跑 server 也在同一篇：[docs/getting-started.md](./docs/getting-started.md)。
 
-换端口：`PORT=9000 npx @xiechimon/cairn`。
+## 接下来读什么
 
-### 让自己的机器跑 build
+| 文档 | 内容 |
+|---|---|
+| [docs/getting-started.md](./docs/getting-started.md) | 跑起 server、登记机器、Docker、公网部署、从源码构建 |
+| [docs/configuration.md](./docs/configuration.md) | 全部 server 与 daemon 环境变量 |
+| [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | 用 Tailscale 从手机私网访问 |
+| [CONTEXT.md](./CONTEXT.md) | 领域模型与术语表 |
+| [docs/spec/](./docs/spec/) | 实现规范 |
 
-不起 daemon 也能用全部界面功能；要让 agent 真在某台机器上跑 build 时再登记。在执行机上：
-
-```sh
-npm i -g @xiechimon/cairn-cli
-# 首次注册：网页 /app/api-keys 建 key（明文只显示一次），然后
-cairn start --api-key <cairn_...> --team <teamId>
-# 日常（凭据已存 ~/.cairn/machine.json）：
-cairn start        # stop / restart / logs -f / status 同面
-```
-
-两个包都装 `cairn` 这个 bin：同机全局双装时后装的占名。干净的分工是——浏览机跑 server，执行机装 cairn-cli。
-
-### 用 Docker 跑 server
-
-只容器化 server（含 web UI）；agent 仍由你自己机器上的 daemon 执行。镜像监听 `0.0.0.0`，状态全放在 `/data`：
-
-```sh
-docker build -t cairn .
-docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
-```
-
-镜像内置 `CAIRN_REQUIRE_TOKEN=1`：`CAIRN_TOKEN` 未设或为空时，容器打印原因后以退出码 1 退出，不会在公网地址上裸奔。备份 = 整个拷走 `/data` 卷（数据库和 `secretbox.key` 要一起）。token 走请求头，请在容器前面加 TLS（反向代理或平台的 HTTPS 域名）。
-
-### 部署到 Railway
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
-
-`railway.json` 让 Railway 用 `Dockerfile` 构建并以 `/app` 做健康检查。按钮打开 Railway 的新建项目页；选 Deploy from GitHub repo 和本仓库，然后：
-
-1. 挂一个卷到 `/data`。
-2. 设 `CAIRN_TOKEN` 为 `${{secret(64, "abcdef0123456789")}}`（Railway 生成一次随机值），并设 `RAILWAY_RUN_UID=0`（Railway 的卷归 root，镜像默认以 `node` 用户运行）。
-3. 生成公网域名。`PORT` 由 Railway 提供。
-
-让 daemon 指向公网 server：先在 web UI（`/app/api-keys`）建 API key，然后在跑 build 的机器上：
-
-```sh
-cairn start --server https://<你的应用>.up.railway.app --api-key <cairn_...> --team <teamId>
-```
-
-### 从源码开发
-
-要求 Node.js >= 22.19、pnpm（可 `corepack enable`）。
-
-```sh
-pnpm install
-pnpm start        # 构建 web UI 并由 server 同源托管
-```
-
-watch 模式开发栈，每进程一条：`pnpm dev:web`、`pnpm dev:server`、`pnpm dev:daemon`（`pnpm dev` 三进程一起跑）。
-
-## 部署
-
-把 server 自托管在常开机上，手机经私有 tailnet 随时连回 Cairn。将 server 绑到 `127.0.0.1`，用 `tailscale serve` 反代到 `http://127.0.0.1:<端口>`，并设 `CAIRN_TAILSCALE_USERS` 让白名单内的 Tailscale 身份免输入访问令牌直接登录。完整 walkthrough 见 [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md)。要走公网路线，见上文 Railway 模板。
-
-## 配置
-
-server 环境变量（全部可选）：
-
-| 变量 | 默认 | 说明 |
-|---|---|---|
-| `CAIRN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。来自环回对端的白名单 Tailscale Serve 身份同样放行。 |
-| `CAIRN_TAILSCALE_USERS` | 未设 | 逗号分隔的 Tailscale 用户登录名；环回对端的 `Tailscale-User-Login` 命中名单时免 `CAIRN_TOKEN` 放行。同机 `tailscale serve` 部署请设 `HOST=127.0.0.1` 并反代到 `http://127.0.0.1:<端口>`；非环回直连、打标签设备与 Funnel 流量仍需 token。设了名单但绑定地址非环回时启动日志 WARN。 |
-| `CAIRN_REQUIRE_TOKEN` | 未设（Docker 镜像内为 `1`） | `1` / `true` / `yes`：`CAIRN_TOKEN` 未设或为空时拒绝启动（打印原因，退出码 1）。 |
-| `PORT` | `8787` | HTTP 监听端口。 |
-| `HOST` | 未设（全部接口） | HTTP 绑定地址。分体部署（server 在常开主机、daemon 在另一台机器用 `CAIRN_SERVER` 指过来）时设为该主机的局域网/内网地址，并同设 `CAIRN_TOKEN`。显式 `0.0.0.0`/`::` 且 `CAIRN_TOKEN` 未设 → 启动日志 WARN。 |
-| `CAIRN_HOME` | `~/.cairn` | 数据根。server 状态在 `<CAIRN_HOME>/server/`（`server.db`、`secretbox.key`、托管裸仓）；daemon 的 `machine.json`、`daemon.log`、`workspaces/` 在根下。**备份 = 整目录拷走**——密文离了 keyfile 永久不可解，只拷 db 没用。 |
-| `CAIRN_GITHUB_OAUTH_CLIENT_ID`<br>`CAIRN_GITHUB_OAUTH_CLIENT_SECRET` | 未设 | 自注册 GitHub OAuth App 的凭证对，开启 provider OAuth 登录。两件同设或同缺——只配一件 server 启动即报错，不静默。 |
-| `CAIRN_WEB_DIR` | `apps/web/dist`（存在即托管） | SPA 静态托管根覆写；未设且无构建产物 = 纯 API 形态。 |
-| `CAIRN_SKILLS_DIR` | `~/.agents/skills` | 技能根目录。每个含 `SKILL.md` 的一级子目录 = 一个技能（id = frontmatter `name`，缺省回落目录名）。每次请求现扫，不入库——加技能 = 往目录放文件夹，删技能 = 删文件夹。 |
-| `CAIRN_ISSUE_INTAKE` | 未设（关） | GitHub issue 进料。`1`、`true` 或 `yes` 开，其余值一律关，默认关。开了之后 server 每 5 分钟从已连接 GitHub、且 Coordinator 已绑定带模型 Agent 的团队的每个 GitHub 项目里，领带 `ready-for-agent` 标签的 open issue，导入成任务并开始编排。只领该标签最新一条 `labeled` 事件由仓库 triage、write、maintain 或 admin 权限用户打上、且不经 GitHub App 的 issue。经 GitHub App 打的标不算，即使 app 持有该用户的授权；但这一条只认得出 GitHub App：用 OAuth App 令牌或个人访问令牌（PAT）打的标，看上去与该用户亲手打的一样，照领。OAuth App 令牌包括 `gh auth login` 拿到的令牌，也包括团队的 GitHub 连接令牌。cairn 把连接令牌随步下发给 git 命令（git 自己的钩子也在这个环境里跑），也交给仓库里的 `.agents/setup` 与 `.agents/resume` 钩子，能改这些钩子的 agent 代码就读得到它；cairn 的 agent 步还能直接用机器上已登录的 `gh`。两条路都能让 agent 以对应账号的身份打标、给进料喂票。别人打的、或打了又摘的也不领。每个项目同时至多 3 张不在已完成 / 已关闭的导入任务（失败的也算）。开启时已经打着标签的存量 issue 也会被领，按最旧先、受同一上限约束（每个项目每轮至多读 300 条带标签的 issue）——开之前先看清哪些 issue 打着标签。进料导入的任务以 Coordinator 绑定的 Agent 为创建者，进料也只关这些任务：手工导入或 webhook 导入的任务从不被它关闭，Coordinator 没绑 Agent 的团队不关任何任务，Coordinator 换绑别的 Agent 之后，换绑前领的任务也不再由它关闭。这样的任务，server 见过它的 issue 处于 open、之后又看到它被 triage 及以上权限的用户关闭，才把任务关闭；server 第一次看到 issue 时它已关闭（例如重启后）、外部作者自己关掉的 issue、被人重新打开的任务都不动，审核中的任务、有 build 开出过 PR 的任务也不动，拆分后子任务还没全部完成或关闭的任务也不动。这些审核中、开出过 PR 的任务进料从不关闭。build 开出过 PR 的审核中任务，PR 合并进默认分支后 PR 对账可以把它收尾为已完成，PR 未合并就关闭的可以收尾为失败（对账还核别的条件，不满足时只留提示）；施工中的任务继续走 CI 循环；没有 PR 的审核中任务、失败的任务留在原处，等人手动处理。导入后开始编排失败的，后面几轮重试，连同第一次至多 3 次（重启后不再重试），之后任务留在待开始等人处理。进料自己的 GitHub 读（issue 列表、issue 事件、协作者权限、issue 状态）遇到限流时，该团队这一轮停读，等下一轮，GitHub 给了限流解除的时刻就写进日志；导入时的读遇到限流，只算这一次导入失败，本轮接着看下一条 issue。启动日志写明进料开没开。`cairn` 标签的 webhook（`POST /api/webhook/github/<token>`，进料开没开都生效）守同一条权限判据、同一上限：打标人（事件的 `sender`）在仓库上有 triage、write、maintain 或 admin 权限、且项目未到上限 3，才导入；外部作者从带该标签的模板开的 issue 不导入。sender 不是 GitHub 账号名、打标人权限读不到（读失败，或 GitHub 以限流作答）、团队没有可用的 GitHub token、项目已到上限、项目存的仓库名不是 `owner/repo`、或 GitHub 上找不到该 issue，都不导入，记一行日志写明原因，投递以 202 作答。拒收若关于打标人的权限（不到 triage、读不到、遇限流），作答只说打标人未获确认，不说是哪一种、什么权限，细节在日志里。这只让作答文字不带权限结论：之后导入是否继续，仍会显出打标人够不够格，所以 webhook URL 泄漏了仍要吊销它的 token。 |
-| `CAIRN_INTAKE_AGENT_ALLOWLIST` | unset (deny all agent labels) | Comma-separated agent display names allowed for `agent:<name>` intake routing. Names are trimmed and matched exactly, including case; empty entries are ignored. Only opt in agents whose machine and tools are safe for untrusted issues. Agents with secrets or MCP servers are refused at intake and checked again before dispatch; removing a name blocks dispatch of existing presets too. |
-| `CAIRN_TRAJ_OUTCOME_BACKFILL` | 未设（关） | 轨迹结果回填。`1`、`true` 或 `yes` 开，其余值一律关。开了之后 server 启动时扫一次，之后每 24 小时扫一次：对每个 PR 合并满 7 天的 build，读项目的本地仓库，记下 `revertedWithin7d`（窗口内默认分支上有指向该 PR 或合并提交的 revert 提交）与 `fixedByLaterPr`（后续 PR 删掉了该 build 新增的行），每个 build 只记一次。`pnpm traj:backfill` 手动扫一次。导出的轨迹包用记下的值取代窗口未满时的 `null`。 |
-
-daemon 环境变量（上述 CLI flag 的等价覆写）：`CAIRN_SERVER`（默认 `http://127.0.0.1:8787`）、`CAIRN_API_KEY`、`CAIRN_TEAM`、`CAIRN_WORKSPACES_DIR`（默认 `<CAIRN_HOME>/workspaces`）。
-
-## 开发
-
-```sh
-pnpm dev:server   # API server 热重载，http://127.0.0.1:8787（首启建库 + 迁移 + seed）
-pnpm dev:web      # vite dev server，http://localhost:5173，/api 与 /git proxy 到 8787
-```
-
-vite dev server 带 `strictPort`：撞端口即启动失败，不静默顺延到下一个空闲口。危险的是
-顺延而不是撞端口本身——proxy 目标不变，顺延后的界面会去驱动持有该端口的别的栈。
-覆写走 `CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`。
-
-提交前三闸：
-
-```sh
-pnpm lint         # biome ci
-pnpm typecheck    # 全包 tsc
-pnpm test         # vitest
-```
-
-### 仓库结构
+## 仓库结构
 
 | 路径 | 内容 |
 |---|---|
