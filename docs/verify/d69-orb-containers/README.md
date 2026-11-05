@@ -11,9 +11,9 @@ Failure controls were written and observed failing before the fixes: missing pro
 - `owner-host-check.json` and `owner-relay-restart.json`: fresh repeats after integrating #2761 immutable container IDs and enrolled daemon ownership; both pass. The relay ran as an isolated manual process; the deployment unit was not started.
 - `container-canary.json`: the full scratch server, enrolled daemon, actual Orb worker and runner delivered the attacker result and normal Git bundle in 25.956 seconds. Every required Orb route was blocked, container sudo worked, public GitHub was reachable, and all delivered Orb objects were free of sentinel markers. The host negative control read all five synthetic sentinels, its delivered objects contained their markers, and both host listeners were reachable. No sentinels remained after cleanup.
 - `cleanup-identity.json`: real Podman name replacement between inspect and removal deletes only the inspected original ID. The foreign replacement survives and is rejected on a subsequent cleanup attempt.
-- Exact changed Orb CI command: 558 tests passed, including `trial-evidence-check.test.mjs`. Targeted runtime/provider/probe tests: 195 passed. Canary cleanup tests were red before ownership/ID validation; all 104 canary script tests pass.
+- Exact changed Orb CI command: 561 tests passed, including `trial-evidence-check.test.mjs`. Targeted runtime/provider/probe tests: 202 passed. Canary cleanup tests were red before ownership/ID validation; all 104 canary script tests pass.
 
-The fresh source commit is `57afe4047`; subsequent evidence-only commits do not change the executed implementation. The image is `cairn-orb-base:eb01c9191591ca17`.
+The original fresh source commit is `57afe4047`; subsequent evidence-only commits do not change the executed implementation. The image is `cairn-orb-base:eb01c9191591ca17`.
 
 The relay export must be a canonical, nonsymlink directory named `cairn-orb-egress` or `cairn-orb-egress-<lowercase suffix>`, owned by the daemon user with mode 0700. It must contain exactly the configured socket, owned by that user with mode 0600. Sibling files, general home directories, symbolic aliases and unsafe ownership or modes fail before any container action. The runtime and host collector share this validation; the validated directory is mounted read-only so a recreated socket remains visible. The installed relay unit uses the dedicated deployment checkout and pinned fnm Node 24.
 
@@ -22,3 +22,9 @@ The container canary requires `XDG_RUNTIME_DIR`, a pinned `CAIRN_ORB_IMAGE`, and
 The relay restart probe is reproducible from `apps/daemon` with `XDG_RUNTIME_DIR=/run/user/$(id -u) node --import tsx ../../docs/verify/d69-orb-containers/relay-restart.mjs`. It allocates its own relay directory and container and removes both. The image must already exist.
 
 Not verified: production rollout, phone access and push delivery. Production daemons have not been restarted. Current-head Codex SECURITY review is pending under the updated D80 rule; code review alone does not satisfy it.
+
+## Dedicated export review fix
+
+Source `f11b1c75862479da928edf7d4216d1aaeff7d282` fixes both P1 review classes. Twelve negative controls were red first across sibling-file disclosure, arbitrary export directories, symbolic aliases, permissions, missing boundary metadata and startup without the lane checkout. The exact Orb CI command passes 561 tests; 202 runtime/provider/probe tests and package types pass.
+
+`dedicated-relay-restart.json` proves an adjacent synthetic private file prevents container creation, then a socket-only export works. The same container sees a recreated relay socket and container sudo cannot unlink it. `dedicated-host-check.json` passes the real host prerequisites. `dedicated-container-canary.json` passes the full real scratch Thread in 20.812 seconds with all Orb routes blocked, clean delivered objects, the leaking host negative control, live listeners, public GitHub access and no leftover sentinels. Production was unchanged.
