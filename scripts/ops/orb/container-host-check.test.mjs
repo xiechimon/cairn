@@ -352,7 +352,9 @@ test('a throwing probe is reported and fails the check', async () => {
   assert.ok(result.errors.some((error) => error.includes('podman exploded')));
 });
 
-test('the real filesystem and connect checks accept a live 0600 socket and refuse a wider one', async (t) => {
+test('the real filesystem and connect checks accept a live 0600 socket and refuse a wider one', {
+  skip: process.getuid() === 0,
+}, async (t) => {
   const root = makeTestTempDir('orb-host-check-');
   t.after(() => releaseTestTempDir(root));
   const directory = join(root, 'cairn-orb-egress');
