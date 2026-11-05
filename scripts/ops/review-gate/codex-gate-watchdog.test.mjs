@@ -18,7 +18,8 @@ const joined = args.join(' ');
 const out = (value) => process.stdout.write(JSON.stringify(value));
 if (joined.includes('--slurp') && joined.includes('/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/check-runs?')) out([world.checkRuns]);
-else if (joined.includes('--slurp') && joined.includes('/runs?')) out([world.runs]);
+else if (joined.includes('--slurp') && joined.includes('/runs?'))
+  out([{ workflow_runs: world.runs }]);
 else if (joined.includes('check-runs?')) out({ check_runs: world.checkRuns });
 else if (/--input -/.test(joined) && joined.includes('/dispatches')) out({});
 else if (joined.includes('gh api')) out({});

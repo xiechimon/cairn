@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 import { checkContainerHost, parseContainerHostCheck } from './container-host-check.mjs';
 import { checkHost } from './orb-host-check.mjs';
 
@@ -355,12 +355,10 @@ test('a throwing probe is reported and fails the check', async () => {
 test('the real filesystem and connect checks accept a live 0600 socket and refuse a wider one', {
   skip: process.getuid() === 0,
 }, async (t) => {
-  const root = makeTestTempDir('orb-host-check-');
-  t.after(() => releaseTestTempDir(root));
-  const directory = join('/private/tmp', `cairn-orb-egress-${process.pid}`);
-  mkdirSync(directory, { mode: 0o700, recursive: true });
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const path = join(directory, 'egress.sock');
+  const socketDirectory = join(realpathSync(tmpdir()), `cairn-orb-egress-${process.pid}`);
+  mkdirSync(socketDirectory, { mode: 0o700 });
+  t.after(() => rmSync(socketDirectory, { recursive: true, force: true }));
+  const path = join(socketDirectory, 'egress.sock');
   const server = createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -378,16 +376,16 @@ test('the real filesystem and connect checks accept a live 0600 socket and refus
     }).options;
   chmodSync(path, 0o600);
   assert.equal((await checkContainerHost(real())).relay, 'ok');
-  const sibling = join(directory, 'private.pem');
+  const sibling = join(socketDirectory, 'private.pem');
   writeFileSync(sibling, 'synthetic private file', { mode: 0o600 });
   assert.notEqual((await checkContainerHost(real())).relay, 'ok');
   rmSync(sibling);
   chmodSync(path, 0o644);
   assert.equal((await checkContainerHost(real())).relay, 'mode');
   chmodSync(path, 0o600);
-  chmodSync(directory, 0o755);
+  chmodSync(socketDirectory, 0o755);
   assert.equal((await checkContainerHost(real())).relay, 'mode');
-  chmodSync(directory, 0o700);
+  chmodSync(socketDirectory, 0o700);
   server.close();
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.notEqual((await checkContainerHost(real())).relay, 'ok');

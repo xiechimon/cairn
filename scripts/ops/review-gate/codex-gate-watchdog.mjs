@@ -86,7 +86,12 @@ export function watchdog(repo, env = process.env) {
     const staleCheck = newestOwnCheck(runs.check_runs, pr.head.sha, now);
     if (staleCheck !== null) stale.push({ pr: pr.number, sha: pr.head.sha, check: staleCheck });
   }
-  const runs = listPaged(`repos/${repo}/actions/workflows/${GATE_WORKFLOW}/runs?event=schedule`);
+  const pages = listPaged(`repos/${repo}/actions/workflows/${GATE_WORKFLOW}/runs?event=schedule`);
+  if (!Array.isArray(pages)) throw new Error('malformed workflow-runs response');
+  const runs = pages.flatMap((page) => {
+    if (!Array.isArray(page?.workflow_runs)) throw new Error('malformed workflow-runs response');
+    return page.workflow_runs;
+  });
   const staleSchedule = newestSchedule(runs, now);
   const dispatched = { ...(state?.dispatched ?? {}) };
   const cutoff = now - 60 * 60 * 1000;
