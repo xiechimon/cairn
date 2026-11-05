@@ -766,6 +766,49 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['english commits']);
   });
 
+  test('entries written in the same millisecond keep insertion order', () => {
+    const at = nowMs();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: 'zzz-first',
+        agentId: 'ordering-probe',
+        teamId: s.team.id,
+        title: 'first',
+        content: 'first',
+        projectId: null,
+        sourceTodoId: null,
+        sourceBuildId: null,
+        source: 'Planner',
+        layer: 'core',
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: 'aaa-second',
+        agentId: 'ordering-probe',
+        teamId: s.team.id,
+        title: 'second',
+        content: 'second',
+        projectId: null,
+        sourceTodoId: null,
+        sourceBuildId: null,
+        source: 'Planner',
+        layer: 'core',
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run();
+    expect(
+      listMemoryEntries(s.db, { agentId: 'ordering-probe', teamId: s.team.id }).map(
+        (m) => m.content,
+      ),
+    ).toEqual(['first', 'second']);
+  });
+
   test('flag on: a scratchpad is listed and mutated only in its thread', () => {
     setRoutingRulesEnabled(true);
     const pad = save({

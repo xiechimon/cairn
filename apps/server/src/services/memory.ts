@@ -142,7 +142,7 @@ export function listMemoryEntries(
         scratchpadVisible(scope.threadId),
       ),
     )
-    .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
+    .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
     .all();
 }
 
