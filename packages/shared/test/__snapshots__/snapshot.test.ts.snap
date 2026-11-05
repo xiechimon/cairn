@@ -7560,6 +7560,19 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/teams/{id}/machines",
   },
   {
+    "method": "GET",
+    "note": "the team computers (D75 P8a)",
+    "path": "/api/computers",
+  },
+  {
+    "method": "GET",
+    "note": "recent computer.command feed entries, newest last (D75 P8a)",
+    "path": "/api/computers/{id}/commands",
+    "query": [
+      "limit",
+    ],
+  },
+  {
     "method": "POST",
     "note": "D75: mint one sealed viewer capability for a screen or controlled terminal",
     "path": "/api/teams/{teamId}/computers/{computerId}/screen",
@@ -7578,19 +7591,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "DELETE",
     "note": "D75: release user control and close its live channels",
     "path": "/api/teams/{teamId}/computers/{computerId}/control",
-  },
-  {
-    "method": "GET",
-    "note": "the team computers (D75 P8a)",
-    "path": "/api/computers",
-  },
-  {
-    "method": "GET",
-    "note": "recent computer.command feed entries, newest last (D75 P8a)",
-    "path": "/api/computers/{id}/commands",
-    "query": [
-      "limit",
-    ],
   },
   {
     "method": "GET",

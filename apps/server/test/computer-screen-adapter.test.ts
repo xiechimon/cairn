@@ -100,12 +100,12 @@ test('the adapter authenticates outbound and bridges a Unix screen stream withou
   const { request, cap, origin } = await boot();
   dir = makeTestTempDir('screen-socket-');
   const path = join(dir, 'view.sock');
-  let input = '';
+  const input: Buffer[] = [];
   net = createNetServer((socket) => {
     cleanup.push(() => socket.destroy());
     socket.write('RFB 003.008\n');
     socket.on('data', (data) => {
-      input += data.toString();
+      input.push(Buffer.from(data));
       socket.write(data);
     });
   });
@@ -137,10 +137,15 @@ test('the adapter authenticates outbound and bridges a Unix screen stream withou
   const greeting = once(viewer, 'message');
   await once(viewer, 'open');
   expect((await greeting)[0].toString()).toBe('RFB 003.008\n');
+  const pointer = Buffer.from([5, 1, 0, 10, 0, 20]);
+  const framebufferRequest = Buffer.from([3, 1, 0, 0, 0, 0, 0, 100, 0, 80]);
+  viewer.send(pointer);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(input).toEqual([]);
   const echoed = once(viewer, 'message');
-  viewer.send(Buffer.from([0, 128, 255]));
-  expect((await echoed)[0]).toEqual(Buffer.from([0, 128, 255]));
-  expect(input.length).toBe(3);
+  viewer.send(framebufferRequest);
+  expect((await echoed)[0]).toEqual(framebufferRequest);
+  expect(Buffer.concat(input)).toEqual(framebufferRequest);
   viewer.close();
   await running;
   expect(closed).toBe(1);

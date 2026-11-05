@@ -87,10 +87,11 @@ function isInside(root: string, target: string): boolean {
   );
 }
 
-class AsyncEventQueue {
+export class AsyncEventQueue {
   private readonly items: ComputerProcessEvent[] = [];
   private wake: (() => void) | undefined;
   private ended = false;
+  private failure: unknown;
 
   push(event: ComputerProcessEvent): void {
     this.items.push(event);
@@ -98,6 +99,12 @@ class AsyncEventQueue {
   }
 
   end(): void {
+    this.ended = true;
+    this.notify();
+  }
+
+  fail(error: unknown): void {
+    this.failure = error;
     this.ended = true;
     this.notify();
   }
@@ -115,6 +122,7 @@ class AsyncEventQueue {
         yield next;
         continue;
       }
+      if (this.failure !== undefined) throw this.failure;
       if (this.ended) return;
       await new Promise<void>((resolve) => {
         this.wake = resolve;
