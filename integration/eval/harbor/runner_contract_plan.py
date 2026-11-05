@@ -158,3 +158,60 @@ def _build_mode(config_text):
     if match is None:
         return None
     return match.group(1)
+
+
+E2E_REJECTION = "Contains Playwright or e2e tests"
+
+
+def selection_after_plan(reason, paths, contract, reason_without_e2e):
+    plan = (
+        plan_runner_contract(contract)
+        if isinstance(contract, dict)
+        else {
+            "blocked": True,
+            "commands": [],
+            "trustedInputs": [],
+            "blockers": ["runner contract required"],
+        }
+    )
+    decision = {
+        "reason": reason,
+        "qualifiedTask": False,
+        "qualificationCredit": 0,
+        "verified": False,
+        "conversionAllowed": False,
+        "missingPaths": [],
+        "plan": plan,
+    }
+    if reason != E2E_REJECTION:
+        return decision
+    if reason_without_e2e:
+        decision["reason"] = reason_without_e2e
+        return decision
+    missing = [path for path in paths if _grading_path(path) and path not in _covered_paths(plan)]
+    decision["missingPaths"] = missing
+    if plan.get("blocked") or missing:
+        return decision
+    decision["reason"] = None
+    decision["conversionAllowed"] = True
+    return decision
+
+
+def _grading_path(path):
+    return (
+        "/e2e/" in f"/{path}"
+        or "e2e.test." in path
+        or path.endswith((".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.tsx"))
+        or "snapshots" in path
+        or path.endswith((".png", ".jpg", ".webp"))
+    )
+
+
+def _covered_paths(plan):
+    covered = set()
+    for command in plan.get("commands") or []:
+        covered.update(command.get("paths") or [])
+    for item in plan.get("trustedInputs") or []:
+        if item.get("role") in ("helper", "asset"):
+            covered.add(item["path"])
+    return covered
