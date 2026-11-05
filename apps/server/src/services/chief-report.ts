@@ -38,7 +38,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { askQuestionContentOf } from './chief-questions.js';
 import type { ConversationStreamHub } from './events.js';
-import { ingestIntake } from './intake-items.js';
+import { ingestIntake, pendingIntakeReports } from './intake-items.js';
 import { listNeedsYou } from './needs-you.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { wallClockParts } from './schedules.js';
@@ -908,6 +908,37 @@ export function postReportWithoutRun(
       .run();
   });
   for (const effect of effects) effect();
+}
+
+export function retryPendingIntakeReports(deps: ReportDeps, now: number): void {
+  for (const reportId of pendingIntakeReports(deps.db)) {
+    const rec = deps.db.select().from(chiefReport).where(eq(chiefReport.id, reportId)).get();
+    if (!rec?.inputs) continue;
+    const inputs = rec.inputs;
+    const effects: Effects = [];
+    deps.db.transaction(() => {
+      if (ingestIntake(deps.db, rec, now) === 0) return;
+      const existing = deps.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, reportRowId(rec)))
+        .get();
+      let previous: unknown;
+      try {
+        previous = JSON.parse(String(existing?.content));
+      } catch {
+        previous = null;
+      }
+      const parsed = chiefReportContentSchema.safeParse(previous);
+      const content = parsed.success
+        ? { ...parsed.data, intake: intakeOf(deps.db, rec.id) }
+        : reportContent(deps, rec, inputs, 'posted', rec.attempts > 0, now);
+      writeReportRow(deps, rec, content, effects);
+      pushReport(deps, rec, content, now, effects);
+      deps.db.update(chiefReport).set({ status: 'posted' }).where(eq(chiefReport.id, rec.id)).run();
+    });
+    for (const effect of effects) effect();
+  }
 }
 
 export function startReportRun(

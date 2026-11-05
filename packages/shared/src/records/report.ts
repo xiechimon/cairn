@@ -8,3 +8,5 @@ export const infoReportMessageSchema = z.object({
   attachmentToken: z.string(),
   content: z.string(),
 });
+
+export type InfoReportMessage = z.infer<typeof infoReportMessageSchema>;

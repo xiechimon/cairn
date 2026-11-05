@@ -516,3 +516,26 @@ for (const path of [
     assert.ok(result.selection.includes('account-feature-releases.spec.ts'));
   });
 }
+
+test('Activity and palette source edits keep their navigation regressions in the affected set', () => {
+  for (const path of [
+    'apps/web/src/routes/activity-page.tsx',
+    'apps/web/src/search/activity-model.ts',
+    'apps/web/src/search/activity-href.ts',
+    'apps/web/src/search/query-chip.tsx',
+    'apps/web/src/search/search-query.ts',
+    'apps/web/src/overlay/search-panel.tsx',
+    'apps/web/src/board/sidebar.tsx',
+    'apps/web/src/board/sidebar-user-menu.tsx',
+  ]) {
+    const result = selectSpecs({
+      paths: [path],
+      allSpecs: listSpecs(),
+      dependencies: () => assert.fail('no dependency change'),
+      workspace: () => workspacePackages(LOCKFILE),
+    });
+    assert.equal(result.full, false, path);
+    assert.ok(result.selection.includes('activity-page.spec.ts'), path);
+    assert.ok(result.selection.includes('search-syntax-palette.spec.ts'), path);
+  }
+});

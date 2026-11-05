@@ -5,7 +5,10 @@ import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
   AGENT_TOOL_TAG,
+  CHIEF_REMOTE_TOOLS,
+  CHIEF_ROUTER_TOOLS,
   isSessionStepKind,
+  type RemoteToolDef,
   type RequiredCapabilities,
   type RouteOverride,
   type StepKind,
@@ -44,6 +47,10 @@ export function setRoutingRulesEnabled(on: boolean): void {
 
 export function routingRulesEnabled(): boolean {
   return routingRulesOn;
+}
+
+export function chiefRemoteTools(): readonly RemoteToolDef[] {
+  return routingRulesOn ? [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS] : CHIEF_REMOTE_TOOLS;
 }
 
 export function routeForStep(

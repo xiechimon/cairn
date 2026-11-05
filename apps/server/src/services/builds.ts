@@ -237,6 +237,7 @@ interface BuildSteerOptions {
   allowReviewContinuation?: boolean;
   afterTurn?: boolean;
   human?: boolean;
+  actor?: string;
   schedule?: { id: string; createdBy: string; at: number };
 }
 
@@ -404,10 +405,11 @@ export async function sendBuildSteer(
       const now = nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
-      if (human) settleWorkerReply(deps, conversationId, body.content);
+      if (human || continuationOptions.actor !== undefined)
+        settleWorkerReply(deps, conversationId, body.content);
       const messageRow = {
         id: human ? `human-${newRecordId()}` : newRecordId(),
-        actor: human ? deps.user.displayName : null,
+        actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
         role: 'user' as const,
         content: body.content,
         createdAt: now,
@@ -449,7 +451,10 @@ export async function sendBuildSteer(
           .run();
       }
       if (todoRow) {
-        if (!continuationOptions.schedule)
+        if (
+          !continuationOptions.schedule &&
+          (continuationOptions.human ?? deps.steerOptions?.human) !== false
+        )
           addUserMessageAttachmentGrants(db, todoRow.id, todoRow.teamId, body.content);
         if (running) {
           deps.machineHub?.steerSignal(todoRow.teamId, running.id);
@@ -668,6 +673,21 @@ function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {
     .at(-1);
   if (lastDone) return lastDone.kind === 'plan' ? 'confirm' : 'review';
   return buildRow.prevPhase ?? 'todo';
+}
+
+export function stoppedBeforeFirstRun(
+  db: Db,
+  row: Pick<typeof todo.$inferSelect, 'phase' | 'latestBuildId'>,
+): boolean {
+  if (row.phase !== 'todo' || row.latestBuildId === null) return false;
+  const latest = db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  if (latest?.errorMessage !== STOP_MESSAGE) return false;
+  const steps = db
+    .select({ status: step.status })
+    .from(step)
+    .where(eq(step.buildId, latest.id))
+    .all();
+  return steps.length > 0 && steps.every((s) => s.status === 'stopped');
 }
 
 function releaseUnissuedMergeAdmission(db: Db, row: typeof step.$inferSelect): void {
@@ -1687,7 +1707,7 @@ export async function applyBuildStepAction(
       todoRecord.teamId,
       `${SESSION_REWORK_BRIEF}\n\n${body.feedback}`,
       false,
-      true,
+      origin === 'person',
     );
     return;
   }
@@ -1696,7 +1716,7 @@ export async function applyBuildStepAction(
     todoRecord.phase === 'review'
       ? buildReviewRejectPrompt(body.feedback)
       : buildReplanPrompt(body.feedback);
-  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, true);
+  enqueueStep(deps, buildId, 'plan', todoRecord.teamId, replanPrompt, false, origin === 'person');
 }
 
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {

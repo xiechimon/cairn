@@ -61,4 +61,35 @@ describe('thread report rows with the session line', () => {
     ];
     expect(mapChiefStream(rows)).toEqual([{ ...REPORT, id: 'a', line: 'Short line' }]);
   });
+
+  test('a needs-you report says the thread needs you and keeps its line', () => {
+    const html = render({ ...REPORT, phase: 'needs-you', id: 'r3', line: 'Which export format?' });
+    expect(html).toContain('Task #3 Export: Needs you');
+    expect(html).toContain('Which export format?');
+    expect(html).toContain('data-phase="needs-you"');
+    expect(html).not.toContain('thread-report-reply');
+  });
+
+  test('done and failed reports carry the same line next to their status', () => {
+    const done = render({ ...REPORT, phase: 'done', id: 'r4', line: 'Shipped the export' });
+    expect(done).toContain('Task #3 Export: Done, not verified');
+    expect(done).toContain('Shipped the export');
+    const failed = render({ ...REPORT, phase: 'failed', id: 'r5', line: 'Tests would not pass' });
+    expect(failed).toContain('Task #3 Export: Failed');
+    expect(failed).toContain('Tests would not pass');
+  });
+
+  test('the stream mapper keeps a needs-you report and its line', () => {
+    const rows = [
+      {
+        id: 'a',
+        role: 'system' as const,
+        content: JSON.stringify({ ...REPORT, phase: 'needs-you', line: 'Which format?' }),
+        createdAt: 1,
+      },
+    ];
+    expect(mapChiefStream(rows)).toEqual([
+      { ...REPORT, phase: 'needs-you', id: 'a', line: 'Which format?' },
+    ]);
+  });
 });

@@ -17,7 +17,7 @@ function row(id: string, role: MessageRow['role'], content: unknown): MessageRow
 }
 
 describe('chief thread reports and quiet event turns (#1784)', () => {
-  test.each(['done', 'failed', 'review'])(
+  test.each(['done', 'failed', 'review', 'needs-you'])(
     '%s report stays while the wake prompt, its tools and its text are hidden',
     (phase) => {
       const items = mapChiefStream(

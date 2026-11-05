@@ -19,6 +19,7 @@ import {
 } from './config.js';
 import { createDaemonLogger } from './log.js';
 import { runMachine } from './machine-loop.js';
+import { runOrbServicesEnsure } from './orb/services-runtime.js';
 import { runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
@@ -253,6 +254,18 @@ export function buildProgram(): Command {
     .action(async (opts: { socket: string }) => {
       if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
       await runOrbWorker({ socketPath: opts.socket });
+    });
+
+  const orb = program.command('orb').description('Orb host helpers');
+  orb
+    .command('services')
+    .command('ensure')
+    .description('Start missing services from .agents/services.yaml and wait until ready')
+    .option('--json', 'print JSON status')
+    .option('--file <path>', 'services file (default .agents/services.yaml)')
+    .action(async (opts: { json?: boolean; file?: string }) => {
+      const code = await runOrbServicesEnsure(opts);
+      if (code !== 0) process.exitCode = code;
     });
 
   return program;

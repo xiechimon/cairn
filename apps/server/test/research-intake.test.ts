@@ -17,12 +17,15 @@ import {
   message,
   retroProposal,
   todo,
+  tokenUsage,
   user,
 } from '../src/db/schema.js';
 import { planChiefDigests } from '../src/services/chief-digest.js';
 import { decideRetroProposal } from '../src/services/chief-report.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { storeInfoReport } from '../src/services/info-handoff.js';
 import { intakeTally, normalizeIntakeUrl, parseIntakeItems } from '../src/services/intake-items.js';
+import { openCitationCheck } from '../src/services/research-citations.js';
 import { planResearchIntake } from '../src/services/research-intake.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
@@ -77,6 +80,16 @@ async function world(opts: { github?: { calls: string[] } } = {}) {
       displayName: 'opus',
       provider: 'claude-code',
       modelId: 'claude-opus-5-5',
+    })
+    .run();
+  s.db
+    .insert(agent)
+    .values({
+      id: 'citation-checker',
+      teamId,
+      displayName: 'Checker',
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
     })
     .run();
   s.db
@@ -176,23 +189,69 @@ function openThread(w: World, seq: number, title: string, phase: 'todo' | 'done'
     .run();
 }
 
-function land(w: World, todoId: string, report: string): void {
+function land(w: World, todoId: string, report: string, audited = true): void {
   const buildId = w.s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.latestBuildId;
   if (!buildId) throw new Error('intake todo has no build');
+  storeInfoReport(
+    { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
+    {
+      buildId,
+      teamId: w.teamId,
+      createdBy: w.s.user.id,
+      report,
+    },
+  );
   w.s.db
-    .insert(message)
-    .values({
-      id: `info-report-${buildId}`,
-      conversationId: buildId,
-      role: 'system',
-      content: JSON.stringify({
-        kind: 'info-report',
-        attachmentId: 'att',
-        attachmentToken: 'tok',
-        content: report,
-      }),
-      createdAt: 1,
-    })
+    .insert(tokenUsage)
+    .values({ buildId, model: 'claude-opus-5-5', input: 1, output: 1 })
+    .onConflictDoNothing()
+    .run();
+  if (audited) auditIntake(w, buildId, report);
+}
+
+function auditIntake(w: World, buildId: string, report: string): void {
+  const checker = openCitationCheck(w.s.svc, buildId);
+  if (!checker) return;
+  let items: unknown = [];
+  try {
+    const raw = [...report.matchAll(/```json\s*\n([\s\S]*?)\n```/g)].at(-1)?.[1];
+    items = raw ? JSON.parse(raw) : [];
+  } catch {
+    items = [];
+  }
+  const claims = (Array.isArray(items) ? items : []).flatMap((item) => {
+    if (
+      typeof item !== 'object' ||
+      item === null ||
+      typeof item.url !== 'string' ||
+      !/^https?:/.test(item.url)
+    )
+      return [];
+    const claim = typeof item.claim === 'string' ? item.claim.trim() : '';
+    return [
+      {
+        url: item.url,
+        claim: claim || 'No supported claim',
+        verdict: claim ? 'supported' : 'unsupported',
+        reason: 'Fixture release feed',
+        quote: claim,
+        fetchedAt: '2026-10-27',
+        quality: 'primary',
+      },
+    ];
+  });
+  storeInfoReport(
+    { db: w.s.db, attachmentsDir: w.s.attachmentsDir },
+    {
+      buildId: checker.buildId,
+      teamId: w.teamId,
+      createdBy: w.s.user.id,
+      report: `Citation audit\n\n\`\`\`json\n${JSON.stringify({ claims })}\n\`\`\``,
+    },
+  );
+  w.s.db
+    .insert(tokenUsage)
+    .values({ buildId: checker.buildId, model: 'gpt-6.1-sol', input: 1, output: 1 })
     .run();
 }
 
@@ -410,6 +469,29 @@ describe('daily intake tick', () => {
     expect(spec).toContain('https://example.com/recent recent claim');
     expect(spec).not.toContain('old claim');
   });
+
+  test('an open stuck-research todo is not an intake search cue', async () => {
+    const w = await world();
+    openThread(w, 1, 'real work', 'todo');
+    w.s.db
+      .insert(todo)
+      .values({
+        id: 'todo-stuck-research',
+        teamId: w.teamId,
+        projectId: w.projectId,
+        title: 'Research: Fix flaky export',
+        phase: 'building',
+        phaseAt: 500,
+        seqNum: 9,
+        sourceKind: 'research-stuck',
+        sourceRef: 'build:0',
+      })
+      .run();
+    runIntake(w, D1_0630);
+    const spec = intakeTodos(w)[0]?.spec ?? '';
+    expect(spec).toContain('real work');
+    expect(spec).not.toContain('Research: Fix flaky export');
+  });
 });
 
 describe('intake items in the 08:00 report', () => {
@@ -421,6 +503,119 @@ describe('intake items in the 08:00 report', () => {
     finishedYesterday(w, D1_0830);
     return w;
   }
+
+  test('a persisted pending delivery survives restart and two newer intake threads', async () => {
+    const w = await dayWithIntake(null);
+    const intake = intakeTodos(w)[0];
+    if (!intake?.latestBuildId) throw new Error('intake missing');
+    const report = block([item(1)]);
+    land(w, intake.id, report, false);
+    runReport(w, D1_0830);
+    const madeAt = postedReport(w, '2026-10-27').madeAt;
+    expect(postedReport(w, '2026-10-27').intake ?? []).toEqual([]);
+    runIntake(w, D2_0630);
+    runIntake(w, D2_0630 + DAY_MS);
+    expect(intakeTodos(w)).toHaveLength(3);
+    auditIntake(w, intake.latestBuildId, report);
+    const options = { tickMs: 60_000, researchIntakeProjectId: null };
+    await createScheduler(w.s.svc, options).tick(D2_0830 + DAY_MS);
+    await createScheduler(w.s.svc, options).tick(D2_0830 + DAY_MS + 1000);
+    const delivered = postedReport(w, '2026-10-27');
+    expect(delivered.intake?.map((row) => row.claim)).toEqual(['claim 1']);
+    expect(delivered.madeAt).toBe(madeAt);
+    expect(delivered.yesterday.finishedCount).toBe(1);
+    expect(w.s.db.select().from(retroProposal).all()).toHaveLength(1);
+  });
+
+  test('late audited intake creates the previously empty report without a second report row', async () => {
+    const w = await world();
+    runIntake(w, D1_0630);
+    const intake = intakeTodos(w)[0];
+    if (!intake) throw new Error('intake missing');
+    runReport(w, D1_0830);
+    const reportId = reportIdOf(w, '2026-10-27', 'chief-1');
+    expect(
+      w.s.db.select().from(chiefReport).where(eq(chiefReport.id, reportId)).get()?.status,
+    ).toBe('empty');
+    land(w, intake.id, block([item(1)]));
+    await createScheduler(w.s.svc, { tickMs: 60_000, researchIntakeProjectId: null }).tick(
+      D1_0830 + 1000,
+    );
+    expect(postedReport(w, '2026-10-27').intake?.map((row) => row.claim)).toEqual(['claim 1']);
+    expect(w.s.db.select().from(chiefReport).all()).toHaveLength(1);
+    expect(
+      w.s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `${CHIEF_REPORT_ROW_ID_PREFIX}${reportId}`))
+        .all(),
+    ).toHaveLength(1);
+  });
+
+  test('malformed delivery records rotate out of a bounded batch so ready work is not starved', async () => {
+    const w = await dayWithIntake(null);
+    runReport(w, D1_0830);
+    const rec = w.s.db
+      .select()
+      .from(chiefReport)
+      .where(eq(chiefReport.id, reportIdOf(w, '2026-10-27', 'chief-1')))
+      .get();
+    if (!rec?.inputs) throw new Error('report inputs missing');
+    for (let i = 0; i < 5; i++) {
+      const id = `broken-${i}`;
+      w.s.db
+        .insert(chiefReport)
+        .values({
+          id,
+          chiefId: 'chief-1',
+          teamId: w.teamId,
+          day: `2026-10-0${i + 1}`,
+          threadId: 'thread-main',
+          status: 'posted',
+          inputs: rec.inputs,
+          createdAt: 0,
+        })
+        .run();
+      w.s.db
+        .insert(message)
+        .values({
+          id: `research-intake-delivery:${id}`,
+          conversationId: `research-intake-delivery:${id}`,
+          role: 'system',
+          content: { todoIds: 'malformed' },
+          createdAt: 0,
+        })
+        .run();
+    }
+    const intake = intakeTodos(w)[0];
+    if (!intake) throw new Error('intake missing');
+    land(w, intake.id, block([item(1)]));
+    const options = { tickMs: 60_000, researchIntakeProjectId: null };
+    await createScheduler(w.s.svc, options).tick(D1_0830 + 1000);
+    expect(postedReport(w, '2026-10-27').intake ?? []).toEqual([]);
+    await createScheduler(w.s.svc, options).tick(D1_0830 + 2000);
+    expect(postedReport(w, '2026-10-27').intake?.map((row) => row.claim)).toEqual(['claim 1']);
+  });
+
+  test('late audited items share the original five-item budget', async () => {
+    const w = await world();
+    runIntake(w, D1_0630);
+    const first = intakeTodos(w)[0];
+    if (!first) throw new Error('first source missing');
+    land(w, first.id, block([item(1), item(2), item(3), item(4)]));
+    runIntake(w, D2_0630);
+    const second = intakeTodos(w).find((row) => row.id !== first.id);
+    if (!second?.latestBuildId) throw new Error('second source missing');
+    const delayed = block([item(5), item(6), item(7)]);
+    land(w, second.id, delayed, false);
+    runReport(w, D2_0830);
+    expect(postedReport(w, '2026-10-28').intake).toHaveLength(4);
+    auditIntake(w, second.latestBuildId, delayed);
+    await createScheduler(w.s.svc, { tickMs: 60_000, researchIntakeProjectId: null }).tick(
+      D2_0830 + 1000,
+    );
+    expect(postedReport(w, '2026-10-28').intake).toHaveLength(5);
+  });
 
   test('lists the items as draft intake rows, not as retro proposals', async () => {
     const w = await dayWithIntake(block([item(1), item(2)]));
@@ -525,15 +720,17 @@ describe('intake items in the 08:00 report', () => {
     expect(postedReport(w, '2026-10-27').intake).toHaveLength(1);
   });
 
-  test('a thread still running at 08:00 posts the report without intake and the items show next day', async () => {
+  test('a late source updates the original report and is not repeated on the next day', async () => {
     const w = await dayWithIntake(null);
     runReport(w, D1_0830);
     expect(postedReport(w, '2026-10-27').intake ?? []).toEqual([]);
     const [intake] = intakeTodos(w);
     if (intake) land(w, intake.id, block([item(1)]));
     runIntake(w, D2_0630);
+    expect(postedReport(w, '2026-10-27').intake?.map((i) => i.claim)).toEqual(['claim 1']);
+    finishedYesterday(w, D2_0830);
     runReport(w, D2_0830);
-    expect(postedReport(w, '2026-10-28').intake?.map((i) => i.claim)).toEqual(['claim 1']);
+    expect(postedReport(w, '2026-10-28').intake ?? []).toEqual([]);
   });
 
   test('items already listed are not listed again by a later report', async () => {

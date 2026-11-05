@@ -1,4 +1,5 @@
-import type { SearchResponse } from '@cairn/shared';
+import { parseSearchQuery, type SearchResponse } from '@cairn/shared';
+import { Activity, CircleHelp } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
@@ -12,42 +13,36 @@ import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/di
 import { Input } from '../components/ui/input.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { withoutDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
 import type { AgentRef, FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  Clock,
-  FileCheck,
-  Kanban,
-  Key,
-  Layers,
-  Network,
-  Puzzle,
-  Route,
-  Search,
-  Server,
-  Users,
-  X,
-} from '../icons/index.js';
+import { Clock, Kanban, Search, Settings, X } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
+import { ACTIVITY_PATH, activityHref } from '../search/activity-href.js';
+import { activityTodosForHits, searchTodosLocally } from '../search/activity-model.js';
+import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
+import {
+  chipProblem,
+  completeTrailingToken,
+  endsInFilter,
+  joinQuery,
+  removeChipAt,
+  splitQuery,
+} from '../search/search-query.js';
+import { SETTINGS_HREF } from '../settings/settings-href.js';
 
 const NAV_ROWS = [
-  { label: '任务', Icon: FileCheck, href: '/app' },
-  { label: '首页', Icon: Kanban, href: '/app' },
+  { label: 'Coordinator', Icon: Kanban, href: '/app' },
   { label: '定时', Icon: Clock, href: '/app/schedules' },
-  { label: '团队', Icon: Users, href: '/app/team' },
-  { label: '技能', Icon: Puzzle, href: '/app/resources/skills' },
-  { label: 'MCP', Icon: Network, href: '/app/resources/mcp-servers' },
-  { label: '密钥', Icon: Key, href: '/app/resources/secrets' },
-  { label: '机器', Icon: Server, href: '/app/resources/machines' },
-  { label: '模型服务', Icon: Layers, href: '/app/resources/providers' },
-  { label: '模型路由', Icon: Route, href: '/app/resources/model-routing' },
+  { label: '活动', Icon: Activity, href: ACTIVITY_PATH },
+  { label: '设置', Icon: Settings, href: SETTINGS_HREF },
 ];
 
-const ROW_BASE =
+export const ROW_BASE =
   'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
 
-const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
+export const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
 function rowLitClasses(selected: boolean, kbd: boolean): string {
   if (selected) return ROW_LIT;
@@ -55,8 +50,9 @@ function rowLitClasses(selected: boolean, kbd: boolean): string {
   return 'hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 }
 
-const GROUP_LABEL = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
-const ROW_END = 'ml-auto flex flex-none items-center gap-1.5 pl-3 text-meta text-content-tertiary';
+export const GROUP_LABEL = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
+export const ROW_END =
+  'ml-auto flex flex-none items-center gap-1.5 pl-3 text-meta text-content-tertiary';
 
 export interface SearchCommand {
   id: string;
@@ -183,16 +179,31 @@ export function SearchPanel({
   }, []);
   useSingleLitSurface(open);
   const q = query.trim().toLowerCase();
+  const { chips, text } = splitQuery(query, Date.now());
+  const hasFilters = parseSearchQuery(query, Date.now()).filters.length > 0;
   const useServer = server !== undefined && q !== '';
+  const localSearch =
+    !useServer && hasFilters
+      ? searchTodosLocally(
+          fixture.todos,
+          (projectId) => fixture.projectNames?.[projectId] ?? PROJECT_NAME,
+          parseSearchQuery(query, Date.now()),
+        )
+      : undefined;
   const todos: TodoRowItem[] = useServer
     ? server.todos
-    : q === ''
-      ? []
-      : fixture.todos.filter((t) => t.title.toLowerCase().includes(q));
+    : localSearch !== undefined
+      ? localSearch.todos
+      : q === ''
+        ? []
+        : fixture.todos.filter((t) => t.title.toLowerCase().includes(q));
+  const chipProblems = chips.map((chip) =>
+    chipProblem(chip, useServer ? server.filters : localSearch?.filters),
+  );
   const agentAvatarById = useAgentAvatarUrlById();
   const agents: AgentRowItem[] = useServer
     ? server.agents.map((a) => ({ ...a, avatarUrl: agentAvatarById.get(a.id) ?? null }))
-    : q === ''
+    : q === '' || hasFilters
       ? []
       : [...new Set(fixture.todos.map((t) => t.agent))]
           .filter((agent): agent is AgentRef => agent != null)
@@ -209,7 +220,7 @@ export function SearchPanel({
       : ((projectId !== undefined ? fixture.projectNames?.[projectId] : undefined) ?? projectName);
   const projects: ProjectRowItem[] = useServer
     ? server.projects
-    : q === ''
+    : q === '' || hasFilters
       ? []
       : liveProjects
         ? liveProjects
@@ -244,6 +255,19 @@ export function SearchPanel({
     navigate({ pathname, search });
     onClose();
   };
+  const openActivity = () => {
+    navigate(activityHref(query, search));
+    onClose();
+  };
+  const viewAllCount = activityTodosForHits(
+    todos,
+    live ? fixture.todos : withoutDeleted(fixture.todos),
+  ).length;
+  const showViewAll = q !== '' && viewAllCount > 0;
+  const [helpOpen, setHelpOpen] = useState(false);
+  useEffect(() => {
+    if (!open) setHelpOpen(false);
+  }, [open]);
   const goThread = (id: string) => {
     navigate(threadHrefFrom(id, search));
     onClose();
@@ -260,6 +284,7 @@ export function SearchPanel({
           ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
           ...agents.map(() => () => go('/app/team')),
+          ...(showViewAll ? [openActivity] : []),
         ]),
   ];
   const base = commands.length;
@@ -314,18 +339,48 @@ export function SearchPanel({
             </span>
           </div>
         )}
-        <div className="flex h-12 flex-none items-center gap-2.5 border-b border-border px-4 text-content-tertiary">
-          <Search width={16} height={16} />
+        <div className="flex min-h-12 flex-none flex-wrap items-center gap-1.5 border-b border-border px-4 py-2 text-content-tertiary">
+          <Search width={16} height={16} className="flex-none" />
+          {chips.map((chip, index) => (
+            <QueryChip
+              key={`${chip.raw}-${index}`}
+              chip={chip}
+              problem={chipProblems[index] ?? null}
+              onRemove={() => {
+                onQuery(joinQuery(removeChipAt(chips, index), text));
+                inputRef.current?.focus({ preventScroll: true });
+              }}
+            />
+          ))}
           <Input
             ref={attachInput}
-            className="flex-1 h-auto border-none shadow-none ring-0 p-0 text-card-title md:text-card-title leading-5 rounded-none bg-transparent dark:bg-transparent text-foreground placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:!ring-0 focus-visible:outline-none"
-            value={query}
-            placeholder={t(activeContext != null ? '输入命令或搜索…' : '搜索任务、项目、成员…')}
-            onChange={(event) => onQuery(event.target.value)}
+            className="flex-1 min-w-24 h-auto border-none shadow-none ring-0 p-0 text-card-title md:text-card-title leading-5 rounded-none bg-transparent dark:bg-transparent text-foreground placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:!ring-0 focus-visible:outline-none"
+            value={text}
+            aria-label={t('搜索')}
+            placeholder={t(
+              activeContext != null
+                ? '输入命令或搜索…'
+                : chips.length > 0
+                  ? '再加一个筛选或词'
+                  : '搜索任务、项目、成员…',
+            )}
+            onChange={(event) => onQuery(joinQuery(chips, event.target.value))}
             onKeyDown={(event) => {
-              if (event.key === 'Backspace' && query === '' && activeContext != null) {
+              const lastChip = chips.at(-1);
+              if (event.key === 'Backspace' && text === '' && lastChip !== undefined) {
+                event.preventDefault();
+                onQuery(joinQuery(chips.slice(0, -1), lastChip.raw));
+              } else if (event.key === 'Backspace' && query === '' && activeContext != null) {
                 event.preventDefault();
                 dropContext();
+              } else if (event.key === 'Tab' && !event.shiftKey) {
+                const completed = completeTrailingToken(text);
+                if (completed === null) return;
+                event.preventDefault();
+                onQuery(joinQuery(chips, completed));
+              } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                openActivity();
               } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 if (actions.length === 0) return;
                 event.preventDefault();
@@ -337,6 +392,13 @@ export function SearchPanel({
                       : actions.length - 1
                     : (prev + step + actions.length) % actions.length,
                 );
+              } else if (
+                event.key === 'Enter' &&
+                cursor == null &&
+                endsInFilter(text, Date.now())
+              ) {
+                event.preventDefault();
+                onQuery(`${query} `);
               } else if (event.key === 'Enter' && cursor != null) {
                 const action = actions[cursor];
                 if (action == null) return;
@@ -346,12 +408,29 @@ export function SearchPanel({
             }}
           />
         </div>
+        <ChipProblems chips={chips} problems={chipProblems} />
         {q !== '' && hitCount === 0 ? (
-          <div className="px-4 py-6 text-ui text-content-tertiary">
-            {t('没有与“{q}”匹配的结果', { q: query.trim() })}
+          <div className="flex flex-col gap-2 px-4 py-6 text-ui text-content-tertiary">
+            <span>
+              {chips.length > 0
+                ? t('没有同时满足这些筛选的任务')
+                : t('没有与“{q}”匹配的结果', { q: query.trim() })}
+            </span>
+            {chips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-content-secondary"
+                  onClick={() => onQuery(text)}
+                >
+                  {t('清除全部筛选')}
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pt-1 pb-1.5" ref={listRef}>
+          <div className="min-h-12 flex-1 overflow-y-auto px-1.5 pt-1 pb-1.5" ref={listRef}>
             {commands.length > 0 && (
               <>
                 <div className={GROUP_LABEL}>{t('这个任务')}</div>
@@ -458,9 +537,38 @@ export function SearchPanel({
                     })}
                   </>
                 )}
+                {showViewAll && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('没找到想要的？')}</div>
+                    <Button
+                      variant="ghost"
+                      data-row-kind="activity"
+                      data-row-index={base + todos.length + projects.length + agents.length}
+                      data-selected={
+                        cursor === base + todos.length + projects.length + agents.length
+                          ? ''
+                          : undefined
+                      }
+                      className={`${ROW_BASE} ${rowLitClasses(cursor === base + todos.length + projects.length + agents.length, kbd)}`}
+                      onClick={openActivity}
+                    >
+                      <Activity width={15} height={15} />
+                      {t('在活动里查看全部 {n} 条', { n: viewAllCount })}
+                      <span className={ROW_END}>
+                        <Kbd>⌘↵</Kbd>
+                      </span>
+                    </Button>
+                  </>
+                )}
               </>
             )}
           </div>
+        )}
+        {helpOpen && (
+          <SyntaxHelp
+            onClose={() => setHelpOpen(false)}
+            className="mx-1.5 mb-1.5 max-h-64 min-h-24 shrink overflow-y-auto shadow-none ring-1 ring-border"
+          />
         )}
         <div className="flex h-9 flex-none items-center gap-4 border-t border-border px-3.5 text-caption text-content-tertiary">
           <span className="flex items-center gap-1.5">
@@ -479,6 +587,16 @@ export function SearchPanel({
             </span>
           )}
           <span className="ml-auto flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="xs"
+              className="text-content-tertiary"
+              aria-expanded={helpOpen}
+              onClick={() => setHelpOpen((value) => !value)}
+            >
+              <CircleHelp data-icon="inline-start" />
+              {t('语法')}
+            </Button>
             <Kbd>Esc</Kbd>
             {t('关闭')}
           </span>
