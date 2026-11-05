@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { constants } from 'node:fs';
 import {
@@ -16,6 +15,7 @@ import {
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { awaitWithSignal } from './cancellation.js';
+import { spawnContainedCommand } from './contained-spawn.js';
 import { COMPUTER_MARKER_ENV, ProcessTree } from './process-tree.js';
 import {
   type ComputerExecuteRequest,
@@ -87,11 +87,10 @@ function isInside(root: string, target: string): boolean {
   );
 }
 
-export class AsyncEventQueue {
+class AsyncEventQueue {
   private readonly items: ComputerProcessEvent[] = [];
   private wake: (() => void) | undefined;
   private ended = false;
-  private failure: Error | undefined;
 
   push(event: ComputerProcessEvent): void {
     this.items.push(event);
@@ -101,11 +100,6 @@ export class AsyncEventQueue {
   end(): void {
     this.ended = true;
     this.notify();
-  }
-
-  fail(error: Error): void {
-    this.failure ??= error;
-    this.end();
   }
 
   private notify(): void {
@@ -121,7 +115,6 @@ export class AsyncEventQueue {
         yield next;
         continue;
       }
-      if (this.failure) throw this.failure;
       if (this.ended) return;
       await new Promise<void>((resolve) => {
         this.wake = resolve;
@@ -258,9 +251,9 @@ export class HostComputerProvider implements ComputerProvider {
       ...hostCommandEnvironment(this.env, request.env),
       [COMPUTER_MARKER_ENV]: marker,
     };
-    let child: ReturnType<typeof spawn>;
+    let child: ReturnType<typeof spawnContainedCommand>;
     try {
-      child = spawn(command, args, {
+      child = spawnContainedCommand(command, args, {
         cwd,
         env,
         detached: true,
@@ -301,9 +294,7 @@ export class HostComputerProvider implements ComputerProvider {
       finish(code, reason, note);
     };
     const abort = () => {
-      const timedOut =
-        signal.reason === 'timeout' ||
-        (signal.reason instanceof Error && signal.reason.name === 'TimeoutError');
+      const timedOut = signal.reason === 'timeout';
       void terminate(
         timedOut ? 124 : 130,
         timedOut ? 'timeout' : 'aborted',

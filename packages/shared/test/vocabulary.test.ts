@@ -393,6 +393,7 @@ describe('worker memory tools (02 §4.4/r5 §6: worker-step remoteTools memory t
     expect(Object.keys(props).sort()).toEqual([
       'content',
       'force',
+      'layer',
       'projectId',
       'sourceTodoId',
       'title',

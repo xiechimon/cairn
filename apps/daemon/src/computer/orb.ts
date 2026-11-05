@@ -3,6 +3,7 @@ import {
   closeSync,
   constants,
   fchmodSync,
+  fstatSync,
   lstatSync,
   openSync,
   unlinkSync,
@@ -14,6 +15,7 @@ import { z } from 'zod';
 import type { ComputerOrbs } from '../orb/computer.js';
 import { ORB_MAX_FRAME_BYTES } from '../orb/protocol.js';
 import { AsyncEventQueue } from './host.js';
+import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import {
   decodeOrbComputerFrame,
   encodeOrbComputerFrame,
@@ -63,7 +65,8 @@ interface Pending {
 
 export interface OrbComputerProviderOptions {
   orbs: Pick<ComputerOrbs, 'ensure' | 'touch'>;
-  runtimeRoot?: string;
+  runtimeRoot?: string | (() => string);
+  inputFence?: ComputerInputFence;
   expectedRelease?: () => string | undefined;
   release?: {
     publish(): Promise<string>;
@@ -96,6 +99,7 @@ class GuestLink {
   private nextId = 0;
   private closed = false;
   private ownsFiles = false;
+  private directoryDescriptor: number | undefined;
   private readonly pending = new Map<number, Pending>();
   private readonly waiters = new Set<() => void>();
   private readonly sockets = new Set<Socket>();
@@ -107,7 +111,12 @@ class GuestLink {
   ) {}
 
   private get socketPath(): string {
-    return join(this.directory, ORB_COMPUTER_SOCKET);
+    return join(
+      process.platform === 'linux' && this.directoryDescriptor !== undefined
+        ? `/proc/self/fd/${this.directoryDescriptor}`
+        : this.directory,
+      ORB_COMPUTER_SOCKET,
+    );
   }
 
   listen(): Promise<void> {
@@ -128,6 +137,22 @@ class GuestLink {
       throw new ComputerTransportError(
         'Computer runtime directory must be a 0700 directory owned by the daemon',
       );
+    const descriptor = openSync(
+      this.directory,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    const opened = fstatSync(descriptor);
+    if (
+      !opened.isDirectory() ||
+      opened.dev !== directory.dev ||
+      opened.ino !== directory.ino ||
+      opened.uid !== process.getuid?.() ||
+      (opened.mode & 0o7777) !== 0o700
+    ) {
+      closeSync(descriptor);
+      throw new ComputerTransportError('Computer runtime directory changed before opening');
+    }
+    this.directoryDescriptor = descriptor;
     const paths = [this.socketPath, `${this.socketPath}.token`];
     for (const path of paths) {
       const metadata = lstatSync(path, { throwIfNoEntry: false });
@@ -150,17 +175,27 @@ class GuestLink {
         process.umask(mask);
       }
     });
+    if (this.closed) throw new ComputerTransportError('Computer link closed during startup');
     this.ownsFiles = true;
-    const descriptor = openSync(
+    const current = lstatSync(this.directory);
+    if (
+      !current.isDirectory() ||
+      current.dev !== opened.dev ||
+      current.ino !== opened.ino ||
+      current.uid !== opened.uid ||
+      (current.mode & 0o7777) !== 0o700
+    )
+      throw new ComputerTransportError('Computer runtime directory changed while opening');
+    const tokenDescriptor = openSync(
       `${this.socketPath}.token`,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
       0o600,
     );
     try {
-      fchmodSync(descriptor, 0o600);
-      writeFileSync(descriptor, this.token);
+      fchmodSync(tokenDescriptor, 0o600);
+      writeFileSync(tokenDescriptor, this.token);
     } finally {
-      closeSync(descriptor);
+      closeSync(tokenDescriptor);
     }
     this.watchdog = setInterval(
       () => this.checkHeartbeat(),
@@ -363,7 +398,6 @@ class GuestLink {
     let finished = false;
     let stopTimer: NodeJS.Timeout | undefined;
     let limitTimer: NodeJS.Timeout | undefined;
-    let stopReason: 'timeout' | 'aborted' | undefined;
     const settle = () => {
       finished = true;
       clearTimeout(stopTimer);
@@ -372,6 +406,7 @@ class GuestLink {
       this.pending.delete(id);
       queue.end();
     };
+    let stopReason: 'timeout' | 'aborted' | undefined;
     const forceExit = (code: number, reason: 'timeout' | 'aborted') => {
       if (finished) return;
       queue.push({ kind: 'exit', code, reason });
@@ -452,24 +487,31 @@ class GuestLink {
     for (const socket of this.sockets) socket.destroy();
     const server = this.server;
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
-    if (!this.ownsFiles) return;
-    for (const path of [this.socketPath, `${this.socketPath}.token`]) {
-      try {
-        const metadata = lstatSync(path, { throwIfNoEntry: false });
-        if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
-      } catch {}
+    try {
+      if (this.ownsFiles) {
+        for (const path of [this.socketPath, `${this.socketPath}.token`]) {
+          try {
+            const metadata = lstatSync(path, { throwIfNoEntry: false });
+            if (metadata?.isFile() || metadata?.isSocket()) unlinkSync(path);
+          } catch {}
+        }
+      }
+    } finally {
+      if (this.directoryDescriptor !== undefined) closeSync(this.directoryDescriptor);
+      this.directoryDescriptor = undefined;
     }
   }
 }
 
 export class OrbComputerProvider implements ScopedComputerProviders {
   private readonly links = new Map<string, GuestLink>();
+  private readonly inputLeases = new Map<string, ComputerInputLease>();
   private readonly settings: LinkSettings;
   private published: string | undefined;
   private publishing: Promise<string> | undefined;
   private readonly connectTimeoutMs: number;
   private readonly touchMs: number;
-  private readonly runtimeRoot: string;
+  private readonly runtimeRoot: string | (() => string);
 
   constructor(private readonly options: OrbComputerProviderOptions) {
     this.runtimeRoot = options.runtimeRoot ?? DEFAULT_RUNTIME_ROOT;
@@ -490,6 +532,24 @@ export class OrbComputerProvider implements ScopedComputerProviders {
           }
         : {}),
     };
+  }
+
+  private releaseInput(scopeKey: string): void {
+    const lease = this.inputLeases.get(scopeKey);
+    if (!lease) return;
+    this.inputLeases.delete(scopeKey);
+    lease.release();
+  }
+
+  private async claimInput(scopeKey: string, signal?: AbortSignal): Promise<void> {
+    const fence = this.options.inputFence;
+    if (!fence || this.inputLeases.has(scopeKey)) return;
+    try {
+      this.inputLeases.set(scopeKey, await fence.acquire(scopeKey, signal));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ComputerRefusal(message);
+    }
   }
 
   forScope(scopeKey: string): ComputerProvider {
@@ -605,18 +665,26 @@ export class OrbComputerProvider implements ScopedComputerProviders {
 
   private async link(scopeKey: string, signal?: AbortSignal): Promise<GuestLink> {
     await this.beforeDelivery(() => this.ensurePublished(), signal);
+    await this.claimInput(scopeKey, signal);
     let name: string;
     try {
       name = await this.beforeDelivery(() => this.options.orbs.ensure(scopeKey), signal);
     } catch (error) {
+      if (!this.links.has(scopeKey)) this.releaseInput(scopeKey);
       this.options.onError?.(`computer ${scopeKey} could not start: ${String(error)}`);
       throw new ComputerRefusal('The computer could not be started, so nothing ran');
     }
-    const directory = join(this.runtimeRoot, name);
+    const directory = join(
+      typeof this.runtimeRoot === 'function' ? this.runtimeRoot() : this.runtimeRoot,
+      name,
+    );
     let link = this.links.get(scopeKey);
     if (link && link.directory !== directory) {
       await link.close();
+      this.links.delete(scopeKey);
+      this.releaseInput(scopeKey);
       link = undefined;
+      await this.claimInput(scopeKey, signal);
     }
     if (!link) {
       link = new GuestLink(directory, this.settings);
@@ -626,10 +694,22 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       await this.beforeDelivery(link.listen.bind(link), signal);
     } catch (error) {
       this.options.onError?.(`computer ${scopeKey} socket failed: ${String(error)}`);
+      await link.close();
+      if (this.links.get(scopeKey) === link) this.links.delete(scopeKey);
+      this.releaseInput(scopeKey);
       throw new ComputerRefusal('The computer link could not be opened, so nothing ran');
     }
-    await link.connected(this.connectTimeoutMs, signal);
-    if (signal?.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
+    try {
+      await link.connected(this.connectTimeoutMs, signal);
+      if (signal?.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
+    } catch (error) {
+      if (signal?.aborted) {
+        await link.close();
+        if (this.links.get(scopeKey) === link) this.links.delete(scopeKey);
+        this.releaseInput(scopeKey);
+      }
+      throw error;
+    }
     return link;
   }
 
@@ -638,8 +718,14 @@ export class OrbComputerProvider implements ScopedComputerProviders {
   }
 
   async close(): Promise<void> {
+    const scopes = [...this.links.keys()];
     const links = [...this.links.values()];
     this.links.clear();
-    await Promise.all(links.map((link) => link.close()));
+    try {
+      await Promise.all(links.map((link) => link.close()));
+    } finally {
+      for (const scopeKey of scopes) this.releaseInput(scopeKey);
+      for (const scopeKey of this.inputLeases.keys()) this.releaseInput(scopeKey);
+    }
   }
 }

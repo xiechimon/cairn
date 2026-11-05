@@ -35,14 +35,19 @@ function writeToken(token: string | null): void {
 export interface AuthSnapshot {
   gateOpen: boolean;
   rejected: boolean;
+  generation: number;
 }
 
-let snapshot: AuthSnapshot = { gateOpen: false, rejected: false };
+let snapshot: AuthSnapshot = { gateOpen: false, rejected: false, generation: 0 };
 const listeners = new Set<() => void>();
 let gateWaiters: Array<() => void> = [];
 
-function publish(gateOpen: boolean, rejected: boolean): void {
-  snapshot = { gateOpen, rejected };
+function publish(gateOpen: boolean, rejected: boolean, acceptedToken = false): void {
+  snapshot = {
+    gateOpen,
+    rejected,
+    generation: snapshot.generation + Number(acceptedToken || gateOpen !== snapshot.gateOpen),
+  };
   for (const listener of listeners) listener();
 }
 
@@ -78,7 +83,7 @@ export function passGate(token: string): void {
   writeToken(token);
   const waiters = gateWaiters;
   gateWaiters = [];
-  publish(false, false);
+  publish(false, false, true);
   for (const wake of waiters) wake();
 }
 

@@ -162,7 +162,6 @@ export function parseShellWords(source: string, env: ShellParseEnv): ShellParseE
     for (index = 0; index < chunk.length; index += 1) {
       let character = chunk.charAt(index);
       if (character !== '$') flushRun();
-      isGlob = isGlob || (!quote && (character === '*' || character === '?'));
       if (escaped) {
         out += character;
         escaped = false;
@@ -208,12 +207,14 @@ export function parseShellWords(source: string, env: ShellParseEnv): ShellParseE
         for (const valueCharacter of value) {
           if (!IFS.includes(valueCharacter)) {
             flushRun();
+            isGlob ||= '*?['.includes(valueCharacter);
             out += valueCharacter;
           } else {
             pendingSplit = true;
           }
         }
       } else {
+        isGlob ||= '*?['.includes(character);
         out += character;
       }
     }
@@ -245,6 +246,31 @@ export function parseShellWords(source: string, env: ShellParseEnv): ShellParseE
           : part,
       );
     }
+  }
+  return result;
+}
+
+export function preserveShellCommandBoundaries(command: string): string {
+  let quote: "'" | '"' | undefined;
+  let result = '';
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    const next = command[index + 1];
+    if (character === '\\' && quote !== "'") {
+      if (next === '\n') {
+        index += 1;
+        continue;
+      }
+      result += character;
+      if (next !== undefined) {
+        result += next;
+        index += 1;
+      }
+      continue;
+    }
+    if (character === quote) quote = undefined;
+    else if (!quote && (character === "'" || character === '"')) quote = character;
+    result += character === '\n' && !quote ? '\n;' : character;
   }
   return result;
 }

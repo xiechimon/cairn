@@ -7,7 +7,7 @@ import { transcriptRowSchema } from '../records/message.js';
 import { notificationRecordSchema } from '../records/notification.js';
 import { stepActivitySchema, stepJournalRowSchema } from '../records/step.js';
 import { todoRecordSchema } from '../records/todo.js';
-import { computerCommandSchema } from './computer.js';
+import { COMPUTER_STATES, computerCommandSchema } from './computer.js';
 
 export const SSE_CHANNELS = [
   {
@@ -74,6 +74,13 @@ export const computerCommandEventSchema = z.object({
 });
 export type ComputerCommandEvent = z.infer<typeof computerCommandEventSchema>;
 
+export const computerStateEventSchema = z.object({
+  type: z.literal('computer.state'),
+  computerId: recordId,
+  state: z.enum(COMPUTER_STATES),
+});
+export type ComputerStateEvent = z.infer<typeof computerStateEventSchema>;
+
 export const teamStreamEventSchema = z.discriminatedUnion('type', [
   pingEventSchema,
   machinePresenceEventSchema,
@@ -82,6 +89,7 @@ export const teamStreamEventSchema = z.discriminatedUnion('type', [
   notificationEventSchema,
   branchSyncEventSchema,
   computerCommandEventSchema,
+  computerStateEventSchema,
 ]);
 export type TeamStreamEvent = z.infer<typeof teamStreamEventSchema>;
 

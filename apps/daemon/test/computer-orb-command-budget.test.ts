@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+} from 'node:fs';
 import { createConnection, type Socket } from 'node:net';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -32,12 +42,14 @@ afterEach(async () => {
   expect(releaseTestTempDir(allocatedRoot)).toBe(true);
 });
 
-async function connectGuest(): Promise<OrbComputerHostFrame[]> {
+async function connectGuest(
+  socketPath = join(root, 'c1', 'computer.sock'),
+): Promise<OrbComputerHostFrame[]> {
   const received: OrbComputerHostFrame[] = [];
   await vi.waitFor(() => {
     expect(existsSync(join(root, 'c1', 'computer.sock.token'))).toBe(true);
   });
-  socket = createConnection(join(root, 'c1', 'computer.sock'));
+  socket = createConnection(socketPath);
   socket.on('error', () => {});
   readOrbComputerLines(socket, (line) => {
     received.push(decodeOrbComputerFrame(line) as OrbComputerHostFrame);
@@ -166,4 +178,90 @@ test.each([
   cancellation.abort(reason);
   expect(await collect(events)).toEqual([{ kind: 'exit', code, reason: kind }]);
   await vi.waitFor(() => expect(received.some((frame) => 'cancel' in frame)).toBe(true));
+});
+
+test('owner-qualified runtime roots are resolved lazily before opening a link', async () => {
+  const runtimeRoot = vi.fn(() => root);
+  provider = new OrbComputerProvider({
+    runtimeRoot,
+    orbs: { ensure: async () => 'c1', touch: vi.fn() },
+  });
+  expect(runtimeRoot).not.toHaveBeenCalled();
+  const reading = provider.forScope('chief:one').readFile('/readme');
+  const received = await connectGuest();
+  await vi.waitFor(() => expect(received.some((frame) => 'method' in frame)).toBe(true));
+  const request = received.find((frame) => 'method' in frame);
+  if (!request || !('id' in request)) throw new Error('No file request was received');
+  socket?.write(encodeOrbComputerFrame({ id: request.id, value: 'owner-scoped data' }));
+  socket?.write(encodeOrbComputerFrame({ id: request.id, done: true }));
+  expect(await reading).toBe('owner-scoped data');
+  expect(runtimeRoot).toHaveBeenCalledTimes(1);
+});
+
+test.runIf(process.platform === 'linux')(
+  'a long physical runtime path still opens the actual Unix socket',
+  async () => {
+    root = join(root, 'owner-qualified-private-runtime'.repeat(4));
+    mkdirSync(join(root, 'c1'), { recursive: true, mode: 0o700 });
+    const descriptor = openSync(
+      join(root, 'c1'),
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    try {
+      provider = new OrbComputerProvider({
+        runtimeRoot: root,
+        orbs: { ensure: async () => 'c1', touch: vi.fn() },
+      });
+      const reading = provider.forScope('chief:one').readFile('/readme');
+      const received = await connectGuest(`/proc/self/fd/${descriptor}/computer.sock`);
+      await vi.waitFor(() => expect(received.some((frame) => 'method' in frame)).toBe(true));
+      const request = received.find((frame) => 'method' in frame);
+      if (!request || !('id' in request)) throw new Error('No file request was received');
+      socket?.write(encodeOrbComputerFrame({ id: request.id, value: 'long-path data' }));
+      socket?.write(encodeOrbComputerFrame({ id: request.id, done: true }));
+      expect(await reading).toBe('long-path data');
+    } finally {
+      closeSync(descriptor);
+    }
+  },
+);
+
+async function answerRead(value: string): Promise<void> {
+  const received = await connectGuest();
+  await vi.waitFor(() => expect(received.some((frame) => 'method' in frame)).toBe(true));
+  const request = received.find((frame) => 'method' in frame);
+  if (!request || !('id' in request)) throw new Error('No file request was received');
+  socket?.write(encodeOrbComputerFrame({ id: request.id, value }));
+  socket?.write(encodeOrbComputerFrame({ id: request.id, done: true }));
+}
+
+test('a refused runtime directory can be opened after it becomes private', async () => {
+  chmodSync(join(root, 'c1'), 0o755);
+  provider = new OrbComputerProvider({
+    runtimeRoot: root,
+    orbs: { ensure: async () => 'c1', touch: vi.fn() },
+  });
+  await expect(provider.forScope('chief:one').readFile('/readme')).rejects.toThrow(
+    'could not be opened',
+  );
+  chmodSync(join(root, 'c1'), 0o700);
+  const reading = provider.forScope('chief:one').readFile('/readme');
+  await answerRead('private again');
+  expect(await reading).toBe('private again');
+});
+
+test('a directory left at the socket path is refused until it is removed', async () => {
+  const occupied = join(root, 'c1', 'computer.sock');
+  mkdirSync(occupied);
+  provider = new OrbComputerProvider({
+    runtimeRoot: root,
+    orbs: { ensure: async () => 'c1', touch: vi.fn() },
+  });
+  await expect(provider.forScope('chief:one').readFile('/readme')).rejects.toThrow(
+    'could not be opened',
+  );
+  rmSync(occupied, { recursive: true });
+  const reading = provider.forScope('chief:one').readFile('/readme');
+  await answerRead('socket cleared');
+  expect(await reading).toBe('socket cleared');
 });

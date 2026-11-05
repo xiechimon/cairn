@@ -71,12 +71,16 @@ function connect(s: TestServer, machineId: string): ComputerCall[] {
 
 function watchFeed(s: TestServer): Record<string, unknown>[] {
   const events: Record<string, unknown>[] = [];
-  s.hub.subscribe(s.team.id, {
-    nextSeq: () => 1,
-    send: async (payload) => {
-      events.push(payload as Record<string, unknown>);
+  s.hub.subscribe(
+    s.team.id,
+    {
+      nextSeq: () => 1,
+      send: async (payload) => {
+        events.push(payload as Record<string, unknown>);
+      },
     },
-  });
+    s.user.id,
+  );
   return events;
 }
 
@@ -306,9 +310,21 @@ describe('forwardComputerCall replay', () => {
     return { ...ctx, calls, result, id: computerCallId('step-a', toolCallId) };
   }
 
+  test('a dispatched command reports starting, a live frame reports running, and completion reports stopped', async () => {
+    const { s, result, id } = await started();
+    expect(s.db.select().from(computerTable).get()?.state).toBe('starting');
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: 'a' },
+    ]);
+    expect(s.db.select().from(computerTable).get()?.state).toBe('running');
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(2, 'done', 0)]);
+    await result;
+    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
+  });
+
   test('a finished unsafe call retried with the same toolCallId returns the stored result and dispatches nothing', async () => {
     const { s, deps, calls, result, id } = await started();
-    receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'file-a', 0)]);
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(1, 'file-a', 0)]);
     expect(await result).toEqual({ text: 'file-a' });
     const again = await forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
     expect(again).toEqual({ text: 'file-a' });
@@ -317,17 +333,61 @@ describe('forwardComputerCall replay', () => {
 
   test('a non-zero exit code is part of the stored result', async () => {
     const { s, result, id } = await started();
-    receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'boom', 2)]);
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(1, 'boom', 2)]);
     expect((await result).text).toBe('boom\n[exit code 2]');
   });
 
   test('an unsafe call in flight whose waiter is gone is marked interrupted and not re-dispatched', async () => {
     const { s, deps, calls, id } = await started();
+    const feed = watchFeed(s);
     dropComputerWaiters();
     const again = await forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
     expect(again.text).toContain('interrupted, may have partially run');
     expect(calls).toHaveLength(1);
     expect(callRow(s, id).state).toBe('interrupted');
+    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
+    expect(
+      feed.filter((event) => event.type === 'computer.state').map((event) => event.state),
+    ).toEqual(expect.arrayContaining(['stopped']));
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'computer.command',
+          command: expect.objectContaining({ status: 'interrupted' }),
+        }),
+      ]),
+    );
+  });
+
+  test('a terminal frame after the waiter is gone still publishes stopped state and the final feed', async () => {
+    const { s, id } = await started();
+    const feed = watchFeed(s);
+    dropComputerWaiters();
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: 'late ' },
+    ]);
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(2, 'late-done', 0)]);
+    expect(callRow(s, id).state).toBe('done');
+    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
+    expect(
+      feed.filter((event) => event.type === 'computer.state').map((event) => event.state),
+    ).toEqual(['running', 'stopped']);
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual([
+      expect.objectContaining({
+        type: 'computer.command',
+        command: expect.objectContaining({
+          status: 'running',
+          output: expect.stringContaining('late'),
+        }),
+      }),
+      expect.objectContaining({
+        type: 'computer.command',
+        command: expect.objectContaining({
+          status: 'done',
+          output: expect.stringContaining('late'),
+        }),
+      }),
+    ]);
   });
 
   test('a toolCallId reused with a different tool is refused and the stored call is kept', async () => {
@@ -337,7 +397,7 @@ describe('forwardComputerCall replay', () => {
     const first = forwardComputerCall(deps, 'sidecar', 'step-a', shell('rm -rf build', 'reuse'));
     const [sent] = calls;
     if (!sent) throw new Error('no dispatch');
-    receiveComputerFrames(s.db, 'omarchy', sent.callId, [
+    receiveComputerFrames(s.db, s.hub, 'omarchy', sent.callId, [
       { kind: 'done', seq: 1, text: 'ok', exitCode: 0 },
     ]);
     await first;
@@ -365,7 +425,7 @@ describe('forwardComputerCall replay', () => {
     const first = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
     const id = computerCallId('step-a', 'r1');
     expect(calls[0]?.callId).toBe(createHash('sha256').update('step-a\0r1').digest('hex'));
-    receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(1, 'first')]);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [done(1, 'first')]);
     expect((await first).text).toBe('first');
     const second = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
     expect(calls).toHaveLength(2);
@@ -377,7 +437,7 @@ describe('forwardComputerCall replay', () => {
       lastSeq: 0,
       resultText: null,
     });
-    receiveComputerFrames(ctx.s.db, 'omarchy', rerunId, [done(1, 'second')]);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', rerunId, [done(1, 'second')]);
     expect((await second).text).toBe('second');
   });
 
@@ -401,11 +461,11 @@ describe('forwardComputerCall replay', () => {
       errorMessage: 'superseded by a rerun',
     });
     expect(() =>
-      receiveComputerFrames(ctx.s.db, 'omarchy', computerCallId('step-a', 'r1'), [
+      receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', computerCallId('step-a', 'r1'), [
         done(1, 'stale'),
       ]),
     ).toThrow(expect.objectContaining({ status: 409 }));
-    receiveComputerFrames(ctx.s.db, 'omarchy', computerCallId('step-a', 'r1', 2), [
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', computerCallId('step-a', 'r1', 2), [
       done(1, 'fresh'),
     ]);
     expect((await rerun).text).toBe('fresh');
@@ -416,7 +476,7 @@ describe('forwardComputerCall replay', () => {
     const dup = forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
     const dup2 = forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
     expect(calls).toHaveLength(1);
-    receiveComputerFrames(s.db, 'omarchy', id, [done(1, 'once')]);
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [done(1, 'once')]);
     expect(await dup).toEqual({ text: 'once' });
     expect(await dup2).toEqual({ text: 'once' });
   });
@@ -433,7 +493,7 @@ describe('forwardComputerCall daemon errors and deadlines', () => {
 
   test('an error frame with not_delivered says the action did not run', async () => {
     const { s, result, id } = await started();
-    receiveComputerFrames(s.db, 'omarchy', id, [
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [
       { kind: 'error', seq: 1, message: 'orb is down', delivery: 'not_delivered' },
     ]);
     const text = (await result).text;
@@ -443,7 +503,7 @@ describe('forwardComputerCall daemon errors and deadlines', () => {
 
   test('an error frame with unknown delivery says the action may have partially run', async () => {
     const { s, result, id } = await started();
-    receiveComputerFrames(s.db, 'omarchy', id, [
+    receiveComputerFrames(s.db, s.hub, 'omarchy', id, [
       { kind: 'error', seq: 1, message: 'socket closed', delivery: 'unknown' },
     ]);
     expect((await result).text).toContain('may have partially run');
@@ -490,7 +550,9 @@ describe('stop and finish', () => {
     ctx.s.machineHub.stopSignal(ctx.s.team.id, 'step-a');
     expect((await result).text).toContain('cancelled');
     expect(callRow(ctx.s, id).state).toBe('cancelled');
-    const answer = receiveComputerFrames(ctx.s.db, 'omarchy', id, [{ kind: 'heartbeat', seq: 1 }]);
+    const answer = receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
+      { kind: 'heartbeat', seq: 1 },
+    ]);
     expect(answer).toEqual({ ok: true, cancelled: true });
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
   });
@@ -502,7 +564,9 @@ describe('stop and finish', () => {
     const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
     const id = computerCallId('step-a', 'tc-1');
     ctx.s.db.update(stepTable).set({ status: 'stopped' }).where(eq(stepTable.id, 'step-a')).run();
-    const answer = receiveComputerFrames(ctx.s.db, 'omarchy', id, [{ kind: 'heartbeat', seq: 1 }]);
+    const answer = receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
+      { kind: 'heartbeat', seq: 1 },
+    ]);
     expect(answer.cancelled).toBe(true);
     expect((await result).text).toContain('cancelled');
   });
@@ -598,6 +662,52 @@ describe('leases', () => {
 });
 
 describe('feed and redaction', () => {
+  test('fresh intermediate output reaches the feed redacted before the call finishes', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const feed = watchFeed(ctx.s);
+    const result = forwardComputerCall(
+      ctx.deps,
+      'sidecar',
+      'step-a',
+      shell('long-running-command'),
+    );
+    const id = computerCallId('step-a', 'tc-1');
+    const prefix = FAKE_TOKEN.slice(0, 15);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: `first line\n${prefix}` },
+    ]);
+    const commands = () => feed.filter((event) => event.type === 'computer.command');
+    expect(commands()).toHaveLength(2);
+    expect(feed.at(-1)).toMatchObject({
+      type: 'computer.command',
+      command: {
+        computerId: callRow(ctx.s, id).computerId,
+        status: 'running',
+        output: 'first line\n',
+      },
+    });
+    expect(JSON.stringify(feed)).not.toContain(prefix);
+    const next: ComputerFrame = {
+      kind: 'output',
+      seq: 2,
+      stream: 'stdout',
+      text: `${FAKE_TOKEN.slice(15)}\nsecond line\n`,
+    };
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [next]);
+    expect(commands()).toHaveLength(3);
+    expect(feed.at(-1)).toMatchObject({
+      command: { status: 'running', output: 'first line\n[REDACTED]\nsecond line\n' },
+    });
+    expect(JSON.stringify(feed)).not.toContain(FAKE_TOKEN);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [next]);
+    expect(commands()).toHaveLength(3);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [done(3, 'finished')]);
+    expect((await result).text).toBe('finished');
+    expect(feed.at(-1)).toMatchObject({ command: { status: 'done' } });
+  });
+
   test('a token in the command and the output reaches neither the hub event nor the stored rows', async () => {
     const ctx = boot();
     addMachine(ctx.s, 'omarchy', { computer: true });
@@ -611,7 +721,7 @@ describe('feed and redaction', () => {
     );
     const id = computerCallId('step-a', 'tc-1');
     expect(calls[0]?.params.command).toContain(FAKE_TOKEN);
-    receiveComputerFrames(ctx.s.db, 'omarchy', id, [
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
       { kind: 'output', seq: 1, stream: 'stdout', text: `token ${FAKE_TOKEN}\n` },
       done(2, `token ${FAKE_TOKEN}`),
     ]);
@@ -643,10 +753,53 @@ describe('feed and redaction', () => {
       toolCallId: 'r1',
       params: { path: 'a' },
     });
-    expect(feed).toHaveLength(1);
-    expect(feed[0]).toMatchObject({
-      type: 'computer.command',
-      command: { tool: 'launch_app', command: 'firefox https://example.com' },
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual([
+      expect.objectContaining({
+        type: 'computer.command',
+        command: expect.objectContaining({
+          tool: 'launch_app',
+          command: 'firefox https://example.com',
+        }),
+      }),
+    ]);
+  });
+
+  test('a read_file reports starting, running and stopped without a feed command', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const feed = watchFeed(ctx.s);
+    const stranger: Record<string, unknown>[] = [];
+    ctx.s.hub.subscribe(
+      ctx.s.team.id,
+      {
+        nextSeq: () => 1,
+        send: async (payload) => {
+          stranger.push(payload as Record<string, unknown>);
+        },
+      },
+      'someone-else',
+    );
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'read_file',
+      toolCallId: 'r-state',
+      params: { path: 'a' },
     });
+    const id = computerCallId('step-a', 'r-state');
+    const states = () =>
+      feed.filter((event) => event.type === 'computer.state').map((event) => event.state);
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual([]);
+    expect(states()).toEqual(['starting']);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: 'file' },
+    ]);
+    expect(states()).toEqual(['starting', 'running']);
+    receiveComputerFrames(ctx.s.db, ctx.s.hub, 'omarchy', id, [
+      { kind: 'done', seq: 2, text: 'file', exitCode: 0 },
+    ]);
+    await result;
+    expect(states()).toEqual(['starting', 'running', 'stopped']);
+    expect(stranger).toEqual([]);
   });
 });
