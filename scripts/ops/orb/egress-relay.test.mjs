@@ -15,7 +15,7 @@ import {
 import { createServer as createHttpServer, request } from 'node:http';
 import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import {
   createRelay,
@@ -27,6 +27,7 @@ import {
 } from './egress-relay.mjs';
 
 const relayScript = new URL('./egress-relay.mjs', import.meta.url).pathname;
+const peerCredAvailable = existsSync(join(dirname(process.execPath), '../include/node/node_api.h'));
 
 function privateDirectory(t) {
   const directory = mkdtempSync(join(tmpdir(), 'egress-relay-'));
@@ -611,7 +612,9 @@ test('one unix client cannot spend another client connection quota', async (t) =
   );
 });
 
-test('a unix peer pid is the other process holding the socket', async (t) => {
+test('a unix peer pid is the other process holding the socket', {
+  skip: !peerCredAvailable,
+}, async (t) => {
   const seen = [];
   const f = await fixture(
     t,
