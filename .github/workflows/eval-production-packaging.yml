@@ -1,0 +1,87 @@
+name: eval-production-packaging
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/eval-production-packaging.yml'
+      - 'integration/eval/harbor/production/**'
+      - 'apps/daemon/src/**'
+      - 'apps/daemon/package.json'
+      - 'packages/shared/**'
+      - 'integration/package.json'
+      - 'integration/vitest.config.ts'
+      - 'scripts/test-tmpdir.*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/eval-production-packaging.yml'
+      - 'integration/eval/harbor/production/**'
+      - 'apps/daemon/src/**'
+      - 'apps/daemon/package.json'
+      - 'packages/shared/**'
+      - 'integration/package.json'
+      - 'integration/vitest.config.ts'
+      - 'scripts/test-tmpdir.*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-production-packaging-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-packaging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CAIRN_EVAL_PACKAGING_TESTS: '1'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install pinned dependencies without package scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install Bubblewrap and enable ephemeral runner user namespaces
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap
+          if sysctl kernel.unprivileged_userns_clone >/dev/null 2>&1; then
+            sudo sysctl -w kernel.unprivileged_userns_clone=1
+          fi
+          if sysctl kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Require the actual Bubblewrap namespace boundary
+        run: pnpm --filter @cairn/integration exec tsx eval/harbor/production/packaging-preflight.mts
+      - name: Exercise isolated packaging and staged production runtime
+        env:
+          VERIFY_EVIDENCE_DIR: ${{ runner.temp }}/production-packaging-evidence
+        run: >-
+          pnpm exec vitest run --config integration/vitest.config.ts
+          integration/eval/harbor/production/packaging-platform.test.mts
+          integration/eval/harbor/production/package.test.mts
+          integration/eval/harbor/production/runner.test.mts
+      - name: Preserve fake-provider runtime evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: production-packaging-evidence
+          path: |
+            ${{ runner.temp }}/production-packaging-evidence/packaging-manifest.json
+            ${{ runner.temp }}/production-packaging-evidence/artifacts/
+            ${{ runner.temp }}/production-packaging-evidence/provenance.json
+          if-no-files-found: warn
