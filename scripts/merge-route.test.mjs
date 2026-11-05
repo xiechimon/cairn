@@ -51,17 +51,17 @@ test('product source with text changes may enter the queue', (t) => {
   assert.match(result.stdout, /may enter the merge queue/);
 });
 
-test('a binary file outside docs/verify routes to the owner', (t) => {
+test('a binary file outside docs/verify may enter the queue', (t) => {
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
   const result = route(repoWith(t, { 'apps/web/src/logo.png': png }));
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stdout, /binary files outside docs\/verify.*apps\/web\/src\/logo\.png/);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /may enter the merge queue/);
 });
 
-test('a source file with a NUL byte counts as binary', (t) => {
+test('a source file with a NUL byte may enter the queue', (t) => {
   const result = route(repoWith(t, { 'apps/web/src/a.ts': 'export const a = 1;\0\n' }));
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stdout, /binary files outside docs\/verify/);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /may enter the merge queue/);
 });
 
 test('binary evidence under docs/verify may enter the queue', (t) => {
@@ -83,19 +83,19 @@ test('gallery snapshot baselines may enter the queue', (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
-test('a PNG in another spec snapshot folder routes to the owner', (t) => {
+test('a PNG in another spec snapshot folder may enter the queue', (t) => {
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
   const result = route(
     repoWith(t, { 'apps/web/e2e/visual-polish.spec.ts-snapshots/rail-linux.png': png }),
   );
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stdout, /binary files outside docs\/verify/);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /may enter the merge queue/);
 });
 
-test('protected paths route to the owner', (t) => {
+test('protected paths may enter the queue', (t) => {
   const result = route(repoWith(t, { 'scripts/x.mjs': 'export {};\n' }));
-  assert.equal(result.status, 1);
-  assert.match(result.stdout, /protected paths: scripts\/x\.mjs/);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /may enter the merge queue/);
 });
 
 test('a malformed head sha is refused', () => {
@@ -141,19 +141,20 @@ const routeLabelling = ({ dir, head }, gh, liveHead = head) =>
 const protectedChange = { 'scripts/x.mjs': 'export {};\n' };
 const queueableChange = { 'apps/web/src/a.ts': 'export const a = 1;\n' };
 
-test('an owner-routed head gets the owner-route label', (t) => {
+test('a protected path does not get the owner-route label', (t) => {
   const gh = fakeGh(t);
   const result = routeLabelling(repoWith(t, protectedChange), gh);
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.equal(gh.writes().length, 1);
-  assert.match(gh.writes()[0], /--method POST repos\/o\/r\/issues\/7\/labels .*owner-route/);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /may enter the merge queue/);
+  assert.deepEqual(gh.writes(), []);
 });
 
-test('an owner-routed head that already has the label is not written again', (t) => {
+test('a protected path loses a stale owner-route label', (t) => {
   const gh = fakeGh(t, { labels: ['owner-route', 'review-gate'] });
   const result = routeLabelling(repoWith(t, protectedChange), gh);
-  assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.deepEqual(gh.writes(), []);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(gh.writes().length, 1);
+  assert.match(gh.writes()[0], /--method DELETE repos\/o\/r\/issues\/7\/labels\/owner-route/);
 });
 
 test('a queueable head loses a stale owner-route label', (t) => {
@@ -174,20 +175,19 @@ test('a queueable head without the label is not written', (t) => {
 test('a run for a superseded head leaves the label alone', (t) => {
   const newerHead = 'f'.repeat(40);
   const owner = fakeGh(t, { labels: [] });
-  assert.equal(routeLabelling(repoWith(t, protectedChange), owner, newerHead).status, 1);
+  assert.equal(routeLabelling(repoWith(t, protectedChange), owner, newerHead).status, 0);
   assert.deepEqual(owner.writes(), []);
   const queueable = fakeGh(t, { labels: ['owner-route'] });
   assert.equal(routeLabelling(repoWith(t, queueableChange), queueable, newerHead).status, 0);
   assert.deepEqual(queueable.writes(), []);
 });
 
-test('a failed label write keeps the routing verdict', (t) => {
-  const gh = fakeGh(t, { failWrites: true });
+test('a failed label clear still lets the head enter the queue', (t) => {
+  const gh = fakeGh(t, { labels: ['owner-route'], failWrites: true });
   const owner = routeLabelling(repoWith(t, protectedChange), gh);
-  assert.equal(owner.status, 1);
+  assert.equal(owner.status, 0, owner.stdout + owner.stderr);
+  assert.match(owner.stdout, /may enter the merge queue/);
   assert.match(owner.stderr, /owner-route label/);
-  const queueable = routeLabelling(repoWith(t, queueableChange), fakeGh(t, { failWrites: true }));
-  assert.equal(queueable.status, 0);
 });
 
 test('--label-pr without a repository is refused', (t) => {

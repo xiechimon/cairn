@@ -41,7 +41,7 @@
       "run": [
         "node",
         "-e",
-        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(!s.includes(\"mergedBy: 'auto-merge'\"))bad.push('AGENTS.md lost the pr-gate auto-merge route');\nif(!/protected-path PRs and every other route go to ian/.test(s))bad.push('AGENTS.md lost the owner route for protected paths');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(!s.includes(\"mergedBy: 'auto-merge'\"))bad.push('AGENTS.md lost the pr-gate auto-merge route');\nif(!/Protected-path PRs enter the merge queue/.test(s))bad.push('AGENTS.md lost queue admission for protected paths');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
       ]
     },
     {
