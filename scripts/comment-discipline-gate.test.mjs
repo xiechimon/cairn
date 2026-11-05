@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
+import { cleanupTestTempDirs, makeTestTempDir } from './test-tmpdir.mjs';
+
+afterEach(() => cleanupTestTempDirs());
 
 const script = resolve('scripts/comment-discipline-gate.mjs');
 
 test('checks only added source comment lines and exact allowlist entries', () => {
-  const cwd = mkdtempSync(resolve(tmpdir(), 'comment-gate-'));
+  const cwd = makeTestTempDir('comment-gate-');
   const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
   const run = () =>
     spawnSync(process.execPath, [script], {
@@ -64,7 +66,7 @@ test('checks only added source comment lines and exact allowlist entries', () =>
 });
 
 function revertFixture(t) {
-  const cwd = mkdtempSync(resolve(tmpdir(), 'comment-gate-revert-'));
+  const cwd = makeTestTempDir('comment-gate-revert-');
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   const git = (...args) =>
     execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();

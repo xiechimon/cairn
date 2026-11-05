@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
+import { cleanupTestTempDirs, makeTestTempDir } from './test-tmpdir.mjs';
+
+afterEach(() => cleanupTestTempDirs());
 
 const script = resolve(import.meta.dirname, 'doc-drift.mjs');
 const NOW = '2026-10-24T12:00:00Z';
 const date = NOW.slice(0, 10);
 
 const fixture = () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'doc-drift-'));
+  const cwd = makeTestTempDir('doc-drift-');
   const git = (date, ...args) =>
     execFileSync('git', args, {
       cwd,

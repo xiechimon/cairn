@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 import { loadEvalCoverage, renderEvalCoverage } from './eval-coverage.mjs';
+import { cleanupTestTempDirs, makeTestTempDir } from './test-tmpdir.mjs';
+
+afterEach(() => cleanupTestTempDirs());
 
 const repo = 'xiechimon/cairn';
 
@@ -31,7 +33,7 @@ function coverage(root, capabilities, dates) {
 }
 
 test('a hillclimb flow with no capability row fails the coverage check', () => {
-  const root = mkdtempSync(join(tmpdir(), 'eval-coverage-'));
+  const root = makeTestTempDir('eval-coverage-');
   try {
     writeFlow(root, 'chief-dispatch', {
       cases: ['d01'],
@@ -46,7 +48,7 @@ test('a hillclimb flow with no capability row fails the coverage check', () => {
 });
 
 test('coverage rows report scored, built-not-run, none, and tests only', () => {
-  const root = mkdtempSync(join(tmpdir(), 'eval-coverage-'));
+  const root = makeTestTempDir('eval-coverage-');
   try {
     writeFlow(root, 'chief-dispatch', {
       cases: ['d01', 'd02', 'd03'],
