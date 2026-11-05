@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   computerScreenSocketPath,
   createComputerScreenProvider,
@@ -11,18 +12,23 @@ import {
 import { computerMachineName } from '../src/orb/computer.js';
 
 let dir: string | undefined;
+let runtimeRoot: string | undefined;
 let server: Server | undefined;
 const sockets: Socket[] = [];
 
-function shortRuntimeRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'csp-'));
+function shortRuntimeRoot(owned: string): string {
+  const path = join('/tmp', `csp-${createHash('sha256').update(owned).digest('hex').slice(0, 8)}`);
+  mkdirSync(path, { recursive: true, mode: 0o700 });
+  return path;
 }
 
 afterEach(async () => {
   for (const socket of sockets.splice(0)) socket.destroy();
   if (server) await new Promise<void>((resolve) => server?.close(() => resolve()));
   server = undefined;
-  if (dir) rmSync(dir, { recursive: true, force: true });
+  if (runtimeRoot) rmSync(runtimeRoot, { recursive: true, force: true });
+  runtimeRoot = undefined;
+  if (dir) releaseTestTempDir(dir);
   dir = undefined;
 });
 
@@ -60,13 +66,17 @@ function request(
 }
 
 test('view connects to the x11vnc view.sock and carries raw RFB bytes', async () => {
-  dir = shortRuntimeRoot();
-  expect(computerScreenSocketPath(dir, 'chief:view', 'view').length).toBeLessThan(108);
+  dir = makeTestTempDir('s');
+  runtimeRoot = shortRuntimeRoot(dir);
   const scopeKey = 'chief:view';
-  const path = computerScreenSocketPath(dir, scopeKey, 'view');
-  expect(path).toBe(join(dir, computerMachineName(scopeKey), 'computer', 'view.sock'));
+  const path = computerScreenSocketPath(runtimeRoot, scopeKey, 'view');
+  expect(path.length).toBeLessThan(108);
+  expect(path).toBe(join(runtimeRoot, computerMachineName(scopeKey), 'computer', 'view.sock'));
   const input = await listen(path);
-  const provider = createComputerScreenProvider({ runtimeRoot: dir, socketWaitMs: 1_000 });
+  const provider = createComputerScreenProvider({
+    runtimeRoot,
+    socketWaitMs: 1_000,
+  });
   const connection = await provider.connectScreen(request('view', scopeKey));
   const greeting = once(connection.stream, 'data');
   expect((await greeting)[0].toString()).toBe('RFB 003.008\n');
@@ -77,12 +87,13 @@ test('view connects to the x11vnc view.sock and carries raw RFB bytes', async ()
 });
 
 test('control connects to vnc.sock after ensureComputer resolves the Orb', async () => {
-  dir = shortRuntimeRoot();
+  dir = makeTestTempDir('s');
+  runtimeRoot = shortRuntimeRoot(dir);
   const scopeKey = 'chief:control';
-  const path = computerScreenSocketPath(dir, scopeKey, 'control');
+  const path = computerScreenSocketPath(runtimeRoot, scopeKey, 'control');
   let ensured = 0;
   const provider = createComputerScreenProvider({
-    runtimeRoot: dir,
+    runtimeRoot,
     socketWaitMs: 2_000,
     ensureComputer: async () => {
       ensured += 1;
@@ -98,9 +109,10 @@ test('control connects to vnc.sock after ensureComputer resolves the Orb', async
 });
 
 test('a missing screen socket times out instead of hanging', async () => {
-  dir = shortRuntimeRoot();
+  dir = makeTestTempDir('s');
+  runtimeRoot = shortRuntimeRoot(dir);
   const provider = createComputerScreenProvider({
-    runtimeRoot: dir,
+    runtimeRoot,
     socketWaitMs: 80,
   });
   await expect(provider.connectScreen(request('view'))).rejects.toThrow(
