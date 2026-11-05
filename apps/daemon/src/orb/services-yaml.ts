@@ -119,6 +119,12 @@ function parseMap(
     }
     const rest = rawRest.startsWith(' ') ? rawRest.slice(1) : rawRest;
     index += 1;
+    if (/^[|>][-+]?$/.test(rest)) {
+      const block = parseBlockScalar(lines, index, indent, rest);
+      map[key] = block.value;
+      index = block.next;
+      continue;
+    }
     if (rest !== '') {
       map[key] = parseScalar(rest);
       continue;
@@ -157,6 +163,26 @@ function parseList(lines: YamlLine[], index: number): { value: YamlNode[]; next:
     list.push(parseListItem(rest, children));
   }
   return { value: list, next: index };
+}
+
+function parseBlockScalar(
+  lines: YamlLine[],
+  index: number,
+  parentIndent: number,
+  indicator: string,
+): { value: string; next: number } {
+  const chunks: YamlLine[] = [];
+  for (;;) {
+    const line = lineAt(lines, index);
+    if (line === undefined || line.indent <= parentIndent) break;
+    chunks.push(line);
+    index += 1;
+  }
+  const base = chunks[0]?.indent ?? parentIndent + 2;
+  const folded = indicator.startsWith('>');
+  const body = chunks.map((line) => ' '.repeat(Math.max(0, line.indent - base)) + line.text);
+  const value = folded ? body.map((line) => line.trim()).join(' ') : body.join('\n');
+  return { value, next: index };
 }
 
 function parseListItem(rest: string, children: YamlLine[]): YamlNode {

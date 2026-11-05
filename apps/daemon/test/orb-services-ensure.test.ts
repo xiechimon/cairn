@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { buildProgram } from '../src/cli.js';
 import {
@@ -5,7 +6,11 @@ import {
   type OrbEnsureDeps,
   type OrbEnsureService,
 } from '../src/orb/services-ensure.js';
-import { type EnsureCommandIo, runOrbServicesEnsure } from '../src/orb/services-runtime.js';
+import {
+  type EnsureCommandIo,
+  fetchHealthStatus,
+  runOrbServicesEnsure,
+} from '../src/orb/services-runtime.js';
 import { loadEnsureServicesFile } from '../src/orb/services-yaml.js';
 
 function webService(port: number, health = '/healthz'): OrbEnsureService {
@@ -17,9 +22,17 @@ function fakeDeps(opts: {
   startPid?: number;
   portOpen?: boolean;
   health?: number | null;
+  healthSeq?: Array<number | null>;
   readinessMs?: number;
 }): { deps: OrbEnsureDeps; getStarts: () => number } {
-  const state = { starts: 0, pids: [...(opts.pids ?? [])] };
+  const state = {
+    starts: 0,
+    pids: [...(opts.pids ?? [])],
+    ports: new Map<string, number>(),
+    clock: 0,
+    nextPort: 4000,
+    healthCalls: 0,
+  };
   const deps: OrbEnsureDeps = {
     listPids: async () => state.pids,
     start: async () => {
@@ -29,9 +42,26 @@ function fakeDeps(opts: {
       return pid;
     },
     waitForPort: async () => opts.portOpen !== false,
-    healthStatus: async () => (opts.health === undefined ? 200 : opts.health),
-    allocatePort: async () => 4000,
-    now: () => 0,
+    healthStatus: async () => {
+      state.healthCalls += 1;
+      if (opts.healthSeq !== undefined) {
+        return opts.healthSeq[Math.min(state.healthCalls - 1, opts.healthSeq.length - 1)] ?? null;
+      }
+      return opts.health === undefined ? 200 : opts.health;
+    },
+    allocatePort: async () => {
+      const port = state.nextPort;
+      state.nextPort += 1;
+      return port;
+    },
+    lastPort: async (name) => state.ports.get(name) ?? null,
+    savePort: async (name, port) => {
+      state.ports.set(name, port);
+    },
+    now: () => state.clock,
+    sleep: async (ms) => {
+      state.clock += ms;
+    },
     readinessMs: opts.readinessMs ?? 60_000,
   };
   return { deps, getStarts: () => state.starts };
@@ -53,10 +83,31 @@ describe('ensureOrbServices (#2280)', () => {
   });
 
   it('reports ready false when health returns 500', async () => {
-    const { deps } = fakeDeps({ portOpen: true, health: 500 });
+    const { deps } = fakeDeps({ portOpen: true, health: 500, readinessMs: 20 });
     const result = await ensureOrbServices([webService(3000)], deps);
     expect(result.services[0]?.ready).toBe(false);
     expect(result.ok).toBe(false);
+  });
+
+  it('reuses an auto-assigned port on the second ensure', async () => {
+    const service: OrbEnsureService = { name: 'web', command: 'pnpm dev', health: '/healthz' };
+    const first = fakeDeps({ portOpen: true, health: 200 });
+    const once = await ensureOrbServices([service], first.deps);
+    const again = await ensureOrbServices([service], first.deps);
+    expect(first.getStarts()).toBe(1);
+    expect(once.services[0]?.url).toBe('http://127.0.0.1:4000/healthz');
+    expect(again.services[0]?.url).toBe('http://127.0.0.1:4000/healthz');
+  });
+
+  it('retries health 503 until a 200 within the readiness deadline', async () => {
+    const { deps } = fakeDeps({
+      portOpen: true,
+      healthSeq: [503, 503, 200],
+      readinessMs: 100,
+    });
+    const result = await ensureOrbServices([webService(3000)], deps);
+    expect(result.ok).toBe(true);
+    expect(result.services[0]?.ready).toBe(true);
   });
 
   it('returns NOT RESPONDING when the port never opens', async () => {
@@ -125,6 +176,18 @@ describe('loadEnsureServicesFile (#2280)', () => {
     const [web] = loadEnsureServicesFile(groupedPortalsYaml);
     expect(web?.name).toBe('web');
     expect(web?.command).toBe('pnpm dev');
+  });
+
+  it('folds a >- command block into one command string', () => {
+    const [web] = loadEnsureServicesFile(`
+services:
+  web:
+    command: >-
+      php artisan serve
+      --host=0.0.0.0
+      --port=$PORT
+`);
+    expect(web?.command).toBe('php artisan serve --host=0.0.0.0 --port=$PORT');
   });
 
   it('rejects env that sets PORT', () => {
@@ -209,6 +272,30 @@ services:
     });
     expect(await runOrbServicesEnsure({}, io)).toBe(1);
     expect(err.join('')).toContain('NOT RESPONDING');
+  });
+
+  it('keeps a 302 health status instead of following the redirect', async () => {
+    const server = createServer((req, res) => {
+      if (req.url === '/healthz') {
+        res.writeHead(302, { Location: '/gone' });
+        res.end();
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+    try {
+      const address = server.address();
+      const port = typeof address === 'object' && address !== null ? address.port : 0;
+      expect(await fetchHealthStatus(`http://127.0.0.1:${port}/healthz`)).toBe(302);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
   });
 
   it('registers cairn-daemon orb services ensure --json', () => {

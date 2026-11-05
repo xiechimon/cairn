@@ -43,14 +43,7 @@ export function createNodeEnsureDeps(stateDir: string): OrbEnsureDeps {
       return child.pid;
     },
     waitForPort,
-    healthStatus: async (url) => {
-      try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
-        return response.status;
-      } catch {
-        return null;
-      }
-    },
+    healthStatus: fetchHealthStatus,
     allocatePort: async () => {
       const server = createServer();
       await new Promise<void>((resolve, reject) => {
@@ -62,9 +55,31 @@ export function createNodeEnsureDeps(stateDir: string): OrbEnsureDeps {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       return port;
     },
+    lastPort: async (name) => {
+      const n = Number(readPidText(join(stateDir, `${name}.port`)));
+      return Number.isInteger(n) && n > 0 ? n : null;
+    },
+    savePort: async (name, port) => {
+      writeFileSync(join(stateDir, `${name}.port`), `${port}\n`);
+    },
     now: () => Date.now(),
+    sleep: async (ms) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    },
     readinessMs: 60_000,
   };
+}
+
+export async function fetchHealthStatus(url: string): Promise<number | null> {
+  try {
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(2000),
+    });
+    return response.status;
+  } catch {
+    return null;
+  }
 }
 
 export function defaultEnsureCommandIo(): EnsureCommandIo {
@@ -144,7 +159,11 @@ async function waitForPort(port: number, deadlineMs: number): Promise<boolean> {
 }
 
 function readPid(path: string): number | null {
-  if (!existsSync(path)) return null;
-  const n = Number(readFileSync(path, 'utf8').trim());
+  const n = Number(readPidText(path));
   return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function readPidText(path: string): string {
+  if (!existsSync(path)) return '';
+  return readFileSync(path, 'utf8').trim();
 }
