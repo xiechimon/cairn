@@ -1,8 +1,9 @@
 import type { ComputerRecord } from '@cairn/shared';
-import { MonitorSmartphone } from 'lucide-react';
+import { Maximize2, MonitorSmartphone } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { computerScreenWsUrl, openComputerScreen } from '../api/computer-screen.js';
+import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 
 type ScreenStatus = 'connecting' | 'connected' | 'placeholder' | 'failed';
@@ -27,11 +28,15 @@ export function MachineScreenSurface({
   computer,
   leaseId,
   interactive,
+  fill = false,
+  onExpand,
 }: {
   teamId: string;
   computer: ComputerRecord;
   leaseId: string | null;
   interactive: boolean;
+  fill?: boolean;
+  onExpand?: () => void;
 }) {
   const { t } = useI18n();
   const host = useRef<HTMLDivElement>(null);
@@ -63,6 +68,7 @@ export function MachineScreenSurface({
         rfb.viewOnly = !interactive;
         rfb.scaleViewport = true;
         rfb.clipViewport = true;
+        rfb.focusOnClick = interactive;
         rfb.background = 'transparent';
         rfb.addEventListener('connect', () => {
           if (!cancelled) setStatus('connected');
@@ -96,7 +102,8 @@ export function MachineScreenSurface({
     <div
       data-testid="machine-screen"
       data-status={status}
-      className="relative aspect-[16/10] overflow-hidden bg-(--surface-1)"
+      data-interactive={interactive ? 'true' : 'false'}
+      className={`relative overflow-hidden bg-(--surface-1) ${fill ? 'min-h-0 flex-1' : 'aspect-[16/10]'}`}
     >
       <div ref={host} className="absolute inset-0" />
       {status !== 'connected' && (
@@ -110,6 +117,19 @@ export function MachineScreenSurface({
                 : t('桌面控制已上线，屏幕显示在这里')}
           </span>
         </div>
+      )}
+      {onExpand != null && (
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon-sm"
+          data-testid="machine-screen-expand"
+          aria-label={t('放大屏幕')}
+          className="absolute top-2 right-2 z-10"
+          onClick={onExpand}
+        >
+          <Maximize2 aria-hidden="true" className="size-3.5" />
+        </Button>
       )}
     </div>
   );

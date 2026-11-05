@@ -13,8 +13,10 @@ import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-pan
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { X } from '../icons/index.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
@@ -122,12 +124,14 @@ function MachineScreen({
   teamId,
   leaseId,
   interactive,
+  onExpand,
 }: {
   machine: MachineRow;
   computer: ComputerRecord | null;
   teamId: string | undefined;
   leaseId: string | null;
   interactive: boolean;
+  onExpand?: () => void;
 }) {
   const { t } = useI18n();
   const online = machine.online === true;
@@ -138,6 +142,7 @@ function MachineScreen({
         computer={computer}
         leaseId={leaseId}
         interactive={interactive}
+        onExpand={onExpand}
       />
     );
   }
@@ -166,6 +171,7 @@ function MachineCard({
   const desktopInstalled = desktopControlInstalled(machine, computer);
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled &&
@@ -174,11 +180,17 @@ function MachineCard({
     teamId !== undefined &&
     !busy &&
     (leaseId !== null || computer.controlHolder !== 'user');
+  const screenLive =
+    computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
   useEffect(() => {
     if (computer?.controlHolder === 'user') return;
     setLeaseId(null);
   }, [computer?.controlHolder, computer?.id]);
+
+  useEffect(() => {
+    if (!screenLive) setExpanded(false);
+  }, [screenLive]);
 
   const onDesktopToggle = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
@@ -199,13 +211,62 @@ function MachineCard({
 
   return (
     <ListCard className="flex-none">
-      <MachineScreen
-        machine={machine}
-        computer={computer}
-        teamId={teamId}
-        leaseId={leaseId}
-        interactive={leaseId !== null}
-      />
+      {expanded && screenLive ? (
+        <ScreenPlaceholder online label={t('屏幕已放大')} />
+      ) : (
+        <MachineScreen
+          machine={machine}
+          computer={computer}
+          teamId={teamId}
+          leaseId={leaseId}
+          interactive={false}
+          onExpand={screenLive ? () => setExpanded(true) : undefined}
+        />
+      )}
+      {expanded && screenLive && computer !== null && teamId !== undefined && (
+        <DialogShell
+          bare
+          open={expanded}
+          onClose={() => setExpanded(false)}
+          title={machine.name}
+          width="min(96vw, 1120px)"
+          height="min(88vh, 820px)"
+          className="flex flex-col"
+        >
+          <div className="relative flex items-start gap-3 px-5 pt-4.5 pr-13 pb-2">
+            <div className="min-w-0 flex-1">
+              <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
+                {machine.name}
+              </div>
+              <p className="mt-0.5 text-meta text-content-tertiary">
+                {leaseId !== null ? t('在大屏里点击和键入') : t('打开桌面控制后再操作')}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-4 right-4 text-content-tertiary hover:text-foreground"
+              aria-label={t('关闭')}
+              onClick={() => setExpanded(false)}
+            >
+              <X width={16} height={16} />
+            </Button>
+          </div>
+          <div
+            data-testid="machine-screen-enlarged"
+            className="flex min-h-0 flex-1 flex-col px-3 pb-3"
+          >
+            <MachineScreenSurface
+              teamId={teamId}
+              computer={computer}
+              leaseId={leaseId}
+              interactive={leaseId !== null}
+              fill
+            />
+          </div>
+        </DialogShell>
+      )}
       <div className="flex items-center gap-3 px-3.5 py-3">
         <Icon aria-hidden="true" className="size-4.5 flex-none text-content-secondary" />
         <span className="flex min-w-0 flex-1 flex-col">
