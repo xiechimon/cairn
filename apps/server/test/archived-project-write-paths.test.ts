@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { project, todo } from '../src/db/schema.js';
+import { build, project, todo } from '../src/db/schema.js';
 import type { ChiefToolDeps } from '../src/services/chief-tools.js';
 import { executeThreadMcpTool } from '../src/services/mcp-threads.js';
 import { bootServer, req } from './helpers.js';
@@ -22,6 +22,19 @@ function world() {
       phase: 'todo',
       phaseAt: Date.now(),
       seqNum: 1,
+      latestBuildId: 'build-readonly',
+    })
+    .run();
+  s.db
+    .insert(build)
+    .values({
+      id: 'build-readonly',
+      todoId: CARD,
+      withPlan: false,
+      prevPhase: 'todo',
+      triggerSource: 'user',
+      createdAt: Date.now(),
+      changes: [],
     })
     .run();
   return s;
@@ -74,6 +87,22 @@ describe('an archived project refuses every todo write path', () => {
     expect((await req(s.app, 'POST', '/api/projects/project-archived/archive')).status).toBe(200);
     const move = await req(s.app, 'PATCH', `/api/todos/${CARD}`, { projectId: 'project-archived' });
     expect(move.status).toBe(409);
+    s.dispose();
+  });
+
+  test('the MCP reply_thread tool refuses a work thread in an archived project', async () => {
+    const s = world();
+    await archive(s);
+    const deps = { ...s.svc, box: s.secretBox } as unknown as ChiefToolDeps;
+    for (const mode of [undefined, 'steer'] as const) {
+      await expect(
+        executeThreadMcpTool(deps, s.team.id, 'reply_thread', {
+          threadId: CARD,
+          content: 'keep going',
+          ...(mode === undefined ? {} : { mode }),
+        }),
+      ).rejects.toThrow(ARCHIVED);
+    }
     s.dispose();
   });
 

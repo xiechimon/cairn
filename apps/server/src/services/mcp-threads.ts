@@ -387,15 +387,18 @@ export async function executeThreadMcpTool(
         });
       }
       if (input.content === undefined) throw new HttpError(400, 'Thread reply requires content');
-      if (input.projectId !== undefined) {
-        requireProject(db, teamId, input.projectId);
-        assertProjectWritable(db, teamId, input.projectId);
-      }
+      if (input.projectId !== undefined) requireProject(db, teamId, input.projectId);
+      const targetProjectId =
+        input.projectId ??
+        (thread.kind === 'coordinator'
+          ? threadProjectId(db, teamId, input.threadId)
+          : thread.row.projectId);
+      if (targetProjectId !== null) assertProjectWritable(db, teamId, targetProjectId);
       if (thread.kind === 'coordinator') {
         const result = sendChiefMessage(deps, teamId, {
           threadId: input.threadId,
           content: input.content,
-          projectId: input.projectId ?? threadProjectId(db, teamId, input.threadId),
+          projectId: targetProjectId,
         });
         deps.convHub?.publishMessage(input.threadId, result.message);
         const steered =
