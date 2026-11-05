@@ -26,6 +26,7 @@ import { answerQuestion, askQuestionContentOf } from './chief-questions.js';
 import type { ChiefToolDeps } from './chief-tools.js';
 import { steerChiefMessage, stopChiefTurn } from './chief-turns.js';
 import { readConversationPage } from './conversation-page.js';
+import { assertProjectWritable } from './project-writable.js';
 import { containsLike, escapeLike } from './search.js';
 import { drainTaskMessageQueue, queueTaskMessage } from './task-message-queue.js';
 import { toTodoRecord } from './todos.js';
@@ -297,6 +298,7 @@ export async function executeThreadMcpTool(
     case 'start_thread': {
       const input = z.object(THREAD_TOOL_SCHEMAS.start_thread).parse(args);
       requireProject(db, teamId, input.projectId);
+      assertProjectWritable(db, teamId, input.projectId);
       const result = sendChiefMessage(deps, teamId, { ...input, threadId: null });
       deps.convHub?.publishMessage(result.thread.id, result.message);
       return {
@@ -385,7 +387,10 @@ export async function executeThreadMcpTool(
         });
       }
       if (input.content === undefined) throw new HttpError(400, 'Thread reply requires content');
-      if (input.projectId !== undefined) requireProject(db, teamId, input.projectId);
+      if (input.projectId !== undefined) {
+        requireProject(db, teamId, input.projectId);
+        assertProjectWritable(db, teamId, input.projectId);
+      }
       if (thread.kind === 'coordinator') {
         const result = sendChiefMessage(deps, teamId, {
           threadId: input.threadId,
