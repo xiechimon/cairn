@@ -25,6 +25,7 @@ import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
+import { BoardQuestionBar, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -161,59 +162,74 @@ export function BoardPage() {
         onSearch={() => search.setOpen(true)}
       />
       <div className={`board-sheet ${SHEET_PANEL}`}>
-        {chiefView === 'settings' ? (
-          <ChiefSettings
-            chief={chiefData}
-            onBack={() => setChiefView('drawer')}
-            machines={fixture.resources?.machines}
-          />
-        ) : projectLookup === 'loading' ? (
-          <ProjectsLoading />
-        ) : projectLookup === 'failed' ? (
-          <ProjectsFailed
-            retrying={teamsQ.isFetching || projectsQ.isFetching}
-            onRetry={() => {
-              if (teamId === undefined) {
-                void teamsQ.refetch();
-                return;
-              }
-              void projectsQ.refetch();
-            }}
-          />
-        ) : projectLookup === 'unknown' && homeProjectId !== null ? (
-          <ProjectNotFound
-            unknownId={homeProjectId}
-            suggestions={suggestProjects(homeProjectId, knownProjects)}
-            projectHref={(id) => {
-              const params = new URLSearchParams(searchParams);
-              params.set('project', id);
-              params.delete('chat');
-              params.delete(THREAD_PARAM);
-              return `/app?${params.toString()}`;
-            }}
-          />
-        ) : homeProject !== null && !projectChat ? (
-          <ProjectHome
-            key={homeProject.id}
-            project={homeProject}
-            todos={todos}
-            schedules={schedules}
-            now={now}
-            chatHref={projectChatHref}
-          />
-        ) : (
-          <HomeC
-            surface={chief}
-            todos={todos}
-            now={now}
-            projectId={homeProjectName === null ? null : homeProjectId}
-            projectName={homeProjectName}
-            banner={homeBanner}
-            machines={machines}
-            coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
-            schedules={schedules}
-          />
-        )}
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          {chiefView === 'settings' ? (
+            <ChiefSettings
+              chief={chiefData}
+              onBack={() => setChiefView('drawer')}
+              machines={fixture.resources?.machines}
+            />
+          ) : projectLookup === 'loading' ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectsLoading />
+            </div>
+          ) : projectLookup === 'failed' ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectsFailed
+                retrying={teamsQ.isFetching || projectsQ.isFetching}
+                onRetry={() => {
+                  if (teamId === undefined) {
+                    void teamsQ.refetch();
+                    return;
+                  }
+                  void projectsQ.refetch();
+                }}
+              />
+            </div>
+          ) : projectLookup === 'unknown' && homeProjectId !== null ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectNotFound
+                unknownId={homeProjectId}
+                suggestions={suggestProjects(homeProjectId, knownProjects)}
+                projectHref={(id) => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set('project', id);
+                  params.delete('chat');
+                  params.delete(THREAD_PARAM);
+                  return `/app?${params.toString()}`;
+                }}
+              />
+            </div>
+          ) : homeProject !== null && !projectChat ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectHome
+                key={homeProject.id}
+                project={homeProject}
+                todos={todos}
+                schedules={schedules}
+                now={now}
+                chatHref={projectChatHref}
+              />
+            </div>
+          ) : (
+            <HomeC
+              surface={chief}
+              todos={todos}
+              now={now}
+              projectId={homeProjectName === null ? null : homeProjectId}
+              projectName={homeProjectName}
+              banner={homeBanner}
+              machines={machines}
+              coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
+              schedules={schedules}
+            />
+          )}
+          <ChiefQuestionPanel />
+        </div>
         {threadId !== null && (
           <SideChat
             key={threadId}

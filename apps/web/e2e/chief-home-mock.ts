@@ -195,6 +195,7 @@ export async function mockLive(
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? []);
     if (p === '/api/server/backup') return json(state.backup ?? { state: 'none' });
+    if (p === '/api/flags') return json({ flags: [] });
     if (p === '/api/teams/t1/members' || p === '/api/skills') return json([]);
     return json([]);
   });

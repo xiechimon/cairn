@@ -389,6 +389,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ChiefQuestionCard
               item={item}
+              numberKeys={false}
               {...(onAnswerQuestion ? { onAnswer: onAnswerQuestion } : {})}
               {...(onCancelQuestion ? { onCancel: onCancelQuestion } : {})}
             />

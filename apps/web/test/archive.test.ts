@@ -4,5 +4,5 @@ import { todo } from './helpers.js';
 
 test('archived tasks do not contribute to the needs-you count', () => {
   const waiting = { ...todo(2, 'review'), archivedAt: 123 };
-  expect(needsYouCount([waiting], [])).toBe(0);
+  expect(needsYouCount([waiting])).toBe(0);
 });
