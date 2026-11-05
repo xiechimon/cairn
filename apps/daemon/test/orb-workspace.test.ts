@@ -1,5 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
@@ -7,6 +14,16 @@ import { gitPrim } from '../src/git.js';
 import { createDaemonLogger } from '../src/log.js';
 import { orbAgentHome, orbWorkspacesRoot } from '../src/orb/worker.js';
 import { WorkspaceManager } from '../src/workspace.js';
+
+function copySeedRepo(src: string, dest: string): void {
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    const from = join(src, entry.name);
+    const to = join(dest, entry.name);
+    if (entry.isDirectory()) copySeedRepo(from, to);
+    else copyFileSync(from, to);
+  }
+}
 
 test('seeds a private base clone, fetches with the step credential and leaves the seed untouched', async () => {
   const root = mkdtempSync(join(tmpdir(), 'orb-seed-'));
@@ -27,7 +44,7 @@ test('seeds a private base clone, fetches with the step credential and leaves th
     '-m',
     'First',
   ]);
-  cpSync(truth, seed, { recursive: true });
+  copySeedRepo(truth, seed);
   const seedConfig = readFileSync(join(seed, '.git', 'config'), 'utf8');
   writeFileSync(join(truth, 'file.txt'), 'second');
   execFileSync('git', ['-C', truth, 'add', 'file.txt']);
