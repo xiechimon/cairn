@@ -9,11 +9,11 @@ export const SCHEDULE_AFTER_MS = 20 * 60 * 1000;
 export const GATE_WORKFLOW = 'review-gate.yml';
 
 function gh(args, input) {
-  const result = spawnSync(
-    'gh',
-    args,
-    input === undefined ? { encoding: 'utf8' } : { encoding: 'utf8', input: JSON.stringify(input) },
-  );
+  const result = spawnSync('gh', args, {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    ...(input === undefined ? {} : { input: JSON.stringify(input) }),
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr.trim() || 'gh failed');
   return result.stdout;
@@ -24,6 +24,10 @@ function ghJson(args) {
 }
 
 function listPaged(path) {
+  return JSON.parse(gh(['api', '--slurp', path]));
+}
+
+function ghPaged(path) {
   return JSON.parse(
     gh(['api', '--paginate', '--slurp', `${path}${path.includes('?') ? '&' : '?'}per_page=100`]),
   ).flat();
@@ -73,7 +77,7 @@ export function watchdog(repo, env = process.env) {
   const now = parseTime(env.CAIRN_WATCHDOG_NOW ?? new Date().toISOString(), 'watchdog time');
   const statePath = env.CAIRN_WATCHDOG_STATE;
   const state = statePath === undefined ? null : readState(statePath);
-  const pulls = listPaged(`repos/${repo}/pulls?state=open`);
+  const pulls = ghPaged(`repos/${repo}/pulls?state=open`);
   if (!Array.isArray(pulls)) throw new Error('malformed pull list');
   const stale = [];
   for (const pr of pulls) {
@@ -86,7 +90,9 @@ export function watchdog(repo, env = process.env) {
     const staleCheck = newestOwnCheck(runs.check_runs, pr.head.sha, now);
     if (staleCheck !== null) stale.push({ pr: pr.number, sha: pr.head.sha, check: staleCheck });
   }
-  const pages = listPaged(`repos/${repo}/actions/workflows/${GATE_WORKFLOW}/runs?event=schedule`);
+  const pages = listPaged(
+    `repos/${repo}/actions/workflows/${GATE_WORKFLOW}/runs?event=schedule&per_page=5`,
+  );
   if (!Array.isArray(pages)) throw new Error('malformed workflow-runs response');
   const runs = pages.flatMap((page) => {
     if (!Array.isArray(page?.workflow_runs)) throw new Error('malformed workflow-runs response');

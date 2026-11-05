@@ -108,6 +108,10 @@ test('a stale in-progress github-actions check dispatches one evaluation', () =>
   const out = run(world());
   assert.equal(out.result.status, 0, out.result.stderr);
   assert.equal(out.dispatches.length, 1);
+  const scheduleCalls = out.calls.filter((call) => call.args.join(' ').includes('/runs?'));
+  assert.equal(scheduleCalls.length, 1);
+  assert.match(scheduleCalls[0].args.join(' '), /per_page=5/);
+  assert.doesNotMatch(scheduleCalls[0].args.join(' '), /--paginate/);
   assert.deepEqual(JSON.parse(out.dispatches[0].input), {
     ref: 'main',
     inputs: { pr: '7' },
