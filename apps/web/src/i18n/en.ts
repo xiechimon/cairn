@@ -723,7 +723,6 @@ export const EN: Record<string, string> = {
   技能已更新: 'Skill updated',
   关注与提醒: 'Watches & reminders',
   未设置: 'Not set',
-  // #854 收编 popover 后用户菜单面板的 aria-label（原 FloatingShell 壳无标签）
   '尚无章程。点击编辑，为总管添加常设指示。':
     'No charter yet. Click edit to give the Chief standing instructions.',
   编辑: 'Edit',
@@ -1609,7 +1608,6 @@ export const EN: Record<string, string> = {
   '检查网络后再试一次。': 'Check your connection and try again.',
   正在加载项目: 'Loading projects',
   活动: 'Activity',
-  用户菜单: 'User menu',
   '移除筛选 {filter}': 'Remove filter {filter}',
   搜索筛选: 'Search filters',
   '可以任意组合，需同时满足': 'Combine any; they all apply',
