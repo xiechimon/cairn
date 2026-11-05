@@ -31,9 +31,11 @@ if (path === 'graphql') {
  if(args.includes('pullRequestId=bad')) process.exit(1);
  console.log(JSON.stringify({data:{disablePullRequestAutoMerge:{pullRequest:{number:1}}}}));
 } else if (path.includes('/issues?')) console.log(JSON.stringify([d.issues ?? []]));
+else if (path.includes('/issues/') && args.includes('PATCH')) { d.issues = []; fs.writeFileSync(process.env.DATA, JSON.stringify(d)); console.log('{}'); }
 else if (path.endsWith('/rerun') && d.rerunError) { console.error(d.rerunError); process.exit(1); }
 else if (path.includes('/actions/runs/') && !path.endsWith('/rerun')) console.log(JSON.stringify(d.confirmedRun ?? {}));
 else if (path.includes('/statuses/') && d.statusError) process.exit(1);
+else if (path.includes('/actions/workflows/ci.yml/runs')) console.log(JSON.stringify({workflow_runs:d.ciRuns ?? []}));
 else if (path.includes('/actions/workflows/')) console.log(JSON.stringify([{workflow_runs:d.runs ?? []}]));
 else if (path.includes('/labels?')) console.log(JSON.stringify([d.labels ?? []]));
 else if (path.includes('/pulls?')) console.log(JSON.stringify([d.pulls ?? []]));
@@ -62,6 +64,74 @@ else console.log('{}');
     calls: () => readFileSync(log, 'utf8'),
   };
 }
+const main = 'a'.repeat(40);
+const autoBody =
+  'Main CI failed at b: run\n\n<!-- autonomy-brake: auto-resume -->\n\nClose this issue';
+const greenCi = (head = main) => [
+  {
+    id: 11,
+    status: 'completed',
+    conclusion: 'success',
+    head_sha: head,
+    html_url: 'https://example.test/run/11',
+  },
+];
+for (const [name, data, closed] of [
+  ['a green run on the main head', { main, ciRuns: greenCi() }, true],
+  ['a green run for an older head', { main, ciRuns: greenCi('c'.repeat(40)) }, false],
+  [
+    'a still running main ci',
+    { main, ciRuns: [{ ...greenCi()[0], status: 'in_progress', conclusion: null }] },
+    false,
+  ],
+  ['a failed main ci', { main, ciRuns: [{ ...greenCi()[0], conclusion: 'failure' }] }, false],
+  ['a missing main ci', { main, ciRuns: [] }, false],
+])
+  test(`resume against ${name}: closed=${closed}`, (t) => {
+    const f = fixture(t, { issues: [{ number: 5, body: autoBody }], ...data });
+    const r = f.run(['resume']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(f.calls().includes('"state":"closed"'), closed);
+    assert.match(r.stdout, closed ? /#5: resumed/ : /still paused/);
+  });
+test('resume keeps a marker a person opened', (t) => {
+  const f = fixture(t, {
+    issues: [{ number: 5, body: 'I want to stop merging today.' }],
+    main,
+    ciRuns: greenCi(),
+  });
+  const r = f.run(['resume']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /"state":"closed"/);
+  assert.match(r.stdout, /#5: manual marker kept/);
+});
+test('resume without a marker writes nothing', (t) => {
+  const f = fixture(t, { issues: [], main, ciRuns: greenCi() });
+  const r = f.run(['resume']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(f.calls(), /--method/);
+  assert.doesNotMatch(f.calls(), /branches\/main/);
+});
+test('resume refreshes open PR head signals after closing', (t) => {
+  const f = fixture(t, {
+    issues: [{ number: 5, body: autoBody }],
+    main,
+    ciRuns: greenCi(),
+    pulls: [{ number: 7, head: { sha: 'b'.repeat(40) }, auto_merge: null, labels: [] }],
+    runs: [],
+  });
+  const r = f.run(['resume']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), /statuses\/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/);
+  assert.match(f.calls(), /"state":"success"/);
+  assert.match(r.stdout, /autonomy: resumed/);
+});
+test('pause marks its marker as auto-resumable', (t) => {
+  const f = fixture(t, { issues: [] });
+  const r = f.run(['pause', '--reason', 'Main CI failed at b: run']);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(f.calls(), /<!-- autonomy-brake: auto-resume -->/);
+});
 test('status reports an open marker without writes', (t) => {
   const f = fixture(t, { issues: [{ number: 5 }] });
   const r = f.run(['status']);
