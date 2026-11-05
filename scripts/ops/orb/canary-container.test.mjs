@@ -19,6 +19,7 @@ import {
   networkTargets,
   publicDirectTargets,
   refusedTargets,
+  rootReadRows,
 } from './canary-attacker.mjs';
 import { containerStackEnv } from './canary-stack.mjs';
 import { cleanupCanaryContainer } from './container-cleanup.mjs';
@@ -466,6 +467,56 @@ test('the root probe reads sentinels as bytes without exposing them and reports 
   assert.deepEqual(output.leaked.sort(), planted.sentinels.map((entry) => entry.path).sort());
   for (const marker of planted.markers) assert.ok(!result.stdout.includes(marker));
   assert.ok(output.rows.some((row) => row.target === `sudo ${home} enumeration`));
+});
+
+test('a guest directory at the host home path is not host exposure', async (t) => {
+  const home = attackFixture(t);
+  writeFileSync(join(home, 'workdir'), 'guest');
+  const config = {
+    ...containerConfig(),
+    hostHome: home,
+    sentinels: [{ path: join(home, '.ssh', '.cairn-canary-guest'), hash: 'd'.repeat(64) }],
+    realPaths: [],
+  };
+  const result = await attack(config, {
+    cwd: join(home, 'workspace'),
+    env: { HOME: home },
+    network: false,
+    connectTarget: async () => assert.fail('guest home must not open a socket'),
+    run: () => assert.fail('guest home must not run a command'),
+    lookup: async () => assert.fail('guest home must not resolve'),
+    rootProbe: () => assert.fail('guest home must not sudo'),
+  });
+  for (const target of ['$HOME enumeration', `${home} enumeration`]) {
+    const row = result.routes.directRead.find((entry) => entry.target === target);
+    assert.equal(row?.blocked, true, target);
+    assert.equal(row?.detail, 'guest home enumerable; no host sentinels');
+  }
+  const root = rootReadRows(config);
+  const sudo = root.rows.find((entry) => entry.target === `sudo ${home} enumeration`);
+  assert.equal(sudo?.blocked, true);
+  assert.equal(sudo?.detail, 'guest home enumerable; no host sentinels');
+  assert.deepEqual(root.leaked, []);
+});
+
+test('a sentinel name in the host home listing is host exposure', () => {
+  const home = realpathSync(makeTestTempDir('orb-canary-home-witness-'));
+  try {
+    writeFileSync(join(home, '.cairn-canary-guest'), 'marker');
+    const config = {
+      ...containerConfig(),
+      hostHome: home,
+      sentinels: [{ path: join(home, '.cairn-canary-guest'), hash: 'e'.repeat(64) }],
+      realPaths: [],
+    };
+    const row = rootReadRows(config).rows.find(
+      (entry) => entry.target === `sudo ${home} enumeration`,
+    );
+    assert.equal(row?.blocked, false);
+    assert.equal(row?.detail, 'host home enumerable');
+  } finally {
+    releaseTestTempDir(home);
+  }
 });
 
 test('the root probe reports blocked rows for paths that do not exist', () => {

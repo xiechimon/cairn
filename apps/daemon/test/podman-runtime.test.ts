@@ -212,7 +212,7 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     await socket.runtime.spawn(spec({ env: {}, egress: { socketPath: relay.socketPath } }));
     const argv = socket.podman.callsOf('create')[0] ?? [];
     const mounts = argv.flatMap((arg, index) => (argv[index - 1] === '-v' ? [arg] : []));
-    expect(mounts.at(-1)).toBe(`${relay.directory}:/run/cairn-egress:ro`);
+    expect(mounts.at(-1)).toBe(`${relay.socketPath}:/run/cairn-egress/egress.sock:ro`);
     expect(mounts).toHaveLength(4);
     expect(argv.slice(argv.indexOf('-e'), argv.indexOf('-e') + 2)).toEqual([
       '-e',
@@ -221,13 +221,22 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     expect(argv).toContain('none');
   });
 
-  test('a relay socket with a different basename keeps its name in the mounted directory', async () => {
+  test('a relay socket with a different basename still exports only that socket inode', async () => {
     const { podman, runtime } = fixture();
     const relay = await relayFixture('cairn-orb-egress', 'custom.sock');
     await runtime.spawn(spec({ egress: { socketPath: relay.socketPath } }));
     const argv = podman.callsOf('create')[0] ?? [];
-    expect(argv).toContain(`${relay.directory}:/run/cairn-egress:ro`);
-    expect(argv).toContain('CAIRN_ORB_EGRESS_SOCKET=/run/cairn-egress/custom.sock');
+    expect(argv).toContain(`${relay.socketPath}:/run/cairn-egress/egress.sock:ro`);
+    expect(argv).toContain('CAIRN_ORB_EGRESS_SOCKET=/run/cairn-egress/egress.sock');
+  });
+
+  test('only the socket inode is exported so later sibling entries cannot enter a running Orb', async () => {
+    const { podman, runtime } = fixture();
+    const relay = await relayFixture();
+    await runtime.spawn(spec({ egress: { socketPath: relay.socketPath } }));
+    const mounts = (podman.callsOf('create')[0] ?? []).filter((arg) => arg.endsWith(':ro'));
+    expect(mounts).toContain(`${relay.socketPath}:/run/cairn-egress/egress.sock:ro`);
+    expect(mounts).not.toContain(`${relay.directory}:/run/cairn-egress:ro`);
   });
 
   test('persistent home is a named volume mounted after the bind mounts', async () => {
@@ -677,6 +686,271 @@ describe('PodmanOrbRuntime.spawn lifecycle', () => {
       if (options?.signal !== undefined) expect(options.signal).toBe(controller.signal);
     });
     expect(podman.containers.size).toBe(0);
+  });
+});
+
+const OLD_EGRESS_SOCKET = '/run/user/1000/cairn-orb-egress/egress.sock';
+const EGRESS_TARGET = '/run/cairn-egress/egress.sock';
+const EGRESS_ENV = `CAIRN_ORB_EGRESS_SOCKET=${EGRESS_TARGET}`;
+const RETAINED_ID = 'a'.repeat(64);
+
+function retainedWithEgress(
+  state: 'running' | 'paused' | 'exited' | 'created',
+  create = [
+    '-v',
+    `${OLD_EGRESS_SOCKET}:${EGRESS_TARGET}:ro`,
+    '-e',
+    EGRESS_ENV,
+    '-v',
+    'cairn-computer-a:/home/user:rw',
+  ],
+) {
+  return {
+    id: RETAINED_ID,
+    name: ORB,
+    image: IMAGE,
+    state,
+    labels: ORB_LABELS,
+    create,
+  };
+}
+
+describe('PodmanOrbRuntime egress policy drift', () => {
+  test.each(['running', 'paused'] as const)(
+    'a %s container keeps its host volume when egress changes from enabled to none',
+    async (state) => {
+      const { podman, runtime } = fixture();
+      podman.containers.set(ORB, retainedWithEgress(state));
+      await runtime.spawn(
+        spec({ persistentHome: { volume: 'cairn-computer-a', target: '/home/user' } }),
+      );
+      const removed = podman.callsOf('rm');
+      expect(removed).toEqual([
+        ['podman', 'rm', '--force', '--ignore', '--time', '5', RETAINED_ID],
+      ]);
+      expect(removed[0]).not.toContain('--volumes');
+      expect(podman.callsOf('unpause')).toEqual([]);
+      expect(podman.callsOf('start').some((argv) => argv.includes(RETAINED_ID))).toBe(false);
+      const created = podman.callsOf('create');
+      expect(created).toHaveLength(1);
+      const joined = created[0]?.join(' ') ?? '';
+      expect(joined).not.toContain('CAIRN_ORB_EGRESS_SOCKET');
+      expect(joined).not.toContain(OLD_EGRESS_SOCKET);
+      expect(joined).toContain('cairn-computer-a:/home/user:rw');
+      expect(podman.containers.get(ORB)?.state).toBe('running');
+      expect(podman.idOf(ORB)).not.toBe(RETAINED_ID);
+    },
+  );
+
+  test('a retained container mounted on another socket is recreated onto the requested socket', async () => {
+    const { podman, runtime } = fixture();
+    const relay = await relayFixture('cairn-orb-egress-next', 'egress.sock');
+    podman.containers.set(ORB, retainedWithEgress('paused'));
+    await runtime.spawn(
+      spec({
+        egress: { socketPath: relay.socketPath },
+        persistentHome: { volume: 'cairn-computer-a', target: '/home/user' },
+      }),
+    );
+    expect(podman.callsOf('rm')).toEqual([
+      ['podman', 'rm', '--force', '--ignore', '--time', '5', RETAINED_ID],
+    ]);
+    expect(podman.callsOf('unpause')).toEqual([]);
+    const joined = podman.callsOf('create')[0]?.join(' ') ?? '';
+    expect(joined).toContain(`${relay.socketPath}:${EGRESS_TARGET}:ro`);
+    expect(joined).toContain(EGRESS_ENV);
+    expect(joined).not.toContain(OLD_EGRESS_SOCKET);
+    expect(joined).toContain('cairn-computer-a:/home/user:rw');
+  });
+
+  test('the same socket and env resume a paused container without recreating it', async () => {
+    const { podman, runtime } = fixture();
+    const relay = await relayFixture();
+    podman.containers.set(
+      ORB,
+      retainedWithEgress('paused', [
+        '-v',
+        `${relay.socketPath}:${EGRESS_TARGET}:ro`,
+        '-e',
+        EGRESS_ENV,
+      ]),
+    );
+    await runtime.spawn(spec({ egress: { socketPath: relay.socketPath } }));
+    expect(podman.callsOf('rm')).toEqual([]);
+    expect(podman.callsOf('create')).toEqual([]);
+    expect(podman.callsOf('unpause')).toEqual([['podman', 'unpause', RETAINED_ID]]);
+  });
+
+  test.each([
+    [
+      'writable mount',
+      (socket: string) => ['-v', `${socket}:${EGRESS_TARGET}:rw`, '-e', EGRESS_ENV],
+    ],
+    ['env without mount', (_socket: string) => ['-e', EGRESS_ENV]],
+    ['mount without env', (socket: string) => ['-v', `${socket}:${EGRESS_TARGET}:ro`]],
+    [
+      'wrong env value',
+      (socket: string) => [
+        '-v',
+        `${socket}:${EGRESS_TARGET}:ro`,
+        '-e',
+        'CAIRN_ORB_EGRESS_SOCKET=/tmp/other.sock',
+      ],
+    ],
+  ])('a retained container with a %s is replaced', async (_name, create) => {
+    const { podman, runtime } = fixture();
+    const relay = await relayFixture();
+    podman.containers.set(ORB, retainedWithEgress('exited', create(relay.socketPath)));
+    await runtime.spawn(spec({ egress: { socketPath: relay.socketPath } }));
+    expect(podman.callsOf('rm').map((argv) => argv.at(-1))).toEqual([RETAINED_ID]);
+    expect(podman.callsOf('start').some((argv) => argv.includes(RETAINED_ID))).toBe(false);
+    expect(podman.callsOf('create')[0]?.join(' ')).toContain(relay.socketPath);
+  });
+
+  test('a create race does not resume an owned winner whose egress policy differs', async () => {
+    const { podman } = fixture();
+    podman.containers.set(ORB, retainedWithEgress('exited'));
+    const original = podman.runner;
+    let hidden = true;
+    const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
+      runner: async (argv, options) => {
+        if (hidden && argv[1] === 'container' && argv[2] === 'exists') {
+          hidden = false;
+          return { code: 1, stdout: '', stderr: '' };
+        }
+        return original(argv, options);
+      },
+    });
+    await runtime.spawn(
+      spec({ persistentHome: { volume: 'cairn-computer-a', target: '/home/user' } }),
+    );
+    expect(podman.callsOf('start').some((argv) => argv.includes(RETAINED_ID))).toBe(false);
+    expect(podman.callsOf('rm')[0]).toEqual([
+      'podman',
+      'rm',
+      '--force',
+      '--ignore',
+      '--time',
+      '5',
+      RETAINED_ID,
+    ]);
+    const creates = podman.callsOf('create');
+    expect(creates.at(-1)?.join(' ')).toContain('cairn-computer-a:/home/user:rw');
+    expect(creates.at(-1)?.join(' ')).not.toContain('CAIRN_ORB_EGRESS_SOCKET');
+    expect(podman.containers.get(ORB)?.state).toBe('running');
+    expect(podman.idOf(ORB)).not.toBe(RETAINED_ID);
+  });
+
+  test('replacement removes only the inspected id when a foreign container takes the name', async () => {
+    const { podman } = fixture();
+    podman.containers.set(ORB, retainedWithEgress('running'));
+    const original = podman.runner;
+    const runtime = new PodmanOrbRuntime({
+      ownerId: 'machine-alpha',
+      runner: async (argv, options) => {
+        const result = await original(argv, options);
+        if (argv[1] === 'container' && argv[2] === 'inspect') {
+          podman.containers.set(ORB, {
+            id: 'f'.repeat(64),
+            name: ORB,
+            image: IMAGE,
+            state: 'running',
+            labels: {},
+            create: [],
+          });
+        }
+        return result;
+      },
+    });
+    await expect(runtime.spawn(spec())).rejects.toThrow('Orb ownership labels do not match');
+    expect(podman.callsOf('rm')).toEqual([
+      ['podman', 'rm', '--force', '--ignore', '--time', '5', RETAINED_ID],
+    ]);
+    expect(podman.callsOf('start')).toEqual([]);
+    expect(podman.callsOf('unpause')).toEqual([]);
+    expect(podman.containers.get(ORB)?.id).toBe('f'.repeat(64));
+    expect(podman.containers.get(ORB)?.state).toBe('running');
+  });
+
+  test('a drifted container is kept when the replacement image is missing', async () => {
+    const { podman, runtime } = fixture();
+    podman.containers.set(ORB, retainedWithEgress('running'));
+    podman.images.delete(IMAGE);
+    await expect(runtime.spawn(spec())).rejects.toThrow(/Refusing to replace/);
+    expect(podman.callsOf('rm')).toEqual([]);
+    expect(podman.callsOf('create')).toEqual([]);
+    expect(podman.callsOf('start')).toEqual([]);
+    expect(podman.containers.get(ORB)?.id).toBe(RETAINED_ID);
+    expect(podman.containers.get(ORB)?.state).toBe('running');
+  });
+
+  test('a failed removal does not start the drifted container or create another', async () => {
+    const { podman, runtime } = fixture();
+    podman.containers.set(ORB, retainedWithEgress('paused'));
+    podman.failWhen((argv) => argv[1] === 'rm', {
+      code: 125,
+      stdout: '',
+      stderr: 'device or resource busy',
+    });
+    await expect(runtime.spawn(spec())).rejects.toThrow('device or resource busy');
+    expect(podman.callsOf('create')).toEqual([]);
+    expect(podman.callsOf('unpause')).toEqual([]);
+    expect(podman.callsOf('start')).toEqual([]);
+    expect(podman.containers.get(ORB)?.state).toBe('paused');
+  });
+
+  test('a replacement create failure does not start a drifted container', async () => {
+    const { podman, runtime } = fixture();
+    podman.containers.set(ORB, retainedWithEgress('exited'));
+    podman.failWhen((argv) => argv[1] === 'create', {
+      code: 125,
+      stdout: '',
+      stderr: 'Error: crun: cannot set memory limit',
+    });
+    await expect(runtime.spawn(spec())).rejects.toThrow('cannot set memory limit');
+    expect(podman.callsOf('start')).toEqual([]);
+    expect(podman.callsOf('rm')).toHaveLength(1);
+    expect(podman.containers.has(ORB)).toBe(false);
+  });
+
+  test('an inspect record that omits mounts or env is not resumed', async () => {
+    const { podman, runtime } = fixture();
+    const id = 'b'.repeat(64);
+    podman.containers.set(ORB, {
+      id,
+      name: ORB,
+      image: IMAGE,
+      state: 'running',
+      labels: ORB_LABELS,
+      create: [],
+    });
+    let inspections = 0;
+    podman.failWhen(
+      (argv) => argv[1] === 'container' && argv[2] === 'inspect' && inspections++ === 0,
+      {
+        code: 0,
+        stdout: JSON.stringify([
+          { Id: id, State: { Status: 'running' }, Config: { Labels: ORB_LABELS } },
+        ]),
+        stderr: '',
+      },
+    );
+    await runtime.spawn(spec());
+    expect(podman.callsOf('rm').map((argv) => argv.at(-1))).toEqual([id]);
+    expect(podman.callsOf('start').some((argv) => argv.includes(id))).toBe(false);
+    expect(podman.containers.get(ORB)?.state).toBe('running');
+  });
+
+  test('an invalid replacement socket leaves the retained container untouched', async () => {
+    const { podman, runtime } = fixture();
+    podman.containers.set(ORB, retainedWithEgress('running'));
+    await expect(
+      runtime.spawn(spec({ egress: { socketPath: '/var/run/docker.sock' } })),
+    ).rejects.toThrow(/mount/i);
+    expect(podman.calls).toEqual([]);
+    expect(podman.containers.get(ORB)?.id).toBe(RETAINED_ID);
+    expect(podman.containers.get(ORB)?.state).toBe('running');
   });
 });
 

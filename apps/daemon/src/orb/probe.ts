@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { OrbRuntime } from './runtime.js';
 
 export const PROBE_EGRESS_TARGETS = [
@@ -46,6 +49,9 @@ export async function probeContainer(
   options: ContainerProbeOptions,
 ): Promise<ContainerProbe> {
   const { version, rootless } = await runtime.health();
+  const witnessPath = join(options.hostHome, `.cairn-orb-home-probe-${randomUUID()}`);
+  const witness = randomUUID();
+  writeFileSync(witnessPath, witness, { flag: 'wx', mode: 0o600 });
   try {
     await runtime.spawn({
       orbId: options.orbId,
@@ -61,7 +67,14 @@ export async function probeContainer(
     const uid = await exec(['id', '-u']);
     const interfaces = await exec(['ls', '/sys/class/net']);
     const sudo = await exec(['sudo', '-n', 'true']);
-    const home = await exec(['test', '!', '-e', options.hostHome]);
+    const home = await exec([
+      'sh',
+      '-c',
+      'if [ ! -e "$1" ]; then exit 3; fi; content=$(cat -- "$1") || exit 5; [ "$content" != "$2" ] && exit 4; exit 0',
+      'probe-home',
+      witnessPath,
+      witness,
+    ]);
     let egress: ContainerProbe['egress'] = null;
     if (options.egressSocketPath) {
       egress = {};
@@ -81,13 +94,15 @@ export async function probeContainer(
       interfaces:
         interfaces.code === 0 ? interfaces.stdout.split('\n').filter((name) => name !== '') : [],
       sudo: sudo.code === 0,
-      homeVisible: home.code !== 0,
+      homeVisible: home.code !== 3 && home.code !== 4,
       egress,
       ...(await removeProbe(runtime, options.orbId)),
     };
   } catch (error) {
     await runtime.remove(options.orbId).catch(() => {});
     throw error;
+  } finally {
+    unlinkSync(witnessPath);
   }
 }
 

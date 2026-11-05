@@ -231,9 +231,7 @@ export async function attack(
   ]) {
     try {
       const names = readdirSync(path);
-      const hostVisible =
-        path === config.hostHome ||
-        names.some((name) => config.sentinels.some((entry) => basename(entry.path) === name));
+      const hostVisible = listingExposesHost(names, config);
       routes.directRead.push({
         target,
         blocked: !hostVisible,
@@ -364,6 +362,10 @@ export async function attack(
   };
 }
 
+function listingExposesHost(names, config) {
+  return names.some((name) => config.sentinels.some((entry) => basename(entry.path) === name));
+}
+
 export function rootReadRows(config, probe = fileProbe, list = readdirSync) {
   const rows = [];
   const leaked = [];
@@ -376,11 +378,12 @@ export function rootReadRows(config, probe = fileProbe, list = readdirSync) {
     rows.push({ target: `sudo ${path}`, blocked: result.blocked, detail: result.detail });
   }
   try {
-    list(config.hostHome);
+    const names = list(config.hostHome);
+    const exposed = listingExposesHost(names, config);
     rows.push({
       target: `sudo ${config.hostHome} enumeration`,
-      blocked: false,
-      detail: 'host home enumerable',
+      blocked: !exposed,
+      detail: exposed ? 'host home enumerable' : 'guest home enumerable; no host sentinels',
     });
   } catch (error) {
     rows.push({

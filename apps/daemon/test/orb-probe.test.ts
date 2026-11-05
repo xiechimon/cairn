@@ -1,4 +1,6 @@
-import { describe, expect, test } from 'vitest';
+import { readdirSync } from 'node:fs';
+import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PodmanOrbRuntime } from '../src/orb/podman.js';
 import { probeContainer } from '../src/orb/probe.js';
 import type { OrbExecResult } from '../src/orb/provider.js';
@@ -43,9 +45,15 @@ function fakeRuntime(handlers: Record<string, (argv: readonly string[]) => OrbEx
     removeImage: async () => {},
     exec: async (_orbId, argv) => {
       calls.push(`exec ${argv.join(' ')}`);
-      const key = argv[0] === 'sh' ? (argv.at(-1) ?? '') : argv.join(' ');
+      const key =
+        argv[0] === 'sh'
+          ? argv[3] === 'probe-home'
+            ? 'home-proof'
+            : (argv.at(-1) ?? '')
+          : argv.join(' ');
       const handler = handlers[key];
       if (handler) return handler(argv);
+      if (key === 'home-proof') return { code: 3, stdout: '', stderr: '' };
       switch (argv.join(' ')) {
         case 'cat /proc/self/status':
           return ok(STATUS);
@@ -64,7 +72,9 @@ function fakeRuntime(handlers: Record<string, (argv: readonly string[]) => OrbEx
   return { runtime, calls, spawned };
 }
 
-const options = { image: IMAGE, orbId: ORB, hostHome: '/home/ian' };
+const probeHome = makeTestTempDir('orb-probe-');
+afterAll(() => releaseTestTempDir(probeHome));
+const options = { image: IMAGE, orbId: ORB, hostHome: probeHome };
 
 describe('probeContainer', () => {
   test('reports the capability sets, uid, interfaces and sudo of the container user', async () => {
@@ -146,13 +156,43 @@ describe('probeContainer', () => {
     expect(probe.sudo).toBe(false);
   });
 
-  test('a host home visible inside the container is reported', async () => {
+  test('an ordinary guest home at the host home path is not proof that host content is exposed', async () => {
     const { runtime } = fakeRuntime({
       'test ! -e /home/ian': () => ({ code: 1, stdout: '', stderr: '' }),
+    });
+    expect((await probeContainer(runtime, options)).homeVisible).toBe(false);
+  });
+
+  test('a host home visible inside the container is reported', async () => {
+    const { runtime } = fakeRuntime({
+      'home-proof': () => ok(),
     });
     expect((await probeContainer(runtime, options)).homeVisible).toBe(true);
     const absent = fakeRuntime();
     expect((await probeContainer(absent.runtime, options)).homeVisible).toBe(false);
+  });
+
+  test.each([1, 5, 126])('an unreadable or failed home witness fails closed: %s', async (code) => {
+    const { runtime } = fakeRuntime({
+      'home-proof': () => ({ code, stdout: '', stderr: 'denied' }),
+    });
+    expect((await probeContainer(runtime, options)).homeVisible).toBe(true);
+    expect(readdirSync(probeHome)).toEqual([]);
+  });
+
+  test('a different guest file is not the host witness', async () => {
+    const { runtime } = fakeRuntime({ 'home-proof': () => ({ code: 4, stdout: '', stderr: '' }) });
+    expect((await probeContainer(runtime, options)).homeVisible).toBe(false);
+    expect(readdirSync(probeHome)).toEqual([]);
+  });
+
+  test('the exclusive host witness is removed when container startup fails', async () => {
+    const { runtime } = fakeRuntime();
+    runtime.spawn = async () => {
+      throw new Error('failed');
+    };
+    await expect(probeContainer(runtime, options)).rejects.toThrow('failed');
+    expect(readdirSync(probeHome)).toEqual([]);
   });
 
   describe('through the relay socket', () => {

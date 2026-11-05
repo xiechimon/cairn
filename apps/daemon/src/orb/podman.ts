@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import { inspectEgressBoundary } from '../../../../scripts/ops/orb/egress-boundary.mjs';
 import { ORB_NAME_PATTERN } from './names.js';
@@ -33,10 +33,25 @@ type PodmanArgv =
   | readonly ['image', 'exists', string]
   | readonly ['build' | 'create' | 'info' | 'ps' | 'rmi', ...string[]];
 type ContainerOperation = 'start' | 'unpause' | 'stop' | 'commit' | 'rm' | 'exec';
+interface OwnedMount {
+  readonly source: string | undefined;
+  readonly destination: string;
+  readonly readonly: boolean;
+}
 interface OwnedContainer {
   readonly id: string;
   readonly state: string;
+  readonly mounts: readonly OwnedMount[] | undefined;
+  readonly env: readonly string[] | undefined;
 }
+const RESUMABLE_STATES = new Set([
+  'running',
+  'paused',
+  'created',
+  'exited',
+  'stopped',
+  'configured',
+]);
 
 const labelsSchema = z.record(z.string(), z.string()).nullish();
 const inspectSchema = z
@@ -44,7 +59,22 @@ const inspectSchema = z
     z.object({
       Id: containerIdSchema,
       State: z.object({ Status: z.string() }),
-      Config: z.object({ Labels: labelsSchema }).optional(),
+      Mounts: z
+        .array(
+          z.object({
+            Source: z.string().optional(),
+            Destination: z.string(),
+            Mode: z.string().optional(),
+            RW: z.boolean().optional(),
+          }),
+        )
+        .optional(),
+      Config: z
+        .object({
+          Labels: labelsSchema,
+          Env: z.array(z.string()).optional(),
+        })
+        .optional(),
     }),
   )
   .min(1);
@@ -133,6 +163,12 @@ function assertLimits(limits: OrbSpawnSpec['limits']): void {
 function bindMount(source: string, target: string, readonly: boolean): string[] {
   assertMount(source, target);
   return ['-v', `${source}:${target}:${readonly ? 'ro' : 'rw'}`];
+}
+
+function mountIsReadonly(mode: string | undefined, writable: boolean | undefined): boolean {
+  const flags = mode?.split(',') ?? [];
+  if (writable === true || flags.includes('rw')) return false;
+  return writable === false || flags.includes('ro');
 }
 
 function listedState(state: string): OrbRuntimeState['state'] {
@@ -332,9 +368,8 @@ export class PodmanOrbRuntime implements OrbRuntime {
         throw new Error(
           `Orb egress requires a dedicated private socket-only boundary (${boundary.reason})`,
         );
-      const targetDirectory = dirname(ORB_EGRESS_TARGET);
-      mounts.push(...bindMount(boundary.directory, targetDirectory, true));
-      environment[ORB_EGRESS_ENV] = join(targetDirectory, basename(spec.egress.socketPath));
+      mounts.push(...bindMount(spec.egress.socketPath, ORB_EGRESS_TARGET, true));
+      environment[ORB_EGRESS_ENV] = ORB_EGRESS_TARGET;
     }
     const variables = Object.entries(environment).flatMap(([name, value]) => {
       assertVariableName(name, 'environment variable');
@@ -381,7 +416,57 @@ export class PodmanOrbRuntime implements OrbRuntime {
   ): Promise<void> {
     signal?.throwIfAborted();
     const existing = await this.ownedContainer(spec.orbId, signal);
-    if (existing !== undefined) return this.resume(existing, signal);
+    if (existing !== undefined) {
+      this.assertResumable(existing);
+      if (this.egressMatches(existing, spec)) return this.resume(existing, signal);
+      await this.replaceOwned(existing, spec, signal);
+    }
+    await this.createOwned(spec, createArgv, signal, true);
+  }
+
+  private assertResumable(container: OwnedContainer): void {
+    if (RESUMABLE_STATES.has(container.state)) return;
+    throw new Error(
+      `podman reported unexpected container state "${container.state}" for ${container.id}`,
+    );
+  }
+
+  private egressMatches(container: OwnedContainer, spec: OrbSpawnSpec): boolean {
+    if (container.mounts === undefined || container.env === undefined) return false;
+    const mounts = container.mounts.filter((mount) => mount.destination === ORB_EGRESS_TARGET);
+    const values = container.env.filter(
+      (entry) => entry === ORB_EGRESS_ENV || entry.startsWith(`${ORB_EGRESS_ENV}=`),
+    );
+    if (spec.egress === 'none') return mounts.length === 0 && values.length === 0;
+    return (
+      mounts.length === 1 &&
+      mounts[0]?.source === spec.egress.socketPath &&
+      mounts[0]?.readonly === true &&
+      values.length === 1 &&
+      values[0] === `${ORB_EGRESS_ENV}=${ORB_EGRESS_TARGET}`
+    );
+  }
+
+  private async replaceOwned(
+    container: OwnedContainer,
+    spec: OrbSpawnSpec,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    signal?.throwIfAborted();
+    const snapshotReady =
+      spec.snapshotImage !== undefined && (await this.imageExists(spec.snapshotImage));
+    if (!snapshotReady && !(await this.imageExists(spec.image)))
+      throw new Error(`Refusing to replace ${spec.orbId}: image ${spec.image} is missing`);
+    signal?.throwIfAborted();
+    await this.removeOwned(container);
+  }
+
+  private async createOwned(
+    spec: OrbSpawnSpec,
+    createArgv: PodmanArgv,
+    signal: AbortSignal | undefined,
+    allowReplace: boolean,
+  ): Promise<void> {
     const snapshot =
       spec.snapshotImage !== undefined && (await this.imageExists(spec.snapshotImage))
         ? spec.snapshotImage
@@ -392,7 +477,13 @@ export class PodmanOrbRuntime implements OrbRuntime {
     if (created.code !== 0) {
       if (NAME_IN_USE.test(created.stderr)) {
         const raced = await this.ownedContainer(spec.orbId, signal);
-        if (raced !== undefined) return this.resume(raced, signal);
+        if (raced !== undefined && this.egressMatches(raced, spec))
+          return this.resume(raced, signal);
+        if (raced !== undefined && allowReplace) {
+          this.assertResumable(raced);
+          await this.replaceOwned(raced, spec, signal);
+          return this.createOwned(spec, createArgv, signal, false);
+        }
       }
       throw this.failure(['create'], created);
     }
@@ -440,7 +531,16 @@ export class PodmanOrbRuntime implements OrbRuntime {
     const [container] = this.parse('container inspect', inspect.stdout, inspectSchema);
     if (!container || !orbLabelsMatch(orbId, container.Config?.Labels, this.ownerId()))
       throw new Error(`Refusing to adopt ${orbId}: Orb ownership labels do not match`);
-    return { id: container.Id, state: container.State.Status };
+    return {
+      id: container.Id,
+      state: container.State.Status,
+      mounts: container.Mounts?.map((mount) => ({
+        source: mount.Source,
+        destination: mount.Destination,
+        readonly: mountIsReadonly(mount.Mode, mount.RW),
+      })),
+      env: container.Config?.Env,
+    };
   }
 
   private async removeOwned(container: OwnedContainer): Promise<void> {

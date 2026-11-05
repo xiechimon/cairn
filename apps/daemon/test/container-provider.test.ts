@@ -8,6 +8,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:net';
 import { basename, join } from 'node:path';
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -99,6 +100,22 @@ function fixture(overrides: { runtime?: OrbRuntime; egressSocketPath?: string } 
   };
   const provider = new ContainerOrbProvider(options);
   return { root, fake, provider, options, runtimeRoot, distRoot, seedRoot, stateFile, checkout };
+}
+
+async function providerEgressSocket(name = 'cairn-orb-egress') {
+  const root = makeTestTempDir('egr-');
+  const directory = join(root, name);
+  mkdirSync(directory, { mode: 0o700 });
+  chmodSync(directory, 0o700);
+  const socketPath = join(directory, 'egress.sock');
+  const server = createServer((socket) => socket.destroy());
+  await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+  chmodSync(socketPath, 0o600);
+  onTestFinished(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    releaseTestTempDir(root);
+  });
+  return socketPath;
 }
 
 async function started(context: ReturnType<typeof fixture>, conversationId = 'C') {
@@ -253,11 +270,16 @@ describe('ContainerOrbProvider.start', () => {
     });
   });
 
-  test('a running container is not spawned again', async () => {
+  test('a running container is offered again with the current egress policy', async () => {
     const context = fixture();
     const handle = await started(context);
+    const release = handle.releaseKey;
     await context.provider.start(handle);
-    expect(context.fake.callsTo('spawn')).toHaveLength(1);
+    expect(context.fake.callsTo('spawn')).toHaveLength(2);
+    expect(context.fake.specs[1]?.egress).toBe('none');
+    expect(handle.releaseKey).toBe(release);
+    expect(handle.notes).toHaveLength(1);
+    expect(handle.running).toBe(true);
   });
 
   test('a stopped container is spawned again and resets the authenticated release', async () => {
@@ -574,6 +596,47 @@ describe('ContainerOrbProvider over PodmanOrbRuntime', () => {
       expect(argv.at(-1)).toBe(IMAGE);
     }
     expect(podman.calls[0]).toEqual(['podman', 'info', '--format', 'json']);
+  });
+
+  test('restarting without an egress socket replaces a retained running container', async () => {
+    const socketPath = await providerEgressSocket();
+    const podman = new FakePodman();
+    podman.images.add(IMAGE);
+    const runtime = new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner });
+    const context = fixture({ runtime, egressSocketPath: socketPath });
+    await started(context);
+    const restarted = new ContainerOrbProvider({ ...context.options, egressSocketPath: undefined });
+    const handle = await restarted.ensure({ conversationId: 'C', projectId: 'P' });
+    await restarted.prepare(handle);
+    await restarted.start(handle);
+    const creates = podman.callsOf('create');
+    expect(creates).toHaveLength(2);
+    expect(creates[1]?.join(' ')).not.toContain('CAIRN_ORB_EGRESS_SOCKET');
+    expect(creates[1]?.join(' ')).not.toContain(socketPath);
+    expect(podman.callsOf('rm')).toHaveLength(1);
+    expect(podman.callsOf('rm')[0]).not.toContain('--volumes');
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
+    expect(existsSync(join(context.runtimeRoot, 'cairn-orb-C'))).toBe(true);
+    expect(handle.running).toBe(true);
+  });
+
+  test('restarting without an egress socket replaces a paused container instead of resuming it', async () => {
+    const socketPath = await providerEgressSocket();
+    const podman = new FakePodman();
+    podman.images.add(IMAGE);
+    const runtime = new PodmanOrbRuntime({ ownerId: 'machine-alpha', runner: podman.runner });
+    const context = fixture({ runtime, egressSocketPath: socketPath });
+    const handle = await started(context);
+    await context.provider.stop(handle);
+    const restarted = new ContainerOrbProvider({ ...context.options, egressSocketPath: undefined });
+    const restored = await restarted.ensure({ conversationId: 'C', projectId: 'P' });
+    await restarted.prepare(restored);
+    await restarted.start(restored);
+    expect(podman.callsOf('unpause')).toEqual([]);
+    expect(podman.callsOf('create')).toHaveLength(2);
+    expect(podman.callsOf('create')[1]?.join(' ')).not.toContain(socketPath);
+    expect(podman.containers.get('cairn-orb-C')?.state).toBe('running');
+    expect(existsSync(join(context.runtimeRoot, 'cairn-orb-C'))).toBe(true);
   });
 
   test('a rootful podman is refused', async () => {

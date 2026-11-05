@@ -21,9 +21,8 @@ test('the user unit serves the relay on an owner-only unix socket in the runtime
   assert.ok(
     values.get('Environment').includes('CAIRN_ORB_EGRESS_SOCKET=%t/cairn-orb-egress/egress.sock'),
   );
-  assert.deepEqual(values.get('RuntimeDirectory'), ['cairn-orb-egress']);
-  assert.deepEqual(values.get('RuntimeDirectoryMode'), ['0700']);
-  assert.deepEqual(values.get('ExecStartPre'), ['/usr/bin/install -d -m 0700 %t/cairn-orb-egress']);
+  assert.deepEqual(values.get('Requires'), ['cairn-orb-egress.socket']);
+  assert.deepEqual(values.get('After'), ['cairn-orb-egress.socket']);
   assert.deepEqual(values.get('UMask'), ['0077']);
   assert.deepEqual(values.get('Restart'), ['on-failure']);
 });
@@ -64,4 +63,19 @@ test('the relay command starts when only the deployment checkout exists', (t) =>
   const result = spawnSync(command, args, { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, 'deployment-relay');
+});
+
+test('the relay receives one named socket owned by the socket unit across service restarts', () => {
+  const values = entries();
+  assert.ok(values.get('Environment').includes('CAIRN_ORB_SOCKET_ACTIVATION=1'));
+  assert.deepEqual(values.get('Sockets'), ['cairn-orb-egress.socket']);
+  const socket = readFileSync(
+    new URL('../systemd/cairn-orb-egress.socket', import.meta.url),
+    'utf8',
+  );
+  assert.match(socket, /^ListenStream=%t\/cairn-orb-egress\/egress.sock$/m);
+  assert.match(socket, /^SocketMode=0600$/m);
+  assert.match(socket, /^DirectoryMode=0700$/m);
+  assert.match(socket, /^FileDescriptorName=cairn-orb-egress$/m);
+  assert.ok(!values.has('RuntimeDirectory'));
 });

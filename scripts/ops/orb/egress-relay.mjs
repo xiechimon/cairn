@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises';
-import { chmod, lstat, unlink } from 'node:fs/promises';
+import { chmod, lstat, readFile, readlink, unlink } from 'node:fs/promises';
 import { Agent, createServer, request } from 'node:http';
 import { BlockList, connect, isIP } from 'node:net';
 import { dirname, isAbsolute, resolve } from 'node:path';
@@ -16,6 +16,7 @@ export const relayDefaults = {
   maxConnections: 128,
 };
 
+const unixListeners = new WeakSet();
 const refused = new BlockList();
 for (const [address, prefix] of [
   ['0.0.0.0', 8],
@@ -98,7 +99,7 @@ export function createRelay(options = {}) {
   server.requestTimeout = config.idleTimeout;
   server.on('connection', (socket) => {
     socket.on('error', () => socket.destroy());
-    const viaSocketFile = typeof server.address() === 'string';
+    const viaSocketFile = unixListeners.has(server);
     if (
       !viaSocketFile &&
       !allowed.check(socket.remoteAddress, isIP(socket.remoteAddress) === 4 ? 'ipv4' : 'ipv6')
@@ -305,6 +306,7 @@ export async function listenOnUnixSocket(server, socketPath) {
   if (!isAbsolute(socketPath)) throw new Error('Socket path must be absolute');
   await assertPrivateDirectory(dirname(socketPath));
   await removeStaleSocket(socketPath);
+  unixListeners.add(server);
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(socketPath, () => {
@@ -323,6 +325,38 @@ export async function listenOnUnixSocket(server, socketPath) {
   }
 }
 
+export async function listenOnActivatedSocket(server, socketPath, env = process.env) {
+  if (
+    env.LISTEN_PID !== String(process.pid) ||
+    env.LISTEN_FDS !== '1' ||
+    env.LISTEN_FDNAMES !== 'cairn-orb-egress'
+  )
+    throw new Error('Socket activation requires exactly one named listener for this process');
+  if (typeof socketPath !== 'string' || !isAbsolute(socketPath))
+    throw new Error('Socket activation requires an absolute socket path');
+  await assertPrivateDirectory(dirname(socketPath));
+  const socket = await lstat(socketPath);
+  if (!socket.isSocket() || socket.uid !== process.getuid() || (socket.mode & 0o777) !== 0o600)
+    throw new Error('Socket activation requires an owned physical 0600 socket');
+  const descriptor = /^socket:\[(\d+)\]$/.exec(await readlink('/proc/self/fd/3'));
+  const listeners = (await readFile('/proc/net/unix', 'utf8')).split('\n').flatMap((line) => {
+    const match = /^\S+\s+\S+\s+\S+\s+([0-9a-f]+)\s+0001\s+01\s+(\d+)\s+(.+)$/i.exec(line);
+    return match && match[3] === socketPath && (Number.parseInt(match[1], 16) & 0x10000) !== 0
+      ? [match[2]]
+      : [];
+  });
+  if (descriptor === null || listeners.length !== 1 || listeners[0] !== descriptor[1])
+    throw new Error('Socket activation listener does not match the configured Unix socket');
+  unixListeners.add(server);
+  await new Promise((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen({ fd: 3 }, () => {
+      server.off('error', reject);
+      resolveListen();
+    });
+  });
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const server = createRelay({
     allowedPorts: (process.env.CAIRN_ORB_ALLOWED_PORTS ?? relayDefaults.allowedPorts.join(','))
@@ -330,14 +364,20 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       .map(Number),
   });
   const socketPath = process.env.CAIRN_ORB_EGRESS_SOCKET;
-  if (socketPath === undefined) {
+  const activation = process.env.CAIRN_ORB_SOCKET_ACTIVATION;
+  if (activation !== undefined && activation !== '1') {
+    console.error('Invalid socket activation mode');
+    process.exit(1);
+  }
+  if (socketPath === undefined && activation === undefined) {
     server.listen(relayDefaults.port, relayDefaults.host);
     server.on('listening', () =>
       console.log(`Filtering relay listening on ${relayDefaults.host}:${relayDefaults.port}`),
     );
   } else {
     try {
-      await listenOnUnixSocket(server, socketPath);
+      if (activation === '1') await listenOnActivatedSocket(server, socketPath);
+      else await listenOnUnixSocket(server, socketPath);
     } catch (error) {
       console.error(error.message);
       process.exit(1);
