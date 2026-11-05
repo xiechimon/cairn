@@ -466,6 +466,71 @@ describe('D71 thread override set at dispatch', () => {
     const { res } = await start(w, { machineId: newRecordId() });
     expect(res.status).toBe(404);
   });
+
+  test('PATCH stores the override on the todo and startBuilds without a body keeps it', async () => {
+    const w = await setupWorld();
+    const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+      title: 'patch override',
+      spec: 'probe',
+    });
+    const todoId = ((await todoRes.json()) as { id: string }).id;
+    const patched = await req(w.s.app, 'PATCH', `/api/todos/${todoId}`, {
+      routeOverride: {
+        machineId: w.machineId,
+        requiredCapabilities: { executor: 'orb', mcpServers: ['figma'] },
+      },
+    });
+    expect(patched.status).toBe(200);
+    const body = (await patched.json()) as { routeOverride: unknown };
+    expect(body.routeOverride).toEqual({
+      machineId: w.machineId,
+      requiredCapabilities: { executor: 'orb', mcpServers: ['figma'] },
+    });
+    const started = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+      assignment: { plan: null, build: { agentId: AGENT_BUILD } },
+      withPlan: false,
+    });
+    expect(started.status).toBe(201);
+    const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
+    expect(todoRow.routeOverride).toEqual({
+      machineId: w.machineId,
+      requiredCapabilities: { executor: 'orb', mcpServers: ['figma'] },
+    });
+  });
+
+  test('PATCH refuses a machine outside the team', async () => {
+    const w = await setupWorld();
+    const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+      title: 'bad machine',
+      spec: 'probe',
+    });
+    const todoId = ((await todoRes.json()) as { id: string }).id;
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${todoId}`, {
+      routeOverride: { machineId: newRecordId() },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH null clears the override', async () => {
+    const w = await setupWorld();
+    const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+      title: 'clear override',
+      spec: 'probe',
+    });
+    const todoId = ((await todoRes.json()) as { id: string }).id;
+    w.s.db
+      .update(todoTable)
+      .set({ routeOverride: { machineId: w.machineId } })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${todoId}`, { routeOverride: null });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { routeOverride?: unknown }).routeOverride).toBeUndefined();
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!.routeOverride,
+    ).toBeNull();
+  });
 });
 
 function insertPolicy(

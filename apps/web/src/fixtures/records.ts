@@ -76,6 +76,14 @@ export interface TodoRecord {
   sourceRef?: string | null;
   usageCost?: UsageCost;
   verified?: boolean;
+  routeOverride?: {
+    machineId?: string;
+    requiredCapabilities?: {
+      mcpServers?: string[];
+      models?: string[];
+      executor?: 'orb';
+    };
+  } | null;
 }
 
 export interface TokenUsageContent {
