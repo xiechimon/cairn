@@ -37,10 +37,6 @@ docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -h
 
 The image sets `CAIRN_REQUIRE_TOKEN=1`: without a non-empty `CAIRN_TOKEN` the container logs the reason and exits with code 1 instead of serving an open API on a public address. Back up by copying the whole `/data` volume (database and `secretbox.key` together). Terminate TLS in front of the container (a reverse proxy, or the platform's HTTPS domain), since the bearer token travels in a header.
 
-## Deploy on Railway
-
-Railway runs the same Docker image behind a public HTTPS domain. The button, the volume and the token are in [deploy/railway.md](./deploy/railway.md).
-
 ## Develop from source
 
 Requires Node.js >= 22.19 and pnpm (e.g. via `corepack enable`).

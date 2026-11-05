@@ -138,10 +138,4 @@ describe('container image definition', () => {
     expect(dockerfile).not.toMatch(/CAIRN_TOKEN\s*=/);
     expect(dockerfile).not.toMatch(/apps\/daemon/);
   });
-
-  test('railway.json builds the Dockerfile and health-checks the unauthenticated SPA shell', () => {
-    const railway = JSON.parse(readFileSync(join(repoRoot, 'railway.json'), 'utf8'));
-    expect(railway.build).toMatchObject({ builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' });
-    expect(railway.deploy.healthcheckPath).toBe('/app');
-  });
 });
