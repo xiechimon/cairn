@@ -502,6 +502,7 @@ test('the live screen enlarges and becomes interactive after desktop control is 
     'data-interactive',
     'true',
   );
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
   await expect(page.getByText('在大屏里点击和键入')).toBeVisible();
   await page.getByRole('dialog', { name: 'omarchy' }).getByRole('button', { name: '关闭' }).click();
   await expect(enlarged).toHaveCount(0);

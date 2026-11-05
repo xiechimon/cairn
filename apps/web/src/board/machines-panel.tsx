@@ -283,8 +283,8 @@ function MachineCard({
           open={expanded}
           onClose={() => setExpanded(false)}
           title={machine.name}
-          width="min(100vw - 1.5rem, 1120px)"
-          height="min(100dvh - 1.5rem, 820px)"
+          width="min(100vw - 1.5rem, 1280px)"
+          height="min(100dvh - 1.5rem, 900px)"
           className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
         >
           <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
@@ -309,16 +309,26 @@ function MachineCard({
           </div>
           <div
             data-testid="machine-screen-enlarged"
-            className="flex min-h-0 flex-1 flex-col px-2 pb-2 sm:px-3 sm:pb-3"
+            className="grid min-h-0 flex-1 place-items-center px-2 pb-2 sm:px-3 sm:pb-3"
+            style={{ containerType: 'size' }}
           >
-            <MachineScreenSurface
-              teamId={teamId}
-              computer={computer}
-              leaseId={leaseId}
-              interactive={leaseId !== null}
-              fill
-              autoFocus
-            />
+            <div
+              className="max-h-full max-w-full"
+              style={{
+                aspectRatio: '16 / 10',
+                width: 'min(100cqw, calc(100cqh * 16 / 10))',
+                height: 'min(100cqh, calc(100cqw * 10 / 16))',
+              }}
+            >
+              <MachineScreenSurface
+                teamId={teamId}
+                computer={computer}
+                leaseId={leaseId}
+                interactive={leaseId !== null}
+                fill
+                autoFocus
+              />
+            </div>
           </div>
         </DialogShell>
       )}
