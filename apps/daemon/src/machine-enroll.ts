@@ -148,6 +148,7 @@ export async function enrollThroughBrowser(
 
 export async function pendingEnrollmentUrl(
   paths: StatePaths,
+  serverUrl: string,
   waitMs: number,
   sleep: (ms: number) => Promise<void>,
   now: () => number,
@@ -155,7 +156,12 @@ export async function pendingEnrollmentUrl(
   const deadline = now() + waitMs;
   for (;;) {
     const pending = readPending(pendingPath(paths));
-    if (pending !== null && pending.expiresAt > now()) return pending.url;
+    if (
+      pending !== null &&
+      pending.expiresAt > now() &&
+      (pending.serverUrl === undefined || pending.serverUrl === serverUrl)
+    )
+      return pending.url;
     if (now() >= deadline) return null;
     await sleep(200);
   }
