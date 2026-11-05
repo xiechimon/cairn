@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -46,8 +46,8 @@ import { ComputerOrbs } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
 import { createOrbProvider } from './orb/select.js';
-import { ensurePrivateDir } from './private-fs.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
+import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
 import { resumePendingUpload } from './runner.js';
 import {
