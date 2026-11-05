@@ -16,10 +16,11 @@ fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, input }) + '\\n')
 const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
 const joined = args.join(' ');
 const out = (value) => process.stdout.write(JSON.stringify(value));
+if (args.includes('--slurp') && !args.includes('--paginate'))
+  throw new Error('--paginate required when passing --slurp');
 if (joined.includes('--slurp') && joined.includes('/pulls?')) out([world.pulls]);
 else if (joined.includes('--slurp') && joined.includes('/check-runs?')) out([world.checkRuns]);
-else if (joined.includes('--slurp') && joined.includes('/runs?'))
-  out([{ workflow_runs: world.runs }]);
+else if (joined.includes('/runs?')) out({ workflow_runs: world.runs });
 else if (joined.includes('check-runs?')) out({ check_runs: world.checkRuns });
 else if (/--input -/.test(joined) && joined.includes('/dispatches')) out({});
 else if (joined.includes('gh api')) out({});
@@ -112,6 +113,7 @@ test('a stale in-progress github-actions check dispatches one evaluation', () =>
   assert.equal(scheduleCalls.length, 1);
   assert.match(scheduleCalls[0].args.join(' '), /per_page=5/);
   assert.doesNotMatch(scheduleCalls[0].args.join(' '), /--paginate/);
+  assert.doesNotMatch(scheduleCalls[0].args.join(' '), /--slurp/);
   assert.deepEqual(JSON.parse(out.dispatches[0].input), {
     ref: 'main',
     inputs: { pr: '7' },

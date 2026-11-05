@@ -23,10 +23,6 @@ function ghJson(args) {
   return JSON.parse(gh(args));
 }
 
-function listPaged(path) {
-  return JSON.parse(gh(['api', '--slurp', path]));
-}
-
 function ghPaged(path) {
   return JSON.parse(
     gh(['api', '--paginate', '--slurp', `${path}${path.includes('?') ? '&' : '?'}per_page=100`]),
@@ -90,14 +86,12 @@ export function watchdog(repo, env = process.env) {
     const staleCheck = newestOwnCheck(runs.check_runs, pr.head.sha, now);
     if (staleCheck !== null) stale.push({ pr: pr.number, sha: pr.head.sha, check: staleCheck });
   }
-  const pages = listPaged(
+  const page = ghJson([
+    'api',
     `repos/${repo}/actions/workflows/${GATE_WORKFLOW}/runs?event=schedule&per_page=5`,
-  );
-  if (!Array.isArray(pages)) throw new Error('malformed workflow-runs response');
-  const runs = pages.flatMap((page) => {
-    if (!Array.isArray(page?.workflow_runs)) throw new Error('malformed workflow-runs response');
-    return page.workflow_runs;
-  });
+  ]);
+  if (!Array.isArray(page?.workflow_runs)) throw new Error('malformed workflow-runs response');
+  const runs = page.workflow_runs;
   const staleSchedule = newestSchedule(runs, now);
   const dispatched = { ...(state?.dispatched ?? {}) };
   const cutoff = now - 60 * 60 * 1000;
