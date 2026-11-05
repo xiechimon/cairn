@@ -38,65 +38,6 @@ a:active {
   opacity: 1;
 }
 
-@keyframes spinner-breathe {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.92);
-  }
-}
-
-@keyframes message-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes saved-check-decay {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-}
-
-@keyframes grapheme-reveal {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.anim-message-fade-up {
-  animation: message-fade-up var(--spring-snappy-dur) var(--spring-snappy) both;
-}
-
-.anim-saved-check {
-  animation: saved-check-decay 2.5s var(--ease-out-expo) both;
-}
-
-.anim-grapheme-reveal {
-  animation: grapheme-reveal 350ms var(--ease-out-expo) both;
-}
-
 .scroll-fade {
   --scroll-fade-top: 0px;
   --scroll-fade-bottom: 0px;
@@ -270,27 +211,6 @@ a:active {
   mask-composite: intersect;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .anim-message-fade-up,
-  .anim-saved-check,
-  .anim-grapheme-reveal {
-    animation: none;
-  }
-}
-
-@keyframes task-panel-flash {
-  from {
-    background-color: var(--accent-soft);
-  }
-  to {
-    background-color: transparent;
-  }
-}
-
-.task-panel-row[data-flash="true"] {
-  animation: task-panel-flash 1.4s var(--ease-standard);
-}
-
 @keyframes side-panel-in {
   from {
     opacity: 0;
@@ -298,8 +218,10 @@ a:active {
   }
 }
 
-.side-panel {
-  animation: side-panel-in 220ms var(--ease-standard);
+@media (max-width: 1100px) {
+  .side-panel {
+    animation: side-panel-in 220ms var(--ease-standard);
+  }
 }
 
 @keyframes side-panel-scrim-in {
@@ -310,4 +232,18 @@ a:active {
 
 .side-panel-scrim {
   animation: side-panel-scrim-in 200ms var(--ease-standard);
+}
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"],
+  [data-slot="tooltip-content"]
+)[data-closed] {
+  animation: none;
+}
+
+[data-slot="message-scroller-button"][data-active="false"] {
+  transition-duration: var(--dur-fast);
 }

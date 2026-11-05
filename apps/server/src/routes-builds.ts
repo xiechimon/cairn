@@ -41,6 +41,7 @@ import {
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
 import { PhaseTransitionError } from './services/phase.js';
+import { holdSecondRejectionRework } from './services/research-stuck.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
@@ -213,6 +214,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(buildStepActionBodySchema, await jsonBody(c), 'body');
     try {
       await applyBuildStepAction(svc, c.req.param('id'), body);
+      if (body.action === 'revision') holdSecondRejectionRework(svc, c.req.param('id'));
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;

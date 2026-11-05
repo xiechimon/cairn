@@ -8,6 +8,7 @@ import {
   type ChiefModelFallbackContent,
   classifyStepFailure,
   conversationBranch,
+  isBuildStepKind,
   parseLocalMergeInstruction,
   QUOTA_BLOCK_REASON_MAX_CHARS,
   SKILL_INJECTION_CHECK_KIND,
@@ -66,6 +67,7 @@ import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { applyLocalMergeReport } from './local-merge.js';
+import { stopStepComputer } from './machine-computer.js';
 import {
   agentForStep,
   isChiefConversation,
@@ -207,6 +209,7 @@ export async function finishStep(
   body: MachineDoneBody,
 ): Promise<void> {
   await finishStepReport(deps, machineId, stepId, body);
+  stopStepComputer(deps, stepId);
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (row && !isChiefConversation(row.buildId)) await drainTaskMessageQueue(deps, row.buildId);
 }
@@ -239,7 +242,7 @@ async function finishStepReport(
   }
   const stepRow = ownedStep(deps, machineId, stepId);
   revokeStepGitCredential(deps, stepId);
-  if (stepRow.kind === 'build') {
+  if (isBuildStepKind(stepRow.kind)) {
     const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
     const todoRow = buildRow
       ? db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
@@ -610,7 +613,7 @@ async function finishStepReport(
     return;
   }
   if (
-    stepRow.kind === 'build' &&
+    isBuildStepKind(stepRow.kind) &&
     outcome.status === 'success' &&
     outcome.pushHookOutput !== undefined &&
     worker !== null &&
@@ -636,7 +639,7 @@ async function finishStepReport(
       enqueueStep(
         deps,
         stepRow.buildId,
-        'build',
+        stepRow.kind,
         worker.todoRow.teamId,
         `${prompt}\n\n${outcome.pushHookOutput}\n\nFix the hook failures and push the same branch ${conversationBranch(stepRow.buildId)}. Do not create another branch or PR, bypass hooks, or merge the PR.`,
       );

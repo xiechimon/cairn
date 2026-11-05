@@ -15,9 +15,11 @@ test('the home is one Coordinator conversation: serif greeting, a pinned decisio
   await page.goto(home('home-c'));
   const greeting = page.getByTestId('home-c').getByRole('heading', { level: 2 }).first();
   await expect(greeting).toHaveCSS('font-family', /sourceSerif4/);
-  await expect(page.getByTestId('home-c-since')).toContainText('4 waiting on you · 3 in progress');
+  await expect(page.getByTestId('home-c-since')).toContainText('3 waiting on you · 3 in progress');
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]')).toHaveCount(3);
-  await expect(needsYou(page)).toContainText('relay-186 cannot run glm-5.3-flash');
+  await expect(needsYou(page)).not.toContainText('relay-186 cannot run glm-5.3-flash');
+  await expect(page.getByTestId('chief-question-count')).toHaveText('1');
+  await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');
@@ -40,24 +42,22 @@ test('the removed surfaces are gone: thread switcher, task panel, digest and per
   await expect(page.locator('.chief-fab')).toHaveCount(0);
 });
 
-test('"N more" opens the rest of the decisions, grouped by who acts next, a failed thread in its own tone', async ({
+test('Needs you lists worker threads by who acts next, a failed thread in its own tone', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
-  await needsYou(page).getByRole('button', { name: '1 more' }).click();
   const items = needsYou(page).locator('[data-slot="needs-you-item"]');
-  await expect(items).toHaveCount(4);
+  await expect(items).toHaveCount(3);
+  await expect(needsYou(page).getByRole('button', { name: '1 more' })).toHaveCount(0);
   const cards = needsYou(page).locator('[data-slot="thread-card"]');
   await expect(cards).toHaveCount(3);
   await expect(cards.nth(0)).toContainText('Connect a Claude subscription token');
   await expect(cards.nth(0)).toHaveAttribute('data-tone', 'waiting');
   await expect(cards.nth(1)).toContainText('Rerun the relay probe');
-  await expect(items.nth(2)).toHaveAttribute('data-status', 'failed');
+  await expect(items.nth(1)).toHaveAttribute('data-status', 'failed');
   await expect(cards.nth(1)).toHaveAttribute('data-tone', 'failed');
   await expect(cards.nth(2)).toContainText('Fold finished turns');
   await expect(cards.nth(2)).toHaveAttribute('data-tone', 'review');
-  await needsYou(page).getByRole('button', { name: 'Show less' }).click();
-  await expect(items).toHaveCount(3);
 });
 
 test('the Tasks panel lists running threads and a running row opens its thread', async ({
@@ -223,19 +223,21 @@ test('the home lands at the newest message, with the greeting and the pinned dec
 test('at phone width the number-key hint of a question is hidden', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(home('home-c'));
-  await expect(needsYou(page).getByTestId('chief-question-hint')).toBeHidden();
+  await page.getByTestId('chief-question-entry').click();
+  const hint = page.getByTestId('chief-question-panel').getByTestId('chief-question-hint');
+  await expect(hint).toBeHidden();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(needsYou(page).getByTestId('chief-question-hint')).toBeVisible();
+  await expect(hint).toBeVisible();
 });
 
 test('the sidebar Home badge counts the same items as Needs you', async ({ page }) => {
   await page.goto(home('home-c'));
   const badge = page.getByRole('complementary').getByTestId('attention-badge');
   const needsYouCount = await needsYou(page).getByTestId('needs-you-count').textContent();
-  expect(needsYouCount).toBe('4');
+  expect(needsYouCount).toBe('3');
   await expect(badge).toHaveText(needsYouCount ?? '');
   await page.goto('/app/schedules?scenario=home-c');
-  await expect(badge).toHaveText('4');
+  await expect(badge).toHaveText('3');
 });
 
 test('the earlier-messages divider shows only when the conversation reports earlier messages', async ({

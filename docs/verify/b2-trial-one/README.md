@@ -15,6 +15,7 @@ local fake runs must never be recorded as live evidence.
 | `conversationId` | Thread conversation ID used by the Orb executor. For build steps this is the build ID. |
 | `orbName` | Exactly `cairn-orb-<conversationId>`. |
 | `machinectlStatus` | Nonempty output of `machinectl status <orbName>` captured while the trial runs. |
+| `podmanInspect` | Instead of `machinectlStatus` on the container runtime: the JSON output of `podman inspect <orbName>` captured while the trial runs; its `Name` must equal `orbName`. Give exactly one of the two. |
 | `distRelease` | Required `{key, version, sha, fullSha}` object. Copy `key`, `version`, and `sha` from `/var/lib/cairn-orb/dist/current.json` while the trial runs. Record `fullSha` from that deployed checkout's `git rev-parse HEAD`. `sha` must be 7 to 40 lowercase hex characters; `fullSha` must be 40 lowercase hex characters starting with `sha`. The key must contain `-<sha>-` and must not contain `-dirty`; `fullSha` must be reachable from `main`. |
 | `pr` | Positive number of the merged PR delivering this issue. |
 | `mergeCommit` | Full merge commit SHA reported by GitHub for that PR. It must be reachable from `main`. |

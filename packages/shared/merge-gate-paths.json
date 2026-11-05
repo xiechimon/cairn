@@ -104,6 +104,8 @@
   ],
   "limits": {
     "maxLines": 800,
-    "maxFiles": 40
+    "maxFiles": 40,
+    "maxQueueFiles": 80,
+    "maxLinesEachWay": 8000
   }
 }

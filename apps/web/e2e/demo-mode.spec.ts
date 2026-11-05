@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 import { type BuiltSite, buildAndServe } from './demo-server';
-import { openChiefWindow } from './helpers.js';
+import { expandTurns, openChiefWindow } from './helpers.js';
 
 const SITE_URL = 'https://cairn.xmon.me';
 
@@ -120,11 +120,13 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   const traffic = watchTraffic(page);
 
   await page.goto(`${demo.base}/app/todo/${DEMO.cartMerge}`);
+  await expandTurns(page);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.getByText('AI 审核', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('blocking').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/todo/${DEMO.rateLimit}`);
+  await expandTurns(page);
   await expect(page.getByTestId('side-chat-status')).toContainText('待你决定');
   await expect(page.getByText('验证未通过').first()).toBeVisible();
   await expect(page.getByText('验证通过').first()).toBeVisible();

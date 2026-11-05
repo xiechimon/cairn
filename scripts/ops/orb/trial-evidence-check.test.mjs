@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 import { checkTrialEvidence } from './trial-evidence-check.mjs';
 
 const sha = 'a'.repeat(40);
@@ -34,6 +34,21 @@ const evidence = () => ({
   hostWorkspaceAbsent: true,
   hostWorkspacePath: '/workspace/build-1',
   claimedMachineId: 'omarchy-orb',
+});
+
+function podmanInspect(name) {
+  return JSON.stringify([{ Name: name, State: { Status: 'running', Running: true } }]);
+}
+
+test('a podman inspect capture of the trial container stands in for machinectl status', async () => {
+  const w = world();
+  const result = await w.run({
+    ...evidence(),
+    machinectlStatus: undefined,
+    podmanInspect: podmanInspect('cairn-orb-build-1'),
+  });
+  assert.deepEqual(result.failures, []);
+  assert.ok(result.lines.includes('trial-one: ok'));
 });
 
 function world() {
@@ -203,6 +218,15 @@ for (const [name, patch] of [
   ['conversationId', { conversationId: '' }],
   ['orbName', { orbName: 'other' }],
   ['machinectlStatus', { machinectlStatus: '  ' }],
+  ['orbCapture', { machinectlStatus: undefined }],
+  ['orbCapture', { podmanInspect: podmanInspect('cairn-orb-build-1') }],
+  ['podmanInspect', { machinectlStatus: undefined, podmanInspect: '  ' }],
+  ['podmanInspect', { machinectlStatus: undefined, podmanInspect: 'not json' }],
+  ['podmanInspect', { machinectlStatus: undefined, podmanInspect: '[]' }],
+  [
+    'podmanInspect',
+    { machinectlStatus: undefined, podmanInspect: podmanInspect('cairn-orb-other') },
+  ],
   ['pr', { pr: -1 }],
   ['mergeCommit', { mergeCommit: 'short' }],
   ['labelsBefore', { labelsBefore: null }],
@@ -406,6 +430,79 @@ test('a failed build step followed by a completed retry on omarchy-orb passes', 
   assert.ok(result.lines.includes('trial-one: ok'));
 });
 
+test('a completed session execution satisfies the same issue, PR and machine joins', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'][0].kind = 'session';
+
+  const result = await w.run();
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.failures, []);
+  assert.ok(result.lines.includes('trial-one: ok'));
+});
+
+test('a completed session with an unanswered user question cannot prove trial completion', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'][0].kind = 'session';
+  w.responses['/api/todos/todo-1'].awaitingReply = true;
+
+  const result = await w.run();
+
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((failure) => failure.startsWith('server-reply:')));
+  assert.ok(!result.lines.includes('server: checked'));
+  assert.ok(!result.lines.includes('trial-one: ok'));
+});
+
+test('an answered question allows the completed session to satisfy trial evidence', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'][0].kind = 'session';
+  w.responses['/api/todos/todo-1'].awaitingReply = false;
+
+  assert.equal((await w.run()).ok, true);
+});
+
+test('a foreign-machine session cannot hide beside a valid legacy build step', async () => {
+  const w = world();
+  w.responses['/api/builds/build-1/steps'].push({
+    id: 'session-other',
+    buildId: 'build-1',
+    kind: 'session',
+    status: 'done',
+    machineId: 'other-machine',
+  });
+
+  const result = await w.run();
+
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((line) => line.startsWith('server-machine:')));
+  assert.ok(!result.lines.includes('trial-one: ok'));
+});
+
+for (const status of ['pending', 'claimed', 'failed']) {
+  test(`a session with no completed execution still fails: ${status}`, async () => {
+    const w = world();
+    Object.assign(w.responses['/api/builds/build-1/steps'][0], { kind: 'session', status });
+
+    const result = await w.run();
+
+    assert.equal(result.ok, false);
+    assert.ok(!result.lines.includes('trial-one: ok'));
+  });
+}
+
+for (const kind of ['review', 'verify', 'merge', 'plan']) {
+  test(`a completed ${kind} cannot stand in for execution`, async () => {
+    const w = world();
+    w.responses['/api/builds/build-1/steps'][0].kind = kind;
+
+    const result = await w.run();
+
+    assert.equal(result.ok, false);
+    assert.ok(!result.lines.includes('trial-one: ok'));
+  });
+}
+
 for (const [name, mutate] of [
   [
     'server-build',
@@ -596,11 +693,22 @@ test('CLI returns a named failure for a missing evidence file without node_modul
   assert.match(result.stdout, /evidence-file:/);
 });
 
-for (const scenario of ['ok', 'missing URL', 'missing token', 'missing both', 'server 401']) {
+for (const scenario of [
+  'ok',
+  'session',
+  'awaiting reply',
+  'missing URL',
+  'missing token',
+  'missing both',
+  'server 401',
+]) {
   test(`CLI checks authenticated acceptance: ${scenario}`, async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-trial-'));
+    const dir = makeTestTempDir('orb-trial-');
     const w = world();
     const responses = serverWorld().responses;
+    if (['session', 'awaiting reply'].includes(scenario))
+      responses['/api/builds/build-1/steps'][0].kind = 'session';
+    if (scenario === 'awaiting reply') responses['/api/todos/todo-1'].awaitingReply = true;
     const requests = [];
     const server = createServer((req, res) => {
       requests.push(req.url);
@@ -652,9 +760,17 @@ process.stdout.write(JSON.stringify(value));
           timeout: 15_000,
         },
       ).catch((error) => error);
-      if (scenario === 'ok') {
+      if (scenario === 'ok' || scenario === 'session') {
         assert.equal(result.stdout, 'push: ok\ndist: ok\nserver: checked\ntrial-one: ok\n');
         assert.equal(requests.length, 4);
+      } else if (scenario === 'awaiting reply') {
+        assert.equal(result.code, 1);
+        assert.equal(
+          result.stdout,
+          'push: ok\ndist: ok\nserver-reply: trial Thread must not be waiting for a user reply\n',
+        );
+        assert.equal(requests.length, 4);
+        assert.ok(!result.stdout.includes('trial-one: ok'));
       } else {
         assert.equal(result.code, 1);
         assert.equal(
@@ -666,7 +782,7 @@ process.stdout.write(JSON.stringify(value));
       }
     } finally {
       await new Promise((resolve) => server.close(resolve));
-      rmSync(dir, { recursive: true, force: true });
+      releaseTestTempDir(dir);
     }
   });
 }

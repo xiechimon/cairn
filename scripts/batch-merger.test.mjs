@@ -469,30 +469,23 @@ test('a fresh fork head fails eligibility', (t) => {
   assert.match(f.result.stdout, /head-repo-mismatch/);
 });
 
-for (const [name, data, reason] of [
-  ['protected path', { numstat: '1\t0\tdocs/spec/28.md\n' }, 'protected paths'],
-  ['outside set', { numstat: '1\t0\tREADME.md\n' }, 'outside the auto-merge set'],
+for (const [name, data] of [
+  ['protected path', { numstat: '1\t0\tdocs/spec/28.md\n' }],
+  ['outside set', { numstat: '1\t0\tREADME.md\n' }],
   [
     'deleted test',
     { numstat: '0\t1\tapps/web/src/page.test.ts\n', deleted: 'apps/web/src/page.test.ts\n' },
-    'deleted test files',
   ],
-  [
-    'binary source',
-    { numstat: '-\t-\tapps/web/src/page.ts\n' },
-    'binary files outside docs/verify',
-  ],
+  ['binary source', { numstat: '-\t-\tapps/web/src/page.ts\n' }],
   [
     'security surface beside an oversize patch',
     { numstat: `401\t400\tapps/web/src/page.ts\n1\t0\tapps/server/src/services/secrets.ts\n` },
-    'protected paths: apps/server/src/services/secrets.ts',
   ],
 ])
-  test(`owner routing blocks ${name}`, (t) => {
+  test(`path class does not owner-route ${name}`, (t) => {
     const f = fixture(t, data);
-    assert.equal(f.queues.length, 0);
-    assert.match(f.result.stdout, /owner-route/);
-    assert.ok(f.result.stdout.includes(reason), f.result.stdout);
+    assert.equal(f.queues.length, 1, f.result.stdout);
+    assert.doesNotMatch(f.result.stdout, /owner-route/);
   });
 for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat: 'invalid' }])
   test('unavailable owner routing fails closed', (t) => {
@@ -557,62 +550,16 @@ test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).queues.length, 1);
 });
 
-test('an owner-routed head is labelled and never queued', (t) => {
-  const f = fixture(t, { numstat: '1\t0\tdocs/spec/28.md\n' });
-  assert.equal(f.queues.length, 0);
-  assert.ok(f.calls.some((args) => args[1] === 'repos/owner/repo/issues/1/labels'));
-});
-
-const marker = `<!-- batch-merger-owner-route:${head} -->`;
-const ownerRouted = { numstat: '1\t0\tdocs/spec/28.md\n' };
 const writes = (f) => f.calls.filter((args) => args.includes('--method'));
-const ownerComments = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/comments'));
-const labelAdds = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/labels'));
 const labelRemovals = (f) => writes(f).filter((args) => args.includes('DELETE'));
-const markerComment = (sha = head) => ({
-  id: 7,
-  user: { login: 'cairnwright[bot]' },
-  body: `<!-- batch-merger-owner-route:${sha} -->\nOwner route`,
-});
 const labelled = [{ name: 'owner-route' }];
 
-test('an owner-routed head gets one marked comment with reasons and the label', (t) => {
-  const f = fixture(t, ownerRouted);
-  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
-  assert.equal(f.queues.length, 0);
-  const comments = ownerComments(f);
-  assert.equal(comments.length, 1);
-  const payload = JSON.parse(comments[0].at(-1));
-  assert.ok(payload.body.startsWith(marker));
-  assert.ok(payload.body.includes('protected paths: docs/spec/28.md'));
-  const adds = labelAdds(f);
-  assert.equal(adds.length, 1);
-  assert.deepEqual(JSON.parse(adds[0].at(-1)), { labels: ['owner-route'] });
+test('a protected path is queued and not marked owner-route', (t) => {
+  const f = fixture(t, { numstat: '1\t0\tdocs/spec/28.md\n' });
+  assert.equal(f.queues.length, 1, f.result.stdout);
+  assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('a second pass on the same head does not comment again', (t) => {
-  const f = fixture(t, {
-    ...ownerRouted,
-    comments: [markerComment(), ...defaultComments],
-    pulls: [{ ...pull(), labels: labelled }],
-  });
-  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
-  assert.equal(writes(f).length, 0);
-  assert.match(f.result.stdout, /owner-route/);
-});
-test('an already commented head missing the label only gets the label', (t) => {
-  const f = fixture(t, { ...ownerRouted, comments: [markerComment(), ...defaultComments] });
-  assert.equal(ownerComments(f).length, 0);
-  assert.equal(labelAdds(f).length, 1);
-});
-test('a new head gets a new comment', (t) => {
-  const f = fixture(t, {
-    ...ownerRouted,
-    comments: [markerComment('c'.repeat(40)), ...defaultComments],
-    pulls: [{ ...pull(), labels: labelled }],
-  });
-  assert.equal(ownerComments(f).length, 1);
-  assert.equal(labelAdds(f).length, 0);
-});
+
 test('a PR that is no longer owner-routed loses the label before queueing', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), labels: labelled }] });
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
@@ -635,15 +582,9 @@ test('a failed label removal blocks the merge', (t) => {
 test('a PR without the label is not unlabelled', (t) => {
   assert.equal(labelRemovals(fixture(t)).length, 0);
 });
-test('a failed owner-route comment is an error and never merges', (t) => {
-  const f = fixture(t, { ...ownerRouted, writeError: true, pulls: [pull(), pull(2)] });
-  assert.equal(f.result.status, 1);
-  assert.equal(f.queues.length, 0);
-  assert.match(f.result.stdout, /"action":"error"/);
-});
-test('dry-run reports the owner-route mark without writing', (t) => {
-  const f = fixture(t, { ...ownerRouted, args: ['--dry-run'] });
+test('dry-run of a protected path does not mark owner-route', (t) => {
+  const f = fixture(t, { numstat: '1\t0\tdocs/spec/28.md\n', args: ['--dry-run'] });
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
   assert.equal(writes(f).length, 0);
-  assert.match(f.result.stdout, /would-mark-owner-route/);
+  assert.doesNotMatch(f.result.stdout, /would-mark-owner-route/);
 });

@@ -7,60 +7,48 @@ const prGate = readFileSync('.claude/workflows/pr-gate.js', 'utf8');
 const gatePaths = JSON.parse(readFileSync('packages/shared/merge-gate-paths.json', 'utf8'));
 const config = readFileSync(configPath, 'utf8');
 
-function fileCondition(prefix) {
-  const line = config.split('\n').find((entry) => entry.startsWith(`      - '${prefix} ~= `));
-  assert.ok(line, `${prefix} condition`);
-  const pattern = line.slice(`      - '${prefix} ~= `.length, -1).replaceAll("''", "'");
-  const [, flags, body] = pattern.match(/^\(\?([a-z]+)\)(.*)$/s);
-  return new RegExp(body, flags.includes('a') ? 'i' : 'iu');
-}
-
 test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge-checks.mjs', () => {
   assert.equal(config, mergifyConfig(prGate, gatePaths), 'run node scripts/mergify-config.mjs');
 });
 
-test('negative control: a list or limit changed in merge-gate-paths.json changes .mergify.yml', () => {
+test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
   for (const changed of [
-    { ...gatePaths, protected: [...gatePaths.protected, 'zz-extra/**'] },
-    { ...gatePaths, autoMerge: gatePaths.autoMerge.slice(1) },
-    { ...gatePaths, limits: { ...gatePaths.limits, maxFiles: gatePaths.limits.maxFiles + 1 } },
+    {
+      ...gatePaths,
+      limits: { ...gatePaths.limits, maxQueueFiles: gatePaths.limits.maxQueueFiles + 1 },
+    },
+    {
+      ...gatePaths,
+      limits: { ...gatePaths.limits, maxLinesEachWay: gatePaths.limits.maxLinesEachWay + 1 },
+    },
   ])
     assert.notEqual(mergifyConfig(prGate, changed), config);
 });
 
-test('protected paths never enter the queue', () => {
-  const protectedRe = fileCondition('-files');
-  for (const path of [
-    '.github/workflows/ci.yml',
-    'scripts/x.mjs',
-    'SCRIPTS/x.mjs',
-    'apps/web/.claude/x.md',
-    'AGENTS.md',
-    'apps/server/drizzle/0099_x.sql',
-    'apps/server/src/services/merge-gate/readiness.ts',
-    'apps/server/src/lib/secret-box.ts',
-    'pnpm-lock.yaml',
-    'apps/web/package.json',
-  ])
-    assert.match(path, protectedRe, path);
-  assert.doesNotMatch('apps/web/src/board/card.tsx', protectedRe);
+test('a queue line cap that is not a positive integer fails closed', () => {
+  assert.throws(
+    () =>
+      mergifyConfig(prGate, {
+        ...gatePaths,
+        limits: { ...gatePaths.limits, maxLinesEachWay: 0 },
+      }),
+    /maxLinesEachWay/,
+  );
 });
 
-test('only files inside the auto-merge set may enter the queue', () => {
-  const lines = config.split('\n').filter((entry) => entry.startsWith("      - '-files ~= "));
-  assert.equal(lines.length, 4);
-  assert.equal(lines[0], lines[2]);
-  assert.equal(lines[1], lines[3]);
-  const body = lines[1].slice("      - '-files ~= (?ai)".length, -1);
-  const outsideRe = new RegExp(body, 'i');
-  for (const path of ['README.md', '.mergify.yml', 'docs/x.png', 'apps/web/vite.ts'])
-    assert.match(path, outsideRe, path);
-  for (const path of [
-    'apps/web/src/a.tsx',
-    'packages/shared/test/a.test.ts',
-    'docs/verify/1/a.png',
-  ])
-    assert.doesNotMatch(path, outsideRe, path);
+test('the queue starts a batch immediately, admits 80 files, and accepts a stack dependency', () => {
+  assert.equal(gatePaths.limits.maxQueueFiles, 80);
+  assert.match(config, /batch_max_wait_time: 0 s\n/);
+  for (const name of ['default', 'bot']) {
+    const [queue] = rules[name].split('    merge_conditions:\n');
+    assert.match(queue, /- '#files <= 80'\n/, name);
+    assert.match(queue, /- '#added-lines <= 8000'\n/, name);
+    assert.match(queue, /- or:\n {10}- base = main\n {10}- "#depends-on > 0"\n/, name);
+  }
+});
+
+test('path class does not keep a pull request out of the queue', () => {
+  assert.doesNotMatch(config, /-files ~=| -removed-files ~=|owner-route/);
 });
 
 const rules = Object.fromEntries(
@@ -82,7 +70,7 @@ for (const [name, author, method] of [
     assert.doesNotMatch(queue, /status-success = review-gate/);
     assert.match(queue, /- check-success = merge-route\n/);
     assert.doesNotMatch(queue, /check-skipped = merge-route/);
-    assert.match(queue, /- -label = owner-route\n/);
+    assert.doesNotMatch(queue, /owner-route/);
     for (const check of ['check', 'pack-smoke', 'e2e-gate', 'pr-evidence', 'gates'])
       assert.match(queue, new RegExp(`check-success = ${check}\\n`), check);
     for (const check of ['check', 'pack-smoke', 'e2e-gate', 'gates'])

@@ -1,4 +1,4 @@
-import { neutralizeIssueAttachmentTokens } from '@cairn/shared';
+import { isBuildStepKind, neutralizeIssueAttachmentTokens } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { build, message, project, steerPending, step, team, todo } from '../db/schema.js';
 import { type FetchLike, githubCollaboratorPermission, githubPull } from '../lib/github.js';
@@ -190,12 +190,12 @@ export function createPrFeedbackPoller(
                 if (
                   active.some(
                     (row) =>
-                      row.status === 'claimed' && row.kind !== 'build' && row.kind !== 'plan',
+                      row.status === 'claimed' && !isBuildStepKind(row.kind) && row.kind !== 'plan',
                   )
                 )
                   return;
                 for (const row of active) {
-                  if (row.kind === 'build' || row.kind === 'plan') continue;
+                  if (isBuildStepKind(row.kind) || row.kind === 'plan') continue;
                   const finishedAt = nowMs();
                   deps.db
                     .update(step)
@@ -204,7 +204,7 @@ export function createPrFeedbackPoller(
                     .run();
                   publishStepRow(deps, { ...row, status: 'stopped', finishedAt });
                 }
-                active = active.filter((row) => row.kind === 'build' || row.kind === 'plan');
+                active = active.filter((row) => isBuildStepKind(row.kind) || row.kind === 'plan');
                 const claimed = active.find((row) => row.status === 'claimed');
                 if (claimed) {
                   const pending = deps.db

@@ -5,19 +5,23 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
-  CHIEF_REMOTE_TOOLS,
   claudeLoginBlocksClaim,
   claudeRateBlock,
   formatSkillRouteSection,
+  isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   parseLocalMergeInstruction,
+  type RemoteToolDef,
   type SkillInjectionRecord,
+  type StepKind,
   selectSkillsForTask,
   suggestSkillsForMessage,
+  WORKER_ASK_USER_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
+  WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, machine, skillAudit, step, todo } from '../db/schema.js';
@@ -70,7 +74,12 @@ import { mergedCatalogModels } from './model-liveness.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
-import { memoryOwnerOf, routeForStep } from './routing-rules.js';
+import {
+  chiefRemoteTools,
+  memoryOwnerOf,
+  routeForStep,
+  routingRulesEnabled,
+} from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -327,7 +336,7 @@ function chiefClaimPayload(
       systemPrompt,
       trigger,
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : chiefRemoteTools())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(digest ? { remoteToolsOnly: true as const } : {}),
   };
@@ -571,7 +580,7 @@ async function tryClaim(
     if (!allowed) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
     const guardPr =
-      cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
+      cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
@@ -725,17 +734,21 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
-        (tool) =>
-          cand.stepRow.kind === 'plan' ||
-          cand.stepRow.kind === 'build' ||
-          !isThreadScheduleTool(tool.name),
-      ),
+      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
   return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
+}
+
+export function workerRemoteTools(kind: StepKind, isGithubProject: boolean): RemoteToolDef[] {
+  const base = (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
+    (tool) => kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name),
+  );
+  return kind === 'session' && routingRulesEnabled()
+    ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]
+    : [...base];
 }
 
 export async function claimStep(

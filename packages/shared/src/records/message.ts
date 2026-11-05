@@ -51,6 +51,34 @@ export const REVIEW_VERDICT_KIND = 'review_verdict';
 
 export const VERIFY_VERDICT_KIND = 'verify_verdict';
 
+export const RESEARCH_REQUESTED_KIND = 'research-requested';
+export const RESEARCH_REPORT_KIND = 'research-report';
+export const RESEARCH_TIMEOUT_KIND = 'research-timeout';
+export const RESEARCH_INJECT_MAX_BYTES = 2_400;
+
+export const researchRequestedMessageSchema = z.object({
+  kind: z.literal(RESEARCH_REQUESTED_KIND),
+  todoId: z.string(),
+  round: z.number().int().nonnegative(),
+});
+export type ResearchRequestedMessage = z.infer<typeof researchRequestedMessageSchema>;
+
+export const researchReportMessageSchema = z.object({
+  kind: z.literal(RESEARCH_REPORT_KIND),
+  attachmentId: z.string(),
+  todoId: z.string(),
+  round: z.number().int().nonnegative(),
+  acceptedAudit: z.string().min(1).optional(),
+});
+export type ResearchReportMessage = z.infer<typeof researchReportMessageSchema>;
+
+export const researchTimeoutMessageSchema = z.object({
+  kind: z.literal(RESEARCH_TIMEOUT_KIND),
+  todoId: z.string(),
+  round: z.number().int().nonnegative(),
+});
+export type ResearchTimeoutMessage = z.infer<typeof researchTimeoutMessageSchema>;
+
 export const CHIEF_TURN_ERROR_KIND = 'chief_turn_error';
 export const chiefTurnErrorContentSchema = z.object({
   kind: z.literal(CHIEF_TURN_ERROR_KIND),
@@ -92,6 +120,8 @@ export const CHIEF_REPORT_KIND = 'chief_daily_report';
 export const CHIEF_REPORT_ROW_ID_PREFIX = 'chief-report-';
 export const CHIEF_REPORT_REF_MAX = 8;
 export const CHIEF_REPORT_RETRO_MAX = 5;
+export const CHIEF_REPORT_INTAKE_MAX = 5;
+export const INTAKE_SOURCE_KIND = 'intake';
 
 const chiefReportTodoRefSchema = z.object({
   id: z.string(),
@@ -130,6 +160,18 @@ export const retroProposalSchema = z.object({
 });
 export type RetroProposal = z.infer<typeof retroProposalSchema>;
 
+export const intakeItemSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  claim: z.string().min(1).max(400),
+  matches: z.string().max(400),
+  action: z.string().max(400),
+  projectId: z.string(),
+  status: retroProposalStatusSchema,
+  todoId: z.string().nullable(),
+});
+export type IntakeItem = z.infer<typeof intakeItemSchema>;
+
 export const chiefReportLedgerSchema = z.object({
   finished: z.array(chiefReportTodoRefSchema),
   finishedCount: z.number().int(),
@@ -156,6 +198,7 @@ export const chiefReportContentSchema = z.object({
     questions: z.number().int(),
   }),
   retro: z.array(retroProposalSchema),
+  intake: z.array(intakeItemSchema).optional(),
   retroRan: z.boolean(),
   truncated: z.array(z.string()),
 });
@@ -177,14 +220,17 @@ export const chiefModelFallbackContentSchema = z.object({
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
 
+export const THREAD_REPORT_LINE_MAX = 200;
+
 export const threadReportContentSchema = z.object({
   kind: z.literal('thread-report'),
   todoId: recordId,
-  phase: z.enum(['done', 'failed', 'review']),
+  phase: z.enum(['done', 'failed', 'review', 'needs-you']),
   seqNum: z.number().int().positive(),
   title: z.string(),
   wakeStepId: recordId.optional(),
   verified: z.boolean().optional(),
+  line: z.string().max(THREAD_REPORT_LINE_MAX).optional(),
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 
@@ -201,6 +247,7 @@ export const threadMessageContentSchema = z.object({
   excerpt: z.string().max(THREAD_MESSAGE_EXCERPT_MAX),
   delivered: threadMessageDeliverySchema,
   conversationId: recordId,
+  by: z.enum(['user', 'coordinator']).optional(),
 });
 export type ThreadMessageContent = z.infer<typeof threadMessageContentSchema>;
 
@@ -384,7 +431,9 @@ export const buildSteerBodySchema = z.object({
   mode: z.literal('queue').optional(),
   deliverAfterStop: z.boolean().optional(),
   cancelQueued: z.boolean().optional(),
+  editQueued: z.boolean().optional(),
   queuedMessageId: recordId.optional(),
+  clientMessageId: z.string().min(1).max(200).optional(),
 });
 export type BuildSteerBody = z.infer<typeof buildSteerBodySchema>;
 

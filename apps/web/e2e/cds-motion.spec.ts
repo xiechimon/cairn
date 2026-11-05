@@ -16,36 +16,20 @@ test('motion tokens and scroll-fade utility land', async ({ page }) => {
     const style = getComputedStyle(probe);
     const mask = style.maskImage || style.getPropertyValue('mask-image') || '';
     const icon = getComputedStyle(probe.querySelector('.icon-baseline') as Element).verticalAlign;
-    const animNames: Record<string, string> = {};
-    for (const cls of ['anim-message-fade-up', 'anim-saved-check', 'anim-grapheme-reveal']) {
-      const el = document.createElement('div');
-      el.className = cls;
-      document.body.append(el);
-      animNames[cls] = getComputedStyle(el).animationName;
-      el.remove();
-    }
     probe.remove();
     return {
-      snappy: cs.getPropertyValue('--spring-snappy').trim(),
-      snappyDur: cs.getPropertyValue('--spring-snappy-dur').trim(),
       durFast: cs.getPropertyValue('--dur-fast').trim(),
       durOverlay: cs.getPropertyValue('--dur-overlay').trim(),
-      easePop: cs.getPropertyValue('--ease-pop').trim(),
-      retired: ['--spring-bouncy', '--spring-gentle', '--spring-heavy', '--spring-bubble', '--spring-modal', '--dur-drawer', '--ease-snap', '--ease-overshoot'].filter((name) => cs.getPropertyValue(name).trim() !== ''),
+      retired: ['--spring-bouncy', '--spring-gentle', '--spring-heavy', '--spring-bubble', '--spring-modal', '--dur-drawer', '--ease-snap', '--ease-overshoot', '--spring-snappy', '--spring-snappy-dur', '--ease-pop', '--dur-window'].filter((name) => cs.getPropertyValue(name).trim() !== ''),
       fadeSize: cs.getPropertyValue('--scroll-fade-size').trim(),
       maskStarts: String(mask).startsWith('linear-gradient'),
-      animNames,
       icon,
     };
   });
 
   const toMs = (v: string) => (v.endsWith('ms') ? Number.parseFloat(v) : Number.parseFloat(v) * 1000);
-  const bezier = (v: string) => v.replace(/\s/g, '').replace(/(^|[^\d])0\./g, '$1.');
-  expect(vals.snappy.startsWith('linear(')).toBe(true);
-  expect(toMs(vals.snappyDur)).toBe(380);
   expect(toMs(vals.durFast)).toBe(150);
   expect(toMs(vals.durOverlay)).toBe(200);
-  expect(bezier(vals.easePop)).toBe('cubic-bezier(.22,1,.36,1)');
   expect(vals.retired).toEqual([]);
   expect(vals.fadeSize).toBe('28px');
   expect(vals.maskStarts).toBe(true);
@@ -66,9 +50,6 @@ test('motion tokens and scroll-fade utility land', async ({ page }) => {
   });
   expect(axis.h).toBe(true);
   expect(axis.both).toBe(true);
-  expect(vals.animNames['anim-message-fade-up']).toContain('message-fade-up');
-  expect(vals.animNames['anim-saved-check']).toContain('saved-check-decay');
-  expect(vals.animNames['anim-grapheme-reveal']).toContain('grapheme-reveal');
   expect(vals.icon).toMatch(/^-?(0\.125em|1\.75px)$/);
 });
 

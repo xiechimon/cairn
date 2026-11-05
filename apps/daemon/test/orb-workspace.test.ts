@@ -1,12 +1,29 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { gitPrim } from '../src/git.js';
 import { createDaemonLogger } from '../src/log.js';
-import { ORB_AGENT_HOME, ORB_WORKSPACES_ROOT } from '../src/orb/worker.js';
+import { orbAgentHome, orbWorkspacesRoot } from '../src/orb/worker.js';
 import { WorkspaceManager } from '../src/workspace.js';
+
+function copySeedRepo(src: string, dest: string): void {
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    const from = join(src, entry.name);
+    const to = join(dest, entry.name);
+    if (entry.isDirectory()) copySeedRepo(from, to);
+    else copyFileSync(from, to);
+  }
+}
 
 test('seeds a private base clone, fetches with the step credential and leaves the seed untouched', async () => {
   const root = mkdtempSync(join(tmpdir(), 'orb-seed-'));
@@ -27,7 +44,7 @@ test('seeds a private base clone, fetches with the step credential and leaves th
     '-m',
     'First',
   ]);
-  cpSync(truth, seed, { recursive: true });
+  copySeedRepo(truth, seed);
   const seedConfig = readFileSync(join(seed, '.git', 'config'), 'utf8');
   writeFileSync(join(truth, 'file.txt'), 'second');
   execFileSync('git', ['-C', truth, 'add', 'file.txt']);
@@ -70,7 +87,11 @@ test('seeds a private base clone, fetches with the step credential and leaves th
   }
 }, 30_000);
 
-test('orb worker workspaces live under the agent home the image creates', () => {
-  expect(ORB_WORKSPACES_ROOT.startsWith(`${ORB_AGENT_HOME}/`)).toBe(true);
-  expect(ORB_WORKSPACES_ROOT).not.toBe('/work');
+test('the orb worker home is the passwd home of the user it runs as, not a fixed image path', () => {
+  expect(orbAgentHome()).toBe(userInfo().homedir);
+});
+
+test('orb worker workspaces live under that home', () => {
+  expect(orbWorkspacesRoot()).toBe(`${orbAgentHome()}/work`);
+  expect(orbWorkspacesRoot()).not.toBe('/work');
 });

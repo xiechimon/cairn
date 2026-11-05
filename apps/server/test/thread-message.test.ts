@@ -96,11 +96,20 @@ describe('POST /api/todos/:id/messages', () => {
       excerpt: 'Use the cached index',
       delivered: 'steer',
       conversationId: 'direct-build',
+      by: 'user',
     });
     expect(publish).toHaveBeenCalledWith(
       H.threadId,
       expect.objectContaining({ id: marker?.row.id, role: 'system' }),
     );
+  });
+
+  test('a user steer with a same-team attachment token grants that attachment to the thread', async () => {
+    seedThread('building', 'claimed');
+    const token = `![shot.png](attachment:${H.teamId}/att-user.png)`;
+    const res = await send({ content: token, clientMessageId: 'c-att-user' });
+    expect(res.status).toBe(201);
+    expect(H.s.db.select().from(todo).get()?.userMessageAttachmentIds).toEqual(['att-user']);
   });
 
   test('continues a done thread with a new turn', async () => {
@@ -110,6 +119,13 @@ describe('POST /api/todos/:id/messages', () => {
     expect(await res.json()).toMatchObject({ delivered: 'new-turn' });
     expect(H.s.db.select().from(todo).get()?.phase).toBe('queued');
     expect(markers()).toHaveLength(1);
+    expect(
+      H.s.db
+        .select()
+        .from(step)
+        .all()
+        .find((row) => row.id !== 'direct-step')?.byPerson,
+    ).toBe(true);
   });
 
   test('treats a reply at the plan gate as a revision, never as approval', async () => {
@@ -238,6 +254,65 @@ describe('Coordinator awareness of direct thread messages', () => {
     const prompt = coordinatorPrompts().at(-1) ?? '';
     expect(pickedProjectIdOf(prompt)).toBe(H.projectId);
     expect(prompt).toContain('#7');
+  });
+
+  function insertMarker(id: string, over: Record<string, unknown>, createdAt: number) {
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id,
+        threadId: H.threadId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: 'thread-message',
+          todoId: 'direct-todo',
+          seqNum: 7,
+          title: 'Talk to me directly',
+          excerpt: 'placeholder',
+          delivered: 'steer',
+          conversationId: 'direct-build',
+          ...over,
+        }),
+        createdAt,
+      })
+      .run();
+  }
+
+  test('only markers from the user reach the next Coordinator prompt; markers without by count as the user', async () => {
+    seedThread('building', 'claimed');
+    insertMarker('m-user', { by: 'user', excerpt: 'from the user' }, 2_000_000_000_000);
+    insertMarker('m-legacy', { excerpt: 'from an old row' }, 2_000_000_000_001);
+    insertMarker(
+      'm-coordinator',
+      { by: 'coordinator', excerpt: 'from a tool call' },
+      2_000_000_000_002,
+    );
+    await sayToCoordinator('Status?');
+    const prompt = coordinatorPrompts().at(-1) ?? '';
+    expect(prompt).toContain('from the user');
+    expect(prompt).toContain('from an old row');
+    expect(prompt).not.toContain('from a tool call');
+  });
+
+  test('a prompt note carries no control or format characters and no secrets', async () => {
+    seedThread('building', 'claimed');
+    const secret = 'sk-abcdefghijklmnopqrstuvwxyz0123456789';
+    const content = `Use it\u202e\u200b\u0007 now ${secret}`;
+    await send({ content, clientMessageId: 'c-10' });
+    expect(markers()[0]?.content.excerpt).toMatch(/^Use it now /);
+    expect(markers()[0]?.content.excerpt).not.toContain(secret);
+    expect(markers()[0]?.content.excerpt).not.toMatch(/[\p{Cc}\p{Cf}]/u);
+    insertMarker(
+      'm-raw',
+      { by: 'user', excerpt: `raw\u202e\u200bnote ${secret}` },
+      2_000_000_000_000,
+    );
+    await sayToCoordinator('Status?');
+    const prompt = coordinatorPrompts().at(-1) ?? '';
+    expect(prompt).toContain('raw note');
+    expect(prompt).not.toContain(secret);
+    expect(prompt).not.toMatch(/\p{Cf}/u);
+    expect(prompt).not.toContain(String.fromCharCode(7));
   });
 
   test('a message to another team’s thread is refused at the service', async () => {

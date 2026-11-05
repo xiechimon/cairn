@@ -2,7 +2,19 @@
 set -uo pipefail
 umask 077
 
-CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn}"
+unset GH_TOKEN GITHUB_TOKEN
+for credential_variable in ${!GIT_CONFIG_@}; do
+  case "$credential_variable" in
+    GIT_CONFIG_COUNT | GIT_CONFIG_KEY_* | GIT_CONFIG_VALUE_* | GIT_CONFIG_PARAMETERS) unset "$credential_variable" ;;
+  esac
+done
+GITHUB_COMMAND_WRAPPER="${CAIRN_GH_WRAPPER:-$HOME/.cairn/tools/app-token/as-bot.sh}"
+
+gh() {
+  "$GITHUB_COMMAND_WRAPPER" gh "$@"
+}
+
+CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
 STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
 REPO="${CAIRN_REPO:-xiechimon/cairn}"
 REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"
@@ -76,7 +88,11 @@ check_lag() {
   open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$LAG_TITLE\" in:title" --json number --jq '.[0].number // empty')"
   if [ "$deployed" = "$head" ]; then
     if [ -n "$open_issue" ]; then
-      gh issue close "$open_issue" -R "$REPO" -c "Caught up: omarchy runs $head." >/dev/null && log "closed lag issue #$open_issue"
+      if ! gh issue close "$open_issue" -R "$REPO" -c "Caught up: omarchy runs $head." >/dev/null; then
+        log "failed to close lag issue #$open_issue"
+        return 1
+      fi
+      log "closed lag issue #$open_issue"
     fi
     return 0
   fi

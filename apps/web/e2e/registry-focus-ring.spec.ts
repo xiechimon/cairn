@@ -230,11 +230,9 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectFieldRing({ ...(await readFocus(shell)), focusVisible: true });
   });
 
-  // Segmented options sit 2px apart, so their keyboard ring is drawn inside
-  // the option box (offset -2) instead of the global outset outline.
   test('a segmented option draws the focus ring inset', async ({ page }) => {
     await themed(page, 'dark', SCHEDULES);
-    const option = page.locator('.sched-form-freq-tab[aria-checked="true"]');
+    const option = page.getByRole('radiogroup', { name: '频率' }).getByRole('radio', { checked: true });
     await expect(option).toBeVisible();
     await focusKeyboard(option);
     const info = await readFocus(option);

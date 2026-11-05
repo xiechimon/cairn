@@ -98,6 +98,7 @@ describe('todo.usageCost: persisted cost columns summed over every build of the 
       cacheRead: 0.4375,
       cacheWrite: 0.21875,
       total: 3.28125,
+      priced: true,
     });
     expect((await readTodo(s, other)).usageCost).toEqual({
       input: 0,
@@ -164,5 +165,46 @@ describe('todo.usageCost: persisted cost columns summed over every build of the 
     const list = ((await res.json()) as unknown[]).map((t) => todoRecordSchema.parse(t));
     expect(list.find((t) => t.id === id)?.usageCost?.total).toBe(0.9375);
     s.dispose();
+  });
+
+  test.each([
+    { name: 'mixed positive and unknown', costs: [2.5, null, 0.5], total: 3, priced: false },
+    { name: 'mixed free and unknown', costs: [0, null, 0], total: 0, priced: false },
+    { name: 'all unknown', costs: [null, null, null], total: 0, priced: false },
+    { name: 'fully priced positive', costs: [2.5, 0, 0.5], total: 3, priced: true },
+    { name: 'fully priced free', costs: [0, 0, 0], total: 0, priced: true },
+  ])('$name requires every historical model row to be priced', async ({ costs, total, priced }) => {
+    const { s, todoIds } = await worldWithTodos(2);
+    try {
+      const [id, emptyId] = todoIds as [string, string];
+      insertBuild(s, 'cost-history-first', id);
+      insertBuild(s, 'cost-history-second', id);
+      insertBuild(s, 'cost-history-empty', emptyId);
+      s.db
+        .insert(tokenUsage)
+        .values(
+          costs.map((cost, index) => ({
+            buildId: index === 0 ? 'cost-history-first' : 'cost-history-second',
+            model: `gw/history-${index}`,
+            input: 100,
+            costInput: cost,
+            costOutput: cost === null ? null : 0,
+            costCacheRead: cost === null ? null : 0,
+            costCacheWrite: cost === null ? null : 0,
+            costTotal: cost,
+          })),
+        )
+        .run();
+      const expected = { input: total, output: 0, cacheRead: 0, cacheWrite: 0, total, priced };
+      expect((await readTodo(s, id)).usageCost).toEqual(expected);
+      const res = await req(s.app, 'GET', `/api/todos?teamId=${s.team.id}`);
+      expect(res.status).toBe(200);
+      const list = ((await res.json()) as unknown[]).map((row) => todoRecordSchema.parse(row));
+      expect(list.find((row) => row.id === id)?.usageCost).toEqual(expected);
+      expect((await readTodo(s, emptyId)).usageCost).toBeUndefined();
+      expect(list.find((row) => row.id === emptyId)).not.toHaveProperty('usageCost');
+    } finally {
+      s.dispose();
+    }
   });
 });

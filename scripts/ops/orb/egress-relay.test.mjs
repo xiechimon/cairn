@@ -1,11 +1,31 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer as createHttpServer, request } from 'node:http';
 import { connect, createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { createRelay, relayDefaults } from './egress-relay.mjs';
+import { createRelay, listenOnUnixSocket, relayDefaults } from './egress-relay.mjs';
+
+const relayScript = new URL('./egress-relay.mjs', import.meta.url).pathname;
+
+function privateDirectory(t) {
+  const directory = mkdtempSync(join(tmpdir(), 'egress-relay-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  return directory;
+}
 
 async function listen(server) {
   server.listen(0, '127.0.0.1');
@@ -13,7 +33,7 @@ async function listen(server) {
   return server.address().port;
 }
 
-async function fixture(t, options = {}) {
+async function fixture(t, options = {}, { unix = false } = {}) {
   const targets = [];
   const upstream = createHttpServer();
   const sockets = new Set();
@@ -44,7 +64,12 @@ async function fixture(t, options = {}) {
     resolve: async () => [{ address: '93.184.216.34', family: 4 }],
     ...options,
   });
-  const port = await listen(relay);
+  let port;
+  let socketPath;
+  if (unix) {
+    socketPath = join(privateDirectory(t), 'egress.sock');
+    await listenOnUnixSocket(relay, socketPath);
+  } else port = await listen(relay);
   t.after(() => {
     for (const socket of sockets) socket.destroy();
     relay.close();
@@ -52,7 +77,7 @@ async function fixture(t, options = {}) {
   });
   const exchange = (text) =>
     new Promise((resolve, reject) => {
-      const socket = connect(port, '127.0.0.1');
+      const socket = unix ? connect(socketPath) : connect(port, '127.0.0.1');
       let data = '';
       socket.setTimeout(2000, () => socket.destroy(new Error('test timeout')));
       socket.on('error', reject);
@@ -64,7 +89,7 @@ async function fixture(t, options = {}) {
       socket.on('close', () => resolve(data));
       socket.on('connect', () => socket.write(text));
     });
-  return { targets, relay, port, exchange };
+  return { targets, relay, port, socketPath, exchange };
 }
 
 test('allowed public CONNECT tunnels bytes through a pinned upstream IP', async (t) => {
@@ -426,4 +451,316 @@ test('unit environment configures destination ports and invalid values fail befo
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Invalid destination port allowlist/);
   }
+});
+
+const unixRefusedTargets = [
+  '10.0.0.1:443',
+  '127.0.0.1:443',
+  '169.254.169.254:80',
+  '100.64.0.5:443',
+  '192.168.1.1:22',
+  '172.16.0.1:443',
+  '[::1]:443',
+  '[fe80::1]:443',
+  '[fd00::1]:443',
+  '[::ffff:127.0.0.1]:443',
+];
+for (const target of unixRefusedTargets) {
+  test(`unix client CONNECT to ${target} gets the same 403 as a TCP client`, async (t) => {
+    const unix = await fixture(t, {}, { unix: true });
+    const tcp = await fixture(t);
+    const request = `CONNECT ${target} HTTP/1.1\r\nHost: ignored\r\n\r\n`;
+    const unixAnswer = await unix.exchange(request);
+    assert.match(unixAnswer, /^HTTP\/1.1 403/);
+    assert.equal(unixAnswer, await tcp.exchange(request));
+    assert.deepEqual(unix.targets, []);
+  });
+}
+
+test('unix client forward requests to metadata and private hosts are refused', async (t) => {
+  const f = await fixture(t, {}, { unix: true });
+  for (const url of ['http://169.254.169.254/latest/meta-data/', 'http://10.0.0.1/']) {
+    assert.match(
+      await f.exchange(`GET ${url} HTTP/1.1\r\nHost: ignored\r\n\r\n`),
+      /^HTTP\/1.1 403/,
+    );
+  }
+  assert.deepEqual(f.targets, []);
+});
+
+test('unix client hostnames resolving to private or mixed answers are refused after DNS', async (t) => {
+  for (const answers of [
+    [{ address: '127.0.0.1', family: 4 }],
+    [{ address: '169.254.169.254', family: 4 }],
+    [
+      { address: '93.184.216.34', family: 4 },
+      { address: '10.1.2.3', family: 4 },
+    ],
+  ]) {
+    const f = await fixture(t, { resolve: async () => answers }, { unix: true });
+    assert.match(
+      await f.exchange('CONNECT rebind.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\n'),
+      /^HTTP\/1.1 403/,
+    );
+    assert.deepEqual(f.targets, []);
+  }
+});
+
+test('unix client destination ports outside the allowlist are refused before DNS', async (t) => {
+  let resolutions = 0;
+  const f = await fixture(
+    t,
+    {
+      resolve: async () => {
+        resolutions++;
+        return [{ address: '93.184.216.34', family: 4 }];
+      },
+    },
+    { unix: true },
+  );
+  for (const target of ['github.com:25', 'github.com:8080', '93.184.216.34:7890']) {
+    assert.match(
+      await f.exchange(`CONNECT ${target} HTTP/1.1\r\nHost: ignored\r\n\r\n`),
+      /^HTTP\/1.1 403/,
+    );
+  }
+  assert.equal(resolutions, 0);
+  assert.deepEqual(f.targets, []);
+});
+
+test('unix client allowed public CONNECT and forward requests reach the pinned upstream', async (t) => {
+  const f = await fixture(t, {}, { unix: true });
+  assert.match(
+    await f.exchange('CONNECT github.com:443 HTTP/1.1\r\nHost: ignored\r\n\r\nping'),
+    /^HTTP\/1.1 200.*\r\n\r\nping/s,
+  );
+  assert.match(
+    await f.exchange('GET http://github.com/ HTTP/1.1\r\nHost: ignored\r\n\r\n'),
+    /^HTTP\/1.1 200/,
+  );
+  assert.equal(f.targets[0], '93.184.216.34:443');
+  assert.equal(f.targets[1], '93.184.216.34:80');
+});
+
+test('unix client malformed requests still get 400 and the relay keeps serving', async (t) => {
+  const f = await fixture(t, {}, { unix: true });
+  for (const line of ['CONNECT user:password@public.example:443', 'GET /relative']) {
+    assert.match(await f.exchange(`${line} HTTP/1.1\r\nHost: ignored\r\n\r\n`), /^HTTP\/1.1 400/);
+  }
+  assert.match(
+    await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\nping'),
+    /^HTTP\/1.1 200/,
+  );
+});
+
+test('unix mode skips the client subnet check that TCP mode still enforces', async (t) => {
+  const config = { subnet: relayDefaults.subnet };
+  const tcp = await fixture(t, config);
+  const unix = await fixture(t, config, { unix: true });
+  const request = 'CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\nping';
+  assert.match(await tcp.exchange(request), /^HTTP\/1.1 403/);
+  assert.match(await unix.exchange(request), /^HTTP\/1.1 200/);
+  assert.deepEqual(tcp.targets, []);
+});
+
+test('unix connection limit and header cap apply to socket clients', async (t) => {
+  const f = await fixture(
+    t,
+    { maxHeaderSize: 128, idleTimeout: 100, maxConnections: 1 },
+    { unix: true },
+  );
+  assert.match(
+    await f.exchange(`CONNECT public.example:443 HTTP/1.1\r\nX-Large: ${'a'.repeat(256)}\r\n\r\n`),
+    /^HTTP\/1.1 431/,
+  );
+  const idle = connect(f.socketPath);
+  await once(idle, 'connect');
+  assert.match(
+    await f.exchange('CONNECT public.example:443 HTTP/1.1\r\nHost: ignored\r\n\r\n'),
+    /^HTTP\/1.1 503/,
+  );
+  await once(idle, 'close');
+});
+
+test('socket file is mode 0600 after listen and removed on close', async (t) => {
+  const f = await fixture(t, {}, { unix: true });
+  const stats = lstatSync(f.socketPath);
+  assert.equal(stats.isSocket(), true);
+  assert.equal(stats.mode & 0o777, 0o600);
+  await new Promise((resolve) => f.relay.close(resolve));
+  assert.equal(existsSync(f.socketPath), false);
+});
+
+async function leaveStaleSocket(socketPath) {
+  const child = spawn(
+    process.execPath,
+    [
+      '-e',
+      "require('node:net').createServer().listen(process.argv[1], () => console.log('ready'))",
+      socketPath,
+    ],
+    { stdio: ['ignore', 'pipe', 'inherit'] },
+  );
+  await once(child.stdout, 'data');
+  child.kill('SIGKILL');
+  await once(child, 'exit');
+  assert.equal(lstatSync(socketPath).isSocket(), true);
+}
+
+test('a stale socket left by a dead process is replaced', async (t) => {
+  const socketPath = join(privateDirectory(t), 'egress.sock');
+  await leaveStaleSocket(socketPath);
+  const relay = createRelay({});
+  t.after(() => relay.close());
+  await listenOnUnixSocket(relay, socketPath);
+  assert.equal(lstatSync(socketPath).mode & 0o777, 0o600);
+});
+
+test('a socket that another process is still serving is not replaced', async (t) => {
+  const socketPath = join(privateDirectory(t), 'egress.sock');
+  const live = createServer((socket) => {
+    socket.on('error', () => socket.destroy());
+    socket.end('live');
+  });
+  live.listen(socketPath);
+  await once(live, 'listening');
+  t.after(() => live.close());
+  const relay = createRelay({});
+  await assert.rejects(listenOnUnixSocket(relay, socketPath), /already in use/);
+  const probe = connect(socketPath);
+  let answer = '';
+  probe.on('data', (chunk) => {
+    answer += chunk;
+  });
+  await once(probe, 'close');
+  assert.equal(answer, 'live');
+});
+
+test('a regular file, directory or symlink at the socket path is never removed', async (t) => {
+  const directory = privateDirectory(t);
+  const file = join(directory, 'file');
+  writeFileSync(file, 'precious');
+  const folder = join(directory, 'folder');
+  mkdirSync(folder);
+  const link = join(directory, 'link');
+  symlinkSync(file, link);
+  for (const path of [file, folder, link]) {
+    const relay = createRelay({});
+    await assert.rejects(listenOnUnixSocket(relay, path), /not a socket/);
+    assert.equal(relay.listening, false);
+  }
+  assert.equal(readFileSync(file, 'utf8'), 'precious');
+  assert.equal(lstatSync(folder).isDirectory(), true);
+  assert.equal(lstatSync(link).isSymbolicLink(), true);
+});
+
+test('socket directories reachable by group or others, symlinked, missing or relative are refused', async (t) => {
+  const base = privateDirectory(t);
+  for (const mode of [0o770, 0o707, 0o777, 0o720, 0o755, 0o750, 0o711, 0o701]) {
+    const directory = join(base, `mode-${mode.toString(8)}`);
+    mkdirSync(directory);
+    chmodSync(directory, mode);
+    await assert.rejects(
+      listenOnUnixSocket(createRelay({}), join(directory, 'egress.sock')),
+      /Insecure socket directory/,
+    );
+    assert.equal(existsSync(join(directory, 'egress.sock')), false);
+  }
+  const real = join(base, 'real');
+  mkdirSync(real, { mode: 0o700 });
+  const link = join(base, 'link');
+  symlinkSync(real, link);
+  await assert.rejects(listenOnUnixSocket(createRelay({}), join(link, 'egress.sock')), /Insecure/);
+  await assert.rejects(
+    listenOnUnixSocket(createRelay({}), join(base, 'missing', 'egress.sock')),
+    /ENOENT/,
+  );
+  await assert.rejects(listenOnUnixSocket(createRelay({}), 'egress.sock'), /must be absolute/);
+});
+
+test('a private 0700 socket directory is accepted', async (t) => {
+  const directory = join(privateDirectory(t), 'run');
+  mkdirSync(directory, { mode: 0o700 });
+  const relay = createRelay({});
+  t.after(() => relay.close());
+  await listenOnUnixSocket(relay, join(directory, 'egress.sock'));
+  assert.equal(relay.listening, true);
+});
+
+async function startUnixRelayProcess(t, socketPath, extraEnv = {}) {
+  const child = spawn(process.execPath, [relayScript], {
+    env: { ...process.env, CAIRN_ORB_EGRESS_SOCKET: socketPath, ...extraEnv },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  t.after(() => child.kill('SIGKILL'));
+  return child;
+}
+
+async function exchangeOverSocket(socketPath, text) {
+  return new Promise((resolve, reject) => {
+    const socket = connect(socketPath);
+    let data = '';
+    socket.setTimeout(3000, () => socket.destroy(new Error('test timeout')));
+    socket.on('error', reject);
+    socket.on('data', (chunk) => {
+      data += chunk;
+    });
+    socket.on('close', () => resolve(data));
+    socket.on('connect', () => socket.write(text));
+  });
+}
+
+test('the relay process survives unix connections and removes its socket on SIGTERM', async (t) => {
+  const socketPath = join(privateDirectory(t), 'egress.sock');
+  const child = await startUnixRelayProcess(t, socketPath);
+  const [banner] = await once(child.stdout, 'data');
+  assert.match(String(banner), /listening on unix socket/);
+  assert.equal(lstatSync(socketPath).mode & 0o777, 0o600);
+  for (const target of ['10.0.0.1:443', '169.254.169.254:80', 'github.com:25', '127.0.0.1:443']) {
+    assert.match(
+      await exchangeOverSocket(socketPath, `CONNECT ${target} HTTP/1.1\r\nHost: x\r\n\r\n`),
+      /^HTTP\/1.1 403/,
+    );
+  }
+  assert.equal(child.exitCode, null);
+  child.kill('SIGTERM');
+  const [code] = await once(child, 'exit');
+  assert.equal(code, 0);
+  assert.equal(existsSync(socketPath), false);
+});
+
+test('the relay process refuses an insecure directory or a non-socket path before serving', async (t) => {
+  const base = privateDirectory(t);
+  const open = join(base, 'open');
+  mkdirSync(open);
+  chmodSync(open, 0o777);
+  const file = join(base, 'file');
+  writeFileSync(file, 'precious');
+  for (const [socketPath, pattern] of [
+    [join(open, 'egress.sock'), /Insecure socket directory/],
+    [file, /not a socket/],
+    ['relative.sock', /must be absolute/],
+    ['', /must be absolute/],
+  ]) {
+    const result = spawnSync(process.execPath, [relayScript], {
+      encoding: 'utf8',
+      env: { ...process.env, CAIRN_ORB_EGRESS_SOCKET: socketPath },
+      timeout: 15000,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, pattern);
+  }
+  assert.equal(readFileSync(file, 'utf8'), 'precious');
+});
+
+test('unix mode still rejects invalid destination port allowlists before listening', async (t) => {
+  const socketPath = join(privateDirectory(t), 'egress.sock');
+  const result = spawnSync(process.execPath, [relayScript], {
+    encoding: 'utf8',
+    env: { ...process.env, CAIRN_ORB_EGRESS_SOCKET: socketPath, CAIRN_ORB_ALLOWED_PORTS: '0' },
+    timeout: 15000,
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Invalid destination port allowlist/);
+  assert.equal(existsSync(socketPath), false);
 });

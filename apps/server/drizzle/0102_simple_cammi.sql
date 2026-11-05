@@ -1,0 +1,1 @@
+ALTER TABLE `todo` ADD `awaitingReply` integer DEFAULT false NOT NULL;

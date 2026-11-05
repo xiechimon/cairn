@@ -6,6 +6,10 @@ on:
     branches: [main, 'prototype/**']
   pull_request:
 
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.ref == 'refs/heads/main' && 'ci-main' || format('ci-ref-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -102,6 +106,11 @@ jobs:
 
       - name: PR evidence regression tests
         run: python3 scripts/pr-evidence-gate.test.py
+
+      - name: Harbor task conversion, probe and labeler tests
+        run: |
+          cd integration/eval/harbor
+          pipx run pytest test_pr_to_task.py test_control_probe.py test_label_task.py
 
       - name: Prepush self-test
         run: pnpm prepush --self-test
@@ -389,7 +398,7 @@ jobs:
 
       - name: Mergify queue config follows pr-gate routing
         if: ${{ !cancelled() }}
-        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs
+        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs scripts/workflow-concurrency.test.mjs scripts/autonomy-brake.test.mjs scripts/autonomy-brake-workflow.test.mjs
 
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
@@ -409,7 +418,11 @@ jobs:
 
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() }}
-        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs
+        run: node --test scripts/gardener-ratchet.test.mjs scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs
+
+      - name: Nightly scan self-test (§11.1)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/nightly-scan/nightly-scan.test.mjs
 
       - name: Merge routing size caps (#2371)
         if: ${{ !cancelled() }}
@@ -452,4 +465,4 @@ jobs:
           RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
       - name: Self-deploy and deploy-lag watch fixtures (#2288)
         if: ${{ !cancelled() }}
-        run: node --test scripts/ops/deploy-self.test.mjs
+        run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs

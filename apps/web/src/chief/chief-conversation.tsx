@@ -21,6 +21,7 @@ import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
+import { TurnFold, useTurnFold } from '../components/chat/turn-fold.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -54,6 +55,7 @@ import {
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
+import { chiefTurns, groupTurns, latestOpenTurnId } from '../lib/turn-fold.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
@@ -64,6 +66,7 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
@@ -248,6 +251,7 @@ export function ChiefConversation({
     null,
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
+  const turnFold = useTurnFold();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const copyText = useCallback((key: string, text: string) => {
     const clip = navigator.clipboard;
@@ -476,12 +480,14 @@ export function ChiefConversation({
         ]
       : [],
   );
+  const outstandingReports = outstandingReportIds(chief.stream ?? []);
   const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
       item={item}
       index={i}
       latest={i === latestMessage?.i}
+      replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
       bound={chief.bound}
       agent={chief.agent}
       runningTool={chief.runningTool}
@@ -494,6 +500,23 @@ export function ChiefConversation({
       onCancelQuestion={onCancelQuestion}
     />
   );
+  const openTurnId = latestOpenTurnId(groupTurns(rows, chiefTurns), chiefTurns);
+  const foldedRows = (list: { item: ChiefStreamItem; i: number }[]) =>
+    groupTurns(list, chiefTurns).map((segment) =>
+      segment.kind === 'row' ? (
+        streamRow(segment.row.item)
+      ) : (
+        <TurnFold
+          key={segment.turn.id}
+          turn={segment.turn}
+          open={turnFold.isOpen(segment.turn, openTurnId)}
+          defaultOpenId={openTurnId}
+          onToggle={turnFold.toggle}
+        >
+          {segment.turn.rows.map((row) => streamRow(row.item))}
+        </TurnFold>
+      ),
+    );
   const intro = (
     <>
       {!chief.bound && (
@@ -640,14 +663,14 @@ export function ChiefConversation({
                   <TodoGlanceContext.Provider value={glances}>
                     {lead}
                     {day == null ? (
-                      rows.map(streamRow)
+                      foldedRows(rows)
                     ) : (
                       <>
                         <div data-testid="chief-earlier" className="opacity-60">
-                          {rows.slice(0, day.earlier).map(streamRow)}
+                          {foldedRows(rows.slice(0, day.earlier))}
                         </div>
                         {day.today}
-                        {rows.slice(day.earlier).map(streamRow)}
+                        {foldedRows(rows.slice(day.earlier))}
                       </>
                     )}
                   </TodoGlanceContext.Provider>
@@ -691,7 +714,7 @@ export function ChiefConversation({
           )}
           <div
             data-invalid={composerError != null ? '' : undefined}
-            className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+            className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
             style={home ? { viewTransitionName: 'chief-composer' } : undefined}
           >
             <QueuedCapsules

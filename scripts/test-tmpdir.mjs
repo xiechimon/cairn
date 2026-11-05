@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const allocations = new Set();
+const allocations = new Map();
 
 export function createTestTempRun({ runId = randomUUID() } = {}) {
   if (typeof runId !== 'string' || !/^[a-f0-9-]{36}$/.test(runId)) {
@@ -24,9 +24,22 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
       if (typeof prefix !== 'string' || !/^[a-zA-Z0-9_-]*$/.test(prefix)) {
         throw new TypeError('prefix must contain only letters, digits, underscores or hyphens');
       }
-      const path = mkdtempSync(join(tmpdir(), `cairn-test-${runId}-${prefix}`));
+      const path = mkdtempSync(
+        join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `cairn-test-${runId}-${prefix}`),
+      );
+      try {
+        if (process.env.CAIRN_TEST_TEMP_STRICT === '1' && process.env.CAIRN_TEST_TEMP_REPORT) {
+          appendFileSync(
+            process.env.CAIRN_TEST_TEMP_REPORT,
+            `${JSON.stringify({ kind: 'allocation', path, runId })}\n`,
+          );
+        }
+      } catch (error) {
+        rmSync(path, { recursive: true, force: true });
+        throw error;
+      }
       owned.add(path);
-      allocations.add(path);
+      allocations.set(path, runId);
       return path;
     },
     release,
@@ -53,8 +66,18 @@ export const releaseTestTempDir = defaultRun.release;
 export const cleanupTestTempDirs = defaultRun.cleanup;
 
 process.once('exit', () => {
-  for (const path of allocations) {
+  for (const [path, runId] of allocations) {
     try {
+      if (process.env.CAIRN_TEST_TEMP_STRICT === '1' && existsSync(path)) {
+        console.error(`test-tmpdir: survivor ${path}`);
+        if (process.exitCode === undefined || Number(process.exitCode) === 0) process.exitCode = 1;
+        if (process.env.CAIRN_TEST_TEMP_REPORT) {
+          appendFileSync(
+            process.env.CAIRN_TEST_TEMP_REPORT,
+            `${JSON.stringify({ kind: 'leak', path, runId })}\n`,
+          );
+        }
+      }
       rmSync(path, { recursive: true, force: true });
     } catch (error) {
       console.error(error);

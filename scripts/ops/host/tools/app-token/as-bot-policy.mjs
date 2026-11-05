@@ -4,7 +4,7 @@ const PROTECTED_BRANCHES = new Set(['main', 'master']);
 
 const GH_ALLOWED = {
   pr: new Set(['view', 'list', 'comment', 'create', 'close', 'update-branch', 'edit', 'merge']),
-  issue: new Set(['view', 'list', 'comment', 'create', 'edit', 'pin']),
+  issue: new Set(['view', 'list', 'comment', 'create', 'edit', 'pin', 'close']),
   api: new Set(),
 };
 
@@ -135,8 +135,22 @@ function checkPrEdit(args) {
   return allow;
 }
 
+function checkLagIssueClose(args) {
+  const [number, repoFlag, repo, commentFlag, comment] = args;
+  if (
+    args.length !== 5 ||
+    !/^[1-9][0-9]*$/.test(number ?? '') ||
+    !['-R', '--repo'].includes(repoFlag) ||
+    repo !== 'xiechimon/cairn' ||
+    !['-c', '--comment'].includes(commentFlag) ||
+    !/^Caught up: omarchy runs [a-f0-9]{40}\.$/.test(comment ?? '')
+  )
+    return deny('gh issue close is restricted to the Cairn deploy-lag recovery command');
+  return allow;
+}
+
 function checkGh(args) {
-  const { rest } = stripRepoFlag(args);
+  const { repo, rest } = stripRepoFlag(args);
   const [group, sub, ...tail] = rest;
   if (!group || !(group in GH_ALLOWED))
     return deny(
@@ -148,6 +162,11 @@ function checkGh(args) {
   if (rest.includes('--delete-last')) return deny('--delete-last is refused');
   if (group === 'pr' && sub === 'merge') return checkPrMerge(tail);
   if (group === 'pr' && sub === 'edit') return checkPrEdit(tail);
+  if (group === 'issue' && sub === 'close') {
+    if (repo !== undefined)
+      return deny('gh issue close is restricted to the Cairn deploy-lag recovery command');
+    return checkLagIssueClose(tail);
+  }
   return allow;
 }
 

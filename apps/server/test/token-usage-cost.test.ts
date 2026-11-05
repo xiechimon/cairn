@@ -288,7 +288,7 @@ describe('token usage cost at write time', () => {
       });
       const task = await readTodo(w.s, pricedTodo);
       expect(task.usageCost?.total).toBeCloseTo(0.1284 + 0.03, 9);
-      expect(task.usageCost).not.toHaveProperty('priced');
+      expect(task.usageCost?.priced).toBe(false);
 
       await startBuild(w.s, w.projectId, unknownTodo);
       const onlyUnknown = await claimStep(w.s.app, w.token);

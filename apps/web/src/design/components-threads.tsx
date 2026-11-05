@@ -6,6 +6,8 @@ import { NextSteps } from '../components/thread/next-steps.js';
 import { PermissionCard, type PermissionChoice } from '../components/thread/permission-card.js';
 import { PlanApproval } from '../components/thread/plan-approval.js';
 import { PrBar } from '../components/thread/pr-bar.js';
+import { PrCard } from '../components/thread/pr-card.js';
+import type { PrCardModel } from '../components/thread/pr-card-model.js';
 import { ProposalCard } from '../components/thread/proposal-card.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { UsageStrip } from '../components/thread/usage-strip.js';
@@ -220,6 +222,138 @@ export function PrBarSection() {
           autoMerge={false}
           onAutoMergeChange={() => undefined}
         />
+      </Specimen>
+    </Section>
+  );
+}
+
+const PR_CARD_BASE: PrCardModel = {
+  number: 2512,
+  title: 'web: PR card shows the gate verdict',
+  branch: 'cairn/pr-card-2512',
+  state: 'open',
+  checks: { passed: 6, failed: 0, running: 0, total: 6 },
+  verdict: null,
+  currentHead: 'a1b2c3d',
+};
+
+const PR_CARD_LENSES = [
+  { name: 'Correctness', result: 'pass' },
+  { name: 'Security', result: 'pass' },
+  { name: 'Tests', result: 'pass' },
+] as const;
+
+const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
+  {
+    label: 'Open',
+    pr: { ...PR_CARD_BASE, checks: { passed: 0, failed: 0, running: 0, total: 6 } },
+  },
+  {
+    label: 'Conflicts',
+    pr: { ...PR_CARD_BASE, state: 'conflicts', blockers: ['Conflicts with main in 2 files'] },
+  },
+  {
+    label: 'Checks running',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'checks-running',
+      checks: { passed: 3, failed: 0, running: 3, total: 6 },
+    },
+  },
+  {
+    label: 'Checks failed',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'checks-failed',
+      checks: { passed: 4, failed: 2, running: 0, total: 6 },
+      blockers: ['typecheck failed', 'web e2e failed'],
+    },
+  },
+  {
+    label: 'Review BLOCK',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'review-block',
+      verdict: {
+        result: 'block',
+        judgedHead: 'a1b2c3d',
+        lenses: [
+          { name: 'Correctness', result: 'block' },
+          { name: 'Security', result: 'pass' },
+          { name: 'Tests', result: 'pass' },
+        ],
+      },
+      blockers: ['Stale cache read in merge-readiness.ts'],
+    },
+  },
+  {
+    label: 'Review PASS',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'review-pass',
+      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+    },
+  },
+  {
+    label: 'Stale verdict',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'review-pass',
+      currentHead: 'e4f5a6b',
+      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+    },
+  },
+  {
+    label: 'Queued',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'queued',
+      queuePosition: 2,
+      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+    },
+  },
+  {
+    label: 'Merged',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'merged',
+      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+    },
+  },
+  {
+    label: 'Owner route',
+    pr: {
+      ...PR_CARD_BASE,
+      state: 'owner-route',
+      ownerRoute: 'Touches apps/server/src/services/secrets.ts; ian merges',
+      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+    },
+  },
+];
+
+export function PrCardSection() {
+  return (
+    <Section
+      id="pr-card"
+      title="PR card"
+      lede="The merge gate's verdict for a pull request as one card in the thread, bound to the head it was judged on. When the head moves past the judged head the card asks for a re-review instead of saying ready."
+    >
+      <Specimen
+        title="PR card"
+        stage="canvas"
+        code="<PrCard pr={prCardModel(facts, readiness)} onViewDiff={...} onResolve={...} githubHref={url} />"
+      >
+        <div
+          data-pr-card-grid=""
+          className="grid w-full grid-cols-[repeat(auto-fill,minmax(min(26rem,100%),1fr))] gap-4"
+        >
+          {PR_CARD_CASES.map(({ label, pr }) => (
+            <div key={label} data-pr-card-case={label} className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-caption text-content-tertiary">{label}</span>
+              <PrCard pr={pr} githubHref="https://github.com" />
+            </div>
+          ))}
+        </div>
       </Specimen>
     </Section>
   );
