@@ -361,6 +361,14 @@ export function memoryOwnerOf(
   return rule?.adoptedAgentIds?.includes(agentId) ? rule.id : agentId;
 }
 
+export function memoryOpsAreTeamScoped(kind: StepKind): boolean {
+  return kind !== 'review' && kind !== 'verify';
+}
+
+export function memoryInjectTeamId(kind: StepKind, teamId: string): string | undefined {
+  return memoryOpsAreTeamScoped(kind) ? teamId : undefined;
+}
+
 function sessionAgentIds(db: Db, rule: RoutingRuleRow): string[] {
   const chiefAgents = new Set(
     db
@@ -424,12 +432,36 @@ export function adoptAgentMemories(db: Db): number {
                 .update(JSON.stringify(['adopt', rule.id, row.id]))
                 .digest('hex'),
               agentId: rule.id,
+              adoptedFrom: row.id,
               supersededBy: null,
               lastInjectedAt: null,
             })
             .onConflictDoNothing()
             .run();
           copied += res.changes;
+        }
+      }
+      const unmarked = tx
+        .select({ id: agentMemory.id })
+        .from(agentMemory)
+        .where(and(eq(agentMemory.teamId, rule.teamId), isNull(agentMemory.adoptedFrom)))
+        .all();
+      for (const orig of unmarked) {
+        const seen = new Set<string>();
+        let id: string | null = createHash('sha256')
+          .update(JSON.stringify(['adopt', rule.id, orig.id]))
+          .digest('hex');
+        while (id !== null && !seen.has(id)) {
+          seen.add(id);
+          const row = tx.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
+          if (row === undefined) break;
+          if (row.adoptedFrom === null) {
+            tx.update(agentMemory)
+              .set({ adoptedFrom: orig.id })
+              .where(eq(agentMemory.id, row.id))
+              .run();
+          }
+          id = row.supersededBy;
         }
       }
       const union = [...new Set([...(rule.adoptedAgentIds ?? []), ...adopted])].sort();

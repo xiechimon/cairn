@@ -40,7 +40,7 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
     const agentId = c.req.param('aid');
     const rows = listMemoryEntries(
       ctx.db,
-      { agentId, teamId },
+      { agentId, teamId, teamScoped: false },
       c.req.query('includeInvalid') === 'true',
     );
     return c.json(rows.map(toMemoryRecord));
@@ -53,6 +53,7 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       memoryId: c.req.param('mid'),
       agentId: c.req.param('aid'),
       teamId,
+      teamScoped: false,
     });
     if (row === null) throw notFound(`memory ${c.req.param('mid')}`);
     return c.json(toMemoryRecord(row));
@@ -65,6 +66,7 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       memoryId: c.req.param('mid'),
       agentId: c.req.param('aid'),
       teamId,
+      teamScoped: false,
     });
     if (removed === 0) throw notFound(`memory ${c.req.param('mid')}`);
     return c.body(null, 204);

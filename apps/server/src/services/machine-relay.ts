@@ -27,7 +27,12 @@ import { agentForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { memoryOwnerOf, routeForStep, routingRulesEnabled } from './routing-rules.js';
+import {
+  memoryOpsAreTeamScoped,
+  memoryOwnerOf,
+  routeForStep,
+  routingRulesEnabled,
+} from './routing-rules.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
@@ -181,6 +186,8 @@ async function executeWorkerMemoryToolCall(
     {
       teamId: todoRow.teamId,
       agentId: memoryOwnerOf(deps.db, todoRow.teamId, agentId, row.kind),
+      sourceAgentId: agentForStep(deps.db, todoRow, row.kind, row.prompt)?.id ?? agentId,
+      teamScoped: memoryOpsAreTeamScoped(row.kind),
       todoId: todoRow.id,
       projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
       buildId: row.buildId,

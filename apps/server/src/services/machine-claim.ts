@@ -76,6 +76,7 @@ import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  memoryInjectTeamId,
   memoryOwnerOf,
   routeForStep,
   routingRulesEnabled,
@@ -289,13 +290,19 @@ function chiefClaimPayload(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemories(deps.db, { agentId: agentRow.id, projectId: null });
+  const memories = injectMemories(deps.db, {
+    agentId: agentRow.id,
+    teamId: threadRow.teamId,
+    threadId: threadRow.id,
+    projectId: null,
+  });
   const projectSection = digest
     ? null
     : projectTurnContext(deps.db, {
         teamId: threadRow.teamId,
         agentId: agentRow.id,
         projectId: stepScopeProjectId(stepRow),
+        threadId: threadRow.id,
       });
   const instruction =
     stepRow.prompt === null
@@ -727,6 +734,8 @@ async function tryClaim(
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
           agentId: memoryOwnerOf(db, teamId, agentRow.id, cand.stepRow.kind),
+          teamId: memoryInjectTeamId(cand.stepRow.kind, teamId),
+          threadId: cand.todoRow.id,
           projectId: cand.todoRow.projectId,
         }),
         defaultSkill: agentRow.defaultSkill,

@@ -1,10 +1,17 @@
 import { createHash } from 'node:crypto';
-import { ISSUE_FENCE_OPEN, MEMORY_QUOTA_PER_AGENT } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import {
+  ISSUE_FENCE_OPEN,
+  MEMORY_QUOTA_PER_AGENT,
+  MEMORY_QUOTA_PER_TEAM,
+  type MemoryLayer,
+  REVIEW_FANOUT_ROLES,
+} from '@cairn/shared';
+import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, memorySaveConflict } from '../db/schema.js';
+import { agentMemory, agent as agentTable, memorySaveConflict, routingRule } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { routingRulesEnabled } from './routing-rules.js';
 
 function validateMemoryText(title: string, content: string): void {
   if (title.includes(ISSUE_FENCE_OPEN) || content.includes(ISSUE_FENCE_OPEN)) {
@@ -39,9 +46,90 @@ type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const stillValid = isNull(agentMemory.invalidAt);
 
+function notAdoptedDuplicate() {
+  return isNull(agentMemory.adoptedFrom);
+}
+
+const INDEPENDENT_PERSONAS = [...REVIEW_FANOUT_ROLES, 'verifier'] as const;
+
+function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] {
+  if (!routingRulesEnabled()) return [];
+  const ids = new Set<string>();
+  for (const rule of db
+    .select({
+      id: routingRule.id,
+      seededFromAgentId: routingRule.seededFromAgentId,
+      adoptedAgentIds: routingRule.adoptedAgentIds,
+    })
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'review')))
+    .all()) {
+    ids.add(rule.id);
+    if (rule.seededFromAgentId) ids.add(rule.seededFromAgentId);
+    for (const id of rule.adoptedAgentIds ?? []) ids.add(id);
+  }
+  for (const row of db
+    .select({ id: agentTable.id })
+    .from(agentTable)
+    .where(and(eq(agentTable.teamId, teamId), inArray(agentTable.persona, INDEPENDENT_PERSONAS)))
+    .all()) {
+    ids.add(row.id);
+  }
+  return [...ids];
+}
+
+function ownerWhere(
+  db: Db | MemoryTx,
+  scope: { agentId: string; teamId: string; teamScoped?: boolean },
+) {
+  const independentAgentIds =
+    routingRulesEnabled() && scope.teamScoped !== false
+      ? independentMemoryAgentIds(db, scope.teamId)
+      : [];
+  return routingRulesEnabled() && scope.teamScoped !== false
+    ? and(
+        eq(agentMemory.teamId, scope.teamId),
+        notAdoptedDuplicate(),
+        eq(agentMemory.independent, false),
+        independentAgentIds.length > 0
+          ? notInArray(agentMemory.agentId, independentAgentIds)
+          : undefined,
+      )
+    : and(eq(agentMemory.agentId, scope.agentId), eq(agentMemory.teamId, scope.teamId));
+}
+
+function layerWhere(scope: { layer?: MemoryLayer; threadId?: string | null }) {
+  if (!routingRulesEnabled()) return undefined;
+  const layer = scope.layer ?? 'core';
+  if (layer !== 'scratchpad') return eq(agentMemory.layer, layer);
+  return and(
+    eq(agentMemory.layer, 'scratchpad'),
+    scope.threadId == null || scope.threadId === ''
+      ? isNull(agentMemory.threadId)
+      : eq(agentMemory.threadId, scope.threadId),
+  );
+}
+
+function scratchpadVisible(threadId?: string) {
+  if (!routingRulesEnabled()) return undefined;
+  return threadId === undefined
+    ? ne(agentMemory.layer, 'scratchpad')
+    : or(ne(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId));
+}
+
+function injectLayerWhere(threadId?: string) {
+  if (!routingRulesEnabled()) return undefined;
+  return threadId === undefined
+    ? eq(agentMemory.layer, 'core')
+    : or(
+        eq(agentMemory.layer, 'core'),
+        and(eq(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId)),
+      );
+}
+
 export function listMemoryEntries(
   db: Db | MemoryTx,
-  scope: { agentId: string; teamId: string },
+  scope: { agentId: string; teamId: string; threadId?: string; teamScoped?: boolean },
   includeInvalid = false,
 ) {
   return db
@@ -49,9 +137,9 @@ export function listMemoryEntries(
     .from(agentMemory)
     .where(
       and(
-        eq(agentMemory.agentId, scope.agentId),
-        eq(agentMemory.teamId, scope.teamId),
+        ownerWhere(db, scope),
         includeInvalid ? undefined : stillValid,
+        scratchpadVisible(scope.threadId),
       ),
     )
     .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
@@ -60,15 +148,26 @@ export function listMemoryEntries(
 
 export function injectMemories(
   db: Db,
-  scope: { agentId: string; projectId?: string | null; projectOnly?: boolean },
+  scope: {
+    agentId: string;
+    projectId?: string | null;
+    projectOnly?: boolean;
+    teamId?: string;
+    threadId?: string;
+  },
 ) {
   return db.transaction((tx) => {
+    const teamId = scope.teamId;
+    const teamScoped = routingRulesEnabled() && teamId !== undefined;
     const rows = tx
       .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
       .from(agentMemory)
       .where(
         and(
-          eq(agentMemory.agentId, scope.agentId),
+          teamScoped
+            ? ownerWhere(tx, { agentId: scope.agentId, teamId, teamScoped: true })
+            : eq(agentMemory.agentId, scope.agentId),
+          injectLayerWhere(scope.threadId),
           stillValid,
           scope.projectId === undefined
             ? undefined
@@ -98,7 +197,14 @@ export function injectMemories(
 
 export function memoriesInScope(
   tx: MemoryTx,
-  scope: { agentId: string; teamId: string; projectId: string | null },
+  scope: {
+    agentId: string;
+    teamId: string;
+    projectId: string | null;
+    layer?: MemoryLayer;
+    threadId?: string | null;
+    teamScoped?: boolean;
+  },
   everyProject = false,
 ) {
   return tx
@@ -106,9 +212,9 @@ export function memoriesInScope(
     .from(agentMemory)
     .where(
       and(
-        eq(agentMemory.agentId, scope.agentId),
-        eq(agentMemory.teamId, scope.teamId),
+        ownerWhere(tx, scope),
         stillValid,
+        layerWhere(scope),
         everyProject
           ? undefined
           : scope.projectId === null
@@ -130,20 +236,44 @@ export function saveMemoryEntry(
     projectId: string | null;
     sourceTodoId: string | null;
     sourceBuildId: string | null;
+    source?: string | null;
+    layer?: MemoryLayer;
+    threadId?: string | null;
     force?: boolean;
+    teamScoped?: boolean;
   },
 ) {
   validateMemoryText(input.title, input.content);
   return db.transaction((tx) => {
-    if (listMemoryEntries(tx, input).length >= MEMORY_QUOTA_PER_AGENT) {
-      throw new HttpError(409, `memory quota exceeded (${MEMORY_QUOTA_PER_AGENT}/agent)`);
+    const teamQuota = routingRulesEnabled() && input.teamScoped !== false;
+    const quota = teamQuota ? MEMORY_QUOTA_PER_TEAM : MEMORY_QUOTA_PER_AGENT;
+    const quotaLabel = teamQuota ? 'team' : 'agent';
+    const used = tx
+      .select({ id: agentMemory.id })
+      .from(agentMemory)
+      .where(and(ownerWhere(tx, input), stillValid))
+      .all().length;
+    if (used >= quota) {
+      throw new HttpError(409, `memory quota exceeded (${quota}/${quotaLabel})`);
     }
     const rows = memoriesInScope(tx, input);
     if (rows.some((row) => row.content === input.content)) {
       throw new HttpError(409, 'memory already exists; use update_memory');
     }
     const id = createHash('sha256')
-      .update(JSON.stringify([input.agentId, input.teamId, input.projectId, input.content]))
+      .update(
+        JSON.stringify(
+          routingRulesEnabled()
+            ? [
+                input.teamId,
+                input.projectId,
+                input.layer ?? 'core',
+                input.threadId ?? null,
+                input.content,
+              ]
+            : [input.agentId, input.teamId, input.projectId, input.content],
+        ),
+      )
       .digest('hex');
     const candidates = rows.filter(
       (row) => overlaps(row.title, input.title) || overlaps(row.content, input.content),
@@ -177,11 +307,20 @@ export function saveMemoryEntry(
       };
     }
     tx.delete(memorySaveConflict).where(eq(memorySaveConflict.id, id)).run();
-    const { force: _force, ...entry } = input;
+    const { force: _force, source, layer, threadId, teamScoped: _teamScoped, ...entry } = input;
     const now = nowMs();
     return tx
       .insert(agentMemory)
-      .values({ id: newRecordId(), ...entry, createdAt: now, updatedAt: now })
+      .values({
+        id: newRecordId(),
+        ...entry,
+        source: source ?? null,
+        layer: layer ?? 'core',
+        threadId: threadId ?? null,
+        independent: routingRulesEnabled() && input.teamScoped === false,
+        createdAt: now,
+        updatedAt: now,
+      })
       .returning()
       .get();
   });
@@ -189,7 +328,14 @@ export function saveMemoryEntry(
 
 export function updateMemoryEntry(
   db: Db,
-  input: { memoryId: string; agentId: string; teamId: string; content: string },
+  input: {
+    memoryId: string;
+    agentId: string;
+    teamId: string;
+    content: string;
+    threadId?: string;
+    teamScoped?: boolean;
+  },
 ) {
   return db.transaction((tx) => {
     const row = tx
@@ -198,8 +344,8 @@ export function updateMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          eq(agentMemory.agentId, input.agentId),
-          eq(agentMemory.teamId, input.teamId),
+          ownerWhere(tx, input),
+          scratchpadVisible(input.threadId),
         ),
       )
       .get();
@@ -214,9 +360,11 @@ export function updateMemoryEntry(
     }
     validateMemoryText(row.title, input.content);
     if (row.content === input.content) return row;
-    const duplicate = memoriesInScope(tx, row, row.projectId === null).find(
-      (other) => other.id !== row.id && other.content === input.content,
-    );
+    const duplicate = memoriesInScope(
+      tx,
+      { ...row, teamScoped: input.teamScoped },
+      row.projectId === null,
+    ).find((other) => other.id !== row.id && other.content === input.content);
     if (duplicate) {
       throw new HttpError(409, `memory ${duplicate.id} already has this content`);
     }
@@ -232,6 +380,11 @@ export function updateMemoryEntry(
         projectId: row.projectId,
         sourceTodoId: row.sourceTodoId,
         sourceBuildId: row.sourceBuildId,
+        source: row.source,
+        layer: row.layer,
+        threadId: row.threadId,
+        adoptedFrom: row.adoptedFrom,
+        independent: row.independent,
         history: [
           ...row.history,
           { title: row.title, content: row.content, updatedAt: row.updatedAt },
@@ -251,12 +404,18 @@ export function updateMemoryEntry(
 
 export function promoteMemoryEntry(
   db: Db,
-  input: { memoryId: string; agentId: string; teamId: string },
+  input: {
+    memoryId: string;
+    agentId: string;
+    teamId: string;
+    threadId?: string;
+    teamScoped?: boolean;
+  },
 ): typeof agentMemory.$inferSelect | null {
   const where = and(
     eq(agentMemory.id, input.memoryId),
-    eq(agentMemory.agentId, input.agentId),
-    eq(agentMemory.teamId, input.teamId),
+    ownerWhere(db, input),
+    scratchpadVisible(input.threadId),
   );
   const row = db.select().from(agentMemory).where(where).get();
   if (row === undefined) return null;
@@ -268,7 +427,13 @@ export function promoteMemoryEntry(
 
 export function deleteMemoryEntry(
   db: Db,
-  input: { memoryId: string; agentId: string; teamId: string },
+  input: {
+    memoryId: string;
+    agentId: string;
+    teamId: string;
+    threadId?: string;
+    teamScoped?: boolean;
+  },
 ) {
   return db.transaction((tx) => {
     const removed = tx
@@ -276,8 +441,8 @@ export function deleteMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          eq(agentMemory.agentId, input.agentId),
-          eq(agentMemory.teamId, input.teamId),
+          ownerWhere(tx, input),
+          scratchpadVisible(input.threadId),
         ),
       )
       .run().changes;
