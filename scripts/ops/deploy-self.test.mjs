@@ -364,6 +364,49 @@ test('deploys a green main SHA, restarts server before daemon and records the SH
   assert.match(again.stdout, /already deployed/);
 });
 
+test('feeds deploy record JSON to an executable local notify hook', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  const notifyLog = join(f.fake, 'notify.log');
+  const hook = join(f.state, 'notify.sh');
+  mkdirSync(f.state, { recursive: true });
+  writeFileSync(hook, `#!/bin/bash\ncat >> "${notifyLog}"\n`);
+  chmodSync(hook, 0o700);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /deploy notify /);
+  const notified = JSON.parse(readFileSync(notifyLog, 'utf8'));
+  assert.equal(notified.sha, target);
+  assert.equal(notified.previous, f.previous);
+  assert.equal(notified.result, 'deployed');
+  assert.equal(notified.host, 'omarchy');
+});
+
+test('ignores a failing or non-executable notify hook', () => {
+  const f = fixture();
+  const target = pushTarget(f);
+  mkdirSync(f.state, { recursive: true });
+  const failing = join(f.state, 'notify.sh');
+  writeFileSync(failing, '#!/bin/bash\nexit 7\n');
+  chmodSync(failing, 0o700);
+  const failed = f.run(DEPLOY, [target]);
+  assert.equal(failed.status, 0, failed.stderr);
+  assert.match(failed.stdout, /deploy notify exited 7 \(ignored\)/);
+  assert.equal(JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8')).result, 'deployed');
+
+  const g = fixture();
+  const next = pushTarget(g);
+  mkdirSync(g.state, { recursive: true });
+  const inert = join(g.state, 'notify.sh');
+  const notifyLog = join(g.fake, 'notify.log');
+  writeFileSync(inert, `#!/bin/bash\necho ran >> "${notifyLog}"\n`);
+  chmodSync(inert, 0o600);
+  const skipped = g.run(DEPLOY, [next]);
+  assert.equal(skipped.status, 0, skipped.stderr);
+  assert.match(skipped.stdout, /deploy notify skipped: .* is not executable/);
+  assert.equal(existsSync(notifyLog), false);
+});
+
 test('rolls code and database back when the new server fails its health check', () => {
   const f = fixture();
   const target = pushTarget(f);
