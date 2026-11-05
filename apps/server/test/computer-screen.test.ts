@@ -131,15 +131,21 @@ describe('screen capabilities and control leases', () => {
       );
     }
     const lease = gateway.acquireControl(s.team.id, s.user.id, 'computer-screen');
-    expect(() => gateway.acquireControl(s.team.id, s.user.id, 'computer-screen')).toThrow(
-      /already/,
-    );
+    const reclaimed = gateway.acquireControl(s.team.id, s.user.id, 'computer-screen');
+    expect(reclaimed.leaseId).not.toBe(lease.leaseId);
+    expect(reclaimed.controlFence).toBeGreaterThan(lease.controlFence);
+    expect(() =>
+      gateway.open(s.team.id, s.user.id, 'computer-screen', {
+        kind: 'terminal',
+        leaseId: lease.leaseId,
+      }),
+    ).toThrow(/control lease/);
     expect(() =>
       gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'terminal', leaseId: 'wrong' }),
     ).toThrow(/control lease/);
     const opened = gateway.open(s.team.id, s.user.id, 'computer-screen', {
       kind: 'terminal',
-      leaseId: lease.leaseId,
+      leaseId: reclaimed.leaseId,
     });
     expect(opened.kind).toBe('terminal');
   });

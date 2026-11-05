@@ -174,12 +174,7 @@ function MachineCard({
   const [expanded, setExpanded] = useState(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
-    desktopInstalled &&
-    online &&
-    computer !== null &&
-    teamId !== undefined &&
-    !busy &&
-    (leaseId !== null || computer.controlHolder !== 'user');
+    desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
   const screenLive =
     computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
@@ -192,6 +187,24 @@ function MachineCard({
     if (!screenLive) setExpanded(false);
   }, [screenLive]);
 
+  useEffect(() => {
+    if (
+      teamId === undefined ||
+      computer === null ||
+      computer.controlHolder !== 'user' ||
+      leaseId !== null ||
+      busy
+    )
+      return;
+    setBusy(true);
+    void acquireComputerControl(teamId, computer.id)
+      .then((lease) => {
+        setLeaseId(lease.leaseId);
+        return invalidateConverged(qc, { queryKey: ['computers', teamId] });
+      })
+      .finally(() => setBusy(false));
+  }, [teamId, computer, leaseId, busy, qc]);
+
   const onDesktopToggle = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
     setBusy(true);
@@ -203,7 +216,11 @@ function MachineCard({
         ? releaseComputerControl(teamId, computer.id, leaseId).then(() => {
             setLeaseId(null);
           })
-        : Promise.resolve();
+        : acquireComputerControl(teamId, computer.id).then((lease) =>
+            releaseComputerControl(teamId, computer.id, lease.leaseId).then(() => {
+              setLeaseId(null);
+            }),
+          );
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
       .finally(() => setBusy(false));
