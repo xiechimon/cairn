@@ -61,7 +61,7 @@ Requests without an allowlisted identity still require the access token. This in
 
 ## Public-internet alternative
 
-For public team access without an always-on host, use the Railway deployment with its public HTTPS domain and `CAIRN_TOKEN`. Tailscale Serve is the private, single-tailnet route; Railway is the public route.
+For public team access instead of a tailnet, run the same container image on any host with a public address, set `CAIRN_TOKEN`, and terminate TLS in front of it with a reverse proxy. Tailscale Serve is the private, single-tailnet route; this is the public one.
 
 ## Known pitfalls
 
