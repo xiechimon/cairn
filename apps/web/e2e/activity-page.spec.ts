@@ -262,3 +262,173 @@ test.describe('viewer-local calendar groups', () => {
     await expect(group(page, 'week')).toHaveCount(0);
   });
 });
+
+
+test.describe('Activity dependency readiness', () => {
+  test('pending projects do not render incomplete rows or a success summary', async ({ page }) => {
+    let release: (() => void) | undefined;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    let requested = false;
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+      if (path !== '/api/projects') return undefined;
+      requested = true;
+      return pending.then(() => json([{ id: 'proj-1', name: 'Loaded project' }]));
+    });
+    await page.goto('/app/activity');
+    await expect.poll(() => requested).toBe(true);
+    await expect(page.getByRole('status')).toContainText('Loading activity');
+    await expect(rows(page)).toHaveCount(0);
+    await expect(page.getByTestId('activity-summary')).toHaveCount(0);
+    release?.();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page).first()).toContainText('Loaded project');
+  });
+
+  for (const prerequisite of ['pending', 'failed', 'empty'] as const) {
+    test(`teams ${prerequisite} recover before queries for the new team ID`, async ({ page }) => {
+      let recovered = false;
+      let release: (() => void) | undefined;
+      const pending = new Promise<void>((resolve) => { release = resolve; });
+      const requests: string[] = [];
+      await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+        requests.push(route.request().url());
+        if (path === '/api/teams') {
+          if (recovered) return json([{ id: 'recovered-team', name: 'Recovered' }]);
+          if (prerequisite === 'pending') return pending.then(() => json([{ id: 'recovered-team', name: 'Recovered' }]));
+          return prerequisite === 'failed' ? json({ error: 'teams down' }, 500) : json([]);
+        }
+        if (path === '/api/todos') return json([{ ...TASK, teamId: 'recovered-team' }]);
+        if (path === '/api/search') return json({ todos: [{ id: TASK.id }], projects: [], agents: [], filters: [] });
+        return undefined;
+      });
+      await page.goto('/app/activity?q=is%3Arunning');
+      if (prerequisite === 'pending') {
+        await expect(page.getByRole('status')).toContainText('Loading activity');
+      } else {
+        await expect(page.getByTestId('activity-error')).toBeVisible();
+      }
+      expect(requests.filter((url) => /\/api\/(todos|projects|search)\?/.test(url))).toEqual([]);
+      recovered = true;
+      if (prerequisite === 'pending') release?.();
+      else await page.getByTestId('activity-error').getByRole('button', { name: 'Retry' }).click();
+      await expect(rows(page)).toHaveCount(1);
+      expect(requests.some((url) => url.includes('/api/todos?teamId=recovered-team'))).toBe(true);
+      expect(requests.some((url) => url.includes('/api/projects?teamId=recovered-team'))).toBe(true);
+      expect(requests.some((url) => url.includes('undefined'))).toBe(false);
+    });
+  }
+
+  for (const dependency of ['projects', 'todos', 'search'] as const) {
+    test(`${dependency} failure is truthful and Retry refetches active dependencies`, async ({ page }) => {
+      let failing = true;
+      const requests: string[] = [];
+      await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+        requests.push(path);
+        if (path === `/api/${dependency}` && failing) return json({ error: 'down' }, 500);
+        if (path === '/api/search') return json({ todos: [{ id: TASK.id }], projects: [], agents: [], filters: [] });
+        return undefined;
+      });
+      await page.goto('/app/activity?q=is%3Arunning');
+      await expect(page.getByTestId('activity-error')).toBeVisible();
+      await expect(page.getByTestId('activity-summary')).toHaveCount(0);
+      await expect(rows(page)).toHaveCount(0);
+      failing = false;
+      const before = requests.filter((path) => path === `/api/${dependency}`).length;
+      await page.getByTestId('activity-error').getByRole('button', { name: 'Retry' }).click();
+      await expect(rows(page)).toHaveCount(1);
+      expect(requests.filter((path) => path === `/api/${dependency}`).length).toBeGreaterThan(before);
+    });
+  }
+});
+
+test.describe('idle Activity calendar clock', () => {
+  test.use({ timezoneId: 'America/Los_Angeles' });
+
+  test('ordinary renders before midnight use the current wall clock for row ages', async ({ page }) => {
+    const now = Date.UTC(2026, 10, 4, 20);
+    await page.clock.install({ time: now });
+    await mockLive(page, {
+      threads: [], messages: [], todos: [{ ...TASK, phaseAt: now - 5 * 60_000 }],
+    });
+    await page.goto('/app/activity');
+    await expect(rows(page).first()).toContainText('5m ago');
+    await page.clock.setSystemTime(now + 20 * 60_000);
+    await page.getByRole('button', { name: 'Syntax', exact: true }).click();
+    await expect(page.getByTestId('syntax-help')).toBeVisible();
+    await expect(rows(page).first()).toContainText('25m ago');
+    await expect(group(page, 'today')).toContainText(TASK.title);
+  });
+
+  test('an idle page crosses two midnights and Monday without unrelated mutations', async ({ page }) => {
+    const now = Date.UTC(2026, 10, 9, 7, 59, 59);
+    await page.clock.install({ time: now });
+    await mockLive(page, { threads: [], messages: [], todos: [{ ...TASK, phaseAt: now - 1000 }] });
+    await page.goto('/app/activity');
+    await expect(group(page, 'today')).toContainText(TASK.title);
+    await page.clock.runFor(1500);
+    await expect(group(page, 'yesterday')).toContainText(TASK.title);
+    await page.clock.fastForward(24 * 3_600_000);
+    await expect(group(page, 'older')).toContainText(TASK.title);
+    await expect(group(page, 'week')).toHaveCount(0);
+  });
+
+  test('visibility catches a suspended date and refreshes relative search once', async ({ page }) => {
+    const now = Date.UTC(2026, 10, 4, 20);
+    await page.clock.install({ time: now });
+    let searches = 0;
+    await mockLive(page, { threads: [], messages: [], todos: [{ ...TASK, phaseAt: now }] }, (path, _route, json) => {
+      if (path !== '/api/search') return undefined;
+      searches += 1;
+      return json({ todos: searches === 1 ? [{ id: TASK.id }] : [], projects: [], agents: [], filters: [] });
+    });
+    await page.goto('/app/activity?q=after%3A7d');
+    await expect(rows(page)).toHaveCount(1);
+    const before = searches;
+    await page.clock.setSystemTime(now + 2 * 24 * 3_600_000);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.getByTestId('activity-empty')).toBeVisible();
+    expect(searches).toBe(before + 1);
+  });
+
+  test('a cached project refresh failure is shown and retry restores its labels without blank searches', async ({ page }) => {
+    const now = Date.UTC(2026, 10, 4, 20);
+    await page.clock.install({ time: now });
+    let failing = false;
+    let searches = 0;
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+      if (path === '/api/search') { searches += 1; return json({ todos: [], projects: [], agents: [], filters: [] }); }
+      if (path === '/api/projects' && failing) return json({ error: 'down' }, 500);
+      return undefined;
+    });
+    await page.goto('/app/activity');
+    await expect(rows(page)).toHaveCount(1);
+    failing = true;
+    await page.clock.setSystemTime(now + 24 * 3_600_000);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await page.clock.runFor(1200);
+    await expect(page.getByTestId('activity-error')).toBeVisible();
+    await expect(rows(page)).toHaveCount(0);
+    failing = false;
+    await page.getByTestId('activity-error').getByRole('button', { name: 'Retry' }).click();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page).first()).toContainText('cairn');
+    expect(searches).toBe(0);
+  });
+
+  test('fixture groups and timestamps stay static across midnight and visibility return', async ({ page }) => {
+    await page.clock.install({ time: Date.UTC(2026, 10, 4, 20) });
+    await page.goto(ACTIVITY);
+    await expect(groups(page)).toHaveCount(4);
+    const before = await page.getByTestId('activity-list').innerText();
+    await page.clock.fastForward(2 * 24 * 3_600_000);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(await page.getByTestId('activity-list').innerText()).toBe(before);
+  });
+});

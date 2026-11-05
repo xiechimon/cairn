@@ -3,7 +3,6 @@ import { cn } from 'cn';
 import { CircleHelp, Plus, Search, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { formatUsd, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -41,6 +40,8 @@ import {
   removeChipAt,
   splitQuery,
 } from '../search/search-query.js';
+import { useActivityClock } from '../search/use-activity-clock.js';
+import { useActivityData } from '../search/use-activity-data.js';
 
 const QUICK_FILTERS = [
   { label: '失败', token: 'is:failed' },
@@ -103,7 +104,7 @@ export function ActivityPage() {
   const navigate = useNavigate();
   const threadHref = useThreadHref();
   const [params, setParams] = useSearchParams();
-  const { live, teamId } = useLiveData();
+  const { live } = useLiveData();
   const fixture = resolveScenario(params);
   const queryParam = params.get('q') ?? '';
   const [query, setQueryState] = useState(() => {
@@ -128,10 +129,9 @@ export function ActivityPage() {
     if (next.toString() !== params.toString()) setParams(next, { replace: true });
   };
 
-  const todosQ = useTodos(teamId, live);
-  const projectsQ = useProjects(teamId, live);
-  const searchQ = useSearchResults(query, live);
-  const now = live ? Date.now() : fixture.now;
+  const activity = useActivityData(live, query);
+  const { todos: todosQ, projects: projectsQ, search: searchQ } = activity;
+  const now = useActivityClock(live, fixture.now, activity.refreshAtBoundary);
   const allTodos: TodoRecord[] = useMemo(
     () => (live ? (todosQ.data ?? []).map(toDisplayTodo) : withoutDeleted(fixture.todos)),
     [live, todosQ.data, fixture],
@@ -177,12 +177,8 @@ export function ActivityPage() {
     );
   };
 
-  const loading = live && (todosQ.isPending || (trimmed !== '' && searchQ.isPending));
-  const failed = live && (todosQ.isError || (trimmed !== '' && searchQ.isError));
-  const retry = () => {
-    void todosQ.refetch();
-    void searchQ.refetch();
-  };
+  const loading = activity.state === 'loading';
+  const failed = activity.state === 'error';
 
   return (
     <PageShell
@@ -295,7 +291,7 @@ export function ActivityPage() {
             icon={TriangleAlert}
             title={t('活动没能加载')}
             description={t('检查网络后再试一次。')}
-            action={{ label: t('重试'), onClick: retry }}
+            action={{ label: t('重试'), onClick: activity.retry }}
             className="py-16"
           />
         ) : rows.length === 0 ? (
