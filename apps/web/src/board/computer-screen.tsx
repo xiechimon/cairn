@@ -30,6 +30,7 @@ export function MachineScreenSurface({
   interactive,
   fill = false,
   onExpand,
+  autoFocus = false,
 }: {
   teamId: string;
   computer: ComputerRecord;
@@ -37,9 +38,11 @@ export function MachineScreenSurface({
   interactive: boolean;
   fill?: boolean;
   onExpand?: () => void;
+  autoFocus?: boolean;
 }) {
   const { t } = useI18n();
   const host = useRef<HTMLDivElement>(null);
+  const rfbRef = useRef<NovncRfb | null>(null);
   const [status, setStatus] = useState<ScreenStatus>('connecting');
   const online = computer.machine.online && computer.state !== 'failed';
 
@@ -69,9 +72,13 @@ export function MachineScreenSurface({
         rfb.scaleViewport = true;
         rfb.clipViewport = true;
         rfb.focusOnClick = interactive;
+        rfb.showDotCursor = interactive;
         rfb.background = 'transparent';
+        rfbRef.current = rfb;
         rfb.addEventListener('connect', () => {
-          if (!cancelled) setStatus('connected');
+          if (cancelled) return;
+          setStatus('connected');
+          if (interactive && autoFocus) rfb?.focus({ preventScroll: true });
         });
         rfb.addEventListener('disconnect', () => {
           if (!cancelled) setStatus('placeholder');
@@ -91,10 +98,29 @@ export function MachineScreenSurface({
     void connect();
     return () => {
       cancelled = true;
+      rfbRef.current = null;
       rfb?.disconnect();
       target.replaceChildren();
     };
-  }, [teamId, computer.id, computer.machine.online, computer.state, interactive, leaseId, online]);
+  }, [
+    teamId,
+    computer.id,
+    computer.machine.online,
+    computer.state,
+    interactive,
+    leaseId,
+    online,
+    autoFocus,
+  ]);
+
+  useEffect(() => {
+    const rfb = rfbRef.current;
+    if (rfb == null || status !== 'connected') return;
+    rfb.viewOnly = !interactive;
+    rfb.focusOnClick = interactive;
+    rfb.showDotCursor = interactive;
+    if (interactive && autoFocus) rfb.focus({ preventScroll: true });
+  }, [interactive, autoFocus, status]);
 
   if (!online) return <ScreenPlaceholder online={false} label={t('电脑离线')} />;
 
@@ -103,9 +129,12 @@ export function MachineScreenSurface({
       data-testid="machine-screen"
       data-status={status}
       data-interactive={interactive ? 'true' : 'false'}
-      className={`relative overflow-hidden bg-(--surface-1) ${fill ? 'min-h-0 flex-1' : 'aspect-[16/10]'}`}
+      className={`relative overflow-hidden bg-(--surface-1) ${fill ? 'min-h-0 flex-1 rounded-md ring-1 ring-border/60' : 'aspect-[16/10]'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
-      <div ref={host} className="absolute inset-0" />
+      <div
+        ref={host}
+        className="absolute inset-0 [&_canvas]:h-full [&_canvas]:w-full [&_canvas]:outline-none"
+      />
       {status !== 'connected' && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-meta text-content-tertiary">
           <span className="flex flex-col items-center gap-2">
@@ -125,8 +154,11 @@ export function MachineScreenSurface({
           size="icon-sm"
           data-testid="machine-screen-expand"
           aria-label={t('放大屏幕')}
-          className="absolute top-2 right-2 z-10"
-          onClick={onExpand}
+          className="absolute top-2 right-2 z-10 shadow-sm"
+          onClick={(event) => {
+            event.stopPropagation();
+            onExpand();
+          }}
         >
           <Maximize2 aria-hidden="true" className="size-3.5" />
         </Button>

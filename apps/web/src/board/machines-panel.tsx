@@ -4,7 +4,11 @@ import { Globe, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
-import { acquireComputerControl, releaseComputerControl } from '../api/computer-screen.js';
+import {
+  acquireComputerControl,
+  releaseComputerControl,
+  renewComputerControl,
+} from '../api/computer-screen.js';
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
@@ -196,14 +200,31 @@ function MachineCard({
       busy
     )
       return;
+    let cancelled = false;
     setBusy(true);
     void acquireComputerControl(teamId, computer.id)
       .then((lease) => {
+        if (cancelled) return;
         setLeaseId(lease.leaseId);
         return invalidateConverged(qc, { queryKey: ['computers', teamId] });
       })
-      .finally(() => setBusy(false));
-  }, [teamId, computer, leaseId, busy, qc]);
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, computer?.id, computer?.controlHolder, leaseId, busy, qc, computer]);
+
+  useEffect(() => {
+    if (teamId === undefined || computer === null || leaseId === null) return;
+    const tick = window.setInterval(() => {
+      void renewComputerControl(teamId, computer.id, leaseId).catch(() => {
+        setLeaseId(null);
+      });
+    }, 10 * 60_000);
+    return () => window.clearInterval(tick);
+  }, [teamId, computer, leaseId]);
 
   const onDesktopToggle = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
@@ -226,6 +247,22 @@ function MachineCard({
       .finally(() => setBusy(false));
   };
 
+  const openEnlarged = () => {
+    if (!screenLive) return;
+    if (leaseId === null && teamId !== undefined && computer !== null && !busy) {
+      setBusy(true);
+      void acquireComputerControl(teamId, computer.id)
+        .then((lease) => {
+          setLeaseId(lease.leaseId);
+          setExpanded(true);
+          return invalidateConverged(qc, { queryKey: ['computers', teamId] });
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+    setExpanded(true);
+  };
+
   return (
     <ListCard className="flex-none">
       {expanded && screenLive ? (
@@ -237,7 +274,7 @@ function MachineCard({
           teamId={teamId}
           leaseId={leaseId}
           interactive={false}
-          onExpand={screenLive ? () => setExpanded(true) : undefined}
+          onExpand={screenLive ? openEnlarged : undefined}
         />
       )}
       {expanded && screenLive && computer !== null && teamId !== undefined && (
@@ -246,11 +283,11 @@ function MachineCard({
           open={expanded}
           onClose={() => setExpanded(false)}
           title={machine.name}
-          width="min(96vw, 1120px)"
-          height="min(88vh, 820px)"
-          className="flex flex-col"
+          width="min(100vw - 1.5rem, 1120px)"
+          height="min(100dvh - 1.5rem, 820px)"
+          className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
         >
-          <div className="relative flex items-start gap-3 px-5 pt-4.5 pr-13 pb-2">
+          <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
             <div className="min-w-0 flex-1">
               <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
                 {machine.name}
@@ -263,7 +300,7 @@ function MachineCard({
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="absolute top-4 right-4 text-content-tertiary hover:text-foreground"
+              className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4"
               aria-label={t('关闭')}
               onClick={() => setExpanded(false)}
             >
@@ -272,7 +309,7 @@ function MachineCard({
           </div>
           <div
             data-testid="machine-screen-enlarged"
-            className="flex min-h-0 flex-1 flex-col px-3 pb-3"
+            className="flex min-h-0 flex-1 flex-col px-2 pb-2 sm:px-3 sm:pb-3"
           >
             <MachineScreenSurface
               teamId={teamId}
@@ -280,6 +317,7 @@ function MachineCard({
               leaseId={leaseId}
               interactive={leaseId !== null}
               fill
+              autoFocus
             />
           </div>
         </DialogShell>
