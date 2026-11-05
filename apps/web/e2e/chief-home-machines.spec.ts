@@ -42,6 +42,8 @@ test('the chip opens one card per computer, the Coordinator machine first, with 
       await expect(toggle).not.toBeChecked();
     }
   }
+  await expect(panel(page).getByText('已安装')).toHaveCount(0);
+  await expect(panel(page).getByText('未安装')).toHaveCount(0);
   await expect(panel(page)).toContainText('辅助功能');
 
   await panel(page).getByRole('link', { name: '添加电脑' }).click();

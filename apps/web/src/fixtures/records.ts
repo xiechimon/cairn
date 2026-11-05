@@ -282,6 +282,8 @@ export interface MachineRow {
     skills: string[];
     hardware?: MachineHardware;
     executor?: MachineExecutor;
+    computer?: true;
+    ownComputer?: true;
   } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
