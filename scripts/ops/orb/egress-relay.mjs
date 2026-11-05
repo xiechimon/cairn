@@ -172,11 +172,16 @@ export function createRelay(options = {}) {
   server.on('connection', (socket) => {
     socket.on('error', () => socket.destroy());
     const viaSocketFile = unixListeners.has(server);
+    const refuse = (status) => {
+      socket.end(`${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`, () =>
+        socket.destroy(),
+      );
+    };
     if (
       !viaSocketFile &&
       !allowed.check(socket.remoteAddress, isIP(socket.remoteAddress) === 4 ? 'ipv4' : 'ipv6')
     ) {
-      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+      refuse('HTTP/1.1 403 Forbidden');
       return;
     }
     const identity = viaSocketFile
@@ -184,9 +189,7 @@ export function createRelay(options = {}) {
       : '';
     const identityCount = identity ? (clientsByIdentity.get(identity) ?? 0) : 0;
     if (clients.size >= config.maxConnections || (identity && identityCount >= maxPerClient)) {
-      socket.end(
-        'HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
-      );
+      refuse('HTTP/1.1 503 Service Unavailable');
       return;
     }
     clients.add(socket);

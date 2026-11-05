@@ -644,6 +644,35 @@ test('a unix peer pid is the other process holding the socket', async (t) => {
   assert.equal(seen[0], child.pid);
 });
 
+test('a rejected quota connection is destroyed after the 503', async (t) => {
+  const f = await fixture(
+    t,
+    {
+      idleTimeout: 5000,
+      maxConnections: 4,
+      maxConnectionsPerClient: 1,
+      clientIdentity: () => 'orb:held',
+    },
+    { unix: true },
+  );
+  const held = connect(f.socketPath);
+  const extra = connect(f.socketPath);
+  t.after(() => {
+    held.destroy();
+    extra.destroy();
+  });
+  await once(held, 'connect');
+  await once(extra, 'connect');
+  extra.pause();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const open = await new Promise((resolve, reject) => {
+    f.relay.getConnections((error, count) => (error ? reject(error) : resolve(count)));
+  });
+  assert.equal(open, 1);
+  held.destroy();
+  extra.destroy();
+});
+
 test('unix peers outside a container share one unknown quota', async (t) => {
   const seen = [];
   const f = await fixture(
