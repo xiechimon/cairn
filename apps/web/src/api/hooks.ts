@@ -695,6 +695,14 @@ export function useApiMutations(teamId: string | undefined) {
             plan?: NonNullable<Assignment['plan']>;
             build?: NonNullable<Assignment['build']>;
           };
+          routeOverride?: {
+            machineId?: string;
+            requiredCapabilities?: {
+              mcpServers?: string[];
+              models?: string[];
+              executor?: 'orb';
+            };
+          } | null;
         };
       }) => api.patch<TodoRecord>(`/api/todos/${input.id}`, input.body),
       onSuccess: invalidateAll,
@@ -764,11 +772,20 @@ export function useApiMutations(teamId: string | undefined) {
         todoIds: string[];
         assignment: Assignment;
         withPlan: boolean;
+        routeOverride?: {
+          machineId?: string;
+          requiredCapabilities?: {
+            mcpServers?: string[];
+            models?: string[];
+            executor?: 'orb';
+          };
+        };
       }) =>
         api.post<{ builds: BuildRecord[] }>(`/api/projects/${input.projectId}/builds`, {
           todoIds: input.todoIds,
           assignment: input.assignment,
           withPlan: input.withPlan,
+          ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
         }),
       onSuccess: invalidateAll,
     }),

@@ -27,7 +27,9 @@ import {
 } from './egress-relay.mjs';
 
 const relayScript = new URL('./egress-relay.mjs', import.meta.url).pathname;
-const peerCredAvailable = existsSync(join(dirname(process.execPath), '../include/node/node_api.h'));
+const peerCredAvailable =
+  process.platform === 'linux' &&
+  existsSync(join(dirname(process.execPath), '../include/node/node_api.h'));
 
 function privateDirectory(t) {
   const directory = mkdtempSync(join(tmpdir(), 'egress-relay-'));

@@ -1137,7 +1137,7 @@ export function startBuilds(
     }
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,
-      routeOverride: input.routeOverride ?? null,
+      ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
       latestBuildId: id,
       lastRunAt: createdAt,
     });

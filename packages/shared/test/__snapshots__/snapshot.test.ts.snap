@@ -6107,6 +6107,44 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "routeOverride": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "machineId": {
+                      "type": "string",
+                    },
+                    "requiredCapabilities": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "executor": {
+                          "const": "orb",
+                          "type": "string",
+                        },
+                        "mcpServers": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "models": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                      },
+                      "type": "object",
+                    },
+                  },
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "seqNum": {
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
@@ -10305,6 +10343,44 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "retryAfterMs",
             "probeAt",
           ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "routeOverride": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "machineId": {
+              "type": "string",
+            },
+            "requiredCapabilities": {
+              "additionalProperties": false,
+              "properties": {
+                "executor": {
+                  "const": "orb",
+                  "type": "string",
+                },
+                "mcpServers": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "models": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "type": "object",
+            },
+          },
           "type": "object",
         },
         {

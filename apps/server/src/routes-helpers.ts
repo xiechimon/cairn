@@ -7,6 +7,7 @@ import {
   githubIssueStateSchema,
   type MemoryRecord,
   phaseSchema,
+  routeOverrideSchema,
   type TagRecord,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -61,6 +62,7 @@ export const patchTodoBodySchema = z.object({
       build: assignmentSlotSchema.optional(),
     })
     .optional(),
+  routeOverride: routeOverrideSchema.nullable().optional(),
 });
 
 export const patchSecretBodySchema = z.object({

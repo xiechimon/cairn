@@ -17,6 +17,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import { RouteOverrideDialog } from './route-override-dialog.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
 export type ThreadActionKind = 'start' | 'approve' | 'finish' | 'retry' | 'unarchive';
@@ -68,7 +69,9 @@ export function useThreadActions({
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | null>(null);
+  const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | 'route-override' | null>(
+    null,
+  );
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
@@ -257,6 +260,10 @@ export function useThreadActions({
               },
             }
           : {})}
+        onRouteOverride={() => {
+          setMenuOpen(false);
+          setDialog('route-override');
+        }}
       />
       <DeleteConfirm
         open={dialog === 'delete'}
@@ -289,6 +296,12 @@ export function useThreadActions({
         infoOutput={chat.infoOutput}
         confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}
         {...(live ? { onConfirm: confirmAccept } : {})}
+      />
+      <RouteOverrideDialog
+        open={dialog === 'route-override'}
+        onClose={() => setDialog(null)}
+        todoId={todo.id}
+        initial={todo.routeOverride}
       />
     </>
   );
