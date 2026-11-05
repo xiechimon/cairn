@@ -40,14 +40,32 @@ function runStep(t, file, name, env) {
   });
   return { result, dir, calls: () => readFileSync(calls, 'utf8') };
 }
-test('workflow_run success does not pause or sweep', (t) => {
+test('workflow_run success resumes instead of pausing', (t) => {
   const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
     EVENT_NAME: 'workflow_run',
     CONCLUSION: 'success',
     HEAD_BRANCH: 'main',
   });
   assert.equal(f.result.status, 0, f.result.stderr);
+  assert.equal(f.calls(), 'scripts/autonomy-brake.mjs resume\n');
+});
+test('a green run from a fork cannot resume', (t) => {
+  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+    EVENT_NAME: 'workflow_run',
+    CONCLUSION: 'success',
+    HEAD_REPOSITORY: 'fork/repo',
+    HEAD_BRANCH: 'main',
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
   assert.equal(f.calls(), '');
+});
+test('schedule sweeps the markers and then tries to resume', (t) => {
+  const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
+    EVENT_NAME: 'schedule',
+    PAUSED: 'true',
+  });
+  assert.equal(f.result.status, 0, f.result.stderr);
+  assert.equal(f.calls(), 'scripts/autonomy-brake.mjs sweep\nscripts/autonomy-brake.mjs resume\n');
 });
 test('a cancelled main ci run does not pause or sweep', (t) => {
   const f = runStep(t, '.github/workflows/autonomy-brake.yml', 'Apply the brake', {
