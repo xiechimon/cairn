@@ -13,6 +13,7 @@ const pendingSchema = z.object({
   enrollId: z.string().min(1),
   url: z.string().min(1),
   expiresAt: z.number(),
+  serverUrl: z.string().optional(),
 });
 
 export type PendingEnrollment = z.infer<typeof pendingSchema>;
@@ -87,7 +88,11 @@ export async function enrollThroughBrowser(
   const api = asEnrollApi(client);
   const path = pendingPath(paths);
   let pending = readPending(path);
-  if (pending !== null && pending.expiresAt <= io.now()) {
+  if (
+    pending !== null &&
+    (pending.expiresAt <= io.now() ||
+      (pending.serverUrl !== undefined && pending.serverUrl !== serverUrl))
+  ) {
     rmSync(path, { force: true });
     pending = null;
   }
@@ -97,6 +102,7 @@ export async function enrollThroughBrowser(
       enrollId: started.enrollId,
       url: rewriteToServerOrigin(started.url, serverUrl),
       expiresAt: io.now() + ENROLL_TTL_MS,
+      serverUrl,
     };
     writePrivateFile(path, `${JSON.stringify(pending, null, 2)}\n`);
     io.log(`Open ${pending.url} and approve this machine (expires in 10 minutes).`);
@@ -137,5 +143,20 @@ export async function enrollThroughBrowser(
       );
     }
     await io.sleep(POLL_INTERVAL_MS);
+  }
+}
+
+export async function pendingEnrollmentUrl(
+  paths: StatePaths,
+  waitMs: number,
+  sleep: (ms: number) => Promise<void>,
+  now: () => number,
+): Promise<string | null> {
+  const deadline = now() + waitMs;
+  for (;;) {
+    const pending = readPending(pendingPath(paths));
+    if (pending !== null && pending.expiresAt > now()) return pending.url;
+    if (now() >= deadline) return null;
+    await sleep(200);
   }
 }

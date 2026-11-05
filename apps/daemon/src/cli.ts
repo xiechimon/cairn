@@ -20,6 +20,7 @@ import {
   WorkspacesDirError,
 } from './config.js';
 import { createDaemonLogger } from './log.js';
+import { pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
 import { orbReleaseFromEntry } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
@@ -125,6 +126,7 @@ export function buildProgram(): Command {
         runnerArgv: passthroughArgv(opts),
       });
       process.stdout.write(`Started in background (pid ${pid})\n`);
+      await printEnrollmentUrl(config.home);
     });
 
   program
@@ -160,6 +162,7 @@ export function buildProgram(): Command {
         runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
       });
       process.stdout.write(`Started in background (pid ${pid})\n`);
+      await printEnrollmentUrl(config.home);
     });
 
   program
@@ -301,3 +304,13 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) void main();
+
+async function printEnrollmentUrl(home: string): Promise<void> {
+  const url = await pendingEnrollmentUrl(
+    statePaths(home),
+    2_000,
+    (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    () => Date.now(),
+  );
+  if (url !== null) process.stdout.write(`Approve this machine in a browser: ${url}\n`);
+}

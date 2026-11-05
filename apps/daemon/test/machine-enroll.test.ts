@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { enrollThroughBrowser } from '../src/machine-enroll.js';
+import { enrollThroughBrowser, pendingEnrollmentUrl } from '../src/machine-enroll.js';
 import { statePaths } from '../src/state.js';
 
 const SERVER = 'https://cairn.example';
@@ -120,6 +120,74 @@ test('a restart reuses the pending enrollment instead of starting a second one',
   );
   expect(starts).toEqual([]);
   expect(polled).toBe('e-pending');
+  releaseTestTempDir(home);
+});
+
+test('a pending enrollment for another server is discarded and restarted', async () => {
+  const { home, paths } = world();
+  mkdirSync(home, { recursive: true });
+  writeFileSync(
+    join(home, 'enroll.json'),
+    JSON.stringify({
+      enrollId: 'e-old',
+      url: AUTHORIZE,
+      expiresAt: 900_000,
+      serverUrl: 'https://old.example',
+    }),
+  );
+  const starts: string[] = [];
+  let polled: string | null = null;
+  await enrollThroughBrowser(
+    clientOf((enrollId) => {
+      polled = enrollId;
+      return { status: 'authorized', machine: machine() as never };
+    }, starts),
+    paths,
+    SERVER,
+    'omarchy',
+    { now: () => 1_000, sleep: async () => {}, log: () => {} },
+  );
+  expect(starts).toEqual(['omarchy']);
+  expect(polled).toBe('e1');
+  releaseTestTempDir(home);
+});
+
+test('the approval URL is readable from the pending record while the supervisor runs', async () => {
+  const { home, paths } = world();
+  mkdirSync(home, { recursive: true });
+  writeFileSync(
+    join(home, 'enroll.json'),
+    JSON.stringify({
+      enrollId: 'e1',
+      url: `${SERVER}/app/machines/authorize?enroll=e1`,
+      expiresAt: 900_000,
+    }),
+  );
+  expect(
+    await pendingEnrollmentUrl(
+      paths,
+      1_000,
+      async () => {},
+      () => 1_000,
+    ),
+  ).toBe(`${SERVER}/app/machines/authorize?enroll=e1`);
+  releaseTestTempDir(home);
+});
+
+test('the approval URL is null when no enrollment appears inside the window', async () => {
+  const { home, paths } = world();
+  let now = 0;
+  expect(
+    await pendingEnrollmentUrl(
+      paths,
+      500,
+      async () => {
+        now += 200;
+      },
+      () => now,
+    ),
+  ).toBeNull();
+  expect(now).toBeGreaterThanOrEqual(500);
   releaseTestTempDir(home);
 });
 
