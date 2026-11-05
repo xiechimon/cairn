@@ -7,6 +7,8 @@ This directory holds two kinds of things: **long-lived documents** (specs, decis
 | Directory / file | Content |
 |---|---|
 | `spec/` | Numbered specs (test layering, PR process, etc.); the canonical text of the engineering rules |
+| `getting-started.md` | Run the server, enroll a machine, Docker, deploy publicly, build from source |
+| `configuration.md` | Every server and daemon environment variable |
 | `privacy.md` | What Cairn sends (nothing) and what the optional first-PR discussion prompt does and does not carry |
 | `community/welcome.md` | Discussion categories, where bugs and security reports go, and how to post a first-PR write-up |
 | `pr-review.md` | The PR review process (five-step process + six-section scorecard) |
