@@ -202,6 +202,7 @@ export function createSchedule(
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) throw new Error('schedule missing after insert');
+  notifyScheduleClock();
   return record;
 }
 
@@ -210,6 +211,7 @@ export function deleteSchedule(deps: ScheduleDeps & { user: UserRecord }, id: st
   if (!row) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
   endSnoozeOn(deps, row.todoId, 'schedule-cleared');
+  notifyScheduleClock();
   return true;
 }
 
@@ -240,6 +242,7 @@ export function setScheduleEnabled(
     }
   }
   const updated = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  notifyScheduleClock();
   return updated ? toScheduleRecord(deps, updated) : null;
 }
 
@@ -261,8 +264,19 @@ export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRo
     .map((r) => r.schedule);
 }
 
+let scheduleClockListener: (() => void) | null = null;
+
+export function setScheduleClockListener(listener: (() => void) | null): void {
+  scheduleClockListener = listener;
+}
+
+function notifyScheduleClock(): void {
+  scheduleClockListener?.();
+}
+
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
   deps.db.update(schedule).set({ nextRunAt }).where(eq(schedule.id, id)).run();
+  notifyScheduleClock();
 }
 
 export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
@@ -271,6 +285,7 @@ export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): v
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.id, id))
     .run();
+  notifyScheduleClock();
 }
 
 export const ARCHIVED_SCHEDULE_PAUSE_REASON = 'Task archived';
@@ -281,6 +296,7 @@ export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: st
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.todoId, todoId))
     .run();
+  notifyScheduleClock();
 }
 
 export function parseThreadCadence(
