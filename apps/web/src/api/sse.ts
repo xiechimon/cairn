@@ -56,7 +56,20 @@ export function startTeamStream(teamId: string, qc: QueryClient, generation = 0)
       for (const queryKey of teamEventInvalidations(ev, teamId)) {
         void invalidateConverged(qc, { queryKey });
       }
-      if (ev.type === 'computer.command' && computerFeedStore.push(ev.command)) {
+      if (ev.type === 'computer.command') {
+        const prior = computerFeedStore.snapshot();
+        computerFeedStore.push(ev.command);
+        if (computerFeedStore.snapshot() !== prior) {
+          void invalidateConverged(qc, { queryKey: ['computers', teamId] });
+        }
+      }
+      if (
+        ev.type === 'computer.state' &&
+        (ev.state === 'stopped' ||
+          ev.state === 'starting' ||
+          ev.state === 'running' ||
+          ev.state === 'failed')
+      ) {
         void invalidateConverged(qc, { queryKey: ['computers', teamId] });
       }
       if (ev.type === 'notification') {
