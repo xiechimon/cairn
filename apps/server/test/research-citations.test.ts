@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   agent,
+  build,
   chief,
   chiefReport,
   machine,
+  message,
   routingRule,
   todo,
   tokenUsage,
@@ -150,6 +152,113 @@ describe('research citation handoff', () => {
       .filter((row) => row.sourceKind === 'research-citation-check');
     expect(checkers).toHaveLength(1);
     expect(checkers.some((row) => row.sourceRef?.startsWith(generic.buildId))).toBe(false);
+  });
+
+  test('promoting a reused source to tier 2 schedules its audit and cannot be downgraded', async () => {
+    const { s, opened } = await world();
+    s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, opened.todoId)).run();
+    const input = {
+      teamId: s.team.id,
+      projectId: s.db.select().from(todo).all()[0]!.projectId,
+      title: 'Reuse',
+      question: 'What changed?',
+      source: { kind: 'research-intake-item' as const, ref: 'reuse' },
+    };
+    const first = openResearchThread(s.svc, { ...input, tier: 1 });
+    land(s, first.buildId, source, 'claude-sonnet-5-5');
+    planResearchCitationChecks(s.svc);
+    expect(
+      s.db
+        .select()
+        .from(todo)
+        .all()
+        .filter((row) => row.sourceKind === 'research-citation-check'),
+    ).toHaveLength(0);
+    expect(openResearchThread(s.svc, { ...input, tier: 2 }).buildId).toBe(first.buildId);
+    openResearchThread(s.svc, { ...input, tier: 1 });
+    planResearchCitationChecks(s.svc);
+    expect(
+      s.db
+        .select()
+        .from(todo)
+        .all()
+        .filter((row) => row.sourceKind === 'research-citation-check'),
+    ).toHaveLength(1);
+    const marker = s.db
+      .select()
+      .from(message)
+      .where(eq(message.id, `research-tier-${first.buildId}`))
+      .get();
+    expect(JSON.parse(marker!.content as string).tier).toBe(2);
+  });
+
+  test('unrelated historical info rows do not cause per-row planning queries', async () => {
+    const { s, opened } = await world();
+    const projectId = s.db.select().from(todo).all()[0]!.projectId;
+    s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, opened.todoId)).run();
+    s.db
+      .insert(todo)
+      .values(
+        Array.from({ length: 100 }, (_, i) => ({
+          id: `unrelated-${i}`,
+          teamId: s.team.id,
+          projectId,
+          title: 'Historical information',
+          output: 'info' as const,
+          phase: 'done' as const,
+          phaseAt: 1,
+          seqNum: 100 + i,
+          latestBuildId: `unrelated-build-${i}`,
+        })),
+      )
+      .run();
+    const selects = vi.spyOn(s.db, 'select');
+    try {
+      planResearchCitationChecks(s.svc);
+      expect(selects.mock.calls.length).toBeLessThanOrEqual(2);
+    } finally {
+      selects.mockRestore();
+    }
+  });
+
+  test('already planned reports do not incur per-report reads on later ticks', async () => {
+    const { s, opened } = await world();
+    const checker = openCitationCheck(s.svc, opened.buildId)!;
+    land(s, checker.buildId, receipt(), 'gpt-6.1-sol');
+    const selects = vi.spyOn(s.db, 'select');
+    try {
+      planResearchCitationChecks(s.svc);
+      expect(selects.mock.calls.length).toBeLessThanOrEqual(2);
+    } finally {
+      selects.mockRestore();
+    }
+  });
+
+  test('blocked batches cool down so a later report is not starved', async () => {
+    const { s, opened } = await world();
+    const projectId = s.db.select().from(todo).all()[0]!.projectId;
+    s.db.update(todo).set({ archivedAt: Date.now() }).where(eq(todo.id, opened.todoId)).run();
+    for (let i = 0; i < 6; i++) {
+      const research = openResearchThread(s.svc, {
+        teamId: s.team.id,
+        projectId,
+        tier: 2,
+        title: `Batch ${i}`,
+        question: 'Check releases.',
+      });
+      s.db.update(build).set({ createdAt: i }).where(eq(build.id, research.buildId)).run();
+      land(s, research.buildId, i < 5 ? 'No URLs were fetched.' : source, 'claude-sonnet-5-5');
+    }
+    const checkerCount = () =>
+      s.db
+        .select()
+        .from(todo)
+        .all()
+        .filter((row) => row.sourceKind === 'research-citation-check').length;
+    planResearchCitationChecks(s.svc);
+    expect(checkerCount()).toBe(0);
+    planResearchCitationChecks(s.svc);
+    expect(checkerCount()).toBe(1);
   });
 
   test('the Coordinator is not selected even when its model is independent', async () => {

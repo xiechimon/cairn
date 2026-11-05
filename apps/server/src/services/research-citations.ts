@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { infoReportMessageSchema, quoteIssueLines, RESEARCH_DATA_NOTE } from '@cairn/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, notExists, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, message, todo, tokenUsage } from '../db/schema.js';
@@ -14,6 +15,7 @@ import { createTodo } from './todos.js';
 const CHECK_SOURCE_KIND = 'research-citation-check';
 const TIER_MARKER_KIND = 'research-tier';
 const CHECKS_PER_TICK = 5;
+const CITATION_RETRY_MS = 60_000;
 
 const claimSchema = z
   .object({
@@ -124,18 +126,28 @@ function independent(models: readonly string[], others: readonly string[]): bool
   );
 }
 
-function blocked(deps: BuildDeps, source: SourceReport, reason: string): null {
-  deps.db
-    .insert(message)
+function recordCitationAttempt(
+  db: Db,
+  source: Pick<SourceReport, 'buildId' | 'attachmentId'>,
+  kind: 'research-citation-requested' | 'research-citation-blocked',
+  reason: string,
+): void {
+  const content = JSON.stringify({ kind, reason });
+  const createdAt = nowMs();
+  db.insert(message)
     .values({
-      id: `research-citation-blocked-${source.sourceRef}`,
+      id: `research-citation-attempt-${source.buildId}:${source.attachmentId}`,
       conversationId: source.buildId,
       role: 'system',
-      content: JSON.stringify({ kind: 'research-citation-blocked', reason }),
-      createdAt: nowMs(),
+      content,
+      createdAt,
     })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({ target: message.id, set: { content, createdAt } })
     .run();
+}
+
+function blocked(deps: BuildDeps, source: SourceReport, reason: string): null {
+  recordCitationAttempt(deps.db, source, 'research-citation-blocked', reason);
   return null;
 }
 
@@ -252,44 +264,88 @@ export function checkedResearchReport(db: Db, buildId: string): CheckedResearchR
 }
 
 export function recordResearchTier(deps: BuildDeps, buildId: string, tier: 1 | 2): void {
+  const id = `${TIER_MARKER_KIND}-${buildId}`;
+  const existing = deps.db.select().from(message).where(eq(message.id, id)).get();
+  let previousTier: unknown;
+  try {
+    const value: unknown =
+      typeof existing?.content === 'string' ? JSON.parse(existing.content) : existing?.content;
+    previousTier =
+      typeof value === 'object' && value !== null && 'tier' in value ? value.tier : undefined;
+  } catch {
+    previousTier = undefined;
+  }
+  const content = JSON.stringify({
+    kind: TIER_MARKER_KIND,
+    tier: previousTier === 2 || tier === 2 ? 2 : 1,
+  });
   deps.db
     .insert(message)
     .values({
-      id: `${TIER_MARKER_KIND}-${buildId}`,
+      id,
       conversationId: buildId,
       role: 'system',
-      content: JSON.stringify({ kind: TIER_MARKER_KIND, tier }),
+      content,
       createdAt: nowMs(),
     })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({ target: message.id, set: { content } })
     .run();
 }
 
 export function planResearchCitationChecks(deps: BuildDeps): void {
+  const tierMarker = alias(message, 'research_tier');
+  const report = alias(message, 'research_report');
+  const attempt = alias(message, 'citation_attempt');
+  const checker = alias(todo, 'citation_checker');
+  const tier = sql<number>`CASE WHEN json_valid(${tierMarker.content}) THEN
+    CASE WHEN json_valid(json_extract(${tierMarker.content}, '$')) THEN
+      json_extract(json_extract(${tierMarker.content}, '$'), '$.tier') END END`;
+  const sourcePrefix = sql`${build.id} || ':' || ${build.reportAttachmentId} || ':'`;
+  const existingChecker = deps.db
+    .select({ id: checker.id })
+    .from(checker)
+    .where(
+      and(
+        eq(checker.teamId, todo.teamId),
+        eq(checker.sourceKind, CHECK_SOURCE_KIND),
+        isNotNull(checker.latestBuildId),
+        sql`substr(${checker.sourceRef}, 1, length(${sourcePrefix})) = ${sourcePrefix}`,
+      ),
+    );
   const candidates = deps.db
-    .select()
+    .select({ buildId: build.id, attachmentId: build.reportAttachmentId })
     .from(todo)
-    .where(and(eq(todo.output, 'info'), isNull(todo.archivedAt)))
+    .innerJoin(build, eq(todo.latestBuildId, build.id))
+    .innerJoin(report, eq(report.id, sql`'info-report-' || ${build.id}`))
+    .leftJoin(tierMarker, eq(tierMarker.id, sql`'research-tier-' || ${build.id}`))
+    .leftJoin(
+      attempt,
+      eq(
+        attempt.id,
+        sql`'research-citation-attempt-' || ${build.id} || ':' || ${build.reportAttachmentId}`,
+      ),
+    )
+    .where(
+      and(
+        eq(todo.output, 'info'),
+        isNull(todo.archivedAt),
+        isNotNull(build.reportAttachmentId),
+        or(sql`${todo.sourceKind} IN ('research-intake', 'research-stuck')`, eq(tier, 2)),
+        or(isNull(attempt.createdAt), lt(attempt.createdAt, nowMs() - CITATION_RETRY_MS)),
+        notExists(existingChecker),
+      ),
+    )
+    .orderBy(asc(build.createdAt), asc(build.id))
+    .limit(CHECKS_PER_TICK)
     .all();
-  let opened = 0;
-  for (const row of candidates) {
-    if (!row.latestBuildId) continue;
-    const tier = deps.db
-      .select()
-      .from(message)
-      .where(eq(message.id, `${TIER_MARKER_KIND}-${row.latestBuildId}`))
-      .get();
-    let multiAgent = false;
-    try {
-      multiAgent = typeof tier?.content === 'string' && JSON.parse(tier.content).tier === 2;
-    } catch {
-      multiAgent = false;
-    }
-    if (!multiAgent && !['research-intake', 'research-stuck'].includes(row.sourceKind ?? ''))
-      continue;
-    const source = sourceReport(deps.db, row.latestBuildId);
-    if (!source || checkerTodo(deps.db, source)?.latestBuildId) continue;
-    if (openCitationCheck(deps, row.latestBuildId)) opened++;
-    if (opened >= CHECKS_PER_TICK) break;
+  for (const candidate of candidates) {
+    if (candidate.attachmentId === null) continue;
+    recordCitationAttempt(
+      deps.db,
+      { buildId: candidate.buildId, attachmentId: candidate.attachmentId },
+      'research-citation-requested',
+      'Starting an independent citation check.',
+    );
+    openCitationCheck(deps, candidate.buildId);
   }
 }
