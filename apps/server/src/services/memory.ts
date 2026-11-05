@@ -4,10 +4,17 @@ import {
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_QUOTA_PER_TEAM,
   type MemoryLayer,
+  REVIEW_FANOUT_ROLES,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, memorySaveConflict, routingRule } from '../db/schema.js';
+import {
+  agentMemory,
+  agent as agentTable,
+  memorySaveConflict,
+  routingRule,
+  todo,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { routingRulesEnabled } from './routing-rules.js';
@@ -49,6 +56,8 @@ function notAdoptedDuplicate() {
   return isNull(agentMemory.adoptedFrom);
 }
 
+const INDEPENDENT_PERSONAS = [...REVIEW_FANOUT_ROLES, 'verifier'] as const;
+
 function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] {
   if (!routingRulesEnabled()) return [];
   const ids = new Set<string>();
@@ -65,6 +74,23 @@ function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] 
     if (rule.seededFromAgentId) ids.add(rule.seededFromAgentId);
     for (const id of rule.adoptedAgentIds ?? []) ids.add(id);
   }
+  for (const row of db
+    .select({ id: agentTable.id })
+    .from(agentTable)
+    .where(and(eq(agentTable.teamId, teamId), inArray(agentTable.persona, INDEPENDENT_PERSONAS)))
+    .all()) {
+    ids.add(row.id);
+  }
+  for (const row of db
+    .select({ assignment: todo.assignment })
+    .from(todo)
+    .where(eq(todo.teamId, teamId))
+    .all()) {
+    const reviewId = row.assignment?.review?.agentId;
+    const verifyId = row.assignment?.verify?.agentId;
+    if (reviewId) ids.add(reviewId);
+    if (verifyId) ids.add(verifyId);
+  }
   return [...ids];
 }
 
@@ -80,6 +106,7 @@ function ownerWhere(
     ? and(
         eq(agentMemory.teamId, scope.teamId),
         notAdoptedDuplicate(),
+        eq(agentMemory.independent, false),
         independentAgentIds.length > 0
           ? notInArray(agentMemory.agentId, independentAgentIds)
           : undefined,
@@ -148,20 +175,13 @@ export function injectMemories(
   return db.transaction((tx) => {
     const teamId = scope.teamId;
     const teamScoped = routingRulesEnabled() && teamId !== undefined;
-    const independentAgentIds = teamScoped ? independentMemoryAgentIds(tx, teamId) : [];
     const rows = tx
       .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
       .from(agentMemory)
       .where(
         and(
           teamScoped
-            ? and(
-                eq(agentMemory.teamId, teamId),
-                notAdoptedDuplicate(),
-                independentAgentIds.length > 0
-                  ? notInArray(agentMemory.agentId, independentAgentIds)
-                  : undefined,
-              )
+            ? ownerWhere(tx, { agentId: scope.agentId, teamId, teamScoped: true })
             : eq(agentMemory.agentId, scope.agentId),
           injectLayerWhere(scope.threadId),
           stillValid,
@@ -313,6 +333,7 @@ export function saveMemoryEntry(
         source: source ?? null,
         layer: layer ?? 'core',
         threadId: threadId ?? null,
+        independent: routingRulesEnabled() && input.teamScoped === false,
         createdAt: now,
         updatedAt: now,
       })
@@ -379,6 +400,7 @@ export function updateMemoryEntry(
         layer: row.layer,
         threadId: row.threadId,
         adoptedFrom: row.adoptedFrom,
+        independent: row.independent,
         history: [
           ...row.history,
           { title: row.title, content: row.content, updatedAt: row.updatedAt },

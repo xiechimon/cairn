@@ -6,6 +6,7 @@ import {
   agent as agentTable,
   project as projectTable,
   routingRule,
+  todo,
 } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
@@ -24,7 +25,7 @@ import {
   memoryOpsAreTeamScoped,
   setRoutingRulesEnabled,
 } from '../src/services/routing-rules.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, req, type TestServer } from './helpers.js';
 
 describe('memory re-key behind routing rules (#2577 PR 6)', () => {
   let s: TestServer;
@@ -570,6 +571,95 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         teamScoped: false,
       }).map((m) => m.content),
     ).toEqual(['verdict: skip findings']);
+  });
+
+  test('flag on: agent-scoped saves stay out of team scope even without a review-rule id', () => {
+    setRoutingRulesEnabled(true);
+    save({
+      agentId: 'builder',
+      content: 'reviewer private note',
+      source: 'Implementer',
+      teamScoped: false,
+    });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'planner', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual([]);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'planner',
+        teamId: s.team.id,
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual([]);
+  });
+
+  test('flag on: fan-out reviewer and verifier assignment memories stay out of team scope', () => {
+    setRoutingRulesEnabled(true);
+    s.db
+      .insert(agentTable)
+      .values({
+        id: 'auditor',
+        teamId: s.team.id,
+        displayName: 'SecurityAuditor',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+        persona: 'security_auditor',
+      })
+      .run();
+    s.db
+      .insert(agentTable)
+      .values({
+        id: 'slot-verifier',
+        teamId: s.team.id,
+        displayName: 'SlotVerifier',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+      })
+      .run();
+    s.db.insert(projectTable).values({ id: 'proj-verify', name: 'one', teamId: s.team.id }).run();
+    s.db
+      .insert(todo)
+      .values({
+        id: 'todo-verify',
+        teamId: s.team.id,
+        projectId: 'proj-verify',
+        title: 'ship',
+        spec: '',
+        phase: 'todo',
+        phaseAt: 1,
+        seqNum: 1,
+        assignment: { plan: null, build: null, verify: { agentId: 'slot-verifier' } },
+      })
+      .run();
+    save({ agentId: 'auditor', content: 'security lens', source: 'SecurityAuditor' });
+    save({ agentId: 'slot-verifier', content: 'verify lens', source: 'SlotVerifier' });
+    expect(
+      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
+    ).toEqual([]);
+    expect(
+      injectMemories(s.db, {
+        agentId: 'builder',
+        teamId: s.team.id,
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual([]);
+  });
+
+  test('flag on: agent memory API lists the requested reviewer store', async () => {
+    setRoutingRulesEnabled(true);
+    insertReviewRule();
+    save({
+      agentId: 'review-rule',
+      content: 'reviewer private note',
+      source: 'Reviewer',
+      teamScoped: false,
+    });
+    save({ agentId: 'planner', content: 'author core', source: 'Planner' });
+    const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/agents/review-rule/memories`);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { content: string }[]).map((m) => m.content)).toEqual([
+      'reviewer private note',
+    ]);
   });
 
   test('flag on: reviewer update duplicate check stays agent-scoped', () => {
