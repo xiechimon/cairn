@@ -20,6 +20,7 @@ import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import type { ThreadChanges } from './thread-changes.js';
 import { threadCopy, threadTone } from './thread-copy.js';
+import { ThreadAutomations } from './thread-automations.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
 import { useThreadMentions } from './use-thread-mentions.js';
 
@@ -365,6 +366,7 @@ function ReadyThread({
         todo={todo}
         onClose={onClose}
         menu={actions.menu}
+        titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
         {...(chat.changes.status !== 'none'
           ? {
               changesButton: (
@@ -416,6 +418,7 @@ function Head({
   onClose,
   menu,
   changesButton,
+  titleExtra,
   children,
 }: {
   todoId: string;
@@ -423,6 +426,7 @@ function Head({
   onClose: () => void;
   menu?: ReactNode;
   changesButton?: ReactNode;
+  titleExtra?: ReactNode;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -435,16 +439,19 @@ function Head({
     >
       <div className="flex min-w-0 items-center gap-1">
         {todo != null && <ToneGlyph tone={threadTone(todo)} className="size-3.5 flex-none" />}
-        <h2 className="m-0 ml-0.5 min-w-0 flex-1 truncate text-ui font-semibold text-foreground">
-          {todo != null ? (
-            <>
-              <span className="font-normal text-content-tertiary tabular-nums">#{todo.seqNum}</span>{' '}
-              {todo.title}
-            </>
-          ) : (
-            t('任务')
-          )}
-        </h2>
+        <div className="ml-0.5 flex min-w-0 flex-1 items-center gap-1">
+          <h2 className="m-0 min-w-0 truncate text-ui font-semibold text-foreground">
+            {todo != null ? (
+              <>
+                <span className="font-normal text-content-tertiary tabular-nums">#{todo.seqNum}</span>{' '}
+                {todo.title}
+              </>
+            ) : (
+              t('任务')
+            )}
+          </h2>
+          {titleExtra}
+        </div>
         {changesButton}
         {menu}
         <Button
