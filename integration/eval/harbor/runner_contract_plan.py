@@ -202,7 +202,7 @@ def _grading_path(path):
     return (
         "/e2e/" in f"/{path}"
         or "e2e.test." in path
-        or path.endswith((".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.tsx"))
+        or re.search(r"\.(test|spec)\.[^/]+$", path) is not None
         or "snapshots" in path
         or path.endswith((".png", ".jpg", ".webp"))
     )

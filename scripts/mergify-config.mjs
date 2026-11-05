@@ -10,7 +10,7 @@ const mergeBotAccount = 'xiechimon';
 export const admitLabel = 'queue-admit';
 const batchHeadRe = '^B[0-9]+/';
 const batchSize = 5;
-const batchWait = '3 min';
+const batchWait = '0 s';
 const checkRetries = 1;
 const scopes = {
   web: ['apps/web/**/*'],
@@ -21,9 +21,9 @@ const barrierFiles = ['packages/**/*'];
 function queueLimits(source, gatePaths) {
   if (!source.includes('function globToRegExp'))
     throw new Error('pr-gate.js no longer has globToRegExp');
-  const maxFiles = gatePaths.limits?.maxFiles;
+  const maxFiles = gatePaths.limits?.maxQueueFiles;
   if (!Number.isInteger(maxFiles) || maxFiles < 1)
-    throw new Error('limits.maxFiles must be a positive integer');
+    throw new Error('limits.maxQueueFiles must be a positive integer');
   return { maxFiles };
 }
 
@@ -38,7 +38,9 @@ export function mergifyConfig(prGateSource, gatePaths) {
   const prChecks = [...requiredChecks, ...mustBeGreenJobs];
   const draftChecks = prChecks.filter((check) => !prOnlyChecks.includes(check));
   const queueConditions = [
-    '      - base = main',
+    '      - or:',
+    '          - base = main',
+    '          - "#depends-on > 0"',
     '      - -draft',
     '      - -label = needs-decision',
     '      - -label = coordinator-hold',
