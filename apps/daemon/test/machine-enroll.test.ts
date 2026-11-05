@@ -166,11 +166,39 @@ test('the approval URL is readable from the pending record while the supervisor 
   expect(
     await pendingEnrollmentUrl(
       paths,
+      SERVER,
       1_000,
       async () => {},
       () => 1_000,
     ),
   ).toBe(`${SERVER}/app/machines/authorize?enroll=e1`);
+  releaseTestTempDir(home);
+});
+
+test('the approval URL stays hidden while the pending record belongs to another server', async () => {
+  const { home, paths } = world();
+  mkdirSync(home, { recursive: true });
+  writeFileSync(
+    join(home, 'enroll.json'),
+    JSON.stringify({
+      enrollId: 'e-old',
+      url: 'https://old.example/app/machines/authorize?enroll=e-old',
+      expiresAt: 900_000,
+      serverUrl: 'https://old.example',
+    }),
+  );
+  let now = 0;
+  expect(
+    await pendingEnrollmentUrl(
+      paths,
+      SERVER,
+      500,
+      async () => {
+        now += 200;
+      },
+      () => now,
+    ),
+  ).toBeNull();
   releaseTestTempDir(home);
 });
 
@@ -180,6 +208,7 @@ test('the approval URL is null when no enrollment appears inside the window', as
   expect(
     await pendingEnrollmentUrl(
       paths,
+      SERVER,
       500,
       async () => {
         now += 200;

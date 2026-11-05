@@ -126,7 +126,7 @@ export function buildProgram(): Command {
         runnerArgv: passthroughArgv(opts),
       });
       process.stdout.write(`Started in background (pid ${pid})\n`);
-      await printEnrollmentUrl(config.home);
+      await printEnrollmentUrl(config.home, config.serverUrl);
     });
 
   program
@@ -162,7 +162,7 @@ export function buildProgram(): Command {
         runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
       });
       process.stdout.write(`Started in background (pid ${pid})\n`);
-      await printEnrollmentUrl(config.home);
+      await printEnrollmentUrl(config.home, config.serverUrl);
     });
 
   program
@@ -305,9 +305,10 @@ function isMainModule(): boolean {
 
 if (isMainModule()) void main();
 
-async function printEnrollmentUrl(home: string): Promise<void> {
+async function printEnrollmentUrl(home: string, serverUrl: string): Promise<void> {
   const url = await pendingEnrollmentUrl(
     statePaths(home),
+    serverUrl,
     2_000,
     (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     () => Date.now(),
