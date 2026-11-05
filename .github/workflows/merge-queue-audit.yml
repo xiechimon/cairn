@@ -19,16 +19,40 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Audit the merged commit
+      - name: Audit every commit that landed
         env:
           GH_TOKEN: ${{ github.token }}
-          AUDIT_SHA: ${{ inputs.sha || github.event.head_commit.id }}
+          INPUT_SHA: ${{ inputs.sha }}
+          BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.event.head_commit.id || github.sha }}
         run: |
-          if node scripts/ops/merge-route-audit.mjs commit "$AUDIT_SHA"; then
+          set -uo pipefail
+          if [ -n "${INPUT_SHA:-}" ]; then
+            commits="$INPUT_SHA"
+          elif [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            commits="$HEAD_SHA"
+          else
+            commits="$(git rev-list "$BEFORE".."$HEAD_SHA")"
+          fi
+          if [ -z "$commits" ]; then
+            echo "merge-queue-audit: no commits to audit"
+            exit 0
+          fi
+          violations=""
+          for sha in $commits; do
+            node scripts/ops/merge-route-audit.mjs commit "$sha"
+            status=$?
+            case "$status" in
+              0) ;;
+              1) violations="$violations $sha" ;;
+              *) echo "merge-queue-audit: audit failed for $sha (exit $status)"; exit "$status" ;;
+            esac
+          done
+          if [ -z "$violations" ]; then
             exit 0
           fi
           title="Merged outside the merge queue"
-          body="Commit $AUDIT_SHA reached main without a \`queued\` label before its merge. Agents merge only through the Mergify queue; a direct \`gh pr merge\` (or admin merge) bypasses every required check. Opened by the merge-queue-audit workflow."
+          body="These commits reached main without a \`queued\` label before their merge:$violations. Agents merge only through the Mergify queue; a direct \`gh pr merge\` or an admin merge bypasses every required check. Opened by the merge-queue-audit workflow."
           open_issue="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')"
           if [ -n "$open_issue" ]; then
             gh issue comment "$open_issue" --body "$body"
