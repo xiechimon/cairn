@@ -6,7 +6,6 @@ const prGatePath = '.claude/workflows/pr-gate.js';
 const gatePathsPath = 'packages/shared/merge-gate-paths.json';
 export const configPath = '.mergify.yml';
 const prOnlyChecks = ['pr-evidence'];
-const maxLinesEachWay = 400;
 const botAuthor = 'cairnwright[bot]';
 const mergeBotAccount = 'xiechimon';
 export const admitLabel = 'queue-admit';
@@ -48,6 +47,9 @@ const passedOrSkipped = (check) =>
   `      - or:\n          - check-success = ${check}\n          - check-skipped = ${check}`;
 
 export function mergifyConfig(prGateSource, gatePaths) {
+  const maxLinesEachWay = gatePaths.limits?.maxLinesEachWay;
+  if (!Number.isInteger(maxLinesEachWay) || maxLinesEachWay < 1)
+    throw new Error('limits.maxLinesEachWay must be a positive integer');
   const { protectedSources, autoMergeSources, maxFiles } = routingPolicy(prGateSource, gatePaths);
   const protectedRe = `(?i)^(?:${protectedSources.map(anchorless).join('|')})$`;
   const outsideRe = `(?ai)^(?!(?:${autoMergeSources.map(anchorless).join('|')})$)`;
