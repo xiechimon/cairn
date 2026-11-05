@@ -301,7 +301,9 @@ export class HostComputerProvider implements ComputerProvider {
       finish(code, reason, note);
     };
     const abort = () => {
-      const timedOut = signal.reason === 'timeout';
+      const timedOut =
+        signal.reason === 'timeout' ||
+        (signal.reason instanceof Error && signal.reason.name === 'TimeoutError');
       void terminate(
         timedOut ? 124 : 130,
         timedOut ? 'timeout' : 'aborted',
