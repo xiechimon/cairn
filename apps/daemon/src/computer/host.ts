@@ -15,6 +15,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { awaitWithSignal } from './cancellation.js';
 import { COMPUTER_MARKER_ENV, ProcessTree } from './process-tree.js';
 import {
   type ComputerExecuteRequest,
@@ -155,14 +156,18 @@ export class HostComputerProvider implements ComputerProvider {
     await Promise.all([...this.running].map((command) => command.stop()));
   }
 
-  private async realHome(): Promise<string> {
-    return realpath(this.home);
+  private async realHome(signal?: AbortSignal): Promise<string> {
+    return awaitWithSignal(realpath(this.home), signal);
   }
 
-  private async resolveInHome(requested: string | undefined, label: string): Promise<string> {
+  private async resolveInHome(
+    requested: string | undefined,
+    label: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
     const text = (requested ?? '').trim();
     if (text.includes('\0')) throw new ComputerRefusal(`${label} contains a null byte`);
-    const realHome = await this.realHome();
+    const realHome = await this.realHome(signal);
     let expanded = text;
     if (text === '' || text === '~') expanded = this.home;
     else if (text.startsWith('~/')) expanded = path.join(this.home, text.slice(2));
@@ -176,9 +181,10 @@ export class HostComputerProvider implements ComputerProvider {
     const missing: string[] = [];
     while (true) {
       try {
-        existing = await realpath(existing);
+        existing = await awaitWithSignal(realpath(existing), signal);
         break;
       } catch (error) {
+        signal?.throwIfAborted();
         const parent = path.dirname(existing);
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || parent === existing) {
           throw new ComputerRefusal(`${label} cannot be resolved`);
@@ -196,37 +202,75 @@ export class HostComputerProvider implements ComputerProvider {
   async execute(request: ComputerExecuteRequest): Promise<AsyncIterable<ComputerProcessEvent>> {
     const deadlineAt = Date.now() + request.timeoutMs;
     const timeoutMessage = `command timed out after ${request.timeoutMs} ms; process tree killed`;
-    const cwd = await this.resolveInHome(request.cwd, 'cwd');
-    const info = await stat(cwd).catch(() => undefined);
-    if (!info?.isDirectory()) throw new ComputerRefusal('cwd is not an existing directory');
+    const lifetime = new AbortController();
+    const signal = AbortSignal.any([request.signal, lifetime.signal]);
+    const deadlineTimer = setTimeout(() => lifetime.abort('timeout'), request.timeoutMs);
+    deadlineTimer.unref();
+    const pending = {
+      async stop() {
+        lifetime.abort('shutdown');
+      },
+    };
+    const stoppedBeforeSpawn = () => {
+      clearTimeout(deadlineTimer);
+      const timedOut = signal.reason === 'timeout' || (!signal.aborted && Date.now() >= deadlineAt);
+      return immediate([
+        {
+          kind: 'stderr',
+          text: timedOut
+            ? 'command timed out before starting\n'
+            : 'command cancelled before starting\n',
+        },
+        {
+          kind: 'exit',
+          code: timedOut ? 124 : 130,
+          reason: timedOut ? 'timeout' : 'aborted',
+          delivery: 'not_delivered',
+        },
+      ]);
+    };
+    this.running.add(pending);
+    let cwd: string;
+    try {
+      signal.throwIfAborted();
+      cwd = await this.resolveInHome(request.cwd, 'cwd', signal);
+      const info = await awaitWithSignal(
+        stat(cwd).catch(() => undefined),
+        signal,
+      );
+      if (!info?.isDirectory()) throw new ComputerRefusal('cwd is not an existing directory');
+    } catch (error) {
+      if (signal.aborted) return stoppedBeforeSpawn();
+      clearTimeout(deadlineTimer);
+      throw error;
+    } finally {
+      this.running.delete(pending);
+    }
     const [command, ...args] = request.argv;
-    if (!command) throw new ComputerRefusal('empty command');
-    if (request.signal.aborted) {
-      return immediate([
-        { kind: 'stderr', text: 'command aborted\n' },
-        { kind: 'exit', code: 130, reason: 'aborted' },
-      ]);
+    if (!command) {
+      clearTimeout(deadlineTimer);
+      throw new ComputerRefusal('empty command');
     }
-    const remaining = deadlineAt - Date.now();
-    if (remaining <= 0) {
-      return immediate([
-        { kind: 'stderr', text: `${timeoutMessage}\n` },
-        { kind: 'exit', code: 124, reason: 'timeout' },
-      ]);
-    }
+    if (signal.aborted || Date.now() >= deadlineAt) return stoppedBeforeSpawn();
 
     const marker = randomBytes(12).toString('hex');
     const env = {
       ...hostCommandEnvironment(this.env, request.env),
       [COMPUTER_MARKER_ENV]: marker,
     };
-    const child = spawn(command, args, {
-      cwd,
-      env,
-      detached: true,
-      shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(command, args, {
+        cwd,
+        env,
+        detached: true,
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      clearTimeout(deadlineTimer);
+      throw error;
+    }
     const tree = child.pid ? new ProcessTree(child.pid, marker, this.killGraceMs) : undefined;
     const queue = new AsyncEventQueue();
     let settled = false;
@@ -235,8 +279,8 @@ export class HostComputerProvider implements ComputerProvider {
     const finish = (code: number, reason?: 'timeout' | 'aborted', note?: string) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout);
-      request.signal.removeEventListener('abort', abort);
+      clearTimeout(deadlineTimer);
+      signal.removeEventListener('abort', abort);
       this.running.delete(handle);
       child.stdout?.destroy();
       child.stderr?.destroy();
@@ -256,12 +300,17 @@ export class HostComputerProvider implements ComputerProvider {
       await stop();
       finish(code, reason, note);
     };
-    const abort = () => void terminate(130, 'aborted', 'command aborted');
-    const timeout = setTimeout(() => void terminate(124, 'timeout', timeoutMessage), remaining);
-    timeout.unref();
+    const abort = () => {
+      const timedOut = signal.reason === 'timeout';
+      void terminate(
+        timedOut ? 124 : 130,
+        timedOut ? 'timeout' : 'aborted',
+        timedOut ? timeoutMessage : 'command aborted',
+      );
+    };
     const handle = { stop: () => terminate(130, 'aborted', 'command stopped') };
     this.running.add(handle);
-    request.signal.addEventListener('abort', abort, { once: true });
+    signal.addEventListener('abort', abort, { once: true });
 
     child.stdout?.setEncoding('utf8');
     child.stderr?.setEncoding('utf8');
@@ -277,7 +326,7 @@ export class HostComputerProvider implements ComputerProvider {
       finish(1);
     });
     child.on('exit', (code, signal) => {
-      clearTimeout(timeout);
+      clearTimeout(deadlineTimer);
       setTimeout(() => {
         if (stopping) return;
         finish(code ?? 1, undefined, signal ? `command terminated by ${signal}` : undefined);

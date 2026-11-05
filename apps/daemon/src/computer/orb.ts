@@ -358,6 +358,7 @@ class GuestLink {
   }
 
   execute(request: ComputerExecuteRequest): AsyncIterable<ComputerProcessEvent> {
+    if (request.signal.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
     const queue = new AsyncEventQueue();
     let finished = false;
     let stopTimer: NodeJS.Timeout | undefined;
@@ -377,7 +378,12 @@ class GuestLink {
     };
     const onAbort = () => {
       this.cancel(id);
-      stopTimer ??= setTimeout(() => forceExit(130, 'aborted'), this.settings.stopGraceMs);
+      const timedOut =
+        request.signal.reason instanceof Error && request.signal.reason.name === 'TimeoutError';
+      stopTimer ??= setTimeout(
+        () => forceExit(timedOut ? 124 : 130, timedOut ? 'timeout' : 'aborted'),
+        this.settings.stopGraceMs,
+      );
       stopTimer.unref();
     };
     const id = this.register({
@@ -500,11 +506,20 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       execute: async (request) => {
         if (request.env && Object.keys(request.env).length > 0)
           throw new ComputerRefusal('The computer does not accept environment overrides');
-        return keepAlive(request.signal, async (link) => {
+        if (request.timeoutMs <= 0) throw new ComputerRefusal('No time was left for the command');
+        const endsAt = Date.now() + request.timeoutMs;
+        const signal = AbortSignal.any([request.signal, AbortSignal.timeout(request.timeoutMs)]);
+        return keepAlive(signal, async (link) => {
+          const remaining = endsAt - Date.now();
+          if (remaining <= 0) throw new ComputerRefusal('No time was left for the command');
           const timer = setInterval(() => this.options.orbs.touch(scopeKey), this.touchMs);
           timer.unref();
           try {
-            return this.touching(link.execute(request), timer, scopeKey);
+            return this.touching(
+              link.execute({ ...request, signal, timeoutMs: remaining }),
+              timer,
+              scopeKey,
+            );
           } catch (error) {
             clearInterval(timer);
             throw error;
@@ -592,7 +607,7 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       this.links.set(scopeKey, link);
     }
     try {
-      await link.listen();
+      await this.beforeDelivery(link.listen.bind(link), signal);
     } catch (error) {
       this.options.onError?.(`computer ${scopeKey} socket failed: ${String(error)}`);
       throw new ComputerRefusal('The computer link could not be opened, so nothing ran');
