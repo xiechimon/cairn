@@ -50,10 +50,6 @@ export const EN: Record<string, string> = {
   '正在调用 {n} 个工具': 'Calling {n#1 tool|# tools}',
   '（{n} 个失败）': '({n} failed)',
   '已工作 {n} 分钟': 'Worked for {n#1 minute|# minutes}',
-  '{n} 秒': '{n#1 second|# seconds}',
-  '{n} 分钟': '{n#1 minute|# minutes}',
-  '{n} 小时': '{n#1 hour|# hours}',
-  '{d}后失败': 'failed after {d}',
   '工作中 · {time}': 'Working · {time}',
   思考了: 'Thought',
   读取了: 'Read',
@@ -108,10 +104,6 @@ export const EN: Record<string, string> = {
   '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
   正在连接屏幕: 'Connecting to the screen',
   屏幕暂时连不上: 'The screen could not connect',
-  放大屏幕: 'Enlarge screen',
-  屏幕已放大: 'Screen is enlarged',
-  在大屏里点击和键入: 'Click and type in the enlarged screen',
-  打开桌面控制后再操作: 'Turn on desktop control to click and type',
   出错: 'Error',
   开着: 'On',
   正在开机: 'Starting up',
@@ -131,6 +123,10 @@ export const EN: Record<string, string> = {
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
   桌面控制: 'Desktop control',
+  放大屏幕: 'Enlarge screen',
+  屏幕已放大: 'Screen is enlarged',
+  在大屏里点击和键入: 'Click and type in the enlarged screen',
+  打开桌面控制后再操作: 'Turn on desktop control to click and type',
   '让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。':
     'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
   浏览器: 'Browser',
@@ -194,7 +190,6 @@ export const EN: Record<string, string> = {
   侧边栏: 'Sidebar',
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
-  总管: 'Chief',
   返回: 'Back',
   更多: 'More',
   关闭: 'Close',
@@ -398,8 +393,8 @@ export const EN: Record<string, string> = {
   还没有定时任务: 'No schedules yet',
   '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。':
     'Automatically rerun a task on a cycle or at a chosen time. Every round starts a fresh run from the task description, pausing at the confirm or review gate for the owner to pick up.',
-  '也可以直接告诉总管某个任务要多久重跑一次，它会替你写好规则。':
-    'You can also just tell the Chief how often a task should rerun, and it will write the rule for you.',
+  '也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。':
+    'You can also just tell the Coordinator how often a task should rerun, and it will write the rule for you.',
 
   // —— account route (r7 13) ——
   更换: 'Change',
@@ -503,8 +498,8 @@ export const EN: Record<string, string> = {
   '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
     'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
   添加密钥: 'Add secret',
-  '也可以让总管添加：它会开一张安全输入卡填写值，值不会进入对话。':
-    'The Chief can add them too: it opens a secure input card for the value, which never enters the conversation.',
+  '也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。':
+    'The Coordinator can add them too: it opens a secure input card for the value, which never enters the conversation.',
   个文件: 'file(s)',
   描述: 'Description',
 
@@ -719,8 +714,8 @@ export const EN: Record<string, string> = {
   // —— chief drawer / settings (r5 100–116) ——
   主题: 'Thread',
   新主题: 'New thread',
-  总管设置: 'Chief settings',
-  '请先为总管选择一个 Agent。': 'Choose an Agent for the Coordinator first.',
+  'Coordinator 设置': 'Coordinator settings',
+  '请先为 Coordinator 选择一个 Agent。': 'Choose an Agent for the Coordinator first.',
   选择一个主题开始: 'Pick a thread to start',
   '有什么可以帮你的？': 'How can I help?',
   '完成 {n}': 'Done in {n}',
@@ -730,27 +725,26 @@ export const EN: Record<string, string> = {
   技能已更新: 'Skill updated',
   关注与提醒: 'Watches & reminders',
   未设置: 'Not set',
-  // #854 收编 popover 后用户菜单面板的 aria-label（原 FloatingShell 壳无标签）
-  '尚无章程。点击编辑，为总管添加常设指示。':
-    'No charter yet. Click edit to give the Chief standing instructions.',
+  '尚无章程。点击编辑，为 Coordinator 添加常设指示。':
+    'No charter yet. Click edit to give the Coordinator standing instructions.',
   编辑: 'Edit',
   '尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。':
     'No Agent selected yet. Pick an Agent on the "Agent" tab first; memories are saved on that Agent.',
-  '暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。':
-    'Nothing being watched yet. When the Chief watches a todo, or promises to check back at a set time, it is listed here by thread.',
+  '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。':
+    'Nothing being watched yet. When the Coordinator watches a todo, or promises to check back at a set time, it is listed here by thread.',
   // #811 关注 tab：无备注 wake 行的回退文案（有备注显示备注原文）。
   到点提醒: 'Scheduled check-in',
   // #182 设置面接线：选择总管 Agent dialog + 章程编辑弹窗；换绑二次确认
   // copy 走 shared CHIEF_REBIND_CONFIRM_COPY canon（<agent> 占位，显示层替换，
   // i18n-coverage COMPUTED_KEYS 登记）。
-  '选择总管 Agent': "Choose the Chief's Agent",
+  '选择 Coordinator Agent': "Choose the Coordinator's Agent",
   '搜索 Agent…': 'Search Agents…',
   '没有匹配的 Agent': 'No matching Agents',
   // #615 总管抽屉主模型闭环文案（模型行 aria + 覆盖 dialog 默认行/搜索/空态）。
   // #615 返工：恢复钮（参考站 live aria 正词）+ 过程折叠 + 确认层 + 工具行失败徽标。
   恢复到此处: 'Restore to here',
-  '恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。':
-    'Restore to here? The {n## message after it is removed|# messages after it are removed} and the Chief resends from this one as a fresh turn.',
+  '恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。':
+    'Restore to here? The {n## message after it is removed|# messages after it are removed} and the Coordinator resends from this one as a fresh turn.',
   // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   展开实时步骤: 'Show live steps',
   收起实时步骤: 'Hide live steps',
@@ -784,8 +778,8 @@ export const EN: Record<string, string> = {
   '(info)': '(info)',
   '建议：': 'Suggestion: ',
   '建议：{body}': 'Suggestion: {body}',
-  '更换总管的 agent？总管的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
-    "Switch the Chief's Agent? The Chief's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
+  '更换 Coordinator 的 agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
+    "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
   编辑章程: 'Edit charter',
   保存章程: 'Save charter',
   '长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…':
@@ -886,8 +880,8 @@ export const EN: Record<string, string> = {
   完成任务: 'Complete task',
   负责人: 'Owner',
   'issue 状态': 'Issue state',
-  总管用的模型额度已用完: "The chief's model is out of quota",
-  总管用的模型暂时过载: "The chief's model is overloaded",
+  'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
+  'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
   '本轮没有文件改动，完成不会合并分支。':
@@ -940,7 +934,7 @@ export const EN: Record<string, string> = {
   '查一下这个月的 token 用量': "Check this month's token usage",
 
   // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
-  由总管发起: 'Started by Chief',
+  '由 Coordinator 发起': 'Started by Coordinator',
   '运行在 {m} 上': 'Running on {m}',
   上一版本: 'Previous version',
   '与其他版本对比…': 'Compare with other versions…',
@@ -1168,9 +1162,9 @@ export const EN: Record<string, string> = {
   // #895 机器页三态读标注（spec 21 A8；orchestration 块 join 行集）+ chief
   // 设置 Agent tab「机器」槽的描述（A6）。徽标/状态 = 机器与总管编排的
   // 关系面，非机器自身状态。
-  总管主机: 'Chief host',
-  总管回合进行中: 'Chief turn in progress',
-  总管等待机器: 'Chief waiting for machine',
+  'Coordinator 主机': 'Coordinator host',
+  'Coordinator 回合进行中': 'Coordinator turn in progress',
+  'Coordinator 等待机器': 'Coordinator waiting for machine',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
@@ -1203,8 +1197,8 @@ export const EN: Record<string, string> = {
     'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The machine must have cairn CLI 0.1.28 or newer.',
   '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。':
     'Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.',
-  '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给总管用于分派。':
-    'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the chief for dispatch.',
+  '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给 Coordinator 用于分派。':
+    'Describe the Agent’s ongoing responsibility — multi-line OK. The text is injected into the system prompt of every task it runs and is given to the Coordinator for dispatch.',
   '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。':
     'The team skill this Agent always carries, without an @ mention in the message.',
   '尚无记忆。Agent 会在工作中将值得沉淀的经验存入此处。':
@@ -1225,37 +1219,38 @@ export const EN: Record<string, string> = {
   没有匹配的记忆: 'No memories match',
   '换个关键词再试。': 'Try another search term.',
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
-  总管本轮执行失败: 'The chief turn failed',
-  '撤回失败，总管可能已经开始处理这条了。':
-    'Could not withdraw: the chief may already be working on it.',
+  'Coordinator 本轮执行失败': 'The Coordinator turn failed',
+  '撤回失败，Coordinator 可能已经开始处理这条了。':
+    'Could not withdraw: the Coordinator may already be working on it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
   '停止失败，请重试。': 'Could not stop. Try again.',
   '已停止，没有建任务。': 'Stopped. No task was created.',
   '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
-  '已存下，总管恢复后会处理': 'Saved. The chief will handle it once it is back',
+  '已存下，Coordinator 恢复后会处理': 'Saved. The Coordinator will handle it once it is back',
   现在插话: 'Steer now',
   移除: 'Remove',
   排队中的消息: 'Queued messages',
   撤回: 'Withdraw',
   '由备用模型 {model} 回答': 'Answered by backup model {model}',
-  '总管用的模型 {model} 额度已用完': "The chief's model {model} is out of quota",
-  '总管用的模型 {model} 暂时过载': "The chief's model {model} is overloaded",
+  'Coordinator 用的模型 {model} 额度已用完': "The Coordinator's model {model} is out of quota",
+  'Coordinator 用的模型 {model} 暂时过载': "The Coordinator's model {model} is overloaded",
   '{time} 会自动再试': 'it retries automatically at {time}',
   恢复时间还不确定: 'no recovery time yet',
-  总管暂时不可用: 'The chief is unavailable',
+  'Coordinator 暂时不可用': 'The Coordinator is unavailable',
   '{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。':
     '{why}; {when}. Tasks keep running; your messages are saved and handled in order once it is back.',
   详情: 'Details',
-  给总管换模型: "Change the chief's model",
-  '总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
-    "The chief's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
+  '给 Coordinator 换模型': "Change the Coordinator's model",
+  'Coordinator 的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。':
+    "The Coordinator's main model is unavailable, so backup model {model} is replying. Its judgment may be less sharp.",
   换模型: 'Change model',
-  停止总管这次回复: 'Stop this chief reply',
+  '停止 Coordinator 这次回复': 'Stop this Coordinator reply',
   '备用模型 {model}': 'Backup model {model}',
   '，主模型暂时用不了': ', main model unavailable',
-  '可以继续说，总管恢复后会按顺序处理…':
-    'Keep typing; the chief handles messages in order once it is back…',
-  发出的话会直接插进总管这一轮: "What you send goes into the chief's current reply",
+  '可以继续说，Coordinator 恢复后会按顺序处理…':
+    'Keep typing; the Coordinator handles messages in order once it is back…',
+  '发出的话会直接插进 Coordinator 这一轮':
+    "What you send goes into the Coordinator's current reply",
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
@@ -1269,10 +1264,10 @@ export const EN: Record<string, string> = {
   上传中: 'Uploading',
   // —— #640 开始任务单出口（直发总管编排回合；r14 §5.7 前置裁决落地）——
   来源: 'Source',
-  总管编排会话: 'Chief orchestration session',
-  已交给总管编排: 'Handed to the chief',
-  '总管将直接规划，并按活的类型派发执行。':
-    'The chief plans first, then dispatches each piece to the right agent.',
+  'Coordinator 编排会话': 'Coordinator orchestration session',
+  '已交给 Coordinator 编排': 'Handed to the Coordinator',
+  'Coordinator 将直接规划，并按活的类型派发执行。':
+    'The Coordinator plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
   未能开始编排: 'Could not start orchestration',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
@@ -1280,8 +1275,8 @@ export const EN: Record<string, string> = {
   等机器上线: 'waiting for a machine to come online',
   '缺 {missing}': 'missing {missing}',
   排队中: 'queued',
-  '总管正在编排这张任务，等这一轮结束再发起。':
-    'The chief is already orchestrating this task — wait for this round to finish.',
+  'Coordinator 正在编排这张任务，等这一轮结束再发起。':
+    'The Coordinator is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':
     'Firing again only queues one more orchestration round; it will not start sooner.',
   变更加载失败: 'Failed to load the changes',
@@ -1321,7 +1316,7 @@ export const EN: Record<string, string> = {
   '创建 Agent 失败，请重试。': 'Could not create the agent. Try again.',
   '删除 Agent 失败，请重试。': 'Could not delete the agent. Try again.',
   '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
-  总管提问: 'Chief question',
+  'Coordinator 提问': 'Coordinator question',
   提问: 'Questions',
   稍后: 'Later',
   待回答的提问: 'Pending questions',
@@ -1345,8 +1340,8 @@ export const EN: Record<string, string> = {
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
-  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。规划和执行步会换，总管只换同一运行时的备选；审核、验证、合并不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
-    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Plan and build steps switch; the chief uses backups within the same runtime. Review, verify and merge steps never switch. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
+  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。规划和执行步会换，Coordinator 只换同一运行时的备选；审核、验证、合并不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
+    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Plan and build steps switch; the Coordinator uses backups within the same runtime. Review, verify and merge steps never switch. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
   '备用 {n}': 'Fallback {n}',
   '备用 {n} 运行时': 'Fallback {n} runtime',
   '备用 {n} 模型': 'Fallback {n} model',
@@ -1362,7 +1357,7 @@ export const EN: Record<string, string> = {
     'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
   已忘掉: 'Forgotten',
   查看这条记忆: 'View this memory',
-  让总管忘掉这条: 'Make the chief forget this',
+  '让 Coordinator 忘掉这条': 'Make the Coordinator forget this',
   决定: 'Decided',
   还开着: 'Still open',
   记住了: 'Remembered',
@@ -1402,14 +1397,14 @@ export const EN: Record<string, string> = {
     'These sources were too long, so only their latest part was read: {sources}. ',
   '复盘建议只是草稿：点「建成线程」才会建线程，建好后也要你自己开始。':
     'Retro suggestions are drafts: a thread is created only when you choose "Make it a thread", and you still start it yourself.',
-  '总管把昨天的对话整理成了 {n} 条摘要':
-    "The chief summarized yesterday's chat into {n## item|# items}",
-  '对话太长了，总管把上面的内容整理成了 {n} 条摘要':
-    'The chat got long, so the chief summarized everything above into {n## item|# items}',
+  'Coordinator 把昨天的对话整理成了 {n} 条摘要':
+    "The Coordinator summarized yesterday's chat into {n## item|# items}",
+  '对话太长了，Coordinator 把上面的内容整理成了 {n} 条摘要':
+    'The chat got long, so the Coordinator summarized everything above into {n## item|# items}',
   '昨天的摘要 · {time} 整理': "Yesterday's summary · made at {time}",
   '上面内容的摘要 · {time} 整理': 'Summary of the chat above · made at {time}',
-  '原文都还在，往上滑就能看到。总管接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉总管。':
-    'The original messages are still here; scroll up to see them. The chief continues from this summary and checks task progress in the tasks themselves, not from memory of the chat. If something is missing or wrong, tell the chief below.',
+  '原文都还在，往上滑就能看到。Coordinator 接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉 Coordinator。':
+    'The original messages are still here; scroll up to see them. The Coordinator continues from this summary and checks task progress in the tasks themselves, not from memory of the chat. If something is missing or wrong, tell the Coordinator below.',
   执行: 'Build',
   合并: 'Merge',
   运行中: 'Running',
@@ -1547,7 +1542,7 @@ export const EN: Record<string, string> = {
   '回复 #{seq}': 'Reply to #{seq}',
   '回复 #{seq}…': 'Reply to #{seq}…',
   '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
-  '总管直接对 #{n} 说：{excerpt}': 'The Coordinator told #{n} directly: {excerpt}',
+  'Coordinator 直接对 #{n} 说：{excerpt}': 'The Coordinator told #{n} directly: {excerpt}',
   '对某个 thread 说': 'Talk to a thread',
   '正在对 #{seq} 说': 'Talking to #{seq}',
   发给谁: 'Send to',
@@ -1601,6 +1596,34 @@ export const EN: Record<string, string> = {
   只影响这台设备: 'Applies to this device only',
   模型与账户: 'Models & accounts',
   订阅与路由: 'Subscriptions & routing',
+  工作路由: 'Work routing',
+  路由规则: 'Routing rules',
+  工作策略: 'Work policies',
+  路由规则开关: 'Routing rules switch',
+  'CAIRN_ROUTING_RULES 已开启；调度走规则与策略。':
+    'CAIRN_ROUTING_RULES is on; dispatch uses rules and policies.',
+  'CAIRN_ROUTING_RULES 仍关闭；可先编辑，切流在 PR9。':
+    'CAIRN_ROUTING_RULES is still off; edit now, cutover is PR9.',
+  规则已启用: 'Enabled',
+  规则未启用: 'Disabled',
+  '还没有路由规则。': 'No routing rules yet.',
+  '从现有 Agent 生成 session / review 规则与工作策略，或等 CAIRN_ROUTING_RULES 开启后由服务器种子写入。':
+    'Seed session/review rules and work policies from agents, or wait for server seeding when CAIRN_ROUTING_RULES is on.',
+  '从 Agent 生成': 'Seed from agents',
+  '已从 Agent 生成规则与策略': 'Seeded rules and policies from agents',
+  '生成失败，请重试。': 'Seeding failed. Try again.',
+  模型与首选机器: 'Model and preferred machine',
+  首选机器: 'Preferred machine',
+  不固定: 'Any machine',
+  会话: 'Session',
+  摘要: 'Digest',
+  压缩: 'Compaction',
+  会话权限: 'Session policy',
+  评审权限: 'Review policy',
+  '声明可写工具；密钥与 MCP 只读展示': 'Writable tools; secrets and MCP are shown read-only',
+  有未保存的改动: 'Unsaved changes',
+  已与服务器一致: 'In sync with the server',
+  规则已保存: 'Saved',
   执行环境: 'Execution',
   团队与访问: 'Team & access',
   关闭设置: 'Close settings',
@@ -1616,7 +1639,6 @@ export const EN: Record<string, string> = {
   '检查网络后再试一次。': 'Check your connection and try again.',
   正在加载项目: 'Loading projects',
   活动: 'Activity',
-  用户菜单: 'User menu',
   '移除筛选 {filter}': 'Remove filter {filter}',
   搜索筛选: 'Search filters',
   '可以任意组合，需同时满足': 'Combine any; they all apply',
