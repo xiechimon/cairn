@@ -12,8 +12,8 @@ import {
   type ResearchTimeoutMessage,
   researchRequestedMessageSchema,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
-import { attachment, build, message, todo } from '../db/schema.js';
+import { and, eq } from 'drizzle-orm';
+import { attachment, build, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
@@ -261,4 +261,67 @@ export function stuckResearchWaitState(
     return 'timed-out';
   }
   return 'waiting';
+}
+
+export const RESEARCH_REWORK_HOLD = 'research-wait';
+
+function latestPendingPlanStep(deps: BuildDeps, buildId: string) {
+  return deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.kind, 'plan'), eq(step.status, 'pending')))
+    .all()
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+}
+
+export function holdSecondRejectionRework(deps: BuildDeps, buildId: string): void {
+  const state = readStuckBuildState(deps.db, buildId);
+  const reason = stuckResearchReason({
+    ciRed: false,
+    ciFixRounds: state.ciFixRounds,
+    ciFixRoundsMax: state.ciFixRounds + 1,
+    rejectionsInRound: state.rejectionsInRound,
+    infraFailure: state.infraFailure,
+    requestedInRound: state.requestedInRound,
+  });
+  if (reason === 'second-rejection') {
+    try {
+      openStuckResearch(deps, buildId);
+    } catch (error) {
+      if (!(error instanceof HttpError) || error.status !== 409) throw error;
+    }
+  }
+  if (stuckResearchWaitState(deps, buildId) !== 'waiting') return;
+  const pending = latestPendingPlanStep(deps, buildId);
+  const request = deps.db
+    .select({ createdAt: message.createdAt })
+    .from(message)
+    .where(eq(message.id, `${RESEARCH_REQUESTED_KIND}-${buildId}-${state.round}`))
+    .get();
+  if (!pending || !request) return;
+  deps.db
+    .update(step)
+    .set({
+      holdReason: RESEARCH_REWORK_HOLD,
+      holdUntil: request.createdAt + RESEARCH_WAIT_MAX_MS,
+    })
+    .where(eq(step.id, pending.id))
+    .run();
+}
+
+export function releaseResearchReworkHolds(deps: BuildDeps, now = nowMs()): void {
+  const held = deps.db.select().from(step).where(eq(step.holdReason, RESEARCH_REWORK_HOLD)).all();
+  for (const row of held) {
+    if (stuckResearchWaitState(deps, row.buildId, now) === 'waiting') continue;
+    const lessons = retryLessonsOf(deps.db, row.buildId);
+    const prompt =
+      lessons !== null && !(row.prompt ?? '').includes(lessons)
+        ? `${row.prompt ?? ''}\n\n${lessons}`
+        : row.prompt;
+    deps.db
+      .update(step)
+      .set({ holdReason: null, holdUntil: null, prompt })
+      .where(eq(step.id, row.id))
+      .run();
+  }
 }

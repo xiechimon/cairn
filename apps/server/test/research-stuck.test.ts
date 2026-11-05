@@ -7,6 +7,7 @@ import {
   build,
   buildFeedback,
   message,
+  step,
   todo,
   tokenUsage,
 } from '../src/db/schema.js';
@@ -16,10 +17,12 @@ import { openCitationCheck } from '../src/services/research-citations.js';
 import {
   deliverStuckResearch,
   openStuckResearch,
+  RESEARCH_REWORK_HOLD,
+  releaseResearchReworkHolds,
   stuckResearchWaitState,
 } from '../src/services/research-stuck.js';
 import { retryLessonsOf } from '../src/services/retry-lessons.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, postProject, req, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -193,6 +196,47 @@ describe('openStuckResearch', () => {
     expect(
       w.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-stuck')).all(),
     ).toHaveLength(0);
+  });
+});
+
+describe('second review rejection', () => {
+  test('opens research and holds the replan step, then releases it after the wait', async () => {
+    const w = await world();
+    w.s.db.delete(buildFeedback).where(eq(buildFeedback.buildId, w.buildId)).run();
+    const post = (feedback: string) =>
+      req(w.s.app, 'POST', `/api/builds/${w.buildId}/steps`, {
+        action: 'revision',
+        side: 'plan',
+        feedback,
+        clientMessageId: newRecordId(),
+      });
+    expect((await post('first rejection')).status).toBe(202);
+    expect(
+      w.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-stuck')).all(),
+    ).toHaveLength(0);
+    w.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-stuck')).run();
+    expect((await post('second rejection')).status).toBe(202);
+    expect(
+      w.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-stuck')).all(),
+    ).toHaveLength(1);
+    const held = w.s.db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, w.buildId), eq(step.holdReason, RESEARCH_REWORK_HOLD)))
+      .all();
+    expect(held).toHaveLength(1);
+    expect(held[0]?.holdUntil ?? 0).toBeGreaterThan(Date.now());
+    const requested = systemKinds(w.s, w.buildId, 'research-requested')[0];
+    if (!requested) throw new Error('request missing');
+    w.s.db
+      .update(message)
+      .set({ createdAt: Date.now() - 21 * 60_000 })
+      .where(eq(message.id, requested.id))
+      .run();
+    releaseResearchReworkHolds(w.deps);
+    const released = w.s.db.select().from(step).where(eq(step.id, held[0]!.id)).get();
+    expect(released?.holdUntil).toBeNull();
+    expect(released?.prompt ?? '').toContain('没有在等待时间内回来');
   });
 });
 

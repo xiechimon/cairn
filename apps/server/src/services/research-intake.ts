@@ -10,6 +10,7 @@ import type { BuildDeps } from './builds.js';
 import { localDay, retryPendingIntakeReports } from './chief-report.js';
 import { recentIntakeItems } from './intake-items.js';
 import { planResearchCitationChecks } from './research-citations.js';
+import { releaseResearchReworkHolds } from './research-stuck.js';
 import { openResearchThread } from './research-thread.js';
 import { serverTimezone, wallClockParts } from './schedules.js';
 
@@ -29,6 +30,7 @@ function intakeTimezone(configured: string | null | undefined): string {
 
 export function planResearchIntake(deps: BuildDeps, projectId: string | null, now: number): void {
   planResearchCitationChecks(deps);
+  releaseResearchReworkHolds(deps, now);
   retryPendingIntakeReports(deps, now);
   if (projectId === null) return;
   const { db } = deps;
