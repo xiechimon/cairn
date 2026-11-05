@@ -6,7 +6,7 @@ import {
 import { and, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
 import { chief, project, todo } from '../db/schema.js';
 import type { BuildDeps } from './builds.js';
-import { localDay } from './chief-report.js';
+import { localDay, retryPendingIntakeReports } from './chief-report.js';
 import { recentIntakeItems } from './intake-items.js';
 import { planResearchCitationChecks } from './research-citations.js';
 import { openResearchThread } from './research-thread.js';
@@ -28,6 +28,7 @@ function intakeTimezone(configured: string | null | undefined): string {
 
 export function planResearchIntake(deps: BuildDeps, projectId: string | null, now: number): void {
   planResearchCitationChecks(deps);
+  retryPendingIntakeReports(deps, now);
   if (projectId === null) return;
   const { db } = deps;
   const projectRow = db.select().from(project).where(eq(project.id, projectId)).get();

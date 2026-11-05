@@ -5,7 +5,7 @@ import {
   RESEARCH_INTAKE_HISTORY_DAYS,
   RESEARCH_INTAKE_SOURCE_KIND,
 } from '@cairn/shared';
-import { and, count, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { chiefReport, message, retroProposal, todo } from '../db/schema.js';
@@ -17,6 +17,8 @@ const FIELD_MAX = 400;
 const TITLE_MAX = 120;
 const RECENT_INTAKE_THREADS = 2;
 const NO_VALUE = '无';
+const DELIVERY_PREFIX = 'research-intake-delivery:';
+const deliverySchema = z.object({ todoIds: z.array(z.string()).max(RECENT_INTAKE_THREADS) });
 const FENCED_JSON = /```json\s*\n([\s\S]*?)\n```/g;
 
 const rawItemSchema = z.object({
@@ -120,6 +122,25 @@ function landedReport(db: Db, buildId: string): string | null {
   return report.success ? report.data.content : null;
 }
 
+export function pendingIntakeReports(db: Db): string[] {
+  return db
+    .select({ id: chiefReport.id })
+    .from(message)
+    .innerJoin(chiefReport, eq(message.id, sql`${DELIVERY_PREFIX} || ${chiefReport.id}`))
+    .where(
+      and(
+        gte(message.id, DELIVERY_PREFIX),
+        lt(message.id, 'research-intake-delivery;'),
+        inArray(chiefReport.status, ['posted', 'empty']),
+        isNotNull(chiefReport.inputs),
+      ),
+    )
+    .orderBy(asc(message.createdAt), asc(message.id))
+    .limit(5)
+    .all()
+    .map((row) => row.id);
+}
+
 export function ingestIntake(
   db: Db,
   report: { id: string; teamId: string; chiefId: string },
@@ -129,15 +150,55 @@ export function ingestIntake(
     .select({ id: chiefReport.id })
     .from(chiefReport)
     .where(eq(chiefReport.chiefId, report.chiefId));
-  const recent = db
-    .select()
-    .from(todo)
-    .where(and(eq(todo.teamId, report.teamId), eq(todo.sourceKind, RESEARCH_INTAKE_SOURCE_KIND)))
-    .orderBy(desc(todo.sourceRef))
-    .limit(RECENT_INTAKE_THREADS)
-    .all()
-    .reverse();
-  if (recent.length === 0) return 0;
+  const deliveryId = `${DELIVERY_PREFIX}${report.id}`;
+  const queued = db.select().from(message).where(eq(message.id, deliveryId)).get();
+  let queuedContent: unknown = queued?.content;
+  if (typeof queuedContent === 'string') {
+    try {
+      queuedContent = JSON.parse(queuedContent);
+    } catch {
+      queuedContent = null;
+    }
+  }
+  const delivery = queued === undefined ? null : deliverySchema.safeParse(queuedContent);
+  if (delivery !== null && !delivery.success) {
+    db.update(message).set({ createdAt: now }).where(eq(message.id, deliveryId)).run();
+    return 0;
+  }
+  const pinned = delivery?.success ? delivery.data.todoIds : null;
+  const recent =
+    pinned === null
+      ? db
+          .select()
+          .from(todo)
+          .where(
+            and(
+              eq(todo.teamId, report.teamId),
+              eq(todo.sourceKind, RESEARCH_INTAKE_SOURCE_KIND),
+              isNull(todo.archivedAt),
+            ),
+          )
+          .orderBy(desc(todo.sourceRef))
+          .limit(RECENT_INTAKE_THREADS)
+          .all()
+          .reverse()
+      : db
+          .select()
+          .from(todo)
+          .where(
+            and(
+              eq(todo.teamId, report.teamId),
+              eq(todo.sourceKind, RESEARCH_INTAKE_SOURCE_KIND),
+              isNull(todo.archivedAt),
+              inArray(todo.id, pinned),
+            ),
+          )
+          .all()
+          .sort((a, b) => pinned.indexOf(a.id) - pinned.indexOf(b.id));
+  if (recent.length === 0) {
+    if (queued) db.delete(message).where(eq(message.id, deliveryId)).run();
+    return 0;
+  }
   const history = db
     .select({ sourceId: retroProposal.sourceId })
     .from(retroProposal)
@@ -181,14 +242,27 @@ export function ingestIntake(
       )
       .get()?.n ?? 0);
   let added = 0;
+  const pending: string[] = [];
   for (const intake of recent) {
     if (slots <= 0) break;
-    if (ingested.has(intake.id) || intake.latestBuildId === null) continue;
+    if (ingested.has(intake.id)) continue;
+    if (intake.latestBuildId === null) {
+      pending.push(intake.id);
+      continue;
+    }
     const text = landedReport(db, intake.latestBuildId);
-    if (text === null) continue;
+    if (text === null) {
+      pending.push(intake.id);
+      continue;
+    }
+    const items = parseIntakeItems(text);
+    if (items.length === 0) continue;
     const checked = checkedResearchReport(db, intake.latestBuildId);
-    if (checked === null) continue;
-    for (const item of parseIntakeItems(text)) {
+    if (checked === null) {
+      pending.push(intake.id);
+      continue;
+    }
+    for (const item of items) {
       if (
         !checked.claims.some(
           (claim) =>
@@ -223,6 +297,19 @@ export function ingestIntake(
       added++;
     }
   }
+  if (pending.length > 0 && slots > 0) {
+    const content = { todoIds: pending };
+    db.insert(message)
+      .values({
+        id: deliveryId,
+        conversationId: deliveryId,
+        role: 'system',
+        content,
+        createdAt: now,
+      })
+      .onConflictDoUpdate({ target: message.id, set: { content, createdAt: now } })
+      .run();
+  } else db.delete(message).where(eq(message.id, deliveryId)).run();
   return added;
 }
 
