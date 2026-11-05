@@ -48,6 +48,11 @@ import {
 } from './chief.js';
 import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import {
+  assertToolAllowedUnderRouting,
+  executeRouterTool,
+  isRouterTool,
+} from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
@@ -195,6 +200,9 @@ const PROJECT_WRITE_TOOLS = new Set([
   'confirm_builds',
   'cancel_builds',
   'merge_builds',
+  'open_thread',
+  'message_thread',
+  'stop_thread',
   'save_memory',
 ]);
 
@@ -307,7 +315,9 @@ export async function executeChiefTool(
           .get()?.name
       : undefined;
   const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Chief' };
+  assertToolAllowedUnderRouting(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
+  if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();

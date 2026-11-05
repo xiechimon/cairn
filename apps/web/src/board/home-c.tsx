@@ -10,7 +10,8 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
-import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
+import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Greeting } from '../components/stream/greeting.js';
@@ -28,7 +29,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
+import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
 import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
@@ -51,9 +52,7 @@ const NEEDS_YOU_PINNED = 3;
 
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
 
-type NeedsYouEntry =
-  | { kind: 'question'; key: string; item: ChiefQuestionItem }
-  | { kind: 'thread'; key: string; todo: TodoRecord; status: string };
+type NeedsYouEntry = { kind: 'thread'; key: string; todo: TodoRecord; status: string };
 
 export function streamForProject(
   stream: readonly ChiefStreamItem[],
@@ -140,6 +139,7 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
+  const questions = useOptionalChiefRoot();
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
@@ -147,7 +147,16 @@ export function HomeC({
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state: location.state });
   };
-  const togglePane = (next: WorkPane) => showPane(pane === next && threadId === null ? null : next);
+  const togglePane = (next: WorkPane) => {
+    questions?.setQuestionsOpen(false);
+    showPane(pane === next && threadId === null ? null : next);
+  };
+  useEffect(() => {
+    if (questions?.questionsOpen !== true || pane === null) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete(PANE_PARAM);
+    setSearchParams(params, { replace: true, state: location.state });
+  }, [questions?.questionsOpen, pane, searchParams, setSearchParams, location.state]);
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const { chiefData, chiefView, setChiefView } = surface;
@@ -174,23 +183,15 @@ export function HomeC({
     () => streamForProject(chiefData.stream ?? [], projectId),
     [chiefData.stream, projectId],
   );
-  const questions = pendingQuestions(stream);
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
-  const entries: NeedsYouEntry[] = [
-    ...questions.map((item) => ({
-      kind: 'question' as const,
-      key: item.requestId,
-      item,
-    })),
-    ...needsYouThreads(scoped).map((todo) => ({
-      kind: 'thread' as const,
-      key: todo.id,
-      todo,
-      status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
-    })),
-  ];
+  const entries: NeedsYouEntry[] = needsYouThreads(scoped).map((todo) => ({
+    kind: 'thread' as const,
+    key: todo.id,
+    todo,
+    status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
+  }));
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
@@ -265,35 +266,22 @@ export function HomeC({
         {t('待你决定')}
       </SectionHead>
       {shown.map((entry) => (
-        <div
-          key={entry.key}
-          data-slot="needs-you-item"
-          data-status={entry.kind === 'question' ? 'question' : entry.status}
-        >
-          {entry.kind === 'question' ? (
-            <ChiefQuestionCard
-              item={entry.item}
-              onAnswer={surface.onAnswerQuestion}
-              onCancel={surface.onCancelQuestion}
-              numberKeys={threadId === null && entry.key === questions[0]?.requestId}
-            />
-          ) : (
-            <NeedsYouThreadCard
-              todo={entry.todo}
-              title={entry.todo.title}
-              tone={threadTone(entry.todo)}
-              stateLabel={t(threadCopy(entry.todo).state)}
-              reason={t(threadCopy(entry.todo).reason)}
-              {...(threadCopy(entry.todo).primary != null
-                ? {
-                    primaryLabel: t(threadCopy(entry.todo).primary ?? ''),
-                    onPrimary: () => openThread(entry.todo.id),
-                  }
-                : {})}
-              viewLabel={t('查看 thread')}
-              onView={() => openThread(entry.todo.id)}
-            />
-          )}
+        <div key={entry.key} data-slot="needs-you-item" data-status={entry.status}>
+          <NeedsYouThreadCard
+            todo={entry.todo}
+            title={entry.todo.title}
+            tone={threadTone(entry.todo)}
+            stateLabel={t(threadCopy(entry.todo).state)}
+            reason={t(threadCopy(entry.todo).reason)}
+            {...(threadCopy(entry.todo).primary != null
+              ? {
+                  primaryLabel: t(threadCopy(entry.todo).primary ?? ''),
+                  onPrimary: () => openThread(entry.todo.id),
+                }
+              : {})}
+            viewLabel={t('查看 thread')}
+            onView={() => openThread(entry.todo.id)}
+          />
         </div>
       ))}
       {entries.length > NEEDS_YOU_PINNED && (
@@ -360,6 +348,7 @@ export function HomeC({
       <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
         {projectName ?? t('Coordinator')}
       </h1>
+      <ChiefQuestionEntry />
       <MachineChip
         machines={computers}
         open={pane === 'machines' && threadId === null}

@@ -427,7 +427,14 @@ class GuestLink {
         if (event.success && !finished) queue.push(event.data);
       },
       done: () => {
-        if (!finished) settle();
+        if (finished) return;
+        if (request.signal.aborted) {
+          const timedOut =
+            request.signal.reason instanceof Error && request.signal.reason.name === 'TimeoutError';
+          forceExit(timedOut ? 124 : 130, timedOut ? 'timeout' : 'aborted');
+          return;
+        }
+        settle();
       },
       error: (error) => {
         if (finished) return;

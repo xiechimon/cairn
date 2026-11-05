@@ -1,4 +1,5 @@
 import {
+  isBuildStepKind,
   type MergeReadiness,
   mergeReadinessSchema,
   parseGithubIssueSourceRef,
@@ -271,11 +272,13 @@ export async function evaluateMergeGate(
     ),
   ];
   const buildSteps = steps
-    .filter((item) => item.kind === 'build' && item.status === 'done')
+    .filter((item) => isBuildStepKind(item.kind) && item.status === 'done')
     .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
   const authorStep = buildSteps.at(-1);
   const authorAgent =
-    authorStep !== undefined ? agentForStep(deps.db, todoRow, 'build', authorStep.prompt) : null;
+    authorStep !== undefined
+      ? agentForStep(deps.db, todoRow, authorStep.kind, authorStep.prompt)
+      : null;
   const chiefRow = deps.db.select().from(chief).where(eq(chief.teamId, todoRow.teamId)).get();
   const verifier =
     todoRow.assignment?.verify?.agentId != null ||

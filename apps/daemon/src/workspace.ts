@@ -27,7 +27,12 @@ import {
   type WorktreeOps,
   type WorktreePrepareInput,
 } from '@cairn/shared';
-import { gitPrim, withGitCredentialFallback, withGitNetRetries } from './git.js';
+import {
+  GIT_NET_RETRY_DELAYS_MS,
+  gitPrim,
+  withGitCredentialFallback,
+  withGitNetRetries,
+} from './git.js';
 import type { DaemonLogger } from './log.js';
 import {
   runWorkspaceHook,
@@ -121,16 +126,31 @@ export class WorkspaceManager implements WorktreeOps {
         op: (cred: BoundGitCredentials | null) => Promise<void>,
         onFallback?: (reason: string) => void,
       ): Promise<GitCredentialSource> => {
-        const source = await withGitCredentialFallback(op, input.credentials, {
-          what,
-          allowMachineFallback: credFallback,
-          onFallback: (reason) => {
-            onFallback?.(reason);
-            this.logger.workspace(
-              `git ${what} auth failed (per-step token), retrying with machine credentials: ${reason}`,
-            );
+        const source = await withGitCredentialFallback(
+          (cred) => {
+            let attempt = 0;
+            return withGitNetRetries(() => {
+              if (attempt > 0) {
+                this.logger.workspace(
+                  `git ${what} network retry ${attempt}/${GIT_NET_RETRY_DELAYS_MS.length} after ${GIT_NET_RETRY_DELAYS_MS[attempt - 1]}ms`,
+                );
+              }
+              attempt++;
+              return op(cred);
+            });
           },
-        });
+          input.credentials,
+          {
+            what,
+            allowMachineFallback: credFallback,
+            onFallback: (reason) => {
+              onFallback?.(reason);
+              this.logger.workspace(
+                `git ${what} auth failed (per-step token), retrying with machine credentials: ${reason}`,
+              );
+            },
+          },
+        );
         if (source === 'machine') credentialSource = 'machine';
         return source;
       };
@@ -139,9 +159,7 @@ export class WorkspaceManager implements WorktreeOps {
         if (seed && existsSync(seed)) {
           await gitPrim.clone(seed, baseRepoDir, null);
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
-          await runNet('fetch', (cred) =>
-            withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)),
-          );
+          await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
           await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
           this.logger.workspace('Repo source: orb seed');
           fromLocal = true;
@@ -152,9 +170,7 @@ export class WorkspaceManager implements WorktreeOps {
             try {
               await gitPrim.clone(input.localPath, baseRepoDir, null);
               await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
-              const fetchSource = await runNet('fetch', (cred) =>
-                withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)),
-              );
+              const fetchSource = await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
               const setHeadCred = fetchSource === 'machine' ? null : input.credentials;
               await gitPrim.remoteSetHeadAuto(baseRepoDir, setHeadCred);
               this.logger.workspace(`Repo source: local-path ${input.localPath}`);
@@ -179,7 +195,7 @@ export class WorkspaceManager implements WorktreeOps {
           this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
           await runNet(
             'clone',
-            (cred) => withGitNetRetries(() => gitPrim.clone(cloneUrl, baseRepoDir, cred)),
+            (cred) => gitPrim.clone(cloneUrl, baseRepoDir, cred),
             () => rmSync(baseRepoDir, { recursive: true, force: true }),
           );
         }
@@ -189,7 +205,7 @@ export class WorkspaceManager implements WorktreeOps {
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           this.logger.workspace('Repo origin re-pointed to the project clone URL');
         }
-        await runNet('fetch', (cred) => withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)));
+        await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
       }
       const defaultBranch = input.baseBranch ?? (await gitPrim.remoteDefaultBranch(baseRepoDir));
       if (input.readonly === true) {

@@ -10,6 +10,7 @@ import {
   PHASE_VALUES,
   patchMachineBodySchema,
   patchProviderBodySchema,
+  patchScheduleBodySchema,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
@@ -66,7 +67,13 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
-import { createSchedule, deleteSchedule, listSchedules } from './services/schedules.js';
+import { runScheduleNow } from './services/schedule-run.js';
+import {
+  createSchedule,
+  deleteSchedule,
+  listSchedules,
+  setScheduleEnabled,
+} from './services/schedules.js';
 import { search } from './services/search.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
 import { importSkill, refreshSkill, type SkillImportOpts } from './services/skill-import.js';
@@ -124,11 +131,23 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(record, 201);
   });
 
+  app.patch('/api/schedules/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = parseWith(patchScheduleBodySchema, await jsonBody(c), 'body');
+    const record = setScheduleEnabled(svc, id, body);
+    if (!record) throw notFound(`schedule ${id}`);
+    return c.json(record);
+  });
+
   app.delete('/api/schedules/:id', (c) => {
     const id = c.req.param('id');
     if (!deleteSchedule(svc, id)) throw notFound(`schedule ${id}`);
     return c.body(null, 204);
   });
+
+  app.post('/api/schedules/:id/run', (c) =>
+    c.json(runScheduleNow(svc, ctx.team.id, c.req.param('id'))),
+  );
 
   app.get('/api/search', (c) =>
     c.json(search(svc, { teamId: ctx.team.id, q: c.req.query('q') ?? null })),

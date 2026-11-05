@@ -1,8 +1,9 @@
-import type { MachineStreamEvent, MachineSyncCommand } from '@cairn/shared';
+import type { ComputerCall, MachineStreamEvent, MachineSyncCommand } from '@cairn/shared';
 
 export class MachineWakeHub {
   private readonly waiters = new Map<string, Set<() => void>>();
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
+  private readonly stopListeners = new Map<string, Set<() => void>>();
   private readonly wakeSeqs = new Map<string, number>();
   private readonly streamsByMachine = new Map<
     string,
@@ -112,6 +113,34 @@ export class MachineWakeHub {
     }
   }
 
+  isConnected(machineId: string): boolean {
+    return this.streamsByMachine.has(machineId);
+  }
+
+  pushComputer(machineId: string, call: ComputerCall): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'computer', call });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  onStop(stepId: string, listener: () => void): () => void {
+    let set = this.stopListeners.get(stepId);
+    if (!set) {
+      set = new Set();
+      this.stopListeners.set(stepId, set);
+    }
+    set.add(listener);
+    return () => {
+      set?.delete(listener);
+      if (set && set.size === 0) this.stopListeners.delete(stepId);
+    };
+  }
+
   releaseMachine(machineId: string): void {
     this.streamsByMachine.delete(machineId);
   }
@@ -134,5 +163,6 @@ export class MachineWakeHub {
         send({ type: 'stop', stepId });
       } catch {}
     }
+    for (const listener of [...(this.stopListeners.get(stepId) ?? [])]) listener();
   }
 }

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MERGE_ANNOUNCEMENT, type TranscriptRow } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -355,6 +356,12 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     await accept.getByRole('button', { name: '完成' }).click();
     await waitChip('done');
 
+    const transcript = (await api(server.url, 'GET', `/api/conversations/${buildId}/messages`))
+      .body as { messages: TranscriptRow[] };
+    expect(transcript.messages.some((row) => row.content === MERGE_ANNOUNCEMENT)).toBe(true);
+    const foldedTurns = page.locator('[data-testid=turn-header][aria-expanded=false]');
+    await pexpect(foldedTurns.first()).toBeVisible();
+    while ((await foldedTurns.count()) > 0) await foldedTurns.first().click();
     await pexpect(page.locator('.chat-note', { hasText: '发起了合并' })).toBeVisible();
     await pexpect(page.locator('.chat-note', { hasText: '🎉 任务已完成' })).toBeVisible({
       timeout: 30_000,

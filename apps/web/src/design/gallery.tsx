@@ -1,10 +1,12 @@
 import { cn } from 'cn';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { SegmentedRadio } from '../components/segmented.js';
+import { AutomationSection } from './components-automation.js';
 import {
   AvatarSection,
   ConversationSection,
   EmptySection,
+  SearchSyntaxSection,
   SettingsSection,
   TraceSection,
 } from './components-content.js';
@@ -18,6 +20,7 @@ import {
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
 import { PanelSection } from './components-panel.js';
+import { ScheduleDetailSection } from './components-schedule-detail.js';
 import {
   CoordinatorStreamSection,
   ProjectsSection,
@@ -25,10 +28,12 @@ import {
   SidebarSection,
 } from './components-shell.js';
 import { StoneSection, ThreadCardSection, ThreadRowSection } from './components-stone.js';
+import { ThreadUsageSection } from './components-thread-usage.js';
 import {
   PermissionSection,
   PlanSection,
   PrBarSection,
+  PrCardSection,
   ScheduledSection,
 } from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
@@ -52,6 +57,7 @@ import { ProductOverlaysSection } from './product-overlays.js';
 import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
+import { ProductTurnFoldSection } from './product-turn-fold.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -99,6 +105,7 @@ const NAV = [
       ['product-detail', 'Task detail'],
       ['product-chief', 'Coordinator'],
       ['product-thread-reply', 'Thread reply'],
+      ['product-turn-fold', 'Turn folding'],
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
       ['product-add-provider', 'Add provider'],
@@ -113,8 +120,12 @@ const NAV = [
       ['thread-row', 'Thread row and bulk bar'],
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
+      ['thread-usage', 'Thread usage footer'],
       ['pr-bar', 'Pull request bar'],
+      ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
+      ['schedule-detail', 'Scheduled task detail'],
+      ['thread-automation', 'Thread automation badge'],
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
       ['coordinator', 'Coordinator stream'],
@@ -268,6 +279,7 @@ export function Gallery() {
           <DialogSection />
           <ToastSection />
           <EmptySection />
+          <SearchSyntaxSection />
           <SettingsSection />
           <AvatarSection />
           <ConversationSection />
@@ -285,6 +297,7 @@ export function Gallery() {
             <ProductDetailSection />
             <ProductChiefSection />
             <ProductThreadReplySection />
+            <ProductTurnFoldSection />
             <ProductOverlaysSection />
             <ProductPagesSection theme={theme} />
             <ProductAddProviderSection />
@@ -299,8 +312,12 @@ export function Gallery() {
           <ThreadRowSection />
           <PermissionSection />
           <PlanSection />
+          <ThreadUsageSection />
           <PrBarSection />
+          <PrCardSection />
           <ScheduledSection />
+          <ScheduleDetailSection />
+          <AutomationSection />
           <SidebarSection />
           <ProjectsSection />
           <CoordinatorStreamSection />

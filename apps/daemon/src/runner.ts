@@ -45,6 +45,7 @@ import {
   FIXED_TAGS,
   INFO_REPORT_MAX_BYTES,
   isBackendRuntimeId,
+  isBuildStepKind,
   isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
   LocalRepoUnreachableError,
@@ -77,6 +78,7 @@ import {
   piWorktreeSkillDirs,
   type SkillsCatalogOpts,
 } from './backend/skills.js';
+import { prepareWebTools } from './backend/web-search.js';
 import { type BriefHandle, caseInsensitiveFsFor, cleanupBrief, writeBrief } from './brief-file.js';
 import {
   type ClaudeCodeAuthProbe,
@@ -90,9 +92,9 @@ import {
   prepareCredentialSessionUpload,
 } from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
+import { buildExecutorRecord } from './executor-record.js';
 import { GitPushHookError, withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
-import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import { landLocalMerge } from './local-merge.js';
 import type { DaemonLogger } from './log.js';
@@ -232,14 +234,14 @@ function confirmedPlanFile(plansDir: string, convId: string): string | null {
 
 function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: string): string {
   let text = buildTaskPrompt(claimed);
-  if (claimed.step.kind === 'build') {
+  if (isBuildStepKind(claimed.step.kind)) {
     const planFile = confirmedPlanFile(plansDir, convId);
     if (planFile !== null) text = appendConfirmedPlanNote(text, planFile);
   } else if (claimed.step.kind === 'plan') {
     text = appendPlanLocationNote(text, join(plansDir, convId, PLAN_FILE_NAME));
   }
   if (
-    (claimed.step.kind === 'build' ||
+    (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
       claimed.step.kind === 'verify') &&
     (claimed.project?.repo ?? null) !== null
@@ -449,7 +451,7 @@ async function runClaimedStep(
       : claimed.session.action === 'continue' && claimed.session.sessionId
         ? (claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind])
         : buildTaskPrompt(claimed));
-  const isInfoBuild = claimed.step.kind === 'build' && claimed.todo?.output === 'info';
+  const isInfoBuild = isBuildStepKind(claimed.step.kind) && claimed.todo?.output === 'info';
   const readonlyWorkspace = !isChief && claimed.todo?.output === 'info';
   const reportFile = join(deps.paths.reportsDir, convId, REPORT_FILE_NAME);
   const promptWithPlanNote =
@@ -462,7 +464,7 @@ async function runClaimedStep(
     promptWithPlanNote !== null &&
     promptWithPlanNote.trim() !== '' &&
     !isInfoBuild &&
-    (claimed.step.kind === 'build' ||
+    (isBuildStepKind(claimed.step.kind) ||
       claimed.step.kind === 'merge' ||
       claimed.step.kind === 'verify') &&
     (claimed.project?.repo ?? null) !== null
@@ -747,9 +749,18 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, `team skills distribution failed: ${reason}`);
     return;
   }
+  const isPi = backend.brief?.backendId === 'pi';
+  const webTools = prepareWebTools({
+    enabled: isPi && !isChief && !isReview && claimed.remoteToolsOnly !== true,
+    metered: opts.env?.CAIRN_ORB !== '1',
+    creds,
+    stepId,
+    home: deps.paths.home,
+    log: (line) => logger.step(line),
+  });
   const secretTool = stepTakesSecrets(claimed.step.kind)
     ? buildSecretTool({
-        creds,
+        creds: webTools.secretCreds,
         stepId,
         agentId: agent?.id ?? null,
         onAudit: (line) => logger.step(line),
@@ -762,12 +773,13 @@ async function runClaimedStep(
   const createTagTool = (claimed.localTools ?? []).includes(LOCAL_TOOL_CREATE_TAG)
     ? buildCreateTagTool({ repoDir: ws?.cwd ?? null, cred: creds.git, identity: stepIdentity })
     : null;
-  const localToolDefs = [secretTool, createTagTool].filter((t): t is LocalToolDef => t !== null);
+  const localToolDefs = [secretTool, createTagTool, ...webTools.tools].filter(
+    (t): t is LocalToolDef => t !== null,
+  );
   const injectedForSession =
     agent.injectedSkills === undefined || agent.defaultSkill == null
       ? agent.injectedSkills
       : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
-  const isPi = backend.brief?.backendId === 'pi';
   const skillsRootDir = deps.skillsDir;
   const canSkillTool = isPi && skillsRootDir !== undefined;
   if (canSkillTool) {
@@ -1036,14 +1048,21 @@ async function runClaimedStep(
         .filter(([name]) => injectedNames === undefined || injectedNames.includes(name))
         .map(([name, path]) => ({ name, content: readFileSync(path, 'utf8') }));
       provenance.baseSha = headAtStart;
-      provenance.harnessHash = computeHarnessHash({
-        systemPrompt: systemPrompt ?? '',
-        skills,
-        tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
-          name,
-          description,
-        })),
+      const executorRecord = buildExecutorRecord({
+        backend: backend.capabilities.name,
+        model: modelKey,
+        effort: agent.thinkingLevel,
+        harness: {
+          systemPrompt: systemPrompt ?? '',
+          skills,
+          tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
+            name,
+            description,
+          })),
+        },
       });
+      provenance.harnessHash = executorRecord.harness_sha;
+      logger.step(`executor record ${JSON.stringify(executorRecord)}`);
       await client.heartbeat(stepId, provenance);
     } catch (err: unknown) {
       logger.step(
@@ -1072,7 +1091,7 @@ async function runClaimedStep(
   } | null = null;
   let networkRetries = 0;
   const networkRetryDelays =
-    claimed.step.kind === 'plan' || claimed.step.kind === 'build'
+    claimed.step.kind === 'plan' || isBuildStepKind(claimed.step.kind)
       ? PROVIDER_NETWORK_RETRY_DELAYS_MS
       : [0, 5_000];
   const envFirstMs = envPositiveMs(STREAM_FIRST_EVENT_ENV);
@@ -1147,7 +1166,8 @@ async function runClaimedStep(
   const absoluteDurationCapMs = envPositiveMs(STREAM_DURATION_CAP_ENV);
   const streamDurationCapMs =
     absoluteDurationCapMs ?? opts.streamDurationCapMs ?? STREAM_DURATION_CAP_DEFAULT_MS;
-  const progressResetsDuration = claimed.step.kind === 'build' && absoluteDurationCapMs === null;
+  const progressResetsDuration =
+    isBuildStepKind(claimed.step.kind) && absoluteDurationCapMs === null;
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
   const runningToolCalls = new Set<string>();
@@ -1898,7 +1918,7 @@ async function runClaimedStep(
   }
 
   let pushHookOutput: string | null = null;
-  if (claimed.step.kind === 'build' && closingPushHookError !== null) {
+  if (isBuildStepKind(claimed.step.kind) && closingPushHookError !== null) {
     pushHookOutput = stripAnsiEscapes(closingPushHookError.message);
     lastError = null;
     if (ws !== null && deps.workspace) {
@@ -1909,7 +1929,7 @@ async function runClaimedStep(
 
   let preservedCommits: string[] = [];
   if (
-    claimed.step.kind === 'build' &&
+    isBuildStepKind(claimed.step.kind) &&
     lastError !== null &&
     !stopped &&
     ws !== null &&
@@ -2090,7 +2110,6 @@ async function runClaimedStep(
   }
   clearCredentials(creds);
   journal.remove(stepId);
-  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -2213,7 +2232,6 @@ export async function resumePendingUpload(
     }
   }
   journal.remove(stepId);
-  rmSync(join(deps.paths.outboxDir, `step-${stepId}.session.jsonl`), { force: true });
   deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }

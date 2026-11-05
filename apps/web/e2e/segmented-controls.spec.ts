@@ -124,17 +124,18 @@ test('sched freq: the chosen radio reads against the track, hover steps the rest
 }) => {
   await page.goto('/app/schedules?scenario=r3-92');
   const group = page.getByRole('radiogroup', { name: '频率' });
-  const active = page.locator('.sched-form-freq-tab[aria-checked="true"]');
-  const weekly = page.locator('.sched-form-freq-tab', { hasText: '每周' });
+  const active = group.getByRole('radio', { checked: true });
+  const weekly = group.getByRole('radio', { name: '每周' });
 
   expect(await bg(active)).toBe(CARD_DARK);
   expect(await bg(group)).not.toBe(CARD_DARK);
   await expectInkStep(weekly, active);
 
   await themed(page, 'light', '/app/schedules?scenario=r3-92');
-  const lightActive = page.locator('.sched-form-freq-tab[aria-checked="true"]');
+  const lightGroup = page.getByRole('radiogroup', { name: '频率' });
+  const lightActive = lightGroup.getByRole('radio', { checked: true });
   expect(await bg(lightActive)).toBe(CARD_LIGHT);
-  await expectInkStep(page.locator('.sched-form-freq-tab', { hasText: '每周' }), lightActive);
+  await expectInkStep(lightGroup.getByRole('radio', { name: '每周' }), lightActive);
 });
 
 test('files seg + tasks view toggle: hover steps the unselected ink (dark)', async ({ page }) => {

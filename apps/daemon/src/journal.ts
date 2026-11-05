@@ -1,8 +1,11 @@
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
 import type { StopRequest } from './step-stops.js';
+
+const STEP_OUTBOX_SUFFIXES = ['.transcript.json', '.session.jsonl'];
+const STEP_OUTBOX_FILE = /^step-(.+)\.(?:transcript\.json|session\.jsonl)$/;
 
 export type JournalState = 'claimed' | 'running' | 'awaiting-upload' | 'done' | 'failed';
 
@@ -94,6 +97,25 @@ export class StepJournal {
 
   remove(stepId: string): void {
     if (existsSync(this.file(stepId))) rmSync(this.file(stepId));
+    for (const suffix of STEP_OUTBOX_SUFFIXES)
+      rmSync(join(this.dir, `step-${stepId}${suffix}`), { force: true });
+  }
+
+  sweepOrphanFiles(input: { now: number; ttlMs: number }): string[] {
+    if (!existsSync(this.dir)) return [];
+    const removed: string[] = [];
+    for (const name of readdirSync(this.dir)) {
+      const match = STEP_OUTBOX_FILE.exec(name);
+      const stepId = match?.[1];
+      if (!stepId || existsSync(this.file(stepId))) continue;
+      const path = join(this.dir, name);
+      try {
+        if (input.now - statSync(path).mtimeMs <= input.ttlMs) continue;
+        rmSync(path, { force: true });
+        removed.push(name);
+      } catch {}
+    }
+    return removed;
   }
 
   private write(entry: StepJournalEntry): void {

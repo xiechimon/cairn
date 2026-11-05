@@ -12,6 +12,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import {
   type BackendRuntimeId,
   CONFIRM_ANNOUNCEMENT,
+  isBuildStepKind,
   MERGE_ANNOUNCEMENT,
   redactSecrets,
   trajectoryPackSchema,
@@ -231,7 +232,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
                 .orderBy(asc(gateVerdict.createdAt), asc(gateVerdict.stepId))
                 .all(),
               ciFixRounds: steps.filter(
-                (s) => s.kind === 'build' && s.prompt?.startsWith('[ci-fix]'),
+                (s) => isBuildStepKind(s.kind) && s.prompt?.startsWith('[ci-fix]'),
               ).length,
             },
             outcome: {

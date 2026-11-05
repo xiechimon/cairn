@@ -22,7 +22,8 @@ import {
 import { createDaemonLogger } from './log.js';
 import { runMachine } from './machine-loop.js';
 import { orbReleaseFromEntry } from './orb/protocol.js';
-import { ORB_AGENT_HOME, runOrbWorker } from './orb/worker.js';
+import { runOrbServicesEnsure } from './orb/services-runtime.js';
+import { orbAgentHome, runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import { isAlive, runSupervisor, spawnSupervisor, stopSupervisor } from './supervisor.js';
 import { runTokenCommand } from './token-command.js';
@@ -266,9 +267,21 @@ export function buildProgram(): Command {
       const exit = await runOrbComputerAgent({
         socketPath: opts.socket,
         release: orbReleaseFromEntry(realpathSync(fileURLToPath(import.meta.url))),
-        provider: new HostComputerProvider({ home: ORB_AGENT_HOME }),
+        provider: new HostComputerProvider({ home: orbAgentHome() }),
       });
       process.exitCode = exit === 'stale-release' ? 75 : 1;
+    });
+
+  const orb = program.command('orb').description('Orb host helpers');
+  orb
+    .command('services')
+    .command('ensure')
+    .description('Start missing services from .agents/services.yaml and wait until ready')
+    .option('--json', 'print JSON status')
+    .option('--file <path>', 'services file (default .agents/services.yaml)')
+    .action(async (opts: { json?: boolean; file?: string }) => {
+      const code = await runOrbServicesEnsure(opts);
+      if (code !== 0) process.exitCode = code;
     });
 
   return program;

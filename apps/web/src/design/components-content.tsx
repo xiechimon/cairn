@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
+import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { ChiefIdentity } from '../chief/chief-identity.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -39,6 +40,8 @@ import {
   SquarePen,
   X,
 } from '../icons/index.js';
+import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
+import { splitQuery } from '../search/search-query.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
@@ -114,6 +117,41 @@ export function EmptySection() {
           </div>
         </div>
       </Specimen>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Specimen title="Project not found" note="An unknown project link, with close names">
+          <MemoryRouter>
+            <ProjectNotFound
+              unknownId="cairn-old"
+              suggestions={{
+                kind: 'close',
+                projects: [{ id: 'p1', name: 'cairn', lastActiveAt: 2 }],
+              }}
+              projectHref={() => '#'}
+            />
+          </MemoryRouter>
+        </Specimen>
+        <Specimen title="Project not found, recent" note="Nothing is close, so the latest projects">
+          <MemoryRouter>
+            <ProjectNotFound
+              unknownId="zzzzzzzz"
+              suggestions={{
+                kind: 'recent',
+                projects: [
+                  { id: 'p1', name: 'relay', lastActiveAt: 3 },
+                  { id: 'p2', name: 'docs-site', lastActiveAt: 2 },
+                  { id: 'p3', name: 'orb', lastActiveAt: 1 },
+                ],
+              }}
+              projectHref={() => '#'}
+            />
+          </MemoryRouter>
+        </Specimen>
+        <Specimen title="Projects failed to load" note="Retry, or leave for the Coordinator">
+          <MemoryRouter>
+            <ProjectsFailed onRetry={() => undefined} />
+          </MemoryRouter>
+        </Specimen>
+      </div>
     </Section>
   );
 }
@@ -410,6 +448,39 @@ export function TraceSection() {
       >
         <TraceGroup steps={TRACE_TOOLS} density="compact" defaultOpen className="w-120" />
       </Specimen>
+    </Section>
+  );
+}
+
+const GALLERY_CHIPS = splitQuery('is:failed project:cairn cost:lots ', 0).chips;
+
+export function SearchSyntaxSection() {
+  return (
+    <Section
+      id="search-syntax"
+      title="Search filters"
+      lede="Typed filters become chips in the field. A value that cannot match is flagged on its chip with a reason, and the footer opens the syntax list."
+    >
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Specimen title="Chips" note="Valid, then flagged with its reason">
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {GALLERY_CHIPS.map((chip, index) => (
+                <QueryChip
+                  key={chip.raw}
+                  chip={chip}
+                  problem={index === 2 ? 'bad_cost' : null}
+                  onRemove={() => undefined}
+                />
+              ))}
+            </div>
+            <ChipProblems chips={GALLERY_CHIPS} problems={[null, null, 'bad_cost']} />
+          </div>
+        </Specimen>
+        <Specimen title="Syntax help" note="Opened from the palette footer or the Activity field">
+          <SyntaxHelp className="w-full" />
+        </Specimen>
+      </div>
     </Section>
   );
 }

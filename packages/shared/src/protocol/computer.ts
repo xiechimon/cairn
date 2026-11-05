@@ -109,3 +109,40 @@ export type ComputerState = (typeof COMPUTER_STATES)[number];
 
 export const COMPUTER_CONTROL_HOLDERS = ['none', 'bot', 'user'] as const;
 export type ComputerControlHolder = (typeof COMPUTER_CONTROL_HOLDERS)[number];
+
+export const machineComputerRelayBodySchema = z.object({
+  computer: z.literal(true),
+  name: computerToolSchema,
+  toolCallId: z.string().min(1).max(200),
+  params: z.record(z.string(), z.unknown()),
+});
+export type MachineComputerRelayBody = z.infer<typeof machineComputerRelayBodySchema>;
+
+export const computerRelayResultSchema = z.object({
+  text: z.string(),
+  images: z.array(computerImageSchema).max(COMPUTER_IMAGES_MAX).optional(),
+});
+export type ComputerRelayResult = z.infer<typeof computerRelayResultSchema>;
+
+export const COMPUTER_FEED_TOOLS = [
+  'shell',
+  'user_computer_shell',
+  'write_file',
+  'attach_file',
+  'open_path',
+  'launch_app',
+] as const;
+export type ComputerFeedTool = (typeof COMPUTER_FEED_TOOLS)[number];
+
+export const computerCommandSchema = z.object({
+  callId: computerCallIdSchema,
+  stepId: recordId,
+  tool: z.enum(COMPUTER_FEED_TOOLS),
+  command: z.string(),
+  cwd: z.string(),
+  status: z.enum(['running', 'done', 'error', 'interrupted', 'cancelled']),
+  exitCode: z.number().int().nullable(),
+  output: z.string(),
+  at: epochMs,
+});
+export type ComputerCommand = z.infer<typeof computerCommandSchema>;

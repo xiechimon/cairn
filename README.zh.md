@@ -1,17 +1,12 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="site/img/banner-dark.webp">
-    <img alt="Cairn：agent 在山路上垒石堆，人在山门口把关" src="site/img/banner-light.webp" width="100%">
-  </picture>
-
-  <p><b>你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活，自动合并要过证据闸，证据绑定到具体那份补丁。</b></p>
-
-  <p>自托管、开源的 agent 团队，而且它在开发它自己。</p>
+  <img src="site/logo.svg" alt="Cairn" width="64" height="64">
+  <h1>Cairn</h1>
 
   <p>
+    <a href="./README.md">English</a> ·
+    <b>简体中文</b> ·
     <a href="https://cairn.xmon.me">官网</a> ·
-    <a href="#快速开始">快速开始</a> ·
-    <a href="./README.md">English</a>
+    <a href="#快速开始">快速开始</a>
   </p>
 
   <p>
@@ -21,15 +16,24 @@
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
+
+  <p><b>你跟一个 Coordinator 说要做什么，agent 在你自己的机器上分 thread 隔离干活，没有证据就不合并。</b></p>
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
+    <img alt="桌面端的 Cairn：Coordinator 对话，等你拍板的决定置顶，手机上打开着一个 thread" src="site/img/hero-light.webp" width="100%">
+  </picture>
+
+  <img alt="手机端的 Cairn：等你拍板的决定、一个 thread、项目主页和全部工作" src="site/img/phones.webp" width="100%">
 </div>
 
-## 亮点
-
-- **一个 Coordinator，很多 thread。** 你在任何设备上只跟一个 Coordinator 对话。它负责听、为每件活开一个 thread，然后不插手。每个 thread 跑一个 agent 会话（用你订阅的 Claude Code 或 Gemini CLI，或内置的 pi 运行时接任意模型服务），从计划一路做到 PR。
-- **只给你看需要你的事。** 首页置顶等你拍板的决定；进展和结果留在对话和每日汇报里。只有需要人动手时才推送。
+- **Coordinator。** 你在任何设备上只跟一个 Coordinator 对话。它负责听、为每件活开一个 thread，并在同一个永不结束的对话里回报。
+- **Thread。** 一件活对应一个 agent 会话：用你订阅的 Claude Code 或 Gemini CLI，或内置的 pi 运行时接任意模型服务。thread 从计划一路做到 PR，也可以在侧边对话里打开它直接插话。
+- **只给你看需要你的事。** 首页置顶等你拍板的决定，并显示进行中的工作。只有需要人动手时才推送。
 - **合并闸绑定证据。** agent 合并前，闸只认绑定到当前补丁摘要的审核结论，head 在结论之后变了就拒绝；这些规则用 TLA+ 做过模型检查。手动合并按钮目前只核对钉住的提交（见 spec 18 的 F1）。受保护路径仍然停下等你；AI 审核者能直接拦下合并，不只是留评论。
-- **harness 改动经评测把关。** 每次构建记录基线提交和 harness 哈希，驳回写成结构化记录，改 Coordinator 调度 harness 的提交必须先过评测回归下限才能合入；提示词、技能、路由改动的配对试验采纳机制还在计划中。这里的「训练」指优化 harness，不微调模型。
+- **harness 经评测把关。** 每次构建记录基线提交和 harness 哈希，驳回写成结构化记录，改 Coordinator 调度 harness 的提交必须先过评测回归下限才能合入；提示词、技能、路由改动的配对试验采纳机制还在计划中。这里的「训练」指优化 harness，不微调模型。
 - **跑在你自己的机器上。** 在任意主机上跑 daemon 就能登记成执行机。thread 会派到满足运行时、模型和工具要求的任意机器上，在独立的 git worktree 里干活；主机支持时也可以每个任务一个用完即弃的 Orb 容器（`CAIRN_EXECUTOR=orb`，目前需手动开启）。计划、diff、工具调用实时推回来。
+- **项目。** 项目主页含项目说明、项目记忆、项目密钥和并发上限；人的消息永远插队。仓库可以由服务器自己托管，也可以接 GitHub。
 - **自举闭环。** Cairn 自己领票、实现、审核、开 PR，正在用它自己开发它自己。
 
 ## 作品
@@ -183,7 +187,7 @@ pnpm test         # vitest
 ## 第三方署名
 
 - 头像字体 [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
-- 字体 Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
+- 字体 Instrument Sans / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
 - 图标 [lucide](https://lucide.dev) — ISC License
 - emoji 策展数据 [gitmoji](https://gitmoji.dev) — MIT License
 - 执行引擎 [pi SDK](https://github.com/badlogic/pi-mono) — MIT License

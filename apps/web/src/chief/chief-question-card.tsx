@@ -1,6 +1,14 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { STATUS_WORDS } from '../board/status-words.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -8,6 +16,14 @@ import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dial
 import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import {
+  applyQuestionPick,
+  emptyQuestionDrafts,
+  type QuestionDraft,
+  questionDraftComplete,
+  questionDraftStore,
+  replaceQuestionDraft,
+} from './question-drafts.js';
 
 export type ChiefQuestionItem = Extract<ChiefStreamItem, { kind: 'question' }>;
 
@@ -16,11 +32,8 @@ export interface ChiefQuestionCardProps {
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancel?: (requestId: string) => void;
   numberKeys?: boolean;
+  draftKey?: string;
 }
-
-type Draft =
-  | { kind: 'choices'; picked: string[]; other: boolean; otherText: string }
-  | { kind: 'text'; value: string };
 
 const CARD_CLS =
   'flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3';
@@ -84,17 +97,65 @@ function RecommendedMark() {
   );
 }
 
+function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draftKey?: string) {
+  const stored = useSyncExternalStore(
+    questionDraftStore.subscribe,
+    () => {
+      if (draftKey === undefined) return null;
+      const record = questionDraftStore.get(draftKey);
+      return record !== undefined && record.drafts.length === questions.length ? record : null;
+    },
+    () => null,
+  );
+  const [localDrafts, setLocalDrafts] = useState(() => emptyQuestionDrafts(questions));
+  const [localStep, setLocalStep] = useState(0);
+  const drafts = stored?.drafts ?? localDrafts;
+  const step = stored?.step ?? localStep;
+  const submitting = stored?.submitting === true;
+  const persist = (nextDrafts: QuestionDraft[], nextStep: number) => {
+    if (draftKey === undefined) return;
+    questionDraftStore.set(draftKey, {
+      drafts: nextDrafts,
+      step: nextStep,
+      submitting,
+      error: null,
+    });
+  };
+  useEffect(() => {
+    if (draftKey !== undefined && item.status !== 'pending') questionDraftStore.clear(draftKey);
+  }, [draftKey, item.status]);
+  return {
+    drafts,
+    step,
+    submitting,
+    setDrafts: (update: (prev: QuestionDraft[]) => QuestionDraft[]) => {
+      const next = update(drafts);
+      if (draftKey !== undefined) persist(next, step);
+      else setLocalDrafts(next);
+    },
+    setStep: (update: (prev: number) => number) => {
+      const next = update(step);
+      if (draftKey !== undefined) persist(drafts, next);
+      else setLocalStep(next);
+    },
+  };
+}
+
 export function ChiefQuestionCard({
   item,
   onAnswer,
   onCancel,
-  numberKeys = true,
+  numberKeys = false,
+  draftKey,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
-  const pending = item.status === 'pending' && onAnswer !== undefined;
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
-  const [drafts, setDrafts] = useState<Draft[]>(() => initialDrafts(questions));
-  const [step, setStep] = useState(0);
+  const { drafts, step, submitting, setDrafts, setStep } = useQuestionDrafts(
+    item,
+    questions,
+    draftKey,
+  );
+  const pending = item.status === 'pending' && onAnswer !== undefined && !submitting;
   const total = questions.length;
   const lastStep = total - 1;
   const last = step === lastStep;
@@ -117,15 +178,15 @@ export function ChiefQuestionCard({
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
       e.preventDefault();
-      setDrafts((prev) => applyPick(prev, step, question, n - 1));
+      setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
   }, [pending, numberKeys, step, question]);
 
-  const stepComplete = useMemo(() => draftComplete(draft, question), [draft, question]);
+  const stepComplete = useMemo(() => questionDraftComplete(draft, question), [draft, question]);
   const allComplete = useMemo(
-    () => pending && questions.every((q, i) => draftComplete(drafts[i], q)),
+    () => pending && questions.every((q, i) => questionDraftComplete(drafts[i], q)),
     [pending, drafts, questions],
   );
 
@@ -222,7 +283,7 @@ export function ChiefQuestionCard({
           disabled={!pending}
           onChange={(e) => {
             const value = e.target.value;
-            setDrafts((prev) => replaceDraft(prev, step, { kind: 'text', value }));
+            setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
           }}
         />
       ) : (
@@ -239,7 +300,7 @@ export function ChiefQuestionCard({
                 aria-pressed={selected}
                 title={option.description}
                 className={`${OPT_CLS}${selected ? ` ${OPT_SEL_CLS}` : ''}`}
-                onClick={() => setDrafts((prev) => applyPick(prev, step, question, oi))}
+                onClick={() => setDrafts((prev) => applyQuestionPick(prev, step, question, oi))}
               >
                 <span className={`${NUM_CLS} ${selected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
                   {oi + 1}
@@ -265,7 +326,7 @@ export function ChiefQuestionCard({
             aria-pressed={otherSelected}
             className={`${OPT_CLS}${otherSelected ? ` ${OPT_SEL_CLS}` : ''}`}
             onClick={() =>
-              setDrafts((prev) => applyPick(prev, step, question, question.options.length))
+              setDrafts((prev) => applyQuestionPick(prev, step, question, question.options.length))
             }
           >
             <span className={`${NUM_CLS} ${otherSelected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
@@ -285,7 +346,7 @@ export function ChiefQuestionCard({
                 setDrafts((prev) => {
                   const current = prev[step];
                   if (current?.kind !== 'choices') return prev;
-                  return replaceDraft(prev, step, { ...current, otherText: value });
+                  return replaceQuestionDraft(prev, step, { ...current, otherText: value });
                 });
               }}
             />
@@ -373,51 +434,4 @@ function answeredRows(
       )}
     </div>
   );
-}
-
-function initialDrafts(questions: readonly Question[]): Draft[] {
-  return questions.map((q) =>
-    q.options.length === 0
-      ? { kind: 'text' as const, value: '' }
-      : { kind: 'choices' as const, picked: [], other: false, otherText: '' },
-  );
-}
-
-function applyPick(
-  prev: Draft[],
-  qi: number,
-  question: ChiefQuestionItem['questions'][number],
-  index: number,
-): Draft[] {
-  const current = prev[qi];
-  if (current?.kind !== 'choices') return prev;
-  if (index === question.options.length) {
-    if (question.multiSelect === true)
-      return replaceDraft(prev, qi, { ...current, other: !current.other });
-    return replaceDraft(prev, qi, { ...current, picked: [], other: true });
-  }
-  const label = question.options[index]?.label;
-  if (label === undefined) return prev;
-  if (question.multiSelect === true) {
-    const picked = current.picked.includes(label)
-      ? current.picked.filter((l) => l !== label)
-      : [...current.picked, label];
-    return replaceDraft(prev, qi, { ...current, picked });
-  }
-  return replaceDraft(prev, qi, { ...current, picked: [label], other: false });
-}
-
-function draftComplete(
-  draft: Draft | undefined,
-  question: ChiefQuestionItem['questions'][number] | undefined,
-): boolean {
-  if (draft === undefined || question === undefined) return false;
-  if (draft.kind === 'text') return draft.value.trim() !== '';
-  return draft.picked.length >= 1 || (draft.other && draft.otherText.trim() !== '');
-}
-
-function replaceDraft(prev: Draft[], qi: number, next: Draft): Draft[] {
-  const copy = [...prev];
-  copy[qi] = next;
-  return copy;
 }

@@ -1,6 +1,6 @@
-import { resolve } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK } from './chief-home-mock';
+import { evidenceShot } from './evidence';
 
 const workbench = (page: Page, name: string) =>
   page.getByRole('complementary').getByRole('button', { name, exact: true });
@@ -50,16 +50,10 @@ test.describe('English count grammar', () => {
         await mockLive(page, { threads: [], messages: [], todos: [TASK] });
         await page.goto('/app');
         await expect(page.getByTestId('home-c-since')).toContainText('1 in progress');
-        await page.screenshot({
-          path: resolve(`../../docs/verify/2420/after-home-${width}-${theme}.png`),
-          fullPage: true,
-        });
+        await evidenceShot(page, `after-home-${width}-${theme}.png`);
         await page.goto('/app/team?scenario=team-org-chart-single');
         await expect(page.getByText('1 member', { exact: true })).toBeVisible();
-        await page.screenshot({
-          path: resolve(`../../docs/verify/2420/after-team-${width}-${theme}.png`),
-          fullPage: true,
-        });
+        await evidenceShot(page, `after-team-${width}-${theme}.png`);
       });
     }
   }

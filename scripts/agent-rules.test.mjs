@@ -15,7 +15,7 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
       guidance
         .split('\n')
         .includes(
-          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (every other PR goes to ian), ${tasks} and no \`needs-decision\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
+          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (path class does not route to ian), ${tasks} and no \`needs-decision\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
         ),
       file,
     );
@@ -25,12 +25,30 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   assert.ok(retro.includes("mergedBy: 'auto-merge'"), '.claude/skills/retro-cairn/SKILL.md');
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
   assert.match(agents, /pr-gate[^\n]*go[^\n]*`mergedBy: 'auto-merge'`/);
-  assert.match(agents, /protected-path PRs[^\n]*go to ian/i);
+  assert.match(agents, /Protected-path PRs enter the merge queue/);
+  assert.match(agents, /Protected paths require Codex cloud code review on the PR head/);
+  assert.ok(!agents.includes('codex exec` from Claude'));
+});
+
+test('canonical security guidance requires exact-head clean Codex SECURITY state without a Claude rerun', () => {
+  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+  assert.match(agents, /Codex `security_review` state on the exact head/);
+  assert.match(agents, /`status=completed` and `has_unresolved_findings=false`/);
+  assert.match(agents, /plus green CI and `review-gate` SUCCESS/);
+  assert.match(agents, /resolve every security finding regardless of severity/);
+  assert.match(agents, /no later Claude rerun is required/);
   assert.match(
     agents,
-    /Protected or security paths need the Codex cloud review on the PR head plus `\/security-review`/,
+    /D88 permits an explicitly null unresolved field only with a trusted fresh clean SECURITY receipt/,
   );
-  assert.ok(!agents.includes('codex exec` from Claude'));
+  assert.match(
+    agents,
+    /Both approval paths require zero unresolved security-review threads at every severity/,
+  );
+  assert.match(agents, /unknown thread attribution blocks/);
+  assert.match(agents, /Missing fields, malformed values and explicit true stay blocked/);
+  assert.match(agents, /ordinary code review alone is insufficient/);
+  assert.doesNotMatch(agents, /Run `\/security-review`|plus `\/security-review`/);
 });
 
 test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => {
@@ -55,4 +73,15 @@ test('active docs never tell agents to add needs-decision', () => {
     assert.ok(!guidance.includes('--add-label needs-decision'), file);
     assert.doesNotMatch(guidance, /(?<![Nn]ever )\badd(?:s|ing)? (?:the )?`needs-decision`/, file);
   }
+});
+
+test('agents admin-merge only a PR ian named in chat', () => {
+  const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+  assert.match(
+    agents,
+    /When ian authorizes a named PR on his route in chat, an agent may merge it with `gh pr merge <n> --admin`, using the merge method `docs\/ops\/agent-bot-identity.md` gives its opener/,
+  );
+  assert.match(agents, /Without that per-PR authorization, agents never use `--admin`\./);
+  const skill = readFileSync(join(ROOT, '.claude/skills/pr-cairn/SKILL.md'), 'utf8');
+  assert.match(skill, /an agent uses `--admin` only on a PR ian named in chat/);
 });

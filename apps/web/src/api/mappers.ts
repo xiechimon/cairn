@@ -193,6 +193,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
+    ...(w.awaitingReply === true ? { awaitingReply: true } : {}),
   };
 }
 
@@ -638,6 +639,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
       continue;
     }
+    const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
+    if (ask !== null) {
+      entries.push({
+        at: m.createdAt,
+        item: {
+          kind: 'question',
+          id: m.id,
+          requestId: ask.requestId,
+          status: ask.status,
+          questions: ask.questions,
+          answers: ask.answers,
+        },
+      });
+      continue;
+    }
     const text = textOfContent(m.content).trim();
     if (m.role === 'user') {
       if ([...scheduledStepIds].some((id) => m.id === transcriptPromptRowId(id))) continue;
@@ -649,7 +665,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (classifyUserText(text, todo) !== 'user') continue;
-      entries.push({ at: m.createdAt, item: { kind: 'user', text, markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },
+      });
       continue;
     }
     if (m.role === 'system') {
@@ -665,7 +684,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         }
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'review', ...verdict, id: m.id, createdAt: m.createdAt },
+          });
           continue;
         }
         const report = infoReportMessageSchema.safeParse(JSON.parse(m.content as string));
@@ -676,13 +698,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
               kind: 'report',
               markdown: `${report.data.attachmentToken}\n\n${report.data.content}`,
               id: m.id,
+              createdAt: m.createdAt,
             },
           });
           continue;
         }
         const verifyVerdict = verifyVerdictOfContent(m.content);
         if (verifyVerdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'verify', ...verifyVerdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'verify', ...verifyVerdict, id: m.id, createdAt: m.createdAt },
+          });
         }
         continue;
       }
@@ -698,7 +724,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       continue;
     }
     if (text !== '') {
-      entries.push({ at: m.createdAt, item: { kind: 'robot', markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt },
+      });
       continue;
     }
     const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
@@ -722,6 +751,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       item: {
         kind: 'plan',
         title: `方案 · v${p.version}`,
+        createdAt: p.createdAt,
         preview: preview.length > 90 ? `${preview.slice(0, 90)}…` : preview,
       },
     });
@@ -729,7 +759,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   if (build?.withPlan === true) {
     for (const s of steps) {
       if (s.kind === 'build' && !scheduledStepIds.has(s.id)) {
-        entries.push({ at: s.createdAt, item: { kind: 'user', text: '确认' } });
+        entries.push({
+          at: s.createdAt,
+          item: { kind: 'user', text: '确认', createdAt: s.createdAt },
+        });
       }
     }
   }
@@ -739,8 +772,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const entry of entries) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
-      if (previous?.kind === 'work') previous.steps.push(entry.item.step);
-      else items.push({ kind: 'work', id: entry.item.step.id, steps: [entry.item.step] });
+      if (previous?.kind === 'work') {
+        previous.steps.push(entry.item.step);
+        previous.createdAt = entry.at;
+      } else {
+        items.push({
+          kind: 'work',
+          id: entry.item.step.id,
+          steps: [entry.item.step],
+          createdAt: entry.at,
+        });
+      }
     } else items.push(entry.item);
   }
 
@@ -829,6 +871,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
+      createdAt: todo.phaseAt,
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
     });
   }
@@ -1257,12 +1300,13 @@ export function askQuestionOfContent(content: unknown): {
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
 } | null {
-  if (typeof content !== 'string') return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    return null;
+  let parsed: unknown = content;
+  if (typeof content === 'string') {
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return null;
+    }
   }
   if (
     parsed === null ||
@@ -1488,6 +1532,15 @@ function collectChiefStream(
     pendingTools = [];
   }
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  items.forEach((item, index) => {
+    if (
+      item.kind === 'user' ||
+      item.kind === 'robot' ||
+      item.kind === 'error' ||
+      item.kind === 'stopped'
+    )
+      item.createdAt = itemsAt[index] ?? lastAt;
+  });
   const pending = [...pendingIds.keys()].flatMap((id) => {
     const item = pendingById.get(id);
     return item === undefined ? [] : [item];

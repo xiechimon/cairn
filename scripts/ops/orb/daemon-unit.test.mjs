@@ -23,7 +23,9 @@ test('Orb daemon uses a separate machine identity and state with the production 
   assert.notEqual(env.CAIRN_HOME, '%h/.cairn');
   assert.equal(env.CAIRN_WORKSPACES_DIR, '%h/.cairn-orb-daemon/workspaces');
   assert.ok(!env.TMPDIR || env.CAIRN_HEAVY_SLOTS_DIR);
-  assert.deepEqual(entries.get('WorkingDirectory'), ['%h/Code/AgentProjects/cairn/apps/daemon']);
+  assert.deepEqual(entries.get('WorkingDirectory'), [
+    '%h/Code/AgentProjects/cairn-exec/apps/daemon',
+  ]);
   assert.match(
     entries.get('ExecStart')[0],
     /node dist\/cli\.mjs start -f --server http:\/\/127\.0\.0\.1:8787 --name omarchy-orb$/,

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
 const GATED = '/app/schedules?scenario=100';
 const READY = '/app/schedules?scenario=111';
@@ -12,8 +13,6 @@ function setTheme(page: Page, theme: 'light' | 'dark') {
   return page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
 }
 
-/** Resolve a CSS expression for one property through a probe element, so
- *  token values are compared the way the computed style reports them. */
 function probe(page: Page, prop: 'color' | 'backgroundColor' | 'fontFamily', value: string) {
   return page.evaluate(
     ([p, v]) => {
@@ -43,7 +42,6 @@ async function openWindow(page: Page, url: string) {
   await page.goto(url);
   const win = page.locator('aside.chief-drawer');
   await expect(win).toBeVisible();
-  // The entrance is a fade + scale; measure the settled box.
   await win.evaluate((el) =>
     Promise.all(el.getAnimations().map((a) => a.finished)).then(() => undefined),
   );
@@ -91,6 +89,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openWindow(page, THREAD);
+    await expandTurns(page);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
     await expect(note, 'W5').toHaveCSS('font-size', '13px');
     const foot = win.getByTestId('chief-msg-foot').first();
@@ -136,8 +135,6 @@ for (const theme of ['light', 'dark'] as const) {
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
     expect(heights.length, 'S2').toBe(2);
     for (const h of heights) expect(h, 'S2').toBeGreaterThanOrEqual(52);
-    // The divider between the two rows is drawn: the agent row is a button,
-    // and a button's own transparent border must not hide the card's rule.
     const agentRow = cards.locator('> .settings-row').first();
     await expect(agentRow, 'S2: divider').toHaveCSS('border-bottom-width', '1px');
     await expect(agentRow, 'S2: divider').toHaveCSS(

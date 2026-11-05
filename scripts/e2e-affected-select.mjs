@@ -36,6 +36,8 @@ const BOARD = [
   'task-panel',
 ];
 const SIDEBAR = [
+  'activity-page',
+  'search-syntax-palette',
   'menu-keys',
   'settings-',
   'sidebar-',
@@ -86,6 +88,7 @@ const DETAIL = [
   'cds-composer',
   'cds-dialogs',
   'cds-transcript',
+  'turn-folding',
   'checkbox-unified',
   'composer-inline-mention',
   'composer-paste',
@@ -130,6 +133,7 @@ const AGENT = [
   'chief-home-digest',
 ];
 export const LIVE_SERVER = [
+  'account-feature-releases',
   'token-gate',
   'live-server-',
   'agent-fallback-models',
@@ -158,6 +162,7 @@ const OVERLAY = [
   'storage-unavailable',
 ];
 const OVERLAYS = [
+  'activity-page',
   'chip-',
   'hotkeys',
   'search-',
@@ -208,6 +213,7 @@ const RESOURCES = [
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
+  'motion-quiet',
   'color-freeze',
   'fixture-mode-chip',
   'orientation-variants',
@@ -215,6 +221,8 @@ export const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 export const FILE_RULES = new Map([
+  ['apps/web/src/components/thread/pr-card.tsx', ['pr-card']],
+  ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card']],
   ['apps/web/src/design/components-overlays.tsx', ['menu-keys', 'shadcn-primitives']],
   [
     'apps/web/src/components/menu-keys.tsx',
@@ -235,6 +243,8 @@ export const FILE_RULES = new Map([
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
   ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
+  ['apps/web/src/board/sidebar-user-menu.tsx', SIDEBAR],
+  ['apps/web/src/routes/activity-page.tsx', ['activity-page', 'search-syntax-palette']],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
@@ -243,6 +253,7 @@ export const FILE_RULES = new Map([
     ['account-', 'user-menu-', 'cds-density', 'push-device-switch'],
   ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
+  ['apps/web/src/routes/feature-releases.tsx', ['account-feature-releases']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],
@@ -285,6 +296,7 @@ export const FILE_RULES = new Map([
 ]);
 
 export const DIR_RULES = [
+  { prefix: 'apps/web/src/search/', specs: ['activity-page', 'search-'] },
   { prefix: 'apps/web/src/board/', specs: BOARD },
   {
     prefix: 'apps/web/src/task-panel/',

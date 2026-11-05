@@ -19,10 +19,13 @@ import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { ProjectHome, type ProjectHomeProject } from '../board/project-home.js';
+import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
+import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
+import { BoardQuestionBar, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -75,6 +78,16 @@ export function BoardPage() {
           icon: liveProject?.icon ?? fixture.projectAvatars?.[homeProjectId]?.icon,
           color: liveProject?.color ?? fixture.projectAvatars?.[homeProjectId]?.color,
         };
+  const projectLookup =
+    homeProjectId === null || homeProject !== null || (!live && fixture.projectNames == null)
+      ? 'resolved'
+      : live && teamId === undefined && teamsQ.isError
+        ? 'failed'
+        : !live || projectsQ.data !== undefined
+          ? 'unknown'
+          : projectsQ.isError
+            ? 'failed'
+            : 'loading';
   const projectChat = searchParams.get('chat') === '1';
   const previousChiefView = useRef(chiefView);
   useEffect(() => {
@@ -98,6 +111,27 @@ export function BoardPage() {
     () => (live ? mapMachines(machinesQ.data ?? []) : fixture.resources?.machines),
     [live, machinesQ.data, fixture],
   );
+
+  const knownProjects: SuggestableProject[] = useMemo(() => {
+    const lastActive = new Map<string, number>();
+    for (const todo of todos) {
+      if (todo.projectId == null) continue;
+      lastActive.set(todo.projectId, Math.max(lastActive.get(todo.projectId) ?? 0, todo.phaseAt));
+    }
+    const listed = live
+      ? (projectsQ.data ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          icon: p.icon,
+          color: p.color,
+        }))
+      : Object.entries(fixture.projectNames ?? {}).map(([id, name]) => ({
+          id,
+          name,
+          ...fixture.projectAvatars?.[id],
+        }));
+    return listed.map((p) => ({ ...p, lastActiveAt: lastActive.get(p.id) ?? 0 }));
+  }, [live, projectsQ.data, fixture, todos]);
 
   const search = useSearchState(fixture.ui?.searchOpen === true, fixture.ui?.searchQuery ?? '');
   const searchResults = useSearchResults(search.query, live && search.open);
@@ -128,34 +162,74 @@ export function BoardPage() {
         onSearch={() => search.setOpen(true)}
       />
       <div className={`board-sheet ${SHEET_PANEL}`}>
-        {chiefView === 'settings' ? (
-          <ChiefSettings
-            chief={chiefData}
-            onBack={() => setChiefView('drawer')}
-            machines={fixture.resources?.machines}
-          />
-        ) : homeProject !== null && !projectChat ? (
-          <ProjectHome
-            key={homeProject.id}
-            project={homeProject}
-            todos={todos}
-            schedules={schedules}
-            now={now}
-            chatHref={projectChatHref}
-          />
-        ) : (
-          <HomeC
-            surface={chief}
-            todos={todos}
-            now={now}
-            projectId={homeProjectName === null ? null : homeProjectId}
-            projectName={homeProjectName}
-            banner={homeBanner}
-            machines={machines}
-            coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
-            schedules={schedules}
-          />
-        )}
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          {chiefView === 'settings' ? (
+            <ChiefSettings
+              chief={chiefData}
+              onBack={() => setChiefView('drawer')}
+              machines={fixture.resources?.machines}
+            />
+          ) : projectLookup === 'loading' ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectsLoading />
+            </div>
+          ) : projectLookup === 'failed' ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectsFailed
+                retrying={teamsQ.isFetching || projectsQ.isFetching}
+                onRetry={() => {
+                  if (teamId === undefined) {
+                    void teamsQ.refetch();
+                    return;
+                  }
+                  void projectsQ.refetch();
+                }}
+              />
+            </div>
+          ) : projectLookup === 'unknown' && homeProjectId !== null ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectNotFound
+                unknownId={homeProjectId}
+                suggestions={suggestProjects(homeProjectId, knownProjects)}
+                projectHref={(id) => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set('project', id);
+                  params.delete('chat');
+                  params.delete(THREAD_PARAM);
+                  return `/app?${params.toString()}`;
+                }}
+              />
+            </div>
+          ) : homeProject !== null && !projectChat ? (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <BoardQuestionBar />
+              <ProjectHome
+                key={homeProject.id}
+                project={homeProject}
+                todos={todos}
+                schedules={schedules}
+                now={now}
+                chatHref={projectChatHref}
+              />
+            </div>
+          ) : (
+            <HomeC
+              surface={chief}
+              todos={todos}
+              now={now}
+              projectId={homeProjectName === null ? null : homeProjectId}
+              projectName={homeProjectName}
+              banner={homeBanner}
+              machines={machines}
+              coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
+              schedules={schedules}
+            />
+          )}
+          <ChiefQuestionPanel />
+        </div>
         {threadId !== null && (
           <SideChat
             key={threadId}

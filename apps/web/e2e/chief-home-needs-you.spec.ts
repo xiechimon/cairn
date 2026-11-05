@@ -17,7 +17,7 @@ function question(requestId: string, header: string, text: string, options: unkn
   };
 }
 
-test('two pending decisions are two cards; the recommended option is first and answering it resumes the thread (#1784)', async ({
+test('two pending decisions are two header questions; the recommended option is first and answering it resumes the thread (#1784)', async ({
   page,
 }) => {
   const answered: { requestId: string; body: unknown }[] = [];
@@ -57,25 +57,24 @@ test('two pending decisions are two cards; the recommended option is first and a
     return json(JSON.parse(state.messages.find((row) => row.id === `row-${requestId}`)!.content));
   });
   await page.goto('/app');
-  const needsYou = page.getByTestId('needs-you');
-  const cards = needsYou.getByTestId('chief-question-card');
-  await expect(cards).toHaveCount(2);
-  await expect(needsYou.getByTestId('needs-you-count')).toHaveText('2');
-  const first = cards.first();
-  await expect(first.getByTestId('chief-question-status')).toHaveText('待你决定');
-  await expect(first.getByTestId('chief-question-option-0-0')).toHaveText('1Claude subscription （推荐）');
-  await expect(first.getByTestId('chief-question-option-0-1')).toContainText('wokey');
-  await expect(first.getByTestId('chief-question-other-0')).toHaveText('3用我自己的话回答');
-  await first.getByTestId('chief-question-option-0-0').click();
-  await first.getByRole('button', { name: '提交回答' }).click();
+  await expect(page.getByTestId('needs-you')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
+  await page.getByTestId('chief-question-entry').click();
+  const panel = page.getByTestId('chief-question-panel');
+  const card = panel.getByTestId('chief-question-card');
+  await expect(card.getByTestId('chief-question-status')).toHaveText('待你决定');
+  await expect(card.getByTestId('chief-question-option-0-0')).toHaveText('1Claude subscription （推荐）');
+  await expect(card.getByTestId('chief-question-option-0-1')).toContainText('wokey');
+  await expect(card.getByTestId('chief-question-other-0')).toHaveText('3用我自己的话回答');
+  await card.getByTestId('chief-question-option-0-0').click();
+  await card.getByRole('button', { name: '提交回答' }).click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({
     requestId: 'ask-0000000a',
     body: { answers: [{ header: 'Model · #74', choices: ['Claude subscription'] }] },
   });
-  await expect(cards).toHaveCount(1);
-  await expect(needsYou.getByTestId('needs-you-count')).toHaveText('1');
-  await expect(cards.first()).toContainText('Who merges it?');
+  await expect(page.getByTestId('chief-question-count')).toHaveText('1');
+  await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
 });
 
 test('own words: the free-text row takes a typed answer', async ({ page }) => {
@@ -98,7 +97,8 @@ test('own words: the free-text row takes a typed answer', async ({ page }) => {
     },
   );
   await page.goto('/app');
-  const card = page.getByTestId('needs-you').getByTestId('chief-question-card');
+  await page.getByTestId('chief-question-entry').click();
+  const card = page.getByTestId('chief-question-panel').getByTestId('chief-question-card');
   await card.getByTestId('chief-question-other-0').click();
   await card.getByTestId('chief-question-input-0').fill('Use the metered key this once');
   await card.getByRole('button', { name: '提交回答' }).click();
@@ -107,7 +107,7 @@ test('own words: the free-text row takes a typed answer', async ({ page }) => {
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
 });
 
-test('number keys pick only in the first pinned decision card', async ({ page }) => {
+test('number keys pick only in the open question card', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -123,10 +123,13 @@ test('number keys pick only in the first pinned decision card', async ({ page })
     todos: [],
   });
   await page.goto('/app');
-  const cards = page.getByTestId('needs-you').getByTestId('chief-question-card');
-  await expect(cards).toHaveCount(2);
+  await page.getByTestId('chief-question-entry').click();
+  const panel = page.getByTestId('chief-question-panel');
+  const card = panel.getByTestId('chief-question-card');
+  await expect(card).toHaveCount(1);
   await page.keyboard.press('2');
-  await expect(cards.first().getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
-  await expect(cards.nth(1).getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
-  await expect(cards.nth(1).getByTestId('chief-question-hint')).toHaveText('');
+  await expect(card.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
+  await panel.getByTestId('chief-question-pick').nth(1).click();
+  await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(panel.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
 });

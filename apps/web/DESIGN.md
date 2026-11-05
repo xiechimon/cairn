@@ -80,7 +80,7 @@ typography:
   code:         { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
 fonts:
   serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
-  display: var(--font-display)   # Bricolage Grotesque → sans
+  display: var(--font-display)   # Instrument Sans at 650 (the display role, same face as sans)
   sans: var(--font-sans)         # Instrument Sans → PingFang SC
   mono: var(--font-mono)         # JetBrains Mono
 rounded:
@@ -139,7 +139,7 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Typography
 
-- **Two title faces**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. Bricolage Grotesque (`font-heading` with `font-title`, 650) for the brand name, section and column headings, pane and dialog titles. Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
+- **One serif voice, one sans**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. The brand name, section and column headings, pane and dialog titles are Instrument Sans at 650 (`font-heading` with `font-title`; `font-heading` is the display role and resolves to the sans). Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
 - **Seven font sizes, measured against Claude Code**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 15 body text and card titles (messages, plans, composer) / 14 UI text / 13 meta and code (mono) / 12 badges and group labels. Body steps above UI text so reading text and chrome do not blur together. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` and `text-code` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
@@ -311,9 +311,9 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
   - S 400: keys, API keys, delete and other confirmations, short forms.
   - M 480: skills, most new-entity forms (agent, schedule, charter, review, request changes).
   - L 640: multi-step flows and long lists (add machine, provider selector, GitHub issue, raw error, attachment preview, new task).
-- **Head**: 16px display title (`text-heading`) + an optional 12px `ink-3` subtitle line (`subtitle`); a 28px ghost close button in the top-right corner. The close button is last in the DOM, and initial focus lands on the first field.
+- **Head**: 17px display title (`text-heading`) + an optional 13px `ink-3` subtitle line (`subtitle`, `text-meta`); a 28px ghost close button in the top-right corner. The close button is last in the DOM, and initial focus lands on the first field.
 - **Body**: the single scrolling box (`min-h-0`), with 20px left/right padding that also serves as room for the focus ring. The panel is capped at `100vh - 64px`; in short viewports the body scrolls and the foot stays on screen.
-- **Foot (split)**: a 12px `ink-3` hint or status on the left (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
+- **Foot (split)**: a 13px `ink-3` hint or status on the left (`text-meta`) (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
 - **Grouped selector** (providers): a search box on top, then groups under small headings (`text-caption` 500 `ink-3`); each row is 40px = a 22px first-letter tile (white background + `line` ring) + name + an `ink-3` tag on the right (OAuth / not yet enabled). Hover and keyboard focus = the selector's selected row (white card + hairline ring). Disabled rows drop the text to `ink-3` and show no hover. Search filters across groups and whole empty groups hide; "Other · custom endpoint" is always there.
 - **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 12px radius (`--radius-popover`), 4px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 8px radius (`--radius-menu-item` = popover radius minus padding, the same 12/8 pair Linear and Amp use), 14px text, 15px `ink-3` icons, hover `menu-hover`; every row of an action menu ends in one key hint, right-aligned in `text-caption` `ink-3` (see Menu keys below); dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
 - **Menu keys** (`components/menu-keys.tsx`, outside the pinned `components/ui`): every row of an action menu shows one letter on the right (`KeyedMenuItem`, `KeyedMenuRadioItem`, `KeyedMenuCheckboxItem`, `KeyedMenuSubTrigger` take a `shortcut`), and pressing it while the menu is open runs that row. One handler on the popup (`KeyedMenuContent` / `KeyedMenuSubContent`) does the matching, so no menu carries its own key code. The letter comes from the label, and a clash goes to the next letter that still reads well (Complete `C`, Request changes `R`, Stop `S`, Copy link `L`, Archive `A`, Close `X` because `C` is taken, Delete `D`; Mark as unread `U`, Snooze `S`). A row that opens a confirmation ends in an ellipsis (`Delete…`, passed as `confirms`). The hint is one quiet style everywhere: `text-caption`, `ink-3`, no box, right-aligned, tabular figures. Letters are not typeahead: while a keyed menu is open a letter that no row owns does nothing (it neither moves focus nor reaches the global keys), arrows, Enter, Escape and Tab behave as before, chords with Cmd, Ctrl or Alt and IME composition are left alone, and a text field inside the menu types normally. Menus of user data (project and model pickers, thread switchers) have no letters; version rows use digits. Never show a hint that does nothing.
@@ -323,29 +323,26 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
 
 ## Motion
 
-The stone is quiet. Motion comes in four kinds, each with one duration and one easing; values come from the motion slots in `src/styles/shadcn.css` (`--dur-fast` / `--dur-overlay` / `--dur-window` / `--ease-standard` / `--ease-pop` / `--ease-out-expo` / `--ease-drawer` / `--spring-snappy`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
+The stone is quiet. Motion only says where a surface came from or that something is still working. Anything the user triggers often, and any reply to their own input, is instant. Values come from the motion slots in `src/styles/shadcn.css` (`--dur-fast` / `--dur-overlay` / `--ease-standard` / `--ease-out-expo` / `--ease-drawer`) or the tw-animate-css defaults. A new surface first finds its row in the table below; if none fits, it gets no motion. A new slot must ship with its consumer in the same PR.
 
 | Kind | Surface | Duration | Easing | Animated properties |
 |---|---|---|---|---|
 | Micro-interaction | Hover and press tint on rows, cards and buttons; segmented controls; disclosure chevrons | 150ms (`--dur-fast`) | `--ease-standard` (same as tw `ease-out`) | `background-color` / `color` / `box-shadow` / `transform` |
 | Micro-interaction | Task card hover lift and shadow | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
 | Overlay | Dialog, confirmation surface, ⌘K | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
-| Overlay | Chief window grows from and returns to the lower-right corner | 320ms in (`--dur-window`), 200ms out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin near the lower-right corner |
-| Overlay | Menu, popover, Select | 100ms in and out | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
-| Overlay | Tooltip | 150ms in and out (tw-animate default) | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
+| Overlay | Chief window grows from and returns to the lower-right corner | 200ms in and out (`--dur-overlay`) | `--ease-drawer` (`cubic-bezier(.32,.72,0,1)`) | `opacity` + `scale(.4→1)`, origin near the lower-right corner |
+| Overlay | Menu, popover, Select | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
+| Overlay | Tooltip | 150ms in (tw-animate default), no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
 | Overlay | Inline popovers (mention, slash, chip) | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.98→1)` |
-| Arrival | New card on the board, column change, filter hit | 150ms | `--ease-pop` | `opacity` + `translateY(4px→0)` |
-| Arrival | Conversation message entry | 380ms (`--spring-snappy-dur`) | `--spring-snappy` | `opacity` + `translateY` |
-| Arrival | Streaming text reveal | 350ms | `--ease-out-expo` | `opacity` |
-| Arrival | Saved check fade | 2.5s | `--ease-out-expo` | `opacity` + `scale` |
+| Overlay | Side panel floating over the scrim (1100px and below) | 220ms in, scrim 200ms | `--ease-standard` | `opacity` + `translate(12px→0)` |
+| Overlay | Jump-to-latest button in the transcript | 200ms in, 150ms out (`--dur-fast`) | tw arbitrary ease in and out | `opacity` + `scale` + `translate` |
 | Loop | Running task card footer and the busy Coordinator: the spiral mark spins | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
-| Loop | In-flight spinner pulse | 3.6s | `ease-in-out` | `opacity` + `scale` |
 
 - Animate only `opacity` / `transform` / shadow / color, never layout properties (width / height / top).
-- Instant, no transition: press (`:active` darkening, card background tint), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames).
+- Instant, no transition: press (`:active` darkening, card background tint), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames), the user's own chat message, the composer ring on hover and focus, closing a menu, popover, Select or tooltip (the `[data-closed]` rule in `motion.css`), and the side panel docked beside the page.
 - `prefers-reduced-motion`: every keyframe animation shrinks to 0.01ms and loops run once (the site-wide rule in `motion.css`); transitions are untouched.
-- Not used: route transitions, list FLIP, cross-column flights, a spring family (only message entry uses `--spring-snappy`).
-- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and `anim-*` class names; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
+- Not used: route transitions, list FLIP, cross-column flights, entry animations on new board cards or chat messages, spring easings.
+- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the retired ones; `e2e/motion-quiet.spec.ts` pins the instant surfaces above and the floating panel slide; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
 
 ## Texture
 
@@ -392,12 +389,12 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: direction A, Cairn. Stone paper, dense, calm. Light (.light): canvas #e6e7e1 → sheet #f6f6f2 → card #fdfdfb, ink #1d231f. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow.
 - Dark (:root default): the same ladder in deep stone, lighter with elevation: canvas #141715 → sheet #1b1f1c → card #222723 → popover #262b27. Ink #e6e8e2 / #b4bab3 / #959c96. Accent #ebb550 with dark ochre text on it. Running #82b46f. All tokens live in src/styles/shadcn.css.
 - Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges; lichen green (running) = working/online; slate blue = ready for review. Status chips: idle neutral, plan slate, confirm ochre, done lichen, failed rust. Everything else is ink greys.
-- Type: Bricolage Grotesque (font-heading, 650) for brand, page, pane and dialog titles and the Coordinator greeting; Instrument Sans for everything else; JetBrains Mono for code, times, ids. Chinese falls back to PingFang SC. Sizes only 26/20/17/14/12.5/12; body weight 450, titles 650.
+- Type: three families only. Source Serif 4 (font-serif, 600) for the Coordinator greeting and page titles; Instrument Sans for everything else, at 650 (font-heading font-title) for the brand, section and column headings, pane and dialog titles; JetBrains Mono for code, times, ids. Chinese falls back to Songti SC under the serif and PingFang SC under the sans. Sizes only 26/20/17/15/14/13/12 through text-greeting / text-page / text-heading / text-card-title / text-ui / text-meta and text-code / text-caption; body weight 450, row titles 600, display titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Every icon draws at stroke 1.75 (`test/icon-stroke.test.ts` pins `src/icons`). The spiral mark is the brand and the Coordinator avatar.
 - Primary button = shadcn default Button on --primary (light #233127 with #f4f6f1 text, dark #e6e8e2 with dark text), 8px corners, 32px tall. Card actions = accent text links. No solid buttons on cards except the one primary action of a thread card.
-- Radii: menu and dialog 18px, card and composer 14px, menu row 12px, button, input and row 8px.
-- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 13px sub-line, split footer (12px ink-3 hint left, actions right, primary button). Menus: popover color, 18px corners, 6px padding, 32px rows with 12px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
+- Radii: dialog and ⌘K 18px, card, composer and chat bubble 14px, menu and popover 12px, menu row, button, input and row 8px.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 13px sub-line, split footer (13px ink-3 hint left, actions right, primary button). Menus: popover color, 12px corners, 4px padding, 32px rows with 8px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (14px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Use components/ui primitives and tokens; no hex in components.

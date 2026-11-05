@@ -6,11 +6,11 @@ import {
   todoRecordSchema,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { machine as machineTable, todo as todoTable } from '../src/db/schema.js';
 import { completeStep, listSteps } from '../src/services/builds.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { serverTimezone, wallClockParts } from '../src/services/schedules.js';
+import { pauseSchedule, serverTimezone, wallClockParts } from '../src/services/schedules.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, postProject, req, type TestServer } from './helpers.js';
 
@@ -23,6 +23,7 @@ function boot() {
   return s;
 }
 afterEach(() => {
+  vi.useRealTimers();
   while (servers.length > 0) servers.pop()?.dispose();
 });
 
@@ -414,5 +415,156 @@ describe('scheduled thread continuation', () => {
     const list = (await (await req(s.app, 'GET', '/api/schedules')).json()) as unknown[];
     expect(list).toEqual([]);
     expect(await buildsOf(s, s.projectId)).toHaveLength(0);
+  });
+});
+
+describe('PATCH /api/schedules/{id} enabled (pause and resume)', () => {
+  const DAY = 24 * 3_600_000;
+
+  async function createDaily(s: Awaited<ReturnType<typeof withTodo>>) {
+    return scheduleRecordSchema.parse(
+      await (
+        await req(s.app, 'POST', '/api/schedules', {
+          todoId: s.todoDoc.id,
+          kind: 'daily',
+          at: new Date('2026-09-01T14:30:00+08:00').getTime(),
+          tz: TZ,
+        })
+      ).json(),
+    );
+  }
+
+  async function patch(s: TestServer, id: string, body: unknown) {
+    return req(s.app, 'PATCH', `/api/schedules/${id}`, body);
+  }
+
+  test('a paused schedule does not fire across three periods; resuming recomputes from now without a burst', async () => {
+    const s = await withTodo();
+    const created = await createDaily(s);
+    const t0 = created.nextRunAt as number;
+    const paused = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: false })).json(),
+    );
+    expect(paused).toMatchObject({ enabled: false, nextRunAt: null });
+    for (const k of [1, 2, 3]) await s.scheduler.tick(t0 + k * DAY);
+    expect(await buildsOf(s, s.projectId)).toHaveLength(0);
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(t0 + 3 * DAY + 60_000);
+    const now = Date.now();
+    const resumed = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: true })).json(),
+    );
+    expect(resumed.enabled).toBe(true);
+    expect(resumed.nextRunAt).toBeGreaterThan(now);
+    expect((resumed.nextRunAt as number) - now).toBeLessThanOrEqual(DAY);
+    expect(wallClockParts(resumed.nextRunAt as number, TZ)).toMatchObject({ hour: 14, minute: 30 });
+    await s.scheduler.tick(now);
+    expect(await buildsOf(s, s.projectId)).toHaveLength(0);
+    await s.scheduler.tick(resumed.nextRunAt as number);
+    expect(await buildsOf(s, s.projectId)).toHaveLength(1);
+  });
+
+  test('resuming a cron schedule recomputes the next run from now', async () => {
+    const s = await withTodo();
+    const created = scheduleRecordSchema.parse(
+      await (
+        await req(s.app, 'POST', '/api/schedules', {
+          todoId: s.todoDoc.id,
+          kind: 'cron',
+          cron: '0 9 * * *',
+          tz: TZ,
+        })
+      ).json(),
+    );
+    await patch(s, created.id, { enabled: false });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(created.nextRunAt! + 10 * DAY);
+    const now = Date.now();
+    const resumed = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: true })).json(),
+    );
+    expect(resumed.nextRunAt).toBeGreaterThan(now);
+    expect((resumed.nextRunAt as number) - now).toBeLessThanOrEqual(DAY);
+    expect(wallClockParts(resumed.nextRunAt as number, TZ)).toMatchObject({ hour: 9, minute: 0 });
+  });
+
+  test('resuming a once schedule whose time passed fires it once at the next tick', async () => {
+    const s = await withTodo();
+    const at = new Date('2026-09-24T14:30:00+08:00').getTime();
+    const created = scheduleRecordSchema.parse(
+      await (
+        await req(s.app, 'POST', '/api/schedules', {
+          todoId: s.todoDoc.id,
+          kind: 'once',
+          at,
+          tz: TZ,
+        })
+      ).json(),
+    );
+    await patch(s, created.id, { enabled: false });
+    await s.scheduler.tick(at + DAY);
+    expect(await buildsOf(s, s.projectId)).toHaveLength(0);
+    const resumed = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: true })).json(),
+    );
+    expect(resumed.nextRunAt).toBeGreaterThan(0);
+    await s.scheduler.tick(resumed.nextRunAt as number);
+    expect(await buildsOf(s, s.projectId)).toHaveLength(1);
+  });
+
+  test('resuming a once schedule still in the future keeps its anchor', async () => {
+    const s = await withTodo();
+    const at = Math.ceil((Date.now() + 3 * DAY) / 900_000) * 900_000;
+    const created = scheduleRecordSchema.parse(
+      await (
+        await req(s.app, 'POST', '/api/schedules', {
+          todoId: s.todoDoc.id,
+          kind: 'once',
+          at,
+          tz: TZ,
+        })
+      ).json(),
+    );
+    await patch(s, created.id, { enabled: false });
+    const resumed = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: true })).json(),
+    );
+    expect(resumed.nextRunAt).toBe(at);
+  });
+
+  test('resuming clears the pause reason and the retry delay', async () => {
+    const s = await withTodo();
+    const created = await createDaily(s);
+    pauseSchedule(s.svc, created.id, 'boom');
+    const resumed = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: true })).json(),
+    );
+    expect(resumed.pausedReason).toBeNull();
+    expect(resumed.nextRunAt).not.toBeNull();
+  });
+
+  test('PATCH is idempotent: repeating pause or resume leaves the record unchanged', async () => {
+    const s = await withTodo();
+    const created = await createDaily(s);
+    const first = await (await patch(s, created.id, { enabled: true })).json();
+    expect(first).toEqual(created);
+    const a = await (await patch(s, created.id, { enabled: false })).json();
+    const b = await (await patch(s, created.id, { enabled: false })).json();
+    expect(b).toEqual(a);
+    pauseSchedule(s.svc, created.id, 'Task archived');
+    const c = scheduleRecordSchema.parse(
+      await (await patch(s, created.id, { enabled: false })).json(),
+    );
+    expect(c.pausedReason).toBe('Task archived');
+  });
+
+  test('unknown id 404; invalid body 400; extra fields 400', async () => {
+    const s = await withTodo();
+    const created = await createDaily(s);
+    expect((await patch(s, 'nope', { enabled: false })).status).toBe(404);
+    expect((await patch(s, created.id, {})).status).toBe(400);
+    expect((await patch(s, created.id, { enabled: 'no' })).status).toBe(400);
+    expect((await patch(s, created.id, { enabled: false, kind: 'once' })).status).toBe(400);
   });
 });

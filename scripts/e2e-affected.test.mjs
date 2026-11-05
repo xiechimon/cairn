@@ -496,3 +496,46 @@ test('ci shards e2e-affected by the matrix size and runs the CSS gate once', () 
   }
   assert.match(job, /name: gallery-snapshots-affected-\$\{\{ matrix\.shard \}\}/);
 });
+
+for (const path of [
+  'apps/web/src/routes/account-page.tsx',
+  'apps/web/src/routes/feature-releases.tsx',
+  'apps/server/src/routes-flags.ts',
+  'apps/server/src/services/feature-flags.ts',
+  'apps/web/e2e/live-server.ts',
+]) {
+  test(`${path} selects the real feature release flow without a full fallback`, () => {
+    const result = selectSpecs({
+      paths: [path],
+      allSpecs: listSpecs(),
+      dependencies: () => ({ specs: [], why: 'unchanged dependencies' }),
+      workspace: () => () => null,
+    });
+
+    assert.equal(result.full, false);
+    assert.ok(result.selection.includes('account-feature-releases.spec.ts'));
+  });
+}
+
+test('Activity and palette source edits keep their navigation regressions in the affected set', () => {
+  for (const path of [
+    'apps/web/src/routes/activity-page.tsx',
+    'apps/web/src/search/activity-model.ts',
+    'apps/web/src/search/activity-href.ts',
+    'apps/web/src/search/query-chip.tsx',
+    'apps/web/src/search/search-query.ts',
+    'apps/web/src/overlay/search-panel.tsx',
+    'apps/web/src/board/sidebar.tsx',
+    'apps/web/src/board/sidebar-user-menu.tsx',
+  ]) {
+    const result = selectSpecs({
+      paths: [path],
+      allSpecs: listSpecs(),
+      dependencies: () => assert.fail('no dependency change'),
+      workspace: () => workspacePackages(LOCKFILE),
+    });
+    assert.equal(result.full, false, path);
+    assert.ok(result.selection.includes('activity-page.spec.ts'), path);
+    assert.ok(result.selection.includes('search-syntax-palette.spec.ts'), path);
+  }
+});
