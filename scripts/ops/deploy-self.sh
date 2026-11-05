@@ -21,7 +21,9 @@ usage: deploy-self.sh <40-hex sha on origin/main> | --recover
 Deploys one green main commit to this host's cairn checkout and user units, with rollback.
   1. refuses a SHA not on origin/main, without every required check green, while autonomy
      is paused, or whose pnpm-workspace.yaml allows a new install script (exit 2)
-  2. waits while a step is claimed or $CAIRN_DEPLOY_STATE/hold exists (exit 75)
+  2. waits while a step is claimed or $CAIRN_DEPLOY_STATE/hold exists (exit 75), except that
+     claimed steps with no heartbeat for CAIRN_DEPLOY_STEP_STALE_SECONDS stop blocking the
+     deploy once CAIRN_DEPLOY_STEP_WAIT_SECONDS have passed; that deploy opens an alarm
   3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
   4. checks out the target, installs with --frozen-lockfile, builds the daemon and web assets
   5. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
@@ -40,7 +42,8 @@ Environment (defaults in brackets):
   CAIRN_DEPLOY_SCRATCH [$CAIRN_DEPLOY_STATE/scratch]  CAIRN_REPO [xiechimon/cairn]
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
   CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
-  CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]
+  CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]  CAIRN_DEPLOY_STEP_WAIT_SECONDS [1800]
+  CAIRN_DEPLOY_STEP_STALE_SECONDS [600]
   CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
   CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
@@ -62,6 +65,9 @@ MACHINE_NAME="${CAIRN_MACHINE_NAME:-$(hostname -s)}"
 KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
 NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
 NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
+STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
+STEP_STALE_SECONDS="${CAIRN_DEPLOY_STEP_STALE_SECONDS:-600}"
+STEPS_ALARM_TITLE="Deploy forced past a claimed step with no heartbeat"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
@@ -132,6 +138,9 @@ run_notify() {
 write_record() {
   local sha="$1" previous="$2" result="$3" failed="${4:-}" snapshot="${5:-}"
   local record
+  if [ "$result" = deployed ]; then
+    rm -f "$STATE/steps-waiting-since" "$STATE/alarms/deploy-forced-past-stale-steps"
+  fi
   record="$(printf '{"sha":"%s","previous":"%s","result":"%s","failed":"%s","snapshot":"%s","at":"%s","host":"%s"}\n' \
     "$sha" "$previous" "$result" "$failed" "$snapshot" "$(date -u +%FT%TZ)" "$MACHINE_NAME")"
   printf '%s' "$record" >"$STATE/deployed.json.tmp" && mv "$STATE/deployed.json.tmp" "$STATE/deployed.json"
@@ -148,11 +157,43 @@ claimed_steps() {
   sqlite3 -readonly "$DB" "select count(*) from step where status = 'claimed'"
 }
 
+stale_claimed_steps() {
+  local cutoff=$(( ($(date +%s) - STEP_STALE_SECONDS) * 1000 ))
+  sqlite3 -readonly "$DB" \
+    "select count(*) from step where status = 'claimed' and (lastHeartbeatAt is null or lastHeartbeatAt < $cutoff)"
+}
+
+step_wait_alarm() {
+  local running="$1" waited="$2" reason="deploy-forced-past-stale-steps" open_issue body
+  echo "$reason: $running claimed step(s) without a heartbeat for ${STEP_STALE_SECONDS}s blocked the deploy for ${waited}s; continuing" >&2
+  mkdir -p "$STATE/alarms" || return 0
+  [ ! -e "$STATE/alarms/$reason" ] || return 0
+  body="$reason: $running claimed step(s) on $MACHINE_NAME had no heartbeat for ${STEP_STALE_SECONDS}s and held the deploy for ${waited}s, past the ${STEP_WAIT_SECONDS}s bound. The deploy continued. Inspect the step and the daemon that owns it; the alarm clears on the next recorded deploy."
+  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$STEPS_ALARM_TITLE\" in:title" --json number --jq '.[0].number // empty')" || return 0
+  if [ -n "$open_issue" ]; then
+    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null || return 0
+  else
+    gh issue create -R "$REPO" -t "$STEPS_ALARM_TITLE" -b "$body" -a xiechimon >/dev/null || return 0
+  fi
+  touch "$STATE/alarms/$reason" || true
+}
+
 assert_idle() {
   [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
-  local running
+  local running stale now since waited
   running="$(claimed_steps)"
-  [ "$running" = 0 ] || busy "$running step running"
+  if [ "$running" = 0 ]; then
+    rm -f "$STATE/steps-waiting-since"
+    return 0
+  fi
+  now="$(date +%s)"
+  [ -e "$STATE/steps-waiting-since" ] || printf '%s\n' "$now" >"$STATE/steps-waiting-since"
+  since="$(cat "$STATE/steps-waiting-since")"
+  waited=$((now - since))
+  [ "$waited" -ge "$STEP_WAIT_SECONDS" ] || busy "$running step running for ${waited}s"
+  stale="$(stale_claimed_steps)"
+  [ "$stale" = "$running" ] || busy "$running step running for ${waited}s"
+  step_wait_alarm "$running" "$waited"
 }
 
 allow_builds_block() {

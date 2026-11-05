@@ -80,7 +80,7 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date } = {}) {
   return git(work, 'rev-parse', 'HEAD');
 }
 
-function fixture({ claimed = 0 } = {}) {
+function fixture({ claimed = 0, heartbeatAgeMs = null } = {}) {
   const dir = makeTestTempDir('deploy-self-');
   const origin = join(dir, 'origin.git');
   const work = join(dir, 'work');
@@ -102,13 +102,18 @@ function fixture({ claimed = 0 } = {}) {
   const db = join(data, 'server.db');
   sqlite(
     db,
-    `create table step(id text primary key, status text);
+    `create table step(id text primary key, status text, lastHeartbeatAt integer);
      create table machine(id text primary key, name text, lastSeenAt integer, maxConcurrent integer default 1);
      create table __drizzle_migrations(id integer primary key, hash text);
      insert into machine values ('m1', 'omarchy', 0, 1);
      insert into __drizzle_migrations(hash) values ('m0');`,
   );
-  for (let i = 0; i < claimed; i++) sqlite(db, `insert into step values ('s${i}', 'claimed')`);
+  const heartbeat = heartbeatAgeMs === null ? 'null' : String(Date.now() - heartbeatAgeMs);
+  for (let i = 0; i < claimed; i++)
+    sqlite(
+      db,
+      `insert into step(id, status, lastHeartbeatAt) values ('s${i}', 'claimed', ${heartbeat})`,
+    );
 
   fakeTool(
     bin,
@@ -195,7 +200,7 @@ if [ "$2 $3" = "start cairn-server.service" ]; then
     rm -f "${fake}/up"
     sqlite3 "${db}" "update machine set lastSeenAt = lastSeenAt + 1"
     [ ! -f "${fake}/machine-write-on-broken-start" ] || sqlite3 "${db}" "update machine set maxConcurrent = 4"
-    [ ! -f "${fake}/write-on-broken-start" ] || sqlite3 "${db}" "insert or ignore into step values ('written-after', 'done')"
+    [ ! -f "${fake}/write-on-broken-start" ] || sqlite3 "${db}" "insert or ignore into step(id, status) values ('written-after', 'done')"
     [ ! -f "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "alter table step add column note text; alter table step add column tier text default 'low'"
     [ ! -s "${fake}/column-on-broken-start" ] || sqlite3 "${db}" "update step set note = '$(cat "${fake}/column-on-broken-start")'"
   else touch "${fake}/up"; fi
@@ -322,6 +327,38 @@ test('waits while a step is running or a deploy hold is set', () => {
   assert.match(heldResult.stderr, /hold: orb trial-one/);
 });
 
+test('forces the deploy past claimed steps with no heartbeat once the wait bound passes', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 3_600_000 });
+  const target = pushTarget(f);
+  mkdirSync(f.state, { recursive: true });
+  writeFileSync(join(f.state, 'steps-waiting-since'), `${Math.floor(Date.now() / 1000) - 4_000}\n`);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /deploy-forced-past-stale-steps/);
+  assert.match(f.log('gh.log'), /issue create.*no heartbeat/);
+  const record = JSON.parse(readFileSync(join(f.state, 'deployed.json'), 'utf8'));
+  assert.equal(record.sha, target);
+  assert.equal(existsSync(join(f.state, 'alarms/deploy-forced-past-stale-steps')), false);
+});
+
+test('keeps waiting past the bound while the claimed step still heartbeats', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 1_000 });
+  const target = pushTarget(f);
+  mkdirSync(f.state, { recursive: true });
+  writeFileSync(join(f.state, 'steps-waiting-since'), `${Math.floor(Date.now() / 1000) - 4_000}\n`);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 75, result.stderr);
+  assert.match(result.stderr, /1 step running/);
+});
+
+test('keeps waiting below the bound even without a heartbeat', () => {
+  const f = fixture({ claimed: 1, heartbeatAgeMs: 3_600_000 });
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 75, result.stderr);
+  assert.match(result.stderr, /1 step running for 0s/);
+});
+
 test('stops before touching services when the migration rehearsal fails', () => {
   const f = fixture();
   const target = pushTarget(f);
@@ -411,7 +448,7 @@ test('rolls code and database back when the new server fails its health check', 
   const f = fixture();
   const target = pushTarget(f);
   writeFileSync(join(f.fake, 'broken-sha'), target);
-  sqlite(f.db, "insert into step values ('done-before', 'done')");
+  sqlite(f.db, "insert into step(id, status) values ('done-before', 'done')");
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /health check failed/);
@@ -449,7 +486,7 @@ test('treats values in a column added after the snapshot as writes, but not its 
     ['', 'rolled-back'],
   ]) {
     const f = fixture();
-    sqlite(f.db, "insert into step values ('done-before', 'done')");
+    sqlite(f.db, "insert into step(id, status) values ('done-before', 'done')");
     const target = pushTarget(f);
     writeFileSync(join(f.fake, 'broken-sha'), target);
     writeFileSync(join(f.fake, 'column-on-broken-start'), note);
@@ -513,7 +550,7 @@ test('recovers an interrupted switch: finishes a healthy target, rolls back an u
 test('recovers a rollback killed while swapping the DB, before any service starts', () => {
   for (const point of ['before-move', 'after-move', 'mid-copy']) {
     const f = fixture();
-    sqlite(f.db, "insert into step values ('in-snapshot', 'done')");
+    sqlite(f.db, "insert into step(id, status) values ('in-snapshot', 'done')");
     const target = pushTarget(f);
     git(f.checkout, 'fetch', '-q', 'origin', 'main');
     git(f.checkout, 'checkout', '-q', '--detach', target);
@@ -521,7 +558,7 @@ test('recovers a rollback killed while swapping the DB, before any service start
     mkdirSync(f.backups, { recursive: true });
     const snapshot = join(f.backups, 'stopped-interrupted.db');
     sqlite(f.db, `vacuum into '${snapshot}'`);
-    sqlite(f.db, "insert into step values ('failed-only', 'done')");
+    sqlite(f.db, "insert into step(id, status) values ('failed-only', 'done')");
     const failedDir = join(f.backups, 'failed-interrupted');
     mkdirSync(failedDir);
     if (point !== 'before-move') renameSync(f.db, join(failedDir, 'server.db'));
@@ -563,7 +600,7 @@ test('recovery after the snapshot was restored and services started keeps their 
     mkdirSync(f.backups, { recursive: true });
     const snapshot = join(f.backups, 'stopped-interrupted.db');
     sqlite(f.db, `vacuum into '${snapshot}'`);
-    sqlite(f.db, "insert into step values ('written-by-restarted-previous', 'done')");
+    sqlite(f.db, "insert into step(id, status) values ('written-by-restarted-previous', 'done')");
     const failedDir = join(f.backups, 'failed-interrupted');
     mkdirSync(failedDir);
     writeFileSync(
