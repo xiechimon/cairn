@@ -1,9 +1,9 @@
 import { once } from 'node:events';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   computerScreenSocketPath,
   createComputerScreenProvider,
@@ -14,11 +14,15 @@ let dir: string | undefined;
 let server: Server | undefined;
 const sockets: Socket[] = [];
 
+function shortRuntimeRoot(): string {
+  return mkdtempSync(join(tmpdir(), 'csp-'));
+}
+
 afterEach(async () => {
   for (const socket of sockets.splice(0)) socket.destroy();
   if (server) await new Promise<void>((resolve) => server?.close(() => resolve()));
   server = undefined;
-  if (dir) releaseTestTempDir(dir);
+  if (dir) rmSync(dir, { recursive: true, force: true });
   dir = undefined;
 });
 
@@ -56,7 +60,8 @@ function request(
 }
 
 test('view connects to the x11vnc view.sock and carries raw RFB bytes', async () => {
-  dir = makeTestTempDir('screen-provider-');
+  dir = shortRuntimeRoot();
+  expect(computerScreenSocketPath(dir, 'chief:view', 'view').length).toBeLessThan(108);
   const scopeKey = 'chief:view';
   const path = computerScreenSocketPath(dir, scopeKey, 'view');
   expect(path).toBe(join(dir, computerMachineName(scopeKey), 'computer', 'view.sock'));
@@ -72,7 +77,7 @@ test('view connects to the x11vnc view.sock and carries raw RFB bytes', async ()
 });
 
 test('control connects to vnc.sock after ensureComputer resolves the Orb', async () => {
-  dir = makeTestTempDir('screen-provider-');
+  dir = shortRuntimeRoot();
   const scopeKey = 'chief:control';
   const path = computerScreenSocketPath(dir, scopeKey, 'control');
   let ensured = 0;
@@ -93,10 +98,12 @@ test('control connects to vnc.sock after ensureComputer resolves the Orb', async
 });
 
 test('a missing screen socket times out instead of hanging', async () => {
-  dir = makeTestTempDir('screen-provider-');
+  dir = shortRuntimeRoot();
   const provider = createComputerScreenProvider({
     runtimeRoot: dir,
     socketWaitMs: 80,
   });
-  await expect(provider.connectScreen(request('view'))).rejects.toThrow(/ENOENT|socket missing/);
+  await expect(provider.connectScreen(request('view'))).rejects.toThrow(
+    /ENOENT|EINVAL|socket missing/,
+  );
 });

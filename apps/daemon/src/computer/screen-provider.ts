@@ -68,9 +68,10 @@ export function computerScreenSocketPath(
 }
 
 function waitForSocket(socket: Socket, signal: AbortSignal): Promise<void> {
-  if (!socket.connecting) return Promise.resolve();
   return new Promise((resolve, reject) => {
+    let immediate: ReturnType<typeof setImmediate> | undefined;
     const finish = (action: () => void) => {
+      if (immediate !== undefined) clearImmediate(immediate);
       socket.off('connect', onConnect);
       socket.off('error', onError);
       signal.removeEventListener('abort', onAbort);
@@ -79,9 +80,24 @@ function waitForSocket(socket: Socket, signal: AbortSignal): Promise<void> {
     const onConnect = () => finish(resolve);
     const onError = (error: Error) => finish(() => reject(error));
     const onAbort = () => finish(() => reject(new Error('computer screen closed')));
+    signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    if (socket.errored) {
+      onError(socket.errored);
+      return;
+    }
     socket.once('connect', onConnect);
     socket.once('error', onError);
-    signal.addEventListener('abort', onAbort, { once: true });
+    if (!socket.connecting) {
+      immediate = setImmediate(() => {
+        if (socket.errored) onError(socket.errored);
+        else if (socket.destroyed) onError(new Error('computer screen socket missing'));
+        else onConnect();
+      });
+    }
   });
 }
 
