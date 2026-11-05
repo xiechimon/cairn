@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { SegmentedRadio } from '../components/segmented.js';
+import { AutomationSection } from './components-automation.js';
 import {
   AvatarSection,
   ConversationSection,
@@ -119,6 +120,7 @@ const NAV = [
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
+      ['thread-automation', 'Thread automation badge'],
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
       ['coordinator', 'Coordinator stream'],
@@ -307,6 +309,7 @@ export function Gallery() {
           <PrBarSection />
           <PrCardSection />
           <ScheduledSection />
+          <AutomationSection />
           <SidebarSection />
           <ProjectsSection />
           <CoordinatorStreamSection />
