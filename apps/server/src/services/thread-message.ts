@@ -25,6 +25,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
+import { assertProjectWritable } from './project-writable.js';
 import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
 import { answerWorkerQuestionsById, pendingWorkerQuestionIds } from './worker-question-store.js';
@@ -191,6 +192,7 @@ export async function messageThreadAsUser(
   const replay = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
   if (replay !== undefined) return replay;
   if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  assertProjectWritable(deps.db, row.teamId, row.projectId);
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }

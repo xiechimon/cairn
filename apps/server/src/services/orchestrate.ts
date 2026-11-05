@@ -6,6 +6,7 @@ import { sendChiefMessage } from './chief.js';
 import { isCorrectionTask } from './correction.js';
 import type { ConversationStreamHub } from './events.js';
 import { CORRECTION_PROMPT } from './merge-gate/correction.js';
+import { assertProjectWritable } from './project-writable.js';
 import { getTodo, type TodoDeps } from './todos.js';
 
 export interface OrchestrateDeps extends TodoDeps {
@@ -16,6 +17,7 @@ export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
   const record = getTodo(deps, todoId);
   if (!record) throw notFound(`todo ${todoId}`);
   if (record.archivedAt != null) throw conflict('Unarchive to continue');
+  assertProjectWritable(deps.db, record.teamId, record.projectId);
   if (!canOrchestrate(record.phase)) {
     throw conflict(`orchestrate 仅适用于 待开始/失败 相位（当前 ${record.phase}）`);
   }

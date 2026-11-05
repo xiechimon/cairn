@@ -31,6 +31,7 @@ import { readSourceIssueEcho } from './services/github-issues.js';
 import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
+import { assertProjectWritable } from './services/project-writable.js';
 import { snoozeTodo, unsnoozeTodo } from './services/snooze.js';
 import { messageThreadAsUser } from './services/thread-message.js';
 import {
@@ -86,6 +87,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/projects/:id/todos', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
+    assertProjectWritable(ctx.db, row.teamId, row.id);
     const body = parseWith(createTodoBodySchema, await jsonBody(c), 'body');
     const record = createTodo(svc, {
       teamId: row.teamId,
@@ -105,6 +107,10 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     const body = parseWith(patchTodoBodySchema, await jsonBody(c), 'body');
     const prior = getTodo(svc, id);
+    if (prior !== null) assertProjectWritable(svc.db, prior.teamId, prior.projectId);
+    if (body.projectId !== undefined && body.projectId !== prior?.projectId) {
+      assertProjectWritable(svc.db, ctx.team.id, body.projectId);
+    }
     if (
       body.phase === 'todo' &&
       prior != null &&
