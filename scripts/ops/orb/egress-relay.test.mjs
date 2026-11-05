@@ -664,7 +664,7 @@ test('a rejected quota connection is destroyed after the 503', async (t) => {
   await once(held, 'connect');
   await once(extra, 'connect');
   extra.pause();
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await new Promise((resolve) => setTimeout(resolve, 80));
   const open = await new Promise((resolve, reject) => {
     f.relay.getConnections((error, count) => (error ? reject(error) : resolve(count)));
   });

@@ -22,6 +22,7 @@ export const relayDefaults = {
   maxConnectionsPerClient: 32,
 };
 
+const refuseDestroyDelayMs = 25;
 const unixListeners = new WeakSet();
 const refused = new BlockList();
 for (const [address, prefix] of [
@@ -173,9 +174,11 @@ export function createRelay(options = {}) {
     socket.on('error', () => socket.destroy());
     const viaSocketFile = unixListeners.has(server);
     const refuse = (status) => {
-      socket.end(`${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`, () =>
-        socket.destroy(),
-      );
+      socket.end(`${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+      const timer = setTimeout(() => {
+        if (!socket.destroyed) socket.destroy();
+      }, refuseDestroyDelayMs);
+      socket.once('close', () => clearTimeout(timer));
     };
     if (
       !viaSocketFile &&
