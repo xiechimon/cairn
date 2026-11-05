@@ -53,6 +53,33 @@ describe('machine stream', () => {
   });
 });
 
+describe('computer frame request cancellation', () => {
+  test('cancelling a frame request reaches the underlying fetch', async () => {
+    let observedSignal: AbortSignal | undefined;
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      observedSignal = init?.signal ?? undefined;
+      if (observedSignal) {
+        const signal = observedSignal;
+        await new Promise<void>((_resolve, reject) => {
+          if (signal.aborted) reject(signal.reason);
+          else signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      }
+      return Response.json({ ok: true, cancelled: false });
+    };
+    const client = new MachineClient({ serverUrl: 'http://server', fetchImpl });
+    const controller = new AbortController();
+    const pending = client.computerFrames(
+      CALL.callId,
+      { frames: [{ kind: 'heartbeat', seq: 1 }] },
+      controller.signal,
+    );
+    controller.abort(new Error('frame request stopped'));
+    await expect(pending).rejects.toThrow('frame request stopped');
+    expect(observedSignal).toBe(controller.signal);
+  });
+});
+
 describe('computer calls without a provider', () => {
   test('the daemon answers at once with a not-delivered error so the call is never left waiting', async () => {
     const posts: { path: string; body: MachineComputerFramesBody }[] = [];

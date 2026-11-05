@@ -144,6 +144,7 @@ export interface MachineApi {
   computerFrames?(
     callId: string,
     body: MachineComputerFramesBody,
+    signal?: AbortSignal,
   ): Promise<MachineComputerFramesResponse>;
   stream(
     signal: AbortSignal,
@@ -559,9 +560,11 @@ export class MachineClient implements MachineApi {
   async computerFrames(
     callId: string,
     body: MachineComputerFramesBody,
+    signal?: AbortSignal,
   ): Promise<MachineComputerFramesResponse> {
     return this.request('POST', `/api/machine/computer/${callId}`, {
       body,
+      signal,
       parse: (raw) => machineComputerFramesResponseSchema.parse(raw),
     });
   }
