@@ -30,6 +30,7 @@ import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
+import { ComputerInputFence } from './computer/input-fence.js';
 import { OrbComputerProvider } from './computer/orb.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import type { DaemonConfig } from './config.js';
@@ -41,6 +42,7 @@ import { ComputerOrbs } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
+import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
 import { resumePendingUpload } from './runner.js';
 import {
@@ -192,6 +194,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostComputer =
     opts.hostComputer ??
     (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
+  const enrolledIdentity = { machineId: '' };
   const computerOrbs =
     opts.orbComputer === undefined && orbProvider instanceof NspawnOrbProvider
       ? new ComputerOrbs({
@@ -199,12 +202,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           runtimeRoot: orbProvider.runtimeRoot,
         })
       : undefined;
+  const computerInputLocks = join(paths.home, 'computer-input');
+  if (computerOrbs) ensurePrivateDir(computerInputLocks);
   const orbComputer =
     opts.orbComputer ??
     (computerOrbs && orbProvider instanceof NspawnOrbProvider
       ? new OrbComputerProvider({
           orbs: computerOrbs,
           runtimeRoot: orbProvider.runtimeRoot,
+          inputFence: new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId),
           release: {
             publish: () => orbProvider.publishRelease(),
             authenticated: (machine, release) =>
@@ -321,6 +327,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
+  enrolledIdentity.machineId = machineId;
 
   await client.presence({
     cliVersion: DAEMON_VERSION,

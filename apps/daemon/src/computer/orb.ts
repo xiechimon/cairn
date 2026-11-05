@@ -15,6 +15,7 @@ import { z } from 'zod';
 import type { ComputerOrbs } from '../orb/computer.js';
 import { ORB_MAX_FRAME_BYTES } from '../orb/protocol.js';
 import { AsyncEventQueue } from './host.js';
+import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import {
   decodeOrbComputerFrame,
   encodeOrbComputerFrame,
@@ -65,6 +66,7 @@ interface Pending {
 export interface OrbComputerProviderOptions {
   orbs: Pick<ComputerOrbs, 'ensure' | 'touch'>;
   runtimeRoot?: string | (() => string);
+  inputFence?: ComputerInputFence;
   expectedRelease?: () => string | undefined;
   release?: {
     publish(): Promise<string>;
@@ -487,6 +489,7 @@ class GuestLink {
 
 export class OrbComputerProvider implements ScopedComputerProviders {
   private readonly links = new Map<string, GuestLink>();
+  private readonly inputLeases = new Map<string, ComputerInputLease>();
   private readonly settings: LinkSettings;
   private published: string | undefined;
   private publishing: Promise<string> | undefined;
@@ -513,6 +516,24 @@ export class OrbComputerProvider implements ScopedComputerProviders {
           }
         : {}),
     };
+  }
+
+  private releaseInput(scopeKey: string): void {
+    const lease = this.inputLeases.get(scopeKey);
+    if (!lease) return;
+    this.inputLeases.delete(scopeKey);
+    lease.release();
+  }
+
+  private async claimInput(scopeKey: string, signal?: AbortSignal): Promise<void> {
+    const fence = this.options.inputFence;
+    if (!fence || this.inputLeases.has(scopeKey)) return;
+    try {
+      this.inputLeases.set(scopeKey, await fence.acquire(scopeKey, signal));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ComputerRefusal(message);
+    }
   }
 
   forScope(scopeKey: string): ComputerProvider {
@@ -628,10 +649,12 @@ export class OrbComputerProvider implements ScopedComputerProviders {
 
   private async link(scopeKey: string, signal?: AbortSignal): Promise<GuestLink> {
     await this.beforeDelivery(() => this.ensurePublished(), signal);
+    await this.claimInput(scopeKey, signal);
     let name: string;
     try {
       name = await this.beforeDelivery(() => this.options.orbs.ensure(scopeKey), signal);
     } catch (error) {
+      if (!this.links.has(scopeKey)) this.releaseInput(scopeKey);
       this.options.onError?.(`computer ${scopeKey} could not start: ${String(error)}`);
       throw new ComputerRefusal('The computer could not be started, so nothing ran');
     }
@@ -642,7 +665,10 @@ export class OrbComputerProvider implements ScopedComputerProviders {
     let link = this.links.get(scopeKey);
     if (link && link.directory !== directory) {
       await link.close();
+      this.links.delete(scopeKey);
+      this.releaseInput(scopeKey);
       link = undefined;
+      await this.claimInput(scopeKey, signal);
     }
     if (!link) {
       link = new GuestLink(directory, this.settings);
@@ -654,10 +680,20 @@ export class OrbComputerProvider implements ScopedComputerProviders {
       this.options.onError?.(`computer ${scopeKey} socket failed: ${String(error)}`);
       await link.close();
       if (this.links.get(scopeKey) === link) this.links.delete(scopeKey);
+      this.releaseInput(scopeKey);
       throw new ComputerRefusal('The computer link could not be opened, so nothing ran');
     }
-    await link.connected(this.connectTimeoutMs, signal);
-    if (signal?.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
+    try {
+      await link.connected(this.connectTimeoutMs, signal);
+      if (signal?.aborted) throw new ComputerRefusal('The call was cancelled before delivery');
+    } catch (error) {
+      if (signal?.aborted) {
+        await link.close();
+        if (this.links.get(scopeKey) === link) this.links.delete(scopeKey);
+        this.releaseInput(scopeKey);
+      }
+      throw error;
+    }
     return link;
   }
 
@@ -666,8 +702,14 @@ export class OrbComputerProvider implements ScopedComputerProviders {
   }
 
   async close(): Promise<void> {
+    const scopes = [...this.links.keys()];
     const links = [...this.links.values()];
     this.links.clear();
-    await Promise.all(links.map((link) => link.close()));
+    try {
+      await Promise.all(links.map((link) => link.close()));
+    } finally {
+      for (const scopeKey of scopes) this.releaseInput(scopeKey);
+      for (const scopeKey of this.inputLeases.keys()) this.releaseInput(scopeKey);
+    }
   }
 }
