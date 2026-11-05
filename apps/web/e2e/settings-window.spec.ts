@@ -7,12 +7,14 @@ const settings = (page: Page) => page.getByRole('dialog', { name: '设置' });
 const navItem = (page: Page, id: string) =>
   settings(page).locator(`[data-settings-section="${id}"]`);
 
-test('sidebar footer: icons instead of the avatar block, offline pill only when a machine is offline', async ({
+test('sidebar footer: settings and activity icons, no user chip, offline pill only when a machine is offline', async ({
   page,
 }) => {
   await page.goto(`/app?${FLEET}`);
   const footer = page.getByTestId('sidebar-footer');
-  await expect(footer.getByRole('link', { name: '设置' })).toBeVisible();
+  await expect(footer.getByTestId('sidebar-settings')).toBeVisible();
+  await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
+  await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="sidebar-user"]')).toHaveCount(0);
   await expect(footer.getByTestId('sidebar-attention')).toHaveText('1 台机器离线');
 
