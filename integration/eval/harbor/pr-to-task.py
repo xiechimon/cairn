@@ -145,30 +145,24 @@ def selection_reason(merged, message, product_lines, paths):
         return "Only documentation or tests change"
     if not any(is_test(path) for path in paths):
         return "No added or changed regression tests"
-    if not 20 <= product_lines <= 400:
-        return "Non-test diff outside 20-400 lines"
+    if not 1 <= product_lines <= 1000:
+        return "Non-test diff outside 1-1000 lines"
     return None
 
 
 def patch_paths(repo, base, head):
-    names = (
-        run(
-            "git",
-            "diff",
-            "--no-renames",
-            "--name-only",
-            "-z",
-            "--diff-filter=ACDMRT",
-            base,
-            head,
-            cwd=repo,
-        )
-        .rstrip("\0")
-        .split("\0")
+    stats = run(
+        "git", "diff", "--no-renames", "--numstat", "-z",
+        "--diff-filter=ACDMRT", base, head, cwd=repo,
     )
-    for name in names:
-        validate_path(name)
-    return names
+    paths = []
+    for line in stats.rstrip("\0").split("\0"):
+        added, deleted, path = line.split("\t", 2)
+        validate_path(path)
+        if path.startswith("docs/verify/") and (added == "-" or deleted == "-"):
+            continue
+        paths.append(path)
+    return paths
 
 
 def convert(repo, base, head, issue_body, destination, command, issue):
@@ -301,7 +295,7 @@ def inspect_pr(number):
     product_lines = 0
     for line in stats.rstrip("\0").split("\0"):
         added, deleted, path = line.split("\t", 2)
-        if not is_test(path):
+        if path in paths and not is_test(path):
             if not added.isdigit() or not deleted.isdigit():
                 return {
                     "pr": number,

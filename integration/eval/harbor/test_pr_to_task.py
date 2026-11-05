@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -109,14 +110,34 @@ def test_selection_rejects_ambiguous_and_ineligible_candidates():
     assert converter.selection_reason(**common) is None
     for changed in [
         dict(message="Closes #42\nCloses #43"),
-        dict(product_lines=19),
-        dict(product_lines=401),
+        dict(product_lines=0),
+        dict(product_lines=1001),
         dict(paths=["apps/web/e2e/a.spec.ts", "a.ts"]),
         dict(paths=["integration/eval/a.ts", "a.test.ts"]),
         dict(merged="2026-06-30T00:00:00Z"),
         dict(paths=["a.ts"]),
     ]:
         assert converter.selection_reason(**(common | changed))
+
+
+@pytest.mark.parametrize("product_lines", [1, 19, 20, 400, 401, 1000])
+def test_selection_accepts_inclusive_expanded_non_test_diff_bounds(product_lines):
+    assert converter.selection_reason(
+        merged="2026-07-01T00:00:00Z",
+        message="Closes #42",
+        product_lines=product_lines,
+        paths=["a.ts", "a.test.ts"],
+    ) is None
+
+
+@pytest.mark.parametrize("product_lines", [0, 1001])
+def test_selection_rejects_outside_expanded_non_test_diff_bounds(product_lines):
+    assert converter.selection_reason(
+        merged="2026-07-01T00:00:00Z",
+        message="Closes #42",
+        product_lines=product_lines,
+        paths=["a.ts", "a.test.ts"],
+    ) == "Non-test diff outside 1-1000 lines"
 
 
 def test_control_classification_refuses_infrastructure_failures():
@@ -572,3 +593,109 @@ def test_trial_environment_is_passed_through_the_privileged_prefix(monkeypatch):
 def test_trial_prefix_is_unchanged_without_a_privileged_prefix(monkeypatch):
     monkeypatch.delenv("CAIRN_DOCKER_PREFIX", raising=False)
     assert converter.prefix_with_env(["uv"], {"PYTHONPATH": "/x"}) == ["uv"]
+
+
+@pytest.fixture
+def binary_change_repository(tmp_path):
+    def create(binary_path, product=True, text_evidence=False):
+        repo = tmp_path / "binary-repo"
+        repo.mkdir()
+
+        def git(*args):
+            return subprocess.check_output(
+                ["git", "-C", str(repo), *args], text=True
+            ).strip()
+
+        git("init")
+        git("config", "user.email", "fixture@example.com")
+        git("config", "user.name", "Fixture")
+        (repo / "add.py").write_text("def add(a, b):\n    return a - b\n")
+        git("add", "add.py")
+        git("commit", "-m", "base")
+        base = git("rev-parse", "HEAD")
+        image = repo / binary_path
+        image.parent.mkdir(parents=True, exist_ok=True)
+        image.write_bytes(b"\x89PNG\r\n\x1a\n\x00evidence")
+        paths = [binary_path]
+        if product:
+            (repo / "add.py").write_text(FIXED_ADD)
+            (repo / "test_add.py").write_text(
+                "from add import add\ndef test_add():\n    assert add(2, 3) == 5\n"
+            )
+            paths += ["add.py", "test_add.py"]
+        else:
+            (repo / "README.md").write_text("Evidence archive.\n")
+            paths.append("README.md")
+        if text_evidence:
+            notes = repo / "docs/verify/42/notes.txt"
+            notes.parent.mkdir(parents=True, exist_ok=True)
+            notes.write_text("Observed fixed addition.\n")
+            paths.append("docs/verify/42/notes.txt")
+        git("add", *paths)
+        git("commit", "-m", "fix\n\nCloses #42")
+        return repo, base, git("rev-parse", "HEAD")
+
+    return create
+
+
+def test_binary_verification_evidence_is_excluded_from_selection_and_solution(
+    binary_change_repository, monkeypatch, tmp_path
+):
+    image = "docs/verify/42/after.png"
+    repo, base, head = binary_change_repository(image)
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Fix"}
+    )
+    assert row["reason"] is None
+    assert row["paths"] == ["add.py", "test_add.py"]
+    assert row["productLines"] == 2
+    task = tmp_path / "task"
+    metadata = converter.convert(
+        repo, base, head, "Fix addition.", task,
+        [sys.executable, "-m", "pytest", "test_add.py"], 42,
+    )
+    assert image not in (task / "solution/solution.patch").read_text()
+    assert (task / "tests/solution-paths.txt").read_text() == "add.py\n"
+    assert image not in json.dumps(row | metadata)
+
+
+@pytest.mark.parametrize(
+    "binary_path", ["src/image.png", "docs/verification/after.png", "docs/verify-other/after.png"]
+)
+def test_binary_outside_exact_verification_prefix_is_still_rejected(
+    binary_change_repository, monkeypatch, binary_path
+):
+    repo, _, head = binary_change_repository(binary_path)
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Fix"}
+    )
+    assert row["reason"] == "Binary non-test diff"
+
+
+def test_binary_verification_evidence_does_not_make_documentation_eligible(
+    binary_change_repository, monkeypatch
+):
+    repo, _, head = binary_change_repository("docs/verify/42/after.png", product=False)
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Evidence"}
+    )
+    assert row["reason"] == "Only documentation or tests change"
+
+
+def test_text_verification_evidence_remains_in_product_paths_and_line_count(
+    binary_change_repository, monkeypatch
+):
+    repo, base, head = binary_change_repository(
+        "docs/verify/42/after.png", text_evidence=True
+    )
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Fix"}
+    )
+    assert row["reason"] is None
+    assert row["productLines"] == 3
+    assert "docs/verify/42/notes.txt" in row["paths"]
+    assert "docs/verify/42/notes.txt" in converter.patch_paths(repo, base, head)

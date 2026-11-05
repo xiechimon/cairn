@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import tarfile
@@ -152,8 +153,13 @@ def test_controls_script_runs_tasks_sequentially_without_nesting_the_heavy_lock(
 
 def test_only_accepted_tasks_get_controls(tmp_path):
     for name, verdict in (("task-1", "accept"), ("task-2", "reject"), ("task-3", "accept")):
-        (tmp_path / name).mkdir()
-        (tmp_path / name / "label.openai.json").write_text(f'{{"verdict": "{verdict}"}}')
+        task = tmp_path / name
+        (task / "tests").mkdir(parents=True)
+        (task / "instruction.md").write_text("issue")
+        (task / "tests/tests.patch").write_text("patch")
+        labeler = batch.load("label_task", "label-task.py")
+        digest = labeler.prompt_digest(labeler.build_prompt(task))
+        (task / "label.openai.json").write_text(json.dumps({"verdict": verdict, "promptSha256": digest}))
     (tmp_path / "task-4").mkdir()
     assert batch.accepted_tasks(tmp_path) == ["task-1", "task-3"]
 
@@ -169,3 +175,18 @@ def test_discovery_row_records_a_failure_instead_of_raising():
 
     row = batch.discover_row({"number": 9}, inspect)
     assert row == {"pr": 9, "reason": "Discovery infrastructure failure: bad object"}
+
+
+def test_accepted_label_is_rejected_after_the_instruction_changes(tmp_path):
+    task = tmp_path / "task-1"
+    (task / "tests").mkdir(parents=True)
+    (task / "instruction.md").write_text("original")
+    (task / "tests/tests.patch").write_text("test patch")
+    labeler = batch.load("label_task", "label-task.py")
+    digest = labeler.prompt_digest(labeler.build_prompt(task))
+    (task / "label.openai.json").write_text(
+        '{"verdict":"accept","promptSha256":"' + digest + '"}'
+    )
+    assert batch.accepted_tasks(tmp_path) == ["task-1"]
+    (task / "instruction.md").write_text("original plus Interface")
+    assert batch.accepted_tasks(tmp_path) == []

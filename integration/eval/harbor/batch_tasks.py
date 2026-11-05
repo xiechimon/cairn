@@ -145,11 +145,16 @@ def discover_new(manifest_path):
 
 
 def accepted_tasks(tasks):
-    return sorted(
-        label.parent.name
-        for label in Path(tasks).glob("task-*/label.openai.json")
-        if json.loads(label.read_text())["verdict"] == "accept"
-    )
+    labeler = load("label_task", "label-task.py")
+    accepted = []
+    for label_path in Path(tasks).glob("task-*/label.openai.json"):
+        label = json.loads(label_path.read_text())
+        if label["verdict"] != "accept":
+            continue
+        prompt = labeler.build_prompt(label_path.parent)
+        if label.get("promptSha256") == labeler.prompt_digest(prompt):
+            accepted.append(label_path.parent.name)
+    return sorted(accepted)
 
 
 def git_show(repo, sha, path):
