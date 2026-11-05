@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { infoReportMessageSchema, quoteIssueLines, RESEARCH_DATA_NOTE } from '@cairn/shared';
-import { and, asc, eq, isNotNull, isNull, lt, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, notExists, notInArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
@@ -162,7 +162,12 @@ export function openCitationCheck(
   const source = sourceReport(deps.db, buildId);
   if (!source) return null;
   const existing = checkerTodo(deps.db, source);
-  if (existing?.latestBuildId) return { todoId: existing.id, buildId: existing.latestBuildId };
+  if (
+    existing?.latestBuildId &&
+    (!['done', 'failed'].includes(existing.phase) ||
+      checkedResearchReport(deps.db, buildId) !== null)
+  )
+    return { todoId: existing.id, buildId: existing.latestBuildId };
   if (source.models.length === 0 || citedUrls(source.content).size === 0) {
     return blocked(deps, source, 'Source report needs observed model usage and cited URLs.');
   }
@@ -311,6 +316,7 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
         eq(checker.sourceKind, CHECK_SOURCE_KIND),
         isNull(checker.archivedAt),
         isNotNull(checker.latestBuildId),
+        notInArray(checker.phase, ['done', 'failed']),
         sql`substr(${checker.sourceRef}, 1, length(${sourcePrefix})) = ${sourcePrefix}`,
       ),
     );
@@ -337,7 +343,7 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
         notExists(existingChecker),
       ),
     )
-    .orderBy(asc(build.createdAt), asc(build.id))
+    .orderBy(asc(sql`coalesce(${attempt.createdAt}, 0)`), asc(build.createdAt), asc(build.id))
     .limit(CHECKS_PER_TICK)
     .all();
   for (const candidate of candidates) {

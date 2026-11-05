@@ -101,6 +101,85 @@ function receipt(claims: unknown[] = [supported]) {
 
 describe('research citation handoff', () => {
   test.each(['direct', 'scheduler'] as const)(
+    'retries a terminal invalid checker through %s and keeps a replacement in flight',
+    async (mode) => {
+      const { s, opened } = await world();
+      const first = openCitationCheck(s.svc, opened.buildId)!;
+      land(s, first.buildId, 'Malformed citation audit.', 'gpt-6.1-sol');
+      s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, first.todoId)).run();
+      expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+      if (mode === 'direct') openCitationCheck(s.svc, opened.buildId);
+      else planResearchCitationChecks(s.svc);
+      const replacement = s.db.select().from(todo).where(eq(todo.id, first.todoId)).get();
+      expect(replacement?.latestBuildId).not.toBe(first.buildId);
+      expect(openCitationCheck(s.svc, opened.buildId)?.buildId).toBe(replacement?.latestBuildId);
+      land(s, replacement!.latestBuildId!, receipt(), 'gpt-6.1-sol');
+      s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, first.todoId)).run();
+      expect(openCitationCheck(s.svc, opened.buildId)?.buildId).toBe(replacement?.latestBuildId);
+      expect(checkedResearchReport(s.db, opened.buildId)).not.toBeNull();
+    },
+  );
+
+  test('retries a failed checker with no report', async () => {
+    const { s, opened } = await world();
+    const first = openCitationCheck(s.svc, opened.buildId)!;
+    s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, first.todoId)).run();
+    expect(openCitationCheck(s.svc, opened.buildId)?.buildId).not.toBe(first.buildId);
+  });
+
+  test('retries an incomplete audit without accepting its omitted citation', async () => {
+    const { s, opened } = await world(true, `${source} Another claim https://example.com/other`);
+    const first = openCitationCheck(s.svc, opened.buildId)!;
+    land(s, first.buildId, receipt(), 'gpt-6.1-sol');
+    s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, first.todoId)).run();
+    expect(checkedResearchReport(s.db, opened.buildId)).toBeNull();
+    planResearchCitationChecks(s.svc);
+    expect(s.db.select().from(todo).where(eq(todo.id, first.todoId)).get()?.latestBuildId).not.toBe(
+      first.buildId,
+    );
+  });
+
+  test('does not reopen an intentionally closed checker', async () => {
+    const { s, opened } = await world();
+    const first = openCitationCheck(s.svc, opened.buildId)!;
+    s.db.update(todo).set({ phase: 'closed' }).where(eq(todo.id, first.todoId)).run();
+    planResearchCitationChecks(s.svc);
+    expect(openCitationCheck(s.svc, opened.buildId)?.buildId).toBe(first.buildId);
+  });
+
+  test('completed valid audits rotate out of the bounded batch before later invalid audits', async () => {
+    const { s, opened } = await world();
+    const projectId = s.db.select().from(todo).where(eq(todo.id, opened.todoId)).get()!.projectId;
+    const sources = [opened];
+    for (let i = 1; i < 6; i++) {
+      const next = openResearchThread(s.svc, {
+        teamId: s.team.id,
+        projectId,
+        tier: 2,
+        title: `Audit ${i}`,
+        question: 'What changed?',
+      });
+      land(s, next.buildId, source, 'claude-sonnet-5-5');
+      sources.push(next);
+    }
+    const checks = sources.map((source, i) => {
+      s.db.update(build).set({ createdAt: i }).where(eq(build.id, source.buildId)).run();
+      const check = openCitationCheck(s.svc, source.buildId)!;
+      land(s, check.buildId, i < 5 ? receipt() : 'Invalid audit.', 'gpt-6.1-sol');
+      s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, check.todoId)).run();
+      return check;
+    });
+    planResearchCitationChecks(s.svc);
+    expect(
+      s.db.select().from(todo).where(eq(todo.id, checks[5]!.todoId)).get()?.latestBuildId,
+    ).toBe(checks[5]!.buildId);
+    planResearchCitationChecks(s.svc);
+    expect(
+      s.db.select().from(todo).where(eq(todo.id, checks[5]!.todoId)).get()?.latestBuildId,
+    ).not.toBe(checks[5]!.buildId);
+  });
+
+  test.each(['direct', 'scheduler'] as const)(
     'replaces an archived checker through %s without reviving its old audit',
     async (mode) => {
       const { s, opened } = await world();
