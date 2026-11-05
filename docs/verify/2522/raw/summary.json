@@ -1,0 +1,78 @@
+{
+  "model": "anthropic/claude-haiku-5-5",
+  "thinking": "low",
+  "inputBudget": 64000,
+  "spentUsd": 1.0075034250000001,
+  "arms": [
+    {
+      "arm": "a0-resume-pi-default",
+      "spec": {
+        "name": "a0-resume-pi-default",
+        "mode": "resume",
+        "compaction": {
+          "enabled": true
+        },
+        "align": 1
+      },
+      "systemTokensEstimate": 1570,
+      "error": null,
+      "turns": 19,
+      "input": 120,
+      "cacheRead": 10752661,
+      "cacheWrite": 14467
+    },
+    {
+      "arm": "a1-resume-tuned-compaction",
+      "spec": {
+        "name": "a1-resume-tuned-compaction",
+        "mode": "resume",
+        "compaction": {
+          "enabled": true,
+          "reserveTokens": 936000,
+          "keepRecentTokens": 16384
+        },
+        "align": 1
+      },
+      "systemTokensEstimate": 1570,
+      "error": null,
+      "turns": 19,
+      "input": 118,
+      "cacheRead": 2128606,
+      "cacheWrite": 45332
+    },
+    {
+      "arm": "b1-fresh-retrieval",
+      "spec": {
+        "name": "b1-fresh-retrieval",
+        "mode": "fresh",
+        "compaction": {
+          "enabled": true
+        },
+        "align": 1
+      },
+      "systemTokensEstimate": 1570,
+      "error": null,
+      "turns": 19,
+      "input": 98,
+      "cacheRead": 1809678,
+      "cacheWrite": 396362
+    },
+    {
+      "arm": "b2-fresh-retrieval-aligned8",
+      "spec": {
+        "name": "b2-fresh-retrieval-aligned8",
+        "mode": "fresh",
+        "compaction": {
+          "enabled": true
+        },
+        "align": 8
+      },
+      "systemTokensEstimate": 1570,
+      "error": null,
+      "turns": 19,
+      "input": 90,
+      "cacheRead": 1760571,
+      "cacheWrite": 209289
+    }
+  ]
+}
