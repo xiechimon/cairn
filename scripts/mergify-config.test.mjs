@@ -12,28 +12,11 @@ test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge
 });
 
 test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
-  for (const changed of [
-    {
-      ...gatePaths,
-      limits: { ...gatePaths.limits, maxQueueFiles: gatePaths.limits.maxQueueFiles + 1 },
-    },
-    {
-      ...gatePaths,
-      limits: { ...gatePaths.limits, maxLinesEachWay: gatePaths.limits.maxLinesEachWay + 1 },
-    },
-  ])
-    assert.notEqual(mergifyConfig(prGate, changed), config);
-});
-
-test('a queue line cap that is not a positive integer fails closed', () => {
-  assert.throws(
-    () =>
-      mergifyConfig(prGate, {
-        ...gatePaths,
-        limits: { ...gatePaths.limits, maxLinesEachWay: 0 },
-      }),
-    /maxLinesEachWay/,
-  );
+  const changed = {
+    ...gatePaths,
+    limits: { ...gatePaths.limits, maxQueueFiles: gatePaths.limits.maxQueueFiles + 1 },
+  };
+  assert.notEqual(mergifyConfig(prGate, changed), config);
 });
 
 test('the queue starts a batch immediately, admits 80 files, and accepts a stack dependency', () => {
@@ -42,7 +25,7 @@ test('the queue starts a batch immediately, admits 80 files, and accepts a stack
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
     assert.match(queue, /- '#files <= 80'\n/, name);
-    assert.match(queue, /- '#added-lines <= 8000'\n/, name);
+    assert.doesNotMatch(queue, /#added-lines|#deleted-lines/, name);
     assert.match(queue, /- or:\n {10}- base = main\n {10}- "#depends-on > 0"\n/, name);
   }
 });
@@ -81,8 +64,8 @@ for (const [name, author, method] of [
     assert.match(merge, /max_checks_retries: 1$/m);
   });
 
-test('bot PRs need exactly one commit so a rebase keeps the Cairnwright author', () => {
-  assert.match(rules.bot, /- '#commits = 1'\n/);
+test('neither queue caps commit count; merge-pr.sh still enforces bot single-commit rebase identity', () => {
+  assert.doesNotMatch(rules.bot, /#commits/);
   assert.doesNotMatch(rules.default, /#commits/);
 });
 
