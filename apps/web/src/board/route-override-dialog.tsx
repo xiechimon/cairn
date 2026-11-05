@@ -69,9 +69,10 @@ export function RouteOverrideDialog({
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
-  const machinesQ = useMachines(teamId, live);
-  const mcpQ = useMcpServers(teamId, live);
-  const settingsQ = useRoutingSettings(teamId, live);
+  const active = open === true;
+  const machinesQ = useMachines(teamId, live && active);
+  const mcpQ = useMcpServers(teamId, live && active);
+  const settingsQ = useRoutingSettings(teamId, live && active);
   const [machineId, setMachineId] = useState<string | null>(initial?.machineId ?? null);
   const [requireOrb, setRequireOrb] = useState(initial?.requiredCapabilities?.executor === 'orb');
   const [mcpServers, setMcpServers] = useState<string[]>(
