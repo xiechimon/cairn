@@ -35,6 +35,7 @@ const BOARD = [
   'chief-project-pick',
   'task-panel',
   'thread-route-override',
+  'route-override-capabilities',
 ];
 const SIDEBAR = [
   'activity-page',
@@ -109,6 +110,7 @@ const DETAIL = [
   'mobile-narrow',
   'task-panel',
   'thread-route-override',
+  'route-override-capabilities',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -162,6 +164,7 @@ const OVERLAY = [
   'review-reject',
   'storage-unavailable',
   'thread-route-override',
+  'route-override-capabilities',
 ];
 const OVERLAYS = [
   'activity-page',

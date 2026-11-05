@@ -40,10 +40,12 @@ function buildOverride(
   machineId: string | null,
   requireOrb: boolean,
   mcpServers: string[],
+  models: string[] | undefined,
 ): RouteOverride | null {
   const requiredCapabilities: RequiredCapabilities = {
     ...(requireOrb ? { executor: 'orb' as const } : {}),
     ...(mcpServers.length > 0 ? { mcpServers } : {}),
+    ...(models !== undefined && models.length > 0 ? { models } : {}),
   };
   const hasCaps = Object.keys(requiredCapabilities).length > 0;
   if (machineId === null && !hasCaps) return null;
@@ -92,7 +94,7 @@ export function RouteOverrideDialog({
         .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
         .map((machine) => ({ id: machine.id, name: machine.name }));
   const mcpOptions = live
-    ? (mcpQ.data ?? []).map((row) => ({ id: row.id, name: row.label }))
+    ? (mcpQ.data ?? []).map((row) => ({ id: row.slug, name: row.label }))
     : (fixture.resources?.mcpServers ?? []).map((row) => ({ id: row.name, name: row.name }));
   const routingEnabled = live
     ? (settingsQ.data?.enabled ?? false)
@@ -109,7 +111,12 @@ export function RouteOverrideDialog({
       onClose();
       return;
     }
-    const routeOverride = buildOverride(machineId, requireOrb, mcpServers);
+    const routeOverride = buildOverride(
+      machineId,
+      requireOrb,
+      mcpServers,
+      initial?.requiredCapabilities?.models,
+    );
     mutations.patchTodo.mutate(
       { id: todoId, body: { routeOverride } },
       {
