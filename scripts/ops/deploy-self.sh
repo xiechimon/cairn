@@ -30,6 +30,9 @@ Deploys one green main commit to this host's cairn checkout and user units, with
 An interrupted deploy leaves $CAIRN_DEPLOY_STATE/in-progress; the next run (or --recover) health-checks
 the target and finishes it or rolls it back before doing anything else.
 Writes the result to $CAIRN_DEPLOY_STATE/deployed.json and $CAIRN_DATA_DIR/deploy.json.
+After each record, if $CAIRN_DEPLOY_NOTIFY (default $CAIRN_DEPLOY_STATE/notify.sh) is
+executable, feeds that JSON on stdin. A missing, non-executable, failing or timed-out
+notify never changes the deploy exit status.
 
 Environment (defaults in brackets):
   CAIRN_CHECKOUT [~/Code/AgentProjects/cairn-exec]  CAIRN_DATA_DIR [~/.cairn/server]
@@ -38,6 +41,8 @@ Environment (defaults in brackets):
   CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
   CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
   CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]
+  CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
+  CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
   CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
 EOF
   exit 2
@@ -55,6 +60,8 @@ HEALTH_TRIES="${CAIRN_HEALTH_TRIES:-60}"
 HEALTH_INTERVAL="${CAIRN_HEALTH_INTERVAL:-2}"
 MACHINE_NAME="${CAIRN_MACHINE_NAME:-$(hostname -s)}"
 KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
+NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
+NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
@@ -105,6 +112,23 @@ fi
 echo $$ >"$LOCK/pid"
 trap 'rm -rf "$LOCK"; rm -f "$RUNNING_COPY"' EXIT
 
+run_notify() {
+  local record="$1" status=0
+  [ -e "$NOTIFY_HOOK" ] || return 0
+  if [ ! -x "$NOTIFY_HOOK" ]; then
+    log "deploy notify skipped: $NOTIFY_HOOK is not executable"
+    return 0
+  fi
+  log "deploy notify $NOTIFY_HOOK"
+  if command -v timeout >/dev/null 2>&1; then
+    printf '%s' "$record" | timeout "$NOTIFY_TIMEOUT" "$NOTIFY_HOOK" || status=$?
+  else
+    printf '%s' "$record" | "$NOTIFY_HOOK" || status=$?
+  fi
+  [ "$status" -eq 0 ] || log "deploy notify exited $status (ignored)"
+  return 0
+}
+
 write_record() {
   local sha="$1" previous="$2" result="$3" failed="${4:-}" snapshot="${5:-}"
   local record
@@ -112,6 +136,7 @@ write_record() {
     "$sha" "$previous" "$result" "$failed" "$snapshot" "$(date -u +%FT%TZ)" "$MACHINE_NAME")"
   printf '%s' "$record" >"$STATE/deployed.json.tmp" && mv "$STATE/deployed.json.tmp" "$STATE/deployed.json"
   printf '%s' "$record" >"$DATA_DIR/deploy.json.tmp" && mv "$DATA_DIR/deploy.json.tmp" "$DATA_DIR/deploy.json"
+  run_notify "$record"
 }
 
 mark_failed() {
