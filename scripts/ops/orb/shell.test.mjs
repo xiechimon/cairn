@@ -285,7 +285,12 @@ test('a computer Orb gets its persistent home bind and the computer template nev
       binds,
       new RegExp(`--bind=/var/lib/cairn-computer/${name}:/home/agent:idmap,norbind`),
     );
+    assert.match(
+      binds,
+      new RegExp(`--bind=/run/cairn-orb/${name}/computer:/run/cairn-computer:idmap,norbind`),
+    );
     assert.match(binds, /--bind=\/run\/cairn-orb\//);
+    assert.ok(existsSync(join(f.root, `run/cairn-orb/${name}/computer`)));
     const dry = f.run('prepare-machine.sh', ['--dry-run', name]);
     assert.equal(dry.status, 0, dry.stderr);
     assert.ok(
@@ -1178,6 +1183,8 @@ test('computer image builds from the base with the host mirrorlist read-only and
     );
     const desktop = readFileSync(join(f.image, 'usr/local/lib/cairn-computer/desktop.sh'), 'utf8');
     assert.match(desktop, /-unixsock \/run\/cairn-computer\/view\.sock -viewonly/);
+    assert.doesNotMatch(unit, /RuntimeDirectory=cairn-computer/);
+    assert.match(unit, /ExecStartPre=.*-d \/run\/cairn-computer/);
     assert.match(desktop, /-nolisten tcp/);
     assert.doesNotMatch(desktop, /-rfbport [1-9]/);
     assert.equal(existsSync(join(f.image, 'etc/cairn-orb-image')), false);

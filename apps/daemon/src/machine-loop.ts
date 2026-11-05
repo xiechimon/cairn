@@ -36,7 +36,7 @@ import { OrbComputerProvider } from './computer/orb.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import { OutboundComputerScreens } from './computer/screen-channel.js';
-import { hostComputerScreen } from './computer/screen-provider.js';
+import { createComputerScreenProvider } from './computer/screen-provider.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -339,7 +339,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const screens = new OutboundComputerScreens({
     serverUrl: config.serverUrl,
     getToken: () => inMemoryToken,
-    provider: hostComputerScreen,
+    provider: createComputerScreenProvider({
+      runtimeRoot:
+        orbProvider instanceof NspawnOrbProvider ? () => orbProvider.runtimeRoot : '/run/cairn-orb',
+      ...(computerOrbs ? { ensureComputer: (scopeKey) => computerOrbs.ensure(scopeKey) } : {}),
+    }),
   });
 
   let networkFailures = 0;

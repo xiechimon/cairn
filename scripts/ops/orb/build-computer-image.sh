@@ -131,11 +131,11 @@ After=local-fs.target
 
 [Service]
 User=agent
-RuntimeDirectory=cairn-computer
-RuntimeDirectoryMode=0700
 UMask=0077
 Restart=on-failure
 RestartSec=2
+ExecStartPre=/bin/sh -c 'while [ ! -d /run/cairn-computer ]; do sleep 1; done'
+TimeoutStartSec=infinity
 ExecStart=/usr/local/lib/cairn-computer/desktop.sh
 LimitCORE=0
 
