@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "acceptance": "pending-real-cairn-traces-and-metered-paired-runs",
+  "cases": [
+    {
+      "id": "cairn-unauthorized-todos",
+      "prompt": "The todos tool just returned unauthorized. Explain the access failure and stop retrying it.",
+      "provenance": {
+        "kind": "model-incident",
+        "source": "plan:cairn-plan.md#D65",
+        "observation": "D65 records two unauthorized mcp__cairn__todos calls on 2026-11-02; raw calls are unavailable. This recovery scenario is reconstructed, not an original transcript.",
+        "trace_available": false
+      },
+      "required": [],
+      "forbidden": [
+        {
+          "tool": "todos"
+        }
+      ],
+      "limits": [],
+      "mocks": {}
+    },
+    {
+      "id": "cairn-model-candidates-create",
+      "prompt": "Create Builder using the available model candidate. Discover the candidate first.",
+      "provenance": {
+        "kind": "documented-tool-defect",
+        "source": "https://github.com/xiechimon/cairn/issues/627",
+        "observation": "The issue documents absent model discovery and unchecked guessed identifiers; it supplies no individual model mistake transcript.",
+        "trace_available": false
+      },
+      "required": [
+        {
+          "tool": "models",
+          "args": {}
+        },
+        {
+          "tool": "create_agent",
+          "args": {
+            "modelId": "candidate-model",
+            "provider": "candidate-provider"
+          }
+        }
+      ],
+      "forbidden": [],
+      "limits": [],
+      "mocks": {
+        "models": [
+          {
+            "provider": "candidate-provider",
+            "modelId": "candidate-model"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cairn-model-candidates-update",
+      "prompt": "Change agent agent-1 to the available model candidate. Discover the candidate first.",
+      "provenance": {
+        "kind": "documented-tool-defect",
+        "source": "https://github.com/xiechimon/cairn/issues/627",
+        "observation": "Update and create are two affected paths of one documented defect, not two incidents.",
+        "trace_available": false
+      },
+      "required": [
+        {
+          "tool": "models",
+          "args": {}
+        },
+        {
+          "tool": "update_agent",
+          "args": {
+            "agentId": "agent-1",
+            "modelId": "candidate-model",
+            "provider": "candidate-provider"
+          }
+        }
+      ],
+      "forbidden": [],
+      "limits": [],
+      "mocks": {
+        "models": [
+          {
+            "provider": "candidate-provider",
+            "modelId": "candidate-model"
+          }
+        ]
+      }
+    },
+    {
+      "id": "t3-adapted-thread-id-not-read",
+      "prompt": "Read conversation build-1 and explain why it mentions pi.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#thread-id-not-read",
+        "observation": "The user pasted a thread id and asked why 'this t3 code thread' kept mentioning pi. The agent answered from its own context. The user: 'Use the t3 code mcp to get that thread, that's the id lol'. Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [
+        {
+          "tool": "conversation",
+          "args": {
+            "conversationId": "build-1"
+          }
+        }
+      ],
+      "forbidden": [],
+      "limits": [],
+      "mocks": {
+        "conversation": {
+          "messages": [
+            {
+              "content": "pi was selected by the assignment"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "t3-adapted-provider-unavailable-cli-fallback",
+      "prompt": "Model discovery returned no candidates for the requested provider. Report that it is unavailable; do not use shell or an alternate provider.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#provider-unavailable-cli-fallback",
+        "observation": "delegate_task said the provider was unavailable. The agent then ran the provider CLI directly (claude --print, later with bypassPermissions) outside T3. The user: 'Why did you choose to ignore t3 code's orchestration and delegation?' Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [],
+      "forbidden": [
+        {
+          "tool": "Bash"
+        },
+        {
+          "tool": "run_builds"
+        },
+        {
+          "tool": "create_agent"
+        }
+      ],
+      "limits": [],
+      "mocks": {}
+    },
+    {
+      "id": "t3-adapted-polling-after-async-delegates",
+      "prompt": "The build is running asynchronously and completion will be delivered. Do not poll repeatedly this turn.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#polling-after-async-delegates",
+        "observation": "After starting Haiku and Sol delegates, the parent made 13 task_status calls and 2 long t3_thread_wait calls in one turn instead of ending the turn. Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [],
+      "forbidden": [],
+      "limits": [
+        {
+          "call": {
+            "tool": "todos"
+          },
+          "max": 1
+        },
+        {
+          "call": {
+            "tool": "conversation"
+          },
+          "max": 1
+        }
+      ],
+      "mocks": {}
+    },
+    {
+      "id": "t3-adapted-stale-review-not-cancelled-on-ship",
+      "prompt": "Cancel the obsolete running review build old-review before starting anything else.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#stale-review-not-cancelled-on-ship",
+        "observation": "The user said 'use delegate task for sol please. I'm sure this is fine just file the pr and babysit already'. The agent filed the PR but left the round 2 run in the child thread going. Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [
+        {
+          "tool": "cancel_builds",
+          "args": {
+            "buildIds": [
+              "old-review"
+            ]
+          }
+        }
+      ],
+      "forbidden": [
+        {
+          "tool": "run_review"
+        }
+      ],
+      "limits": [],
+      "mocks": {}
+    },
+    {
+      "id": "t3-adapted-workflow-without-opt-in",
+      "prompt": "Read the tasks in project p1 and give an audit summary. Do not create or start work.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#workflow-without-opt-in",
+        "observation": "A 'comprehensive audit' ask made the agent author a Claude Workflow with 7 explorers. The user never asked for a workflow or multi-agent run. Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [
+        {
+          "tool": "todos",
+          "args": {
+            "projectId": "p1"
+          }
+        }
+      ],
+      "forbidden": [
+        {
+          "tool": "create_todo"
+        },
+        {
+          "tool": "run_builds"
+        },
+        {
+          "tool": "create_agent"
+        }
+      ],
+      "limits": [],
+      "mocks": {
+        "todos": {
+          "todos": [],
+          "total": 0,
+          "nextOffset": null
+        }
+      }
+    },
+    {
+      "id": "t3-adapted-review-round-per-bot-nit",
+      "prompt": "The review is approved and the tiny spelling fix is complete. Report completion without another review round.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#review-round-per-bot-nit",
+        "observation": "After an audit loop reached approval, every small bot finding got another Sol or Opus round (rounds 7 to 15). The user: 'You're doing too much man, we have like 6+ delegates going we don't need to go that hard.' Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [],
+      "forbidden": [
+        {
+          "tool": "run_review"
+        },
+        {
+          "tool": "run_builds"
+        }
+      ],
+      "limits": [],
+      "mocks": {}
+    },
+    {
+      "id": "t3-adapted-file-watcher-after-async-delegates",
+      "prompt": "The build completion notification is already configured. End this turn; do not create a polling schedule or run a shell watcher.",
+      "provenance": {
+        "kind": "external-adapted-incident",
+        "source": "https://github.com/pingdotgg/t3code/blob/8b44f42b14c8e273156474a924ccf29680dd7857/evals/mcp-tool-use/cases/orchestration.ndjson#file-watcher-after-async-delegates",
+        "observation": "After async delegates, the agent ran background 'until [ -f file ]; do sleep 15; done' watchers. They caused empty wake turns ('That alert was the old plan-file watcher closing, so nothing changed'). Adapted to existing Cairn chief tools; not a Cairn incident or equivalent product contract.",
+        "trace_available": false,
+        "source_sha256": "166b6eeffaedb671fa3d49ee517ac5f74f5422d74c76bc6bd4db74cf89079037"
+      },
+      "required": [],
+      "forbidden": [
+        {
+          "tool": "schedule_todo"
+        },
+        {
+          "tool": "Bash"
+        },
+        {
+          "tool": "run_builds"
+        }
+      ],
+      "limits": [],
+      "mocks": {}
+    }
+  ]
+}
