@@ -1,7 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
-import { expandTurns } from './helpers';
 
 const historyOf = (total: number): Row[] =>
   Array.from({ length: total }, (_, i) => ({
@@ -88,7 +87,6 @@ test('only the newest message keeps its actions visible; older ones show them on
 }) => {
   await mockSlowSend(page, 6);
   await page.goto('/app');
-  await expandTurns(page);
   await viewport(page).evaluate((node) => {
     node.scrollTop = node.scrollHeight;
   });

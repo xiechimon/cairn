@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const GATED = '/app/schedules?scenario=100';
 const READY = '/app/schedules?scenario=111';
@@ -89,7 +88,6 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openWindow(page, THREAD);
-    await expandTurns(page);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
     await expect(note, 'W5').toHaveCSS('font-size', '13px');
     const foot = win.getByTestId('chief-msg-foot').first();

@@ -1,6 +1,5 @@
 import { appendPlanLocationNote, buildPlanFirstRoundInstruction } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER_ID = 'user-1';
@@ -199,7 +198,6 @@ test('3. review announcement row = note family (same shape as `发起了合并`)
 
 test('4. real steer utterances go through markdown: fences become code blocks, literal ``` does not leak', async ({ page }) => {
   await stubWorld(page);
-  await expandTurns(page);
   const bubbles = page.getByTestId('user-bubble');
   await expect(bubbles).toHaveCount(2);
   const md = bubbles.first();
@@ -210,7 +208,6 @@ test('4. real steer utterances go through markdown: fences become code blocks, l
 
 test('5. a one-line message keeps the one-line bubble height (no geometry drift)', async ({ page }) => {
   await stubWorld(page);
-  await expandTurns(page);
   const short = page.getByTestId('user-bubble').filter({ hasText: '收到，谢谢' });
   await expect(short).toBeVisible();
   const box = await short.evaluate((el) => {

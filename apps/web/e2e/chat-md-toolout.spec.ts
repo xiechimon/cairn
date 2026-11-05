@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 
@@ -9,7 +8,6 @@ const toggle = (page: Page) =>
 
 test('A1: tool output is collapsed behind individual calls by default', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   // the group renders collapsed — no output block on screen yet
   await expect(page.getByTestId('tool-output')).toHaveCount(0);
   // the stdout must NOT have leaked into a centered dim note either
@@ -23,7 +21,6 @@ test('A1: tool output is collapsed behind individual calls by default', async ({
 
 test('A2: expanding calls reveals one standalone block per tool output', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   if ((await toggle(page).getAttribute('aria-expanded')) !== 'true') await toggle(page).click();
   for (const call of await page.getByTestId('work-call').all()) await call.click();
   const outputs = page.getByTestId('tool-output');
@@ -38,7 +35,6 @@ test('A3: the output block is left aligned, mono, in the tertiary ink — not a 
   page,
 }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   if ((await toggle(page).getAttribute('aria-expanded')) !== 'true') await toggle(page).click();
   for (const call of await page.getByTestId('work-call').all()) await call.click();
   const ink = await page.evaluate(() => {
@@ -66,7 +62,6 @@ test('A3: the output block is left aligned, mono, in the tertiary ink — not a 
 
 test('B1: a markdown heading renders as a heading element, not literal ##', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const head = page.getByTestId('agent-text').getByRole('heading').first();
   await expect(head).toBeVisible();
   await expect(head).toContainText('检查结果');
@@ -80,7 +75,6 @@ test('B1: a markdown heading renders as a heading element, not literal ##', asyn
 
 test('B2: ordered list renders ordinals and unordered list renders bullets', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const ordered = page.getByTestId('md-item-ordered');
   await expect(ordered).toHaveCount(2);
   await expect(ordered.first()).toContainText('第一步：确认目录');
@@ -96,7 +90,6 @@ test('B2: ordered list renders ordinals and unordered list renders bullets', asy
 
 test('B3: nested list items indent past their parent', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const parentLeft = await page
     .getByTestId('md-item-ordered')
     .filter({ hasText: '第一步' })
@@ -112,7 +105,6 @@ test('B3: nested list items indent past their parent', async ({ page }) => {
 
 test('B3b: task list lines render as one todo card with per-state rows', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   await expect(page.getByTestId('md-tasks')).toHaveCount(1);
   const tasks = page.getByTestId('md-task');
   await expect(tasks).toHaveCount(4);
@@ -124,7 +116,6 @@ test('B3b: task list lines render as one todo card with per-state rows', async (
 
 test('B4: a code fence renders as a mono block with no literal ``` leak', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const code = page.getByTestId('md-code').first();
   await expect(code).toBeVisible();
   await expect(code).toContainText('total 16');
@@ -137,7 +128,6 @@ test('B4: a code fence renders as a mono block with no literal ``` leak', async 
 
 test('B5: inline code keeps the existing mono chip', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const chip = page.getByTestId('agent-text').locator('code', { hasText: 'ls -la' });
   await expect(chip).toHaveCount(1);
   const family = await chip.first().evaluate((el) => getComputedStyle(el).fontFamily.toLowerCase());
@@ -146,7 +136,6 @@ test('B5: inline code keeps the existing mono chip', async ({ page }) => {
 
 test('B6: no raw markdown syntax survives as literal prose', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const text = page.getByTestId('agent-text').first();
   await expect(text).not.toContainText('## 检查结果');
   await expect(text).not.toContainText('1. 第一步');

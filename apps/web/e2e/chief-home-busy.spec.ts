@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow, expandTurns } from './helpers.js';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -280,7 +280,6 @@ test.describe('chief unavailable (T4)', () => {
       ],
     });
     await page.goto('/app');
-    await expandTurns(page);
     const home = page.getByTestId('home-c');
     const notes = home.getByTestId('chief-fallback-note');
     await expect(notes).toHaveCount(1);
@@ -422,7 +421,6 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
       ],
     });
     await page.goto('/app');
-    await expandTurns(page);
     const home = page.getByTestId('home-c');
     const reply = home.getByTestId('chief-msg').filter({ hasText: '已派发 #9。' });
     await expect(reply).toHaveCount(1);
@@ -454,7 +452,6 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
       ],
     });
     await page.goto('/app');
-    await expandTurns(page);
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stopped')).toHaveText('已停止，没有建任务。');
     await expect(home.getByRole('alert')).toHaveCount(0);
@@ -481,7 +478,6 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
       ],
     });
     await page.goto('/app');
-    await expandTurns(page);
     const stopped = page.getByTestId('chief-stopped');
     await expect(stopped).toContainText('已停止。停之前已经建了任务');
     await evidenceShot(page, 'stopped-with-task.png');

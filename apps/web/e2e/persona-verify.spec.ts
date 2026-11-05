@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=verify-verdict';
 
@@ -11,7 +10,6 @@ test('verify verdict rows render all three chip states with their conclusions', 
   page,
 }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   await expect(verifyRow(page, '验证通过')).toContainText('e2e 与单测全绿');
   await expect(verifyRow(page, '验证未通过')).toContainText('两条失败用例需修复后复验');
   await expect(verifyRow(page, '判定提取失败')).toContainText('终轮输出不含合法 JSON');
@@ -19,7 +17,6 @@ test('verify verdict rows render all three chip states with their conclusions', 
 
 test('evidence entries render as path blocks, notes included', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const evidence = page.getByTestId('verify-evidence');
 
   await expect(evidence).toHaveCount(3);
