@@ -19,7 +19,7 @@ interface GatePaths {
   protected: string[];
   humanQueue: Record<string, string[]>;
   mergeGateSource: string[];
-  limits: { maxLines: number; maxFiles: number; maxLinesEachWay: number };
+  limits: { maxLines: number; maxFiles: number; maxQueueFiles: number; maxLinesEachWay: number };
 }
 
 const gatePaths = JSON.parse(read('packages/shared/merge-gate-paths.json')) as GatePaths;
@@ -92,7 +92,13 @@ describe('merge-gate-paths.json is the single source', () => {
     expect(GATE_LIMITS.maxLines).toBe(gatePaths.limits.maxLines);
     expect(GATE_LIMITS.maxFiles).toBe(gatePaths.limits.maxFiles);
     expect(GATE_LIMITS.maxLinesEachWay).toBe(gatePaths.limits.maxLinesEachWay);
-    expect(gatePaths.limits).toEqual({ maxLines: 800, maxFiles: 40, maxLinesEachWay: 8000 });
+    expect(GATE_LIMITS.maxQueueFiles).toBe(gatePaths.limits.maxQueueFiles);
+    expect(gatePaths.limits).toEqual({
+      maxLines: 800,
+      maxFiles: 40,
+      maxQueueFiles: 80,
+      maxLinesEachWay: 8000,
+    });
   });
 
   test('every human-queue path is protected', () => {
