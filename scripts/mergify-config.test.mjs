@@ -13,7 +13,10 @@ test('.mergify.yml is generated from merge-gate-paths.json, pr-gate.js and merge
 
 test('negative control: a limit changed in merge-gate-paths.json changes .mergify.yml', () => {
   for (const changed of [
-    { ...gatePaths, limits: { ...gatePaths.limits, maxFiles: gatePaths.limits.maxFiles + 1 } },
+    {
+      ...gatePaths,
+      limits: { ...gatePaths.limits, maxQueueFiles: gatePaths.limits.maxQueueFiles + 1 },
+    },
     {
       ...gatePaths,
       limits: { ...gatePaths.limits, maxLinesEachWay: gatePaths.limits.maxLinesEachWay + 1 },
@@ -33,12 +36,14 @@ test('a queue line cap that is not a positive integer fails closed', () => {
   );
 });
 
-test('the queue admits 8000 lines each way from merge-gate-paths.json', () => {
-  assert.equal(gatePaths.limits.maxLinesEachWay, 8000);
+test('the queue starts a batch immediately, admits 80 files, and accepts a stack dependency', () => {
+  assert.equal(gatePaths.limits.maxQueueFiles, 80);
+  assert.match(config, /batch_max_wait_time: 0 s\n/);
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
+    assert.match(queue, /- '#files <= 80'\n/, name);
     assert.match(queue, /- '#added-lines <= 8000'\n/, name);
-    assert.match(queue, /- '#deleted-lines <= 8000'\n/, name);
+    assert.match(queue, /- or:\n {10}- base = main\n {10}- "#depends-on > 0"\n/, name);
   }
 });
 

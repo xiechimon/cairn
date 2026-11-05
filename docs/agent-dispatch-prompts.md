@@ -31,13 +31,13 @@ Do not continue on a banned model from the "Do not use" line of the "Model roles
 Measured on 2026-11-02 in a scratch repo set up like cairn (results on #2566):
 
 - A held lower layer blocks every layer above it from reaching `main` while they stay stacked: `gh stack merge`, `gh pr merge`, both REST merge APIs, auto-merge and Mergify all refuse. Unstacking is the only leak: the upper PR then merges into the held layer's unprotected branch, so never unstack a layer to merge it.
-- Mergify cannot land a stacked PR (its merge fails on its own `Mergify Merge Queue` check), and `.mergify.yml` requires `base = main`. Only `gh stack merge` lands a stack.
+- A stacked PR enters the same queue when its body has `Depends-On: #N` for the layer below and that layer's head is its base. The queue then treats the chain as landing on `main`. A stack with no `Depends-On` line is skipped, because the queue rule only matches `base = main` or a dependency.
 - GitHub rebases an upper layer server-side after the layer below squash-merges. Its head SHA changes, so the `review-gate` check re-runs on the new head.
 
 Rules:
 
 - Layers on protected paths use the same queue as every other green PR. Build them with `gh stack` (`gh extension install github/gh-stack`) when the work is stacked, one PR per layer, and report the stack ready once every layer has CI and a Codex review on its head. Do not wait for ian to merge a protected path. The Codex review reads each PR against its own base, so each layer is reviewed on its own diff.
-- Layers the merge queue would admit: do not stack them. Open the lower PR on `main`, wait for the queue to merge it, then branch the next one from the new `origin/main`. A stacked PR would sit outside the queue.
+- Layers the merge queue would admit can be stacked. The bottom PR targets `main`. Each layer above sets its base to the previous head and puts `Depends-On: #N` in the body. Queue the top once every layer is green; the chain enters together.
 - Never point a PR at a lane branch by hand; a hand-made base branch has no stack rule behind it.
 
 ## Accessing GitHub

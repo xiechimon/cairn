@@ -362,6 +362,20 @@ def test_an_unlisted_test_directory_file_does_not_become_product():
     assert "apps/web/test/i18n-extra.ts" in record["blockers"][0]
 
 
+def test_supported_test_suffixes_outside_test_directories_do_not_become_product():
+    plan = planner.plan_runner_contract(contract())
+    for extra in (
+        "apps/web/src/board.test.mjs",
+        "apps/web/src/board.test.cjs",
+        "apps/web/src/board.test.jsx",
+        "apps/web/src/board.spec.js",
+    ):
+        record = planner.unverified_partition([*mixed_paths(), extra], plan)
+        assert record["blocked"] is True
+        assert record["productPaths"] == []
+        assert extra in record["blockers"][0]
+
+
 def test_integration_files_stay_grader_inputs_without_a_browser_command():
     unit = "apps/server/test/m4b-memory.test.ts"
     integration = "integration/test/m4b-memory-e2e.test.ts"

@@ -2,7 +2,9 @@ queue_rules:
   - name: default
     queue_conditions:
       - -author = cairnwright[bot]
-      - base = main
+      - or:
+          - base = main
+          - "#depends-on > 0"
       - -draft
       - -label = needs-decision
       - -label = coordinator-hold
@@ -33,7 +35,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 40'
+      - '#files <= 80'
       - '#added-lines <= 8000'
       - '#deleted-lines <= 8000'
     merge_conditions:
@@ -57,7 +59,7 @@ queue_rules:
           - check-skipped = ops-backup-test
     merge_method: squash
     batch_size: 5
-    batch_max_wait_time: 3 min
+    batch_max_wait_time: 0 s
     max_checks_retries: 1
     branch_protection_injection_mode: none
     merge_bot_account: xiechimon
@@ -65,7 +67,9 @@ queue_rules:
     queue_conditions:
       - author = cairnwright[bot]
       - '#commits = 1'
-      - base = main
+      - or:
+          - base = main
+          - "#depends-on > 0"
       - -draft
       - -label = needs-decision
       - -label = coordinator-hold
@@ -96,7 +100,7 @@ queue_rules:
       - or:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
-      - '#files <= 40'
+      - '#files <= 80'
       - '#added-lines <= 8000'
       - '#deleted-lines <= 8000'
     merge_conditions:
@@ -120,7 +124,7 @@ queue_rules:
           - check-skipped = ops-backup-test
     merge_method: rebase
     batch_size: 5
-    batch_max_wait_time: 3 min
+    batch_max_wait_time: 0 s
     max_checks_retries: 1
     branch_protection_injection_mode: none
     merge_bot_account: xiechimon
