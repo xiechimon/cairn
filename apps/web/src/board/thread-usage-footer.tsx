@@ -45,6 +45,25 @@ export function ThreadUsageDisclosure({
             tokens: summary.tokens,
             models: models ?? '—',
           });
+  const toggle = (
+    <Button
+      variant="ghost"
+      size="xs"
+      aria-label={t('thread 用量')}
+      aria-expanded={open}
+      aria-controls={open ? contentId : undefined}
+      onClick={() => setOpen((previous) => !previous)}
+      className={cn(
+        'justify-start gap-1.5 px-1 text-left',
+        state === 'error' ? 'min-w-0 flex-1' : 'w-full',
+      )}
+    >
+      <ChevronRight data-icon="inline-start" className={cn(open && '-rotate-90')} />
+      <span className="min-w-0 truncate tabular-nums" title={caption}>
+        {caption}
+      </span>
+    </Button>
+  );
   return (
     <section
       data-testid="thread-usage"
@@ -79,12 +98,9 @@ export function ThreadUsageDisclosure({
             {t('包含全部运行；总时长暂不可用。')}
           </p>
           {state === 'error' && (
-            <div className="flex items-center gap-2 px-1 text-meta text-destructive" role="status">
-              <span>{t('用量加载失败')}</span>
-              <Button variant="outline" size="xs" onClick={onRetry}>
-                {t('重试')}
-              </Button>
-            </div>
+            <p className="m-0 px-1 text-meta text-destructive" role="status">
+              {t('用量加载失败')}
+            </p>
           )}
           {state === 'loading' && (
             <span className="px-1 text-meta text-content-tertiary" role="status">
@@ -93,20 +109,16 @@ export function ThreadUsageDisclosure({
           )}
         </div>
       )}
-      <Button
-        variant="ghost"
-        size="xs"
-        aria-label={t('thread 用量')}
-        aria-expanded={open}
-        aria-controls={open ? contentId : undefined}
-        onClick={() => setOpen((previous) => !previous)}
-        className="w-full justify-start gap-1.5 px-1 text-left"
-      >
-        <ChevronRight data-icon="inline-start" className={cn(open && '-rotate-90')} />
-        <span className="min-w-0 truncate tabular-nums" title={caption}>
-          {caption}
-        </span>
-      </Button>
+      {state === 'error' ? (
+        <div className="flex items-center gap-1.5">
+          {toggle}
+          <Button variant="outline" size="xs" data-testid="thread-usage-retry" onClick={onRetry}>
+            {t('重试')}
+          </Button>
+        </div>
+      ) : (
+        toggle
+      )}
     </section>
   );
 }
