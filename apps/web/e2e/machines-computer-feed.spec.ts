@@ -484,6 +484,30 @@ test('with a machine listed the panel still shows its card and the screen placeh
   await expect(card.getByRole('switch', { name: '浏览器' })).toBeDisabled();
 });
 
+test('the live screen enlarges and becomes interactive after desktop control is on', async ({
+  page,
+}) => {
+  const panel = await open(
+    page,
+    { computers: [computer()], commands: [command(1)] },
+    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+  );
+  const card = panel.locator('[data-slot="list-card"]').nth(1);
+  await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
+  await card.getByRole('switch', { name: '桌面控制' }).click();
+  await card.getByTestId('machine-screen-expand').click();
+  const enlarged = page.getByTestId('machine-screen-enlarged');
+  await expect(enlarged).toBeVisible();
+  await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
+    'data-interactive',
+    'true',
+  );
+  await expect(page.getByText('在大屏里点击和键入')).toBeVisible();
+  await page.getByRole('dialog', { name: 'omarchy' }).getByRole('button', { name: '关闭' }).click();
+  await expect(enlarged).toHaveCount(0);
+  await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
+});
+
 test('without a computer row the machine keeps the waiting placeholder and disabled toggles', async ({
   page,
 }) => {

@@ -73,8 +73,8 @@ interface DialogShellProps {
   className?: string;
   size?: DialogSize;
   bare?: boolean;
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   zIndex?: number | string;
   onBackdropClick?: () => void;
   onEscapeWhileNested?: () => void;

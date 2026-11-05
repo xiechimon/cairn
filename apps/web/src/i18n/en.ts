@@ -123,6 +123,10 @@ export const EN: Record<string, string> = {
   电脑离线: 'Computer offline',
   'Coordinator 在这台': 'Coordinator runs here',
   桌面控制: 'Desktop control',
+  放大屏幕: 'Enlarge screen',
+  屏幕已放大: 'Screen is enlarged',
+  在大屏里点击和键入: 'Click and type in the enlarged screen',
+  打开桌面控制后再操作: 'Turn on desktop control to click and type',
   '让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。':
     'Lets agents operate apps on this computer. macOS needs Accessibility permission.',
   浏览器: 'Browser',

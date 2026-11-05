@@ -39,11 +39,6 @@ export function acquireComputerControl(
     const now = Date.now();
     if (!machineHub.isConnected(row.machineId))
       throw new HttpError(409, 'the computer is not connected');
-    if (
-      row.controlHolder === 'user' &&
-      (row.controlLeaseExpiresAt === null || row.controlLeaseExpiresAt > now)
-    )
-      throw new HttpError(409, 'the computer already has a control lease');
     const driving = tx
       .select({ id: computerCall.id })
       .from(computerCall)

@@ -4,7 +4,11 @@ import { Globe, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
-import { acquireComputerControl, releaseComputerControl } from '../api/computer-screen.js';
+import {
+  acquireComputerControl,
+  releaseComputerControl,
+  renewComputerControl,
+} from '../api/computer-screen.js';
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
@@ -13,8 +17,10 @@ import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-pan
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { X } from '../icons/index.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
 import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
@@ -122,12 +128,14 @@ function MachineScreen({
   teamId,
   leaseId,
   interactive,
+  onExpand,
 }: {
   machine: MachineRow;
   computer: ComputerRecord | null;
   teamId: string | undefined;
   leaseId: string | null;
   interactive: boolean;
+  onExpand?: () => void;
 }) {
   const { t } = useI18n();
   const online = machine.online === true;
@@ -138,6 +146,7 @@ function MachineScreen({
         computer={computer}
         leaseId={leaseId}
         interactive={interactive}
+        onExpand={onExpand}
       />
     );
   }
@@ -166,19 +175,56 @@ function MachineCard({
   const desktopInstalled = desktopControlInstalled(machine, computer);
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
-    desktopInstalled &&
-    online &&
-    computer !== null &&
-    teamId !== undefined &&
-    !busy &&
-    (leaseId !== null || computer.controlHolder !== 'user');
+    desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
+  const screenLive =
+    computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
 
   useEffect(() => {
     if (computer?.controlHolder === 'user') return;
     setLeaseId(null);
   }, [computer?.controlHolder, computer?.id]);
+
+  useEffect(() => {
+    if (!screenLive) setExpanded(false);
+  }, [screenLive]);
+
+  useEffect(() => {
+    if (
+      teamId === undefined ||
+      computer === null ||
+      computer.controlHolder !== 'user' ||
+      leaseId !== null ||
+      busy
+    )
+      return;
+    let cancelled = false;
+    setBusy(true);
+    void acquireComputerControl(teamId, computer.id)
+      .then((lease) => {
+        if (cancelled) return;
+        setLeaseId(lease.leaseId);
+        return invalidateConverged(qc, { queryKey: ['computers', teamId] });
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, computer?.id, computer?.controlHolder, leaseId, busy, qc, computer]);
+
+  useEffect(() => {
+    if (teamId === undefined || computer === null || leaseId === null) return;
+    const tick = window.setInterval(() => {
+      void renewComputerControl(teamId, computer.id, leaseId).catch(() => {
+        setLeaseId(null);
+      });
+    }, 10 * 60_000);
+    return () => window.clearInterval(tick);
+  }, [teamId, computer, leaseId]);
 
   const onDesktopToggle = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
@@ -191,21 +237,91 @@ function MachineCard({
         ? releaseComputerControl(teamId, computer.id, leaseId).then(() => {
             setLeaseId(null);
           })
-        : Promise.resolve();
+        : acquireComputerControl(teamId, computer.id).then((lease) =>
+            releaseComputerControl(teamId, computer.id, lease.leaseId).then(() => {
+              setLeaseId(null);
+            }),
+          );
     void run
       .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
       .finally(() => setBusy(false));
   };
 
+  const openEnlarged = () => {
+    if (!screenLive) return;
+    if (leaseId === null && teamId !== undefined && computer !== null && !busy) {
+      setBusy(true);
+      void acquireComputerControl(teamId, computer.id)
+        .then((lease) => {
+          setLeaseId(lease.leaseId);
+          setExpanded(true);
+          return invalidateConverged(qc, { queryKey: ['computers', teamId] });
+        })
+        .finally(() => setBusy(false));
+      return;
+    }
+    setExpanded(true);
+  };
+
   return (
     <ListCard className="flex-none">
-      <MachineScreen
-        machine={machine}
-        computer={computer}
-        teamId={teamId}
-        leaseId={leaseId}
-        interactive={leaseId !== null}
-      />
+      {expanded && screenLive ? (
+        <ScreenPlaceholder online label={t('屏幕已放大')} />
+      ) : (
+        <MachineScreen
+          machine={machine}
+          computer={computer}
+          teamId={teamId}
+          leaseId={leaseId}
+          interactive={false}
+          onExpand={screenLive ? openEnlarged : undefined}
+        />
+      )}
+      {expanded && screenLive && computer !== null && teamId !== undefined && (
+        <DialogShell
+          bare
+          open={expanded}
+          onClose={() => setExpanded(false)}
+          title={machine.name}
+          width="min(100vw - 1.5rem, 1120px)"
+          height="min(100dvh - 1.5rem, 820px)"
+          className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
+        >
+          <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
+            <div className="min-w-0 flex-1">
+              <div className="font-heading text-heading leading-[1.4] font-title text-foreground">
+                {machine.name}
+              </div>
+              <p className="mt-0.5 text-meta text-content-tertiary">
+                {leaseId !== null ? t('在大屏里点击和键入') : t('打开桌面控制后再操作')}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-3 right-3 text-content-tertiary hover:text-foreground sm:top-4 sm:right-4"
+              aria-label={t('关闭')}
+              onClick={() => setExpanded(false)}
+            >
+              <X width={16} height={16} />
+            </Button>
+          </div>
+          <div
+            data-testid="machine-screen-enlarged"
+            className="flex min-h-0 flex-1 flex-col px-2 pb-2 sm:px-3 sm:pb-3"
+          >
+            <MachineScreenSurface
+              teamId={teamId}
+              computer={computer}
+              leaseId={leaseId}
+              interactive={leaseId !== null}
+              fill
+              autoFocus
+            />
+          </div>
+        </DialogShell>
+      )}
       <div className="flex items-center gap-3 px-3.5 py-3">
         <Icon aria-hidden="true" className="size-4.5 flex-none text-content-secondary" />
         <span className="flex min-w-0 flex-1 flex-col">
