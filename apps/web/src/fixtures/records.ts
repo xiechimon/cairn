@@ -3,9 +3,11 @@ import {
   type AgentTask,
   type AgentTodoItem,
   type ChiefDigestItem,
+  type ChiefReportContent,
   type ClaudeLogin,
   type DocumentDiffFile,
   type GithubRepoSummary,
+  type MachineExecutor,
   type MachineHardware,
   type MemoryRecord,
   type ModelSource,
@@ -19,9 +21,12 @@ import {
   type SecretRecord,
   type SkillFact,
   type TagRecord,
+  type ThreadMessageContent,
   type ThreadReportContent,
   type UsageCost,
 } from '@cairn/shared';
+import type { MachineProvider } from '../api/claude-accounts.js';
+import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
 export { PHASE_VALUES };
@@ -70,6 +75,7 @@ export interface TodoRecord {
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
+  verified?: boolean;
 }
 
 export interface TokenUsageContent {
@@ -135,8 +141,15 @@ export interface ScheduleRecord {
   kind: 'hourly' | 'daily' | 'weekly' | 'once' | 'cron';
   at: number;
   tz: string;
-  nextRunAt: number;
+  nextRunAt: number | null;
+  cron?: string | null;
+  prompt?: string;
+  lastRunAt?: number | null;
+  lastRunStatus?: string | null;
+  lastRunError?: string | null;
   createdBy: string;
+  enabled?: boolean;
+  pausedReason?: string | null;
   todo: {
     seqNum: number;
     title: string;
@@ -264,12 +277,18 @@ export interface MachineRow {
   chiefWaiting?: boolean;
   maxConcurrent?: number;
   runningSteps?: number;
-  capabilities?: { mcpServers: string[]; skills: string[]; hardware?: MachineHardware } | null;
+  capabilities?: {
+    mcpServers: string[];
+    skills: string[];
+    hardware?: MachineHardware;
+    executor?: MachineExecutor;
+  } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
   concurrencyRange?: { min: number; max: number };
   concurrencySource?: 'measured' | 'estimate' | 'manual';
   claudeLogin?: ClaudeLogin;
+  providers?: MachineProvider[];
 }
 
 export interface ResourcesContent {
@@ -280,6 +299,7 @@ export interface ResourcesContent {
   providers?: ProviderRecord[];
   memories?: MemoryRecord[];
   secrets?: SecretRecord[];
+  accounts?: AccountsContent;
 }
 
 export interface DocSegment {
@@ -324,6 +344,7 @@ export type TranscriptItem =
       markdown?: string;
       id?: string;
       at?: string;
+      createdAt?: number;
     }
   | {
       kind: 'robot';
@@ -331,6 +352,7 @@ export type TranscriptItem =
       markdown?: string;
       footer?: RobotFooter;
       id?: string;
+      createdAt?: number;
     }
   | {
       kind: 'streaming';
@@ -343,8 +365,8 @@ export type TranscriptItem =
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | { kind: 'injected-skills'; skills: { id: string; reason: string }[] }
-  | { kind: 'plan'; title: string; preview: string; seconds?: number }
-  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean }
+  | { kind: 'plan'; title: string; preview: string; seconds?: number; createdAt?: number }
+  | { kind: 'work'; id: string; steps: WorkStep[]; expanded?: boolean; createdAt?: number }
   | { kind: 'elapsed'; seconds: number }
   | {
       kind: 'note';
@@ -355,9 +377,23 @@ export type TranscriptItem =
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }
   | { kind: 'chief' }
-  | { kind: 'fail'; title: string; body: string }
+  | { kind: 'fail'; title: string; body: string; createdAt?: number }
+  | {
+      kind: 'question';
+      id: string;
+      requestId: string;
+      status: 'pending' | 'answered' | 'cancelled';
+      questions: {
+        header: string;
+        question: string;
+        options: { label: string; description?: string; recommended?: boolean }[];
+        multiSelect?: boolean;
+      }[];
+      answers: { header: string; choices?: string[]; text?: string }[] | null;
+    }
   | {
       kind: 'review';
+      createdAt?: number;
       conclusion: string;
       findings: ReviewFinding[];
       extractionError?: string;
@@ -365,13 +401,14 @@ export type TranscriptItem =
     }
   | {
       kind: 'verify';
+      createdAt?: number;
       passed: boolean;
       conclusion: string;
       evidence: { path: string; note?: string }[];
       extractionError?: string;
       id?: string;
     }
-  | { kind: 'report'; markdown: string; id?: string }
+  | { kind: 'report'; markdown: string; id?: string; createdAt?: number }
   | {
       kind: 'thinking';
       text: string;
@@ -476,8 +513,9 @@ export interface ChiefSegment {
 
 export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
+  | (ThreadMessageContent & { id: string; projectId?: string | null })
   | { kind: 'note'; text: string; machineName?: string }
-  | { kind: 'error'; text: string }
+  | { kind: 'error'; text: string; createdAt?: number }
   | { kind: 'handoff'; todoId: string; id?: string }
   | {
       kind: 'question';
@@ -487,7 +525,7 @@ export type ChiefStreamItem =
       questions: {
         header: string;
         question: string;
-        options: { label: string; description?: string }[];
+        options: { label: string; description?: string; recommended?: boolean }[];
         multiSelect?: boolean;
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
@@ -499,9 +537,15 @@ export type ChiefStreamItem =
       markdown?: string;
       pending?: 'queued' | 'held';
       at?: string;
+      createdAt?: number;
       projectId?: string | null;
     }
-  | { kind: 'stopped'; todos: { id: string; seq: number; title: string }[]; id?: string }
+  | {
+      kind: 'stopped';
+      todos: { id: string; seq: number; title: string }[];
+      id?: string;
+      createdAt?: number;
+    }
   | {
       kind: 'robot';
       paragraphs?: ChiefSegment[][];
@@ -511,6 +555,7 @@ export type ChiefStreamItem =
       seconds: string;
       tools?: ChiefToolRow[];
       id?: string;
+      createdAt?: number;
       fallbackModel?: string;
       projectId?: string | null;
     }
@@ -520,20 +565,16 @@ export type ChiefStreamItem =
       id?: string;
     }
   | {
-      kind: 'tool';
-      label: string;
-      startedAt?: number;
-      seconds?: number;
-      running?: boolean;
-      error?: boolean;
-      id?: string;
-    }
-  | {
       kind: 'digest';
       id: string;
       reason: 'daily' | 'threshold';
       madeAt: number;
       items: ChiefDigestItem[];
+    }
+  | {
+      kind: 'daily-report';
+      id: string;
+      report: ChiefReportContent;
     }
   | {
       kind: 'streaming';
@@ -549,6 +590,7 @@ export interface ChiefToolRow {
   label: string;
   seconds?: number;
   error?: boolean;
+  running?: boolean;
 }
 
 export interface ChiefThreadRef {
@@ -583,6 +625,7 @@ export interface ChiefContent {
   streamAt?: number[];
   running?: boolean;
   runningTool?: string;
+  waitingTurn?: { messageId: string; text: string };
   outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
   fallbackModel?: string;
   hasEarlier?: boolean;

@@ -234,6 +234,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "id": {
           "type": "string",
         },
+        "instructions": {
+          "type": "string",
+        },
         "name": {
           "type": "string",
         },
@@ -356,6 +359,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "enum": [
             "plan",
             "build",
+            "session",
             "merge",
             "chief",
             "review",
@@ -625,6 +629,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "POST /api/machine/tool/{stepId}",
   "GET /api/machine/token/{stepId}",
   "POST /api/machine/upload-urls/{stepId}",
+  "POST /api/machine/computer/{callId}",
   "POST /api/machine/done/{stepId}",
 ]
 `;
@@ -638,6 +643,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "maximum": 9007199254740991,
       "minimum": 1,
       "type": "integer",
+    },
+    "role": {
+      "const": "coordinator",
+      "type": "string",
     },
   },
   "type": "object",
@@ -883,6 +892,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "id": {
                   "type": "string",
                 },
+                "instructions": {
+                  "type": "string",
+                },
                 "name": {
                   "type": "string",
                 },
@@ -1005,6 +1017,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                   "enum": [
                     "plan",
                     "build",
+                    "session",
                     "merge",
                     "chief",
                     "review",
@@ -1339,13 +1352,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "gateLoosening": {
           "type": "boolean",
         },
-        "sizeAssessment": {
-          "enum": [
-            "accepted",
-            "split-needed",
-          ],
-          "type": "string",
-        },
       },
       "required": [
         "conclusion",
@@ -1602,6 +1608,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "cacheWrite": {
             "maximum": 9007199254740991,
             "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "contextTokens": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
             "type": "integer",
           },
           "cost": {
@@ -2074,6 +2085,7 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "enum": [
               "plan",
               "build",
+              "session",
               "merge",
               "chief",
               "review",
@@ -2222,6 +2234,77 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "required": [
         "type",
         "sync",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "call": {
+          "additionalProperties": false,
+          "properties": {
+            "callId": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "deadlineAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "params": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "scopeKey": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "stepId": {
+              "type": "string",
+            },
+            "tool": {
+              "enum": [
+                "shell",
+                "list_files",
+                "read_file",
+                "write_file",
+                "attach_file",
+                "computer_observe",
+                "computer_act",
+                "open_path",
+                "launch_app",
+                "browser_navigate",
+                "browser_snapshot",
+                "browser_act",
+                "request_takeover",
+                "user_computer_shell",
+                "user_computer_observe",
+                "user_computer_act",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "callId",
+            "stepId",
+            "tool",
+            "params",
+            "deadlineAt",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "computer",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "call",
       ],
       "type": "object",
     },
@@ -3160,6 +3243,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "minimum": -9007199254740991,
                 "type": "integer",
               },
+              "contextTokens": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
               "cost": {
                 "additionalProperties": false,
                 "properties": {
@@ -3233,6 +3321,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "properties": {
             "message": {
               "type": "string",
+            },
+            "processCrash": {
+              "type": "boolean",
             },
             "retryable": {
               "type": "boolean",
@@ -3875,6 +3966,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "enum": [
                 "plan",
                 "build",
+                "session",
                 "merge",
                 "chief",
                 "review",
@@ -3944,6 +4036,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                       "additionalProperties": false,
                       "properties": {
                         "capacity": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
+                        "fallbackAt": {
                           "maximum": 9007199254740991,
                           "minimum": -9007199254740991,
                           "type": "integer",
@@ -4852,6 +4949,57 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
       },
       "type": "array",
     },
+    "filters": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "is",
+              "project",
+              "pr",
+              "by",
+              "after",
+              "cost",
+            ],
+            "type": "string",
+          },
+          "negated": {
+            "type": "boolean",
+          },
+          "raw": {
+            "type": "string",
+          },
+          "reason": {
+            "enum": [
+              "empty",
+              "unknown_state",
+              "bad_pr",
+              "bad_date",
+              "bad_cost",
+              "unknown_project",
+              "unknown_person",
+            ],
+            "type": "string",
+          },
+          "valid": {
+            "type": "boolean",
+          },
+          "value": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "key",
+          "raw",
+          "value",
+          "negated",
+          "valid",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "projects": {
       "items": {
         "additionalProperties": false,
@@ -4944,6 +5092,12 @@ exports[`body/envelope schema snapshots > setSecretBody > setSecretBody.json 1`]
     },
     "name": {
       "type": "string",
+    },
+    "projectId": {
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "value": {
       "type": "string",
@@ -5050,6 +5204,37 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
         "plan",
         "build",
       ],
+      "type": "object",
+    },
+    "routeOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "machineId": {
+          "type": "string",
+        },
+        "requiredCapabilities": {
+          "additionalProperties": false,
+          "properties": {
+            "executor": {
+              "const": "orb",
+              "type": "string",
+            },
+            "mcpServers": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "models": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+      },
       "type": "object",
     },
     "todoIds": {
@@ -5245,6 +5430,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "enum": [
         "plan",
         "build",
+        "session",
         "merge",
         "chief",
         "review",
@@ -5314,6 +5500,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
               "additionalProperties": false,
               "properties": {
                 "capacity": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "fallbackAt": {
                   "maximum": 9007199254740991,
                   "minimum": -9007199254740991,
                   "type": "integer",
@@ -5649,6 +5840,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "awaitingReply": {
+              "type": "boolean",
+            },
             "blockedBy": {
               "anyOf": [
                 {
@@ -5852,6 +6046,11 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                     "github-issue",
                     "github-issue-self",
                     "orchestration",
+                    "research-intake",
+                    "research-intake-item",
+                    "research-citation-check",
+                    "research-before-plan",
+                    "research-stuck",
                   ],
                   "type": "string",
                 },
@@ -5922,6 +6121,9 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
               "type": "integer",
+            },
+            "verified": {
+              "type": "boolean",
             },
             "waitingOn": {
               "additionalProperties": false,
@@ -6240,6 +6442,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "chief_message",
                 "quota_wait",
                 "model_fallback",
+                "no_machine",
                 "todo_done",
                 "todo_failed",
                 "schedule_run",
@@ -6377,6 +6580,91 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
       "required": [
         "type",
         "sync",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "callId": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "command": {
+              "type": "string",
+            },
+            "cwd": {
+              "type": "string",
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "output": {
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "running",
+                "done",
+                "error",
+                "interrupted",
+                "cancelled",
+              ],
+              "type": "string",
+            },
+            "stepId": {
+              "type": "string",
+            },
+            "tool": {
+              "enum": [
+                "shell",
+                "user_computer_shell",
+                "write_file",
+                "attach_file",
+                "open_path",
+                "launch_app",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "callId",
+            "stepId",
+            "tool",
+            "command",
+            "cwd",
+            "status",
+            "exitCode",
+            "output",
+            "at",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "computer.command",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "command",
       ],
       "type": "object",
     },
@@ -6580,6 +6868,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
   ],
   "ENV_VARS": {
     "apiKey": "CAIRN_API_KEY",
+    "coordinatorMachineId": "CAIRN_COORDINATOR_MACHINE_ID",
+    "coordinatorServerContext": "CAIRN_COORDINATOR_SERVER_CONTEXT",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
     "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",
     "githubCreateMinIntervalMs": "CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS",
@@ -6592,6 +6882,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
+    "researchIntakeProjectId": "CAIRN_RESEARCH_INTAKE_PROJECT_ID",
+    "routingRules": "CAIRN_ROUTING_RULES",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",
@@ -6811,6 +7103,10 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > machine surface 1
     "path": "/api/machine/upload-urls/{stepId}",
   },
   {
+    "note": "Computer call frames from the daemon (D75)",
+    "path": "/api/machine/computer/{callId}",
+  },
+  {
     "note": "步骤收尾",
     "path": "/api/machine/done/{stepId}",
   },
@@ -6845,7 +7141,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > merge-gate blocke
   "compare-truncated: human, compare 文件列表被截断",
   "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
   "size-cap: human, 本地补丁超过 800 行或 40 个文件",
-  "size-review: transient, 补丁超过 800 行或 40 个文件：PR 正文要有 ## Size 小节，且当前补丁要有评审明确接受这个规模",
   "independent-review-missing: transient, Protected changes require a bound independent review",
   "outside-auto-merge: human, 改动在可自动合并集之外",
   "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
@@ -7053,7 +7348,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "chief",
   "chief_thread",
   "chief_message",
-  "chief_turn_usage",
   "attachment",
   "branch_sync",
   "github_connection",
@@ -7075,6 +7369,17 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "push_delivery",
   "harness_eval_attempts",
   "autonomous_merge_admission",
+  "chief_report",
+  "retro_proposal",
+  "routing_rule",
+  "work_policy",
+  "chief_turn_usage",
+  "chief_summary",
+  "computer",
+  "computer_call",
+  "due_event",
+  "feature_flag",
+  "client_message",
 ]
 `;
 
@@ -7119,6 +7424,21 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "backup-status.json next to server.db (#2162)",
     "path": "/api/server/backup",
+  },
+  {
+    "method": "GET",
+    "note": "deploy.json next to server.db, written by deploy-self.sh (#2427)",
+    "path": "/api/server/deploy",
+  },
+  {
+    "method": "GET",
+    "note": "owner lists registered flags and their global release state (#2427)",
+    "path": "/api/flags",
+  },
+  {
+    "method": "POST",
+    "note": "owner releases a feature flag to every user (#2427)",
+    "path": "/api/flags/{key}/release",
   },
   {
     "method": "GET",
@@ -7198,7 +7518,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "body {content, projectId?}; projectId only tags the turn, 409 when that project is archived",
+    "note": "body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn",
     "path": "/api/teams/{id}/coordinator/messages",
   },
   {
@@ -7268,6 +7588,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "clears the snooze",
     "path": "/api/todos/{id}/unsnooze",
+  },
+  {
+    "method": "POST",
+    "note": "body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)",
+    "path": "/api/todos/{id}/messages",
   },
   {
     "method": "POST",
@@ -7611,6 +7936,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > age
         {
           "additionalProperties": false,
           "properties": {
+            "executor": {
+              "const": "orb",
+              "type": "string",
+            },
             "mcpServers": {
               "items": {
                 "type": "string",
@@ -8297,6 +8626,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
               "minimum": 1,
               "type": "integer",
             },
+            "stepId": {
+              "type": "string",
+            },
             "waitingFor": {
               "anyOf": [
                 {
@@ -8382,6 +8714,17 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "computer": {
+              "const": true,
+              "type": "boolean",
+            },
+            "executor": {
+              "enum": [
+                "orb",
+                "host",
+              ],
+              "type": "string",
+            },
             "hardware": {
               "additionalProperties": false,
               "properties": {
@@ -8423,6 +8766,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "type": "string",
               },
               "type": "array",
+            },
+            "ownComputer": {
+              "const": true,
+              "type": "boolean",
             },
             "skills": {
               "items": {
@@ -8683,6 +9030,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > not
         "chief_message",
         "quota_wait",
         "model_fallback",
+        "no_machine",
         "todo_done",
         "todo_failed",
         "schedule_run",
@@ -8841,6 +9189,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     "id": {
       "type": "string",
     },
+    "instructions": {
+      "type": "string",
+    },
     "localChecks": {
       "items": {
         "minLength": 1,
@@ -8850,6 +9201,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
     },
     "localPath": {
       "type": "string",
+    },
+    "maxConcurrent": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "mergePolicy": {
       "enum": [
@@ -9230,6 +9586,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
     "name": {
       "type": "string",
     },
+    "projectId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "teamId": {
       "type": "string",
     },
@@ -9237,6 +9599,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sec
   "required": [
     "id",
     "teamId",
+    "projectId",
     "name",
     "description",
   ],
@@ -9264,6 +9627,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > ste
       "enum": [
         "plan",
         "build",
+        "session",
         "merge",
         "chief",
         "review",
@@ -9573,6 +9937,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
         },
       ],
     },
+    "awaitingReply": {
+      "type": "boolean",
+    },
     "blockedBy": {
       "anyOf": [
         {
@@ -9776,6 +10143,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "github-issue",
             "github-issue-self",
             "orchestration",
+            "research-intake",
+            "research-intake-item",
+            "research-citation-check",
+            "research-before-plan",
+            "research-stuck",
           ],
           "type": "string",
         },
@@ -9846,6 +10218,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "verified": {
+      "type": "boolean",
     },
     "waitingOn": {
       "additionalProperties": false,

@@ -165,27 +165,11 @@ async function seedFailedTodo(
   return record;
 }
 
-async function openBoard(): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
-  await pexpect(
-    page.getByRole('complementary').getByRole('button', { name: '新任务' }),
-  ).toBeVisible({ timeout: 30_000 });
-}
-
-async function openDetailByTitle(title: string): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
-  await page.getByRole('link', { name: title }).click();
-  await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
+async function openDetail(todoId: string): Promise<void> {
+  await page.goto(`${server.url}/app/todo/${todoId}`);
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({
     timeout: 15_000,
   });
-}
-
-function cardInColumn(columnName: string, todoId: string) {
-  return page
-    .locator('section', {
-      has: page.locator('.board-column-name', { hasText: columnName }),
-    })
-    .locator(`[data-todo-id="${todoId}"]`);
 }
 
 beforeAll(async () => {
@@ -247,13 +231,12 @@ afterAll(async () => {
   await server?.close();
 });
 
-describe('#1216 board UI reliability triple defect (real web dist + real server + fake machine wire)', () => {
-  test('① save-and-start: one click enters the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
-    await openBoard();
-    await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-    await pexpect(page.locator('.new-task-spec')).toBeVisible();
-    await page.locator('.new-task-spec').fill(SPECS.oneClick);
-    await page.locator('.new-task-dialog').getByRole('button', { name: '保存并开始' }).click();
+describe('#1216 task UI reliability triple defect (real web dist + real server + fake machine wire)', () => {
+  test('① a draft starts from its detail page into the dispatch flow; in-flight state rejects duplicate orchestration', async () => {
+    await api(server.url, 'POST', `/api/projects/${projectId}/todos`, {
+      title: '',
+      spec: SPECS.oneClick,
+    });
 
     let todoId = '';
     let seqNum = 0;
@@ -268,13 +251,17 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
       seqNum = row.seqNum;
       return true;
     }, 15_000);
+    expect(orchestrationTurns(seqNum).length).toBe(0);
+    await openDetail(todoId);
+    await pexpect(page.getByTestId('side-chat-action').getByRole('button').last()).toHaveText(
+      '开始',
+    );
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
     await waitFor(() => orchestrationTurns(seqNum).length === 1, 15_000);
 
-    const card = page.locator(`[data-todo-id="${todoId}"]`);
-    await pexpect(card.locator('.todo-card-orchestration')).toContainText('编排中', {
-      timeout: 15_000,
-    });
-    await pexpect(card.locator('.todo-card-action')).toHaveCount(0);
+    const inflight = page.locator('[data-testid="side-chat-action"] [data-orchestrating="true"]');
+    await pexpect(inflight).toHaveText('编排中', { timeout: 15_000 });
+    await pexpect(inflight).toBeDisabled();
     expect(orchestrationTurns(seqNum).length).toBe(1);
 
     const turn = orchestrationTurns(seqNum)[0];
@@ -294,26 +281,28 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     expect(planStep.kind).toBe('plan');
     await waitFor(() => server.todoPhase(todoId) === 'planning', 15_000);
 
-    await pexpect(cardInColumn('执行中', todoId)).toBeVisible({ timeout: 30_000 });
+    await pexpect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', 'planning', {
+      timeout: 30_000,
+    });
     expect(orchestrationTurns(seqNum).length).toBe(1);
   }, 180_000);
 
   test('② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch', async () => {
     const seeded = await seedFailedTodo('重跑探针卡', SPECS.rerun, tokens.m1);
-    await openDetailByTitle('重跑探针卡');
+    await openDetail(seeded.id);
 
-    await pexpect(page.locator('.detail-head-action')).toHaveText('重跑');
-    await page.locator('.detail-head-action').click();
-    const dialog = page.locator('[role="dialog"]', { hasText: '这张任务将交给总管重新编排。' });
-    await pexpect(dialog).toBeVisible();
-    await dialog.getByRole('button', { name: '重跑' }).click();
+    await pexpect(page.getByTestId('side-chat-action').getByRole('button').last()).toHaveText(
+      '重试',
+    );
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
 
     await waitFor(() => orchestrationTurns(seeded.seqNum).length === 1, 15_000);
-    await pexpect(page.locator('.detail-head-action[data-orchestrating="true"]')).toHaveText(
-      '编排中',
-      { timeout: 15_000 },
-    );
-    await pexpect(page.locator('.detail-head-action[data-orchestrating="true"]')).toBeDisabled();
+    await pexpect(
+      page.locator('[data-testid="side-chat-action"] [data-orchestrating="true"]'),
+    ).toHaveText('编排中', { timeout: 15_000 });
+    await pexpect(
+      page.locator('[data-testid="side-chat-action"] [data-orchestrating="true"]'),
+    ).toBeDisabled();
 
     const turn = orchestrationTurns(seeded.seqNum)[0];
     if (turn === undefined) throw new Error('rerun orchestration turn missing');
@@ -327,7 +316,9 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     };
     expect(record.buildHistory.length).toBe(2);
 
-    await pexpect(page.locator('.detail-chip')).not.toHaveText('失败', { timeout: 30_000 });
+    await pexpect(page.getByTestId('side-chat')).not.toHaveAttribute('data-phase', 'failed', {
+      timeout: 30_000,
+    });
 
     const rerunBuildId = latestBuildIdOf(seeded.id);
     if (rerunBuildId == null) throw new Error('latestBuildId missing after rerun');
@@ -342,10 +333,12 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
   test('③ failed card detail deletable; missing/failed detail shows an explained state, not an empty shell', async () => {
     const seeded = await seedFailedTodo('删除探针卡', SPECS.deletable, tokens.m1);
 
-    await openDetailByTitle('删除探针卡');
-    await pexpect(page.locator('.detail-head-action')).toHaveText('重跑');
+    await openDetail(seeded.id);
+    await pexpect(page.getByTestId('side-chat-action').getByRole('button').last()).toHaveText(
+      '重试',
+    );
 
-    await page.locator('button[aria-label="更多"]').click();
+    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
     await page.getByRole('menuitem', { name: '删除' }).click();
     const confirm = page.locator('[role="alertdialog"][aria-label="删除任务"]');
     await pexpect(confirm).toBeVisible();
@@ -355,16 +348,15 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
       return res.status === 404;
     }, 15_000);
     await pexpect(page).toHaveURL(/\/app$/);
-    await pexpect(page.locator(`[data-todo-id="${seeded.id}"]`)).toHaveCount(0);
 
     await page.goto(`${server.url}/app/todo/does-not-exist-1216`);
-    const unavailable = page.locator('[data-testid="detail-unavailable"]');
+    const unavailable = page.locator('[data-testid="side-chat-unavailable"]');
     await pexpect(unavailable).toBeVisible({ timeout: 15_000 });
-    await pexpect(unavailable).toHaveAttribute('data-state', 'not-found');
-    await unavailable.getByRole('button', { name: '回看板' }).click();
+    await pexpect(unavailable).toHaveAttribute('data-state', 'missing');
+    await page.getByTestId('side-chat').getByRole('button', { name: '关闭' }).click();
     await pexpect(page).toHaveURL(/\/app$/);
     await pexpect(
-      page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+      page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
     ).toBeVisible();
 
     const rerunRow = server.db
@@ -379,7 +371,7 @@ describe('#1216 board UI reliability triple defect (real web dist + real server 
     await pexpect(unavailable).toHaveAttribute('data-state', 'error');
     await page.unroute('**/api/todos**');
     await unavailable.getByRole('button', { name: '重试' }).click();
-    await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
+    await pexpect(page.getByTestId('side-chat')).toBeVisible({
       timeout: 15_000,
     });
   }, 180_000);

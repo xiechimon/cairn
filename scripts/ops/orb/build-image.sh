@@ -46,6 +46,8 @@ host_version() {
 claude_version=$(host_version claude | awk 'NR == 1 {print $1}')
 codex_version=$(host_version codex | awk 'NR == 1 {print $NF}')
 [[ $claude_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $codex_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin host Claude Code and Codex versions\n' >&2; exit 1; }
+pnpm_version=$(cat "$script_dir/pnpm.version")
+[[ $pnpm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { printf 'Cannot pin pnpm from %s/pnpm.version\n' "$script_dir" >&2; exit 1; }
 daemon_args=(bash -lc 'export XDG_RUNTIME_DIR=/run/user/$(id -u); node "$1" "$2"' cairn-orb "$script_dir/daemon-package.mjs" "${CAIRN_ORB_NODE_MAJOR:-}")
 if [[ $(id -un) == ian ]]; then
   node_major=$("${daemon_args[@]}")
@@ -54,7 +56,7 @@ else
 fi
 [[ $node_major =~ ^[1-9][0-9]*$ && $node_major -ge 22 ]] || { printf 'Cannot pin host daemon Node major; set CAIRN_ORB_NODE_MAJOR\n' >&2; exit 1; }
 recipe=$(cat "$script_dir/build-image.sh" "$script_dir/guest-check.mjs" "$script_dir/daemon-package.mjs" | sha256sum | awk '{print $1}')
-expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\nnode_major=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$node_major" "$agent_uid")
+expected=$(printf 'recipe=%s\nclaude=%s\ncodex=%s\npnpm=%s\nnode_major=%s\nagent_uid=%s' "$recipe" "$claude_version" "$codex_version" "$pnpm_version" "$node_major" "$agent_uid")
 previous_marker=
 if [[ -d $image ]]; then
   current_image_type=$(image_type "$image")
@@ -66,7 +68,8 @@ if [[ -d $image ]]; then
   current_marker_pattern='^recipe=[a-zA-Z0-9-]+
 claude=[0-9]+\.[0-9]+\.[0-9]+
 codex=[0-9]+\.[0-9]+\.[0-9]+
-node_major=[1-9][0-9]*
+(pnpm=[0-9]+\.[0-9]+\.[0-9]+
+)?node_major=[1-9][0-9]*
 agent_uid=[0-9]+$'
   legacy_marker_pattern='^recipe=[a-zA-Z0-9-]+
 claude=[0-9]+\.[0-9]+\.[0-9]+
@@ -86,16 +89,17 @@ daemon=[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)?$'
     printf 'rebuild cairn-orb-base: recipe or pinned Node/CLI versions changed\n'
   fi
 fi
-printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl\n'
-printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version"
+printf 'build cairn-orb-base with pacstrap: base git nodejs npm openssh ca-certificates curl bubblewrap socat python jq diffutils patch which inetutils rsync lsof ripgrep unzip\n'
+printf 'pin Node major %s @anthropic-ai/claude-code@%s @openai/codex@%s pnpm@%s; create agent; install proxy settings; register image\n' "$node_major" "$claude_version" "$codex_version" "$pnpm_version"
 if [[ $filesystem == btrfs ]]; then
   printf 'create a locked staging subvolume under /var/lib/machines\n'
 else
   printf 'create a locked staging directory under /var/lib/machines\n'
 fi
 printf '%s\n' \
-  'install pinned CLI packages with npm lifecycle scripts disabled' \
-  'create unprivileged agent user and validate its CLI versions' \
+  'install pinned CLI packages and pnpm with npm lifecycle scripts disabled' \
+  'create unprivileged agent user and validate its CLI and pnpm versions' \
+  'pin Claude config to /var/lib/cairn-claude/config with the weaker nested sandbox, settings root-owned' \
   'lock root login and mask SSH server units' \
   'enable guest systemd-networkd' \
   'install and enable cairn-orb-worker.service, cairn-orb-check.service and cairn-orb-check.path' \
@@ -136,18 +140,35 @@ if [[ $filesystem == btrfs ]]; then
   rmdir -- "$stage"
   btrfs subvolume create "$stage"
 fi
-pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl
+pacstrap -K -M "$stage" base git nodejs npm openssh ca-certificates curl bubblewrap socat python jq diffutils patch which inetutils rsync lsof ripgrep unzip
 printf 'configure image and pinned tools\n'
-arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$node_major" <<'GUEST'
+arch-chroot "$stage" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/bin HOME=/root HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" http_proxy="$http_proxy" https_proxy="$https_proxy" bash -s -- "$claude_version" "$codex_version" "$agent_uid" "$daemon_entry" "$pnpm_version" "$node_major" <<'GUEST'
 set -euo pipefail
-node -e 'const [major, minor] = process.versions.node.split(".").map(Number); const expected = Number(process.argv[1]); if (major !== expected || major < 22 || (major === 22 && minor < 19)) { console.error(`Guest Node ${process.versions.node} must match host daemon Node major ${expected} and be >=22.19; install a compatible guest nodejs package before retrying`); process.exit(1); }' "$5"
-npm install --global --ignore-scripts --no-audit --no-fund "@anthropic-ai/claude-code@$1" "@openai/codex@$2"
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); const expected = Number(process.argv[1]); if (major !== expected || major < 22 || (major === 22 && minor < 19)) { console.error(`Guest Node ${process.versions.node} must match host daemon Node major ${expected} and be >=22.19; install a compatible guest nodejs package before retrying`); process.exit(1); }' "$6"
+npm install --global --ignore-scripts --no-audit --no-fund "@anthropic-ai/claude-code@$1" "@openai/codex@$2" "pnpm@$5"
 claude_package="$(npm root --global)/@anthropic-ai/claude-code"
 [[ -f $claude_package/install.cjs ]] || { printf 'Claude Code package has no install.cjs; cannot place its native binary\n' >&2; exit 1; }
 (cd "$claude_package" && node install.cjs)
 useradd --uid "$3" --create-home --shell /bin/bash agent
-[[ $(runuser -u agent -- claude --version | awk 'NR == 1 {print $1}') == "$1" ]] || { printf 'Claude Code %s is not runnable by agent\n' "$1" >&2; exit 1; }
+[[ $(runuser -u agent -- /usr/bin/claude --version | awk 'NR == 1 {print $1}') == "$1" ]] || { printf 'Claude Code %s is not runnable by agent\n' "$1" >&2; exit 1; }
 [[ $(runuser -u agent -- codex --version | awk 'NR == 1 {print $NF}') == "$2" ]] || { printf 'codex %s is not runnable by agent\n' "$2" >&2; exit 1; }
+[[ $(cd /tmp && runuser -u agent -- pnpm --version) == "$5" ]] || { printf 'pnpm %s is not runnable by agent\n' "$5" >&2; exit 1; }
+runuser -u agent -- /usr/bin/bwrap --version > /dev/null || { printf 'bubblewrap is not runnable by agent\n' >&2; exit 1; }
+runuser -u agent -- /usr/bin/socat -V > /dev/null || { printf 'socat is not runnable by agent\n' >&2; exit 1; }
+runuser -u agent -- /usr/bin/python3 --version > /dev/null || { printf 'python3 is not runnable by agent\n' >&2; exit 1; }
+for tool in jq diff patch which hostname rsync lsof rg unzip; do runuser -u agent -- sh -c 'command -v "$1"' sh "$tool" > /dev/null || { printf '%s is not runnable by agent\n' "$tool" >&2; exit 1; }; done
+install -d -o root -g root -m 755 /var/lib/cairn-claude
+install -d -o root -g agent -m 1770 /var/lib/cairn-claude/config
+printf '%s\n' '{"sandbox": {"enableWeakerNestedSandbox": true}}' > /var/lib/cairn-claude/config/settings.json
+chown root:root /var/lib/cairn-claude/config/settings.json
+chmod 644 /var/lib/cairn-claude/config/settings.json
+runuser -u agent -- /usr/bin/node -e 'const s = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); process.exit(s.sandbox?.enableWeakerNestedSandbox === true ? 0 : 1)' /var/lib/cairn-claude/config/settings.json || { printf 'agent cannot read the Claude sandbox settings\n' >&2; exit 1; }
+runuser -u agent -- touch /var/lib/cairn-claude/config/.agent-write-check || { printf 'agent cannot write the Claude config dir\n' >&2; exit 1; }
+rm -f /var/lib/cairn-claude/config/.agent-write-check
+! runuser -u agent -- rm -f /var/lib/cairn-claude/config/settings.json 2>/dev/null || { printf 'agent can remove the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- mv /var/lib/cairn-claude/config/settings.json /var/lib/cairn-claude/config/moved.json 2>/dev/null || { printf 'agent can rename the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- sh -c 'printf x > /var/lib/cairn-claude/config/settings.json' 2>/dev/null || { printf 'agent can overwrite the Claude settings\n' >&2; exit 1; }
+! runuser -u agent -- mv /var/lib/cairn-claude/config /var/lib/cairn-claude/moved 2>/dev/null || { printf 'agent can move the Claude config dir\n' >&2; exit 1; }
 passwd --lock root
 systemctl disable sshd.service sshd.socket || true
 systemctl mask sshd.service sshd.socket
@@ -166,12 +187,14 @@ StartLimitIntervalSec=0
 [Service]
 User=agent
 Environment=CAIRN_ORB=1
+Environment=CLAUDE_CONFIG_DIR=/var/lib/cairn-claude/config
 Restart=always
 RestartSec=1
 ExecStartPre=/bin/sh -c 'while [ ! -S /run/cairn/relay.sock ]; do sleep 1; done'
 TimeoutStartSec=infinity
 ExecStart=/usr/bin/node $4 orb-step --socket /run/cairn/relay.sock
 UMask=0077
+LimitCORE=0
 
 [Install]
 WantedBy=multi-user.target

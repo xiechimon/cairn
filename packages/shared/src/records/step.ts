@@ -5,10 +5,22 @@ import { skillInjectionSchema } from '../skill-inject.js';
 import { epochMs, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
 
-export const stepKindSchema = z.enum(['plan', 'build', 'merge', 'chief', 'review', 'verify']);
+export const stepKindSchema = z.enum([
+  'plan',
+  'build',
+  'session',
+  'merge',
+  'chief',
+  'review',
+  'verify',
+]);
 export type StepKind = z.infer<typeof stepKindSchema>;
 
-export const SECRET_STEP_KINDS: readonly StepKind[] = ['build', 'merge'];
+export const SECRET_STEP_KINDS: readonly StepKind[] = ['build', 'session', 'merge'];
+
+export function isBuildStepKind(kind: StepKind): boolean {
+  return kind === 'build' || kind === 'session';
+}
 
 export function stepTakesSecrets(kind: StepKind): boolean {
   return SECRET_STEP_KINDS.includes(kind);
@@ -54,6 +66,7 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
           name: z.string(),
           running: z.number().int(),
           capacity: z.number().int(),
+          fallbackAt: epochMs.optional(),
         })
         .nullable(),
       hold: z

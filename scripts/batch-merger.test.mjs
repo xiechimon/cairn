@@ -26,7 +26,7 @@ const pull = (number = 1) => ({
   title: 'Batch work',
   head: { ref: 'B1/work', sha: head, repo: { full_name: 'owner/repo' } },
   base: { ref: 'main' },
-  labels: [{ name: 'review-gate' }],
+  labels: [],
   draft: false,
   auto_merge: null,
 });
@@ -46,7 +46,7 @@ function fixture(t, overrides = {}) {
     numstat: '1\t0\tapps/web/src/page.ts\n',
     deleted: '',
     pulls: [pull()],
-    checks: required.map((name, id) => ({
+    checks: [...required, 'review-gate'].map((name, id) => ({
       name,
       id,
       head_sha: head,
@@ -146,7 +146,7 @@ for (const [name, data] of [
   [
     'red check',
     {
-      checks: required.map((name, id) => ({
+      checks: [...required, 'review-gate'].map((name, id) => ({
         name,
         id,
         head_sha: head,
@@ -158,15 +158,16 @@ for (const [name, data] of [
   ],
   ['missing check', { checks: [] }],
   [
-    'older review',
+    'review check on an older head',
     {
-      comments: [
-        {
-          id: 1,
-          user: { login: 'cairnwright[bot]' },
-          body: `<!-- review-gate:${'b'.repeat(40)} -->\n**Independent review gate: PASS** for \`${head.slice(0, 8)}\`.`,
-        },
-      ],
+      checks: [...required, 'review-gate'].map((name, id) => ({
+        name,
+        id,
+        head_sha: name === 'review-gate' ? 'b'.repeat(40) : head,
+        status: 'completed',
+        conclusion: 'success',
+        app: { slug: 'github-actions' },
+      })),
     },
   ],
   ['recovery label', { pulls: [{ ...pull(), labels: [{ name: 'cairn-recovery' }] }] }],
@@ -244,15 +245,18 @@ test('a red gates run blocks an otherwise green batch', (t) => {
   );
   assert.equal(fixture(t, { checks }).queues.length, 0);
 });
+const reviewed = (checks) => [...checks, completed('review-gate', 99, 'success')];
 test('a docs-only batch with the code-only jobs skipped still merges', (t) => {
-  const checks = required.map((name, id) =>
-    completed(name, id, skippable.includes(name) ? 'skipped' : 'success'),
+  const checks = reviewed(
+    required.map((name, id) =>
+      completed(name, id, skippable.includes(name) ? 'skipped' : 'success'),
+    ),
   );
   assert.equal(fixture(t, { checks }).queues.length, 1);
 });
 test('gates skipped is treated like the other must-be-green jobs', (t) => {
-  const checks = required.map((name, id) =>
-    completed(name, id, name === 'gates' ? 'skipped' : 'success'),
+  const checks = reviewed(
+    required.map((name, id) => completed(name, id, name === 'gates' ? 'skipped' : 'success')),
   );
   assert.equal(fixture(t, { checks }).queues.length, 1);
 });
@@ -298,25 +302,27 @@ test('checks from another app cannot authorize a merge', (t) => {
   }));
   assert.equal(fixture(t, { checks }).queues.length, 0);
 });
-test('an untrusted review author cannot authorize a merge', (t) => {
-  const f = fixture(t, {
-    comments: [
-      {
-        id: 1,
-        user: { login: 'other-user' },
-        body: `<!-- review-gate:${head} -->\n**Independent review gate: PASS** for \`${head.slice(0, 8)}\`.`,
-      },
-    ],
+for (const [name, review] of [
+  [
+    'from another app',
+    [{ ...completed('review-gate', 99, 'success'), app: { slug: 'other-app' } }],
+  ],
+  [
+    'newer failure over an older pass',
+    [completed('review-gate', 98, 'success'), completed('review-gate', 99, 'failure')],
+  ],
+  ['still in progress', [{ ...completed('review-gate', 99, null), status: 'in_progress' }]],
+  ['missing', []],
+])
+  test(`a review-gate check ${name} cannot authorize a merge`, (t) => {
+    const checks = [...required.map((check, id) => completed(check, id, 'success')), ...review];
+    const f = fixture(t, { checks });
+    assert.equal(f.queues.length, 0);
+    assert.ok(f.result.stdout.includes('review-not-pass'), f.result.stdout);
   });
-  assert.equal(f.queues.length, 0);
-});
-test('the latest review for this head blocks an older pass', (t) => {
-  const comments = ['PASS', 'BLOCK'].map((verdict, id) => ({
-    id,
-    user: { login: 'cairnwright[bot]' },
-    body: `<!-- review-gate:${head} -->\n**Independent review gate: ${verdict}** for \`${head.slice(0, 8)}\`.`,
-  }));
-  assert.equal(fixture(t, { comments }).queues.length, 0);
+test('a PASS comment without a passing review-gate check cannot authorize a merge', (t) => {
+  const checks = required.map((check, id) => completed(check, id, 'success'));
+  assert.equal(fixture(t, { checks, comments: defaultComments }).queues.length, 0);
 });
 test('mergify-config exports the admit label the merger writes', async () => {
   const { admitLabel } = await import('./mergify-config.mjs');
@@ -346,7 +352,7 @@ const capped = (f) =>
     .map((decision) => decision.pr);
 const admitted = (number = 1) => ({
   ...pull(number),
-  labels: [{ name: 'review-gate' }, { name: 'queue-admit' }],
+  labels: [{ name: 'queue-admit' }],
 });
 test('the cap admits up to the remaining room and leaves the rest unadmitted', (t) => {
   const f = fixture(t, {
@@ -434,52 +440,15 @@ test('dry-run reports admissions without writing', (t) => {
   assert.deepEqual(capped(f), [2]);
 });
 
-for (const carried of [false, true])
-  test(`real review-gate PASS authorizes merging (carried over: ${carried})`, (t) => {
-    const body = carried
-      ? `<!-- review-gate:${head} -->\n**Independent review gate: PASS** (carried over) for \`${head.slice(0, 8)}\`: same patch as the reviewed head \`bbbbbbbb\`; only the base moved.\n<!-- review-gate-patch:patch -->`
-      : `<!-- review-gate:${head} -->\n**Independent review gate: PASS** for \`${head.slice(0, 8)}\`.\n<!-- review-gate-patch:patch -->`;
-    const f = fixture(t, { comments: [{ id: 1, user: { login: 'cairnwright[bot]' }, body }] });
-    assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
-  });
-test('legacy verdict text does not authorize merging', (t) => {
-  const f = fixture(t, {
-    comments: [
-      {
-        id: 1,
-        user: { login: 'cairnwright[bot]' },
-        body: `<!-- review-gate:${head} -->\nVERDICT: pass`,
-      },
-    ],
-  });
-  assert.equal(f.queues.length, 0);
-});
 test('multi-digit batches are eligible', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), head: { ...pull().head, ref: 'B12/work' } }] });
   assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
 });
-test('a batch without the review label is skipped', (t) => {
+test('a batch needs no review label once its review-gate check passed', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), labels: [] }] });
-  assert.equal(f.queues.length, 0);
-  const decision = JSON.parse(f.result.stdout.trim());
-  assert.equal(decision.action, 'skip');
-  assert.ok(decision.reasons.includes('no-review-label'));
+  assert.equal(f.queues.length, 1, f.result.stdout + f.result.stderr);
 });
 
-test('a BLOCK quoting a PASS line cannot authorize merging', (t) => {
-  const body = `<!-- review-gate:${head} -->\n**Independent review gate: BLOCK** for head.\n\n**Independent review gate: PASS** for quoted head.`;
-  assert.equal(
-    fixture(t, { comments: [{ id: 1, user: { login: 'cairnwright[bot]' }, body }] }).queues.length,
-    0,
-  );
-});
-test('a prefixed marker cannot authorize merging', (t) => {
-  const body = `quoted\n<!-- review-gate:${head} -->\n**Independent review gate: PASS** for head.`;
-  assert.equal(
-    fixture(t, { comments: [{ id: 1, user: { login: 'cairnwright[bot]' }, body }] }).queues.length,
-    0,
-  );
-});
 test('fork batch branches are ignored before disarming', (t) => {
   const f = fixture(t, {
     pulls: [
@@ -500,30 +469,23 @@ test('a fresh fork head fails eligibility', (t) => {
   assert.match(f.result.stdout, /head-repo-mismatch/);
 });
 
-for (const [name, data, reason] of [
-  ['protected path', { numstat: '1\t0\tdocs/adr/0028.md\n' }, 'protected paths'],
-  ['outside set', { numstat: '1\t0\tREADME.md\n' }, 'outside the auto-merge set'],
+for (const [name, data] of [
+  ['protected path', { numstat: '1\t0\tdocs/spec/28.md\n' }],
+  ['outside set', { numstat: '1\t0\tREADME.md\n' }],
   [
     'deleted test',
     { numstat: '0\t1\tapps/web/src/page.test.ts\n', deleted: 'apps/web/src/page.test.ts\n' },
-    'deleted test files',
   ],
-  [
-    'binary source',
-    { numstat: '-\t-\tapps/web/src/page.ts\n' },
-    'binary files outside docs/verify',
-  ],
+  ['binary source', { numstat: '-\t-\tapps/web/src/page.ts\n' }],
   [
     'security surface beside an oversize patch',
     { numstat: `401\t400\tapps/web/src/page.ts\n1\t0\tapps/server/src/services/secrets.ts\n` },
-    'protected paths: apps/server/src/services/secrets.ts',
   ],
 ])
-  test(`owner routing blocks ${name}`, (t) => {
+  test(`path class does not owner-route ${name}`, (t) => {
     const f = fixture(t, data);
-    assert.equal(f.queues.length, 0);
-    assert.match(f.result.stdout, /owner-route/);
-    assert.ok(f.result.stdout.includes(reason), f.result.stdout);
+    assert.equal(f.queues.length, 1, f.result.stdout);
+    assert.doesNotMatch(f.result.stdout, /owner-route/);
   });
 for (const data of [{ gitError: true }, { policy: 'invalid policy' }, { numstat: 'invalid' }])
   test('unavailable owner routing fails closed', (t) => {
@@ -550,7 +512,7 @@ test('an evidence binary stays eligible', (t) => {
 });
 const manyFiles = (n) =>
   Array.from({ length: n }, (_, i) => `1\t0\tapps/web/src/page${i}.ts\n`).join('');
-const withoutSizeSection = (data) => ({
+const withRedPrEvidence = (data) => ({
   ...data,
   checks: required.map((name, id) => ({
     name,
@@ -561,25 +523,26 @@ const withoutSizeSection = (data) => ({
     app: { slug: 'github-actions' },
   })),
 });
-test('product lines beside evidence over the line limit go to the size review, not the owner', (t) => {
+test('product lines beside evidence over the line limit are queued, not owner-routed', (t) => {
   const f = fixture(t, {
     numstat: '401\t400\tapps/web/src/page.ts\n900\t0\tdocs/verify/2371/run.txt\n',
   });
   assert.equal(f.queues.length, 1, f.result.stdout);
   assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('product files beside evidence over the file limit go to the size review, not the owner', (t) => {
+test('product files beside evidence over the file limit are queued, not owner-routed', (t) => {
   const f = fixture(t, { numstat: `${manyFiles(41)}1\t0\tdocs/verify/2371/run.txt\n` });
   assert.equal(f.queues.length, 1, f.result.stdout);
   assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('an oversize patch without the Size section stays blocked by a red pr-evidence', (t) => {
-  const f = fixture(t, withoutSizeSection({ numstat: '401\t400\tapps/web/src/page.ts\n' }));
+test('a red pr-evidence keeps a patch out of the queue', (t) => {
+  const f = fixture(t, withRedPrEvidence({}));
   assert.equal(f.queues.length, 0);
   assert.ok(f.result.stdout.includes('check:pr-evidence'), f.result.stdout);
 });
-test('an oversize patch with no passing review comment is not queued', (t) => {
-  const f = fixture(t, { numstat: manyFiles(41), comments: [] });
+test('an oversize patch with no passing review-gate check is not queued', (t) => {
+  const checks = required.map((check, id) => completed(check, id, 'success'));
+  const f = fixture(t, { numstat: manyFiles(41), checks });
   assert.equal(f.queues.length, 0);
   assert.ok(f.result.stdout.includes('review-not-pass'), f.result.stdout);
 });
@@ -587,62 +550,16 @@ test('clean product source remains eligible', (t) => {
   assert.equal(fixture(t).queues.length, 1);
 });
 
-test('an owner-routed head is labelled and never queued', (t) => {
-  const f = fixture(t, { numstat: '1\t0\tdocs/adr/0028.md\n' });
-  assert.equal(f.queues.length, 0);
-  assert.ok(f.calls.some((args) => args[1] === 'repos/owner/repo/issues/1/labels'));
-});
-
-const marker = `<!-- batch-merger-owner-route:${head} -->`;
-const ownerRouted = { numstat: '1\t0\tdocs/adr/0028.md\n' };
 const writes = (f) => f.calls.filter((args) => args.includes('--method'));
-const ownerComments = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/comments'));
-const labelAdds = (f) => writes(f).filter((args) => args[1].endsWith('/issues/1/labels'));
 const labelRemovals = (f) => writes(f).filter((args) => args.includes('DELETE'));
-const markerComment = (sha = head) => ({
-  id: 7,
-  user: { login: 'cairnwright[bot]' },
-  body: `<!-- batch-merger-owner-route:${sha} -->\nOwner route`,
-});
-const labelled = [{ name: 'review-gate' }, { name: 'owner-route' }];
+const labelled = [{ name: 'owner-route' }];
 
-test('an owner-routed head gets one marked comment with reasons and the label', (t) => {
-  const f = fixture(t, ownerRouted);
-  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
-  assert.equal(f.queues.length, 0);
-  const comments = ownerComments(f);
-  assert.equal(comments.length, 1);
-  const payload = JSON.parse(comments[0].at(-1));
-  assert.ok(payload.body.startsWith(marker));
-  assert.ok(payload.body.includes('protected paths: docs/adr/0028.md'));
-  const adds = labelAdds(f);
-  assert.equal(adds.length, 1);
-  assert.deepEqual(JSON.parse(adds[0].at(-1)), { labels: ['owner-route'] });
+test('a protected path is queued and not marked owner-route', (t) => {
+  const f = fixture(t, { numstat: '1\t0\tdocs/spec/28.md\n' });
+  assert.equal(f.queues.length, 1, f.result.stdout);
+  assert.doesNotMatch(f.result.stdout, /owner-route/);
 });
-test('a second pass on the same head does not comment again', (t) => {
-  const f = fixture(t, {
-    ...ownerRouted,
-    comments: [markerComment(), ...defaultComments],
-    pulls: [{ ...pull(), labels: labelled }],
-  });
-  assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
-  assert.equal(writes(f).length, 0);
-  assert.match(f.result.stdout, /owner-route/);
-});
-test('an already commented head missing the label only gets the label', (t) => {
-  const f = fixture(t, { ...ownerRouted, comments: [markerComment(), ...defaultComments] });
-  assert.equal(ownerComments(f).length, 0);
-  assert.equal(labelAdds(f).length, 1);
-});
-test('a new head gets a new comment', (t) => {
-  const f = fixture(t, {
-    ...ownerRouted,
-    comments: [markerComment('c'.repeat(40)), ...defaultComments],
-    pulls: [{ ...pull(), labels: labelled }],
-  });
-  assert.equal(ownerComments(f).length, 1);
-  assert.equal(labelAdds(f).length, 0);
-});
+
 test('a PR that is no longer owner-routed loses the label before queueing', (t) => {
   const f = fixture(t, { pulls: [{ ...pull(), labels: labelled }] });
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
@@ -665,15 +582,9 @@ test('a failed label removal blocks the merge', (t) => {
 test('a PR without the label is not unlabelled', (t) => {
   assert.equal(labelRemovals(fixture(t)).length, 0);
 });
-test('a failed owner-route comment is an error and never merges', (t) => {
-  const f = fixture(t, { ...ownerRouted, writeError: true, pulls: [pull(), pull(2)] });
-  assert.equal(f.result.status, 1);
-  assert.equal(f.queues.length, 0);
-  assert.match(f.result.stdout, /"action":"error"/);
-});
-test('dry-run reports the owner-route mark without writing', (t) => {
-  const f = fixture(t, { ...ownerRouted, args: ['--dry-run'] });
+test('dry-run of a protected path does not mark owner-route', (t) => {
+  const f = fixture(t, { numstat: '1\t0\tdocs/spec/28.md\n', args: ['--dry-run'] });
   assert.equal(f.result.status, 0, f.result.stdout + f.result.stderr);
   assert.equal(writes(f).length, 0);
-  assert.match(f.result.stdout, /would-mark-owner-route/);
+  assert.doesNotMatch(f.result.stdout, /would-mark-owner-route/);
 });

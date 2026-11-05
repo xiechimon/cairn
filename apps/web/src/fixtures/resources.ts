@@ -1,4 +1,4 @@
-import type { ModelSource } from '@cairn/shared';
+import type { ModelSource, ProviderRecord } from '@cairn/shared';
 import {
   legacyDone,
   legacyReview,
@@ -36,6 +36,50 @@ const PROVIDER_SOURCE_CC: ModelSource = {
   ],
 };
 
+function fixtureProvider(
+  id: string,
+  fields: Pick<ProviderRecord, 'providerId' | 'label' | 'baseUrl' | 'api' | 'models'>,
+): ProviderRecord {
+  return {
+    kind: 'custom',
+    id,
+    authHeader: true,
+    compat: { supportsDeveloperRole: false },
+    createdBy: 'u-fixture',
+    createdAt: r7(9, 0),
+    updatedAt: r7(9, 0),
+    ...fields,
+  };
+}
+
+const PROVIDERS: ProviderRecord[] = [
+  fixtureProvider('prov-anthropic', {
+    providerId: 'anthropic',
+    label: 'Anthropic',
+    baseUrl: 'https://api.anthropic.com',
+    api: 'anthropic-messages',
+    models: [{ id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' }],
+  }),
+  fixtureProvider('prov-relay', {
+    providerId: 'r3-gateway',
+    label: 'R3 网关',
+    baseUrl: 'https://gateway.example.invalid/v1',
+    api: 'openai-completions',
+    models: [
+      { id: 'claude-sonnet-5', name: 'Claude Sonnet 5（R3 网关）' },
+      { id: 'claude-opus-4-5', name: 'Claude Opus 4.5（R3 网关）' },
+      { id: 'gpt-5.2', name: 'GPT-5.2（R3 网关）' },
+    ],
+  }),
+  fixtureProvider('prov-copilot', {
+    providerId: 'github-copilot',
+    label: 'GitHub Copilot',
+    baseUrl: 'https://api.githubcopilot.com',
+    api: 'openai-completions',
+    models: [{ id: 'gpt-4o', name: 'gpt-4o' }],
+  }),
+];
+
 export const RESOURCES: ResourcesContent = {
   skills: [{ name: 'r3-probe-skill', description: 'R3 盘点测试技能' }],
   mcpServers: [
@@ -67,6 +111,7 @@ export const RESOURCES: ResourcesContent = {
     },
   ],
   providerSources: [PROVIDER_SOURCE_PI, PROVIDER_SOURCE_CC],
+  providers: PROVIDERS,
 };
 
 export const resourcesDefault: FixtureSet = {
@@ -218,4 +263,109 @@ export const machinesChiefState: FixtureSet = {
       },
     ],
   },
+};
+
+const FLEET_SLOTS = [
+  { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'default-sonnet' },
+  { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'default-haiku' },
+];
+
+export const providersFleet: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      {
+        id: 'fleet-mac',
+        kind: 'local',
+        name: MACHINE_NAME,
+        online: true,
+        enabledRuntimes: ['pi', 'claude-code'],
+        capabilities: { mcpServers: [], skills: [], executor: 'host' },
+      },
+      {
+        id: 'fleet-box',
+        kind: 'remote',
+        name: 'build-box',
+        online: true,
+        enabledRuntimes: ['pi', 'claude-code'],
+        capabilities: { mcpServers: [], skills: [], executor: 'host' },
+      },
+      {
+        id: 'fleet-box-orb',
+        kind: 'remote',
+        name: 'build-box-orb',
+        online: true,
+        enabledRuntimes: ['claude-code'],
+        capabilities: { mcpServers: [], skills: [], executor: 'orb' },
+      },
+      {
+        id: 'fleet-old',
+        kind: 'remote',
+        name: 'old-laptop',
+        online: false,
+        enabledRuntimes: ['pi', 'claude-code'],
+      },
+      {
+        id: 'fleet-new',
+        kind: 'remote',
+        name: 'new-box',
+        online: true,
+        enabledRuntimes: ['pi'],
+      },
+    ],
+    providerSources: [
+      {
+        ...PROVIDER_SOURCE_PI,
+        models: [
+          ...PROVIDER_SOURCE_PI.models,
+          { id: 'claude-opus-4-5', name: 'claude-opus-4-5', liveness: 'dead' },
+        ],
+      },
+      {
+        runtime: 'claude-code',
+        installed: true,
+        hostname: MACHINE_NAME,
+        machineId: 'fleet-mac',
+        bin: { path: '/Users/u/.local/bin/claude', version: '2.1.316' },
+        auth: { state: 'logged-in', method: 'oauth_token', provider: 'firstParty' },
+        models: FLEET_SLOTS,
+      },
+      {
+        runtime: 'claude-code',
+        installed: true,
+        hostname: 'build-box',
+        machineId: 'fleet-box',
+        bin: { path: '/home/u/.local/bin/claude', version: '2.1.316' },
+        auth: { state: 'logged-in', method: 'oauth_token', provider: 'firstParty' },
+        models: FLEET_SLOTS,
+      },
+      {
+        runtime: 'claude-code',
+        installed: true,
+        hostname: 'build-box',
+        machineId: 'fleet-box-orb',
+        bin: { path: '/home/u/.local/bin/claude', version: '2.1.316' },
+        auth: { state: 'not-logged-in', provider: 'firstParty' },
+        models: FLEET_SLOTS,
+      },
+      {
+        runtime: 'claude-code',
+        installed: true,
+        hostname: 'DESKTOP-OLD',
+        machineId: 'fleet-old',
+        bin: { path: '/home/u/.local/bin/claude', version: '2.1.285' },
+        auth: { state: 'logged-in', method: 'oauth_token', provider: 'firstParty' },
+        models: [
+          { id: 'glm-5.3', name: 'glm-5.3', slot: 'default-opus' },
+          { id: 'deepseek-v4-pro', name: 'deepseek-v4-pro', slot: 'default' },
+        ],
+      },
+    ],
+  },
+};
+
+export const providersEmpty: FixtureSet = {
+  ...resourcesDefault,
+  resources: { ...RESOURCES, providers: [], providerSources: [PROVIDER_SOURCE_PI] },
 };

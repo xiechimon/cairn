@@ -1,13 +1,17 @@
-import type { ReactNode } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
+import { ChiefQuestionEntry, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
-export const SHEET_PANEL = 'relative isolate flex min-w-0 flex-1 overflow-hidden bg-background';
+export const SHEET_PANEL =
+  'relative isolate my-2 mr-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) bg-background shadow-(--e1) max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:shadow-none';
+
+export const EmbeddedShell = createContext(false);
 
 export interface PageTab {
   id: string;
@@ -50,7 +54,6 @@ interface PageShellProps {
   tab?: string;
   onTab?: (id: string) => void;
   actions?: ReactNode;
-  onNewTask?: () => void;
   bleed?: boolean;
   children: ReactNode;
 }
@@ -65,15 +68,22 @@ export function PageShell({
   tab,
   onTab,
   actions,
-  onNewTask,
   bleed = false,
   children,
 }: PageShellProps) {
   const { t } = useI18n();
+  const embedded = useContext(EmbeddedShell);
   return (
-    <div className="page-shell flex h-full overflow-hidden bg-(--surface-1)" data-route={route}>
-      <AppSidebar fixture={fixture} selected={selected} onNewTask={onNewTask} />
-      <div className={`page-main ${SHEET_PANEL}`}>
+    <div
+      className={
+        embedded
+          ? 'flex h-full min-w-0 flex-1 overflow-hidden'
+          : 'page-shell flex h-full overflow-hidden bg-(--surface-1)'
+      }
+      data-route={route}
+    >
+      {!embedded && <AppSidebar fixture={fixture} selected={selected} />}
+      <div className={embedded ? 'relative flex min-w-0 flex-1' : `page-main ${SHEET_PANEL}`}>
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
           <header
             data-testid="page-topbar"
@@ -92,9 +102,10 @@ export function PageShell({
               {title}
             </h1>
             {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
-            {actions != null && (
-              <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
-            )}
+            <div className="ml-auto flex flex-none items-center gap-0.5">
+              <ChiefQuestionEntry />
+              {actions}
+            </div>
           </header>
           <div
             className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto${bleed ? '' : ' px-4'}`}
@@ -108,6 +119,7 @@ export function PageShell({
             )}
           </div>
         </div>
+        <ChiefQuestionPanel />
       </div>
     </div>
   );

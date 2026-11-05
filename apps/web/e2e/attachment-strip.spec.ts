@@ -1,5 +1,6 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -48,6 +49,31 @@ async function renderTestCard(page: Page): Promise<string> {
     },
     { w: CARD_W, h: CARD_H },
   );
+}
+
+async function settledBox(target: Locator) {
+  type Box = NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>;
+  let previous: Box | null = null;
+  let settled: Box | null = null;
+  await expect
+    .poll(
+      async () => {
+        const box = await target.boundingBox();
+        const unchanged =
+          box !== null &&
+          previous !== null &&
+          box.x === previous.x &&
+          box.y === previous.y &&
+          box.width === previous.width &&
+          box.height === previous.height;
+        previous = box;
+        settled = unchanged ? box : null;
+        return unchanged;
+      },
+      { intervals: [50, 100, 100, 250] },
+    )
+    .toBe(true);
+  return settled as Box | null;
 }
 
 async function stubBoot(page: Page, art: TestArt) {
@@ -212,7 +238,8 @@ async function stubDetailSurface(page: Page) {
   await page.route(`**/api/builds/${BUILD_ID}/changes`, (route) =>
     route.fulfill({ json: { files: [] } }),
   );
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ json: EMPTY_CONVERSATION });
   });
@@ -251,7 +278,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
     .poll(() => thumb.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
   await expect(input).toHaveValue('');
-  const beforeBox = await placeholder.boundingBox();
+  const beforeBox = await settledBox(placeholder);
   expect(beforeBox).not.toBeNull();
   await evidenceShot(page, 'strip-detail-placeholder.png');
 
@@ -269,17 +296,15 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
   await expect
     .poll(() => chipImg.evaluate((el) => (el as HTMLImageElement).naturalWidth))
     .toBe(CARD_W);
-  const afterBox = await chip.boundingBox();
-  expect(afterBox).toMatchObject({
-    x: beforeBox?.x,
-    width: beforeBox?.width,
-    height: beforeBox?.height,
-  });
+  const afterBox = await settledBox(chip);
+  expect(afterBox?.x ?? 0).toBeCloseTo(beforeBox?.x ?? 0, 0);
+  expect(afterBox).toMatchObject({ width: beforeBox?.width, height: beforeBox?.height });
   expect(afterBox?.y).toBeLessThanOrEqual(beforeBox?.y ?? 0);
   await evidenceShot(page, 'strip-detail-settled.png');
 
   const sentBodies: string[] = [];
-  await page.route(`**/api/conversations/${BUILD_ID}/messages`, (route, request) => {
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`), (route, request) => {
     if (request.method() !== 'POST') return route.fallback();
     sentBodies.push((JSON.parse(request.postData() ?? '{}') as { content?: string }).content ?? '');
     return route.fulfill({ status: 201, json: { message: { id: 'msg-1' } } });
@@ -438,57 +463,6 @@ test('detail face: a picked file shows an uploading tile, then a file tile whose
   await expect(input).not.toHaveValue(/attachment:/);
 });
 
-// —— new-task face ————
-
-const SPEC = '[data-testid="new-task-spec"]';
-
-async function bootNewTask(page: Page, art: TestArt) {
-  await stubBoot(page, art);
-  await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
-  await page.goto('/app');
-  await page.locator('.sidebar-new-task').click();
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  await expect(dialog).toBeVisible();
-  const spec = dialog.getByRole('textbox');
-  await expect(spec).toBeVisible();
-  return { dialog, spec };
-}
-
-test('new-task face: placeholder → settled chip → preview', async ({ page }) => {
-  const deferred = await deferUploads(page);
-  const art: TestArt = { b64: PNG_1PX };
-  const { dialog, spec } = await bootNewTask(page, art);
-  art.b64 = await renderTestCard(page);
-
-  await pastePng(page, SPEC, art.b64);
-
-  const strip = dialog.getByRole('status', { name: '附件' });
-  await expect(strip).toBeVisible();
-  const placeholder = strip.getByTestId('attachment-pending');
-  await expect(placeholder).toBeVisible();
-  await expect(placeholder.getByText('上传中')).toHaveText('上传中');
-  await evidenceShot(page, 'strip-newtask-placeholder.png');
-
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // grant
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // upload
-  await expect(spec).toHaveValue(`${TOKEN_1}\n`);
-
-  const chip = strip.getByRole('button', { name: 'pasted-image-1.png' });
-  await expect(chip).toBeVisible();
-  await chip.click();
-  const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
-  await expect(preview).toBeVisible();
-  const view = preview.getByRole('img', { name: 'pasted-image-1.png' });
-  await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
-    CARD_W,
-  );
-  await evidenceShot(page, 'strip-newtask-preview.png');
-  await page.keyboard.press('Escape');
-  await expect(preview).toHaveCount(0);
-});
-
 // —— chief face ————
 
 const AGENTS = [
@@ -520,10 +494,10 @@ async function openChief(page: Page, art: TestArt) {
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await membersLoaded;
 
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
   const input = page.getByTestId('chief-composer-input');

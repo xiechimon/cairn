@@ -21,20 +21,20 @@ held_labels=$(gh pr view "$pr" -R "$R" --json labels --jq '.labels[].name') \
   || { echo "PR #$pr: could not read its labels, so a coordinator-hold cannot be ruled out; not merging" >&2; exit 1; }
 grep -qx coordinator-hold <<<"$held_labels" \
   && { echo "PR #$pr carries coordinator-hold: the coordinator asked for changes; it merges only after the author says ready and the label is removed" >&2; exit 1; }
-node ~/.cairn/tools/review-gate/review-gate.mjs --check "$pr" >/dev/null 2>&1; prot=$?
-case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) prot=0;; esac
-if [ $prot = 3 ] && [ "$(gh pr view "$pr" -R "$R" --json author --jq .author.login)" != app/cairnwright ]; then
-  labels=$(gh pr view "$pr" -R "$R" --json labels --jq '.labels[].name')
-  grep -qx dequeued <<<"$labels" && { echo "PR #$pr was dequeued by Mergify; a human decides before it is queued again" >&2; exit 1; }
-  grep -qx review-gate <<<"$labels" || gh pr edit "$pr" -R "$R" --add-label review-gate \
-    || { echo "PR #$pr: could not add the review-gate label, so the gate would never post the status Mergify needs" >&2; exit 1; }
-  echo "PR #$pr is labelled review-gate; Mergify queues it automatically once the review-gate status and merge-route pass"; exit 0
+check_of() {
+  gh api "repos/$R/commits/$head/check-runs?check_name=$1&filter=latest&per_page=100" \
+    --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.id) | last | if . == null then "missing" elif .status != "completed" then .status else .conclusion end'
+}
+route=$(check_of merge-route)
+case "$(gh pr view "$pr" -R "$R" --json headRefName --jq .headRefName)" in lane/*) route=owner;; esac
+case "$route" in success|failure|owner) ;; *) echo "PR #$pr: its merge-route check for $head is '$route'; wait for CI" >&2; exit 1;; esac
+if [ "$route" = success ] && [ "$(gh pr view "$pr" -R "$R" --json author --jq .author.login)" != app/cairnwright ]; then
+  grep -qx dequeued <<<"$held_labels" && { echo "PR #$pr was dequeued by Mergify; a human decides before it is queued again" >&2; exit 1; }
+  echo "PR #$pr may enter the merge queue; Mergify queues it automatically once the review-gate check passes"; exit 0
 fi
-if [ $prot != 3 ]; then
-  gate=$(gh api "repos/$R/commits/$head/statuses?per_page=100" --jq '[.[] | select(.context == "review-gate" and .creator.login == "xiechimon")][0].state // ""')
-  [ "$gate" = success ] \
-    || { echo "PR #$pr is a lane PR or touches protected paths (or the check failed) and its review-gate status for $head is '${gate:-missing}', not success" >&2; exit 1; }
-fi
+gate=$(check_of review-gate)
+[ "$gate" = success ] \
+  || { echo "PR #$pr: its review-gate check for $head is '${gate:-missing}', not success" >&2; exit 1; }
 opener=$(gh pr view "$pr" -R "$R" --json author --jq .author.login)
 if [ "$opener" = "app/cairnwright" ]; then
   commits=$(gh pr view "$pr" -R "$R" --json commits --jq '.commits|length')

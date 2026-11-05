@@ -19,7 +19,7 @@ interface GatePaths {
   protected: string[];
   humanQueue: Record<string, string[]>;
   mergeGateSource: string[];
-  limits: { maxLines: number; maxFiles: number };
+  limits: { maxLines: number; maxFiles: number; maxQueueFiles: number; maxLinesEachWay: number };
 }
 
 const gatePaths = JSON.parse(read('packages/shared/merge-gate-paths.json')) as GatePaths;
@@ -31,10 +31,10 @@ function prGateEffective(source: string, paths: unknown) {
   const from = source.indexOf('const AUTO_MERGE =');
   const region = source.slice(from, source.indexOf('const FILES_CMD =', from));
   return runInNewContext(
-    `${region}\n;({ AUTO_MERGE, PROTECTED, MAX_LINES, MAX_FILES })`,
+    `${region}\n;({ AUTO_MERGE, PROTECTED })`,
     { args: { gatePaths: paths } },
     sandbox,
-  ) as { AUTO_MERGE: string[]; PROTECTED: string[]; MAX_LINES: number; MAX_FILES: number };
+  ) as { AUTO_MERGE: string[]; PROTECTED: string[] };
 }
 
 interface PrGateRun {
@@ -61,35 +61,6 @@ async function runPrGate(source: string, { args, review }: PrGateRun) {
     sandbox,
   )) as Record<string, unknown>;
   return { result, prompts };
-}
-
-function reviewGateEffective(source: string, json: string) {
-  const from = source.indexOf('const globToRe');
-  const body = source.slice(from, source.indexOf('mkdirSync(', from));
-  const gitCalls: string[][] = [];
-  const execFileSync = (_cmd: string, args: string[]) => {
-    gitCalls.push(args);
-    return json;
-  };
-  const load = new Function(
-    'execFileSync',
-    'MAIN',
-    `${body}\nreturn { repoGatePaths, repoProtected, globToRe }`,
-  ) as (
-    exec: typeof execFileSync,
-    main: string,
-  ) => {
-    repoGatePaths: () => unknown;
-    repoProtected: (paths: unknown) => RegExp[];
-    globToRe: (glob: string) => RegExp;
-  };
-  const { repoGatePaths, repoProtected, globToRe } = load(execFileSync, '/main');
-  return {
-    sources: repoProtected(repoGatePaths()).map((re) => re.source),
-    limits: (repoGatePaths() as GatePaths).limits,
-    globToRe,
-    gitCalls,
-  };
 }
 
 function expandBraces(spec: string): string[] {
@@ -120,7 +91,14 @@ describe('merge-gate-paths.json is the single source', () => {
     expect(HUMAN_QUEUE_PATH_GLOBS).toEqual(gatePaths.humanQueue);
     expect(GATE_LIMITS.maxLines).toBe(gatePaths.limits.maxLines);
     expect(GATE_LIMITS.maxFiles).toBe(gatePaths.limits.maxFiles);
-    expect(gatePaths.limits).toEqual({ maxLines: 800, maxFiles: 40 });
+    expect(GATE_LIMITS.maxLinesEachWay).toBe(gatePaths.limits.maxLinesEachWay);
+    expect(GATE_LIMITS.maxQueueFiles).toBe(gatePaths.limits.maxQueueFiles);
+    expect(gatePaths.limits).toEqual({
+      maxLines: 800,
+      maxFiles: 40,
+      maxQueueFiles: 80,
+      maxLinesEachWay: 8000,
+    });
   });
 
   test('every human-queue path is protected', () => {
@@ -137,8 +115,6 @@ describe('merge-gate-paths.json is the single source', () => {
     const effective = prGateEffective(read('.claude/workflows/pr-gate.js'), gatePaths);
     expect(effective.AUTO_MERGE).toEqual(gatePaths.autoMerge);
     expect(effective.PROTECTED).toEqual([...gatePaths.protected, ...gatePaths.mergeGateSource]);
-    expect(effective.MAX_LINES).toBe(gatePaths.limits.maxLines);
-    expect(effective.MAX_FILES).toBe(gatePaths.limits.maxFiles);
   });
 
   test('negative control: an inline list in pr-gate.js differs from the JSON', () => {
@@ -149,21 +125,12 @@ describe('merge-gate-paths.json is the single source', () => {
     );
     expect(inlined).not.toBe(source);
     expect(prGateEffective(inlined, gatePaths).AUTO_MERGE).not.toEqual(gatePaths.autoMerge);
-    const widened = source.replace(
-      'const MAX_LINES = requireLimit(',
-      'const MAX_LINES = 1 + requireLimit(',
-    );
-    expect(widened).not.toBe(source);
-    expect(prGateEffective(widened, gatePaths).MAX_LINES).not.toBe(gatePaths.limits.maxLines);
   });
 
   test('pr-gate.js fails closed without the JSON in args', () => {
     const source = read('.claude/workflows/pr-gate.js');
     expect(() => prGateEffective(source, undefined)).toThrow(/gatePaths/);
     expect(() => prGateEffective(source, { ...gatePaths, protected: [] })).toThrow(/protected/);
-    expect(() =>
-      prGateEffective(source, { ...gatePaths, limits: { maxLines: 0, maxFiles: 40 } }),
-    ).toThrow(/maxLines/);
   });
 
   test('pr-gate.js gives go only when the safety reviewer confirms gatePaths equals origin/main', async () => {
@@ -210,30 +177,6 @@ describe('merge-gate-paths.json is the single source', () => {
     }
   });
 
-  test('review-gate.mjs effective list equals JSON.protected and reads origin/main', () => {
-    const source = read('scripts/ops/review-gate/review-gate.mjs');
-    const { sources, limits, globToRe, gitCalls } = reviewGateEffective(
-      source,
-      JSON.stringify(gatePaths),
-    );
-    expect(sources).toEqual(gatePaths.protected.map((glob) => globToRe(glob).source));
-    expect(limits).toEqual(gatePaths.limits);
-    expect(
-      gitCalls.every(
-        (call) => call.join(' ') === 'show origin/main:packages/shared/merge-gate-paths.json',
-      ),
-    ).toBe(true);
-    expect(source).toContain('gatePaths.limits');
-  });
-
-  test('negative control: review-gate.mjs follows the JSON it is given, not an inline list', () => {
-    const source = read('scripts/ops/review-gate/review-gate.mjs');
-    const tampered = JSON.stringify({ ...gatePaths, protected: ['zz-only/**'] });
-    const { sources, globToRe } = reviewGateEffective(source, tampered);
-    expect(sources).toEqual([globToRe('zz-only/**').source]);
-    expect(sources).not.toEqual(gatePaths.protected.map((glob) => globToRe(glob).source));
-  });
-
   test('merge-route.mjs takes the JSON from origin/main, beside pr-gate.js', () => {
     const source = read('scripts/merge-route.mjs');
     expect(source).toContain("'origin/main:packages/shared/merge-gate-paths.json'");
@@ -241,16 +184,9 @@ describe('merge-gate-paths.json is the single source', () => {
     expect(source).not.toMatch(/secret-box|\*\*\/drizzle\/\*\*/);
   });
 
-  test('the mergify generator, the review size facts and the evidence gate read limits from the JSON', () => {
+  test('the mergify generator reads limits from the JSON', () => {
     expect(read('scripts/mergify-config.mjs')).toContain("'packages/shared/merge-gate-paths.json'");
-    expect(read('scripts/pr-evidence-gate.py')).toContain(
-      "'packages/shared/merge-gate-paths.json'",
-    );
-    for (const path of [
-      'scripts/mergify-config.mjs',
-      'scripts/ops/review-gate/size-facts.mjs',
-      'scripts/pr-evidence-gate.py',
-    ])
+    for (const path of ['scripts/mergify-config.mjs'])
       expect(read(path), path).not.toMatch(
         /MAX_LINES = \d|MAX_FILES = \d|maxLines: \d|maxFiles: \d/,
       );
@@ -259,7 +195,6 @@ describe('merge-gate-paths.json is the single source', () => {
   test('no consumer keeps an inline copy of the lists', () => {
     for (const path of [
       '.claude/workflows/pr-gate.js',
-      'scripts/ops/review-gate/review-gate.mjs',
       'scripts/ops/host/tools/merge-pr.sh',
       'scripts/merge-route.mjs',
       'scripts/mergify-config.mjs',

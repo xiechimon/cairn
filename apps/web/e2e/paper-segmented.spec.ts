@@ -21,11 +21,6 @@ const CONTROLS: Control[] = [
     track: (page) => page.getByTestId('page-topbar').getByRole('tablist'),
   },
   {
-    name: 'schedules frequency',
-    url: '/app/schedules?scenario=r3-92',
-    track: (page) => page.getByRole('radiogroup', { name: '频率' }),
-  },
-  {
     name: 'project tabs',
     url: `${PROJ}?scenario=r2-24b`,
     track: (page) => page.getByRole('banner').getByRole('tablist'),
@@ -33,12 +28,11 @@ const CONTROLS: Control[] = [
   {
     name: 'providers runtime',
     url: '/app/resources/providers?scenario=10',
-    track: (page) => page.getByRole('tablist', { name: '模型服务' }),
+    track: (page) => page.getByRole('tablist', { name: '范围' }),
   },
   {
-    name: 'user menu theme',
-    url: '/app?scenario=01',
-    open: (page) => page.click('.sidebar-user'),
+    name: 'settings appearance',
+    url: '/app/settings/appearance?scenario=01',
     track: (page) => page.getByRole('radiogroup', { name: '外观' }),
   },
 ];
@@ -188,13 +182,16 @@ test('radio group: arrow keys move focus and select, roving tabindex follows', a
   await expect(daily).toHaveAttribute('aria-checked', 'true');
   await keyboardFocus(daily);
   await page.keyboard.press('ArrowRight');
-  const weekly = group.getByRole('radio', { name: '每周' });
-  await expect(weekly).toHaveAttribute('aria-checked', 'true');
-  await expect(weekly).toBeFocused();
-  await expect(weekly).toHaveAttribute('tabindex', '0');
+  const weekdays = group.getByRole('radio', { name: 'Weekdays' });
+  await expect(weekdays).toHaveAttribute('aria-checked', 'true');
+  await expect(weekdays).toBeFocused();
+  await expect(weekdays).toHaveAttribute('tabindex', '0');
   await expect(daily).toHaveAttribute('tabindex', '-1');
   await page.keyboard.press('End');
-  await expect(group.getByRole('radio', { name: '单次' })).toHaveAttribute('aria-checked', 'true');
+  await expect(group.getByRole('radio', { name: 'Custom cron' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
   await page.keyboard.press('ArrowRight');
-  await expect(group.getByRole('radio', { name: '每小时' })).toHaveAttribute('aria-checked', 'true');
+  await expect(group.getByRole('radio', { name: '单次' })).toHaveAttribute('aria-checked', 'true');
 });

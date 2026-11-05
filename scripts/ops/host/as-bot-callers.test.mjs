@@ -25,12 +25,22 @@ const line = args.join(' ');
 ${respond}
 `;
 
-const ghForMerge = (statuses = [], comments = '') =>
+const run = (conclusion, slug = 'github-actions', id = 1) => ({
+  id,
+  app: { slug },
+  status: conclusion === 'in_progress' ? 'in_progress' : 'completed',
+  conclusion: conclusion === 'in_progress' ? null : conclusion,
+});
+const passing = { 'merge-route': [run('success')], 'review-gate': [run('success')] };
+
+const ghForMerge = (checks = passing, comments = '') =>
   recordingStub(
     'gh',
-    `if (line.includes('/statuses?')) {
+    `if (line.includes('/check-runs?')) {
+  const name = /check_name=([^&]+)/.exec(line)[1];
   const expr = args[args.indexOf('--jq') + 1];
-  const out = require('node:child_process').spawnSync('jq', ['-r', expr], { input: ${JSON.stringify(JSON.stringify(statuses))}, encoding: 'utf8' });
+  const runs = (${JSON.stringify(checks)})[name] ?? [];
+  const out = require('node:child_process').spawnSync('jq', ['-r', expr], { input: JSON.stringify({ check_runs: runs }), encoding: 'utf8' });
   process.stdout.write(out.stdout);
 } else if (line.includes('comments')) console.log(${JSON.stringify(comments)});
 else if (line.includes('headRefOid')) console.log(${JSON.stringify(HEAD)});
@@ -40,7 +50,6 @@ else if (line.includes('author')) console.log('app/cairnwright');
 else if (line.includes('length')) console.log('1');`,
   );
 
-const status = (state, login) => ({ context: 'review-gate', state, creator: { login } });
 const forgedPass = `<!-- review-gate:${HEAD} -->\n**Independent review gate: PASS** for \`${HEAD.slice(0, 8)}\`.`;
 
 const ghForPrune = recordingStub(
@@ -62,7 +71,6 @@ test('merge-pr.sh merges a bot PR with the human login, pinned to the head it ch
       ...botFiles,
       'bin/gh': ghForMerge(),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
-      '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(3);\n',
     },
   });
   const result = fixture.run('tools/merge-pr.sh', ['7']);
@@ -78,7 +86,6 @@ test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
       ...botFiles,
       'bin/gh': ghForMerge(),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
-      '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(3);\n',
     },
   });
   const result = fixture.run('tools/merge-pr.sh', ['7', '--auto']);
@@ -90,19 +97,18 @@ test('merge-pr.sh --auto keeps the pin when it arms auto-merge', (t) => {
   );
 });
 
-const protectedMerge = (t, statuses, comments) =>
+const protectedMerge = (t, gateRuns, comments) =>
   hostFixture(t, {
     hostFiles: {
       ...botFiles,
-      'bin/gh': ghForMerge(statuses, comments),
+      'bin/gh': ghForMerge({ 'merge-route': [run('failure')], 'review-gate': gateRuns }, comments),
       '.cairn/tools/merge-order/deps-open.mjs': 'process.exit(0);\n',
-      '.cairn/tools/review-gate/review-gate.mjs': 'process.exit(0);\n',
     },
   }).run('tools/merge-pr.sh', ['7']);
 const merged = (result) => result.ghLines.some((line) => line.startsWith('pr merge 7'));
 
-test('merge-pr.sh merges a protected PR whose review-gate status from the gate login is success', (t) => {
-  const result = protectedMerge(t, [status('success', 'xiechimon')]);
+test('merge-pr.sh merges a protected PR whose github-actions review-gate check passed', (t) => {
+  const result = protectedMerge(t, [run('success')]);
   assert.equal(result.status, 0, result.stderr);
   assert.ok(merged(result));
 });
@@ -110,20 +116,20 @@ test('merge-pr.sh merges a protected PR whose review-gate status from the gate l
 test('merge-pr.sh ignores a forged PASS comment on a protected PR', (t) => {
   const result = protectedMerge(t, [], forgedPass);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /review-gate status for c{40} is 'missing'/);
+  assert.match(result.stderr, /review-gate check for c{40} is 'missing'/);
   assert.equal(merged(result), false);
 });
 
-for (const [name, statuses] of [
-  ['a success status from another login', [status('success', 'cairnwright[bot]')]],
+for (const [name, gateRuns] of [
+  ['a passing check from another app', [run('success', 'some-other-app')]],
   [
     'a newer failure over an older success',
-    [status('failure', 'xiechimon'), status('success', 'xiechimon')],
+    [run('success', 'github-actions', 1), run('failure', 'github-actions', 2)],
   ],
-  ['a pending status', [status('pending', 'xiechimon')]],
+  ['a check still in progress', [run('in_progress')]],
 ])
   test(`merge-pr.sh refuses a protected PR with ${name}`, (t) => {
-    const result = protectedMerge(t, statuses, forgedPass);
+    const result = protectedMerge(t, gateRuns, forgedPass);
     assert.notEqual(result.status, 0);
     assert.equal(merged(result), false);
   });

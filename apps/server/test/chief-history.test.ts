@@ -4,7 +4,12 @@ import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { buildChiefSystemPrompt, composeChiefSystemPrompt } from '../src/services/chief.js';
-import { SEARCH_SCAN_CAP_ROWS } from '../src/services/chief-history.js';
+import {
+  READ_CALL_BUDGET_CHARS,
+  READ_DEFAULT_CHARS,
+  READ_MAX_CHARS,
+  SEARCH_SCAN_CAP_ROWS,
+} from '../src/services/chief-history.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
@@ -24,7 +29,14 @@ interface SearchResult {
 }
 interface ReadResult {
   trust: string;
-  messages: { id: string; role: string; content: string; createdAt: number }[];
+  messages: {
+    id: string;
+    role: string;
+    content: string;
+    createdAt: number;
+    totalChars: number;
+    nextOffset: number | null;
+  }[];
 }
 
 const BASE_TIME = 1_700_000_000_000;
@@ -286,17 +298,91 @@ describe('search_history scan budget', () => {
 });
 
 describe('read_history', () => {
-  test('returns full text oldest first and labels it untrusted', async () => {
+  test('returns short text whole, oldest first, labelled untrusted', async () => {
     seedMessages(H.threadId, [
       { id: 'r1', content: 'first' },
-      { id: 'r2', role: 'assistant', content: 'second '.repeat(2000) },
+      { id: 'r2', role: 'assistant', content: 'second '.repeat(1000) },
       { id: 'r3', content: 'third' },
     ]);
     const result = (await relay('read_history', { ids: ['r3', 'r2', 'r1'] })) as ReadResult;
     expect(result.trust).toBe('untrusted-history');
     expect(result.messages.map((m) => m.id)).toEqual(['r1', 'r2', 'r3']);
-    expect(result.messages[1]?.content).toBe('second '.repeat(2000));
-    expect(result.messages[1]?.role).toBe('assistant');
+    expect(result.messages[1]?.content).toBe('second '.repeat(1000));
+    expect(result.messages[1]).toMatchObject({
+      role: 'assistant',
+      totalChars: 7000,
+      nextOffset: null,
+    });
+  });
+
+  test('a 3.89M-character message returns one capped page and pages to its end by offset', async () => {
+    const huge = Array.from({ length: 3_890_000 / 10 }, (_, i) => `${i}`.padStart(10, '0')).join(
+      '',
+    );
+    seedMessages(H.threadId, [{ id: 'huge', content: huge }]);
+    const first = (await relay('read_history', { ids: ['huge'] })) as ReadResult;
+    expect(first.messages[0]).toMatchObject({
+      totalChars: 3_890_000,
+      nextOffset: READ_DEFAULT_CHARS,
+    });
+    expect(first.messages[0]?.content).toBe(huge.slice(0, READ_DEFAULT_CHARS));
+    expect(JSON.stringify(first).length).toBeLessThan(READ_DEFAULT_CHARS + 500);
+    const tail = (await relay('read_history', {
+      ids: ['huge'],
+      offset: 3_890_000 - 5,
+      maxChars: READ_MAX_CHARS,
+    })) as ReadResult;
+    expect(tail.messages[0]).toMatchObject({ content: huge.slice(-5), nextOffset: null });
+  });
+
+  test('paging by nextOffset rebuilds a long message exactly', async () => {
+    const long = Array.from({ length: 10_000 }, (_, i) => `${i}`.padStart(10, '0')).join('');
+    seedMessages(H.threadId, [{ id: 'long', content: long }]);
+    let offset: number | null = 0;
+    let pages = 0;
+    let rebuilt = '';
+    while (offset !== null && pages < 20) {
+      const page = (await relay('read_history', {
+        ids: ['long'],
+        offset,
+        maxChars: READ_MAX_CHARS,
+      })) as ReadResult;
+      rebuilt += page.messages[0]?.content ?? '';
+      offset = page.messages[0]?.nextOffset ?? null;
+      pages += 1;
+    }
+    expect(pages).toBe(Math.ceil(100_000 / READ_MAX_CHARS));
+    expect(rebuilt).toBe(long);
+  });
+
+  test('one call never returns more than the call budget across all ids', async () => {
+    seedMessages(
+      H.threadId,
+      Array.from({ length: 6 }, (_, i) => ({ id: `b${i}`, content: 'y'.repeat(READ_MAX_CHARS) })),
+    );
+    const result = (await relay('read_history', {
+      ids: ['b0', 'b1', 'b2', 'b3', 'b4', 'b5'],
+      maxChars: READ_MAX_CHARS,
+    })) as ReadResult;
+    const returned = result.messages.reduce((sum, m) => sum + m.content.length, 0);
+    expect(returned).toBe(READ_CALL_BUDGET_CHARS);
+    expect(result.messages.map((m) => m.nextOffset)).toEqual([null, null, 0, 0, 0, 0]);
+  });
+
+  test('offset and maxChars outside their ranges are rejected', async () => {
+    seedMessages(H.threadId, [{ id: 'p1', content: 'text' }]);
+    for (const params of [
+      { offset: -1 },
+      { offset: 1.5 },
+      { offset: 'x' },
+      { maxChars: 0 },
+      { maxChars: READ_MAX_CHARS + 1 },
+    ]) {
+      expect(
+        await status(relay('read_history', { ids: ['p1'], ...params })),
+        JSON.stringify(params),
+      ).toBe(400);
+    }
   });
 
   test('ids from another thread or another user are silently excluded', async () => {

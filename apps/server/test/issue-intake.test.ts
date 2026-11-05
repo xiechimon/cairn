@@ -1378,7 +1378,9 @@ describe('scheduler wiring', () => {
   });
 
   test('interval: another sweep after ISSUE_INTAKE_INTERVAL_MS, no more sweeps after stop', async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
+    });
     try {
       const w = await makeWorld({ chief: 'unbound', list: [1406] });
       const lines: string[] = [];
@@ -1390,16 +1392,12 @@ describe('scheduler wiring', () => {
         { githubFetch: w.gh.impl, logger: { info: (_obj, msg) => lines.push(msg) } },
       );
       scheduler.start();
-      await vi.waitFor(() => {
-        expect(lines.filter((m) => m === 'issue intake sweep')).toHaveLength(1);
-      });
-      vi.advanceTimersByTime(ISSUE_INTAKE_INTERVAL_MS);
-      await vi.waitFor(() => {
-        expect(lines.filter((m) => m === 'issue intake sweep')).toHaveLength(2);
-      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(lines.filter((m) => m === 'issue intake sweep')).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(ISSUE_INTAKE_INTERVAL_MS);
+      expect(lines.filter((m) => m === 'issue intake sweep')).toHaveLength(2);
       scheduler.stop();
-      vi.advanceTimersByTime(ISSUE_INTAKE_INTERVAL_MS * 2);
-      await new Promise((r) => setTimeout(r, 10));
+      await vi.advanceTimersByTimeAsync(ISSUE_INTAKE_INTERVAL_MS * 2);
       expect(lines.filter((m) => m === 'issue intake sweep')).toHaveLength(2);
     } finally {
       vi.useRealTimers();

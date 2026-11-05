@@ -19,7 +19,7 @@ function boxRing(locator: Locator) {
 
 test('mouse click then Escape on a sidebar row paints no focus ring', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const board = navRow(page, '首页');
+  const board = navRow(page, 'Coordinator');
   await board.click();
   await page.keyboard.press('Escape');
   await settleTransitions(page);
@@ -30,7 +30,7 @@ test('mouse click then Escape on a sidebar row paints no focus ring', async ({ p
 test('mouse click then Escape on a rail row paints no focus ring', async ({ page }) => {
   await page.addInitScript((key) => localStorage.setItem(key, '1'), SIDEBAR_COLLAPSED_KEY);
   await page.goto('/app?scenario=01');
-  const board = sidebarLink(page, /^首页/);
+  const board = sidebarLink(page, /^Coordinator/);
   await board.click();
   await page.keyboard.press('Escape');
   await settleTransitions(page);
@@ -39,8 +39,11 @@ test('mouse click then Escape on a rail row paints no focus ring', async ({ page
 
 test('keyboard focus rings on sidebar rows stay whole', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  for (const name of ['首页', '定时']) {
-    const row = navRow(page, name);
+  const rows = {
+    Coordinator: navRow(page, 'Coordinator'),
+    project: page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first(),
+  };
+  for (const [name, row] of Object.entries(rows)) {
     await keyboardFocus(page, row);
     expect({ name, ...(await readRing(row)), ringShown: (await boxRing(row)) !== 'none' }).toEqual({
       name,
@@ -57,8 +60,8 @@ test('keyboard focus rings on rail rows stay whole', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const rail = page.getByRole('complementary').getByRole('navigation');
   const rows = [
-    sidebarLink(page, /^首页/),
-    sidebarLink(page, '定时'),
+    sidebarLink(page, /^Coordinator/),
+    page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first(),
     rail.getByRole('button').first(),
   ];
   for (const row of rows) {
@@ -69,7 +72,7 @@ test('keyboard focus rings on rail rows stay whole', async ({ page }) => {
 
 test('Escape after Tab keeps the keyboard focus ring', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const board = navRow(page, '首页');
+  const board = navRow(page, 'Coordinator');
   await board.click();
   await keyboardFocus(page, board);
   await page.keyboard.press('Escape');
@@ -80,7 +83,7 @@ test('Escape after Tab keeps the keyboard focus ring', async ({ page }) => {
 
 test('transcript scroller focus ring stays inside its panel', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=57f');
-  const scroller = page.locator('[data-slot="message-scroller-viewport"]').first();
+  const scroller = page.locator('.side-panel [data-slot="message-scroller-viewport"]');
   await keyboardFocus(page, scroller);
   expect(await readRing(scroller)).toEqual({ focused: true, outline: 'solid 2px', clippedBy: [] });
 });

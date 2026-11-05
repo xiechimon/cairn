@@ -67,7 +67,7 @@ async function runningTask(page: Page) {
       skillInjection: null,
     },
   ];
-  const sent: { content: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean }[] = [];
+  const sent: { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean }[] = [];
   const stops: { discard: boolean }[] = [];
   const queuedMessages: { id: string; content: string; createdAt: number; error?: string; deliverAfterStop?: boolean }[] = [];
   const steerPending: string[] = [];
@@ -116,11 +116,27 @@ async function runningTask(page: Page) {
       return route.fulfill({ json: { delegated: true } });
     }
     if (path === `/api/builds/${build.id}/steps`) return route.fulfill({ json: steps });
+    if (path === `/api/todos/${task.id}/messages` && request.method() === 'POST') {
+      const input = request.postDataJSON() as { content: string };
+      sent.push(input);
+      const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now() };
+      messages.push(message);
+      steerPending.push(input.content);
+      task.phase = 'building';
+      task.v += 1;
+      return route.fulfill({ status: 201, json: { todoId: task.id, conversationId: build.id, delivered: 'steer' } });
+    }
     if (path === `/api/conversations/${build.id}/messages`) {
       if (request.method() === 'POST') {
-        const input = request.postDataJSON() as { content: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean };
+        const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean; editQueued?: boolean };
         sent.push(input);
         const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), deliverAfterStop: input.deliverAfterStop };
+        if (input.editQueued) {
+          const row = queuedMessages.find((item) => item.id === input.queuedMessageId);
+          if (!row) return route.fulfill({ status: 409, json: { error: 'Queued message was already delivered' } });
+          row.content = input.content;
+          return route.fulfill({ status: 201, json: { conversationId: build.id } });
+        }
         if (input.cancelQueued) {
           queuedMessages.splice(queuedMessages.findIndex((row) => row.id === input.queuedMessageId), 1);
           return route.fulfill({ status: 201, json: { conversationId: build.id } });
@@ -177,7 +193,7 @@ for (const chord of ['Meta+Enter', 'Control+Enter']) {
     await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
     await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
     expect(task.steerPending).toEqual([]);
-    expect(task.sent).toEqual([{ content: 'Run the next turn', mode: 'queue' }]);
+    expect(task.sent).toEqual([{ content: 'Run the next turn', mode: 'queue', clientMessageId: expect.any(String) }]);
     await expect(task.input).toHaveValue('');
     await expect(page.getByTestId('transcript-col').getByTestId('queued-message')).toHaveCount(0);
     await page.reload();
@@ -202,6 +218,52 @@ test('send now delivers the queued capsule immediately and plain Enter still ste
   await expect.poll(() => task.steerPending).toEqual(['Queued steer', 'Plain steer']);
 });
 
+test('a queued capsule is edited in place: Enter saves, Esc cancels, empty text cancels', async ({ page }) => {
+  const task = await runningTask(page);
+  await task.input.fill('First draft');
+  await task.input.press('Control+Enter');
+  const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+  await capsule.getByRole('button', { name: '编辑排队消息' }).click();
+  const edit = page.getByRole('textbox', { name: '编辑排队消息' });
+  await expect(edit).toBeFocused();
+  await expect(page.getByTestId('save-queued-message')).toBeVisible();
+  await expect(page.getByTestId('cancel-edit-queued-message')).toBeVisible();
+  await expect(page.getByText('回车保存 · Esc 取消')).toBeVisible();
+  await edit.fill('Changed and abandoned');
+  await edit.press('Escape');
+  await expect(capsule).toContainText('First draft');
+  expect(task.sent.filter((body) => body.editQueued)).toEqual([]);
+
+  await capsule.getByTestId('queued-message-text').press('Enter');
+  await page.getByRole('textbox', { name: '编辑排队消息' }).fill('   ');
+  await page.getByRole('textbox', { name: '编辑排队消息' }).press('Enter');
+  await expect(capsule).toContainText('First draft');
+  expect(task.sent.filter((body) => body.editQueued)).toEqual([]);
+
+  await capsule.getByTestId('queued-message-text').click();
+  await page.getByRole('textbox', { name: '编辑排队消息' }).fill('Second draft');
+  await page.getByRole('textbox', { name: '编辑排队消息' }).press('Enter');
+  await expect(capsule).toContainText('Second draft');
+  expect(task.queuedMessages.map((row) => row.content)).toEqual(['Second draft']);
+  expect(task.sent.filter((body) => body.editQueued)).toHaveLength(1);
+});
+
+test('a capsule dispatched while it is being edited is not resurrected and its edit lands in the composer', async ({ page }) => {
+  const task = await runningTask(page);
+  await task.input.fill('Dispatch me');
+  await task.input.press('Control+Enter');
+  const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+  await capsule.getByTestId('queued-message-text').click();
+  await page.getByRole('textbox', { name: '编辑排队消息' }).fill('Dispatch me, edited');
+  task.finish();
+  await page.getByTestId('save-queued-message').click();
+  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(0);
+  await expect(task.input).toHaveValue('Dispatch me, edited');
+  await expect(page.getByText('这条排队消息已经发出，改动没有生效')).toBeVisible();
+  expect(task.queuedMessages).toEqual([]);
+  expect(task.turns()).toBe(1);
+});
+
 test('Stop preserves changes without a dialog and cancelled tools show cancelled', async ({ page }) => {
   const task = await runningTask(page);
   await task.input.fill('A stays queued');
@@ -223,7 +285,6 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   await expect(page.getByTestId('work-cancelled')).toBeVisible();
   await expect(page.getByTestId('work-cancelled')).toHaveText('已取消');
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
-  await expect(page.getByTestId('doc-pane').getByText('kept.ts', { exact: true })).toBeVisible();
 });
 
 test('Escape stops and a second Escape queues the draft after cancellation', async ({ page }) => {
@@ -237,7 +298,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   await expect(task.input).toHaveValue('');
   expect(task.stops).toHaveLength(1);
-  expect(task.sent).toEqual([{ content: 'A stays queued', mode: 'queue' }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true }]);
+  expect(task.sent).toEqual([{ content: 'A stays queued', mode: 'queue', clientMessageId: expect.any(String) }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true, clientMessageId: expect.any(String) }]);
   expect(task.steerPending).toEqual([]);
   expect(task.turns()).toBe(0);
   task.finish('stopped');
@@ -249,7 +310,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
 
 test('discard is available during a running step only and requires confirmation', async ({ page }) => {
   const task = await runningTask(page);
-  await page.getByTestId('detail-head').getByRole('button', { name: '更多' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByTestId('discard-changes').click();
   await expect(page.getByRole('dialog')).toBeVisible();
   expect(task.stops).toEqual([]);
@@ -263,8 +324,7 @@ test('kept changes after Stop do not expose discard', async ({ page }) => {
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   task.finish('stopped');
   await page.reload();
-  await expect(page.getByTestId('doc-pane').getByText('kept.ts', { exact: true })).toBeVisible();
-  await page.getByTestId('detail-head').getByRole('button', { name: '更多' }).click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await expect(page.getByTestId('discard-changes')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
@@ -321,7 +381,7 @@ test('queued capsules stay usable when the phase has no composer', async ({ page
   await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
   task.setPhase('closed');
   await page.reload();
-  await expect(page.getByTestId('composer-card')).toHaveCount(0);
+  await expect(page.getByTestId('composer-card').getByRole('textbox')).toHaveCount(0);
   const capsule = page.getByTestId('queued-capsules-standalone').getByTestId('queued-message');
   await expect(capsule).toContainText('Still queued after close');
   await capsule.getByRole('button', { name: '移除' }).click();

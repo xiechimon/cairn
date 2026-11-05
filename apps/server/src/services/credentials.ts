@@ -11,8 +11,10 @@ import { agent, apiKey, build, chief, chiefThread, step, todo } from '../db/sche
 import { notFound } from '../lib/errors.js';
 import { createApiKey } from './api-keys.js';
 import { openClaudeSubscription } from './claude-subscriptions.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
+import { applyRoute, policyForStep, routeForStep, ruleAgent } from './routing-rules.js';
 import { openSecretValues, type SecretDeps } from './secrets.js';
 
 export interface CredentialsDeps {
@@ -76,7 +78,13 @@ export function resolveStepCredentials(
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
 
   const agentId = todoRow.assignment?.build?.agentId ?? todoRow.assignment?.plan?.agentId ?? null;
-  const agentRow = agentId ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get() : null;
+  const assignedAgent = agentId
+    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
+    : undefined;
+  const route = routeForStep(deps.db, todoRow, stepRow.kind);
+  const policy = policyForStep(deps.db, todoRow, stepRow.kind);
+  const base = assignedAgent ?? (route === null ? null : ruleAgent(route, policy));
+  const agentRow = base === null ? null : applyRoute(base, route, null, policy);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
@@ -101,7 +109,7 @@ export function resolveStepCredentials(
 
   const secrets =
     todoRow.assignment?.source !== 'intake-label' && agentRow && stepTakesSecrets(stepRow.kind)
-      ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets)
+      ? openSecretValues(boxDeps, todoRow.teamId, agentRow.secrets, todoRow.projectId)
       : {};
 
   return {
@@ -126,8 +134,9 @@ export function resolveChiefStepCredentials(
   if (!threadRow) throw notFound(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow?.agentId) throw notFound(`chief agent binding for ${threadId}`);
-  const agentRow = deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get();
-  if (!agentRow) throw notFound(`agent ${chiefRow.agentId}`);
+  const boundAgent = deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get();
+  if (!boundAgent) throw notFound(`agent ${chiefRow.agentId}`);
+  const agentRow = routedChiefAgent(deps.db, threadRow.teamId, boundAgent);
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;

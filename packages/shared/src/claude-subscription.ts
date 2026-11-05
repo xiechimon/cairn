@@ -22,3 +22,10 @@ export const createClaudeSubscriptionSchema = z.object({
 });
 
 export type CreateClaudeSubscription = z.infer<typeof createClaudeSubscriptionSchema>;
+
+export const claudeSubscriptionVerifyResultSchema = z.object({
+  ok: z.boolean(),
+  reason: z.enum(['auth', 'timeout', 'unavailable', 'failed']).optional(),
+});
+
+export type ClaudeSubscriptionVerifyResult = z.infer<typeof claudeSubscriptionVerifyResultSchema>;

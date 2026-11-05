@@ -1,18 +1,17 @@
 import { PanelLeft } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { useNewTaskHotkey } from '../overlay/hotkeys.js';
-import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
+import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
+import { recordOutsideLocation } from '../settings/settings-href.js';
 import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
@@ -34,7 +33,6 @@ export interface AppSidebarProps {
   todos?: TodoRecord[];
   searchPanel?: boolean;
   onSearch?: () => void;
-  onNewTask?: () => void;
 }
 
 export function AppSidebar({
@@ -43,7 +41,6 @@ export function AppSidebar({
   todos,
   searchPanel = true,
   onSearch,
-  onNewTask,
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -79,7 +76,8 @@ export function AppSidebar({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const { key: locationKey } = useLocation();
+  const location = useLocation();
+  const { key: locationKey } = location;
   useEffect(() => {
     setDrawerOpen(false);
   }, [locationKey]);
@@ -102,17 +100,21 @@ export function AppSidebar({
       : fixture.chief != null
         ? 1
         : 0;
-  const internalNewTaskApiRef = useRef<NewTaskSurfaceApi | null>(null);
-  const openInternalNewTask = useCallback(() => internalNewTaskApiRef.current?.openDialog(), []);
-  const openNewTask = onNewTask ?? openInternalNewTask;
-  useNewTaskHotkey(openNewTask);
-  const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
+  const machinesOffline = live
+    ? (machinesQ.data ?? []).filter((m) => !m.online).length
+    : (fixtureMachines ?? []).filter((m) => m.online === false).length;
+  const { pathname, search: locationSearch } = location;
+  useEffect(
+    () => recordOutsideLocation(`${pathname}${locationSearch}`),
+    [pathname, locationSearch],
+  );
+  useTypeToCompose();
   const sidebarProps = {
-    attention: needsYouCount(resolvedTodos, chiefStream),
+    attention: needsYouCount(resolvedTodos),
     machinesOnline,
+    machinesOffline,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
-    onNewTask: openNewTask,
     usageNav: fixture.usageNav === true,
     selected,
     projects,
@@ -148,10 +150,6 @@ export function AppSidebar({
                   closeDrawer();
                   sidebarProps.onSearch();
                 }}
-                onNewTask={() => {
-                  closeDrawer();
-                  openNewTask();
-                }}
               />
             </DialogContent>
           </Dialog>
@@ -169,7 +167,6 @@ export function AppSidebar({
           server={live ? searchResults.data : undefined}
         />
       )}
-      {onNewTask == null && <NewTaskSurfaceRoot fixture={fixture} apiRef={internalNewTaskApiRef} />}
     </>
   );
 }

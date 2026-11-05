@@ -41,6 +41,8 @@ import type {
   PatchChiefBody,
   PatchMachineBody,
   PatchProjectBody,
+  PatchProviderBody,
+  PatchScheduleBody,
   PatchTeamBody,
   PatchUserBody,
   PlanRow,
@@ -51,6 +53,7 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  RetroProposal,
   ScheduleRecord,
   SearchResponse,
   SecretRecord,
@@ -60,6 +63,7 @@ import type {
   TagRecord,
   TeamMember,
   TeamRecord,
+  ThreadMessageResult,
   TodoRecord,
   TokenUsage,
   UpdateSkillBody,
@@ -68,6 +72,7 @@ import type {
 import { backupHealthSchema, backupNotice, SKILL_ENTRY_FILE } from '@cairn/shared';
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQueries,
   useQuery,
@@ -221,6 +226,26 @@ export const useMessages = (conversationId: string | null | undefined, enabled: 
       api.get<ConversationMessagesResponse>(`/api/conversations/${conversationId}/messages`),
     enabled: enabled && conversationId != null,
   });
+
+export function useChiefMessages(threadId: string | null, enabled: boolean) {
+  const query = useInfiniteQuery({
+    queryKey: ['messages', threadId, 'pages'],
+    queryFn: ({ pageParam }) =>
+      api.get<ConversationMessagesResponse>(
+        `/api/conversations/${threadId}/messages${
+          pageParam !== null ? `?before=${encodeURIComponent(pageParam)}` : ''
+        }`,
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
+    enabled: enabled && threadId != null,
+  });
+  const messages = useMemo(
+    () => [...(query.data?.pages ?? [])].reverse().flatMap((page) => page.messages),
+    [query.data],
+  );
+  return { query, messages };
+}
 
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({
@@ -758,9 +783,19 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (body: CreateScheduleBody) => api.post<ScheduleRecord>('/api/schedules', body),
       onSuccess: invalidateAll,
     }),
+    patchSchedule: useMutation({
+      mutationFn: (input: { id: string; body: PatchScheduleBody }) =>
+        api.patch<ScheduleRecord>(`/api/schedules/${input.id}`, input.body),
+      onSuccess: invalidateAll,
+    }),
     deleteSchedule: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/schedules/${id}`),
       onSuccess: invalidateAll,
+    }),
+    runSchedule: useMutation({
+      mutationFn: (id: string) => api.post<ScheduleRecord>(`/api/schedules/${id}/run`, {}),
+      onSuccess: invalidateAll,
+      onError: invalidateAll,
     }),
     patchMachine: useMutation({
       mutationFn: (input: { id: string; body: PatchMachineBody }) =>
@@ -827,10 +862,12 @@ export function useApiMutations(teamId: string | undefined) {
         threadId: string | null;
         content: string;
         projectId?: string | null;
+        clientMessageId?: string;
       }) => {
         const body = {
           content: input.content,
           ...(input.projectId != null ? { projectId: input.projectId } : {}),
+          ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
         };
         return input.threadId === null
           ? api.post<{ thread: ChiefThread }>(`/api/teams/${teamId}/chief/threads`, body)
@@ -917,6 +954,11 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/providers/${id}`),
       onSuccess: invalidateAll,
     }),
+    patchProvider: useMutation({
+      mutationFn: (input: { id: string; body: PatchProviderBody }) =>
+        api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
+      onSuccess: invalidateAll,
+    }),
     createSecret: useMutation({
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
@@ -968,6 +1010,14 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/agents/${id}`),
       onSuccess: invalidateAll,
     }),
+    decideRetroProposal: useMutation({
+      mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
+        api.post<RetroProposal>(
+          `/api/teams/${teamId}/chief/retro-proposals/${input.proposalId}/${input.decision}`,
+          {},
+        ),
+      onSuccess: invalidateAll,
+    }),
     deleteMemory: useMutation({
       mutationFn: (input: { agentId: string; memoryId: string }) =>
         api.del<void>(`/api/teams/${teamId}/agents/${input.agentId}/memories/${input.memoryId}`),
@@ -980,7 +1030,9 @@ export function useApiMutations(teamId: string | undefined) {
         mode?: 'queue';
         deliverAfterStop?: boolean;
         cancelQueued?: boolean;
+        editQueued?: boolean;
         queuedMessageId?: string;
+        clientMessageId?: string;
       }) =>
         api.post<{ message: { id: string } }>(
           `/api/conversations/${input.conversationId}/messages`,
@@ -988,13 +1040,31 @@ export function useApiMutations(teamId: string | undefined) {
             content: input.content,
             ...(input.deliverAfterStop ? { deliverAfterStop: true } : {}),
             ...(input.cancelQueued ? { cancelQueued: true } : {}),
+            ...(input.editQueued ? { editQueued: true } : {}),
             ...(input.mode ? { mode: input.mode } : {}),
             ...(input.queuedMessageId ? { queuedMessageId: input.queuedMessageId } : {}),
+            ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
           },
         ),
+      onError: (_error, input) => {
+        void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
+      },
       onSuccess: (_data, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
+        void qc.invalidateQueries({ queryKey: ['todo'] });
+        void qc.invalidateQueries({ queryKey: ['todos', teamId] });
+      },
+    }),
+    messageThread: useMutation({
+      mutationFn: (input: { todoId: string; content: string; clientMessageId?: string }) =>
+        api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {
+          content: input.content,
+          clientMessageId: input.clientMessageId ?? crypto.randomUUID(),
+        }),
+      onSuccess: (result) => {
+        void qc.invalidateQueries({ queryKey: ['messages'] });
+        void qc.invalidateQueries({ queryKey: ['steps', result.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });
         void qc.invalidateQueries({ queryKey: ['todos', teamId] });
       },

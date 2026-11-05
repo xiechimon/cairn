@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MERGE_ANNOUNCEMENT, type TranscriptRow } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -168,18 +169,25 @@ function collectConvStream(buildId: string): { types: Set<string>; stop(): void 
   return { types, stop: () => ctrl.abort() };
 }
 
-async function openBoard(): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
+async function openProjectTasks(projectId: string): Promise<void> {
+  await page.goto(`${server.url}/app/project/${projectId}/files?tab=tasks`);
   await pexpect(
-    page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+    page.getByRole('complementary').getByRole('button', { name: 'Coordinator' }),
   ).toBeVisible({ timeout: 30_000 });
 }
 
 async function createAndStart(title: string): Promise<void> {
-  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
-  await pexpect(page.locator('.new-task-spec')).toBeVisible();
-  await page.locator('.new-task-spec').fill(title);
-  await page.locator('.new-task-dialog').getByRole('button', { name: '保存', exact: true }).click();
+  const projects = (await api(server.url, 'GET', '/api/projects')).body as { id: string }[];
+  const projectId =
+    projects[0]?.id ??
+    (
+      (await api(server.url, 'POST', '/api/projects', { name: '默认项目', repoKind: 'hosted' }))
+        .body as {
+        id: string;
+      }
+    ).id;
+  await api(server.url, 'POST', `/api/projects/${projectId}/todos`, { title: '', spec: title });
+  await openProjectTasks(projectId);
   await pexpect(page.getByRole('link', { name: title })).toBeVisible({
     timeout: 30_000,
   });
@@ -206,13 +214,13 @@ async function createAndStart(title: string): Promise<void> {
 
 async function openDetail(title: string): Promise<void> {
   await page.getByRole('link', { name: title }).click();
-  await pexpect(page.locator('.detail-shell')).toBeVisible({ timeout: 15_000 });
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({ timeout: 15_000 });
 }
 
 async function dumpSpineDiagnostics(label: string): Promise<void> {
   const out: string[] = [];
   try {
-    const chip = await page.locator('.detail-chip').textContent({ timeout: 3_000 });
+    const chip = await page.getByTestId('side-chat').getAttribute('data-phase', { timeout: 3_000 });
     out.push(`UI chip = ${JSON.stringify(chip)}`);
   } catch (err) {
     out.push(`UI chip unreadable: ${String(err).slice(0, 120)}`);
@@ -294,9 +302,11 @@ async function withDiagnostics<T>(label: string, fn: () => Promise<T>): Promise<
   }
 }
 
-async function waitChip(re: RegExp, timeoutMs = 150_000): Promise<void> {
-  await withDiagnostics(`waitChip(${String(re)})`, () =>
-    pexpect(page.locator('.detail-chip')).toHaveText(re, { timeout: timeoutMs }),
+async function waitChip(phase: string, timeoutMs = 150_000): Promise<void> {
+  await withDiagnostics(`waitChip(${phase})`, () =>
+    pexpect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', phase, {
+      timeout: timeoutMs,
+    }),
   );
 }
 
@@ -305,7 +315,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
   let stream: { types: Set<string>; stop(): void };
 
   test('create → plan → confirm → build → review → merge → done (main-sequence spine)', async () => {
-    await openBoard();
     await createAndStart('M5 脊柱探针');
 
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
@@ -323,18 +332,15 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     stream = collectConvStream(buildId);
 
     await openDetail('M5 脊柱探针');
-    await waitChip(/确认/);
+    await waitChip('confirm');
     await withDiagnostics('plan card v1 on screen', () =>
       pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v1', {
         timeout: 30_000,
       }),
     );
-    await pexpect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v1/, {
-      timeout: 30_000,
-    });
 
-    await page.locator('.detail-head-action').click();
-    await waitChip(/审核/);
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
+    await waitChip('review');
 
     expect(
       stream.types.has('text_delta'),
@@ -344,12 +350,18 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(stream.types.has('step')).toBe(true);
     stream.stop();
 
-    await page.locator('.detail-head-action').click();
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
     const accept = page.getByRole('dialog', { name: '完成任务' });
     await pexpect(accept.getByRole('button', { name: '完成' })).toBeVisible();
     await accept.getByRole('button', { name: '完成' }).click();
-    await waitChip(/已完成/);
+    await waitChip('done');
 
+    const transcript = (await api(server.url, 'GET', `/api/conversations/${buildId}/messages`))
+      .body as { messages: TranscriptRow[] };
+    expect(transcript.messages.some((row) => row.content === MERGE_ANNOUNCEMENT)).toBe(true);
+    const foldedTurns = page.locator('[data-testid=turn-header][aria-expanded=false]');
+    await pexpect(foldedTurns.first()).toBeVisible();
+    while ((await foldedTurns.count()) > 0) await foldedTurns.first().click();
     await pexpect(page.locator('.chat-note', { hasText: '发起了合并' })).toBeVisible();
     await pexpect(page.locator('.chat-note', { hasText: '🎉 任务已完成' })).toBeVisible({
       timeout: 30_000,
@@ -372,7 +384,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
   }, 300_000);
 
   test('reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4)', async () => {
-    await openBoard();
     await createAndStart('M5 驳回探针');
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
       id: string;
@@ -417,28 +428,32 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       }
     });
     await openDetail('M5 驳回探针');
-    await waitChip(/确认/);
+    await waitChip('confirm');
     await pexpect(
-      page.getByTestId('composer-card').getByRole('button', { name: '停止', exact: true }),
+      page
+        .locator('.side-panel')
+        .getByTestId('composer-card')
+        .getByRole('button', { name: '停止', exact: true }),
     ).toBeVisible();
 
     await withDiagnostics('confirm feedback requests a plan revision', async () => {
-      await page.locator('.composer-input').fill('Drop the project suffix from the title');
+      await page
+        .locator('.side-panel .composer-input')
+        .fill('Drop the project suffix from the title');
       const [revision] = await Promise.all([
         page.waitForResponse(
           (response) =>
-            response.url().endsWith(`/api/builds/${rejectBuildId}/steps`) &&
+            response.url().endsWith(`/api/todos/${target!.id}/messages`) &&
             response.request().method() === 'POST',
           { timeout: 10_000 },
         ),
-        page.locator('.composer-send').click(),
+        page.locator('.side-panel .composer-send').click(),
       ]);
       expect(revision.ok()).toBe(true);
       expect(revision.request().postDataJSON()).toMatchObject({
-        action: 'revision',
-        side: 'plan',
-        feedback: 'Drop the project suffix from the title',
+        content: 'Drop the project suffix from the title',
       });
+      expect(await revision.json()).toMatchObject({ delivered: 'revision' });
     });
     const pendingSteps = page.evaluate<{ kind: string; status: string }[]>(
       `fetch('/api/builds/${rejectBuildId}/steps', { headers: { 'x-cairn-route-drain': 'true' } }).then(response => response.json())`,
@@ -462,9 +477,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
         timeout: 30_000,
       }),
     );
-    await pexpect(page.locator('.doc-range-wrap .doc-pane-select')).toHaveText(/v2/, {
-      timeout: 30_000,
-    });
 
     const plans = server.db
       .select()
@@ -481,16 +493,8 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       .all();
     expect(rejectSteps.filter((s) => s.kind === 'plan')).toHaveLength(2);
 
-    await page.locator('.doc-range-wrap .doc-pane-select').click();
-    await pexpect(page.locator('.version-menu-row')).toHaveCount(3, { timeout: 10_000 });
-    await pexpect(page.locator('.version-menu-row').first()).toHaveText(/v2/);
-    await page.getByRole('menuitem', { name: '与其他版本对比…' }).click();
-    await page.getByRole('menuitem', { name: '上一版本' }).click();
-    await pexpect(page.locator('.doc-range-chip')).toHaveText(/v1 → v2/);
-    await pexpect(page.locator('.doc-file-row')).toHaveText(/plan\.md/);
-
-    await page.locator('.detail-head-action').click();
-    await waitChip(/审核/);
+    await page.getByTestId('side-chat-action').getByRole('button').last().click();
+    await waitChip('review');
     expect(server.todoPhase(target!.id)).toBe('review');
   }, 300_000);
 
@@ -549,13 +553,12 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(scheduledSteps.map((s) => s.kind)).toEqual(['build']);
     expect((await api(server.url, 'GET', '/api/schedules')).body as unknown[]).toHaveLength(0);
 
-    await openBoard();
-    const reviewCol = page.getByRole('region', { name: '待处理' });
-    await pexpect(reviewCol.locator('[data-todo-id]', { hasText: 'M5 脊柱探针' })).toBeVisible({
-      timeout: 15_000,
-    });
+    const spineProject = (await api(server.url, 'GET', `/api/todos/${spine!.id}`)).body as {
+      projectId: string;
+    };
+    await openProjectTasks(spineProject.projectId);
     await openDetail('M5 脊柱探针');
     await pexpect(page.locator('.chat-scheduled')).toBeVisible({ timeout: 15_000 });
-    await waitChip(/审核/);
+    await waitChip('review');
   }, 300_000);
 });

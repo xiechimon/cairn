@@ -56,7 +56,7 @@ export function useTeamStream(teamId: string | undefined, enabled: boolean): voi
 function notificationHref(record: NotificationRecord): string {
   return record.type === 'chief_message'
     ? `/app?chief=${encodeURIComponent(record.entityId)}`
-    : `/app/todo/${encodeURIComponent(record.entityId)}`;
+    : `/app?thread=${encodeURIComponent(record.entityId)}`;
 }
 
 async function showViaServiceWorker(
@@ -94,7 +94,9 @@ function fireDesktopNotification(record: NotificationRecord): void {
           ? t('等额度')
           : record.type === 'model_fallback'
             ? t('已换备用模型')
-            : record.entityRef.title;
+            : record.type === 'no_machine'
+              ? t('没有机器能跑')
+              : record.entityRef.title;
   const body =
     record.snippet ??
     (record.entityRef.seqNum !== null

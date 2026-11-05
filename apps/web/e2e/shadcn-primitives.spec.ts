@@ -1,51 +1,37 @@
 import { expect, type Page, test } from '@playwright/test';
 
-test('avatar landing: sidebar portrait goes to the components/ui landing', async ({ page }) => {
-  await page.goto('/app?scenario=22d&view=board');
-  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.reload();
-  await expect(page.locator('.rail-user [data-slot="avatar-image"]')).toHaveCount(1);
+test('avatar landing: the account portrait goes to the components/ui landing', async ({ page }) => {
+  await page.goto('/app/account?scenario=22d');
+  await expect(page.locator('.account-avatar [data-slot="avatar-image"]')).toHaveCount(1);
 });
 
 test('avatar landing fixed-size box (#983/#1003): Root renders a real box carrying the upstream hairline ring, img geometry unchanged', async ({
   page,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.goto('/app?scenario=22d&view=board');
+  await page.goto('/app/account?scenario=22d');
+  await expect(page.locator('.account-avatar [data-slot="avatar-image"]')).toBeVisible();
   const probe = await page.evaluate(() => {
-    const root = document.querySelector('.rail-user [data-slot="avatar"]')!;
-    const img = document.querySelector('.rail-user [data-slot="avatar-image"]')!;
-    const chip = document.querySelector('.rail-user')!;
+    const root = document.querySelector('.account-avatar [data-slot="avatar"]')!;
+    const img = document.querySelector('.account-avatar [data-slot="avatar-image"]')!;
     const box = (el: Element) => {
       const r = el.getBoundingClientRect();
       return { w: r.width, h: r.height };
     };
-    return {
-      display: getComputedStyle(root).display,
-      rootBox: box(root),
-      imgBox: box(img),
-      chipBox: box(chip),
-    };
+    return { display: getComputedStyle(root).display, rootBox: box(root), imgBox: box(img) };
   });
-
   expect(probe.display).not.toBe('contents');
-
-  expect(probe.rootBox.w).toBe(24);
-  expect(probe.rootBox.h).toBe(24);
-  expect(probe.imgBox.w).toBe(24);
-  expect(probe.imgBox.h).toBe(24);
-
-  expect(probe.chipBox.h).toBe(36);
+  expect(probe.rootBox.w).toBeGreaterThan(0);
+  expect(probe.imgBox).toEqual(probe.rootBox);
 });
 
 test('kbd landing: floating hint = registry Tooltip+Kbd combo, not mounted at rest / floats on hover', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
+  await page.goto('/app/schedules?scenario=01');
 
-  const fab = page.getByRole('button', { name: '总管', exact: true });
+  const search = page.locator('.board-sidebar').getByRole('button', { name: '搜索', exact: true });
   const hint = page.locator('[data-slot="tooltip-content"] [data-slot="kbd"]');
   await expect(hint).toHaveCount(0);
-  await fab.hover();
+  await search.hover();
   await expect(hint).toBeVisible();
   await expect(hint).toHaveAttribute('data-slot', 'kbd');
-  await expect(hint).toHaveText('⌘J');
+  await expect(hint).toHaveText('⌘K');
 });

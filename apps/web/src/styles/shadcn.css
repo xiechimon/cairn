@@ -23,21 +23,14 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar-hover: var(--sidebar-hover);
-  --color-sidebar-active: var(--sidebar-active);
   --color-spot-soft: var(--spot-soft);
-  --color-accent-soft: var(--accent-soft);
   --color-danger-soft: var(--danger-soft);
-  --color-spot-text-on-tint: var(--spot-text-on-tint);
-  --color-spot-disabled: var(--spot-disabled);
-  --color-spot-disabled-fg: var(--spot-disabled-fg);
   --color-canvas: var(--canvas);
   --color-running: var(--running);
   --color-running-text: var(--running-text);
   --color-running-bar: var(--running-bar);
-  --color-running-track: var(--running-track);
   --color-accent-hover: var(--accent-hover);
   --color-dialog-surface: var(--dialog-surface);
-  --color-dialog-backdrop: var(--dialog-backdrop);
   --color-menu-hover: var(--menu-hover);
   --color-project-tile-1: var(--project-tile-1);
   --color-project-tile-2: var(--project-tile-2);
@@ -52,10 +45,6 @@
   --color-project-ink-5: var(--project-ink-5);
   --color-project-ink-6: var(--project-ink-6);
   --color-pebble-waiting: var(--pebble-waiting);
-  --color-pebble-review: var(--pebble-review);
-  --color-pebble-working: var(--pebble-working);
-  --color-pebble-idle: var(--pebble-idle);
-  --color-pebble-resolved: var(--pebble-resolved);
   --color-danger-line: var(--danger-line);
   --radius-sm: 6px;
   --radius-md: var(--radius);
@@ -75,68 +64,28 @@
 :root {
   --dur-fast: 150ms;
   --dur-overlay: 200ms;
-  --dur-window: 320ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-pop: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --spring-snappy: linear(
-    0 0%,
-    0.0259 3.57%,
-    0.0912 7.14%,
-    0.1802 10.71%,
-    0.281 14.29%,
-    0.3851 17.86%,
-    0.4862 21.43%,
-    0.5805 25%,
-    0.6654 28.57%,
-    0.7398 32.14%,
-    0.8034 35.71%,
-    0.8565 39.29%,
-    0.8998 42.86%,
-    0.9343 46.43%,
-    0.9611 50%,
-    0.9813 53.57%,
-    0.996 57.14%,
-    1.0063 60.71%,
-    1.013 64.29%,
-    1.017 67.86%,
-    1.0189 71.43%,
-    1.0192 75%,
-    1.0185 78.57%,
-    1.0172 82.14%,
-    1.0154 85.71%,
-    1.0134 89.29%,
-    1.0114 92.86%,
-    1.0095 96.43%,
-    1 100%
-  );
-  --spring-snappy-dur: 380ms;
 
   --z-docked: 10;
   --z-floating: 15;
   --z-backdrop-low: 20;
   --z-panel-low: 21;
-  --z-catcher: 29;
-  --z-popover: 30;
-  --z-confirm: 31;
-  --z-hint: 40;
   --z-modal-scrim: 40;
   --z-modal: 41;
   --z-dialog: 50;
   --z-gate: 60;
-  --z-picker: 80;
 
   --font-sans:
     var(--font-instrument-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Noto Color Emoji";
-  --font-display: var(--font-bricolage), var(--font-sans);
+  --font-display: var(--font-sans);
   --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, Monaco, Consolas, monospace;
 
   --hairline: 1px;
   --edge-ring: inset 0 0 0 var(--hairline) var(--border);
-  --sheet-ring: inset 0 0 0 1px var(--border);
   --radius: 8px;
   --edge-radius: 18px;
   --cds-radius-xs: 2px;
@@ -145,7 +94,6 @@
   --cds-radius-lg: 8px;
   --radius-card: 14px;
   --cds-radius-xl: 12px;
-  --cds-radius-2xl: 16px;
   --radius-popover: 12px;
   --menu-pad: 4px;
   --focus-field-border: var(--focus-ring);
@@ -166,45 +114,19 @@
   --panel-shadow: var(--e1);
   --shadow-popover: var(--e2);
   --dialog-shadow: var(--e3);
-  --card-shadow: var(--cds-shadow-sm);
   --floating-shadow: var(--cds-shadow-lg);
-  --edge-shadow: var(--e2);
-  --fab-shadow: var(--e2);
-  --plate-shadow: var(--e2);
-  --chief-shadow: var(--e2);
   --card-lift: var(--panel-shadow-hover);
-  --drop-tint-border: var(--card-button);
-  --drop-tint-base: color-mix(in srgb, var(--card-button) 5%, transparent);
-  --drop-tint-hover: color-mix(in srgb, var(--card-button) 10%, transparent);
   --chief-launcher-size: 40px;
   --chief-launcher-inset: 8px;
   --chief-launcher-clearance: calc(var(--chief-launcher-size) + var(--chief-launcher-inset) * 2);
-  --board-col-min: 200px;
-  --pad-card: 16px;
-  --pad-page: 28px;
-  --row-h: 40px;
-  --font-label: var(--font-sans);
-  --label-size: 12px;
-  --label-transform: none;
-  --label-spacing: 0.01em;
   --title-weight: 650;
-  --title-tracking: -0.015em;
   --rem-scale: calc(16 / 17);
-  --h-control-xs: 24px;
-  --h-control-sm: 28px;
-  --h-control: 32px;
-  --h-control-lg: 40px;
   --sidebar-w: 248px;
   --chat-max-w: 768px;
   --composer-max-h: 384px;
   --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
   --chat-extra-space: 35vh;
-  --font-size-caption: calc(0.6875rem * var(--rem-scale));
-  --font-size-code: calc(0.75rem * var(--rem-scale));
-  --font-size-body: calc(0.8125rem * var(--rem-scale));
-  --font-size-heading: calc(0.875rem * var(--rem-scale));
-  --font-size-title: calc(1.25rem * var(--rem-scale));
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.25rem * var(--type-scale));
   --type-heading: calc(1.0625rem * var(--type-scale));
@@ -214,13 +136,8 @@
   --type-meta: calc(0.8125rem * var(--type-scale));
   --type-code: calc(0.8125rem * var(--type-scale));
   --type-caption: calc(0.75rem * var(--type-scale));
-  --leading-body: 1.428;
-  --surface-0: var(--background);
   --surface-1: var(--canvas);
-  --surface-2: var(--card);
-  --surface-3: var(--popover);
   --hover-1: color-mix(in oklab, var(--foreground) 5%, transparent);
-  --hover-2: color-mix(in oklab, var(--foreground) 10%, transparent);
   --border-soft: color-mix(in oklab, var(--foreground) 9%, transparent);
   --ring-inset-highlight: color-mix(in oklab, var(--foreground) 10%, transparent);
   color-scheme: dark light;
@@ -241,7 +158,6 @@
   --shadow-composer-focus:
     0 4px 20px rgb(0 0 0 / 0.2),
     inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 36%, transparent);
-  --drag-shadow: 0 10px 28px rgb(0 0 0 / 0.4);
   --canvas: #141715;
   --background: #1b1f1c;
   --foreground: #e6e8e2;
@@ -266,26 +182,18 @@
   --sidebar-hover: rgb(230 232 226 / 0.05);
   --sidebar-active: rgb(230 232 226 / 0.09);
   --surface-tertiary: #2e3430;
-  --surface-press: var(--surface-tertiary);
-  --card-hover: color-mix(in srgb, var(--card), var(--foreground) 6%);
   --text-secondary: #b4bab3;
   --text-tertiary: #959c96;
   --text-dim: #5d655f;
   --icon: #959c96;
   --card-button: #ebb550;
-  --focus-ring: #9cc78b;
-  --col-dot-idle: #6b736d;
-  --col-dot-confirm: #e0a838;
-  --col-dot-building: #82b46f;
+  --focus-ring: var(--ring);
+  --col-dot-building: var(--running);
   --col-dot-done: #7fa3cc;
   --badge-attention: #e0a838;
-  --badge-done: #7fa3cc;
   --badge-idle: #858c86;
-  --badge-attention-fg: #2b1d02;
-  --project-avatar-bg: #8fc07d;
-  --project-avatar-fg: #121513;
-  --chip-idle-bg: #2a302b;
-  --chip-idle-fg: #b4bab3;
+  --chip-idle-bg: var(--secondary);
+  --chip-idle-fg: var(--text-secondary);
   --chip-plan-bg: #1f2c3a;
   --chip-plan-fg: #9cbbe0;
   --chip-confirm-bg: #3a2f17;
@@ -293,30 +201,22 @@
   --chip-done-bg: #223322;
   --chip-done-fg: #9cc78b;
   --seg-active: #323833;
-  --seg-hover: rgb(230 232 226 / 0.05);
   --diff-add-bg: #1f2b1f;
   --diff-add-fg: #9cc78b;
   --chip-failed-bg: #3c201b;
   --chip-failed-fg: #f6b6a8;
-  --fail-fg: #f09a88;
+  --fail-fg: var(--destructive);
   --diff-del-bg: #2f1f1b;
   --diff-add-word-bg: #2b3f29;
   --diff-del-word-bg: #48291f;
   --tile-orange-bg: #3a2f17;
   --tile-orange-fg: #ebb550;
-  --tile-hero-bg: #4a3a17;
-  --row-icon-bg: #2e3430;
-  --notify-icon-bg: var(--row-icon-bg);
-  --menu-icon: #e6e8e2;
   --text-on-accent: #1a1404;
   --overlay-scrim: rgb(0 0 0 / 0.6);
   --text-on-veil: #ffffff;
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
-  --accent-soft: color-mix(in srgb, var(--card-button) 14%, transparent);
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
   --spot-text-on-tint: #f2cf86;
-  --spot-disabled: color-mix(in srgb, var(--card-button) 60%, var(--card));
-  --spot-disabled-fg: color-mix(in srgb, var(--card-button) 65%, white);
   --running: #82b46f;
   --running-text: #9cc78b;
   --running-bar: #6fa35c;
@@ -351,10 +251,10 @@
   --project-ink-4: color-mix(in oklab, var(--project-tile-4), white 40%);
   --project-ink-5: color-mix(in oklab, var(--project-tile-5), white 40%);
   --project-ink-6: color-mix(in oklab, var(--project-tile-6), white 40%);
-  --pebble-waiting: #e0a838;
-  --pebble-review: #7fa3cc;
-  --pebble-working: #82b46f;
-  --pebble-idle: #5d655f;
+  --pebble-waiting: var(--badge-attention);
+  --pebble-review: var(--col-dot-done);
+  --pebble-working: var(--running);
+  --pebble-idle: var(--text-dim);
   --pebble-resolved: #444b46;
   --danger-line: #8c4a3e;
 }
@@ -388,7 +288,6 @@
   --shadow-composer-focus:
     0 4px 20px rgb(0 0 0 / 0.06),
     inset 0 0 0 var(--hairline) color-mix(in srgb, var(--foreground) 36%, transparent);
-  --drag-shadow: 0 10px 28px rgb(29 35 31 / 0.16);
   --canvas: #e6e7e1;
   --background: #f6f6f2;
   --foreground: #1d231f;
@@ -411,26 +310,18 @@
   --sidebar-hover: #dcded7;
   --sidebar-active: #d2d6cc;
   --surface-tertiary: #e1e3dc;
-  --surface-press: var(--surface-tertiary);
-  --card-hover: color-mix(in srgb, var(--card), var(--foreground) 5%);
   --text-secondary: #4b534d;
   --text-tertiary: #5f665f;
   --text-dim: #a8aea6;
   --icon: #5f665f;
   --card-button: #9a6500;
-  --focus-ring: #3f6c35;
-  --col-dot-idle: #a8aea6;
-  --col-dot-confirm: #d49a1c;
-  --col-dot-building: #5f8f4f;
+  --focus-ring: var(--ring);
+  --col-dot-building: var(--running);
   --col-dot-done: #5379a0;
   --badge-attention: #d49a1c;
-  --badge-done: #5379a0;
-  --badge-attention-fg: #3a2600;
   --badge-idle: #7b827c;
-  --project-avatar-bg: #2f5a2a;
-  --project-avatar-fg: #f4f6f1;
-  --chip-idle-bg: #eceee8;
-  --chip-idle-fg: #4b534d;
+  --chip-idle-bg: var(--secondary);
+  --chip-idle-fg: var(--text-secondary);
   --chip-plan-bg: #d7e2ec;
   --chip-plan-fg: #2f5070;
   --chip-confirm-bg: #f3e3bd;
@@ -438,30 +329,22 @@
   --chip-done-bg: #dbe7d2;
   --chip-done-fg: #33592b;
   --seg-active: #e1e3dc;
-  --seg-hover: rgb(29 35 31 / 0.05);
   --diff-add-bg: #e8f0e2;
   --diff-add-fg: #2f5427;
   --chip-failed-bg: #f5ddd7;
   --chip-failed-fg: #8c2f21;
-  --fail-fg: #a33a2a;
+  --fail-fg: var(--destructive);
   --diff-del-bg: #f9e8e3;
   --diff-add-word-bg: #d2e4c7;
   --diff-del-word-bg: #f1d2c9;
   --tile-orange-bg: #f3e3bd;
   --tile-orange-fg: #7a5000;
-  --tile-hero-bg: #ecd6a3;
-  --row-icon-bg: #e1e3dc;
-  --notify-icon-bg: var(--spot-soft);
-  --menu-icon: #1d231f;
   --text-on-accent: #ffffff;
   --overlay-scrim: rgb(0 0 0 / 0.6);
   --text-on-veil: #ffffff;
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
-  --accent-soft: color-mix(in srgb, var(--card-button) 14%, transparent);
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
   --spot-text-on-tint: #6e4900;
-  --spot-disabled: color-mix(in srgb, var(--card-button) 60%, var(--card));
-  --spot-disabled-fg: #ffffff;
   --running: #5f8f4f;
   --running-text: #3f6c35;
   --running-bar: #55833f;
@@ -496,10 +379,10 @@
   --project-ink-4: color-mix(in oklab, var(--project-tile-4), black 22%);
   --project-ink-5: color-mix(in oklab, var(--project-tile-5), black 22%);
   --project-ink-6: color-mix(in oklab, var(--project-tile-6), black 22%);
-  --pebble-waiting: #d49a1c;
-  --pebble-review: #5379a0;
-  --pebble-working: #5f8f4f;
-  --pebble-idle: #a8aea6;
+  --pebble-waiting: var(--badge-attention);
+  --pebble-review: var(--col-dot-done);
+  --pebble-working: var(--running);
+  --pebble-idle: var(--text-dim);
   --pebble-resolved: #c3c7bf;
   --danger-line: #d98c7d;
   --fab-surface: #2f5a2a;

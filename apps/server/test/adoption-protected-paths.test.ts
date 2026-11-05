@@ -35,20 +35,20 @@ describe('adoption evaluator protection', () => {
     ).toContain(path);
   });
 
-  test('ADR 0025 covers the adoption judge with integration/eval/** and spec 29 cites that ADR', () => {
-    expect(PROTECTED_PATH_GLOBS).toContain('integration/eval/**');
-    const adr = readFileSync(
-      join(import.meta.dirname, '../../../docs/adr/0025-eval-surface-into-d4-protected-paths.md'),
-      'utf8',
-    );
-    expect(adr).toContain('integration/eval/adoption/judge.mts');
-    expect(adr).toContain('integration/eval/adoption/sealed-ledger.mts');
-    expect(adr).toContain('integration/eval/**');
+  test('the eval ruler globs cover the adoption judge and spec 29 names it', () => {
+    for (const glob of [
+      'integration/eval/**',
+      '.claude/hillclimb/**',
+      'apps/server/src/trajectory-export.ts',
+      'apps/server/src/trajectory-export-cli.ts',
+      'apps/server/src/trajectory-outcome.ts',
+      'packages/shared/src/trajectory-pack.ts',
+    ])
+      expect(PROTECTED_PATH_GLOBS).toContain(glob);
     const spec = readFileSync(
       join(import.meta.dirname, '../../../docs/spec/29-evaluation-and-data-loop.md'),
       'utf8',
     );
-    expect(spec).toContain('ADR 0025');
     expect(spec).toContain('integration/eval/adoption/judge.mts');
     expect(spec).toContain('#1605');
   });

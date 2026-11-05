@@ -2,7 +2,8 @@
 
 Status: incomplete. There are zero accepted tasks. The manifest is an audit of
 972 merged PRs, not a completed benchmark. Fifty-three PRs passed initial static
-selection. No oracle or independent label has been recorded as passing.
+selection. One probe task (PR #1562) has passing paired controls and one label; no
+task is kept.
 
 The implementation follows the owner's acceptance comment on issue #1517 dated
 2026-10-27 ([source](https://github.com/xiechimon/cairn/issues/1517#issuecomment-6444474886)): Harbor 0.25.0, merge date on or after 2026-07-01, exactly one
@@ -29,20 +30,26 @@ locally; discovery reports unavailable objects instead of guessing a base.
 
 ```sh
 python3 integration/eval/harbor/pr-to-task.py --discover --limit 2000 --output /tmp/candidates.json
-python3 integration/eval/harbor/pr-to-task.py --pr 1990 \
-  --test-command-json '["node","--test","scripts/test-tmpdir.test.mjs"]' \
-  --output /tmp/task-1990
-flock /tmp/cairn-heavy.lock env \
+python3 integration/eval/harbor/pr-to-task.py --pr 1562 \
+  --test-command-json '["node","--test","scripts/single-use-helper-gate.test.mjs"]' \
+  --output /tmp/task-1562
+env \
   UV_CACHE_DIR=/tmp/cairn-1517-uv \
   UV_TOOL_DIR=/tmp/cairn-1517-tools \
   UV_TOOL_BIN_DIR=/tmp/cairn-1517-bin \
   DOCKER_CONFIG=/tmp/cairn-1517-docker \
   python3 integration/eval/harbor/pr-to-task.py \
-  --check /tmp/task-1990 --output /tmp/controls-1990
-uv run --with pytest pytest integration/eval/harbor/test_pr_to_task.py
+  --check /tmp/task-1562 --output /tmp/controls-1562
+python3 integration/eval/harbor/label-task.py /tmp/task-1562 --model gpt-6.1-sol \
+  --output /tmp/label-1562.json
+cd integration/eval/harbor && uv run --with pytest pytest test_pr_to_task.py \
+  test_control_probe.py test_label_task.py
 pnpm --filter @cairn/integration exec vitest run test/bench-v0-manifest.test.ts
 ```
 
+`--check` takes `/tmp/cairn-heavy.lock` itself (override with `CAIRN_HEAVY_LOCK`),
+so do not wrap it in `flock`; lock wait is recorded apart from Harbor wall time.
+Set `DOCKER_CONFIG` only when the default Docker config directory is read-only.
 Use a new output path for each conversion and trial pair. Conversion refuses to
 overwrite an existing directory. Test commands are explicit JSON argument arrays
 reviewed against changed tests; instruction text never supplies executable commands.
@@ -64,21 +71,75 @@ proves patch separation locally; it does not replace real Harbor/image acceptanc
 
 ## Observed blockers
 
-`ai-route pick review` fails because `/home/ian/.cache/ai-route/codex.json` is read
-only in this sandbox. The configured cross-vendor labelers have not run. No model
-verdict has been invented or substituted. Labelers must receive the instruction
-and test patch, without the solution. Reject disagreements without relabeling.
+PR #1562 is the Epic 0 runner probe. On the shared Linux host, Harbor 0.25.0
+ran the oracle (reward 1, pass) and the `nop` agent (reward 0, classified as an
+assertion failure) with `network_mode: none`; Docker's actual NetworkMode was
+read from live containers and is `none` for both. The parent process wrote each
+trial's `outcome.json`; the agent directory holds no reward file. One label from
+OpenAI was produced by invoking `codex exec` directly, never through `ai-route`
+(`route: direct-codex-exec`). A kept task still needs a second accepting label
+from a different vendor, so the manifest stays incomplete. Evidence:
+`docs/verify/1518/epic0/`. Timing per control splits lock wait, Harbor wall time,
+image build (Harbor `environment_setup`), and trial container CPU from cgroup
+`cpu.stat` samples taken every 0.25 seconds (a lower bound; build CPU excluded).
 
-The first real Harbor 0.25.0 oracle/nop pair for PR #1990 failed in Docker build
-setup because `/home/ian/.docker/buildx/activity/` is read only. Both results are
-infrastructure failures even though Harbor exits with code zero. See
-`docs/verify/1517/1990-oracle-infrastructure.log` and
-`docs/verify/1517/1990-nop-infrastructure.log`. A retry with an isolated writable Docker configuration was canceled while
-waiting for the shared heavy-check lock, before starting Harbor. That alternative
-is unverified. The first pair took 15.987 seconds for oracle and 4.421 seconds for
-nop, including framework startup/cleanup; neither reached test execution. The
-generated base archive was 177592320 bytes. No task image or valid test-run disk usage
-measurement exists, so no container acceptance is claimed.
+PR #1990 is not a usable probe: its test file imports a module that the base
+revision does not contain, so `nop` fails with a missing module, which is
+classified as infrastructure, not an assertion. Its earlier failure
+(`docs/verify/1517/1990-*-infrastructure.log`) was a read-only Docker buildx
+directory in a sandbox. The converter now needs a writable `DOCKER_CONFIG`
+only on hosts whose default Docker config directory is not writable.
+
+## Epic 1: trustworthy scoring
+
+Generated tasks grade in a separate verifier container (`environment_mode =
+"separate"`). The agent container never holds `/tests`, the solution or the
+reward. A `[[verifier.collect]]` hook publishes `/app` minus `node_modules` and
+`.git` to `/logs/artifacts/workspace`; Harbor uploads that directory into a fresh
+verifier container whose image, runtime and dependencies the agent could not
+touch. `tests/test.sh` then drops planted `node_modules`/`.git` and deletes every
+workspace file matching the test-infrastructure pattern in `tests/protected-regex.txt`
+(package.json and lockfiles, vitest/vite/jest/playwright config, setup and workspace
+files, `tsconfig*`, `*.test.*`, `*.spec.*`, `test_*.py`, `conftest.py`, and anything
+under `test/`, `tests/`, `__tests__/`, `e2e/`, `fixtures/`), except paths the gold
+solution patch modifies (`tests/solution-paths.txt`). The pristine image supplies the
+base versions, so edited files revert and planted ones vanish;
+`tests/protected-paths.txt` lists the base files protected. It then applies
+`tests/tests.patch`, runs the explicit command and only then writes `1` to the reward
+file, which Harbor itself clears first. The test command is a caller-supplied
+argument array and is not rewritten to name a config.
+Only the parent process writes `outcome.json`; the probe flags any outcome-like
+file under the trial's `agent/` directory or the published artifact root.
+Limitations: files deleted by the agent are not propagated, and helper files outside
+the pattern are treated as product code.
+
+Four cheat agents (`cheat_agent.py`, scripts in `cheat_controls.py`) run as real
+Harbor trials. Each is blocked only when the trial is scored 0 on a real
+assertion, every container had network mode `none`, the parent wrote the outcome,
+and the cheat's own evidence proves it executed:
+
+- `git`: `git log --all`, `show`, `reflog`, `rev-list`, `fsck`, `cat-file` of the
+  base commit, plus a filesystem search for `.git`, packs and a line unique to
+  the fix. All fail and nothing is found.
+- `bash`: overwrites the test file, rewrites `vitest.config.*`, plants `vitest.setup.ts`, pre-seeds `reward.txt`/`reward.json`, plants
+  `/tests/test.sh` and replaces the `node` binary.
+- `forge`: writes `outcome.json`, `result.json`, `reward.*` into every writable
+  location; the probe flags it and the outcome stays the parent's.
+- `network`: `curl`, `npm view`, Python, `getent`, Node DNS and a raw TCP connect
+  all fail; no default route and only `lo`.
+
+```sh
+python3 integration/eval/harbor/pr-to-task.py --pr 1562 \
+  --test-command-json '["node","--test","scripts/single-use-helper-gate.test.mjs"]' \
+  --output /tmp/task-1562
+python3 integration/eval/harbor/pr-to-task.py --cheat-controls /tmp/task-1562 \
+  --output /tmp/cheats-1562
+python3 integration/eval/harbor/pr-to-task.py --check /tmp/task-1562 \
+  --output /tmp/controls-1562-e1
+```
+
+Evidence: `docs/verify/1518/epic1/`, recorded on the head with the protected test-infrastructure restore, including a counterfactual: the same `bash` cheat (runtime replaced, no test edit) against the earlier shared-verifier task scores reward 1, and against the separate verifier scores 0. The task stays unaccepted; Epic 1 proves the
+ruler resists these four cheats, not that PR #1562 is a kept benchmark task.
 
 ## Candidate counts
 

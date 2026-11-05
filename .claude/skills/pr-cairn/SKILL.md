@@ -28,12 +28,12 @@ who did not watch the work. Use this order:
    `## Risk`, separated from the HTML tags by blank lines and closed with
    `</details>`. Keep this block collapsed.
 
-For code changes, use one review round. A fresh, other-vendor independent
-review is required only for protected or security paths, documentation
-included; other docs-only changes need no code review. After three rounds, rethink or hand the PR to ian.
-Review records the review performed, its verdict and unfixed findings with
-reasons; when independent review is required, include vendor, model, fresh
-context and reviewed head SHA. Risk states one-way or two-way
+For code changes, the Codex cloud review on the PR head is the other-vendor
+review. Protected or security paths, documentation included, also need
+`/security-review`; other docs-only changes need no code review. After three
+rounds, rethink or hand the PR to ian.
+Review links the Codex cloud review on the head SHA, states its verdict and
+lists unfixed findings with reasons. Risk states one-way or two-way
 door, blast radius and whether the owner must merge. Put longer overlap
 results and optional Upstream analysis inside the details block. Include
 Upstream only when adding a mechanism; name an existing equivalent or the
@@ -47,11 +47,10 @@ lines do not count. Over the limit, it reports
 `too-long: <n> characters of prose outside tables, images, code and details (limit 600)`.
 Keep Proof and What short; put supporting output in tables or code blocks.
 
-A patch over 800 non-evidence lines or 40 non-evidence files (`docs/verify/**`
-left out, a rename counts two files) also needs `## Size` inside the collapsed
-details block: say why the change cannot be split. Oversize no longer routes
-to ian; the gate reds as `missing-section: Size` until the section is answered,
-and the review must answer why the change is this big.
+Size is not a gate (D68). The `pr-size` workflow labels each PR `size:XS` to
+`size:XXL` from changed lines, leaving out tests, snapshots, `docs/verify/**`,
+generated drizzle meta and the lockfile. The rule is one underlying problem
+per PR, and the review judges it; a large diff alone is not a finding.
 A section containing only fenced code or HTML comments is unanswered.
 
 A legacy `## Verified` aliases Proof. The complete legacy six-section shape
@@ -100,16 +99,9 @@ Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
 
-## Pre-push review
+## Review
 
-Before every push of a code change, get a fresh-context review from the other vendor and fix what it confirms before pushing. With Claude as the implementer, run Codex:
-
-```
-git diff origin/main...HEAD > /tmp/review.diff
-codex exec --sandbox read-only "Review /tmp/review.diff against docs/pr-review.md. List only defects with file:line, why it is wrong and a concrete failure. Say NO FINDINGS if there are none." < /dev/null
-```
-
-With Codex as the implementer, run the same prompt through `claude -p --permission-mode default --tools Read,Grep,Glob`. Fix each confirmed finding and rerun the review on the new diff. Record a skipped finding with its reason under Review. Docs-only changes outside protected paths skip this step.
+Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
 
 ## Mechanics
 
@@ -144,10 +136,10 @@ With Codex as the implementer, run the same prompt through `claude -p --permissi
   run it locally on `/tmp/pr.md` before opening.
 - `coordinator-hold` means the coordinator asked for changes: `.mergify.yml`, `coordinator-merge.mjs` and `merge-pr.sh` all refuse the PR while it is on. Keep it on until you have pushed the requested work, then ask the coordinator to remove it.
 - Never add the `needs-decision` label to a PR. Agents decide by their own recommendation, say what they chose and why in chat, and continue; decisions routed to ian follow `AGENTS.md`, "Merge routes". Before asking ian about a PR whose auto-merge is armed, disarm it with `gh pr merge <n> --disable-auto`.
-- Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs and every other route go to ian), with no unchecked tasks anywhere in the body. ian may admin-merge; agents may not use that authority.
+- Before an agent enables merge, require passing CI checks and a pr-gate verdict of go with `mergedBy: 'auto-merge'` (`AGENTS.md`, "Merge routes"; protected-path PRs enter the merge queue with every other green PR), with no unchecked tasks anywhere in the body. ian may admin-merge; an agent uses `--admin` only on a PR ian named in chat, after every required check passes on its head (`AGENTS.md`, "Merge routes").
 - Read the PR opener and every commit author: `gh pr view <n> --json author,commits`. Follow `docs/ops/agent-bot-identity.md` for the identity checks.
 - Bot-opened PRs require exactly one commit authored by `Cairnwright` (`merge-pr.sh` also accepts `cairnwright[bot]` with `Cairn-Thread:` and `Co-authored-by: xiechimon` trailers; see `docs/pr-review.md`, "Merge method by commit author") before a rebase merge. Use the dispatcher's `~/.cairn/tools/merge-pr.sh`; inspect its source and usage on the dispatch host before invoking it. If the helper is unavailable or the commit identity is wrong, stop and return the PR to the dispatcher.
-- PRs that `.mergify.yml` admits (not protected, not owner-routed, a `review-gate` success status and a green `merge-route` check) enter the Mergify merge queue automatically: add the `review-gate` label, then never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Protected and owner-routed PRs keep the human route.
+- PRs that `.mergify.yml` admits (a green `review-gate` check from GitHub Actions and a green `merge-route` check, with no `coordinator-hold` or `needs-decision`) enter the Mergify merge queue automatically: never `gh pr merge` them; the required `Mergify Merge Queue` check refuses a direct merge while a PR is queued. That check and `Mergify Merge Protections` list any unmet condition; a new push dequeues the PR and it re-enters once CI passes again. Path class does not keep a PR on the human route.
 - Human-opened PRs that Mergify does not admit use `gh pr merge <n> --squash --auto` after verifying their commits contain no `cairnwright[bot]` author, on the route `AGENTS.md` gives them. After a merge, read the main commit author and the `commit-author` Actions result.
 - Prepare commits outside the App token wrapper, following `docs/ops/agent-bot-identity.md`. Verify that neither the author name nor email of any prepared commit contains `cairnwright[bot]` before pushing.
 - If main's author check fails, follow the recovery procedure in `docs/ops/agent-bot-identity.md`. Preserve main history. A subsequent compliant push checks its own `BEFORE_SHA..HEAD` range; verify the actual main commit author and Actions result after merging.
@@ -158,7 +150,6 @@ With Codex as the implementer, run the same prompt through `claude -p --permissi
 |---|---|
 | `## Proof`, `## What`, `## Review`, `## Risk` answered, including headings inside details (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
 | at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
-| over 800 non-evidence lines or 40 non-evidence files: `## Size` answered inside the details block | pr-evidence (required check, file list from the PR files API) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

@@ -53,6 +53,7 @@ export { Plus } from './Plus.js';
 export { PlusSmall } from './PlusSmall.js';
 export { Puzzle } from './Puzzle.js';
 export { Restore } from './Restore.js';
+export { Route } from './Route.js';
 export { RuntimeClaudeCode } from './RuntimeClaudeCode.js';
 export { RuntimePi } from './RuntimePi.js';
 export { Search } from './Search.js';

@@ -1,23 +1,23 @@
-import { resolve } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK } from './chief-home-mock';
+import { evidenceShot } from './evidence';
 
 const workbench = (page: Page, name: string) =>
-  page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: name });
+  page.getByRole('complementary').getByRole('button', { name, exact: true });
 
 test.describe('a browser set to English', () => {
   test.use({ locale: 'en-US' });
 
   test('opens the workbench in English with no stored choice', async ({ page }) => {
     await page.goto('/app');
-    await expect(workbench(page, 'Home')).toBeVisible();
+    await expect(workbench(page, 'Search')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 
   test('keeps a stored Chinese choice', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('cairn-locale', 'zh'));
     await page.goto('/app');
-    await expect(workbench(page, '首页')).toBeVisible();
+    await expect(workbench(page, '搜索')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
   });
 });
@@ -27,14 +27,14 @@ test.describe('a browser set to Chinese', () => {
 
   test('opens the workbench in Chinese with no stored choice', async ({ page }) => {
     await page.goto('/app');
-    await expect(workbench(page, '首页')).toBeVisible();
+    await expect(workbench(page, '搜索')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
   });
 
   test('keeps a stored English choice', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('cairn-locale', 'en'));
     await page.goto('/app');
-    await expect(workbench(page, 'Home')).toBeVisible();
+    await expect(workbench(page, 'Search')).toBeVisible();
   });
 });
 
@@ -50,16 +50,10 @@ test.describe('English count grammar', () => {
         await mockLive(page, { threads: [], messages: [], todos: [TASK] });
         await page.goto('/app');
         await expect(page.getByTestId('home-c-since')).toContainText('1 in progress');
-        await page.screenshot({
-          path: resolve(`../../docs/verify/2420/after-home-${width}-${theme}.png`),
-          fullPage: true,
-        });
+        await evidenceShot(page, `after-home-${width}-${theme}.png`);
         await page.goto('/app/team?scenario=team-org-chart-single');
         await expect(page.getByText('1 member', { exact: true })).toBeVisible();
-        await page.screenshot({
-          path: resolve(`../../docs/verify/2420/after-team-${width}-${theme}.png`),
-          fullPage: true,
-        });
+        await evidenceShot(page, `after-team-${width}-${theme}.png`);
       });
     }
   }

@@ -229,9 +229,89 @@ function baseParts() {
     sessionId: 'sid-1',
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
+    inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
   };
 }
+
+describe('buildClaudeSdkOptions permission mode by execution place', () => {
+  test('an orb step bypasses permissions with the SDK opt-in flag', () => {
+    const opts = buildClaudeSdkOptions(baseParts());
+    expect(opts.permissionMode).toBe('bypassPermissions');
+    expect(opts.allowDangerouslySkipPermissions).toBe(true);
+    expect(opts.allowedTools).toBeUndefined();
+  });
+
+  test('a host step never bypasses: only Read, Glob and Grep exist, hooks and plugins off', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+      lockedDown: true,
+      plugins: [{ type: 'local', path: '/skills' }],
+    });
+    expect(opts.permissionMode).toBe('dontAsk');
+    expect(opts.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(opts.tools).toEqual(['Read', 'Glob', 'Grep']);
+    expect(opts.allowedTools).toEqual(['mcp__cairn', 'Read', 'Glob', 'Grep']);
+    expect(opts.settings).toMatchObject({ disableAllHooks: true });
+    expect(opts.plugins).toBeUndefined();
+  });
+
+  test('a host step inherits no user or local settings, no shell and only the cairn MCP server', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+      lockedDown: true,
+      mcpServers: {
+        cairn: { type: 'sdk', name: 'cairn', instance: {} } as never,
+        attached: { type: 'stdio', command: 'sh' },
+      },
+    });
+    expect(opts.settingSources).toEqual(['project']);
+    expect(opts.settings).toMatchObject({
+      disableAllHooks: true,
+      disableSkillShellExecution: true,
+    });
+    expect(opts.disallowedTools).toContain('Bash');
+    expect(opts.strictMcpConfig).toBe(true);
+    expect(Object.keys(opts.mcpServers ?? {})).toEqual(['cairn']);
+  });
+
+  test('a host step that asks for no built-ins keeps none', () => {
+    expect(
+      buildClaudeSdkOptions({ ...baseParts(), inOrb: false, lockedDown: true, builtinTools: [] })
+        .tools,
+    ).toEqual([]);
+  });
+
+  test('a host build step keeps the main behaviour: no lockdown, no bypass flag', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      inOrb: false,
+      lockedDown: false,
+      plugins: [{ type: 'local', path: '/skills' }],
+    });
+    expect(opts.permissionMode).toBe('bypassPermissions');
+    expect(opts.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(opts.allowedTools).toBeUndefined();
+    expect(opts.tools).toBeUndefined();
+    expect(opts.settingSources).toEqual(['user', 'project', 'local']);
+    expect(opts.settings).not.toHaveProperty('disableAllHooks');
+    expect(opts.disallowedTools).toEqual(['AskUserQuestion']);
+    expect(opts.plugins).toEqual([{ type: 'local', path: '/skills' }]);
+  });
+
+  test('an orb step keeps its tools, hooks and plugins', () => {
+    const opts = buildClaudeSdkOptions({
+      ...baseParts(),
+      plugins: [{ type: 'local', path: '/skills' }],
+    });
+    expect(opts.tools).toBeUndefined();
+    expect(opts.settings).not.toHaveProperty('disableAllHooks');
+    expect(opts.plugins).toEqual([{ type: 'local', path: '/skills' }]);
+  });
+});
 
 describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources + deny hard block)', () => {
   test("settingSources always pinned to ['user','project','local'] ('project' = the brief-bearing slot, spec 24)", () => {

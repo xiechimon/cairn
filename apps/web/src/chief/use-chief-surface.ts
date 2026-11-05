@@ -13,8 +13,8 @@ import { activityStore } from '../api/activity.js';
 import {
   useApiMutations,
   useChief,
+  useChiefMessages,
   useChiefThreads,
-  useMessages,
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
@@ -22,6 +22,8 @@ import { liveThinkingStore } from '../api/live-thinking.js';
 import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
+import { useSendKey } from '../api/use-send-key.js';
+import { THREAD_PARAM } from '../board/thread-copy.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
@@ -38,11 +40,19 @@ import {
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
+import { questionActionThread, questionDraftKey, questionDraftStore } from './question-drafts.js';
 
 export type { ChiefView };
 
+export interface ChiefEarlier {
+  loading: boolean;
+  failed: boolean;
+  onLoad: () => void;
+}
+
 export interface ChiefSurface {
   load: CoordinatorLoad;
+  earlier?: ChiefEarlier;
   retry: () => void;
   chiefView: ChiefView;
   setChiefView: (view: ChiefView) => void;
@@ -51,8 +61,12 @@ export interface ChiefSurface {
   chiefBusy: boolean;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
+  onAnswerQuestion?: (input: {
+    requestId: string;
+    answers: AskUserAnswer[];
+    threadId?: string;
+  }) => void;
+  onCancelQuestion?: (requestId: string, threadId?: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
@@ -68,6 +82,7 @@ export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
 function placeOf(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete('chief');
+  params.delete(THREAD_PARAM);
   return `${pathname}?${params.toString()}`;
 }
 
@@ -90,6 +105,7 @@ export function useChiefSurface(
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const notificationsQ = useNotifications(teamId, live);
   const mutations = useApiMutations(teamId);
+  const sendKey = useSendKey();
 
   const chief = fixture.chief;
   const initialChief: ChiefView =
@@ -152,7 +168,10 @@ export function useChiefSurface(
     onHome,
     place,
   ]);
-  const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
+  const { query: chiefMessagesQ, messages: chiefMessages } = useChiefMessages(
+    live ? (activeThread?.id ?? null) : null,
+    live,
+  );
   const streamHandlers = useMemo(
     () => ({
       onMessage: (row: TranscriptRow) => {
@@ -169,11 +188,7 @@ export function useChiefSurface(
     streamHandlers,
   );
   const activeThreadId = live ? (activeThread?.id ?? null) : null;
-  const chiefMessagesData = chiefMessagesQ.data;
-  const knownChiefIds = useMemo(
-    () => new Set((chiefMessagesData?.messages ?? []).map((m) => m.id)),
-    [chiefMessagesData],
-  );
+  const knownChiefIds = useMemo(() => new Set(chiefMessages.map((m) => m.id)), [chiefMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     activeThreadId !== null ? liveTextStore.getVisible(activeThreadId, knownChiefIds) : '',
   );
@@ -189,26 +204,38 @@ export function useChiefSurface(
   const activity = useSyncExternalStore(activityStore.subscribe, () =>
     activeThreadId !== null ? activityStore.get(activeThreadId) : null,
   );
+  const hasEarlier = chiefMessagesQ.hasNextPage;
   const liveChief = useMemo(() => {
     if (!live || !chiefQ.data) return null;
-    return mapChief(chiefQ.data, {
-      threads: liveThreads,
-      activeThreadId: activeThread?.id ?? null,
-      messages: chiefMessagesQ.data?.messages ?? [],
-      liveText,
-      liveThinking,
-      activity,
-    });
+    return {
+      ...mapChief(chiefQ.data, {
+        threads: liveThreads,
+        activeThreadId: activeThread?.id ?? null,
+        messages: chiefMessages,
+        liveText,
+        liveThinking,
+        activity,
+      }),
+      hasEarlier,
+    };
   }, [
     live,
     chiefQ.data,
     liveThreads,
     activeThread,
-    chiefMessagesQ.data,
+    chiefMessages,
+    hasEarlier,
     liveText,
     liveThinking,
     activity,
   ]);
+  const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
+  const loadEarlier = useCallback(() => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
+  const earlier: ChiefEarlier | undefined = live
+    ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
+    : undefined;
 
   const chiefData = live ? (liveChief ?? chiefDefault) : (chief ?? chiefDefault);
   const liveUnread = live
@@ -229,19 +256,36 @@ export function useChiefSurface(
       }
     : undefined;
   const onAnswerQuestion = live
-    ? (input: { requestId: string; answers: AskUserAnswer[] }) => {
-        if (activeThread === null) return;
+    ? (input: { requestId: string; answers: AskUserAnswer[]; threadId?: string }) => {
+        const threadId = questionActionThread(input.threadId, activeThread?.id ?? null);
+        if (threadId === null) return;
+        const key = questionDraftKey({
+          teamId: teamId ?? 'local',
+          conversationId: threadId,
+          requestId: input.requestId,
+        });
+        questionDraftStore.patch(key, { submitting: true, error: null });
         mutations.chiefAnswerQuestion.mutate(
-          { threadId: activeThread.id, ...input },
-          { onError: (e) => toastError(t('提交回答失败，请重试。'), e) },
+          { threadId, requestId: input.requestId, answers: input.answers },
+          {
+            onSuccess: () => questionDraftStore.clear(key),
+            onError: (e) => {
+              questionDraftStore.patch(key, {
+                submitting: false,
+                error: t('提交回答失败，草稿还在，请再试一次。'),
+              });
+              toastError(t('提交回答失败，请重试。'), e);
+            },
+          },
         );
       }
     : undefined;
   const onCancelQuestion = live
-    ? (requestId: string) => {
-        if (activeThread === null) return;
+    ? (requestId: string, threadId?: string) => {
+        const id = questionActionThread(threadId, activeThread?.id ?? null);
+        if (id === null) return;
         mutations.chiefCancelQuestion.mutate(
-          { threadId: activeThread.id, requestId },
+          { threadId: id, requestId },
           { onError: (e) => toastError(t('取消提问失败，请重试。'), e) },
         );
       }
@@ -280,9 +324,15 @@ export function useChiefSurface(
 
   const onSend = live
     ? (text: string, projectId: string | null) => {
+        const { key } = sendKey.attempt([projectId ?? '', text].join('\n'), 'chief');
         return mutations.chiefSend
-          .mutateAsync({ threadId: activeThread?.id ?? null, content: text, projectId })
-          .then(() => undefined)
+          .mutateAsync({
+            threadId: activeThread?.id ?? null,
+            content: text,
+            projectId,
+            clientMessageId: key,
+          })
+          .then(() => sendKey.settle())
           .catch((error: unknown) => {
             toastError(t('发送失败，请重试。'), error);
             throw error;
@@ -310,6 +360,7 @@ export function useChiefSurface(
 
   return {
     load,
+    earlier,
     retry,
     chiefView,
     setChiefView,

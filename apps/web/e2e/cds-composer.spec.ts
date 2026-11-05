@@ -15,8 +15,6 @@ test('CDS composer: 14px radius, shadow-composer ladder, 8px send, 384 max-h', a
     const root = getComputedStyle(document.documentElement);
     const send = el.querySelector('.composer-send');
     const sendCs = send ? getComputedStyle(send) : null;
-    const bubble = document.querySelector('[data-testid="user-bubble"]');
-    const bubbleCs = bubble ? getComputedStyle(bubble) : null;
     return {
       radius: cs.borderTopLeftRadius,
       border: cs.borderTopWidth,
@@ -25,7 +23,6 @@ test('CDS composer: 14px radius, shadow-composer ladder, 8px send, 384 max-h', a
       radiusComposer: root.getPropertyValue('--radius-composer').trim(),
       composerMaxH: root.getPropertyValue('--composer-max-h').trim(),
       sendRadius: sendCs?.borderTopLeftRadius ?? '',
-      bubbleAnim: bubbleCs?.animationName ?? '',
     };
   });
 
@@ -37,7 +34,6 @@ test('CDS composer: 14px radius, shadow-composer ladder, 8px send, 384 max-h', a
   expect(m.shadow).toContain('0px 0px 0px 1px');
   expect(m.composerShadow).toContain('0px 0px 0px 1px');
   expect(m.sendRadius).toBe('8px');
-  expect(m.bubbleAnim).toContain('message-fade-up');
 });
 
 const TEAM_ID = 'team-1';
@@ -140,7 +136,7 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
 }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('[data-testid="composer-card"]');
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
 
@@ -171,7 +167,7 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
 test('CDS composer: a wrapped single paragraph also clears the toolbar', async ({ page }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('[data-testid="composer-card"]');
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
 
@@ -198,7 +194,7 @@ test('CDS composer: a width change that wraps the draft re-reserves toolbar clea
 }) => {
   await stubLiveDetail(page);
   await page.goto(`/app/todo/${CARD_ID}`);
-  const card = page.locator('[data-testid="composer-card"]');
+  const card = page.locator('.side-panel [data-testid="composer-card"]');
   const input = card.locator('textarea');
   await expect(input).toBeVisible();
 
@@ -208,12 +204,12 @@ test('CDS composer: a width change that wraps the draft re-reserves toolbar clea
   const wide = await card.evaluate((el) => el.getBoundingClientRect().height);
   expect(Math.round(wide)).toBe(86);
 
-  await page.setViewportSize({ width: 900, height: 732 });
+  await page.setViewportSize({ width: 360, height: 732 });
 
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const cardEl = document.querySelector('[data-testid="composer-card"]')!;
+        const cardEl = document.querySelector('.side-panel [data-testid="composer-card"]')!;
         const ta = cardEl.querySelector('textarea')!;
         const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
         const linesWrapped = ta.scrollHeight > 60;

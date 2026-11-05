@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -47,9 +48,9 @@ async function stubBoot(page: Page) {
 
 async function openChiefComposer(page: Page) {
   await stubBoot(page);
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
 
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
   await expect(input).toBeEditable();
@@ -131,21 +132,22 @@ test('live face: minimize and SPA route switches keep the draft (D6 zero regress
   page,
 }) => {
 
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
   const { drawer, input } = await openChiefComposer(page);
   await input.fill(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
 
   await drawer.getByRole('button', { name: '最小化' }).click();
   await expect(drawer).toBeHidden();
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   await expect(input).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
 
-  await page.getByRole('link', { name: '技能' }).click();
-  await expect(page).toHaveURL(/\/app\/resources\/skills/);
+  await page.getByTestId('sidebar-settings').click();
+  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '技能' }).click();
+  await expect(page).toHaveURL(/\/app\/settings\/skills/);
+  await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭设置' }).click();
   await expect(input).toHaveValue(DRAFT);
-  await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
+  await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue(DRAFT);
   await evidenceShot(page, 'd6-legs-draft-intact.png');
@@ -157,7 +159,7 @@ test('fixture face: zero writes, zero reads (A0 S11 shape)', async ({ page }) =>
     ([key, value]) => localStorage.setItem(key, value),
     [DRAFT_KEY, 'SEEDED-BY-TEST'],
   );
-  await page.goto('/app?view=board&scenario=111');
+  await page.goto('/app/schedules?scenario=111');
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
 

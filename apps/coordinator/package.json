@@ -1,0 +1,27 @@
+{
+  "name": "@cairn/coordinator",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "dev": "node --import tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cairn/shared": "workspace:*",
+    "@earendil-works/chord": "1.5.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "@earendil-works/pi-durable": "1.5.0",
+    "@earendil-works/pi-schema": "1.5.0"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

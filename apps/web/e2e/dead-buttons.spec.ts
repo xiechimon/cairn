@@ -1,79 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
-test('feedback route is gone — old URL redirects to the board', async ({ page }) => {
+test('feedback route is gone — old URL redirects to the home', async ({ page }) => {
   await page.goto('/app/feedback');
   await expect(page).toHaveURL('/app');
   await expect(page.locator('[data-route="feedback"]')).toHaveCount(0);
-});
-
-test('user menu drops its dead rows — `反馈` (#149), `新功能/快捷键` (#163)', async ({ page }) => {
-  await page.goto('/app?view=board');
-  await page.locator('.sidebar-user').click();
-  const menu = page.locator('.user-menu');
-  await expect(menu).toBeVisible();
-
-  for (const dead of ['反馈', '新功能', '快捷键']) {
-    await expect(menu).not.toContainText(dead);
-  }
-
-  for (const live of ['外观', '账号', 'API 密钥', 'MCP']) {
-    await expect(menu).toContainText(live);
-  }
-  await expect(menu.locator('a.user-menu-row')).toHaveCount(3);
-});
-
-test('board topbar drops the `看板指南` button — right actions = `筛选` / `定时`, `新任务` lives in the new-task bar (#363, claude shell)', async ({
-  page,
-}) => {
-  await page.goto('/app?view=board');
-
-  await expect(page.locator('.board-guide')).toHaveCount(0);
-  await expect(page.locator('.board-guide-wrap')).toHaveCount(0);
-  await expect(page.locator('.board-guide-pop')).toHaveCount(0);
-  await expect(page.locator('[aria-label="看板指南"]')).toHaveCount(0);
-
-  const actions = page.locator('.board-topbar-actions');
-  await expect(actions).toBeVisible();
-  await expect(actions.getByRole('button')).toHaveCount(1);
-  await expect(actions.getByRole('link')).toHaveCount(1);
-  await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
-  await expect(actions.getByRole('button', { name: '任务面板' })).toHaveCount(0);
-  await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
-  await expect(actions.getByRole('button', { name: '新任务' })).toHaveCount(0);
-
-  const bar = page.getByTestId('board-new-task-bar');
-  await expect(bar).toBeVisible();
-  await expect(bar).toContainText('新任务：接下来让 agent 做什么？');
-  await bar.click();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
-});
-
-test('board renders exactly the four #351 columns, retired names and collapse family gone', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=01&view=board');
-
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('看板');
-
-  await expect(page.locator('.board-column')).toHaveCount(4);
-  for (const [id, name] of [
-    ['todo', '待开始'],
-    ['building', '执行中'],
-    ['pending', '待处理'],
-    ['done', '已完成'],
-  ] as const) {
-    await expect(
-      page.locator(`.board-column[data-column="${id}"] .board-column-name`),
-    ).toHaveText(name);
-  }
-
-  for (const retired of ['规划中', '待确认', '待验收']) {
-    await expect(page.locator('.board-column-name', { hasText: retired })).toHaveCount(0);
-  }
-
-  await expect(page.locator('.board-column-collapse')).toHaveCount(0);
-  await expect(page.locator('.board-column-strip')).toHaveCount(0);
-  await expect(page.locator('.board-column--collapsed')).toHaveCount(0);
 });
 
 test('project files pane: no export button, static branch chip, wired `文件|历史` segment', async ({
@@ -128,25 +59,12 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(dialog).toBeVisible();
 
   await dialog.getByRole('radio', { name: '每周' }).click();
-  await expect(dialog.locator('.sched-form-freq-tab[aria-checked="true"]')).toHaveText('每周');
+  await expect(dialog.getByRole('radio', { checked: true })).toHaveText('每周');
   await dialog.getByRole('button', { name: '保存' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator('.sched-card')).toHaveCount(1);
 
   await expect(page.locator('.sched-card')).toContainText('每周运行');
-});
-
-test('doc pane title reads `变更` and re-selecting it keeps the pane (#306)', async ({
-  page,
-}) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-  const title = page.getByTestId('pane-title');
-  await expect(title).toHaveText('变更');
-  await expect(page.getByTestId('pane-view-changes')).toHaveAttribute('aria-pressed', 'true');
-  await title.click();
-  await page.getByRole('menuitem', { name: '变更' }).click();
-  await expect(page.getByTestId('doc-pane')).toBeVisible();
-  await expect(page.locator('.overlay-actions button', { hasText: '复用方案' })).toHaveCount(0);
 });
 
 test('machines rows carry only live controls, no dead inline buttons (#222 shipped + #1108 narrowed)', async ({
@@ -168,18 +86,6 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
 
   await expect(toolbar.locator('button[aria-label="语音输入"]')).toHaveCount(0);
   await expect(toolbar.locator('button[aria-label="添加附件"]')).toBeVisible();
-});
-
-test('new-task dialog tools drop the `语音输入` button, keep the attachment tool', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
-  await page.locator('.sidebar-new-task').click();
-
-  const tools = page.getByTestId('new-task-tools');
-  await expect(tools).toBeVisible();
-
-  await expect(tools.getByRole('button', { name: '语音输入' })).toHaveCount(0);
-  await expect(tools.getByRole('button')).toHaveCount(1);
-  await expect(tools.getByRole('button', { name: '添加附件' })).toBeVisible();
 });
 
 test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {
@@ -261,7 +167,8 @@ test('mcp page is read-only: no create entry, no per-row more-menu ink, empty st
   await page.goto('/app/resources/mcp-servers?scenario=07');
   await expect(page.locator('[data-testid="resource-row"][data-mcp]')).toHaveCount(1);
   await expect(page.locator('[data-testid="resource-row"] button')).toHaveCount(0);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
 });
 
@@ -290,7 +197,7 @@ test('project settings drops the avatar `更换` ink (#307, supersedes the #177 
 test('chief drawer drops the ⋮ `更多` button and the new-topic button — thread view keeps two head actions (#306, #2531)', async ({
   page,
 }) => {
-  await page.goto('/app?scenario=114&view=board');
+  await page.goto('/app/schedules?scenario=114');
   const drawer = page.locator('.chief-drawer');
 
   const actions = drawer
@@ -372,6 +279,7 @@ test('account drops the `更换` button, keeps the avatar head (#306 wontfix shi
 
 test('transcript work summary collapses and re-expands call rows', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28');
+  await expandTurns(page);
   const summary = page.getByTestId('work-summary');
   await expect(page.getByTestId('work-call')).toHaveCount(2);
   await expect(summary).toHaveAttribute('aria-expanded', 'true');
@@ -387,7 +295,7 @@ const REVIEW_DETAIL = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
 test('more menu `完成` opens the accept dialog on the review surface (#318)', async ({ page }) => {
   await page.goto(REVIEW_DETAIL);
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
 
   const menu = page.getByRole('menu', { name: '更多' });
   await expect(menu).toBeVisible();
@@ -402,51 +310,24 @@ test('more menu `完成` opens the accept dialog on the review surface (#318)', 
 test('more menu `关闭` is phase-gated by the server funnel edges (#318)', async ({ page }) => {
 
   await page.goto(REVIEW_DETAIL);
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await expect(page.getByRole('menuitem', { name: '关闭' })).toBeDisabled();
 
   await page.goto('/app/todo/r8-12?scenario=54');
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   const closeRow = page.getByRole('menuitem', { name: '关闭' });
   await expect(closeRow).toBeEnabled();
 
   await expect(page.getByRole('menuitem', { name: '完成' })).toBeDisabled();
   await closeRow.click();
-  await expect(page).toHaveURL('/app');
+  await expect(page.getByRole('menu')).toHaveCount(0);
 });
 
 test('todo-phase `开始` fires orchestration directly — no start dialog (#640)', async ({ page }) => {
 
   await page.goto('/app/todo/fresh-probe?scenario=23');
-  await page.locator('.detail-head-action').click();
+  await page.getByTestId('side-chat-action').getByRole('button').last().click();
   await expect(page.locator('.overlay-title')).toHaveCount(0);
-});
-
-test('failed rerun dialog is the slim single-exit face — no agent selector, no split switch, no plan/run branch (#640)', async ({
-  page,
-}) => {
-
-  await page.goto('/app/todo/r8-12?scenario=56');
-  await expect(page.locator('.overlay-title')).toHaveText('开始任务');
-  await expect(page.locator('.rerun-agent-row')).toHaveCount(0);
-  await expect(page.locator('.rerun-switch')).toHaveCount(0);
-  await expect(page.locator('.overlay-actions button', { hasText: '先做规划' })).toHaveCount(0);
-  await expect(page.locator('.overlay-actions button', { hasText: '立即执行' })).toHaveCount(0);
-
-  await expect(page.locator('.overlay-actions button', { hasText: '重跑' })).toBeVisible();
-  await expect(page.locator('.overlay-actions button', { hasText: '复用方案' })).toHaveCount(0);
-});
-
-test('reuse panel `查看方案` flips the doc pane to the plan face (#318)', async ({ page }) => {
-  await page.goto('/app/todo/r8-15?scenario=75');
-  await expect(page.locator('.overlay-title')).toHaveText('复用方案');
-
-  await expect(page.getByTestId('pane-title')).toHaveText('变更');
-
-  await page.locator('.overlay-actions button', { hasText: '查看方案' }).click();
-
-  await expect(page.locator('.overlay')).toBeHidden();
-  await expect(page.locator('.doc-empty')).toContainText('暂无方案');
 });
 
 test('project task rows and cards are real links that open the todo detail (#318, #2531)', async ({ page }) => {
@@ -457,10 +338,10 @@ test('project task rows and cards are real links that open the todo detail (#318
   await expect(row.locator('a.prj-task-link')).toHaveCount(1);
   await expect(row.locator('a.prj-task-link')).toHaveAttribute(
     'href',
-    /\/app\/todo\/[^?]+\?scenario=prj-tasks&tab=tasks/,
+    /^\/app\?scenario=prj-tasks&thread=[^&]+$/,
   );
   await row.click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
+  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
 
   await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks');
   await page.locator('.prj-tasks-view-btn').nth(1).click();
@@ -468,77 +349,14 @@ test('project task rows and cards are real links that open the todo detail (#318
   await expect(card).toBeVisible();
   await expect(card.locator('a.prj-task-link')).toHaveCount(1);
   await card.click();
-  await expect(page).toHaveURL(/\/app\/todo\/[^?]+\?scenario=prj-tasks/);
-});
-
-test('new-task dialog: the close control anchors to the head’s right edge (#574 re-key debt)', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=01&view=board');
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  await page.locator('.sidebar-new-task').click();
-  await expect(dialog).toBeVisible();
-  // #656: settle the dialog enter animation (tw-animate-css zoom-in-95) before the
-  // head/close right-edge geometry is measured off the laid-out box.
-  await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-  const hb = await dialog.getByTestId('new-task-head').boundingBox();
-  const cb = await dialog.getByRole('button', { name: '关闭' }).boundingBox();
-  if (hb === null || cb === null) throw new Error('head / close not laid out');
-
-  expect(Math.abs(hb.x + hb.width - (cb.x + cb.width) - 4)).toBeLessThan(1.5);
-  expect(cb.width).toBeCloseTo(28, 0);
-  expect(cb.height).toBeCloseTo(28, 0);
-});
-
-test('new-task dialog gates unsaved closes and resets on discard (#318)', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
-  const dialog = page.getByRole('dialog', { name: '新建任务' });
-  const discard = page.getByRole('alertdialog', { name: '放弃新建任务？' });
-
-  await page.locator('.sidebar-new-task').click();
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(discard).toHaveCount(0);
-
-  await page.locator('.sidebar-new-task').click();
-  await dialog.getByRole('textbox').fill('未保存探针');
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(discard).toBeVisible();
-  await expect(discard).toContainText('放弃新建任务？');
-  await expect(discard).toContainText('未保存的内容将丢失。');
-
-  await discard.getByRole('button', { name: '继续编辑' }).click();
-  await expect(discard).toBeHidden();
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('textbox')).toHaveValue('未保存探针');
-
-  await page.keyboard.press('Escape');
-  await expect(discard).toBeVisible();
-  await expect(discard.getByRole('button', { name: '继续编辑' })).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(discard).toBeHidden();
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await discard.getByRole('button', { name: '放弃并关闭' }).click();
-  await expect(dialog).toBeHidden();
-  await page.locator('.sidebar-new-task').click();
-  await expect(dialog.getByRole('textbox')).toHaveValue('');
+  await expect(page).toHaveURL(/\/app\?scenario=prj-tasks&thread=/);
 });
 
 test('detail transcript action rows carry no restore glyph (#884)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
-  // Positive control: the action-row family still renders and the copy is
-  // still the real button (#634) — the absence assertions below must not
-  // pass vacuously on a page that failed to render.
+  await expandTurns(page);
   await expect(page.locator('.chat-row-icons .chat-copy').first()).toBeVisible();
-  // The dead shape is gone from every action row of the transcript column,
-  // identified by the Restore glyph's own outline (icons/Restore.tsx).
   await expect(page.locator('.chat-col path[d^="M3 12a9"]')).toHaveCount(0);
-  // The user row's action row is exactly the copy button: one glyph, and
-  // it sits inside its button (the task-start bubble row carries a
-  // taskline between the bubble and the action row).
   const userRow = page.locator('.chat-row:has(.chat-bubble) ~ .chat-row-icons').first();
   await expect(userRow.locator('svg')).toHaveCount(1);
   await expect(userRow.locator('button svg')).toHaveCount(1);
@@ -548,6 +366,7 @@ test('fail row `查看原始错误` opens the raw-error dialog with the full tex
   page,
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
+  await expandTurns(page);
 
   await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的机器已离线');
   await page.getByRole('button', { name: '查看原始错误' }).click();
@@ -566,6 +385,7 @@ test('fail row drops the `排查指南` dead link — no doc target, no shape (#
   page,
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
+  await expandTurns(page);
 
   await expect(page.locator('.chat-para--fail')).toBeVisible();
 

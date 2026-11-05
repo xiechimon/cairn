@@ -1,20 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-const QUOTA = '/app?scenario=quota-wait&view=board';
+const QUOTA = '/app?scenario=quota-wait';
 
-test('suspended card carries the `等额度` chip, plain building cards do not (two pins of the card state)', async ({ page }) => {
-  await page.goto(QUOTA);
-  const waiting = page.locator('[data-todo-id="quota-waiting-1"]');
-  await expect(waiting).toBeVisible();
-
-  await expect(waiting.locator('[data-todo-quota="quota"]')).toHaveText('等额度');
-
-  const plain = page.locator('[data-todo-id="quota-plain-1"]');
-  await expect(plain).toBeVisible();
-  await expect(plain.locator('[data-todo-quota]')).toHaveCount(0);
-});
-
-test('board banner names the relay lane and the event type (banner half)', async ({ page }) => {
+test('home banner names the relay lane and the event type', async ({ page }) => {
   await page.goto(QUOTA);
   const banner = page.locator('[data-quota-banner]');
 
@@ -25,14 +13,13 @@ test('board banner names the relay lane and the event type (banner half)', async
   await expect(banner).toContainText(/\d{2}:\d{2} 自动探测/);
 });
 
-test('detail header chip says `等额度` not `执行中` (header half of the card state)', async ({ page }) => {
-  await page.goto(QUOTA);
-  await page.locator('[data-todo-id="quota-waiting-1"] .todo-card-link').click();
-  await expect(page.getByTestId('phase-chip')).toContainText('等额度');
+test('side chat status says `等额度` not `运行中`', async ({ page }) => {
+  await page.goto('/app/todo/quota-waiting-1?scenario=quota-wait');
+  await expect(page.getByTestId('side-chat-status')).toContainText('等额度');
 });
 
-test('no-suspend baseline: 01 scenario board has zero banners and zero chips (legacy zero regression)', async ({ page }) => {
-  await page.goto('/app?scenario=01&view=board');
+test('no-suspend baseline: the 01 scenario home has zero quota banners (legacy zero regression)', async ({ page }) => {
+  await page.goto('/app?scenario=01');
+  await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.locator('[data-quota-banner]')).toHaveCount(0);
-  await expect(page.locator('[data-todo-quota]')).toHaveCount(0);
 });

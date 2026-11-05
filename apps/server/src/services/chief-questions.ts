@@ -17,7 +17,7 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { notifyChiefMessage } from './notifications.js';
-import { pickedProjectIdOf } from './picked-project.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 
 export interface ChiefQuestionDeps {
@@ -67,11 +67,11 @@ function readQuestion(db: Db, threadId: string, requestId: string): AskUserQuest
 
 function askingTurnProjectId(db: Db, threadId: string): string | null {
   const turn = db
-    .select({ prompt: step.prompt })
+    .select({ prompt: step.prompt, scopeProjectId: step.scopeProjectId })
     .from(step)
     .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
     .get();
-  return pickedProjectIdOf(turn?.prompt ?? null);
+  return turn === undefined ? null : stepScopeProjectId(turn);
 }
 
 function questionAskedAt(db: Db, threadId: string, requestId: string): number | null {
@@ -129,7 +129,12 @@ function publishRow(deps: ChiefQuestionDeps, threadId: string, requestId: string
 
 export function createOrGetQuestion(
   deps: ChiefQuestionDeps,
-  input: { threadId: string; requestId: string; questions: AskUserQuestion[] },
+  input: {
+    threadId: string;
+    requestId: string;
+    questions: AskUserQuestion[];
+    provenance?: string;
+  },
 ): { content: AskUserQuestionContent; created: boolean } {
   if (!isChiefConversationId(input.threadId)) {
     throw new HttpError(400, `thread ${input.threadId} is not a chief thread`);
@@ -142,9 +147,8 @@ export function createOrGetQuestion(
     status: 'pending',
     questions: input.questions,
     answers: null,
+    ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
   };
-  writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
-  publishRow(deps, input.threadId, input.requestId);
   const threadRow = deps.db
     .select()
     .from(chiefThread)
@@ -158,18 +162,22 @@ export function createOrGetQuestion(
     chiefRow?.agentId !== undefined && chiefRow.agentId !== null
       ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
       : undefined;
-  if (deps.hub !== undefined && deps.user !== undefined) {
-    notifyChiefMessage(
-      { db: deps.db, hub: deps.hub, user: deps.user },
-      {
-        threadId: input.threadId,
-        message: input.questions[0]?.question ?? '',
-        ...(agentRow
-          ? { agent: { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl } }
-          : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
-      },
-    );
-  }
+  deps.db.transaction(() => {
+    writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
+    if (deps.hub !== undefined && deps.user !== undefined) {
+      notifyChiefMessage(
+        { db: deps.db, hub: deps.hub, user: deps.user },
+        {
+          threadId: input.threadId,
+          message: input.questions[0]?.question ?? '',
+          ...(agentRow
+            ? { agent: { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl } }
+            : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
+        },
+      );
+    }
+  });
+  publishRow(deps, input.threadId, input.requestId);
   if (deps.user !== undefined && deps.vapidKeys != null) {
     const questionLines = input.questions.map((q) => {
       const options = q.options.map((o) => o.label).join(' / ');

@@ -5,7 +5,6 @@ import {
   FolderGit2,
   Inbox,
   LayoutGrid,
-  Moon,
   Plus,
   Search,
   Sparkles,
@@ -29,13 +28,11 @@ import {
   SidebarThreadList,
   SidebarThreadRow,
 } from '../components/shell/sidebar-project.js';
-import { SidebarUser } from '../components/shell/sidebar-user.js';
 import { GoalLine } from '../components/stream/goal-line.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { StreamDigest } from '../components/stream/stream-digest.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { Button } from '../components/ui/button.js';
-import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { Section, Specimen } from './specimen.js';
 
@@ -51,7 +48,7 @@ export function SidebarSection() {
         title="Sidebar"
         note="Click a project"
         stage="canvas"
-        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" tone={0} waiting={2} active />\n<SidebarThreadList><SidebarThreadRow title="Snooze until needed" tone="waiting" open /></SidebarThreadList>\n<SidebarUser name="ian" avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-6" />} machinesOnline={2} />`}
+        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" tone={0} waiting={2} active />\n<SidebarThreadList><SidebarThreadRow title="Snooze until needed" tone="waiting" open /></SidebarThreadList>`}
       >
         <div className="flex w-62 flex-col gap-0.5 py-1">
           <SidebarNavRow icon={<Plus className="size-4" />} label="New" shortcut="C" />
@@ -115,21 +112,6 @@ export function SidebarSection() {
             waiting={1}
             active={active === 'docs'}
             onClick={() => setActive('docs')}
-          />
-          <SidebarUser
-            avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-6" />}
-            name="ian"
-            machinesOnline={2}
-            action={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Toggle theme"
-                onClick={() => toastSuccess('Theme toggled')}
-              >
-                <Moon />
-              </Button>
-            }
           />
         </div>
       </Specimen>
@@ -331,8 +313,8 @@ const ROUTING_JOBS: RoutingJob[] = [
 ];
 
 const ROUTING_CONNECTIONS: RoutingConnection[] = [
-  { id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 38, week: 22 } },
-  { id: 'codex', name: 'Codex', tier: 'Pro', quota: { fiveHour: 86, week: 61 } },
+  { id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } },
+  { id: 'codex', name: 'Codex', tier: 'Pro', quota: { fiveHour: 14, week: 39 } },
   { id: 'openrouter', name: 'OpenRouter key', unavailable: true },
 ];
 
@@ -342,12 +324,12 @@ export function RoutingSection() {
     <Section
       id="routing"
       title="Model routing parts"
-      lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows its 5-hour and weekly quota. A bar turns ochre from 80%."
+      lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows how much of its 5-hour and weekly quota is left. A bar turns ochre at 20% left."
     >
       <Specimen
         title="Routing nodes and quota bar"
         stage="canvas"
-        code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 38, week: 22 } }]} />`}
+        code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } }]} />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-4">
           <SegmentedRadio

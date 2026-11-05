@@ -462,7 +462,7 @@ const RETIRED_SLOTS = {
 // Geometry / motion / font tokens are not color slots — keep them out of the
 // color-slot universe on both sides so the flip/new/retired diff is clean.
 const NONCOLOR =
-  /^--(radius|radius-popover|edge-radius|edge-ring|edge-shadow|card-shadow|dialog-shadow|plate-shadow|drag-shadow|chief-shadow|fab-shadow|pad-card|pad-page|row-h|font-|label-|title-|dur-|ease-|z-|board-col-min)/;
+  /^--(radius|radius-popover|edge-radius|edge-ring|edge-shadow|card-shadow|dialog-shadow|plate-shadow|drag-shadow|chief-shadow|pad-card|pad-page|row-h|font-|label-|title-|dur-|ease-|z-|board-col-min)/;
 const isColor = (n) => n.startsWith('--') && !NONCOLOR.test(n);
 
 for (const mode of ['dark', 'light']) {

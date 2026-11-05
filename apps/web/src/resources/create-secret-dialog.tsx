@@ -2,6 +2,14 @@ import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 import { FORM_TEXTAREA_CLS } from './parts.js';
@@ -9,19 +17,38 @@ import { FORM_TEXTAREA_CLS } from './parts.js';
 interface CreateSecretDialogProps {
   open?: boolean;
   onClose: () => void;
-  onCreate?: (input: { name: string; description?: string; value: string }) => void;
+  onCreate?: (input: {
+    name: string;
+    description?: string;
+    value: string;
+    projectId?: string;
+  }) => void;
+  projects?: readonly { id: string; name: string }[];
+  defaultProjectId?: string | null;
 }
 
-export function CreateSecretDialog({ open, onClose, onCreate }: CreateSecretDialogProps) {
+export function CreateSecretDialog({
+  open,
+  onClose,
+  onCreate,
+  projects = [],
+  defaultProjectId = null,
+}: CreateSecretDialogProps) {
   const { t } = useI18n();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [value, setValue] = useState('');
+  const [scope, setScope] = useState(defaultProjectId ?? '');
   const submit = () => {
     const trimmed = name.trim();
     if (trimmed === '' || value === '') return;
     if (onCreate != null) {
-      onCreate({ name: trimmed, description: description.trim() || undefined, value });
+      onCreate({
+        name: trimmed,
+        description: description.trim() || undefined,
+        value,
+        ...(scope !== '' ? { projectId: scope } : {}),
+      });
     } else {
       onClose();
     }
@@ -57,6 +84,40 @@ export function CreateSecretDialog({ open, onClose, onCreate }: CreateSecretDial
             placeholder="STRIPE_API_KEY"
           />
         </FormField>
+        {projects.length > 0 && (
+          <FormField
+            label={t('范围')}
+            htmlFor="dlg-secret-scope"
+            help={t('项目密钥只发给该项目的 thread，同名时优先于团队密钥。')}
+          >
+            <Select
+              items={[
+                { value: '', label: t('全团队') },
+                ...projects.map((project) => ({ value: project.id, label: project.name })),
+              ]}
+              value={scope}
+              onValueChange={(next) => setScope(next ?? '')}
+            >
+              <SelectTrigger
+                id="dlg-secret-scope"
+                data-testid="secret-scope"
+                className={FORM_CONTROL_CLS}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="">{t('全团队')}</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormField>
+        )}
         <FormField label={t('描述（可选）')} htmlFor="dlg-secret-desc">
           <Input
             id="dlg-secret-desc"

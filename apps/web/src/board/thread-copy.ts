@@ -1,5 +1,6 @@
 import type { StoneTone } from '../components/stone/tone.js';
 import type { TodoRecord } from '../fixtures/records.js';
+import { STATUS_WORDS } from './status-words.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
 
@@ -31,8 +32,17 @@ export function threadStatus(todo: TodoRecord): ThreadStatus {
   }
 }
 
-export function threadHref(id: string): string {
-  return `/app/todo/${id}`;
+export const THREAD_PARAM = 'thread';
+
+export function threadHref(id: string, homeSearch: string): string {
+  const params = new URLSearchParams(homeSearch);
+  params.set(THREAD_PARAM, id);
+  return `/app?${params.toString()}`;
+}
+
+export function threadHrefFrom(id: string, search: string): string {
+  const scenario = new URLSearchParams(search).get('scenario');
+  return threadHref(id, scenario === null ? '' : new URLSearchParams({ scenario }).toString());
 }
 
 export interface ThreadCopy {
@@ -43,26 +53,32 @@ export interface ThreadCopy {
 
 export function threadCopy(todo: TodoRecord): ThreadCopy {
   if (todo.awaitingReply === true) {
-    return { state: '待你处理', reason: '在问你一个问题。', primary: '回答' };
+    return { state: STATUS_WORDS.needsYou, reason: '在问你一个问题。', primary: '回答' };
   }
   switch (todo.phase) {
     case 'confirm':
-      return { state: '待你处理', reason: '计划已就绪，批准后开工。', primary: '看计划' };
+      return {
+        state: STATUS_WORDS.needsYou,
+        reason: '计划已就绪，批准后开工。',
+        primary: '看计划',
+      };
     case 'review':
-      return { state: '等你审阅', reason: '已就绪，等你审阅。', primary: '审阅' };
+      return { state: STATUS_WORDS.needsYou, reason: '已就绪，等你审阅。', primary: '审阅' };
     case 'failed':
-      return { state: '待你处理', reason: '失败了，打开它重试。' };
+      return { state: STATUS_WORDS.failed, reason: '失败了，打开它重试。' };
     case 'queued':
-      return { state: '运行中', reason: '排队等机器。' };
+      return { state: STATUS_WORDS.running, reason: '排队等机器。' };
     case 'planning':
-      return { state: '运行中', reason: '正在写计划。' };
+      return { state: STATUS_WORDS.running, reason: '正在写计划。' };
     case 'building':
-      return { state: '运行中', reason: '正在动手。' };
+      return { state: STATUS_WORDS.running, reason: '正在动手。' };
     case 'done':
     case 'closed':
-      return { state: '已解决', reason: '已完成。' };
+      return todo.verified === true
+        ? { state: STATUS_WORDS.verified, reason: '验证通过。' }
+        : { state: STATUS_WORDS.doneUnverified, reason: '完成了，还没有验证结论。' };
     case 'todo':
-      return { state: '空闲', reason: '还没开始。' };
+      return { state: STATUS_WORDS.idle, reason: '还没开始。' };
   }
 }
 

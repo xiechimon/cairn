@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -94,7 +95,7 @@ const DONE = todo({
   hasPlan: true,
 });
 
-type Sent = { content: string; projectId?: string };
+type Sent = { content: string; projectId?: string; clientMessageId?: string };
 
 async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
   await page.addInitScript(() => {
@@ -185,8 +186,8 @@ const input = (page: Page) => drawer(page).getByTestId('chief-composer-input');
 const homeInput = (page: Page) => page.getByTestId('home-c').getByTestId('chief-composer-input');
 
 async function openDrawer(page: Page) {
-  await page.goto('/app?view=board');
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await page.goto('/app/schedules');
+  await openChiefWindow(page);
   await expect(drawer(page)).toBeVisible();
 }
 
@@ -197,13 +198,13 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     const state = await mockLive(page);
     await openDrawer(page);
     await expect(chip(page)).toHaveText(/自动/);
-    await expect(chip(page)).toHaveAttribute('aria-label', '发给哪个项目：自动，由总管判断');
+    await expect(chip(page)).toHaveAttribute('aria-label', '发给哪个项目：自动，由 Coordinator 判断');
     await chip(page).click();
     const menu = page.getByRole('menu', { name: '发给哪个项目' });
     await expect(menu).toBeVisible();
     const items = menu.getByRole('menuitemradio');
     await expect(items).toHaveCount(4);
-    await expect(items.nth(0)).toContainText('总管判断，拿不准会问你');
+    await expect(items.nth(0)).toContainText('Coordinator 判断，拿不准会问你');
     await expect(items.nth(0)).toHaveAttribute('aria-checked', 'true');
     await expect(items.nth(2)).toContainText('官网 cairn.xmon.me');
     await shot(page, 'chip-menu.png');
@@ -214,7 +215,7 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     await input(page).press('Enter');
     await expect
       .poll(() => state.sent)
-      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2' }]);
+      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
     await expect(chip(page)).toHaveText(/cairn-site/);
     await shot(page, 'chip-picked.png');
   });
@@ -232,7 +233,7 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     await expect(chip(page)).toHaveText(/自动/);
     await input(page).fill('早上的摘要没收到');
     await input(page).press('Enter');
-    await expect.poll(() => state.sent).toEqual([{ content: '早上的摘要没收到' }]);
+    await expect.poll(() => state.sent).toEqual([{ content: '早上的摘要没收到', clientMessageId: expect.any(String) }]);
   });
 
   test('typing @ and picking a project sets the chip and leaves no @ text behind', async ({
@@ -252,7 +253,7 @@ test.describe('the drawer composer picks a project (T6 #2009)', () => {
     await input(page).press('Enter');
     await expect
       .poll(() => state.sent)
-      .toEqual([{ content: '修一下链接', projectId: 'proj-2' }]);
+      .toEqual([{ content: '修一下链接', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
   });
 
   test('a team with one project shows no chip', async ({ page }) => {
@@ -268,29 +269,77 @@ test.describe('the home sends to the project it is filtered to (#2531)', () => {
     page,
   }) => {
     const state = await mockLive(page);
-    await page.goto('/app?project=proj-2');
+    await page.goto('/app?project=proj-2&chat=1');
     await expect(homeInput(page)).toHaveAttribute('placeholder', /cairn-site/);
     await expect(page.getByTestId('home-c').getByTestId('chief-project-chip')).toHaveCount(0);
     await homeInput(page).fill('把按钮颜色统一一下');
     await homeInput(page).press('Enter');
     await expect
       .poll(() => state.sent)
-      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2' }]);
+      .toEqual([{ content: '把按钮颜色统一一下', projectId: 'proj-2', clientMessageId: expect.any(String) }]);
     await page.goto('/app');
     await homeInput(page).fill('早上的摘要没收到');
     await homeInput(page).press('Enter');
     await expect
       .poll(() => state.sent.at(-1))
-      .toEqual({ content: '早上的摘要没收到' });
+      .toEqual({ content: '早上的摘要没收到', clientMessageId: expect.any(String) });
   });
 
   test('phone width keeps the composer on screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockLive(page);
-    await page.goto('/app?project=proj-2');
+    await page.goto('/app?project=proj-2&chat=1');
     await expect(homeInput(page)).toBeInViewport();
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(390);
     await shot(page, 'home-project-phone.png');
+  });
+
+  test('the project home shows the saved instructions and counts only merged work this week', async ({
+    page,
+  }) => {
+    const state = await mockLive(page, {
+      projects: [{ ...PROJECTS[0]!, instructions: '仓库内容用英文；不要 force push。' }, PROJECTS[1]!],
+    });
+    state.todos.push(
+      todo({ id: 'todo-closed', projectId: 'proj-1', title: '放弃的任务', phase: 'closed', seqNum: 13 }),
+    );
+    await page.goto('/app?project=proj-1');
+    await expect(page.getByTestId('project-home-instructions')).toHaveText('仓库内容用英文；不要 force push。');
+    await expect(page.getByTestId('project-home').locator('[data-slot="stat-strip"]')).toContainText(
+      '1本周合并',
+    );
+  });
+
+  test('a paused schedule shows as paused with its reason, not a next run', async ({ page }) => {
+    await mockLive(page);
+    await page.route('**/api/schedules', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 'sch-1',
+            teamId: 't1',
+            projectId: 'proj-1',
+            todoId: 'todo-1',
+            kind: 'daily',
+            cron: null,
+            prompt: '',
+            enabled: false,
+            at: 1,
+            tz: 'UTC',
+            nextRunAt: null,
+            lastRunAt: null,
+            lastRunStatus: null,
+            pausedReason: 'Task archived',
+            createdBy: 'u1',
+            todo: { seqNum: 11, title: '修 README 里的失效链接', phase: 'todo', projectName: 'cairn', ownerId: 'u1' },
+          },
+        ],
+      }),
+    );
+    await page.goto('/app?project=proj-1');
+    const row = page.getByTestId('project-home').getByText('Task archived');
+    await expect(row).toBeVisible();
+    await expect(page.getByTestId('project-home')).not.toContainText('1970');
   });
 });

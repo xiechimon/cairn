@@ -73,28 +73,6 @@ async function geometry(surface: Locator, item: string) {
 
 for (const theme of ['light', 'dark'] as const) {
   for (const { locale, language } of LOCALES) {
-    test(`user menu: every control stays inside the panel, nested radii are concentric (${theme}, ${locale})`, async ({
-      page,
-    }) => {
-      await seed(page, locale, theme);
-      await page.goto(BOARD);
-      await page.getByRole('complementary').getByRole('button', { name: 'Xmon Dai' }).click();
-      const menu = page.locator('.user-menu');
-      await settle(menu);
-
-      expect(await overflowingDescendants(menu)).toEqual([]);
-
-      const g = await geometry(menu, 'a.user-menu-row');
-      expect(g.clipped).toBe(false);
-      expect(g.radii).toHaveLength(3);
-      for (const radius of g.radii) expect(radius).toBe(g.outer - g.pad);
-      expect(g.gapLeft).toBeCloseTo(g.pad, 0);
-      expect(g.gapRight).toBeCloseTo(g.pad, 0);
-      expect(g.gapBottom).toBeCloseTo(g.padBottom, 0);
-
-      await expect(menu.locator('[data-segmented="track"]')).toHaveCount(1);
-    });
-
     test(`language select: padded list, pill rows concentric with the popup (${theme}, ${locale})`, async ({
       page,
     }) => {

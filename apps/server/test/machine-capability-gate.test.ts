@@ -78,7 +78,7 @@ function insertAgent(
   w: World,
   opts: {
     id: string;
-    requiredCapabilities?: { mcpServers?: string[]; models?: string[] } | null;
+    requiredCapabilities?: { mcpServers?: string[]; models?: string[]; executor?: 'orb' } | null;
     mcpServers?: string[];
     modelId?: string | null;
   },
@@ -320,7 +320,7 @@ describe('#1251 claim capability gate', () => {
     expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(runnable.stepId);
   });
 
-  test('failure mode 5: no snapshot reported fail-open -- legacy daemon machines still claim', async () => {
+  test('D71 failure mode 5: no snapshot reported fails closed -- a legacy daemon does not claim a step that requires a capability', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open', requiredCapabilities: { mcpServers: ['figma'] } });
     const legacy = await enrollMachineRest(w, { name: 'cap-open-legacy' });
@@ -328,10 +328,11 @@ describe('#1251 claim capability gate', () => {
       agentId: 'agent-cap-open',
       homeMachineId: legacy.machineId,
     });
-    expect((await claimAs(w, legacy.machineId))?.step.id).toBe(stepId);
+    expect(await claimAs(w, legacy.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
   });
 
-  test('failure mode 5: models dimension fail-open same law for claudeCodeReport null', async () => {
+  test('D71 failure mode 5: models dimension fails closed the same way for claudeCodeReport null', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open2', requiredCapabilities: { models: ['glm-5.3'] } });
     const noReport = await enrollMachineRest(w, {
@@ -342,7 +343,8 @@ describe('#1251 claim capability gate', () => {
       agentId: 'agent-cap-open2',
       homeMachineId: noReport.machineId,
     });
-    expect((await claimAs(w, noReport.machineId))?.step.id).toBe(stepId);
+    expect(await claimAs(w, noReport.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
   });
 
   test('failure mode 6: zero regression -- agent without requiredCapabilities behaves unchanged', async () => {
@@ -560,8 +562,74 @@ describe('#1251 machine-fit read surface (agent surface "which machines can run 
       runtimeOk: true,
       missing: null,
       mcpGaps: null,
-      canRun: true,
+      canRun: false,
     });
     expect(byId[noRuntime.machineId]).toMatchObject({ runtimeOk: false, canRun: false });
+  });
+});
+
+describe('D71 an agent that requires the Orb never runs on a plain host', () => {
+  test('a host executor does not claim an Orb-required step', async () => {
+    const w = await setupWorld();
+    const m = await enrollMachineRest(w, {
+      name: 'orb-req-host',
+      capabilities: { mcpServers: [], skills: [], executor: 'host' },
+    });
+    insertAgent(w, { id: 'agent-orb-host', requiredCapabilities: { executor: 'orb' } });
+    const { stepId } = insertPendingStep(w, {
+      agentId: 'agent-orb-host',
+      homeMachineId: m.machineId,
+    });
+    expect(await claimAs(w, m.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
+  });
+
+  test('a machine that never reported its executor is treated as not an Orb', async () => {
+    const w = await setupWorld();
+    const m = await enrollMachineRest(w, {
+      name: 'orb-req-legacy',
+      capabilities: { mcpServers: [], skills: [] },
+    });
+    insertAgent(w, { id: 'agent-orb-legacy', requiredCapabilities: { executor: 'orb' } });
+    const { stepId } = insertPendingStep(w, {
+      agentId: 'agent-orb-legacy',
+      homeMachineId: m.machineId,
+    });
+    expect(await claimAs(w, m.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
+  });
+
+  test('an Orb executor claims the Orb-required step', async () => {
+    const w = await setupWorld();
+    const m = await enrollMachineRest(w, {
+      name: 'orb-req-orb',
+      capabilities: { mcpServers: [], skills: [], executor: 'orb' },
+    });
+    insertAgent(w, { id: 'agent-orb-orb', requiredCapabilities: { executor: 'orb' } });
+    const { stepId } = insertPendingStep(w, {
+      agentId: 'agent-orb-orb',
+      homeMachineId: m.machineId,
+    });
+    const claimed = await claimAs(w, m.machineId);
+    expect(claimed?.step.id).toBe(stepId);
+  });
+
+  test('machine-fit never shows a machine without an executor report as able to run an Orb-required agent', async () => {
+    const w = await setupWorld();
+    insertAgent(w, { id: 'agent-orb-fit', requiredCapabilities: { executor: 'orb' } });
+    const legacy = await enrollMachineRest(w, { name: 'orb-fit-legacy' });
+    const orb = await enrollMachineRest(w, {
+      name: 'orb-fit-orb',
+      capabilities: { mcpServers: [], skills: [], executor: 'orb' },
+    });
+    const res = await req(
+      w.s.app,
+      'GET',
+      `/api/teams/${w.s.team.id}/agents/agent-orb-fit/machine-fit`,
+    );
+    const body = (await res.json()) as { machines: { machineId: string; canRun: boolean }[] };
+    const byId = Object.fromEntries(body.machines.map((m) => [m.machineId, m]));
+    expect(byId[legacy.machineId]?.canRun).toBe(false);
+    expect(byId[orb.machineId]?.canRun).toBe(true);
   });
 });

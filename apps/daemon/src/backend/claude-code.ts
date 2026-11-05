@@ -1,8 +1,10 @@
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import {
+  type CanUseTool,
   createSdkMcpServer,
   type EffortLevel,
   type McpServerConfig,
@@ -14,6 +16,8 @@ import {
   type SdkMcpToolDefinition,
   type SdkPluginConfig,
   type SettingSource,
+  type SpawnedProcess,
+  type SpawnOptions,
   tool,
 } from '@anthropic-ai/claude-agent-sdk';
 import type {
@@ -473,7 +477,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      this.queue.push({ type: 'error', error: { message, retryable: false } });
+      this.queue.push({ type: 'error', error: { message, retryable: false, processCrash: true } });
     } finally {
       this.finish();
       await this.spans?.flush();
@@ -598,6 +602,8 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
 }
 
 const HOST_MCP_SERVER_NAME = 'cairn';
+const HOST_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'] as const;
+const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, ...HOST_BUILTIN_TOOLS] as const;
 
 function jsonSchemaToZod(schema: unknown, where: string): z.ZodType {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) {
@@ -851,6 +857,8 @@ export interface ClaudeSdkOptionParts {
   sessionId: string;
   disallowedTools: string[];
   builtinTools?: string[];
+  inOrb: boolean;
+  lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
   effort?: EffortLevel;
@@ -870,21 +878,87 @@ const METERED_CLAUDE_AUTH_BLANK = {
   CLAUDE_CODE_USE_FOUNDRY: '',
 };
 
+function approveUnlessDisallowed(disallowedTools: readonly string[]): CanUseTool {
+  return async (toolName, input) =>
+    disallowedTools.includes(toolName)
+      ? { behavior: 'deny', message: `${toolName} is not available in this step` }
+      : { behavior: 'allow', updatedInput: input };
+}
+
+const OAUTH_TOKEN_FD = 3;
+
+function spawnWithOAuthTokenOnFd(token: string): (options: SpawnOptions) => SpawnedProcess {
+  return ({ command, args, cwd, env, signal }) => {
+    const child = spawn(command, args, {
+      ...(cwd !== undefined ? { cwd } : {}),
+      env,
+      signal,
+      stdio: ['pipe', 'pipe', 'ignore', 'pipe'],
+      windowsHide: true,
+    });
+    const channel = child.stdio[OAUTH_TOKEN_FD];
+    if (channel !== null && channel !== undefined && 'end' in channel) {
+      channel.on('error', () => {});
+      channel.end(token);
+    }
+    const { stdin, stdout } = child;
+    if (stdin === null || stdout === null)
+      throw new Error('Claude Code process has no stdio pipes');
+    return Object.assign(child, { stdin, stdout });
+  };
+}
+
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
-  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = managedMcp
-    ? { mcpServers: parts.mcpServers, strictMcpConfig: true }
-    : Object.keys(parts.mcpServers).length > 0
-      ? { mcpServers: parts.mcpServers }
-      : {};
+  const locked = !parts.inOrb && parts.lockedDown;
+  const stepToken = parts.env?.CLAUDE_CODE_OAUTH_TOKEN;
+  const inheritedEnv = claudeCliEnv({
+    ...process.env,
+    ...parts.env,
+    ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
+  });
+  const fdToken = parts.inOrb ? stepToken : undefined;
+  const env =
+    fdToken !== undefined
+      ? {
+          ...Object.fromEntries(
+            Object.entries(inheritedEnv).filter(([key]) => key !== 'CLAUDE_CODE_OAUTH_TOKEN'),
+          ),
+          CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: String(OAUTH_TOKEN_FD),
+        }
+      : inheritedEnv;
+  const scrubbed = env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB === '1';
+  const hostMcp = Object.fromEntries(
+    Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
+  );
+  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = locked
+    ? { mcpServers: hostMcp, strictMcpConfig: true }
+    : managedMcp
+      ? { mcpServers: parts.mcpServers, strictMcpConfig: true }
+      : Object.keys(parts.mcpServers).length > 0
+        ? { mcpServers: parts.mcpServers }
+        : {};
   return {
     cwd: parts.cwd,
     model: parts.modelId,
-    permissionMode: 'bypassPermissions',
-    disallowedTools: parts.disallowedTools,
-    ...(parts.builtinTools !== undefined ? { tools: parts.builtinTools } : {}),
+    ...(locked
+      ? { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }
+      : scrubbed
+        ? {
+            permissionMode: 'default' as const,
+            canUseTool: approveUnlessDisallowed(parts.disallowedTools),
+          }
+        : parts.inOrb
+          ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
+          : { permissionMode: 'bypassPermissions' as const }),
+    disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
+    ...(locked
+      ? { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }
+      : parts.builtinTools !== undefined
+        ? { tools: parts.builtinTools }
+        : {}),
     includePartialMessages: true,
-    settingSources: [...CLAUDE_SETTING_SOURCES],
+    settingSources: locked ? ['project'] : [...CLAUDE_SETTING_SOURCES],
     ...mcpSection,
     ...(parts.effort !== undefined ? { effort: parts.effort } : {}),
     ...(parts.append !== undefined
@@ -899,6 +973,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
       env: claudeCliEnv({}),
+      ...(locked ? { disableAllHooks: true, disableSkillShellExecution: true } : {}),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }
         : {}),
@@ -906,12 +981,11 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     ...(parts.executablePath !== undefined
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
-    env: claudeCliEnv({
-      ...process.env,
-      ...parts.env,
-      ...(parts.env?.CLAUDE_CODE_OAUTH_TOKEN !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
-    }),
-    ...(parts.plugins !== undefined && parts.plugins.length > 0 ? { plugins: parts.plugins } : {}),
+    env,
+    ...(fdToken !== undefined ? { spawnClaudeCodeProcess: spawnWithOAuthTokenOnFd(fdToken) } : {}),
+    ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
+      ? { plugins: parts.plugins }
+      : {}),
     abortController: parts.abortController,
   };
 }
@@ -923,6 +997,7 @@ export function claudeSessionEnv(opts: SessionOpts): Record<string, string> | un
 }
 
 export interface ClaudeCodeBackendOpts {
+  inOrb?: boolean;
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   machineName?: string;
@@ -1011,6 +1086,8 @@ export class ClaudeCodeBackend implements AgentBackend {
       resumeId,
       sessionId,
       disallowedTools,
+      inOrb: this.opts.inOrb === true,
+      lockedDown: opts.lockedDown === true,
       ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),
@@ -1039,7 +1116,9 @@ export class ClaudeCodeBackend implements AgentBackend {
             opts.telemetry,
             { provider: opts.provider.providerId, model: opts.modelId },
             undefined,
-            credentialRedactor(sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN),
+            credentialRedactor(
+              sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
+            ),
           )
         : undefined;
     return new ClaudeSessionHandle(

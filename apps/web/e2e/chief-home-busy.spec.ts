@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow, expandTurns } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -59,6 +60,11 @@ interface State {
   fallbackModel: string | null;
   outage: Outage;
   messages: Row[];
+  turnQueue?: {
+    stepId?: string;
+    position: number;
+    waitingFor: { machineId: string; name: string; running: number; capacity: number } | null;
+  } | null;
 }
 
 const thread = (s: State) => ({
@@ -77,6 +83,7 @@ const thread = (s: State) => ({
   activeRun: s.activeRun,
   pending: s.pending,
   fallbackModel: s.fallbackModel,
+  turnQueue: s.turnQueue ?? null,
 });
 
 const FIRST = { id: 'm1', role: 'user', content: '看板拖完卡片计数不对，修一下', createdAt: 10 };
@@ -112,6 +119,10 @@ async function mockLive(page: Page, state: State) {
       if (withdrawn && request.method() === 'DELETE') {
         state.pending = state.pending.filter((x) => x.messageId !== withdrawn[1]);
         state.messages = state.messages.filter((m) => m.id !== withdrawn[1]);
+        if (state.turnQueue?.stepId === withdrawn[1]) {
+          state.turnQueue = null;
+          state.activeRun = null;
+        }
         return json({ ok: true });
       }
       if (p.endsWith('/steer')) return json({ steered: true });
@@ -192,7 +203,6 @@ test.describe('chief unavailable (T4)', () => {
     await expect(banner).toContainText('relay-a/claude-opus');
     await expect(banner).toContainText('任务照常在跑');
     await expect(banner.getByRole('button', { name: '给总管换模型' })).toBeVisible();
-    await expect(banner.getByRole('button', { name: '直接建任务' })).toBeVisible();
     const held = home.getByTestId('queued-message');
     await expect(held).toHaveCount(2);
     await expect(held.first()).toHaveAttribute('title', '已存下，总管恢复后会处理');
@@ -207,13 +217,6 @@ test.describe('chief unavailable (T4)', () => {
     await evidenceShot(page, 'outage-desktop.png');
     await banner.getByRole('button', { name: '给总管换模型' }).click();
     await expect(page.getByTestId('chief-settings-col')).toBeVisible();
-  });
-
-  test('direct task creation opens the new task dialog', async ({ page }) => {
-    await mockLive(page, outageState());
-    await page.goto('/app');
-    await page.getByTestId('chief-outage').getByRole('button', { name: '直接建任务' }).click();
-    await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
   });
 
   test('withdrawing a held message deletes it and puts the text back in the composer', async ({
@@ -277,6 +280,7 @@ test.describe('chief unavailable (T4)', () => {
       ],
     });
     await page.goto('/app');
+    await expandTurns(page);
     const home = page.getByTestId('home-c');
     const notes = home.getByTestId('chief-fallback-note');
     await expect(notes).toHaveCount(1);
@@ -284,8 +288,8 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByTestId('chief-fallback-banner')).toContainText('relay-b/glm-4.6');
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
-    await page.goto('/app?view=board');
-    await page.getByRole('button', { name: '总管', exact: true }).click();
+    await page.goto('/app/schedules');
+    await openChiefWindow(page);
     const row = page.locator('.chief-drawer').getByTestId('chief-model-row');
     await expect(row).toContainText('备用模型 relay-b/glm-4.6');
     await expect(row.getByTestId('chief-fallback-dot')).toBeVisible();
@@ -338,6 +342,101 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await expect.poll(() => calls).toContain('POST /stop');
   });
 
+  test('Esc in the composer and `/stop` both stop the running reply', async ({ page }) => {
+    const calls = await mockLive(page, busyState());
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.focus();
+    await input.press('Escape');
+    await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(1);
+    await input.fill('/stop');
+    await input.press('ArrowDown');
+    await input.press('Enter');
+    await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(2);
+    await expect(input).toHaveValue('');
+    expect(calls).not.toContain('send');
+  });
+
+  test('typing 停止 sends it as a message to the chief, it does not press stop', async ({
+    page,
+  }) => {
+    const calls = await mockLive(page, busyState());
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.fill('停止');
+    await input.press('Enter');
+    await expect.poll(() => calls).toContain('send');
+    expect(calls).not.toContain('POST /stop');
+  });
+
+  test('stop on a turn still waiting for a machine withdraws that message and returns its text', async ({
+    page,
+  }) => {
+    const calls = await mockLive(page, {
+      activeRun: { phase: 'chief' },
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [FIRST],
+      turnQueue: {
+        stepId: 'm1',
+        position: 1,
+        waitingFor: { machineId: 'mac-1', name: 'studio-mac.local', running: 0, capacity: 8 },
+      },
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    await expect(home.getByTestId('chief-msg').last()).toContainText('studio-mac.local');
+    await home.getByRole('button', { name: '停止总管这次回复' }).click();
+    await expect.poll(() => calls).toContain('DELETE /messages/m1');
+    expect(calls).not.toContain('POST /stop');
+    await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);
+    await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
+    await evidenceShot(page, 'stop-queued-turn.png');
+  });
+
+  test('a running turn leaves the answered turn above it alone: its tools show once, under the reply header', async ({
+    page,
+  }) => {
+    const call = (id: string, name: string, at: number) => ({
+      id,
+      role: 'assistant',
+      content: {
+        kind: 'toolcall',
+        call: { id, name, arguments: {}, startedAt: at, endedAt: at + 1000, result: '{}' },
+      },
+      createdAt: at,
+    });
+    await mockLive(page, {
+      activeRun: { phase: 'chief' },
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [
+        { id: 'u-q', role: 'user', content: '？', createdAt: 1 },
+        call('t-1', 'pull_requests', 2),
+        call('t-2', 'issues', 3),
+        call('t-3', 'run_builds', 4),
+        { id: 'a-1', role: 'assistant', content: '已派发 #9。', createdAt: 5 },
+        { id: 'u-stop', role: 'user', content: '停止', createdAt: 6 },
+      ],
+    });
+    await page.goto('/app');
+    await expandTurns(page);
+    const home = page.getByTestId('home-c');
+    const reply = home.getByTestId('chief-msg').filter({ hasText: '已派发 #9。' });
+    await expect(reply).toHaveCount(1);
+    await reply.getByTestId('chief-tools-toggle').click();
+    await evidenceShot(page, 'tools-once.png');
+    const replyBox = await reply.boundingBox();
+    const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
+    const questionBox = await question.boundingBox();
+    expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
+    for (const name of ['pull_requests', 'issues', 'run_builds']) {
+      await expect(home.getByText(name, { exact: true })).toHaveCount(1);
+    }
+  });
+
   test('a stopped turn says no task was created', async ({ page }) => {
     await mockLive(page, {
       activeRun: null,
@@ -355,6 +454,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
       ],
     });
     await page.goto('/app');
+    await expandTurns(page);
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-stopped')).toHaveText('已停止，没有建任务。');
     await expect(home.getByRole('alert')).toHaveCount(0);
@@ -381,10 +481,11 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
       ],
     });
     await page.goto('/app');
+    await expandTurns(page);
     const stopped = page.getByTestId('chief-stopped');
     await expect(stopped).toContainText('已停止。停之前已经建了任务');
     await evidenceShot(page, 'stopped-with-task.png');
     await stopped.getByRole('link', { name: /#9/ }).click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 });

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
+import { openChiefWindow, expandTurns } from './helpers.js';
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
@@ -10,7 +11,7 @@ const modelName = (page: Page) => modelRow(page).locator('span').nth(2);
 test.describe('chief drawer model row (#615)', () => {
 
   test('the model row is a read-only display of the bound Agent model (#1260)', async ({ page }) => {
-    await page.goto('/app?view=board&scenario=111');
+    await page.goto('/app/schedules?scenario=111');
     await expect(drawer(page)).toBeVisible();
     const row = modelRow(page);
     await expect(row).toBeVisible();
@@ -25,7 +26,7 @@ test.describe('chief drawer model row (#615)', () => {
   test('the row is readable in both themes (#751 A same law)', async ({ page }) => {
 
     for (const theme of ['dark', 'light'] as const) {
-      await page.goto('/app?view=board&scenario=111');
+      await page.goto('/app/schedules?scenario=111');
       await page.evaluate((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.reload();
       await expect(drawer(page)).toBeVisible();
@@ -59,9 +60,9 @@ test.describe('chief drawer model row (#615)', () => {
   });
 
   test('the model row carries the runtime mark, not an agent avatar', async ({ page }) => {
-    await page.goto('/app?view=board&scenario=fab-avatar');
+    await page.goto('/app/schedules?scenario=fab-avatar');
 
-    await page.locator('.chief-fab').click();
+    await openChiefWindow(page);
     await expect(drawer(page)).toBeVisible();
     await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     const row = modelRow(page);
@@ -70,7 +71,7 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(row.locator('span').first().locator('svg')).toHaveCount(1);
     await expect(row.locator('img')).toHaveCount(0);
 
-    await page.goto('/app?view=board&scenario=100');
+    await page.goto('/app/schedules?scenario=100');
     await expect(drawer(page)).toBeVisible();
     await expect(modelRow(page)).toHaveCount(0);
     await expect(page.getByText('n/a', { exact: true })).toHaveCount(0);
@@ -80,7 +81,8 @@ test.describe('chief drawer model row (#615)', () => {
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.goto('/app?view=board&scenario=114');
+    await page.goto('/app/schedules?scenario=114');
+    await expandTurns(page);
     await expect(drawer(page)).toBeVisible();
 
     const copy = page.getByTestId('chief-msg-tools').getByRole('button', { name: '复制' });
@@ -104,7 +106,8 @@ test.describe('chief drawer model row (#615)', () => {
   test('restore button opens the rewind confirm; the grey summary line discloses tool rows', async ({
     page,
   }) => {
-    await page.goto('/app?view=board&scenario=114');
+    await page.goto('/app/schedules?scenario=114');
+    await expandTurns(page);
     await expect(drawer(page)).toBeVisible();
 
     const restore = page
@@ -134,9 +137,9 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(tools).toHaveCount(0);
   });
 
-  test('the gear reaches board settings from a wake surface', async ({ page }) => {
-    await page.goto('/app/team?scenario=12');
-    await page.locator('button[aria-label="总管"]').click();
+  test('the gear reaches the chief settings from a wake surface', async ({ page }) => {
+    await page.goto('/app/schedules?scenario=12');
+    await openChiefWindow(page);
     await expect(drawer(page)).toBeVisible();
     const gear = drawer(page).locator('button[aria-label="总管设置"]');
     await expect(gear).toBeVisible();

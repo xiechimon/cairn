@@ -49,7 +49,15 @@ describe('pi sessions measure time to first token from the prompt send', () => {
     mapPiSessionEvent(delta('text_delta'), state);
     mapPiSessionEvent(end(), state);
     expect(settle(state)).toEqual([
-      { model: 'gw/m1', input: 10, output: 2, cacheRead: 5, cacheWrite: 0, ttftMs: 250 },
+      {
+        model: 'gw/m1',
+        input: 10,
+        output: 2,
+        cacheRead: 5,
+        cacheWrite: 0,
+        ttftMs: 250,
+        contextTokens: 17,
+      },
     ]);
   });
 
@@ -118,5 +126,34 @@ describe('pi sessions measure time to first token from the prompt send', () => {
     mapPiSessionEvent(delta('text_delta'), state);
     mapPiSessionEvent(end(), state);
     expect(settle(state)[0]?.ttftMs).toBe(40);
+  });
+});
+
+describe('pi sessions report the context size of the last request', () => {
+  const msgEnd = (usage: Record<string, number>, stopReason = 'stop'): AgentSessionEventLike => ({
+    type: 'message_end',
+    message: { role: 'assistant', provider: 'gw', model: 'm1', stopReason, usage },
+  });
+
+  test('contextTokens is the last request, not the turn sum, so tool rounds do not inflate it', () => {
+    const state = newMapState({ now: () => 0 });
+    mapPiSessionEvent(
+      msgEnd({ input: 500, output: 40, cacheRead: 20_000, cacheWrite: 300 }),
+      state,
+    );
+    mapPiSessionEvent(msgEnd({ input: 120, output: 60, cacheRead: 20_800, cacheWrite: 50 }), state);
+    const [row] = settle(state);
+    expect(row?.cacheRead).toBe(40_800);
+    expect(row?.contextTokens).toBe(120 + 60 + 20_800 + 50);
+  });
+
+  test('an aborted or failed last message keeps the previous measured context', () => {
+    const state = newMapState({ now: () => 0 });
+    mapPiSessionEvent(msgEnd({ input: 100, output: 10, cacheRead: 900, cacheWrite: 0 }), state);
+    mapPiSessionEvent(
+      msgEnd({ input: 5, output: 0, cacheRead: 0, cacheWrite: 0 }, 'aborted'),
+      state,
+    );
+    expect(settle(state)[0]?.contextTokens).toBe(1010);
   });
 });

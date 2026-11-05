@@ -10,6 +10,7 @@ import {
   PHASE_VALUES,
   patchMachineBodySchema,
   patchProviderBodySchema,
+  patchScheduleBodySchema,
   SKILL_ENTRY_FILE,
   setSecretBodySchema,
   skillRecordSchema,
@@ -18,7 +19,7 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { agent, machine, provider, todo } from './db/schema.js';
+import { agent, machine, provider, routingRule, todo } from './db/schema.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import {
@@ -42,6 +43,7 @@ import {
   readGithubConnectionStatus,
   teamGithubToken,
 } from './services/github-connection.js';
+import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import {
   machineConcurrencyPatch,
   machineRunningCount,
@@ -65,7 +67,13 @@ import {
   getProvidersEnvelope,
   updateProvider,
 } from './services/providers.js';
-import { createSchedule, deleteSchedule, listSchedules } from './services/schedules.js';
+import { runScheduleNow } from './services/schedule-run.js';
+import {
+  createSchedule,
+  deleteSchedule,
+  listSchedules,
+  setScheduleEnabled,
+} from './services/schedules.js';
 import { search } from './services/search.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './services/secrets.js';
 import { importSkill, refreshSkill, type SkillImportOpts } from './services/skill-import.js';
@@ -123,11 +131,23 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(record, 201);
   });
 
+  app.patch('/api/schedules/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = parseWith(patchScheduleBodySchema, await jsonBody(c), 'body');
+    const record = setScheduleEnabled(svc, id, body);
+    if (!record) throw notFound(`schedule ${id}`);
+    return c.json(record);
+  });
+
   app.delete('/api/schedules/:id', (c) => {
     const id = c.req.param('id');
     if (!deleteSchedule(svc, id)) throw notFound(`schedule ${id}`);
     return c.body(null, 204);
   });
+
+  app.post('/api/schedules/:id/run', (c) =>
+    c.json(runScheduleNow(svc, ctx.team.id, c.req.param('id'))),
+  );
 
   app.get('/api/search', (c) =>
     c.json(search(svc, { teamId: ctx.team.id, q: c.req.query('q') ?? null })),
@@ -175,7 +195,10 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
           .join('、')}）——先换绑或整机迁移，再删除。`,
       );
     }
+    ctx.db.update(routingRule).set({ machineId: null }).where(eq(routingRule.machineId, id)).run();
+    const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
+    releasePendingOutput();
     return c.body(null, 204);
   });
 
@@ -542,6 +565,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       name: body.name,
       description: body.description ?? null,
       value: body.value,
+      projectId: body.projectId ?? null,
     });
     return c.json(record, 201);
   });

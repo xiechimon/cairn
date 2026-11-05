@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agentMachineFitResponseSchema,
   agentRecordSchema,
+  capabilityMissingLabels,
   createAgentBodySchema,
   machineCapabilitiesSchema,
   machineEnrollBodySchema,
@@ -260,6 +261,48 @@ describe('agentMachineFitResponseSchema (agent-facing "which machines can run it
   });
 });
 
+describe('D71 executor kind (Orb sandbox vs plain host)', () => {
+  it('a machine report carries executor orb or host', () => {
+    expect(
+      machineCapabilitiesSchema.parse({ mcpServers: [], skills: [], executor: 'orb' }).executor,
+    ).toBe('orb');
+    expect(
+      machineCapabilitiesSchema.parse({ mcpServers: [], skills: [], executor: 'host' }).executor,
+    ).toBe('host');
+  });
+
+  it('an unknown executor kind is rejected on the wire', () => {
+    expect(
+      machineCapabilitiesSchema.safeParse({ mcpServers: [], skills: [], executor: 'vm' }).success,
+    ).toBe(false);
+  });
+
+  it('the server keeps a reported executor and drops a malformed one without losing the list', () => {
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [], executor: 'orb' })).toEqual({
+      mcpServers: [],
+      skills: [],
+      executor: 'orb',
+    });
+    expect(parseReportedCapabilities({ mcpServers: ['a'], skills: [], executor: 7 })).toEqual({
+      mcpServers: ['a'],
+      skills: [],
+    });
+  });
+
+  it('an old daemon that reports no executor stays unreported, never defaulted to host', () => {
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [] })?.executor).toBeUndefined();
+  });
+
+  it('an agent can require the Orb executor and nothing weaker', () => {
+    expect(requiredCapabilitiesSchema.parse({ executor: 'orb' })).toEqual({ executor: 'orb' });
+    expect(requiredCapabilitiesSchema.safeParse({ executor: 'host' }).success).toBe(false);
+  });
+
+  it('a missing Orb executor is labelled for the queue and fit views', () => {
+    expect(capabilityMissingLabels({ executor: 'orb' })).toEqual(['Orb sandbox executor']);
+  });
+});
+
 describe('#1241 parseReportedCapabilities (field-level tightening)', () => {
   const hardware = {
     cpuCores: 8,
@@ -318,5 +361,23 @@ describe('#1241 parseReportedCapabilities (field-level tightening)', () => {
     );
     expect(machineHardwareSchema.safeParse({ ...hardware, memoryTotalMb: -1 }).success).toBe(false);
     expect(machineHardwareSchema.safeParse({ ...hardware, cpuCores: 2.5 }).success).toBe(false);
+  });
+});
+
+describe('computer capabilities (D75)', () => {
+  it('a machine reports that it hosts the Coordinator computer or is an own computer', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: [], skills: [], computer: true, ownComputer: true }),
+    ).toEqual({ mcpServers: [], skills: [], computer: true, ownComputer: true });
+  });
+
+  it('anything but literal true is dropped, so an unclear report never grants a computer', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: [], skills: [], computer: 'yes', ownComputer: 1 }),
+    ).toEqual({ mcpServers: [], skills: [] });
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [], computer: false })).toEqual({
+      mcpServers: [],
+      skills: [],
+    });
   });
 });

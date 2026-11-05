@@ -124,17 +124,18 @@ test('sched freq: the chosen radio reads against the track, hover steps the rest
 }) => {
   await page.goto('/app/schedules?scenario=r3-92');
   const group = page.getByRole('radiogroup', { name: '频率' });
-  const active = page.locator('.sched-form-freq-tab[aria-checked="true"]');
-  const weekly = page.locator('.sched-form-freq-tab', { hasText: '每周' });
+  const active = group.getByRole('radio', { checked: true });
+  const weekly = group.getByRole('radio', { name: '每周' });
 
   expect(await bg(active)).toBe(CARD_DARK);
   expect(await bg(group)).not.toBe(CARD_DARK);
   await expectInkStep(weekly, active);
 
   await themed(page, 'light', '/app/schedules?scenario=r3-92');
-  const lightActive = page.locator('.sched-form-freq-tab[aria-checked="true"]');
+  const lightGroup = page.getByRole('radiogroup', { name: '频率' });
+  const lightActive = lightGroup.getByRole('radio', { checked: true });
   expect(await bg(lightActive)).toBe(CARD_LIGHT);
-  await expectInkStep(page.locator('.sched-form-freq-tab', { hasText: '每周' }), lightActive);
+  await expectInkStep(lightGroup.getByRole('radio', { name: '每周' }), lightActive);
 });
 
 test('files seg + tasks view toggle: hover steps the unselected ink (dark)', async ({ page }) => {
@@ -149,37 +150,6 @@ test('files seg + tasks view toggle: hover steps the unselected ink (dark)', asy
     page.locator('.prj-tasks-view-btn[aria-label="网格视图"]'),
     page.locator('.prj-tasks-view-btn[aria-selected="true"]'),
   );
-});
-
-test('user-menu appearance segment: hover steps the ink, click switches the theme', async ({ page }) => {
-  await themed(page, 'light', '/app?scenario=01');
-  await page.click('.sidebar-user');
-  const group = page.getByRole('radiogroup', { name: '外观' });
-  const dark = group.getByRole('radio', { name: '深色' });
-
-  await expectInkStep(dark, group.getByRole('radio', { name: '浅色' }));
-
-  await dark.click();
-  await expect(dark).toHaveAttribute('aria-checked', 'true');
-
-  await expect(page.locator('html')).not.toHaveClass(/light/);
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(group.getByRole('radio', { name: '浅色' })).toHaveAttribute('aria-checked', 'false');
-});
-
-test('branch-dialog seg: hover steps the Git ink, click swaps the tab body', async ({ page }) => {
-  // #366: the detail route no longer opens the branch dialog (the surface
-  // is a static right-pane section there) — the board card icon remains
-  // the dialog's live trigger.
-  await page.goto('/app?scenario=01&view=board');
-  await page.locator('.todo-card-branch').first().click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  const git = page.getByRole('tab', { name: 'Git' });
-  await expectInkStep(git, page.getByRole('tab', { name: '同步到机器' }));
-
-  await git.click();
-  await expect(page.getByRole('tab', { name: 'Git', selected: true })).toBeVisible();
-  await expect(page.getByRole('tab', { name: '同步到机器', selected: false })).toBeVisible();
 });
 
 test('team layout toggle: segmented face (paper track, white ringed chip)', async ({ page }) => {

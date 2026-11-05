@@ -1,24 +1,40 @@
-import { ChevronDown, FolderOpen, MessageSquareWarning, Settings2 } from 'lucide-react';
+import {
+  FolderOpen,
+  House,
+  ListChecks,
+  MessageSquareWarning,
+  PackageCheck,
+  Settings2,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation } from '../chief/chief-conversation.js';
-import { ChiefQuestionCard, type ChiefQuestionItem } from '../chief/chief-question-card.js';
+import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { TextureSkeleton } from '../components/texture/texture.js';
-import { ThreadCard } from '../components/thread/thread-card.js';
-import { ThreadRow } from '../components/thread/thread-row.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
-import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
+import type {
+  ChiefStreamItem,
+  MachineRow,
+  ScheduleRecord,
+  TodoRecord,
+} from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
-import { ACT_ORDER, actRank, needsYouThreads, pendingQuestions } from './needs-you.js';
-import { relativeTime } from './rel-time.js';
-import { threadCopy, threadHref, threadStatus, threadTone } from './thread-copy.js';
+import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import { MachineChip, MachinesPanel } from './machines-panel.js';
+import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
+import { NeedsYouThreadCard } from './needs-you-thread-card.js';
+import { composeRequest } from './open-composer.js';
+import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { useOpenThread } from './thread-link.js';
+import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
 const GREETINGS: [number, string][] = [
   [5, '夜深了'],
@@ -32,11 +48,11 @@ export function greetingFor(hour: number): string {
   return GREETINGS.find(([until]) => hour < until)?.[1] ?? '晚上好';
 }
 
+const NEEDS_YOU_PINNED = 3;
+
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
 
-type NeedsYouEntry =
-  | { kind: 'question'; key: string; item: ChiefQuestionItem }
-  | { kind: 'thread'; key: string; todo: TodoRecord; status: string };
+type NeedsYouEntry = { kind: 'thread'; key: string; todo: TodoRecord; status: string };
 
 export function streamForProject(
   stream: readonly ChiefStreamItem[],
@@ -83,8 +99,15 @@ interface HomeCProps {
   projectId: string | null;
   projectName: string | null;
   banner?: ReactNode;
-  onNewTask?: () => void;
   machines?: readonly MachineRow[];
+  schedules?: readonly ScheduleRecord[];
+  coordinatorMachineId?: string | null;
+}
+
+function projectHomeSearch(params: URLSearchParams): string {
+  const next = new URLSearchParams(params);
+  next.delete('chat');
+  return `?${next.toString()}`;
 }
 
 export function HomeC({
@@ -94,14 +117,47 @@ export function HomeC({
   projectId,
   projectName,
   banner,
-  onNewTask,
   machines,
+  schedules = [],
+  coordinatorMachineId = null,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
   const navigate = useNavigate();
+  const location = useLocation();
+  const composeAt = composeRequest(location.state);
   const [allOpen, setAllOpen] = useState(false);
-  const [runningOpen, setRunningOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pane = paneOf(searchParams.get(PANE_PARAM));
+  const computers = useMemo(
+    () =>
+      (machines ?? []).map((machine) =>
+        coordinatorMachineId !== null && machine.id === coordinatorMachineId
+          ? { ...machine, chiefHost: true }
+          : machine,
+      ),
+    [machines, coordinatorMachineId],
+  );
+  const threadId = searchParams.get(THREAD_PARAM);
+  const questions = useOptionalChiefRoot();
+  const showPane = (next: WorkPane | null) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete(THREAD_PARAM);
+    if (next === null) params.delete(PANE_PARAM);
+    else params.set(PANE_PARAM, next);
+    setSearchParams(params, { replace: true, state: location.state });
+  };
+  const togglePane = (next: WorkPane) => {
+    questions?.setQuestionsOpen(false);
+    showPane(pane === next && threadId === null ? null : next);
+  };
+  useEffect(() => {
+    if (questions?.questionsOpen !== true || pane === null) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete(PANE_PARAM);
+    setSearchParams(params, { replace: true, state: location.state });
+  }, [questions?.questionsOpen, pane, searchParams, setSearchParams, location.state]);
+  const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const { chiefData, chiefView, setChiefView } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -110,6 +166,15 @@ export function HomeC({
     setChiefView('none');
     composerRef.current?.focus({ preventScroll: true });
   }, [chiefView, setChiefView]);
+  const loaded = surface.load === 'ready';
+  useEffect(() => {
+    if (composeAt === null || !loaded) return;
+    composerRef.current?.focus({ preventScroll: true });
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null },
+    );
+  }, [composeAt, loaded, navigate, location.pathname, location.search]);
   const scoped = useMemo(
     () => todos.filter((todo) => projectId === null || todo.projectId === projectId),
     [todos, projectId],
@@ -118,27 +183,20 @@ export function HomeC({
     () => streamForProject(chiefData.stream ?? [], projectId),
     [chiefData.stream, projectId],
   );
-  const questions = pendingQuestions(stream);
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
-  const entries: NeedsYouEntry[] = [
-    ...questions.map((item) => ({
-      kind: 'question' as const,
-      key: item.requestId,
-      item,
-    })),
-    ...needsYouThreads(scoped).map((todo) => ({
-      kind: 'thread' as const,
-      key: todo.id,
-      todo,
-      status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
-    })),
-  ];
+  const entries: NeedsYouEntry[] = needsYouThreads(scoped).map((todo) => ({
+    kind: 'thread' as const,
+    key: todo.id,
+    todo,
+    status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
+  }));
+  const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
   );
-  const shown = allOpen ? entries : entries.slice(0, 1);
+  const shown = allOpen ? entries : entries.slice(0, NEEDS_YOU_PINNED);
 
   const greeting = (
     <Greeting as="h2">
@@ -172,6 +230,15 @@ export function HomeC({
         variant="ghost"
         size="sm"
         className="text-meta text-content-secondary"
+        render={<Link to={{ pathname: '/app', search: projectHomeSearch(searchParams) }} />}
+      >
+        <House aria-hidden="true" className="size-3.5" />
+        {t('项目主页')}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-meta text-content-secondary"
         render={<Link to={`/app/project/${projectId}/files`} />}
       >
         <FolderOpen aria-hidden="true" className="size-3.5" />
@@ -199,43 +266,32 @@ export function HomeC({
         {t('待你决定')}
       </SectionHead>
       {shown.map((entry) => (
-        <div
-          key={entry.key}
-          data-slot="needs-you-item"
-          data-status={entry.kind === 'question' ? 'question' : entry.status}
-        >
-          {entry.kind === 'question' ? (
-            <ChiefQuestionCard
-              item={entry.item}
-              onAnswer={surface.onAnswerQuestion}
-              onCancel={surface.onCancelQuestion}
-            />
-          ) : (
-            <ThreadCard
-              title={entry.todo.title}
-              tone={threadTone(entry.todo)}
-              stateLabel={t(threadCopy(entry.todo).state)}
-              reason={t(threadCopy(entry.todo).reason)}
-              {...(threadCopy(entry.todo).primary != null
-                ? {
-                    primaryLabel: t(threadCopy(entry.todo).primary ?? ''),
-                    onPrimary: () => navigate(threadHref(entry.todo.id)),
-                  }
-                : {})}
-              viewLabel={t('查看 thread')}
-              onView={() => navigate(threadHref(entry.todo.id))}
-            />
-          )}
+        <div key={entry.key} data-slot="needs-you-item" data-status={entry.status}>
+          <NeedsYouThreadCard
+            todo={entry.todo}
+            title={entry.todo.title}
+            tone={threadTone(entry.todo)}
+            stateLabel={t(threadCopy(entry.todo).state)}
+            reason={t(threadCopy(entry.todo).reason)}
+            {...(threadCopy(entry.todo).primary != null
+              ? {
+                  primaryLabel: t(threadCopy(entry.todo).primary ?? ''),
+                  onPrimary: () => openThread(entry.todo.id),
+                }
+              : {})}
+            viewLabel={t('查看 thread')}
+            onView={() => openThread(entry.todo.id)}
+          />
         </div>
       ))}
-      {entries.length > 1 && (
+      {entries.length > NEEDS_YOU_PINNED && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setAllOpen(!allOpen)}
           className="-ml-2.5 self-start text-meta text-content-tertiary hover:text-foreground"
         >
-          {allOpen ? t('收起其余') : t('还有 {n} 件', { n: entries.length - 1 })}
+          {allOpen ? t('收起其余') : t('还有 {n} 件', { n: entries.length - NEEDS_YOU_PINNED })}
         </Button>
       )}
     </section>
@@ -284,104 +340,156 @@ export function HomeC({
     </section>
   );
 
-  const pill = running.length > 0 && (
-    <div className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-182 flex-col">
+  const paneButtons = (
+    <header
+      data-testid="home-c-pane-buttons"
+      className="flex h-12 flex-none items-center gap-0.5 pr-3 pl-5 max-[640px]:pl-14"
+    >
+      <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
+        {projectName ?? t('Coordinator')}
+      </h1>
+      <ChiefQuestionEntry />
+      <MachineChip
+        machines={computers}
+        open={pane === 'machines' && threadId === null}
+        onToggle={() => togglePane('machines')}
+      />
       <Button
         variant="ghost"
-        data-testid="in-progress-pill"
-        aria-expanded={runningOpen}
-        onClick={() => setRunningOpen(!runningOpen)}
-        className="h-7 gap-2 self-start rounded-full bg-card px-3 text-meta font-normal text-content-secondary shadow-(--e1) hover:bg-card hover:text-foreground dark:hover:bg-card"
+        size="icon-sm"
+        aria-label={t('任务')}
+        aria-pressed={pane === 'tasks' && threadId === null}
+        onClick={() => togglePane('tasks')}
+        className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
       >
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-running" />
-        {t('{n} 件在进行', { n: running.length })}
-        <ChevronDown aria-hidden="true" className={runningOpen ? 'size-3 rotate-180' : 'size-3'} />
+        <ListChecks aria-hidden="true" />
+        {entries.length > 0 && (
+          <span
+            data-testid="tasks-attention-dot"
+            aria-hidden="true"
+            className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
+          />
+        )}
       </Button>
-      {runningOpen && (
-        <div data-testid="in-progress-list" className="mt-2 flex max-h-60 flex-col overflow-y-auto">
-          {running.map((todo) => (
-            <ThreadRow
-              key={todo.id}
-              title={todo.title}
-              tone="working"
-              reason={t(threadCopy(todo).reason)}
-              age={relativeTime(todo.phaseAt, now, t)}
-              onOpen={() => navigate(threadHref(todo.id))}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={t('成果')}
+        aria-pressed={pane === 'made' && threadId === null}
+        onClick={() => togglePane('made')}
+        className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      >
+        <PackageCheck aria-hidden="true" />
+      </Button>
+    </header>
   );
+
+  const workPanel =
+    threadId !== null ? null : pane === 'machines' ? (
+      <MachinesPanel machines={computers} onClose={() => showPane(null)} />
+    ) : (
+      pane !== null && (
+        <WorkPanel
+          pane={pane}
+          todos={scoped}
+          schedules={
+            projectId === null
+              ? schedules
+              : schedules.filter((schedule) => schedule.projectId === projectId)
+          }
+          now={now}
+          onClose={() => showPane(null)}
+          onOpenThread={openThread}
+        />
+      )
+    );
 
   if (surface.load !== 'ready') {
     return (
-      <section data-testid="home-c" className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {surface.load === 'loading' ? (
-          <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
-        ) : (
-          <>
-            <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
-              {projectLinks}
-              <ClaudeLoginBanner machines={machines} now={now} />
-            </div>
-            <EmptyState
-              testId="home-c-error"
-              icon={MessageSquareWarning}
-              title={t('对话加载失败')}
-              description={t('对话记录还在，重试一下。')}
-              action={{ label: t('重试'), onClick: surface.retry }}
-              className="mt-[12vh]"
-            />
-          </>
-        )}
-      </section>
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          {paneButtons}
+          {surface.load === 'loading' ? (
+            <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
+          ) : (
+            <>
+              <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
+                {projectLinks}
+                <ClaudeLoginBanner machines={machines} now={now} />
+              </div>
+              <EmptyState
+                testId="home-c-error"
+                icon={MessageSquareWarning}
+                title={t('对话加载失败')}
+                description={t('对话记录还在，重试一下。')}
+                action={{ label: t('重试'), onClick: surface.retry }}
+                className="mt-[12vh]"
+              />
+            </>
+          )}
+        </section>
+        {workPanel}
+      </div>
     );
   }
 
   return (
-    <section
-      data-testid="home-c"
-      aria-label={t('与 Coordinator 的对话')}
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
-    >
-      <h1 className="sr-only">{t('首页')}</h1>
-      {banner != null && (
-        <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
-      )}
-      <MessageScrollerProvider defaultScrollPosition="start">
-        <ChiefConversation
-          variant="global"
-          chief={{ ...chiefData, stream: conversation, examples: undefined }}
-          onSend={
-            surface.onSend != null
-              ? (text: string) => surface.onSend?.(text, projectId)
-              : live
-                ? undefined
-                : () => Promise.resolve()
-          }
-          onRewind={surface.onRewind}
-          onAnswerQuestion={surface.onAnswerQuestion}
-          onCancelQuestion={surface.onCancelQuestion}
-          onWithdraw={surface.onWithdraw}
-          onSteer={surface.onSteer}
-          onStop={surface.onStop}
-          onSettings={() => surface.setChiefView('settings')}
-          hero={hero}
-          lead={lead}
-          prefill={prefill}
-          placeholder={
-            projectName != null
-              ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
-              : t('跟 Coordinator 说点什么，或描述一个新任务…')
-          }
-          aboveComposer={pill}
-          onNewTask={onNewTask}
-          composerRef={(node) => {
-            composerRef.current = node;
-          }}
-        />
-      </MessageScrollerProvider>
-    </section>
+    <div className="relative flex min-h-0 min-w-0 flex-1">
+      <section
+        data-testid="home-c"
+        aria-label={t('与 Coordinator 的对话')}
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+      >
+        {paneButtons}
+        {banner != null && (
+          <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
+        )}
+        <MessageScrollerProvider defaultScrollPosition="end">
+          <ChiefConversation
+            variant="global"
+            chief={{ ...chiefData, stream: conversation, examples: undefined }}
+            onSend={
+              thread.picked !== null
+                ? thread.send
+                : surface.onSend != null
+                  ? (text: string) => surface.onSend?.(text, projectId)
+                  : live
+                    ? undefined
+                    : () => Promise.resolve()
+            }
+            onRewind={surface.onRewind}
+            onAnswerQuestion={surface.onAnswerQuestion}
+            onCancelQuestion={surface.onCancelQuestion}
+            onWithdraw={surface.onWithdraw}
+            onSteer={surface.onSteer}
+            onStop={surface.onStop}
+            earlier={surface.earlier}
+            onSettings={() => surface.setChiefView('settings')}
+            hero={hero}
+            lead={lead}
+            prefill={prefill}
+            placeholder={
+              projectName != null
+                ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+                : t('跟 Coordinator 说点什么，或描述一个新任务…')
+            }
+            composerError={thread.error}
+            targetPlaceholder={thread.placeholder}
+            composerTools={
+              <ComposerThreadTarget
+                targets={thread.targets}
+                picked={thread.picked}
+                composerRef={composerRef}
+                onPick={thread.pick}
+              />
+            }
+            composerRef={(node) => {
+              composerRef.current = node;
+            }}
+          />
+        </MessageScrollerProvider>
+      </section>
+      {workPanel}
+    </div>
   );
 }

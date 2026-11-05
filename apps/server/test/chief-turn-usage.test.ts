@@ -1,13 +1,27 @@
 import type { MachineDoneBody } from '@cairn/shared';
 import { chiefDigestThreadId, machineDoneBodySchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
-import { build, chiefTurnUsage, step as stepTable, todo, tokenUsage } from '../src/db/schema.js';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import {
+  build,
+  chiefTurnUsage,
+  provider as providerTable,
+  step as stepTable,
+  todo,
+  tokenUsage,
+} from '../src/db/schema.js';
+import { getChiefEnvelope } from '../src/services/chief.js';
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  setCoordinatorServerContextEnabled,
+} from '../src/services/coordinator-context.js';
 import { finishStep } from '../src/services/machines.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { insertMachine } from './helpers.js';
 
 registerChiefHarness();
+beforeEach(() => setCoordinatorServerContextEnabled(true));
+afterEach(() => setCoordinatorServerContextEnabled(false));
 
 function deps() {
   return {
@@ -222,5 +236,92 @@ describe('the done report carries time to first token', () => {
         usage: [usage('m', 1, 0, { ttftMs: -1 })],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('the context meter under CAIRN_COORDINATOR_SERVER_CONTEXT', () => {
+  test('flag off: no turn row is written and the meter keeps the cumulative total', async () => {
+    setCoordinatorServerContextEnabled(false);
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-off');
+    await finishStep(deps(), machineId, 'turn-off', {
+      status: 'success',
+      usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
+    });
+    expect(turnRows()).toEqual([]);
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 1000 + 7 + 800 + 3,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+  });
+
+  test('flag on: the meter shows the last turn context the provider reported, not the running sum', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-a');
+    await finishStep(deps(), machineId, 'turn-a', {
+      status: 'success',
+      usage: [usage('pi/glm', 9000, 40000, { contextTokens: 21_000 })],
+    });
+    claimedStep(machineId, 'turn-b', { createdAt: Date.now() + 5 });
+    await finishStep(deps(), machineId, 'turn-b', {
+      status: 'success',
+      usage: [usage('pi/glm', 6000, 50000, { contextTokens: 23_456 })],
+    });
+    expect(turnRows().map((r) => [r.stepId, r.contextTokens])).toEqual([
+      ['turn-a', 21_000],
+      ['turn-b', 23_456],
+    ]);
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 23_456,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+  });
+
+  test('flag on: a turn without contextTokens (claude-code) leaves the meter on the last known value or empty', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-cc');
+    await finishStep(deps(), machineId, 'turn-cc', {
+      status: 'success',
+      usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toBeNull();
+  });
+
+  test('flag on: the window comes from the model that ran the last turn, from its provider catalog', async () => {
+    H.s.db
+      .insert(providerTable)
+      .values({
+        id: 'prov-stub',
+        teamId: H.teamId,
+        providerId: 'stub-gw',
+        label: 'stub',
+        baseUrl: 'https://example.invalid/v1',
+        api: 'anthropic-messages',
+        compat: {},
+        models: [{ id: 'stub-model', name: 'stub-model', contextWindow: 200_000 }],
+        createdBy: H.userId,
+        createdAt: 1,
+        updatedAt: 1,
+      } as typeof providerTable.$inferInsert)
+      .run();
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-w');
+    await finishStep(deps(), machineId, 'turn-w', {
+      status: 'success',
+      usage: [usage('stub-gw/stub-model', 100, 0, { contextTokens: 110 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 110,
+      contextWindow: 200_000,
+    });
+    claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
+    await finishStep(deps(), machineId, 'turn-fallback', {
+      status: 'success',
+      usage: [usage('other-gw/fallback-model', 100, 0, { contextTokens: 120 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId).context).toEqual({
+      tokens: 120,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
   });
 });

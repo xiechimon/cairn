@@ -6,9 +6,9 @@ const AGENT =
 const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks';
 const AGENT_PERMS = '/app/resources/agents/r3-builder?scenario=agent-detail';
-const ACCEPT = '/app?scenario=34';
+const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
-const BADGES = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=57f';
+const BADGES = '/app?scenario=home-c&pane=machines';
 const SCHEDULES = '/app/schedules?scenario=r3-92';
 
 interface FocusInfo {
@@ -186,6 +186,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
 
   test('checkbox, switch, and badge use the global outline', async ({ page }) => {
     await themed(page, 'dark', ACCEPT);
+    await page.getByTestId('side-chat-action').getByRole('button', { name: '完成…' }).click();
     const checkbox = page.getByRole('dialog', { name: '完成任务' }).locator('[data-slot="checkbox"]');
     await expect(checkbox).toBeVisible();
     await focusKeyboard(checkbox);
@@ -229,11 +230,9 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectFieldRing({ ...(await readFocus(shell)), focusVisible: true });
   });
 
-  // Segmented options sit 2px apart, so their keyboard ring is drawn inside
-  // the option box (offset -2) instead of the global outset outline.
   test('a segmented option draws the focus ring inset', async ({ page }) => {
     await themed(page, 'dark', SCHEDULES);
-    const option = page.locator('.sched-form-freq-tab[aria-checked="true"]');
+    const option = page.getByRole('radiogroup', { name: '频率' }).getByRole('radio', { checked: true });
     await expect(option).toBeVisible();
     await focusKeyboard(option);
     const info = await readFocus(option);
@@ -245,9 +244,9 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
   });
 
-  test('the sidebar user button uses the global outline', async ({ page }) => {
-    await themed(page, 'dark', SKILLS);
-    const user = page.locator('.sidebar-user');
+  test('the sidebar settings link uses the global outline', async ({ page }) => {
+    await themed(page, 'dark', '/app/schedules?scenario=01');
+    const user = page.getByTestId('sidebar-settings');
     await expect(user).toBeVisible();
     await focusKeyboard(user);
     const info = await readFocus(user);

@@ -1,12 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
 
-const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16d';
+const ROUTE = '/app/settings/appearance?scenario=01';
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 
 const lightSeg = (page: Page) =>
-  page.locator('.user-menu-seg button', { hasText: '浅色' });
+  page.getByRole('radio', { name: '浅色' });
 const darkSeg = (page: Page) =>
-  page.locator('.user-menu-seg button', { hasText: '深色' });
+  page.getByRole('radio', { name: '深色' });
 
 const rootTheme = (page: Page) =>
   page.evaluate(() => ({

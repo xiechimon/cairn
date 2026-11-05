@@ -1,29 +1,15 @@
 import { spawn } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
-import {
-  chmodSync,
-  createReadStream,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  readlinkSync,
-  renameSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-} from 'node:fs';
+import { existsSync, readFileSync, readlinkSync } from 'node:fs';
 import { constants } from 'node:os';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
-import { publishOrbDist } from './dist.js';
-import { isOrbPathId, orbReleaseKeySchema } from './protocol.js';
-import { prepareOrbSeed } from './seed.js';
+import { defaultOrbDistSource, publishOrbDist } from './dist.js';
+import { assertOrbMachineName, orbMachineName } from './names.js';
+import { orbReleaseKeySchema } from './protocol.js';
+import { checkOrbDirectory } from './runtime-fs.js';
+import { publishOrbSeed } from './seed.js';
 
 export interface OrbHandle {
   id: string;
@@ -198,11 +184,7 @@ export class NspawnOrbProvider implements OrbProvider {
     this.runtimeRoot = options.runtimeRoot ?? '/run/cairn-orb';
     this.distRoot = options.distRoot ?? '/var/lib/cairn-orb/dist';
     this.seedRoot = options.seedRoot ?? '/var/lib/cairn-orb/seed';
-    this.distSource =
-      options.distSource ??
-      (import.meta.url.endsWith('.ts')
-        ? join(dirname(fileURLToPath(import.meta.url)), '../../dist')
-        : dirname(fileURLToPath(import.meta.url)));
+    this.distSource = options.distSource ?? defaultOrbDistSource();
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? 5_000;
     this.runtimeDirectoryTimeoutMs = options.runtimeDirectoryTimeoutMs ?? 30_000;
     if (!Number.isFinite(this.runtimeDirectoryTimeoutMs) || this.runtimeDirectoryTimeoutMs < 0)
@@ -236,14 +218,9 @@ export class NspawnOrbProvider implements OrbProvider {
     const startedAt = Date.now();
     let handle = this.handles.get(input.conversationId);
     if (!handle) {
-      const suffix =
-        input.conversationId !== 'base' &&
-        /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,44}[a-zA-Z0-9])?$/.test(input.conversationId)
-          ? input.conversationId
-          : createHash('sha256').update(input.conversationId).digest('hex').slice(0, 54);
       handle = {
         ...input,
-        id: `cairn-orb-${suffix}`,
+        id: orbMachineName(input.conversationId),
         running: false,
         lastUsedAt: startedAt,
         notes: [],
@@ -266,7 +243,7 @@ export class NspawnOrbProvider implements OrbProvider {
         ['dist', this.distRoot],
         ['seed', this.seedRoot],
       ] as const) {
-        if (!this.checkDirectory(root, `Orb ${name} root`))
+        if (!checkOrbDirectory(root, `Orb ${name} root`))
           throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
       }
       handle.expectedReleaseKey = await publishOrbDist(
@@ -287,26 +264,16 @@ export class NspawnOrbProvider implements OrbProvider {
         },
       );
       this.save();
-      if (seed) {
-        if (!isOrbPathId(handle.projectId)) throw new Error('Invalid orb project id');
-        const project = join(this.seedRoot, handle.projectId);
-        mkdirSync(project, { recursive: true, mode: 0o755 });
-        const snapshot = mkdtempSync(join(project, '.snapshot-'));
-        try {
-          await prepareOrbSeed({ source: seed, directory: snapshot, projectId: handle.projectId });
-          await this.publish(snapshot, join(project, 'current'), handle.projectId);
-          const link = join(project, `.repo-${randomUUID()}`);
-          try {
-            symlinkSync('current/repo', link);
-            renameSync(link, join(project, 'repo'));
-          } finally {
-            rmSync(link, { force: true });
-          }
-        } catch (error) {
-          rmSync(snapshot, { recursive: true, force: true });
-          throw error;
-        }
-      }
+      if (seed)
+        await publishOrbSeed({
+          source: seed,
+          root: this.seedRoot,
+          projectId: handle.projectId,
+          runningSeedKeys: () =>
+            [...this.handles.values()]
+              .filter((machine) => machine.running && machine.projectId === handle.projectId)
+              .map((machine) => machine.seedKey),
+        });
     });
     this.publishing = publish.catch(() => {});
     await publish;
@@ -345,7 +312,7 @@ export class NspawnOrbProvider implements OrbProvider {
       const deadline = Date.now() + this.runtimeDirectoryTimeoutMs;
       while (true) {
         options.signal?.throwIfAborted();
-        if (this.checkDirectory(directory, 'Orb runtime directory', 0o700)) return;
+        if (checkOrbDirectory(directory, 'Orb runtime directory', 0o700)) return;
         const remaining = deadline - Date.now();
         if (remaining <= 0)
           throw new Error(`Timed out waiting for orb runtime directory: ${directory}`);
@@ -365,18 +332,6 @@ export class NspawnOrbProvider implements OrbProvider {
       throw new Error('Orb authenticated release does not match published release');
     handle.releaseKey = release;
     this.save();
-  }
-
-  private checkDirectory(directory: string, label: string, mode?: number): boolean {
-    const stats = lstatSync(directory, { throwIfNoEntry: false });
-    if (!stats) return false;
-    if (!stats.isDirectory()) throw new Error(`${label} must be a real directory: ${directory}`);
-    const uid = process.getuid?.();
-    if (uid === undefined || stats.uid !== uid)
-      throw new Error(`${label} must be owned by daemon uid ${uid}: ${directory}`);
-    if (mode !== undefined && (stats.mode & 0o7777) !== mode)
-      throw new Error(`${label} must have mode 0700: ${directory}`);
-    return true;
   }
 
   async stop(handle: OrbHandle): Promise<void> {
@@ -447,50 +402,8 @@ export class NspawnOrbProvider implements OrbProvider {
       throw new Error(`${argv[0]} ${argv[1]} failed (${result.code}): ${result.stderr}`);
   }
 
-  private async publish(directory: string, target: string, projectId: string): Promise<void> {
-    chmodSync(directory, 0o755);
-    const hash = createHash('sha256');
-    const files = readdirSync(directory, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => relative(directory, join(entry.parentPath, entry.name)))
-      .sort();
-    for (const file of files) {
-      const path = join(directory, file);
-      hash.update(JSON.stringify([file, statSync(path).size]));
-      for await (const chunk of createReadStream(path)) hash.update(chunk);
-    }
-    const version = join(dirname(target), `.data-${hash.digest('hex')}`);
-    if (existsSync(version)) rmSync(directory, { recursive: true, force: true });
-    else renameSync(directory, version);
-    const link = `${target}-${randomUUID()}`;
-    try {
-      symlinkSync(basename(version), link);
-      renameSync(link, target);
-    } finally {
-      rmSync(link, { force: true });
-    }
-    const running = [...this.handles.values()].filter(
-      (handle) => handle.running && handle.projectId === projectId,
-    );
-    if (running.some((handle) => handle.seedKey === undefined)) return;
-    const retained = new Set(running.map((handle) => handle.seedKey));
-    retained.add(basename(version));
-    for (const entry of readdirSync(dirname(target), { withFileTypes: true })) {
-      if (
-        entry.isDirectory() &&
-        /^\.data-[a-f0-9]{64}$/.test(entry.name) &&
-        !retained.has(entry.name)
-      )
-        rmSync(join(dirname(target), entry.name), { recursive: true, force: true });
-    }
-  }
-
   private validate(handle: OrbHandle): void {
-    if (
-      !/^cairn-orb-[a-zA-Z0-9][a-zA-Z0-9-]{0,53}$/.test(handle.id) ||
-      handle.id === 'cairn-orb-base'
-    )
-      throw new Error('Invalid orb machine name');
+    assertOrbMachineName(handle.id);
   }
 
   private save(): void {

@@ -1,13 +1,34 @@
-import type { StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import {
+  type ChiefThread,
+  parseLocalMergeInstruction,
+  type StepQueueBlocked,
+  type StepQueueInfo,
+} from '@cairn/shared';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
+import { nowMs } from '../lib/ids.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentForStep,
   agentIdForStep,
   missingCapabilities,
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
+import { projectOfTodo } from './git.js';
+import {
+  priorSessionOf,
+  type RouteVerdict,
+  routeTargets,
+  routeVerdict,
+  targetUnavailable,
+  type WorkerStepFacts,
+  waitingSince,
+  workerIneligibility,
+} from './machine-routing.js';
+import { effectiveModel } from './model-fallback.js';
+import { mergedCatalogModels } from './model-liveness.js';
+import { applyRoute, policyForStep, routeForStep } from './routing-rules.js';
 
 export interface QueueTargetStep {
   id: string;
@@ -25,6 +46,10 @@ export function stepQueueProjector(db: Db, teamId: string) {
       kind: step.kind,
       prompt: step.prompt,
       fallback: step.fallback,
+      buildId: step.buildId,
+      freshSession: step.freshSession,
+      holdUntil: step.holdUntil,
+      buildRow: build,
       todoRow: todo,
     })
     .from(step)
@@ -41,7 +66,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       id: step.id,
       createdAt: step.createdAt,
       threadId: step.buildId,
-      home: agent.machineId,
+      boundAgent: agent,
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
       chiefId: chiefThread.chiefId,
@@ -51,7 +76,11 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
-    .all();
+    .all()
+    .map(({ boundAgent, ...row }) => ({
+      ...row,
+      home: routedChiefAgent(db, teamId, boundAgent).machineId,
+    }));
   const queue = [...workerQueue, ...chiefRows].sort(
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
   );
@@ -88,10 +117,70 @@ export function stepQueueProjector(db: Db, teamId: string) {
 
   function agentForRow(row: (typeof queue)[number]): typeof agent.$inferSelect | null {
     if ('todoRow' in row) {
-      return agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
+      const base = agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
+      return base === null
+        ? null
+        : applyRoute(
+            base,
+            routeForStep(db, row.todoRow, row.kind),
+            row.todoRow.routeOverride,
+            policyForStep(db, row.todoRow, row.kind),
+          );
     }
     const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
-    return agentRowOf(chiefRow?.agentId ?? null);
+    const bound = agentRowOf(chiefRow?.agentId ?? null);
+    return bound === null || chiefRow === undefined
+      ? bound
+      : routedChiefAgent(db, chiefRow.teamId, bound);
+  }
+
+  const catalog = mergedCatalogModels();
+
+  interface WorkerRouting {
+    verdict: RouteVerdict;
+    blocked: StepQueueBlocked | undefined;
+  }
+
+  function workerRouting(
+    target: QueueTargetStep,
+    row: (typeof workerQueue)[number],
+  ): WorkerRouting | null {
+    const agentRow = agentForRow(row);
+    if (agentRow === null || agentRow.modelId == null) return null;
+    const now = nowMs();
+    const facts: WorkerStepFacts = {
+      agentRow,
+      model: effectiveModel(agentRow, row),
+      localProject: projectOfTodo(db, row.todoRow)?.repoKind === 'local',
+      localMerge: parseLocalMergeInstruction(row.prompt) !== null,
+      routed: true,
+    };
+    const unavailable = (id: string) =>
+      targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
+    const prior = priorSessionOf(db, row, row.buildRow);
+    const verdict = routeVerdict({
+      machineId: null,
+      targets: routeTargets(
+        !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null,
+        target.homeMachineId,
+      ),
+      unavailable,
+      waitingSince: waitingSince({ createdAt: row.createdAt, holdUntil: row.holdUntil }),
+      now,
+    });
+    if (teamMachines.some((m) => !unavailable(m.id))) return { verdict, blocked: undefined };
+    const home = target.homeMachineId === null ? undefined : machineRowOf(target.homeMachineId);
+    if (home === undefined || !home.online) {
+      return { verdict, blocked: { kind: 'machine-offline', missing: [] } };
+    }
+    const gap = workerIneligibility(db, home, facts, catalog, now);
+    return {
+      verdict,
+      blocked:
+        gap?.kind === 'capability'
+          ? { kind: 'capability-missing', missing: gap.missing }
+          : undefined,
+    };
   }
 
   function blockedFor(
@@ -121,15 +210,28 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const pool = queue.filter((r) => r.home === target.homeMachineId);
     const position = pool.findIndex((r) => r.id === target.id) + 1;
     if (position === 0) return null;
+    const routing =
+      'todoRow' in queueRow && routeForStep(db, queueRow.todoRow, queueRow.kind) !== null
+        ? workerRouting(target, queueRow)
+        : null;
+    const waitingOn =
+      routing === null
+        ? target.homeMachineId
+        : routing.verdict.claim
+          ? null
+          : routing.verdict.waitingFor;
     let waitingFor: StepQueueInfo['waitingFor'] = null;
-    if (target.homeMachineId !== null) {
-      const row = machineRowOf(target.homeMachineId);
+    if (waitingOn !== null) {
+      const row = machineRowOf(waitingOn);
       if (row !== undefined) {
         waitingFor = {
           machineId: row.id,
           name: row.name,
           running: claimedCount(row.id),
           capacity: row.maxConcurrent,
+          ...(routing !== null && !routing.verdict.claim
+            ? { fallbackAt: routing.verdict.fallbackAt }
+            : {}),
         };
       }
     }
@@ -137,7 +239,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       target.holdReason === 'quota' && target.holdUntil != null
         ? { reason: 'quota', retryAt: target.holdUntil }
         : undefined;
-    const blocked = blockedFor(target, queueRow);
+    const blocked = routing !== null ? routing.blocked : blockedFor(target, queueRow);
     return {
       position,
       waitingFor,
@@ -147,6 +249,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
   }
 
   function pendingChiefOf(threadId: string): QueueTargetStep | null {
+    const turnRunning = db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
+      .get();
+    if (turnRunning !== undefined) return null;
     const rows = chiefRows.filter((r) => r.threadId === threadId);
     const last = rows[rows.length - 1];
     if (last === undefined) return null;
@@ -159,5 +267,25 @@ export function stepQueueProjector(db: Db, teamId: string) {
     };
   }
 
-  return { project, pendingChiefOf };
+  function chiefTurnQueueOf(threadId: string): ChiefThread['turnQueue'] {
+    if (pendingChiefOf(threadId) === null) return null;
+    const oldest = db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'pending')))
+      .orderBy(asc(step.createdAt), sql`rowid`)
+      .get();
+    const head = chiefRows.find((r) => r.id === oldest?.id);
+    if (head === undefined) return null;
+    const info = project({
+      id: head.id,
+      createdAt: head.createdAt,
+      homeMachineId: head.home,
+      holdReason: head.holdReason,
+      holdUntil: head.holdUntil,
+    });
+    return info === null ? null : { ...info, stepId: head.id };
+  }
+
+  return { project, pendingChiefOf, chiefTurnQueueOf };
 }

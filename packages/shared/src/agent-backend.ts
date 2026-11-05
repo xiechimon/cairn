@@ -40,6 +40,7 @@ export const modelUsageSchema = z.object({
   cacheWrite: z.number().int(),
   cost: modelCostSchema.optional(),
   ttftMs: z.number().int().nonnegative().optional(),
+  contextTokens: z.number().int().nonnegative().optional(),
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;
 
@@ -104,7 +105,11 @@ export const stepEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('done'), usage: agentTokenUsageSchema }),
   z.object({
     type: z.literal('error'),
-    error: z.object({ message: z.string(), retryable: z.boolean() }),
+    error: z.object({
+      message: z.string(),
+      retryable: z.boolean(),
+      processCrash: z.boolean().optional(),
+    }),
   }),
 ]);
 export type StepEvent = z.infer<typeof stepEventSchema>;
@@ -128,6 +133,7 @@ export interface AgentBackendCapabilities {
 
 export interface SessionOpts {
   provider: ProviderConfig;
+  lockedDown?: boolean;
   modelId: string;
   thinkingLevel?: string;
   systemPrompt?: string;

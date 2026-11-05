@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Code/AgentProjects/cairn/apps/daemon
+WorkingDirectory=%h/Code/AgentProjects/cairn-exec/apps/daemon
 Environment=CAIRN_EXECUTOR=orb
 Environment=CAIRN_HOME=%h/.cairn-orb-daemon
 Environment=CAIRN_WORKSPACES_DIR=%h/.cairn-orb-daemon/workspaces

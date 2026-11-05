@@ -10,62 +10,10 @@
   }
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .todo-card {
-    transition:
-      background-color var(--dur-fast) var(--ease-standard),
-      box-shadow 200ms var(--ease-out-expo),
-      translate 200ms var(--ease-out-expo);
-  }
-
-  .todo-card:hover {
-    background-color: var(--card-hover);
-  }
-}
-
-body[data-board-dragging] .todo-card:hover {
-  background-color: var(--card);
-  box-shadow: var(--panel-shadow);
-  translate: none;
-}
-
-@keyframes card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.todo-card {
-  animation: card-enter var(--dur-fast) var(--ease-pop);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .todo-card-branch {
-    transition: background-color var(--dur-fast) var(--ease-standard);
-  }
-
-  .todo-card-branch:hover {
-    background-color: var(--accent-soft);
-  }
-}
-
 button:active,
 [role="button"]:active,
 a:active {
   opacity: 0.85;
-}
-
-.todo-card:active {
-  background-color: var(--surface-press);
-}
-
-.todo-card-link:active {
-  opacity: 1;
 }
 
 @media (pointer: coarse) {
@@ -74,12 +22,6 @@ a:active {
   a:active {
     transition-duration: 0s;
   }
-}
-
-body[data-board-dragging] {
-  cursor: grabbing;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .theme-suppress,
@@ -94,65 +36,6 @@ body[data-board-dragging] {
 .sidebar-team-collapse:active,
 .rail-toggle:active {
   opacity: 1;
-}
-
-@keyframes spinner-breathe {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.92);
-  }
-}
-
-@keyframes message-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes saved-check-decay {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-}
-
-@keyframes grapheme-reveal {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.anim-message-fade-up {
-  animation: message-fade-up var(--spring-snappy-dur) var(--spring-snappy) both;
-}
-
-.anim-saved-check {
-  animation: saved-check-decay 2.5s var(--ease-out-expo) both;
-}
-
-.anim-grapheme-reveal {
-  animation: grapheme-reveal 350ms var(--ease-out-expo) both;
 }
 
 .scroll-fade {
@@ -328,27 +211,6 @@ body[data-board-dragging] {
   mask-composite: intersect;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .anim-message-fade-up,
-  .anim-saved-check,
-  .anim-grapheme-reveal {
-    animation: none;
-  }
-}
-
-@keyframes task-panel-flash {
-  from {
-    background-color: var(--accent-soft);
-  }
-  to {
-    background-color: transparent;
-  }
-}
-
-.task-panel-row[data-flash="true"] {
-  animation: task-panel-flash 1.4s var(--ease-standard);
-}
-
 @keyframes side-panel-in {
   from {
     opacity: 0;
@@ -356,8 +218,10 @@ body[data-board-dragging] {
   }
 }
 
-.side-panel {
-  animation: side-panel-in 220ms var(--ease-standard);
+@media (max-width: 1100px) {
+  .side-panel {
+    animation: side-panel-in 220ms var(--ease-standard);
+  }
 }
 
 @keyframes side-panel-scrim-in {
@@ -368,4 +232,18 @@ body[data-board-dragging] {
 
 .side-panel-scrim {
   animation: side-panel-scrim-in 200ms var(--ease-standard);
+}
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"],
+  [data-slot="tooltip-content"]
+)[data-closed] {
+  animation: none;
+}
+
+[data-slot="message-scroller-button"][data-active="false"] {
+  transition-duration: var(--dur-fast);
 }

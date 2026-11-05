@@ -1,23 +1,27 @@
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, MachineClaimBody } from '@cairn/shared';
 import {
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
-  CHIEF_REMOTE_TOOLS,
   claudeLoginBlocksClaim,
   claudeRateBlock,
   formatSkillRouteSection,
+  isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   parseLocalMergeInstruction,
+  type RemoteToolDef,
   type SkillInjectionRecord,
+  type StepKind,
   selectSkillsForTask,
   suggestSkillsForMessage,
+  WORKER_ASK_USER_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
+  WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, machine, skillAudit, step, todo } from '../db/schema.js';
@@ -35,10 +39,13 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { coordinatorMachineId, coordinatorSidecarEnabled } from './coordinator-context.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
+  projectRunningCount,
   runtimeGatePasses,
   stepRuntimeFor,
   unassignedStepReason,
@@ -51,9 +58,28 @@ import {
   publishStepStatus,
   upsertMessage,
 } from './machine-deps.js';
+import {
+  pinAllows,
+  priorSessionOf,
+  routeTargets,
+  routeVerdict,
+  targetUnavailable,
+  type WorkerStepFacts,
+  waitingSince,
+  workerIneligibility,
+} from './machine-routing.js';
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
+import { mergedCatalogModels } from './model-liveness.js';
+import { stepScopeProjectId } from './picked-project.js';
+import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
+import {
+  chiefRemoteTools,
+  memoryOwnerOf,
+  routeForStep,
+  routingRulesEnabled,
+} from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -121,7 +147,49 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
       ),
     )
     .orderBy(asc(step.createdAt))
-    .all();
+    .all()
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }))
+    .filter((row) => !sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
+}
+
+function sidecarTakesTurn(
+  deps: MachineDeps,
+  teamId: string,
+  stepRow: typeof step.$inferSelect,
+  agentRow: typeof agent.$inferSelect,
+): boolean {
+  if (!coordinatorSidecarEnabled() || isChiefDigestStep(stepRow) || !agentRow.modelId) return false;
+  const model = effectiveModel(agentRow, stepRow);
+  return (
+    stepRuntimeFor(model.provider) === 'pi' &&
+    claudeUsageGatePasses(deps, { teamId, claudeCodeReport: null }, model)
+  );
+}
+
+function coordinatorTurnCandidates(deps: MachineDeps, machineId: string, teamId: string) {
+  return deps.db
+    .select({ stepRow: step, threadRow: chiefThread, agentRow: agent })
+    .from(step)
+    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .innerJoin(agent, eq(chief.agentId, agent.id))
+    .where(
+      and(
+        eq(step.kind, 'chief'),
+        eq(chiefThread.teamId, teamId),
+        or(
+          and(eq(step.status, 'claimed'), eq(step.machineId, machineId)),
+          and(
+            eq(step.status, 'pending'),
+            or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
+          ),
+        ),
+      ),
+    )
+    .orderBy(asc(step.createdAt))
+    .all()
+    .map((row) => ({ ...row, agentRow: routedChiefAgent(deps.db, teamId, row.agentRow) }))
+    .filter((row) => sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
@@ -193,6 +261,18 @@ function buildChiefClaim(
     .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
     .run();
   if (res.changes === 0) return null;
+  return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
+}
+
+function chiefClaimPayload(
+  deps: MachineDeps,
+  machineId: string,
+  stepRow: typeof step.$inferSelect,
+  threadRow: typeof chiefThread.$inferSelect,
+  agentRow: typeof agent.$inferSelect,
+  machineRow?: typeof machine.$inferSelect,
+): ClaimedStep {
+  const model = effectiveModel(agentRow, stepRow);
   const digest = isChiefDigestStep(stepRow);
   const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
   const trigger = parseChiefTrigger(stepRow.prompt);
@@ -209,7 +289,18 @@ function buildChiefClaim(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemories(deps.db, { agentId: agentRow.id });
+  const memories = injectMemories(deps.db, { agentId: agentRow.id, projectId: null });
+  const projectSection = digest
+    ? null
+    : projectTurnContext(deps.db, {
+        teamId: threadRow.teamId,
+        agentId: agentRow.id,
+        projectId: stepScopeProjectId(stepRow),
+      });
+  const instruction =
+    stepRow.prompt === null
+      ? null
+      : [stepRow.prompt, projectSection, routeSection].filter((part) => part).join('\n\n');
   const chiefMcp = digest
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -226,10 +317,9 @@ function buildChiefClaim(
       action: !stepRow.freshSession && threadRow.sessionId !== '' ? 'continue' : 'new',
       sessionId: !stepRow.freshSession && threadRow.sessionId !== '' ? threadRow.sessionId : null,
     },
-    ...(stepRow.prompt !== null
+    ...(instruction !== null
       ? {
-          instruction:
-            routeSection === '' ? stepRow.prompt : `${stepRow.prompt}\n\n${routeSection}`,
+          instruction,
         }
       : {}),
     agent: {
@@ -246,49 +336,93 @@ function buildChiefClaim(
       systemPrompt,
       trigger,
     },
-    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : CHIEF_REMOTE_TOOLS)],
+    remoteTools: [...(digest ? CHIEF_DIGEST_REMOTE_TOOLS : chiefRemoteTools())],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(digest ? { remoteToolsOnly: true as const } : {}),
   };
 }
 
-async function tryClaim(
+function claimCoordinatorTurn(
   deps: MachineDeps,
   machineId: string,
   teamId: string,
-  origin: string,
-  maxWorkers?: number,
-): Promise<ClaimedStep | null> {
+): ClaimedStep | null {
+  if (machineId !== coordinatorMachineId()) return null;
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
-  refreshClaudeRateParks(deps, teamId);
-  const blockedCache = new Map<string, boolean>();
-  const claudeBlocked = (id: string | null): boolean => {
+  for (const cand of coordinatorTurnCandidates(deps, machineId, teamId)) {
+    if (cand.stepRow.status === 'claimed') {
+      return chiefClaimPayload(
+        deps,
+        machineId,
+        cand.stepRow,
+        cand.threadRow,
+        cand.agentRow,
+        machineRow,
+      );
+    }
+    if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
+    const claimedAt = nowMs();
+    const res = db
+      .update(step)
+      .set({
+        status: 'claimed',
+        machineId,
+        claimedAt,
+        lastHeartbeatAt: claimedAt,
+        holdReason: null,
+        holdUntil: null,
+      })
+      .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
+      .run();
+    if (res.changes === 0) continue;
+    publishStepStatus(deps, cand.stepRow.id);
+    return chiefClaimPayload(
+      deps,
+      machineId,
+      cand.stepRow,
+      cand.threadRow,
+      cand.agentRow,
+      machineRow,
+    );
+  }
+  return null;
+}
+
+function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
+  const cache = new Map<string, boolean>();
+  return (id) => {
     if (id === null) return false;
-    const cached = blockedCache.get(id);
+    const cached = cache.get(id);
     if (cached !== undefined) return cached;
-    const row =
-      id === machineId ? machineRow : db.select().from(machine).where(eq(machine.id, id)).get();
+    const row = db.select().from(machine).where(eq(machine.id, id)).get();
     const blocked = claudeRateBlock(row?.claudeRateLimits ?? [], nowMs()) !== null;
-    blockedCache.set(id, blocked);
+    cache.set(id, blocked);
     return blocked;
   };
-  const running = machineRunningCount(db, machineId);
-  const workerCap = Math.min(
-    machineRow.maxConcurrent,
-    ...(maxWorkers !== undefined ? [maxWorkers] : []),
-  );
-  const full = running >= workerCap;
-  const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
-  const chiefCands = full
-    ? []
-    : claimChiefCandidates(deps, machineId, teamId).sort(
-        (a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)),
-      );
-  const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
-  for (const cand of chiefCands) {
-    if (cand.stepRow.createdAt > earliestWorker) break;
+}
+
+function workerCapOf(machineRow: typeof machine.$inferSelect, maxWorkers?: number): number {
+  return Math.min(machineRow.maxConcurrent, ...(maxWorkers !== undefined ? [maxWorkers] : []));
+}
+
+function claimChiefTurn(
+  deps: MachineDeps,
+  machineId: string,
+  teamId: string,
+  maxWorkers: number | undefined,
+  createdUpTo: number,
+): ClaimedStep | null {
+  const { db } = deps;
+  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!machineRow) return null;
+  if (machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers)) return null;
+  const claudeBlocked = claudeBlockedReader(db);
+  const cands = claimChiefCandidates(deps, machineId, teamId)
+    .filter((cand) => cand.stepRow.createdAt <= createdUpTo)
+    .sort((a, b) => Number(isChiefDigestStep(a.stepRow)) - Number(isChiefDigestStep(b.stepRow)));
+  for (const cand of cands) {
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
       isChiefDigestStep(cand.stepRow) &&
@@ -320,6 +454,37 @@ async function tryClaim(
       return claimed;
     }
   }
+  return null;
+}
+
+async function tryClaim(
+  deps: MachineDeps,
+  machineId: string,
+  teamId: string,
+  origin: string,
+  maxWorkers?: number,
+): Promise<ClaimedStep | null> {
+  const { db } = deps;
+  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!machineRow) return null;
+  refreshClaudeRateParks(deps, teamId);
+  const catalog = mergedCatalogModels();
+  const machineCache = new Map<string, typeof machine.$inferSelect | undefined>();
+  const machineById = (id: string) => {
+    if (!machineCache.has(id)) {
+      machineCache.set(id, db.select().from(machine).where(eq(machine.id, id)).get());
+    }
+    return machineCache.get(id);
+  };
+  const full = machineRunningCount(db, machineId) >= workerCapOf(machineRow, maxWorkers);
+  const queued = full ? [] : claimCandidates(deps, machineId, teamId);
+  const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
+  const workerCands = [
+    ...queued.filter((cand) => cand.stepRow.byPerson),
+    ...queued.filter((cand) => !cand.stepRow.byPerson),
+  ];
+  const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
+  if (chiefAhead) return chiefAhead;
 
   for (const cand of workerCands) {
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
@@ -364,52 +529,58 @@ async function tryClaim(
     )
       continue;
     const model = effectiveModel(agentRow, cand.stepRow);
-    const runtime = stepRuntimeFor(model.provider);
-    if (runtime === 'claude-code' && claudeBlocked(machineId)) continue;
-    if (agentRow.machineId !== machineId) {
-      if (runtime !== 'claude-code' || !claudeBlocked(agentRow.machineId)) continue;
-    }
-    if (!runtimeGatePasses(machineRow, model.provider)) continue;
-    if (localMerge === null && !claudeUsageGatePasses(deps, machineRow, model)) continue;
-    if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) continue;
-    if (!capabilityGatePasses(machineRow, agentRow)) continue;
+    const now = nowMs();
+    const routed = routeForStep(db, cand.todoRow, cand.stepRow.kind) !== null;
+    const facts: WorkerStepFacts = {
+      agentRow,
+      model,
+      localProject: projectOfTodo(db, cand.todoRow)?.repoKind === 'local',
+      localMerge: localMerge !== null,
+      routed,
+    };
+    if (workerIneligibility(db, machineRow, facts, catalog, now) !== null) continue;
     if (
       agentRow.maxConcurrentTasks !== null &&
       agentRunningCount(db, agentRow.id) >= agentRow.maxConcurrentTasks
     ) {
       continue;
     }
-    const prior = db
-      .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, cand.stepRow.buildId),
-          sql`${step.sessionId} is not null`,
-          ...(cand.stepRow.kind === 'build' &&
-          (cand.buildRow.prevPhase === 'done' || cand.buildRow.prevPhase === 'review')
-            ? [eq(step.kind, 'build')]
-            : []),
-        ),
-      )
-      .orderBy(asc(step.createdAt))
-      .all();
-    const latestPrior = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
-    const priorRow =
-      latestPrior !== null &&
-      (latestPrior.fallback?.model?.provider ?? null) ===
-        (cand.stepRow.fallback?.model?.provider ?? null)
-        ? latestPrior
-        : null;
-    const priorSessionId = priorRow?.sessionId ?? null;
-    const priorMachineId = priorRow?.machineId ?? null;
+    const projectCap = projectOfTodo(db, cand.todoRow)?.maxConcurrent ?? null;
+    const projectFull = (reader: Pick<typeof db, 'select'>) =>
+      projectCap !== null &&
+      projectRunningCount(reader, cand.todoRow.projectId) >=
+        projectCap + (cand.stepRow.byPerson ? 1 : 0);
+    if (projectFull(db)) continue;
+    const { priorSessionId, priorMachineId, freshSession } = priorSessionOf(
+      db,
+      cand.stepRow,
+      cand.buildRow,
+    );
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
-    const planHandoffMissing =
-      cand.stepRow.kind === 'build' && cand.buildRow.withPlan && cand.buildRow.planDocId === null;
+    const allowed = routed
+      ? routeVerdict({
+          machineId,
+          targets: routeTargets(
+            !freshSession && priorSessionId !== null ? priorMachineId : null,
+            agentRow.machineId,
+          ),
+          unavailable: (targetId) =>
+            targetUnavailable(db, machineById(targetId), teamId, facts, catalog, now),
+          waitingSince: waitingSince(cand.stepRow),
+          now,
+        }).claim
+      : pinAllows({
+          machineId,
+          pinned: agentRow.machineId === null ? undefined : machineById(agentRow.machineId),
+          pinnedId: agentRow.machineId,
+          model,
+          now,
+        });
+    if (!allowed) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
     const guardPr =
-      cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
+      cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
@@ -429,6 +600,7 @@ async function tryClaim(
     let won = false;
     try {
       won = db.transaction((tx) => {
+        if (projectFull(tx)) return false;
         const res = tx
           .update(step)
           .set({
@@ -480,17 +652,13 @@ async function tryClaim(
     if (cand.todoRow.phase === 'queued') {
       setTodoPhase(deps, cand.todoRow.id, cand.stepRow.kind === 'plan' ? 'planning' : 'building');
     }
-    const session =
-      planHandoffMissing ||
-      cand.stepRow.kind === 'review' ||
-      cand.stepRow.kind === 'verify' ||
-      cand.stepRow.freshSession
-        ? { action: 'new' as const, sessionId: null }
-        : {
-            action: priorSessionId ? ('continue' as const) : ('new' as const),
-            sessionId: priorSessionId,
-            ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
-          };
+    const session = freshSession
+      ? { action: 'new' as const, sessionId: null }
+      : {
+          action: priorSessionId ? ('continue' as const) : ('new' as const),
+          sessionId: priorSessionId,
+          ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
+        };
     const projectRow = projectOfTodo(db, cand.todoRow);
     const repoRef = projectRepoRef(projectRow, origin);
     const mergeTarget =
@@ -544,7 +712,12 @@ async function tryClaim(
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
         output: cand.todoRow.output,
       },
-      project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
+      project: {
+        id: cand.todoRow.projectId,
+        name: projectRow?.name ?? '',
+        ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
+        repo,
+      },
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,
@@ -553,7 +726,7 @@ async function tryClaim(
         modelId: model.modelId,
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
-          agentId: agentRow.id,
+          agentId: memoryOwnerOf(db, teamId, agentRow.id, cand.stepRow.kind),
           projectId: cand.todoRow.projectId,
         }),
         defaultSkill: agentRow.defaultSkill,
@@ -561,17 +734,21 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
-        (tool) =>
-          cand.stepRow.kind === 'plan' ||
-          cand.stepRow.kind === 'build' ||
-          !isThreadScheduleTool(tool.name),
-      ),
+      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject),
       localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
-  return null;
+  return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
+}
+
+export function workerRemoteTools(kind: StepKind, isGithubProject: boolean): RemoteToolDef[] {
+  const base = (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
+    (tool) => kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name),
+  );
+  return kind === 'session' && routingRulesEnabled()
+    ? [...base, WORKER_ASK_USER_TOOL, WORKER_THREAD_REPORT_TOOL]
+    : [...base];
 }
 
 export async function claimStep(
@@ -581,10 +758,18 @@ export async function claimStep(
   holdMs: number,
   origin: string,
   signal?: AbortSignal,
-  body?: { maxWorkers?: number },
+  body?: MachineClaimBody,
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
+  if (body?.role === 'coordinator') {
+    if (machineId !== coordinatorMachineId()) return null;
+    const first = claimCoordinatorTurn(deps, machineId, teamId);
+    if (first) return first;
+    await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
+    if (signal?.aborted) return null;
+    return claimCoordinatorTurn(deps, machineId, teamId);
+  }
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);

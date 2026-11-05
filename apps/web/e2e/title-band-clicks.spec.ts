@@ -45,9 +45,9 @@ for (const [route, scenario] of [
 
 test('team right-slot action owns its hit area (`设置` in the top bar)', async ({ page }) => {
   await page.goto('/app/team?scenario=12');
-  const right = page.locator('[aria-label="设置"]');
-  expect(await right.count()).toBeGreaterThan(0);
-  await expectOwnsCenter(page, '[aria-label="设置"]');
+  const right = page.locator('[role="dialog"] [aria-label="设置"]');
+  await expect(right).toBeVisible();
+  await expectOwnsCenter(page, '[role="dialog"] [aria-label="设置"]');
 });
 
 // resource-new testid: the hit-test probe claims the element by CSS selector,
@@ -59,13 +59,14 @@ for (const [route, scenario] of [
 ] as const) {
   test(`resources \`新建\` owns its hit area — ${route}`, async ({ page }) => {
     await page.goto(`${route}?scenario=${scenario}`);
+    await expect(page.getByTestId('resource-new')).toBeVisible();
     await expectOwnsCenter(page, '[data-testid="resource-new"]');
   });
 }
 
 for (const [route, backTo] of [
-  ['/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06', '/app/resources/machines'],
-  ['/app/resources/agents/r3-builder?scenario=agent-detail', '/app/team'],
+  ['/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06', '/app/settings/machines'],
+  ['/app/resources/agents/r3-builder?scenario=agent-detail', '/app/settings/team'],
   [
     '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
     /\/app\?scenario=r2-24c&project=ZAQczKCu0MOAzC1ZqcFlX$/,

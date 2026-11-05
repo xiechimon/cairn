@@ -1,23 +1,21 @@
 import { expect, test } from '@playwright/test';
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`font baseline: body 450, card title 500, var font really loaded (${theme})`, async ({
+  test(`font baseline: body 450, var font really loaded (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01&view=board');
+    await page.goto('/app/schedules?scenario=01');
 
     const m = await page.evaluate(async () => {
       await document.fonts.ready;
       return {
         bodyWeight: getComputedStyle(document.body).fontWeight,
-        cardTitleWeight: getComputedStyle(document.querySelector('.todo-card-title')!).fontWeight,
         bodyFontLoaded: document.fonts.check('400 14px "instrumentSans"'),
       };
     });
     expect(m.bodyFontLoaded).toBe(true);
     expect(m.bodyWeight).toBe('450');
-    expect(m.cardTitleWeight).toBe('500');
   });
 
   test(`empty-state headline rides the Paper EmptyState title tier (${theme})`, async ({
@@ -33,7 +31,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01&view=board');
+    await page.goto('/app/schedules?scenario=01');
 
     const m = await page.evaluate(() => {
       const row = document.querySelector('.sidebar-team-row');
@@ -63,8 +61,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.markText).toBe('');
     expect(m.markBox).toEqual({ w: 22, h: 22 });
     expect(m.nameText).toContain('Cairn');
-    // the head row keeps its /app/team navigation law
-    expect(m.nameHref).toContain('/app/team');
+    expect(m.nameHref).toBeNull();
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
@@ -87,7 +84,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01&view=board');
+    await page.goto('/app/schedules?scenario=01');
 
     const read = () =>
       page.evaluate(() => {
@@ -118,7 +115,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01&view=board');
+    await page.goto('/app/schedules?scenario=01');
 
     const read = (sel: string) =>
       page.evaluate((s) => {
@@ -235,7 +232,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01&view=board');
+    await page.goto('/app/schedules?scenario=01');
 
     const destructive = await resolveToken(page, '--destructive');
     const card = await resolveToken(page, '--card');
@@ -247,7 +244,7 @@ for (const theme of ['light', 'dark'] as const) {
 
   test(`P5 main-button pair passes 4.5 in both themes (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-    await page.goto('/app?scenario=01&view=board');
+    await page.goto('/app/schedules?scenario=01');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
     expect(bg).toBe(theme === 'dark' ? 'rgb(235, 181, 80)' : 'rgb(154, 101, 0)');
@@ -260,7 +257,7 @@ for (const theme of ['light', 'dark'] as const) {
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
-    await page.locator('.detail-head-icon--more').click();
+    await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
     const menu = page.locator('.more-menu');
     await expect(menu).toBeVisible();
 

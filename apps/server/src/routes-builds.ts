@@ -2,6 +2,7 @@ import {
   type BuildRecord,
   buildStepActionBodySchema,
   buildStopBodySchema,
+  conversationMessagesQuerySchema,
   createBranchSyncBodySchema,
   planRowSchema,
   startBuildsBodySchema,
@@ -28,7 +29,8 @@ import {
   requestStop,
   startBuilds,
 } from './services/builds.js';
-import { chiefThreadMessages, getChiefThread } from './services/chief.js';
+import { getChiefThread } from './services/chief.js';
+import { chiefMessagePage } from './services/coordinator.js';
 import { createSerialConnection } from './services/events.js';
 import {
   projectOfTodo,
@@ -39,6 +41,7 @@ import {
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
 import { PhaseTransitionError } from './services/phase.js';
+import { holdSecondRejectionRework } from './services/research-stuck.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
@@ -68,9 +71,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     if (isChiefConversation(conversationId)) {
       const thread = getChiefThread(svc, conversationId);
       if (!thread) throw notFound(`conversation ${conversationId}`);
-      const rows = chiefThreadMessages(ctx.db, conversationId);
+      const query = parseWith(conversationMessagesQuerySchema, c.req.query(), 'query');
+      const page = chiefMessagePage(svc, conversationId, query);
       return c.json({
-        messages: rows.map((r) => ({
+        messages: page.messages.map((r) => ({
           id: r.id,
           role: r.role,
           content: r.content,
@@ -80,7 +84,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         historyEpoch: 0,
         steerPending: [],
         activeRun: thread.activeRun,
-        nextCursor: null,
+        nextCursor: page.hasEarlier ? (page.messages[0]?.id ?? null) : null,
       });
     }
     const rows = ctx.db
@@ -139,6 +143,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         todoIds: body.todoIds,
         assignment: body.assignment,
         withPlan: body.withPlan,
+        ...(body.routeOverride !== undefined ? { routeOverride: body.routeOverride } : {}),
       });
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
@@ -209,6 +214,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(buildStepActionBodySchema, await jsonBody(c), 'body');
     try {
       await applyBuildStepAction(svc, c.req.param('id'), body);
+      if (body.action === 'revision') holdSecondRejectionRework(svc, c.req.param('id'));
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;

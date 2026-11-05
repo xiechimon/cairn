@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { findLowContrast } from './contrast-probe.js';
-import { pressAndExpect, settleTransitions } from './helpers.js';
+import { expandTurns, pressAndExpect, settleTransitions } from './helpers.js';
 
 // #1442: axe-core (WCAG 2.1 A/AA) over the main pages, light and dark. Any
 // violation fails the test with its rule id, impact and first targets.
@@ -32,14 +32,13 @@ interface AuditPage {
 
 const row = (page: Page) => page.getByTestId('resource-row').first();
 const card = (page: Page) => page.getByTestId('page-col').locator('.settings-card').first();
-const phaseChip = (page: Page) => page.getByTestId('phase-chip');
+const sideChat = (page: Page) => page.getByTestId('side-chat');
 const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 const PAGES: AuditPage[] = [
-  { name: 'board', url: '/app?scenario=board-drag-matrix&view=board', ready: (p) => p.locator('[data-todo-id]').first() },
   {
-    name: 'board search',
-    url: '/app?scenario=01&view=board',
+    name: 'search',
+    url: '/app/schedules?scenario=01',
     open: async (page) => {
       await pressAndExpect(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
@@ -47,29 +46,49 @@ const PAGES: AuditPage[] = [
     ready: (p) => searchDialog(p).locator('[data-row-kind="todo"]').first(),
   },
   {
-    name: 'new task dialog',
-    url: '/app?scenario=01&view=board',
-    open: (page) => page.locator('.sidebar-new-task').click(),
-    ready: (p) => p.getByRole('dialog', { name: '新建任务' }),
+    name: 'new task home composer',
+    url: '/app/schedules?scenario=01',
+    open: (page) =>
+      page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click(),
+    ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
   {
-    name: 'new task dialog filled',
-    url: '/app?scenario=01&view=board',
+    name: 'new task home composer filled',
+    url: '/app/schedules?scenario=01',
     open: async (page) => {
-      await page.locator('.sidebar-new-task').click();
+      await page
+        .getByRole('complementary')
+        .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
+        .click();
+      const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+      await expect(input).toBeVisible();
       await page.keyboard.type('probe');
+      await expect(input).toBeFocused();
     },
-    ready: (p) => p.locator('.new-task-start:enabled'),
+    ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },
-  { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: phaseChip },
-  { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: phaseChip },
-  { name: 'detail review', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27', ready: phaseChip },
+  { name: 'side chat fresh', url: '/app?scenario=23&thread=fresh-probe', ready: sideChat },
   {
-    name: 'detail tool calls',
-    url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
+    name: 'side chat confirm',
+    url: '/app?scenario=17b&thread=7ve0iOkQ-JBpSL98zSiGc',
+    ready: sideChat,
+  },
+  {
+    name: 'side chat review',
+    url: '/app?scenario=27&thread=7ve0iOkQ-JBpSL98zSiGc',
+    ready: sideChat,
+  },
+  {
+    name: 'side chat tool calls',
+    url: '/app?scenario=28&thread=7ve0iOkQ-JBpSL98zSiGc',
+    open: async (p) => {
+      await expandTurns(p);
+      await p.mouse.move(0, 0);
+      await p.waitForTimeout(500);
+    },
     ready: (p) => p.getByTestId('work-call').first(),
   },
-  { name: 'chief window', url: '/app?scenario=100&view=board', ready: (p) => p.locator('.chief-drawer') },
+  { name: 'chief window', url: '/app/schedules?scenario=100', ready: (p) => p.locator('.chief-drawer') },
   { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },
   { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
   {
@@ -98,7 +117,7 @@ const PAGES: AuditPage[] = [
   {
     name: 'providers',
     url: '/app/resources/providers?scenario=01',
-    ready: (p) => p.getByTestId('runtime-empty'),
+    ready: (p) => p.getByTestId('provider-editor'),
   },
   {
     name: 'secrets',

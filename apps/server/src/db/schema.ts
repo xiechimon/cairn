@@ -10,7 +10,13 @@ import type {
   ClaudeCodeReport,
   ClaudeRateLimitWindow,
   ClaudeUsage,
+  ComputerCallState,
+  ComputerControlHolder,
+  ComputerImage,
+  ComputerState,
+  ComputerTool,
   DocumentDiffFile,
+  INTAKE_SOURCE_KIND,
   MachineCapabilities,
   MemoryCandidateStatus,
   ModelRef,
@@ -26,6 +32,8 @@ import type {
   ProviderCompat,
   ProviderModel,
   RequiredCapabilities,
+  RouteOverride,
+  RouteUse,
   ScheduleKind,
   ScheduleReport,
   ShipRoute,
@@ -82,6 +90,8 @@ export const project = sqliteTable('project', {
     .references(() => team.id),
   splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
   description: text('description'),
+  instructions: text('instructions'),
+  maxConcurrent: integer('maxConcurrent'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
@@ -115,6 +125,7 @@ export const todo = sqliteTable(
     seqNum: integer('seqNum').notNull(),
     orderIndex: real('orderIndex').notNull().default(0),
     assignment: json<Assignment | null>('assignment'),
+    routeOverride: json<RouteOverride | null>('routeOverride'),
     latestBuildId: text('latestBuildId'),
     lastRunAt: epochMs('lastRunAt'),
     hasChanges: bool('hasChanges').notNull().default(false),
@@ -128,6 +139,7 @@ export const todo = sqliteTable(
     sourceKind: text('sourceKind').$type<TodoSourceKind | null>(),
     sourceRef: text('sourceRef'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
+    awaitingReply: bool('awaitingReply').notNull().default(false),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()
@@ -178,6 +190,7 @@ export const build = sqliteTable('build', {
   baseSha: text('baseSha'),
   harnessHash: text('harnessHash'),
   reportAttachmentId: text('reportAttachmentId'),
+  reportLine: text('reportLine'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -222,6 +235,8 @@ export const step = sqliteTable(
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
     finishedAt: epochMs('finishedAt'),
     prompt: text('prompt'),
+    scopeProjectId: text('scopeProjectId'),
+    byPerson: bool('byPerson').notNull().default(false),
     freshSession: bool('freshSession').notNull().default(false),
     skillInjection: json<SkillInjectionRecord>('skillInjection'),
     blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
@@ -290,6 +305,73 @@ export const branchSync = sqliteTable('branch_sync', {
   startedAt: epochMs('startedAt'),
   finishedAt: epochMs('finishedAt'),
 });
+
+export const computer = sqliteTable(
+  'computer',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    scope: text('scope').$type<'private'>().notNull().default('private'),
+    scopeKey: text('scopeKey').notNull(),
+    machineId: text('machineId')
+      .notNull()
+      .references(() => machine.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<'orb'>().notNull().default('orb'),
+    providerRef: text('providerRef').notNull(),
+    state: text('state').$type<ComputerState>().notNull().default('stopped'),
+    runningSince: epochMs('runningSince'),
+    executionStepId: text('executionStepId'),
+    executionLeaseExpiresAt: epochMs('executionLeaseExpiresAt'),
+    executionFence: integer('executionFence').notNull().default(0),
+    controlHolder: text('controlHolder').$type<ComputerControlHolder>().notNull().default('none'),
+    controlLeaseId: text('controlLeaseId'),
+    controlLeaseExpiresAt: epochMs('controlLeaseExpiresAt'),
+    controlFence: integer('controlFence').notNull().default(0),
+    screenGeneration: integer('screenGeneration').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('computer_scope_key_idx').on(t.scopeKey)],
+);
+
+export const computerCall = sqliteTable(
+  'computer_call',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    stepId: text('stepId').notNull(),
+    toolCallId: text('toolCallId').notNull(),
+    machineId: text('machineId')
+      .notNull()
+      .references(() => machine.id, { onDelete: 'cascade' }),
+    computerId: text('computerId').references(() => computer.id, { onDelete: 'set null' }),
+    tool: text('tool').$type<ComputerTool>().notNull(),
+    replaySafe: bool('replaySafe').notNull(),
+    params: json<Record<string, unknown>>('params').notNull(),
+    state: text('state').$type<ComputerCallState>().notNull().default('dispatched'),
+    lastSeq: integer('lastSeq').notNull().default(0),
+    outputHead: text('outputHead').notNull().default(''),
+    outputTail: text('outputTail').notNull().default(''),
+    outputChars: integer('outputChars').notNull().default(0),
+    resultText: text('resultText'),
+    resultImages: json<ComputerImage[] | null>('resultImages'),
+    exitCode: integer('exitCode'),
+    errorMessage: text('errorMessage'),
+    errorDelivery: text('errorDelivery').$type<'not_delivered' | 'unknown'>(),
+    deadlineAt: epochMs('deadlineAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    startedAt: epochMs('startedAt'),
+    finishedAt: epochMs('finishedAt'),
+  },
+  (t) => [
+    index('computer_call_step_idx').on(t.stepId),
+    index('computer_call_machine_state_idx').on(t.machineId, t.state),
+  ],
+);
 
 export const queuedMessage = sqliteTable(
   'queued_message',
@@ -361,6 +443,19 @@ export const schedule = sqliteTable(
   ],
 );
 
+export const dueEvent = sqliteTable(
+  'due_event',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull(),
+    dueAt: epochMs('dueAt').notNull(),
+    intervalMs: integer('intervalMs'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('lastError'),
+  },
+  (t) => [index('due_event_dueAt_idx').on(t.dueAt)],
+);
+
 export const notification = sqliteTable(
   'notification',
   {
@@ -411,6 +506,70 @@ export const agent = sqliteTable(
     uniqueIndex('agent_team_persona_unique')
       .on(t.teamId, t.persona)
       .where(sql`${t.persona} is not null`),
+  ],
+);
+
+export const routingRule = sqliteTable(
+  'routing_rule',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    use: text('use').$type<RouteUse>().notNull(),
+    provider: text('provider').notNull(),
+    modelId: text('modelId').notNull(),
+    thinkingLevel: text('thinkingLevel'),
+    fallbackModels: json<ModelRef[] | null>('fallbackModels'),
+    machineId: text('machineId').references(() => machine.id),
+    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
+    tools: json<string[] | null>('tools'),
+    mcpServers: json<string[] | null>('mcpServers'),
+    skillsAllowlist: json<string[] | null>('skillsAllowlist'),
+    defaultSkill: text('defaultSkill'),
+    secrets: json<string[] | null>('secrets'),
+    adoptedAgentIds: json<string[] | null>('adoptedAgentIds'),
+    seededFromAgentId: text('seededFromAgentId'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('routing_rule_team_use_unique').on(t.teamId, t.use)],
+);
+
+export const workPolicy = sqliteTable(
+  'work_policy',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    use: text('use').$type<'session' | 'review'>().notNull(),
+    tools: json<string[]>('tools').notNull(),
+    mcpServers: json<string[]>('mcpServers').notNull(),
+    skillsAllowlist: json<string[] | null>('skillsAllowlist'),
+    defaultSkill: text('defaultSkill'),
+    secrets: json<string[]>('secrets').notNull(),
+    seededFromAgentId: text('seededFromAgentId'),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
+);
+
+export const featureFlag = sqliteTable(
+  'feature_flag',
+  {
+    id: text('id').primaryKey(),
+    key: text('key').notNull(),
+    userId: text('userId').references(() => user.id),
+    enabled: bool('enabled').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('feature_flag_key_global_unique').on(t.key).where(sql`${t.userId} IS NULL`),
+    uniqueIndex('feature_flag_key_user_unique')
+      .on(t.key, t.userId)
+      .where(sql`${t.userId} IS NOT NULL`),
   ],
 );
 
@@ -558,6 +717,7 @@ export const secret = sqliteTable('secret', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
+  projectId: text('projectId').references(() => project.id),
   name: text('name').notNull(),
   description: text('description'),
   valueCipher: text('valueCipher'),
@@ -631,6 +791,7 @@ export const chiefTurnUsage = sqliteTable(
     cacheRead: integer('cacheRead').notNull().default(0),
     cacheWrite: integer('cacheWrite').notNull().default(0),
     ttftMs: integer('ttftMs'),
+    contextTokens: integer('contextTokens'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -638,6 +799,17 @@ export const chiefTurnUsage = sqliteTable(
     index('chief_turn_usage_thread_idx').on(t.threadId, t.createdAt),
   ],
 );
+
+export const chiefSummary = sqliteTable('chief_summary', {
+  threadId: text('threadId').primaryKey(),
+  summary: text('summary').notNull(),
+  coveredThroughId: text('coveredThroughId').notNull(),
+  coveredAt: epochMs('coveredAt').notNull(),
+  coveredRowid: integer('coveredRowid').notNull(),
+  compactedMessages: integer('compactedMessages').notNull(),
+  generation: integer('generation').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
 
 export const chief = sqliteTable('chief', {
   id: text('id').primaryKey(),
@@ -692,6 +864,69 @@ export const chiefMessage = sqliteTable('chief_message', {
   projectId: text('projectId'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export interface ChiefReportSourceRef {
+  kind: 'coordinator' | 'thread' | 'step';
+  id: string;
+  label: string;
+  todoId: string | null;
+  projectId: string | null;
+}
+
+export interface ChiefReportInputs {
+  covers: string;
+  coversStart: number;
+  coversEnd: number;
+  refs: Record<string, ChiefReportSourceRef>;
+  projects: Record<string, string>;
+  truncated: string[];
+}
+
+export const chiefReport = sqliteTable(
+  'chief_report',
+  {
+    id: text('id').primaryKey(),
+    chiefId: text('chiefId').notNull(),
+    teamId: text('teamId').notNull(),
+    day: text('day').notNull(),
+    threadId: text('threadId').notNull(),
+    status: text('status')
+      .$type<'running' | 'retrying' | 'posted' | 'failed' | 'empty'>()
+      .notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    stepId: text('stepId'),
+    inputs: json<ChiefReportInputs | null>('inputs'),
+    pushedAt: epochMs('pushedAt'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('chief_report_chief_day_unique').on(t.chiefId, t.day)],
+);
+
+export const retroProposal = sqliteTable(
+  'retro_proposal',
+  {
+    id: text('id').primaryKey(),
+    reportId: text('reportId').notNull(),
+    teamId: text('teamId').notNull(),
+    projectId: text('projectId').notNull(),
+    title: text('title').notNull(),
+    what: text('what').notNull(),
+    why: text('why').notNull(),
+    safeguard: text('safeguard').notNull(),
+    sourceKind: text('sourceKind')
+      .$type<'coordinator' | 'thread' | 'step' | typeof INTAKE_SOURCE_KIND>()
+      .notNull(),
+    sourceId: text('sourceId').notNull(),
+    sourceLabel: text('sourceLabel').notNull(),
+    sourceTodoId: text('sourceTodoId'),
+    status: text('status').$type<'draft' | 'accepted' | 'dismissed'>().notNull().default('draft'),
+    todoId: text('todoId'),
+    decidedAt: epochMs('decidedAt'),
+    decidedBy: text('decidedBy'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [index('retro_proposal_report_idx').on(t.reportId)],
+);
 
 export const attachment = sqliteTable('attachment', {
   todoId: text('todoId'),
@@ -910,3 +1145,14 @@ export const claudeSubscription = sqliteTable('claude_subscription', {
   expiresAt: epochMs('expiresAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const clientMessage = sqliteTable(
+  'client_message',
+  {
+    scopeId: text('scopeId').notNull(),
+    clientMessageId: text('clientMessageId').notNull(),
+    response: json<unknown>('response'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopeId, t.clientMessageId] })],
+);

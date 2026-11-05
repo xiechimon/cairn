@@ -55,10 +55,13 @@ import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
+import { routeForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { endSnoozeOn } from './snooze.js';
 import { notifyThreadPhase } from './thread-push.js';
 import { insertGateAnnouncement } from './transcript.js';
+import { buildVerified } from './verified.js';
+import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -146,6 +149,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     archivedAt: row.archivedAt,
     snoozedUntil: row.snoozedUntil,
     snoozeMode: row.snoozeMode,
+    ...(row.awaitingReply ? { awaitingReply: true } : {}),
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -166,6 +170,9 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     sourceRef: row.sourceRef,
     output: row.output,
     ...(waitingOn !== undefined ? { waitingOn } : {}),
+    ...((row.phase === 'done' || row.phase === 'closed') && row.latestBuildId !== null
+      ? { verified: buildVerified(db, row.latestBuildId) }
+      : {}),
     quotaWait,
     ...(usage !== undefined && usage.rows > 0
       ? {
@@ -175,7 +182,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
             cacheRead: usage.cacheRead,
             cacheWrite: usage.cacheWrite,
             total: usage.total,
-            ...(usage.priced > 0 ? (usage.total === 0 ? { priced: true } : {}) : { priced: false }),
+            priced: usage.priced === usage.rows,
           },
         }
       : {}),
@@ -198,28 +205,24 @@ function waitingOnOf(
   if (held !== undefined) {
     return { on: 'quota', retryAt: held.holdUntil ?? null };
   }
-  for (const s of pendingSteps) {
-    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
-    if (agentRow === null) continue;
-    if (agentRow.machineId === null) {
-      return { on: 'machine', retryAt: null };
-    }
-    const home = deps.db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
-    if (home === undefined || !home.online) {
-      return { on: 'machine', retryAt: null };
-    }
-    if (!runtimeGatePasses(home, s.fallback?.model?.provider ?? agentRow.provider)) {
-      return { on: 'machine', retryAt: null };
-    }
-    if (!capabilityGatePasses(home, agentRow)) {
-      return { on: 'machine', retryAt: null };
-    }
-  }
   const online = deps.db
-    .select({ id: machine.id })
+    .select()
     .from(machine)
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
+  for (const s of pendingSteps) {
+    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
+    if (agentRow === null) continue;
+    const provider = s.fallback?.model?.provider ?? agentRow.provider;
+    const pooled = routeForStep(deps.db, row, s.kind) !== null;
+    const runnable = online.some(
+      (m) =>
+        (pooled || m.id === agentRow.machineId) &&
+        runtimeGatePasses(m, provider) &&
+        capabilityGatePasses(m, agentRow),
+    );
+    if (!runnable) return { on: 'machine', retryAt: null };
+  }
   if (online.length === 0) {
     return { on: 'machine', retryAt: null };
   }
@@ -334,6 +337,7 @@ export function createTodo(
       orderIndex: (orderRow?.n ?? -1) + 1,
       assignment: input.assignment ?? null,
       latestBuildId: null,
+      awaitingReply: false,
       lastRunAt: null,
       hasChanges: false,
       hasPlan: false,
@@ -570,7 +574,16 @@ export function setTodoPhase(
   id: string,
   to: Phase,
   extra: Partial<
-    Pick<TodoRow, 'hasChanges' | 'hasPlan' | 'latestBuildId' | 'lastRunAt' | 'assignment'>
+    Pick<
+      TodoRow,
+      | 'hasChanges'
+      | 'hasPlan'
+      | 'latestBuildId'
+      | 'lastRunAt'
+      | 'assignment'
+      | 'routeOverride'
+      | 'awaitingReply'
+    >
   > = {},
   options: { landedMerge?: true } = {},
 ): TodoRecord | null {
@@ -593,16 +606,32 @@ export function setTodoPhase(
   }
   assertPhaseTransition(row.phase, to);
   if (to === 'done' && !options.landedMerge) assertCorrectionDone(db, row);
-  db.update(todo)
-    .set({ ...extra, phase: to, phaseAt: nowMs(), v: row.v + 1 })
-    .where(eq(todo.id, id))
-    .run();
-  const record = getTodo(deps, id);
-  if (!record) return null;
-  deps.hub.publishTodoDoc(record.teamId, record);
-  notifyPhaseEntry(deps, record, row.phase, to);
-  if (to === 'done') settleSplitOnDone(deps, id);
-  return record;
+  const leavesQuestion = row.awaitingReply && to !== 'review' && extra.awaitingReply === undefined;
+  return db.transaction(() => {
+    if (leavesQuestion && row.latestBuildId !== null) {
+      cancelPendingWorkerQuestions(
+        deps,
+        row.latestBuildId,
+        'The thread moved on before an answer.',
+      );
+    }
+    db.update(todo)
+      .set({
+        ...extra,
+        ...(leavesQuestion ? { awaitingReply: false } : {}),
+        phase: to,
+        phaseAt: nowMs(),
+        v: row.v + 1,
+      })
+      .where(eq(todo.id, id))
+      .run();
+    const record = getTodo(deps, id);
+    if (!record) return null;
+    deps.hub.publishTodoDoc(record.teamId, record);
+    notifyPhaseEntry(deps, record, row.phase, to);
+    if (to === 'done') settleSplitOnDone(deps, id);
+    return record;
+  });
 }
 
 export function childrenOfTodo(db: Db, parentId: string): TodoRow[] {

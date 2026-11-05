@@ -41,10 +41,10 @@ test('clicking a result row → panel closes + jumps to the todo detail', async 
   await searchProbe(page);
 
   await todoRows(page).first().click();
-  await expect(page).toHaveURL('/app/todo/r3-legacy-1?scenario=01');
+  await expect(page).toHaveURL('/app?scenario=01&thread=r3-legacy-1');
   await expect(panel(page)).toBeHidden();
   // the detail route really rendered the clicked todo
-  await expect(page.locator('.detail-shell')).toHaveAttribute('data-todo-id', 'r3-legacy-1');
+  await expect(page.getByTestId('side-chat')).toHaveAttribute('data-todo-id', 'r3-legacy-1');
 });
 
 test('clicking a go-to row → panel closes + jumps to the matching route', async ({ page }) => {
@@ -90,7 +90,7 @@ test('↑↓ keyboard cursor takes over the highlight; Enter jumps to the cursor
 
   await page.keyboard.press('Enter');
   // second result = the probe2 sibling, fixture order
-  await expect(page).toHaveURL('/app/todo/r3-legacy-2?scenario=01');
+  await expect(page).toHaveURL('/app?scenario=01&thread=r3-legacy-2');
   await expect(panel(page)).toBeHidden();
 });
 

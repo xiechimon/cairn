@@ -5,7 +5,6 @@ import {
   parseReviewPromptMeta,
   type ReviewPromptMeta,
   reviewVerdictSchema,
-  SIZE_JUSTIFICATION_MAX_CHARS,
 } from '../src/records/review.js';
 
 const PLAN = '# plan\n\n## Changes\n- 加一个 parseInput\n';
@@ -163,72 +162,26 @@ describe('ADR 0026 review questions', () => {
   });
 });
 
-describe('size review (#2372)', () => {
-  const SIZE = {
-    countedLines: 912,
-    countedFiles: 12,
-    justification: 'The schema and its callers must land together.\nSplitting breaks the build.',
-  };
-
-  test('an ordinary review prompt neither asks for a size assessment nor marks the meta', () => {
+describe('scope instead of size (D68)', () => {
+  test('a review-gate prompt asks for one problem per PR and never for a size assessment', () => {
     const prompt = buildReviewStepPrompt({ agentId: 'a1', gate: 'review', planText: PLAN });
+    expect(prompt).toContain('one underlying problem per PR');
+    expect(prompt).toContain('A large diff alone does not show unrelated work.');
     expect(prompt).not.toContain('sizeAssessment');
     expect(prompt).not.toContain('## Size review');
-    expect(parseMeta(prompt).sizeReview).toBeUndefined();
   });
 
-  test('a size review prompt quotes the justification, states the counts and asks for an explicit assessment', () => {
-    const prompt = buildReviewStepPrompt({
-      agentId: 'a1',
-      gate: 'review',
-      planText: PLAN,
-      expectedHeadSha: 'ab'.repeat(20),
-      size: SIZE,
+  test('a confirm-gate prompt carries no scope rule', () => {
+    const prompt = buildReviewStepPrompt({ agentId: 'a1', gate: 'confirm', planText: PLAN });
+    expect(prompt).not.toContain('one underlying problem per PR');
+  });
+
+  test('a verdict that still carries a size answer parses without it', () => {
+    const parsed = reviewVerdictSchema.parse({
+      conclusion: 'Reviewed',
+      findings: [],
+      sizeAssessment: 'accepted',
     });
-    expect(parseMeta(prompt)).toMatchObject({ sizeReview: true, expectedHeadSha: 'ab'.repeat(20) });
-    expect(prompt).toContain('## Size review');
-    expect(prompt).toContain('912 lines in 12 non-evidence files');
-    expect(prompt).toContain(
-      '> The schema and its callers must land together.\n> Splitting breaks the build.',
-    );
-    expect(prompt).toContain('"sizeAssessment": "accepted | split-needed"');
-    expect(prompt).toContain('"split-needed"');
-  });
-
-  test('a confirm-gate prompt ignores the size context', () => {
-    const prompt = buildReviewStepPrompt({
-      agentId: 'a1',
-      gate: 'confirm',
-      planText: PLAN,
-      size: SIZE,
-    });
-    expect(prompt).not.toContain('## Size review');
-    expect(parseMeta(prompt).sizeReview).toBeUndefined();
-  });
-
-  test('a long justification is cut at the cap', () => {
-    const prompt = buildReviewStepPrompt({
-      agentId: 'a1',
-      gate: 'review',
-      planText: PLAN,
-      size: { ...SIZE, justification: 'x'.repeat(SIZE_JUSTIFICATION_MAX_CHARS + 50) },
-    });
-    expect(prompt).toContain(`> ${'x'.repeat(SIZE_JUSTIFICATION_MAX_CHARS)}…`);
-    expect(prompt).not.toContain('x'.repeat(SIZE_JUSTIFICATION_MAX_CHARS + 1));
-  });
-
-  test('the verdict keeps accepted or split-needed and rejects any other size answer', () => {
-    const verdict = { conclusion: 'Reviewed', findings: [] };
-    for (const sizeAssessment of ['accepted', 'split-needed'] as const) {
-      expect(reviewVerdictSchema.parse({ ...verdict, sizeAssessment }).sizeAssessment).toBe(
-        sizeAssessment,
-      );
-    }
-    expect(reviewVerdictSchema.parse(verdict).sizeAssessment).toBeUndefined();
-    for (const bad of ['yes', true, null]) {
-      expect(reviewVerdictSchema.safeParse({ ...verdict, sizeAssessment: bad }).success).toBe(
-        false,
-      );
-    }
+    expect(parsed).toEqual({ conclusion: 'Reviewed', findings: [] });
   });
 });

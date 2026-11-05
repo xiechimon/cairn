@@ -79,7 +79,7 @@ test('`配置服务商` SPA-navigates to the providers route, scenario rides alo
     (window as unknown as Record<string, unknown>).__spaMarker = 'alive';
   });
   await dialog.getByRole('link', { name: '配置服务商' }).click();
-  await expect(page).toHaveURL('/app/resources/providers?scenario=team-no-sources');
+  await expect(page).toHaveURL('/app/settings/providers?scenario=team-no-sources');
   expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__spaMarker)).toBe(
     'alive',
   );
@@ -88,5 +88,5 @@ test('`配置服务商` SPA-navigates to the providers route, scenario rides alo
 test('`接入机器` SPA-navigates to the machines route when there are no machines', async ({ page }) => {
   const dialog = await openDialog(page);
   await dialog.getByRole('link', { name: '接入机器' }).click();
-  await expect(page).toHaveURL('/app/resources/machines?scenario=12');
+  await expect(page).toHaveURL('/app/settings/machines?scenario=12');
 });

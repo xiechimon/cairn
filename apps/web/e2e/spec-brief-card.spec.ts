@@ -157,16 +157,6 @@ test('4b. wide screens line length takes the 68ch cap (same law as the 60–75 c
   expect(Math.abs(capped.maxWidth - capped.zero68)).toBeLessThanOrEqual(2);
 });
 
-test('5. live tasks with a spec render it; an empty spec shows the editable description box', async ({ page }) => {
-  await stubWorld(page);
-  await page.goto(`/app/todo/${BRIEF_ID}`);
-  await expect(page.locator('.spec-block')).toBeVisible();
-  await expect(page.getByTestId('fresh-description')).toHaveCount(0);
-  await page.goto(`/app/todo/${BRIEF_EMPTY_ID}`);
-  await expect(page.getByTestId('fresh-description')).toBeVisible();
-  await expect(page.locator('.spec-block')).toHaveCount(0);
-});
-
 test('6. ordered-list numerals distinguished from body text, aligned with the first-line baseline, two-digit numbers do not jog the content column (#814 rework)', async ({
   page,
 }) => {

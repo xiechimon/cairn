@@ -269,10 +269,23 @@ def api(db, home, env, report, node):
         if total != sum(expected.values()):
             raise RuntimeError('api /api/todos total mismatch')
         thread = report['relationships']['chiefThread']
-        with opener.open(f'http://127.0.0.1:{port}/api/conversations/{urllib.parse.quote(thread, safe="")}/messages', timeout=5) as response:
-            payload = json.load(response)
+        returned_messages = []
+        before = None
+        while True:
+            query = '' if before is None else '?' + urllib.parse.urlencode({'before': before})
+            with opener.open(f'http://127.0.0.1:{port}/api/conversations/{urllib.parse.quote(thread, safe="")}/messages{query}', timeout=5) as response:
+                payload = json.load(response)
+            if not isinstance(payload, dict) or not isinstance(payload.get('messages'), list):
+                raise RuntimeError('api chief thread messages mismatch')
+            returned_messages.extend(row['id'] for row in payload['messages'])
+            cursor = payload.get('nextCursor')
+            if not isinstance(cursor, str):
+                break
+            if cursor == before:
+                raise RuntimeError('api chief thread messages cursor did not advance')
+            before = cursor
         expected_messages = [r[0] for r in db.execute('select id from chief_message where threadId=? order by id', (thread,))]
-        if not isinstance(payload, dict) or sorted(row['id'] for row in payload.get('messages', [])) != expected_messages:
+        if sorted(returned_messages) != expected_messages:
             raise RuntimeError('api chief thread messages mismatch')
         report['api'] = {'chiefThread': thread, 'chiefMessages': len(expected_messages), 'count': total, 'teams': len(teams), 'surface': 'createApp wrapper serving todos and chief thread messages on restored DB', 'provider': 'not exercised'}
     finally:

@@ -185,6 +185,8 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...(row.color !== null ? { color: row.color } : {}),
     archivedAt: row.archivedAt,
     ...(row.description !== null ? { description: row.description } : {}),
+    ...(row.instructions !== null ? { instructions: row.instructions } : {}),
+    ...(row.maxConcurrent !== null ? { maxConcurrent: row.maxConcurrent } : {}),
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),
     ...(row.githubRepo !== null ? { githubRepo: row.githubRepo } : {}),

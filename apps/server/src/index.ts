@@ -7,6 +7,7 @@ import { BUNDLED_FORM } from './bundle-form.js';
 import {
   attachmentsDirOf,
   backupStatusPathOf,
+  deployRecordPathOf,
   loadConfig,
   logTokenAuthStartup,
   missingRequiredTokenError,
@@ -17,6 +18,11 @@ import {
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import {
+  setCoordinatorMachineId,
+  setCoordinatorServerContextEnabled,
+} from './services/coordinator-context.js';
+import { setCoordinatorRouteLog } from './services/coordinator-route.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
@@ -24,6 +30,13 @@ import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
+import {
+  adoptAgentMemories,
+  seedReviewRules,
+  seedRoutingRules,
+  seedWorkPolicies,
+  setRoutingRulesEnabled,
+} from './services/routing-rules.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -62,6 +75,18 @@ const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
 backfillPersonas(db);
+setRoutingRulesEnabled(config.routingRules);
+setCoordinatorServerContextEnabled(config.coordinatorServerContext);
+setCoordinatorMachineId(config.coordinatorMachineId);
+setCoordinatorRouteLog((teamId, reason) =>
+  logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
+);
+if (config.routingRules) {
+  seedRoutingRules(db);
+  seedReviewRules(db);
+  seedWorkPolicies(db);
+  adoptAgentMemories(db);
+}
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {
@@ -101,6 +126,7 @@ const app = createApp(
     reposDir,
     attachmentsDir,
     backupStatusPath: backupStatusPathOf(config),
+    deployRecordPath: deployRecordPathOf(config),
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
@@ -131,7 +157,11 @@ const scheduler = createScheduler(
     githubFetch,
     oauthClient: config.githubOauth,
   },
-  { tickMs: config.schedulerTickMs, pushDigestTimes: config.pushDigestTimes },
+  {
+    tickMs: config.schedulerTickMs,
+    pushDigestTimes: config.pushDigestTimes,
+    researchIntakeProjectId: config.researchIntakeProjectId,
+  },
   { attachmentsDir, logger },
   { githubFetch, logger },
   issueIntakeRunOf(config, { githubFetch, logger }),

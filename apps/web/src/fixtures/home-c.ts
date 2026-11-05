@@ -1,7 +1,9 @@
 import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
 import { PROJECT_ID, probeTodo, r7 } from './core.js';
+import { detailBuilding, detailConfirm, detailReview } from './detail.js';
 import type { ChiefContent, FixtureSet, TodoRecord } from './records.js';
+import { scheduleOnce } from './schedules.js';
 
 export const HOME_C_CRED = 'home-c-cred';
 
@@ -12,7 +14,15 @@ function homeTodo(
   phase: TodoRecord['phase'],
   projectId: string,
 ): TodoRecord {
-  return { ...probeTodo(phase, r7(20, 10)), id, seqNum, title, spec: title, projectId };
+  return {
+    ...probeTodo(phase, r7(20, 10)),
+    id,
+    seqNum,
+    title,
+    spec: title,
+    projectId,
+    latestBuildId: phase === 'todo' ? null : `build-${id}`,
+  };
 }
 
 const conversation: ChiefContent = {
@@ -47,11 +57,12 @@ const conversation: ChiefContent = {
           header: 'Credential relay · #74',
           question: 'relay-186 cannot run glm-5.3-flash. Which model should rerun it?',
           options: [
-            {
-              label: 'Claude subscription (recommended)',
-              description: 'Verified, uses the subscription',
-            },
             { label: 'wokey · deepseek-v4.1-flash', description: 'Metered' },
+            {
+              label: 'Claude subscription',
+              description: 'Verified, uses the subscription',
+              recommended: true,
+            },
             { label: 'Hold it', description: '' },
           ],
         },
@@ -62,11 +73,13 @@ const conversation: ChiefContent = {
       id: 'home-c-ask-fold',
       text: 'Fold finished turns before review.',
       projectId: PROJECT_ID,
+      createdAt: r7(20, 5),
     },
     {
       kind: 'robot',
       id: 'home-c-reply-fold',
       seconds: '',
+      createdAt: r7(20, 5) + 4 * 60_000,
       paragraphs: [[{ text: 'Started it; the PR is up for your review.' }]],
     },
   ],
@@ -75,6 +88,23 @@ const conversation: ChiefContent = {
 
 export const homeC: FixtureSet = {
   ...boardDefault,
+  resources: {
+    skills: [],
+    mcpServers: [],
+    providerSources: [],
+    machines: [
+      {
+        id: 'home-c-mac',
+        kind: 'local',
+        name: 'xmonsMac',
+        online: true,
+        chiefHost: true,
+        runningSteps: 2,
+        maxConcurrent: 8,
+      },
+      { id: 'home-c-omarchy', kind: 'remote', name: 'omarchy', online: false, maxConcurrent: 16 },
+    ],
+  },
   projectNames: { [PROJECT_ID]: 'cairn', [HOME_C_CRED]: 'Credential relay' },
   todos: [
     homeTodo('home-c-confirm', 2301, 'Connect a Claude subscription token', 'confirm', PROJECT_ID),
@@ -93,6 +123,29 @@ export const homeC: FixtureSet = {
     homeTodo('home-c-done', 2201, 'Unread dot on threads', 'done', PROJECT_ID),
   ],
   chief: conversation,
+  details: {
+    'home-c-confirm': detailConfirm(false).detail ?? { transcript: [] },
+    'home-c-review': detailReview({ userMenuOpen: false, changesExpanded: false }).detail ?? {
+      transcript: [],
+    },
+    'home-c-working-a': detailBuilding(true).detail ?? { transcript: [] },
+  },
+  schedules: [
+    scheduleOnce,
+    {
+      ...scheduleOnce,
+      id: 'home-c-schedule-idle',
+      todoId: 'home-c-idle',
+      todo: { ...scheduleOnce.todo, seqNum: 2240, title: 'Sidebar status groups', phase: 'todo' },
+    },
+    {
+      ...scheduleOnce,
+      id: 'home-c-schedule-running',
+      projectId: HOME_C_CRED,
+      todoId: 'home-c-working-c',
+      todo: { ...scheduleOnce.todo, seqNum: 75, title: 'Orb canary round 7', phase: 'building' },
+    },
+  ],
   now: r7(20, 30),
 };
 

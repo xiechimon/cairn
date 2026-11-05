@@ -1,3 +1,5 @@
+import { accountsDefault, accountsEmpty } from './accounts.js';
+import { activityFixture, activityManyFixture } from './activity.js';
 import { demoFixture } from './demo.js';
 import {
   agentDelete,
@@ -13,20 +15,15 @@ import {
   boardChiefProbes,
   boardDarkFresh,
   boardDefault,
-  boardDragMatrix,
   boardFailed,
   boardGithubPicker,
   boardInbox,
   boardMachinePicker,
-  boardOverflow,
   boardProjectPicker,
   boardQuotaWait,
   boardR8Overlay,
   boardRepoFilter,
-  boardResetGate,
-  boardStress,
   boardTagFilter,
-  boardTagFilterEmpty,
   boardWithProbe,
   chiefAgentChip,
   chiefFabAvatar,
@@ -74,6 +71,8 @@ import {
   projectLocalFiles,
   projectTasks,
   projectTasksEmpty,
+  providersEmpty,
+  providersFleet,
   r7,
   rerunDialog12,
   rerunDialog15,
@@ -113,6 +112,7 @@ import {
 } from './fixtures.js';
 import { homeC, homeCEmpty } from './home-c.js';
 import type { FixtureSet } from './records.js';
+import { turnFoldThread } from './turn-fold.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
@@ -146,9 +146,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'newtask-machines': boardMachinePicker,
       'github-picker': boardGithubPicker,
       'board-tags': boardTagFilter,
-      'board-tags-empty': boardTagFilterEmpty,
-      'board-drag-matrix': boardDragMatrix,
-      'board-reset-gate': boardResetGate,
       'board-repos': boardRepoFilter,
       'sidebar-threads': sidebarThreads,
       'sidebar-project-icons': sidebarProjectIcons,
@@ -156,10 +153,12 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sidebar-snooze': sidebarSnooze,
       'sidebar-groups': sidebarGroups,
       'home-c': homeC,
+      activity: activityFixture,
+      'activity-many': activityManyFixture,
+      'activity-empty': { ...homeC, todos: [] },
+      'turn-fold-thread': turnFoldThread,
       'home-c-empty': homeCEmpty,
       'sidebar-thread-statuses': sidebarThreadStatuses,
-      'board-overflow': boardOverflow,
-      'board-stress': boardStress,
       'board-inbox': boardInbox,
       'quota-wait': boardQuotaWait,
       '16': detailPlanning,
@@ -294,6 +293,10 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '10-cc-legacy': resourcesCcLegacy,
       'machines-chief-state': machinesChiefState,
       'machines-claude-login': machinesClaudeLogin,
+      'providers-fleet': providersFleet,
+      'providers-empty': providersEmpty,
+      'model-routing': accountsDefault,
+      'model-routing-empty': accountsEmpty,
       'r8-78': boardR8Overlay,
       'r8-79': detailR8Confirm(),
       'r8-80': detailR8Confirm(),

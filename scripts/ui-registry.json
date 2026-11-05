@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "ac9fc7c8ed14a1b32ee49c9287e31b57bbddbf80",
-    "date": "2026-10-31"
+    "sha": "98d7dc6b2d1b142fe214fb5c874a54b77ff669dc",
+    "date": "2026-11-04"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -45,8 +45,8 @@
       "kind": "registry",
       "upstreamItem": "button",
       "status": "deviated",
-      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer.",
-      "hash": "0af5025d00123562d10d93c086363ff61968a948a1a66ba09f33b191b6425112"
+      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries.",
+      "hash": "15a939b54f1e0c65f6650e72a40bcfb00fd15892badafb0db6d05b43cb8912d6"
     },
     "card.tsx": {
       "kind": "registry",
@@ -211,8 +211,8 @@
     },
     "toaster.tsx": {
       "kind": "adapter",
-      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius.",
-      "hash": "eb42e006acc6021856db208481d4b103eede1ddf80c080af07cf8488441bb98f"
+      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer.",
+      "hash": "b312face1c10d4306d8fba3c7875b9b83c588dbecca95de3c09e7a828db85001"
     },
     "tooltip.tsx": {
       "kind": "registry",

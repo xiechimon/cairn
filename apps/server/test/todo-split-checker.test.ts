@@ -110,7 +110,7 @@ describe('split_todo checker', () => {
     'pnpm-lock.yaml',
     'biome.json',
     '.github/',
-    'docs/adr/',
+    'docs/spec/',
     'apps/server/src/services/merge-gate/',
     'apps/web/src/unsafe:name.ts',
     'docs/ſpec/plan.md',

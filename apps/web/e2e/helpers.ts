@@ -108,3 +108,20 @@ export async function keyboardFocus(page: Page, locator: Locator) {
   await page.keyboard.press('Shift+Tab');
   await settleTransitions(page);
 }
+
+export async function openChiefWindow(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  });
+  await page.keyboard.press('ControlOrMeta+j');
+}
+
+export async function expandTurns(page: Page): Promise<void> {
+  const folded = page.locator('[data-testid=turn-header][aria-expanded=false]');
+  await folded
+    .first()
+    .waitFor({ timeout: 3000 })
+    .catch(() => undefined);
+  while ((await folded.count()) > 0) await folded.first().click();
+}

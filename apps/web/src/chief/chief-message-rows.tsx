@@ -1,7 +1,8 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
-import { Link } from 'react-router';
-import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
+import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
+import { reportStatusWord } from '../board/status-words.js';
+import { ThreadLink } from '../board/thread-link.js';
+import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LivePulse, LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { TraceGroup, TraceRows, type TraceStepItem } from '../components/chat/trace-steps.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
@@ -24,6 +25,8 @@ import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
+import { ChiefReportRow } from './chief-report-row.js';
+import { ThreadReportReply } from './thread-report-reply.js';
 
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
@@ -108,16 +111,20 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function turnToolSteps(tools: ChiefToolRow[] | undefined): TraceStepItem[] {
-  return (tools ?? []).map((tool, k) => ({
-    id: k,
-    step: {
-      kind: 'tool',
-      name: tool.label,
-      status: tool.error === true ? 'failed' : 'done',
-      ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
-    },
-  }));
+function turnToolSteps(tools: ChiefToolRow[] | undefined, runningVerb?: string): TraceStepItem[] {
+  return (tools ?? []).map((tool, k) => {
+    const running = runningVerb !== undefined && tool.running === true;
+    return {
+      id: k,
+      step: {
+        kind: 'tool',
+        ...(running ? { verb: runningVerb } : {}),
+        name: tool.label,
+        status: tool.error === true ? 'failed' : running ? 'running' : 'done',
+        ...(tool.seconds !== undefined ? { secs: tool.seconds } : {}),
+      },
+    };
+  });
 }
 
 export const TurnElapsedContext = createContext(true);
@@ -145,14 +152,14 @@ function HandoffRow({ todoId }: { todoId: string }) {
       <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="chief-handoff">
         <MarkerContent className={MARKER_CONTENT_CLS}>
           {t('已转给任务')}
-          <Link
-            to={`/app/todo/${todoId}`}
+          <ThreadLink
+            todoId={todoId}
             className={`${mentionChipClass('todo')} cursor-pointer`}
             data-phase={glance?.phase}
           >
             {glance != null && <TodoStatus phase={glance.phase} />}
             {glance?.seq != null ? `#${glance.seq}` : t('任务')}
-          </Link>
+          </ThreadLink>
         </MarkerContent>
       </Marker>
     </MessageScrollerItem>
@@ -164,12 +171,12 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
     case 'user':
     case 'robot':
     case 'thinking':
-    case 'tool':
     case 'question':
     case 'handoff':
     case 'digest':
     case 'stopped':
     case 'thread-report':
+    case 'thread-message':
       return item.id ?? index;
     default:
       return index;
@@ -179,6 +186,8 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
 interface ChiefStreamRowProps {
   item: ChiefStreamItem;
   index: number;
+  latest: boolean;
+  replyable?: boolean;
   bound: ChiefContent['bound'];
   agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
@@ -203,13 +212,13 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
             <>
               {t('已停止。停之前已经建了任务')}
               {todos.map((todo) => (
-                <Link
+                <ThreadLink
                   key={todo.id}
-                  to={`/app/todo/${todo.id}`}
+                  todoId={todo.id}
                   className={`${mentionChipClass('todo')} cursor-pointer`}
                 >
                   {`#${todo.seq} ${todo.title}`}
-                </Link>
+                </ThreadLink>
               ))}
             </>
           )}
@@ -219,9 +228,16 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   );
 }
 
-export function ChiefStreamRow({
+const messageToolsReveal = (latest: boolean) =>
+  latest
+    ? 'opacity-100'
+    : 'opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+
+export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
+  latest,
+  replyable = false,
   bound,
   agent,
   runningTool,
@@ -239,11 +255,39 @@ export function ChiefStreamRow({
   if (item.kind === 'thread-report')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-report-marker">
+        <Marker
+          variant="separator"
+          className={MARKER_NOTE_CLS}
+          data-testid="thread-report-marker"
+          data-phase={item.phase}
+        >
           <MarkerContent className={MARKER_CONTENT_CLS}>
-            <Link to={`/app/todo/${item.todoId}`} className="hover:underline">
-              {t('来自任务 #{n} {title} 的消息', { n: item.seqNum, title: item.title })}
-            </Link>
+            <ThreadLink todoId={item.todoId} className="hover:underline">
+              {t('任务 #{n} {title}：{status}', {
+                n: item.seqNum,
+                title: item.title,
+                status: t(reportStatusWord(item)),
+              })}
+            </ThreadLink>
+            {item.line !== undefined && <span className="ml-1.5">{item.line}</span>}
+          </MarkerContent>
+        </Marker>
+        {item.phase === 'needs-you' && replyable && <ThreadReportReply todoId={item.todoId} />}
+      </MessageScrollerItem>
+    );
+  if (item.kind === 'thread-message')
+    return (
+      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+        <Marker variant="separator" className={MARKER_NOTE_CLS} data-testid="thread-message-marker">
+          <MarkerContent className={MARKER_CONTENT_CLS}>
+            <ThreadLink todoId={item.todoId} className="hover:underline">
+              {t(
+                item.by === 'coordinator'
+                  ? '总管直接对 #{n} 说：{excerpt}'
+                  : '你直接对 #{n} 说：{excerpt}',
+                { n: item.seqNum, excerpt: item.excerpt },
+              )}
+            </ThreadLink>
           </MarkerContent>
         </Marker>
       </MessageScrollerItem>
@@ -260,6 +304,7 @@ export function ChiefStreamRow({
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'digest')
     return <ChiefDigestRow reason={item.reason} madeAt={item.madeAt} items={item.items} />;
+  if (item.kind === 'daily-report') return <ChiefReportRow report={item.report} />;
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
@@ -292,7 +337,7 @@ export function ChiefStreamRow({
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </div>
             <div
-              className="mt-1 flex items-center gap-1 text-(--text-tertiary) opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
+              className={`mt-1 flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"
             >
               {item.at != null && (
@@ -337,22 +382,6 @@ export function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  if (item.kind === 'tool')
-    return (
-      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${MSG_ROW_CLS}`}>
-          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ToolActivityRow
-              name={item.label}
-              {...(item.startedAt !== undefined ? { startedAt: item.startedAt } : {})}
-              {...(item.seconds !== undefined ? { seconds: item.seconds } : {})}
-              {...(item.running !== undefined ? { running: item.running } : {})}
-              {...(item.error !== undefined ? { error: item.error } : {})}
-            />
-          </MessageContent>
-        </Message>
-      </MessageScrollerItem>
-    );
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
@@ -360,6 +389,7 @@ export function ChiefStreamRow({
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ChiefQuestionCard
               item={item}
+              numberKeys={false}
               {...(onAnswerQuestion ? { onAnswer: onAnswerQuestion } : {})}
               {...(onCancelQuestion ? { onCancel: onCancelQuestion } : {})}
             />
@@ -368,8 +398,9 @@ export function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'streaming') {
+    const callRunning = item.tools?.some((tool) => tool.running === true) === true;
     const liveSteps: TraceStepItem[] = [
-      ...(runningTool != null
+      ...(runningTool != null && !callRunning
         ? [
             {
               id: 'running',
@@ -382,7 +413,7 @@ export function ChiefStreamRow({
             },
           ]
         : []),
-      ...turnToolSteps(item.tools),
+      ...turnToolSteps(item.tools, t('正在调用')),
     ];
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
@@ -458,7 +489,7 @@ export function ChiefStreamRow({
           {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
           {item.typing !== true && (
             <div
-              className="mt-2 flex items-center gap-2 text-meta text-(--text-tertiary)"
+              className={`mt-2 flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-foot"
             >
               <Button
@@ -488,4 +519,4 @@ export function ChiefStreamRow({
       </Message>
     </MessageScrollerItem>
   );
-}
+});

@@ -16,8 +16,8 @@ import {
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow, ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { PROVIDERS_HREF } from '../resources/hrefs.js';
 import { MACHINES_HREF } from '../resources/machines-page.js';
-import { PROVIDERS_HREF } from '../resources/providers-page.js';
 import { AgentModelSelect, AgentRuntimeSelect } from './agent-model-select.js';
 
 const CONTROL_CLS = cn('w-full', FORM_CONTROL_CLS);

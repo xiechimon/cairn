@@ -10,10 +10,16 @@ export const machineHardwareSchema = z.object({
 });
 export type MachineHardware = z.infer<typeof machineHardwareSchema>;
 
+export const machineExecutorSchema = z.enum(['orb', 'host']);
+export type MachineExecutor = z.infer<typeof machineExecutorSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()),
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),
+  executor: machineExecutorSchema.optional(),
+  computer: z.literal(true).optional(),
+  ownComputer: z.literal(true).optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -27,24 +33,33 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     })
     .safeParse({ mcpServers: rec.mcpServers, skills: rec.skills });
   if (!base.success) return undefined;
-  if (rec.hardware === undefined) return base.data;
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
-  return hardware.success ? { ...base.data, hardware: hardware.data } : base.data;
+  const executor = machineExecutorSchema.safeParse(rec.executor);
+  return {
+    ...base.data,
+    ...(hardware.success ? { hardware: hardware.data } : {}),
+    ...(executor.success ? { executor: executor.data } : {}),
+    ...(rec.computer === true ? { computer: true as const } : {}),
+    ...(rec.ownComputer === true ? { ownComputer: true as const } : {}),
+  };
 }
 
 export const requiredCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()).optional(),
   models: z.array(z.string()).optional(),
+  executor: z.literal('orb').optional(),
 });
 export type RequiredCapabilities = z.infer<typeof requiredCapabilitiesSchema>;
 
 export function capabilityMissingLabels(missing: {
   mcpServers?: string[];
   models?: string[];
+  executor?: 'orb';
 }): string[] {
   return [
     ...(missing.mcpServers ?? []).map((slug) => `MCP server "${slug}"`),
     ...(missing.models ?? []).map((id) => `model "${id}"`),
+    ...(missing.executor === 'orb' ? ['Orb sandbox executor'] : []),
   ];
 }
 

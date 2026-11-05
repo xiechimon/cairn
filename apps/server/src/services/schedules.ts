@@ -1,4 +1,10 @@
-import type { CreateScheduleBody, ScheduleKind, ScheduleRecord, UserRecord } from '@cairn/shared';
+import type {
+  CreateScheduleBody,
+  PatchScheduleBody,
+  ScheduleKind,
+  ScheduleRecord,
+  UserRecord,
+} from '@cairn/shared';
 import { classifyStepFailure, isProviderOutage, SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
 import { CronExpressionParser } from 'cron-parser';
 import { and, desc, eq, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
@@ -196,6 +202,7 @@ export function createSchedule(
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) throw new Error('schedule missing after insert');
+  notifyScheduleClock();
   return record;
 }
 
@@ -204,7 +211,39 @@ export function deleteSchedule(deps: ScheduleDeps & { user: UserRecord }, id: st
   if (!row) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
   endSnoozeOn(deps, row.todoId, 'schedule-cleared');
+  notifyScheduleClock();
   return true;
+}
+
+export function setScheduleEnabled(
+  deps: ScheduleDeps,
+  id: string,
+  body: PatchScheduleBody,
+): ScheduleRecord | null {
+  const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  if (!row) return null;
+  if (row.enabled !== body.enabled) {
+    if (body.enabled) {
+      const now = nowMs();
+      const nextRunAt = isRecurring(row.kind)
+        ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
+        : Math.max(row.at ?? now, now);
+      deps.db
+        .update(schedule)
+        .set({ enabled: true, nextRunAt, pausedReason: null, retryNotBefore: null })
+        .where(eq(schedule.id, id))
+        .run();
+    } else {
+      deps.db
+        .update(schedule)
+        .set({ enabled: false, nextRunAt: null })
+        .where(eq(schedule.id, id))
+        .run();
+    }
+  }
+  const updated = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  notifyScheduleClock();
+  return updated ? toScheduleRecord(deps, updated) : null;
 }
 
 export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRow[] {
@@ -225,8 +264,19 @@ export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRo
     .map((r) => r.schedule);
 }
 
+let scheduleClockListener: (() => void) | null = null;
+
+export function setScheduleClockListener(listener: (() => void) | null): void {
+  scheduleClockListener = listener;
+}
+
+function notifyScheduleClock(): void {
+  scheduleClockListener?.();
+}
+
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
   deps.db.update(schedule).set({ nextRunAt }).where(eq(schedule.id, id)).run();
+  notifyScheduleClock();
 }
 
 export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
@@ -235,6 +285,7 @@ export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): v
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.id, id))
     .run();
+  notifyScheduleClock();
 }
 
 export const ARCHIVED_SCHEDULE_PAUSE_REASON = 'Task archived';
@@ -245,6 +296,7 @@ export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: st
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.todoId, todoId))
     .run();
+  notifyScheduleClock();
 }
 
 export function parseThreadCadence(

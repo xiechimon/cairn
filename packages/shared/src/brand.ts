@@ -64,9 +64,13 @@ export const ENV_VARS = {
   issueIntake: 'CAIRN_ISSUE_INTAKE',
   intakeAgentAllowlist: 'CAIRN_INTAKE_AGENT_ALLOWLIST',
   scheduling: 'CAIRN_SCHEDULING',
+  coordinatorServerContext: 'CAIRN_COORDINATOR_SERVER_CONTEXT',
+  coordinatorMachineId: 'CAIRN_COORDINATOR_MACHINE_ID',
+  routingRules: 'CAIRN_ROUTING_RULES',
   trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
   trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
   trajectoryReflectOpenGuardIssues: 'CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES',
+  researchIntakeProjectId: 'CAIRN_RESEARCH_INTAKE_PROJECT_ID',
 } as const;
 
 export const API_KEY_PATTERN = /^cairn_[0-9a-f]{48}$/;

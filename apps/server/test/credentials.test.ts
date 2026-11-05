@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agent, step as stepTable, todo } from '../src/db/schema.js';
+import { agent, routingRule, step as stepTable, todo, workPolicy } from '../src/db/schema.js';
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
 import { stepToken } from '../src/services/machine-step-token.js';
 import { createProvider } from '../src/services/providers.js';
+import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { createSecret } from '../src/services/secrets.js';
 import { bootServer, insertMachine, postProject, req } from './helpers.js';
 
@@ -288,4 +289,95 @@ test('finished steps retain provider-key responses', async () => {
       apiKey: RELAY_KEY,
     });
   }
+});
+
+describe('resolveStepCredentials under CAIRN_ROUTING_RULES', () => {
+  test('a session rule picks the provider key for build steps; secrets stay the agent grant', async () => {
+    const s = await withAgentStack();
+    createProvider(s.keysvc, {
+      teamId: s.team.id,
+      body: {
+        providerId: 'routed-gw',
+        label: 'routed',
+        baseUrl: 'https://routed.example.com/v1',
+        api: 'anthropic-messages',
+        apiKey: 'sk-routed',
+        models: [{ id: 'routed-model', name: 'routed-model' }],
+      },
+      createdBy: s.user.id,
+    });
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-session',
+        teamId: s.team.id,
+        use: 'session',
+        provider: 'routed-gw',
+        modelId: 'routed-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    const buildStepId = addStep(s, s.buildId, 'build');
+    setRoutingRulesEnabled(true);
+    try {
+      const routed = resolveStepCredentials(s.keysvc, buildStepId);
+      expect(routed.provider).toMatchObject({
+        providerId: 'routed-gw',
+        baseUrl: 'https://routed.example.com/v1',
+        apiKey: 'sk-routed',
+        modelId: 'routed-model',
+      });
+      expect(routed.secrets).toEqual({ STRIPE_API_KEY: STRIPE_VALUE });
+      expect(
+        resolveStepCredentials(s.keysvc, addStep(s, s.buildId, 'review')).provider,
+      ).toMatchObject({ providerId: 'r3-gw', apiKey: RELAY_KEY });
+    } finally {
+      setRoutingRulesEnabled(false);
+    }
+    expect(resolveStepCredentials(s.keysvc, buildStepId).provider).toMatchObject({
+      providerId: 'r3-gw',
+      apiKey: RELAY_KEY,
+    });
+  });
+
+  test('a session work policy that names secrets decides which team secrets a build step opens', async () => {
+    const s = await withAgentStack();
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-secrets',
+        teamId: s.team.id,
+        use: 'session',
+        provider: 'r3-gw',
+        modelId: 'claude-sonnet-5',
+        secrets: ['STRIPE_API_KEY'],
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    s.db
+      .insert(workPolicy)
+      .values({
+        id: 'policy-secrets',
+        teamId: s.team.id,
+        use: 'session',
+        tools: [],
+        mcpServers: [],
+        secrets: [],
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    const buildStepId = addStep(s, s.buildId, 'build');
+    setRoutingRulesEnabled(true);
+    try {
+      expect(resolveStepCredentials(s.keysvc, buildStepId).secrets).toEqual({});
+    } finally {
+      setRoutingRulesEnabled(false);
+    }
+    expect(resolveStepCredentials(s.keysvc, buildStepId).secrets).toEqual({
+      STRIPE_API_KEY: STRIPE_VALUE,
+    });
+  });
 });

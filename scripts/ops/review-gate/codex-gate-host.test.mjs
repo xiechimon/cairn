@@ -1,0 +1,691 @@
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
+
+const gateScript = fileURLToPath(new URL('./codex-gate.mjs', import.meta.url));
+const SHA = 'c'.repeat(40);
+const OTHER = 'd'.repeat(40);
+const CODEX = { login: 'chatgpt-codex-connector[bot]', type: 'Bot' };
+const ACTIONS = { login: 'github-actions[bot]', type: 'Bot' };
+const LIMIT_BODY =
+  'You have reached your Codex usage limits for code reviews. You can see your limits in the [Codex usage dashboard](https://chatgpt.com/codex/cloud/settings/usage).';
+
+const FAKE_GH = `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const input = args.includes('--input') ? fs.readFileSync(0, 'utf8') : null;
+fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, input }) + '\\n');
+const world = JSON.parse(fs.readFileSync(process.env.FAKE_WORLD, 'utf8'));
+const joined = args.join(' ');
+const out = (value) => process.stdout.write(JSON.stringify(value));
+if (/api repos\\/o\\/r\\/pulls\\/7$/.test(joined)) out(world.pr);
+else if (joined.includes('--slurp') && joined.includes('/pulls/7/files')) out(world.filePages ?? [world.files ?? []]);
+else if (joined.includes('--slurp') && joined.includes('repos/o/r/pulls?')) out([world.pulls]);
+else if (joined.includes('--slurp') && joined.includes('/git/matching-refs/')) out([world.matchingRefs ?? []]);
+else if (joined.includes('--slurp') && joined.includes('/pulls/7/commits')) out([world.commits ?? []]);
+else if (/api repos\\/o\\/r\\/commits\\/[a-f0-9]+$/.test(joined)) out({sha:world.resolvedSha});
+else if (joined.includes('--slurp') && joined.includes('/issues/7/comments')) out([world.comments]);
+else if (joined.includes('HEAD_REF_FORCE_PUSHED_EVENT')) {
+  out({data:{repository:{pullRequest:{timelineItems:{nodes:world.forcePushes,pageInfo:{hasNextPage:false,endCursor:null}}}}}});
+} else if (joined.includes('graphql')) {
+  out({ data: { repository: { pullRequest: { reviewThreads: {
+    nodes: world.threads, pageInfo: { hasNextPage: false, endCursor: null } } } } } });
+} else if (joined.includes('/check-runs?')) out({ check_runs: world.checkRuns });
+else out({});
+`;
+
+const state = (sha, status, securityReview = {}) =>
+  `Summary\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: { commit_sha: sha, status, has_any_findings: null, has_unresolved_findings: null }, security_review: securityReview })} -->`;
+const stateComment = (sha, status, securityReview) => ({
+  id: 1,
+  body: state(sha, status, securityReview),
+  user: CODEX,
+  html_url: 'https://github.com/o/r/pull/7#issuecomment-1',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:01:00Z',
+});
+const thread = (level, over = {}) => ({
+  isResolved: false,
+  isOutdated: false,
+  path: 'src/a.ts',
+  line: 10,
+  startLine: null,
+  diffSide: 'RIGHT',
+  comments: {
+    nodes: [
+      {
+        author: { login: 'chatgpt-codex-connector', __typename: 'Bot' },
+        body: `**<sub><sub>![${level} Badge](x)</sub></sub>  Finding ${level}**\n\nbody`,
+        url: `https://github.com/o/r/pull/7#discussion_r${level}`,
+      },
+    ],
+  },
+  ...over,
+});
+const basePr = {
+  number: 7,
+  state: 'open',
+  draft: false,
+  head: { sha: SHA, ref: 'feature/x' },
+  user: { login: 'dev' },
+  author_association: 'OWNER',
+  labels: [],
+  changed_files: 1,
+};
+
+function run(world, command = 'evaluate') {
+  const dir = makeTestTempDir('codex-gate-host-');
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'gh'), FAKE_GH);
+  chmodSync(join(bin, 'gh'), 0o755);
+  const worldPath = join(dir, 'world.json');
+  const log = join(dir, 'calls.log');
+  writeFileSync(
+    worldPath,
+    JSON.stringify({
+      pr: basePr,
+      pulls: [basePr],
+      comments: [],
+      threads: [],
+      checkRuns: [],
+      files: [{ filename: 'src/a.ts' }],
+      ...world,
+    }),
+  );
+  writeFileSync(log, '');
+  const result = spawnSync(process.execPath, [gateScript, command], {
+    encoding: 'utf8',
+    env: {
+      PATH: `${bin}:${process.env.PATH}`,
+      GH_TOKEN: 'fake',
+      REPO: 'o/r',
+      ...(command === 'evaluate' ? { PR_NUMBER: '7' } : {}),
+      FAKE_WORLD: worldPath,
+      FAKE_LOG: log,
+    },
+  });
+  const calls = readFileSync(log, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const writes = calls.filter((call) => {
+    const text = call.args.join(' ');
+    return /--method|-X /.test(text) || call.input !== null;
+  });
+  const checkWrites = writes.filter((call) => /check-runs/.test(call.args.join(' ')));
+  releaseTestTempDir(dir);
+  return {
+    result,
+    calls,
+    writes,
+    checkWrites,
+    body: (call) => JSON.parse(call.input),
+    commentPosts: writes.filter((call) => /issues\/7\/comments/.test(call.args.join(' '))),
+    labelAdds: writes.filter(
+      (call) =>
+        /issues\/7\/labels/.test(call.args.join(' ')) && !/DELETE/.test(call.args.join(' ')),
+    ),
+    labelRemoves: writes.filter((call) => /DELETE/.test(call.args.join(' '))),
+  };
+}
+
+const ownRun = (over = {}) => ({
+  id: 55,
+  name: 'review-gate',
+  app: { slug: 'github-actions' },
+  started_at: '2026-01-01T00:00:00Z',
+  ...over,
+});
+
+test('completed clean review PATCHes the existing github-actions check', () => {
+  const out = run({
+    comments: [stateComment(SHA, 'completed')],
+    checkRuns: [ownRun()],
+  });
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.checkWrites.length, 1);
+  assert.match(out.checkWrites[0].args.join(' '), /PATCH.*check-runs\/55|check-runs\/55.*PATCH/);
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'success');
+  assert.equal(body.status, 'completed');
+  assert.equal(body.details_url, 'https://github.com/o/r/pull/7#issuecomment-1');
+});
+
+test('POSTs a new check when none exists for the head', () => {
+  const out = run({ comments: [stateComment(SHA, 'running')], checkRuns: [] });
+  assert.equal(out.checkWrites.length, 1);
+  assert.match(out.checkWrites[0].args.join(' '), /POST/);
+  assert.match(out.checkWrites[0].args.join(' '), /repos\/o\/r\/check-runs/);
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.name, 'review-gate');
+  assert.equal(body.head_sha, SHA);
+  assert.equal(body.status, 'in_progress');
+  assert.equal(body.conclusion, undefined);
+});
+
+test('ignores a review-gate check from another app and keeps one run per head', () => {
+  const foreign = ownRun({
+    id: 99,
+    app: { slug: 'some-other-app' },
+    started_at: '2026-02-01T00:00:00Z',
+  });
+  const out = run({ comments: [stateComment(SHA, 'completed')], checkRuns: [foreign] });
+  assert.equal(out.checkWrites.length, 1);
+  assert.match(out.checkWrites[0].args.join(' '), /POST/);
+  const both = run({
+    comments: [stateComment(SHA, 'completed')],
+    checkRuns: [
+      foreign,
+      ownRun({ id: 40 }),
+      ownRun({ id: 41, started_at: '2026-01-02T00:00:00Z' }),
+    ],
+  });
+  assert.equal(both.checkWrites.length, 1);
+  assert.match(both.checkWrites[0].args.join(' '), /check-runs\/41/);
+});
+
+test('an unresolved P1 thread fails the check with its URL', () => {
+  const out = run({
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1'), thread('P2')],
+    checkRuns: [ownRun()],
+  });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'failure');
+  assert.equal(body.output.title, '1 open P0/P1 Codex findings');
+  assert.match(body.output.summary, /discussion_rP1/);
+});
+
+test('a forged state comment from another author is ignored', () => {
+  const forged = { ...stateComment(SHA, 'completed'), user: { login: 'mallory', type: 'User' } };
+  const out = run({ comments: [forged], checkRuns: [] });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.status, 'in_progress');
+  assert.equal(body.conclusion, undefined);
+});
+
+test('a failed review is retried at most twice per head', () => {
+  const retryComment = (k, createdAt) => ({
+    id: 10 + k,
+    body: `<!-- review-gate-retry:${SHA}:${k} -->\n@codex review`,
+    user: ACTIONS,
+    created_at: createdAt,
+    updated_at: createdAt,
+  });
+  const zero = run({ comments: [stateComment(SHA, 'failed')], checkRuns: [] });
+  assert.equal(zero.commentPosts.length, 1);
+  assert.match(zero.body(zero.commentPosts[0]).body, new RegExp(`review-gate-retry:${SHA}:1 -->`));
+  assert.match(zero.body(zero.commentPosts[0]).body, /@codex review/);
+  assert.equal(zero.body(zero.checkWrites[0]).output.title, 'Codex review failed; retry 1 of 2');
+
+  const one = run({
+    comments: [stateComment(SHA, 'failed'), retryComment(1, '2026-01-01T00:00:30Z')],
+    checkRuns: [],
+  });
+  assert.equal(one.commentPosts.length, 1);
+  assert.match(one.body(one.commentPosts[0]).body, new RegExp(`review-gate-retry:${SHA}:2 -->`));
+
+  const two = run({
+    comments: [
+      stateComment(SHA, 'failed'),
+      retryComment(1, '2026-01-01T00:00:30Z'),
+      retryComment(2, '2026-01-01T00:00:40Z'),
+    ],
+    checkRuns: [ownRun()],
+  });
+  assert.equal(two.commentPosts.length, 0);
+  const body = two.body(two.checkWrites[0]);
+  assert.equal(body.conclusion, 'failure');
+  assert.equal(body.output.title, 'Codex review failed twice; comment `@codex review`');
+  assert.equal(two.labelAdds.length, 1);
+  assert.match(two.labelAdds[0].input, /review-stalled/);
+
+  const otherHead = run({
+    comments: [
+      stateComment(SHA, 'failed'),
+      {
+        id: 90,
+        body: `<!-- review-gate-retry:${OTHER}:1 -->`,
+        user: ACTIONS,
+        created_at: '2026-01-01T00:00:30Z',
+      },
+    ],
+    checkRuns: [],
+  });
+  assert.match(otherHead.body(otherHead.commentPosts[0]).body, new RegExp(`${SHA}:1 -->`));
+});
+
+test('a retry comment posted after the failed state is not repeated', () => {
+  const out = run({
+    comments: [
+      stateComment(SHA, 'failed'),
+      {
+        id: 11,
+        body: `<!-- review-gate-retry:${SHA}:1 -->`,
+        user: ACTIONS,
+        created_at: '2026-01-01T00:05:00Z',
+      },
+    ],
+    checkRuns: [],
+  });
+  assert.equal(out.commentPosts.length, 0);
+  assert.equal(out.body(out.checkWrites[0]).status, 'in_progress');
+});
+
+test('an exhausted allowance fails the check, labels the PR and posts no retry', () => {
+  const limit = {
+    id: 2,
+    body: LIMIT_BODY,
+    user: CODEX,
+    created_at: '2026-01-01T00:10:00Z',
+    updated_at: '2026-01-01T00:10:00Z',
+  };
+  const out = run({
+    comments: [stateComment(OTHER, 'completed'), limit],
+    checkRuns: [ownRun()],
+  });
+  assert.equal(out.commentPosts.length, 0);
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'failure');
+  assert.equal(body.output.title, 'Codex allowance exhausted');
+  assert.match(body.output.summary, /chatgpt\.com\/codex\/cloud\/settings\/usage/);
+  assert.equal(out.labelAdds.length, 1);
+  assert.match(out.labelAdds[0].input, /review-stalled/);
+
+  const forged = run({
+    comments: [
+      stateComment(OTHER, 'completed'),
+      { ...limit, user: { login: 'mallory', type: 'User' } },
+    ],
+    checkRuns: [],
+  });
+  assert.equal(forged.body(forged.checkWrites[0]).status, 'in_progress');
+});
+
+test('review-stalled is not added twice and is removed on success', () => {
+  const stalled = { ...basePr, labels: [{ name: 'review-stalled' }] };
+  const failedTwice = run({
+    pr: stalled,
+    comments: [
+      stateComment(SHA, 'failed'),
+      {
+        id: 11,
+        body: `<!-- review-gate-retry:${SHA}:1 -->`,
+        user: ACTIONS,
+        created_at: '2026-01-01T00:00:30Z',
+      },
+      {
+        id: 12,
+        body: `<!-- review-gate-retry:${SHA}:2 -->`,
+        user: ACTIONS,
+        created_at: '2026-01-01T00:00:40Z',
+      },
+    ],
+    checkRuns: [],
+  });
+  assert.equal(failedTwice.labelAdds.length, 0);
+  const ok = run({ pr: stalled, comments: [stateComment(SHA, 'completed')], checkRuns: [] });
+  assert.equal(ok.labelRemoves.length, 1);
+  assert.match(ok.labelRemoves[0].args.join(' '), /labels\/review-stalled/);
+  const fresh = run({ comments: [stateComment(SHA, 'completed')], checkRuns: [] });
+  assert.equal(fresh.labelRemoves.length, 0);
+});
+
+test('skips closed, draft, merge-queue and non-write PRs without writing', () => {
+  const cases = [
+    { ...basePr, state: 'closed' },
+    { ...basePr, draft: true },
+    { ...basePr, head: { sha: SHA, ref: 'mergify/merge-queue/abc' } },
+    { ...basePr, author_association: 'NONE' },
+    { ...basePr, author_association: 'CONTRIBUTOR', user: { login: 'stranger' } },
+  ];
+  for (const pr of cases) {
+    const out = run({ pr, comments: [stateComment(SHA, 'completed')] });
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.writes.length, 0);
+    assert.match(out.result.stdout + out.result.stderr, /skip/i);
+  }
+  const bot = run({
+    pr: { ...basePr, author_association: 'NONE', user: { login: 'cairnwright[bot]' } },
+    comments: [stateComment(SHA, 'completed')],
+  });
+  assert.equal(bot.checkWrites.length, 1);
+});
+
+test('rejects an unknown command', () => {
+  const dir = makeTestTempDir('codex-gate-cmd-');
+  const result = spawnSync(process.execPath, [gateScript, 'nope'], {
+    encoding: 'utf8',
+    cwd: dir,
+    env: { PATH: process.env.PATH },
+  });
+  releaseTestTempDir(dir);
+  assert.notEqual(result.status, 0);
+});
+
+test('a head with no Codex review after ten minutes gets one @codex review comment', () => {
+  const out = run({ comments: [stateComment(OTHER, 'completed')], checkRuns: [ownRun()] });
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.commentPosts.length, 1);
+  assert.equal(
+    out.body(out.commentPosts[0]).body,
+    `<!-- review-gate-request:${SHA} -->\n@codex review`,
+  );
+  assert.equal(out.body(out.checkWrites[0]).output.title, 'Asked Codex to review ccccccc');
+  assert.equal(out.body(out.checkWrites[0]).status, 'in_progress');
+});
+
+test('no request before ten minutes, without a check run, or after one was made', () => {
+  const fresh = run({ checkRuns: [ownRun({ started_at: new Date().toISOString() })] });
+  const noCheck = run({ checkRuns: [] });
+  const asked = run({
+    checkRuns: [ownRun()],
+    comments: [
+      {
+        id: 9,
+        body: `<!-- review-gate-request:${SHA} -->\n@codex review`,
+        user: ACTIONS,
+        created_at: '2026-01-01T00:20:00Z',
+        updated_at: '2026-01-01T00:20:00Z',
+      },
+    ],
+  });
+  for (const out of [fresh, noCheck, asked]) {
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.commentPosts.length, 0);
+    assert.equal(
+      out.body(out.checkWrites[0]).output.title,
+      'Waiting for the Codex review of ccccccc',
+    );
+  }
+});
+
+test('sweep dispatches one per-PR evaluation for each open non-draft PR that has not passed', () => {
+  const out = run(
+    {
+      pulls: [basePr, { ...basePr, number: 8, draft: true }],
+      comments: [stateComment(SHA, 'completed')],
+      checkRuns: [ownRun()],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.checkWrites.length, 0);
+  assert.equal(out.commentPosts.length, 0);
+  const dispatches = out.writes.filter((call) =>
+    /actions\/workflows\/review-gate\.yml\/dispatches/.test(call.args.join(' ')),
+  );
+  assert.equal(dispatches.length, 1);
+  assert.deepEqual(out.body(dispatches[0]), { ref: 'main', inputs: { pr: '7' } });
+});
+
+test('sweep skips a head whose gate check already passed', () => {
+  const out = run(
+    {
+      comments: [stateComment(SHA, 'completed')],
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.writes.length, 0);
+  assert.equal(out.calls.filter((call) => /pulls\/7$/.test(call.args.join(' '))).length, 0);
+});
+
+const actionsComment = (body, createdAt = '2026-01-01T00:02:00Z') => ({
+  id: 9,
+  body,
+  user: ACTIONS,
+  created_at: createdAt,
+  updated_at: createdAt,
+});
+
+test('a finding on a line the PR did not change is listed but passes the check', () => {
+  const out = run({
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1')],
+    files: [{ filename: 'src/a.ts', patch: '@@ -40,1 +40,2 @@\n ctx\n+added' }],
+    checkRuns: [ownRun()],
+  });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'success');
+  assert.match(body.output.summary, /predate this PR/);
+  assert.equal(out.commentPosts.length, 0);
+});
+
+test('the same finding on an added line blocks and records the block once', () => {
+  const world = {
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1')],
+    files: [{ filename: 'src/a.ts', patch: '@@ -9,1 +9,3 @@\n ctx\n+added\n+added2' }],
+    checkRuns: [ownRun()],
+  };
+  const out = run(world);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.equal(out.commentPosts.length, 1);
+  assert.match(out.body(out.commentPosts[0]).body, new RegExp(`review-gate-block:${SHA}`));
+  const repeat = run({
+    ...world,
+    comments: [...world.comments, actionsComment(`<!-- review-gate-block:${SHA} -->\nx`)],
+  });
+  assert.equal(repeat.commentPosts.length, 0);
+});
+
+test('the third blocked head labels the PR review-gate-human while the check stays red', () => {
+  const prior = ['1', '2'].map((digit) =>
+    actionsComment(`<!-- review-gate-block:${digit.repeat(40)} -->\nx`),
+  );
+  const out = run({
+    comments: [stateComment(SHA, 'completed'), ...prior],
+    threads: [thread('P1', { path: null, line: null })],
+    checkRuns: [ownRun()],
+  });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.conclusion, 'failure');
+  assert.match(body.output.title, /reconsider the approach/);
+  assert.equal(out.labelAdds.length, 1);
+  assert.deepEqual(out.body(out.labelAdds[0]).labels, ['review-gate-human']);
+});
+
+const secureFiles = [{ filename: 'apps/server/src/services/machine-claim.ts' }];
+const securityState = { commit_sha: SHA, status: 'completed', has_unresolved_findings: false };
+
+test('security paths fail closed with completed code review and no exact clean security review', () => {
+  for (const security of [
+    undefined,
+    null,
+    { ...securityState, commit_sha: OTHER },
+    { ...securityState, status: 'running' },
+    { ...securityState, status: 'failed' },
+    { ...securityState, has_unresolved_findings: null },
+    { ...securityState, has_unresolved_findings: true },
+  ]) {
+    const out = run({ files: secureFiles, comments: [stateComment(SHA, 'completed', security)] });
+    assert.equal(out.result.status, 0, out.result.stderr);
+    const check = out.body(out.checkWrites[0]);
+    assert.equal(check.conclusion, 'failure', JSON.stringify(security));
+    assert.match(check.output.summary, /security review/i);
+  }
+});
+
+test('security paths pass clean security state but ignore builtin gate settings and P0 threshold', () => {
+  const review = stateComment(SHA, 'completed', {
+    ...securityState,
+    has_unresolved_findings: true,
+  });
+  review.body += `\n<!-- codex-security-review:v1 ${JSON.stringify({
+    mergeGateEnabled: false,
+    blockingSeverityThreshold: 'P0',
+    status: 'completed',
+    headSha: SHA,
+  })} -->`;
+  const blocked = run({ files: secureFiles, comments: [review] });
+  assert.equal(blocked.body(blocked.checkWrites[0]).conclusion, 'failure');
+  const clean = run({
+    files: secureFiles,
+    comments: [stateComment(SHA, 'completed', securityState)],
+  });
+  assert.equal(clean.body(clean.checkWrites[0]).conclusion, 'success');
+  assert.match(clean.body(clean.checkWrites[0]).output.summary, /security reviewed/);
+});
+
+test('forged security approval cannot supplement a trusted completed code review', () => {
+  for (const user of [
+    { login: 'mallory', type: 'User' },
+    { login: CODEX.login, type: 'User' },
+    { login: 'other[bot]', type: 'Bot' },
+  ]) {
+    const forged = { ...stateComment(SHA, 'completed', securityState), user };
+    const out = run({ files: secureFiles, comments: [stateComment(SHA, 'completed'), forged] });
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  }
+});
+
+test('security review classifies credentials, command boundary and external auth including old renamed paths', () => {
+  for (const file of [
+    { filename: 'apps/daemon/src/credentials.ts' },
+    { filename: 'apps/server/src/routes-machine.ts' },
+    { filename: 'apps/server/src/services/mcp-face.ts' },
+    { filename: 'apps/server/src/services/mcp-servers.ts', status: 'removed' },
+    { filename: 'apps/server/src/services/renamed.ts', previous_filename: secureFiles[0].filename },
+  ]) {
+    const out = run({ files: [file], comments: [stateComment(SHA, 'completed')] });
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure', file.filename);
+  }
+  for (const filename of [
+    'apps/web/src/main.ts',
+    'scripts/ops/run.mjs',
+    'apps/server/drizzle/0102.sql',
+  ]) {
+    const out = run({ files: [{ filename }], comments: [stateComment(SHA, 'completed')] });
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'success', filename);
+  }
+});
+
+test('incomplete PR file pagination cannot preserve a previous successful check', () => {
+  const out = run({
+    pr: { ...basePr, changed_files: 2 },
+    files: [{ filename: 'apps/web/src/main.ts' }],
+    comments: [stateComment(SHA, 'completed')],
+    checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+  });
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+  assert.match(out.body(out.checkWrites[0]).output.summary, /file list/i);
+});
+
+test('sweep re-evaluates a previously successful security head when deploying the stricter policy', () => {
+  const out = run(
+    {
+      files: secureFiles,
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.writes.length, 1);
+  assert.match(out.writes[0].args.join(' '), /dispatches/);
+});
+
+test('security classification includes later file pages and invalidates malformed file lists', () => {
+  const paged = run({
+    pr: { ...basePr, changed_files: 2 },
+    filePages: [[{ filename: 'apps/web/src/main.ts' }], secureFiles],
+    comments: [stateComment(SHA, 'completed')],
+  });
+  assert.equal(paged.body(paged.checkWrites[0]).conclusion, 'failure');
+  assert.match(paged.body(paged.checkWrites[0]).output.summary, /security review/i);
+  for (const files of [
+    [{}],
+    [{ filename: null }],
+    [{ filename: 'apps/web/src/main.ts', previous_filename: 1 }],
+  ]) {
+    const malformed = run({ files, comments: [stateComment(SHA, 'completed')] });
+    assert.equal(malformed.body(malformed.checkWrites[0]).conclusion, 'failure');
+    assert.match(malformed.body(malformed.checkWrites[0]).output.summary, /file list/i);
+  }
+});
+
+test('sweep verifies the full PR file count when list metadata omits it', () => {
+  const { changed_files, ...listed } = basePr;
+  assert.equal(changed_files, 1);
+  const out = run(
+    {
+      pr: { ...basePr, changed_files: 2 },
+      pulls: [listed],
+      files: [{ filename: 'apps/web/src/main.ts' }],
+      checkRuns: [ownRun({ status: 'completed', conclusion: 'success' })],
+    },
+    'sweep',
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.writes.length, 1);
+  assert.match(out.writes[0].args.join(' '), /dispatches/);
+});
+
+const receiptFixture = JSON.parse(
+  readFileSync(new URL('../../../docs/verify/D88/receipt-fixture.json', import.meta.url), 'utf8'),
+);
+const receiptWorld = () => ({
+  pr: { ...basePr, ...receiptFixture.pr, head: { ...basePr.head, ...receiptFixture.pr.head } },
+  files: secureFiles,
+  comments: structuredClone(receiptFixture.evidence.comments),
+  commits: receiptFixture.evidence.commits.map((sha) => ({ sha })),
+  resolvedSha: receiptFixture.evidence.resolvedSha,
+  forcePushes: [],
+});
+
+test('D88 host publishes success only after verifying the real clean SECURITY receipt provenance', () => {
+  const out = run(receiptWorld());
+  assert.equal(out.result.status, 0, out.result.stderr);
+  const check = out.body(out.checkWrites[0]);
+  assert.equal(check.conclusion, 'success');
+  assert.match(check.output.summary, /D88 clean receipt verified/);
+  assert.ok(out.calls.some((call) => call.args.join(' ').includes('repos/o/r/commits/7cd6bab608')));
+  assert.ok(out.calls.some((call) => call.args.join(' ').includes('HEAD_REF_FORCE_PUSHED_EVENT')));
+});
+
+test('D88 host refuses stale, ambiguous or unavailable identity proof and all unresolved security findings', () => {
+  const worlds = [
+    { ...receiptWorld(), resolvedSha: OTHER },
+    { ...receiptWorld(), matchingRefs: [{ ref: 'refs/heads/7cd6bab608' }] },
+    { ...receiptWorld(), commits: [] },
+    { ...receiptWorld(), forcePushes: null },
+    { ...receiptWorld(), forcePushes: [{ createdAt: '2026-11-04T08:53:19Z' }] },
+    ...['P0', 'P1', 'P2', 'P3'].map((level) => {
+      const finding = thread(level, { isOutdated: true });
+      finding.comments.nodes[0].body = `<!-- codex-security-review-finding:v1 -->\n${finding.comments.nodes[0].body}`;
+      return { ...receiptWorld(), threads: [finding] };
+    }),
+  ];
+  for (const [i, world] of worlds.entries()) {
+    const out = run(world);
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure', `world ${i}`);
+  }
+});
+
+test('host blocks explicit-false security approval with open marked, parent-heading or unattributed findings', () => {
+  const marked = thread('P2', { isOutdated: true });
+  marked.comments.nodes[0].body =
+    '<!-- codex-security-review-finding:v1 -->\nMedium security issue';
+  const parent = thread('P2');
+  parent.comments.nodes[0].pullRequestReview = { body: '### 🛡️ Codex Security Review' };
+  const unknown = thread('P2');
+  unknown.comments.nodes[0].author = null;
+  for (const finding of [marked, parent, unknown]) {
+    const out = run({
+      files: secureFiles,
+      comments: [stateComment(SHA, 'completed', securityState)],
+      threads: [finding],
+    });
+    assert.equal(out.result.status, 0, out.result.stderr);
+    assert.equal(out.body(out.checkWrites[0]).conclusion, 'failure');
+    const ordinary = run({ comments: [stateComment(SHA, 'completed')], threads: [finding] });
+    assert.equal(ordinary.body(ordinary.checkWrites[0]).conclusion, 'success');
+  }
+});

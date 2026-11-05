@@ -11,19 +11,21 @@ import { ProjectHomeRedirect } from './pages/project-redirect.js';
 import { ProjectSettingsPage } from './pages/project-settings-page.js';
 import { SchedulesPage } from './pages/schedules-page.js';
 import { PwaBridge } from './pwa/register.js';
+import { MODEL_ROUTING_HREF, PROVIDERS_HREF } from './resources/hrefs.js';
 import { MachineDetailPage } from './resources/machine-detail-page.js';
-import { MACHINES_HREF, MachinesPage } from './resources/machines-page.js';
-import { MCP_HREF, McpServersPage } from './resources/mcp-servers-page.js';
-import { PROVIDERS_HREF, ProvidersPage } from './resources/providers-page.js';
-import { SECRETS_HREF, SecretsPage } from './resources/secrets-page.js';
-import { SKILLS_HREF, SkillsPage } from './resources/skills-page.js';
-import { AccountPage } from './routes/account-page.js';
+import { MACHINES_HREF } from './resources/machines-page.js';
+import { MCP_HREF } from './resources/mcp-servers-page.js';
+import { SECRETS_HREF } from './resources/secrets-page.js';
+import { SKILLS_HREF } from './resources/skills-page.js';
+import { ActivityPage } from './routes/activity-page.js';
 import { AGENTS_HREF, AgentDetailPage } from './routes/agent-detail-page.js';
-import { ApiKeysPage } from './routes/api-keys-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
-import { TeamPage } from './routes/team-page.js';
-import { TodoDetailPage } from './routes/todo-detail-page.js';
+import { TodoRedirect } from './routes/todo-redirect.js';
+import { ACTIVITY_PATH } from './search/activity-href.js';
+import { SETTINGS_HREF } from './settings/settings-href.js';
+import { SettingsPage } from './settings/settings-page.js';
+import { SettingsRedirect } from './settings/settings-redirect.js';
 
 export const router = createBrowserRouter([
   {
@@ -36,23 +38,26 @@ export const router = createBrowserRouter([
             element: <ChiefRoot />,
             children: [
               { path: '/app', element: <BoardPage /> },
-              { path: '/app/todo/:id', element: <TodoDetailPage /> },
+              { path: '/app/todo/:id', element: <TodoRedirect /> },
               { path: '/app/schedules', element: <SchedulesPage /> },
+              { path: ACTIVITY_PATH, element: <ActivityPage /> },
               { path: '/app/project/new', element: <ProjectNewPage /> },
               { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
               { path: '/app/project/:id/files', element: <ProjectPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
-              { path: '/app/team', element: <TeamPage /> },
+              { path: '/app/team', element: <SettingsRedirect section="team" /> },
               { path: `${AGENTS_HREF}/:id`, element: <AgentDetailPage /> },
-              { path: '/app/account', element: <AccountPage /> },
-              { path: '/app/api-keys', element: <ApiKeysPage /> },
-              { path: SKILLS_HREF, element: <SkillsPage /> },
-              { path: MCP_HREF, element: <McpServersPage /> },
-              { path: SECRETS_HREF, element: <SecretsPage /> },
-              { path: MACHINES_HREF, element: <MachinesPage /> },
+              { path: '/app/account', element: <SettingsRedirect section="account" /> },
+              { path: '/app/api-keys', element: <SettingsRedirect section="api-keys" /> },
+              { path: SKILLS_HREF, element: <SettingsRedirect section="skills" /> },
+              { path: MCP_HREF, element: <SettingsRedirect section="mcp" /> },
+              { path: SECRETS_HREF, element: <SettingsRedirect section="secrets" /> },
+              { path: MACHINES_HREF, element: <SettingsRedirect section="machines" /> },
               { path: `${MACHINES_HREF}/:id`, element: <MachineDetailPage /> },
               { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
-              { path: PROVIDERS_HREF, element: <ProvidersPage /> },
+              { path: PROVIDERS_HREF, element: <SettingsRedirect section="providers" /> },
+              { path: MODEL_ROUTING_HREF, element: <SettingsRedirect section="routing" /> },
+              { path: `${SETTINGS_HREF}/:section?`, element: <SettingsPage /> },
               { path: '*', element: <Navigate to="/app" replace /> },
             ],
           },

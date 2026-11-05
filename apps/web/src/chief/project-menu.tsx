@@ -74,7 +74,7 @@ export function ProjectMenu({
             {withAuto && (
               <DropdownMenuRadioItem value={AUTO_VALUE} closeOnClick className={ITEM_CLS}>
                 <CircleDashed className="mt-0.5 size-4.5 flex-none text-content-tertiary" />
-                <OptionText title={t('自动')} hint={t('总管判断，拿不准会问你')} />
+                <OptionText title={t('自动')} hint={t('Coordinator 判断，拿不准会问你')} />
               </DropdownMenuRadioItem>
             )}
             {projects.map((p, i) => (

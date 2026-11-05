@@ -180,16 +180,15 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
   return { todoId, buildId, title };
 }
 
-async function openDetailViaBoard(title: string): Promise<void> {
-  await page.goto(`${server.url}/app?view=board`);
-  await page.getByRole('link', { name: title }).click();
-  await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
+async function openDetail(todoId: string): Promise<void> {
+  await page.goto(`${server.url}/app/todo/${todoId}`);
+  await pexpect(page.getByTestId('side-chat')).toBeVisible({
     timeout: 15_000,
   });
 }
 
 async function openAcceptDialog(): Promise<void> {
-  await page.locator('.detail-head-icon--more').click();
+  await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   const menu = page.getByRole('menu', { name: '更多' });
   await pexpect(menu).toBeVisible();
   await menu.getByRole('menuitem', { name: '完成' }).click();
@@ -265,7 +264,7 @@ afterAll(async () => {
 });
 
 describe('#1236 task-done confirmation dialog (real web dist + real server + fake machine wire)', () => {
-  test('① single-card query not ready: confirm does not close silently — dialog stays, alert visible, zero requests, phase unchanged', async () => {
+  test('① single-card query not ready: the side chat shows an explained error, offers no finish, zero requests, phase unchanged', async () => {
     const card = await driveToReview('静默 no-op 探针：详情单卡查询失败时确认不得静默。', {
       rework: true,
     });
@@ -277,18 +276,11 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     await page.route(`**/api/todos/${card.todoId}`, (route) => route.abort());
     try {
       await page.goto(`${server.url}/app/todo/${card.todoId}`);
-      await pexpect(page.locator('.detail-shell [data-testid="detail-main"]')).toBeVisible({
-        timeout: 15_000,
-      });
-      await openAcceptDialog();
-      const dialog = acceptDialog();
-      await dialog.getByRole('button', { name: '完成' }).click();
-      await page.waitForTimeout(600);
+      const unavailable = page.getByTestId('side-chat-unavailable');
+      await pexpect(unavailable).toHaveAttribute('data-state', 'error', { timeout: 15_000 });
       await shot('silent-noop');
-      await pexpect(dialog).toBeVisible();
-      await pexpect(dialog.getByRole('alert')).toHaveText(
-        '任务数据未就绪，完成请求未送出。请刷新页面后重试。',
-      );
+      await pexpect(unavailable.getByRole('button', { name: '重试' })).toBeVisible();
+      await pexpect(page.getByTestId('side-chat-action')).toHaveCount(0);
       expect(merges).toBe(0);
       expect(server.todoPhase(card.todoId)).toBe('review');
     } finally {
@@ -301,7 +293,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     const card = await driveToReview('合并完成探针：rework 卡 review 点完成必须真落地。', {
       rework: true,
     });
-    await openDetailViaBoard(card.title);
+    await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
     await dialog.getByRole('button', { name: '完成' }).click();
@@ -322,7 +314,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     const card = await driveToReview('不合并完成探针：checkbox 必须是真选项。', {
       rework: false,
     });
-    await openDetailViaBoard(card.title);
+    await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
     const box = dialog.locator('input[type="checkbox"]');
@@ -346,7 +338,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
       route.fulfill({ status: 409, json: { error: reject } }),
     );
     try {
-      await openDetailViaBoard(card.title);
+      await openDetail(card.todoId);
       await openAcceptDialog();
       const dialog = acceptDialog();
       await dialog.getByRole('button', { name: '完成' }).click();
@@ -371,7 +363,7 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
     await doneStep(reviewStep.id, 'failed', { errorMessage: '探针：审核步失败' });
     await waitFor(() => server.todoPhase(card.todoId) === 'failed', 15_000);
 
-    await openDetailViaBoard(card.title);
+    await openDetail(card.todoId);
     await openAcceptDialog();
     const dialog = acceptDialog();
     const box = dialog.locator('input[type="checkbox"]');

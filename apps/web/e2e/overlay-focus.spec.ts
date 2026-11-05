@@ -29,23 +29,7 @@ function expectVisibleRing(info: { style: string; color: string; shadow: string 
 }
 
 test.describe('#15 focus ring incorporated', () => {
-  test('click + key on `新建任务`/topbar buttons: never the UA blue box', async ({ page }) => {
-    await page.goto(BOARD);
-
-    const newTask = page.locator('.sidebar-new-task');
-    await newTask.click();
-
-    await pressAndExpect(page, 'Escape', page.getByRole('dialog', { name: '新建任务' }), 'hidden');
-    await page.waitForTimeout(250);
-    const info = await focusedOutline(page);
-    expect(info).not.toBeNull();
-    expect(info!.style).not.toBe('auto');
-    expect(info!.color).not.toBe(UA_BLUE);
-
-    if (info!.focusVisible) {
-      expectVisibleRing(info!);
-    }
-
+  test('click + key on the `新建定时` button: never the UA blue box', async ({ page }) => {
     await page.goto('/app/schedules?scenario=11');
     const pageNew = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
     await pageNew.click();
@@ -70,7 +54,7 @@ test.describe('#15 focus ring incorporated', () => {
     for (let i = 0; i < 40 && !found; i++) {
       await page.keyboard.press('Tab');
       found = await page.evaluate(
-        () => document.activeElement?.closest('.sidebar-new-task') != null,
+        () => document.activeElement?.closest('.sidebar-search') != null,
       );
     }
     expect(found).toBe(true);

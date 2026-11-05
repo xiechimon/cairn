@@ -58,9 +58,13 @@ export const serverConfigSchema = z.object({
   issueIntake: z.boolean(),
   intakeAgentAllowlist: z.array(z.string()),
   scheduling: z.boolean(),
+  coordinatorServerContext: z.boolean(),
+  coordinatorMachineId: z.string().nullable(),
+  routingRules: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
   trajectoryReflectCurate: z.boolean(),
   trajectoryReflectOpenGuardIssues: z.boolean(),
+  researchIntakeProjectId: z.string().nullable(),
   pushDigestTimes: z
     .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
     .length(2)
@@ -168,9 +172,13 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       .map((name) => name.trim())
       .filter((name) => name !== ''),
     scheduling: envFlag(ENV_VARS.scheduling),
+    coordinatorServerContext: envFlag(ENV_VARS.coordinatorServerContext),
+    coordinatorMachineId: envStr(ENV_VARS.coordinatorMachineId),
+    routingRules: envFlag(ENV_VARS.routingRules),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
     trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),
+    researchIntakeProjectId: envStr(ENV_VARS.researchIntakeProjectId),
     pushDigestTimes: (() => {
       const raw = envStr('CAIRN_PUSH_DIGEST_TIMES');
       if (raw === null) return ['09:00', '18:00'];
@@ -247,6 +255,10 @@ export function reposDirOf(config: ServerConfig): string {
 
 export function backupStatusPathOf(config: Pick<ServerConfig, 'dbPath'>): string {
   return join(dirname(config.dbPath), 'backup-status.json');
+}
+
+export function deployRecordPathOf(config: Pick<ServerConfig, 'dbPath'>): string {
+  return join(dirname(config.dbPath), 'deploy.json');
 }
 
 export function attachmentsDirOf(config: ServerConfig): string {

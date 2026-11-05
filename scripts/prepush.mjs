@@ -40,6 +40,7 @@ export const localOnly = [
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/lint-warning-cap.mjs'],
+  ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
 ];
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;
@@ -58,6 +59,21 @@ function isDocument(path) {
 
 export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
+}
+
+export function needsGates(paths, testsRead) {
+  return hasCode(paths) || paths.some((path) => !path.startsWith('docs/') || testsRead(path));
+}
+
+export function testsRead(path) {
+  const result = spawnSync(
+    'git',
+    ['-c', 'color.ui=never', 'grep', '-l', '-F', '-e', path, '--', '*.test.ts', '*.test.mjs'],
+    { cwd: root, encoding: 'utf8' },
+  );
+  if (result.status === 1) return false;
+  if (result.status !== 0) throw new Error(result.stderr);
+  return true;
 }
 
 export function workflowTestSteps(workflows = join(root, '.github/workflows')) {
@@ -141,15 +157,60 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
       ];
 }
 
-export function runPlan(plan, { cwd, env, exit = (code) => process.exit(code) }) {
+export const NODE_TEST_TIMEOUT_MS = 300_000;
+const STEP_TIMED_OUT = 124;
+const PROCESS_GROUP_RUNNER = `
+const { spawn } = require('node:child_process');
+const [ms, command, ...args] = process.argv.slice(1);
+const child = spawn(command, args, { stdio: 'inherit', detached: true });
+const killGroup = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} };
+const timer = setTimeout(() => { killGroup(); process.exit(${STEP_TIMED_OUT}); }, Number(ms));
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { killGroup(); process.exit(1); });
+child.on('exit', (code) => { clearTimeout(timer); killGroup(); process.exit(code ?? 1); });
+`;
+export const NODE_TEST_STEP_TIMEOUT_MS = 15 * 60_000;
+
+export function runPlan(
+  plan,
+  {
+    cwd,
+    env,
+    exit = (code) => process.exit(code),
+    testTimeoutMs = NODE_TEST_TIMEOUT_MS,
+    stepTimeoutMs = NODE_TEST_STEP_TIMEOUT_MS,
+  },
+) {
   for (const step of plan) {
     const [command, ...commandArgs] = step;
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
-    const result = spawnSync(command, commandArgs, {
-      cwd,
-      stdio: 'inherit',
-      env: scrubGitEnv({ ...env }),
-    });
+    const nodeTest = command === 'node' && commandArgs[0] === '--test';
+    const result = nodeTest
+      ? spawnSync(
+          process.execPath,
+          [
+            '-e',
+            PROCESS_GROUP_RUNNER,
+            String(stepTimeoutMs),
+            command,
+            '--test',
+            '--test-force-exit',
+            `--test-timeout=${testTimeoutMs}`,
+            ...commandArgs.slice(1),
+          ],
+          { cwd, stdio: 'inherit', env: scrubGitEnv({ ...env }) },
+        )
+      : spawnSync(command, commandArgs, {
+          cwd,
+          stdio: 'inherit',
+          env: scrubGitEnv({ ...env }),
+        });
+    if (nodeTest && result.status === STEP_TIMED_OUT) {
+      console.error(
+        `[prepush] ${command} ${commandArgs.join(' ')} did not exit within ${stepTimeoutMs / 60_000} min; killed its process group`,
+      );
+      exit(1);
+      return;
+    }
     if (result.status !== 0) {
       exit(result.status ?? 1);
       return;
@@ -183,20 +244,21 @@ export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
-  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code'];
+  const modes = ['--ci', '--advisory', '--e2e-shard', '--self-test', '--has-code', '--needs-gates'];
   if (
     args.length > 0 &&
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
     console.error(
-      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code]',
+      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code | --needs-gates]',
     );
     process.exit(2);
   }
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
-  if (args[0] === '--has-code') {
+  if (args[0] === '--has-code' || args[0] === '--needs-gates') {
     try {
-      console.log(hasCode(changedPaths()));
+      const paths = changedPaths();
+      console.log(args[0] === '--has-code' ? hasCode(paths) : needsGates(paths, testsRead));
     } catch {
       console.log(true);
     }

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { HISTORY, mockLive, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
+import { openChiefWindow, expandTurns } from './helpers.js';
 
 test.describe('home is one continuous Coordinator chat (T1)', () => {
   test('a fresh home shows the greeting, the composer and the running count, and no chief drawer', async ({
@@ -63,6 +64,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
   }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app');
+    await expandTurns(page);
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     const chip = stream.locator('a.mention-chip--todo').first();
     await expect(chip).toHaveAttribute('data-phase', 'building');
@@ -75,11 +77,12 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(stream.getByTestId('chief-turn-tools').first()).toBeVisible();
     await evidenceShot(page, 'home-chat.png');
     await page.reload();
+    await expandTurns(page);
     await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText(
       '已经补给它了',
     );
     await page.getByTestId('home-c').locator('a.mention-chip--todo').first().click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 
   test('cmd+J on home focuses the home composer instead of opening the drawer', async ({ page }) => {
@@ -91,21 +94,22 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.locator('.chief-drawer')).toBeHidden();
   });
 
-  test('the board view keeps the chief button and drawer', async ({ page }) => {
+  test('a page other than home keeps the chief drawer', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
-    await page.goto('/app?view=board');
+    await page.goto('/app/schedules');
     await expect(page.getByTestId('home-c')).toHaveCount(0);
-    await page.getByRole('button', { name: '总管', exact: true }).click();
+    await openChiefWindow(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
   });
 
   test('a task chip in the drawer opens the task page', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
-    await page.goto('/app?view=board');
-    await page.getByRole('button', { name: '总管', exact: true }).click();
+    await page.goto('/app/schedules');
+    await openChiefWindow(page);
+    await expandTurns(page);
     const drawer = page.locator('.chief-drawer');
     await drawer.locator('a.mention-chip--todo').first().click();
-    await expect(page).toHaveURL(/\/app\/todo\/todo-1/);
+    await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 
   test('phone width: the chat fills the screen and the composer stays on screen', async ({ page }) => {

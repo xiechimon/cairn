@@ -37,7 +37,6 @@ interface NotificationInput {
   entityRef: NotificationRecord['entityRef'];
   agent: { name: string; avatarUrl: string | null };
   snippet: string | null;
-  readAt?: number | null;
 }
 
 function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): NotificationRecord {
@@ -55,7 +54,7 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
       agentName: input.agent.name,
       agentAvatarUrl: input.agent.avatarUrl,
       snippet: input.snippet,
-      readAt: input.readAt ?? null,
+      readAt: null,
       createdAt,
       channels: ['in_app'],
     })
@@ -67,7 +66,7 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
         agentName: input.agent.name,
         agentAvatarUrl: input.agent.avatarUrl,
         snippet: input.snippet,
-        readAt: input.readAt ?? null,
+        readAt: null,
         createdAt,
       },
     })
@@ -224,20 +223,10 @@ export function notifyChiefMessage(
     threadId: string;
     message: string;
     agent: { name: string; avatarUrl: string | null };
-    readAt?: number | null;
   },
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
   if (!thread) throw notFound(`chief thread ${input.threadId}`);
-  const readAt = input.readAt ?? null;
-  if (readAt !== null) {
-    const existing = deps.db
-      .select()
-      .from(notification)
-      .where(eq(notification.id, `${deps.user.id}:${thread.id}`))
-      .get();
-    if (existing !== undefined && existing.readAt === null) return toNotificationRecord(existing);
-  }
   return upsertAndPublish(deps, {
     teamId: thread.teamId,
     type: 'chief_message',
@@ -245,7 +234,6 @@ export function notifyChiefMessage(
     entityRef: { title: thread.title, projectId: null, seqNum: null },
     agent: input.agent,
     snippet: input.message,
-    readAt,
   });
 }
 
@@ -296,6 +284,21 @@ export function notifyQuotaWait(
       ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
     snippet: `${lane} ${kindText}：任务挂起等额度，额度恢复后自动续跑`,
+  });
+}
+
+export function notifyNoMachine(
+  deps: NotificationDeps,
+  todoRow: { id: string; teamId: string; title: string; projectId: string; seqNum: number },
+  snippet: string,
+): NotificationRecord {
+  return upsertAndPublish(deps, {
+    teamId: todoRow.teamId,
+    type: 'no_machine',
+    entityId: todoRow.id,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+    snippet,
   });
 }
 

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -89,10 +90,10 @@ async function openDrawer(page: Page) {
   const membersLoaded = page.waitForResponse(
     (r) => r.url().includes(`/api/teams/${TEAM_ID}/members`) && r.status() === 200,
   );
-  await page.goto('/app?view=board');
+  await page.goto('/app/schedules');
   await membersLoaded;
 
-  await page.getByRole('button', { name: '总管', exact: true }).click();
+  await openChiefWindow(page);
   const drawer = page.locator('.chief-drawer');
   await expect(drawer).toBeVisible();
   const input = page.getByTestId('chief-composer-input');

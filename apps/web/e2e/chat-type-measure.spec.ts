@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
@@ -7,6 +8,9 @@ test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line he
   page,
 }) => {
   await page.goto(DONE);
+  await expandTurns(page);
+  await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
+  await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const text = page.getByTestId('agent-text').first();
   await expect(text).toBeVisible();
   const cs = await text.evaluate((el) => {
@@ -25,6 +29,9 @@ test('chat body reads at 15px (text-card-title) on the unitless 1.5 type line he
 test('68ch measure cap binds the body text and the centered note', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto(DONE);
+  await expandTurns(page);
+  await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
+  await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const caps = await page.evaluate(() => {
     // ch resolves against the element's own font — measure the "0" glyph in
     // the same computed font and compare the used max-width against 68 of them
@@ -43,7 +50,7 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
       return w;
     };
     const ratio = (sel: string) => {
-      const el = document.querySelector(sel)!;
+      const el = document.querySelector(`.side-panel ${sel}`)!;
       const used = Number.parseFloat(getComputedStyle(el).maxWidth);
       return used / zeroWidth(el);
     };
@@ -72,34 +79,39 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(Math.abs(note.leftGap - note.rightGap)).toBeLessThanOrEqual(1);
   // the capped measure must not push the column into horizontal overflow
   const overflow = await page.evaluate(() => {
-    const col = document.querySelector('[data-testid="transcript-col"]')!;
+    const col = document.querySelector('.side-panel [data-testid="transcript-col"]')!;
     return { scroll: col.scrollWidth, client: col.clientWidth };
   });
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
 });
 
-test('composer placeholder sits at 15px (text-card-title) — the same size as the 15px body', async ({ page }) => {
+test('composer placeholder sits at 15px (text-card-title)', async ({ page }) => {
+  await page.goto('/app?scenario=home-c&thread=home-c-idle');
+  const placeholder = page.locator('.side-panel [data-testid="composer-placeholder"]');
+  await expect(placeholder).toHaveCSS('font-size', '15px');
+});
+
+test('agent text sits at 15px', async ({ page }) => {
   await page.goto(CONFIRM);
-  const sizes = await page.evaluate(() => {
-    const ph = document.querySelector('[data-testid="composer-placeholder"]')!;
-    const text = document.querySelector('[data-testid="agent-text"]')!;
-    return {
-      placeholder: getComputedStyle(ph).fontSize,
-      body: getComputedStyle(text).fontSize,
-    };
-  });
-  expect(sizes.placeholder).toBe('15px');
-  expect(sizes.body).toBe('15px');
+  await expandTurns(page);
+  await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
+  await expect(page.locator('.side-panel [data-testid="agent-text"]').first()).toHaveCSS(
+    'font-size',
+    '15px',
+  );
 });
 
 test('bubble / footer keep their own geometry, replies carry no avatar column', async ({ page }) => {
   await page.goto(DONE);
+  await expandTurns(page);
+  await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
+  await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const geo = await page.evaluate(() => {
-    const bubble = document.querySelector('[data-testid="user-bubble"]')!;
-    const avatars = document.querySelectorAll('[data-testid="msg-avatar"]').length;
+    const bubble = document.querySelector('.side-panel [data-testid="user-bubble"]')!;
+    const avatars = document.querySelectorAll('.side-panel [data-testid="msg-avatar"]').length;
     const userItem = bubble.closest('[data-slot="message-scroller-item"]')!;
     const userFooter = userItem.querySelector('[data-testid="msg-actions"]')!;
-    const footer = [...document.querySelectorAll('[data-testid="msg-actions"]')].find(
+    const footer = [...document.querySelectorAll('.side-panel [data-testid="msg-actions"]')].find(
       (el) => !userItem.contains(el),
     )!;
     const b = bubble.getBoundingClientRect();
@@ -124,9 +136,13 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
 }) => {
 
   await page.goto(DONE);
+  await expandTurns(page);
+  await page.locator('.side-panel [data-testid="transcript-col"]').waitFor();
+  await page.locator('.side-panel [data-testid=\"transcript-col\"]').waitFor();
   const probe = await page.evaluate(() => {
     // every element in the transcript that paints a horizontal line
-    const ruled = [...document.querySelectorAll('[data-testid="transcript-col"] *')]
+    const ruled = [...document.querySelectorAll('.side-panel [data-testid="transcript-col"] *')]
+      .filter((el) => el.closest('.spec-block') === null)
       .filter((el) => {
         const cs = getComputedStyle(el);
         const top = Number.parseFloat(cs.borderTopWidth) || 0;
@@ -139,7 +155,7 @@ test('turn boundary is air, not a rule: no divider between a user turn and the a
       })
       .map((el) => el.className);
 
-    const turns = [...document.querySelectorAll('[data-slot="message-scroller-item"]')]
+    const turns = [...document.querySelectorAll('.side-panel [data-slot="message-scroller-item"]')]
       .filter((item) => {
         const prev = item.previousElementSibling;
         return (

@@ -97,12 +97,31 @@ to `/usr/local/lib/cairn-orb/node` for the relay, so a home-based Node install
 works with the user unit's `ProtectHome=yes`. Binary content and mode converge
 on reruns. Existing networkd-managed host links or earlier network configuration
 files stop the installer before changes.
-The image contains Node and pinned Claude Code/Codex CLIs, with npm lifecycle
-scripts disabled. It installs no daemon package or production dependencies.
-`/etc/cairn-orb-image` records `node_major`, `claude`, `codex`, `agent_uid`, and
-the recipe hash. A completed base image is rebuilt when those values change.
-Legacy markers containing pnpm or daemon package/version pins are recognized
-and rebuilt once into this contract. The previous base survives failed builds
+The image contains Node, pinned Claude Code/Codex CLIs and the repository's
+pnpm, installed with npm lifecycle scripts disabled, plus Python (agents reach
+for `python3` in Bash), the CLI tools repository scripts call (`jq`, `diff`, `patch`, `which`, `hostname`, `rsync`, `lsof`, `rg`, `unzip`; `pnpm prepush` fails without `jq`) and bubblewrap and socat: Claude Code refuses to start without bubblewrap, because it scrubs
+subprocess environments through `bwrap`, and its Bash sandbox refuses every
+command with "socat not installed" when socat is missing. Steps that carry the
+subscription token set `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`, which makes that
+sandbox mandatory, and inside nspawn bubblewrap cannot mount a fresh `/proc`
+("Can't mount proc on /proc: Operation not permitted"). The worker unit
+therefore sets `CLAUDE_CONFIG_DIR=/var/lib/cairn-claude/config`, whose
+`settings.json` enables `sandbox.enableWeakerNestedSandbox` so bubblewrap binds
+the Orb's `/proc` instead. A process inside that sandbox still cannot read
+`/proc/<pid>/environ` of processes outside it (measured on omarchy, 2026-11-03).
+`/var/lib/cairn-claude` is `root:root 0755`, `config` is `root:agent 1770`
+(sticky) and `settings.json` is `root:root 0644`, so the agent can write its
+own Claude state there but cannot remove, rename or overwrite the settings or
+move the directory; the image build checks each of these as `agent`. The pnpm version lives in
+`pnpm.version` beside the script, because `cairn-ops-run` materializes only
+`scripts/ops/orb`; `shell.test.mjs` fails when it differs from the root
+`packageManager`. Node 25 and later ship no corepack, so project
+setup hooks and agents in the Orb need pnpm on the image's PATH. The image
+installs no daemon package or production dependencies.
+`/etc/cairn-orb-image` records `node_major`, `claude`, `codex`, `pnpm`,
+`agent_uid`, and the recipe hash. A completed base image is rebuilt when those
+values change. Markers without a pnpm pin, and legacy markers with daemon
+package/version pins, are recognized and rebuilt once into this contract. The previous base survives failed builds
 and is replaced only after the staging image is complete and unmounted.
 Unrecognized images are preserved and stop installation. The rebuild is printed
 and counted; the next run prints `0 changes`. Existing clones keep their tools.
@@ -263,7 +282,8 @@ Put Project seeds at `/var/lib/cairn-orb/seed/<projectId>/repo`, as `ian`.
 The image uses one `daemon_entry` variable, `/opt/cairn/daemon/cli.mjs`. The enabled
 `cairn-orb-worker.service` runs as `agent`, waits for `/run/cairn/relay.sock`,
 and runs exactly `/usr/bin/node /opt/cairn/daemon/cli.mjs orb-step --socket /run/cairn/relay.sock`
-with `Restart=always`.
+with `Restart=always` and `LimitCORE=0`, so a same-uid command that crashes the
+Claude CLI cannot leave a core dump holding the subscription token.
 The daemon relay protocol owns authentication, step binding, heartbeat, tool
 and done messages; host crash fallback and the 120-second watchdog remain
 on the host. This host/image change requires the daemon transport rework.
@@ -424,7 +444,7 @@ The trial uses a second user unit from the main checkout. Install it as the
 checkout owner after the normal daemon deployment has produced `apps/daemon/dist`:
 
 ```sh
-systemctl --user link "$HOME/Code/AgentProjects/cairn/scripts/ops/systemd/cairn-daemon-orb.service"
+systemctl --user link "$HOME/Code/AgentProjects/cairn-exec/scripts/ops/systemd/cairn-daemon-orb.service"
 systemctl --user daemon-reload
 systemctl --user enable --now cairn-daemon-orb.service
 journalctl --user -u cairn-daemon-orb.service -f
@@ -658,3 +678,29 @@ proves the detector and delivery plumbing, not Linux isolation. Only the
 coordinator's live `docs/verify/2277/canary.json` can establish nspawn, filesystem
 and egress behavior on omarchy. The macOS backend-user canary remains outside
 this item's scope.
+
+## Coordinator computer image (D75)
+
+`install-host.sh` also runs `build-computer-image.sh` after the base image. It
+snapshots `cairn-orb-base` into `cairn-orb-computer` and installs
+`xorg-server-xvfb`, `x11vnc`, `fluxbox`, `xdotool`, `chromium` and
+`imagemagick` with `systemd-nspawn --directory` and the host mirrorlist bound
+read-only. `arch-chroot` cannot install into an image that is not a mount
+point. The build refuses a guest Node major other than the base's. It installs
+a Chromium managed policy (no password manager, autofill or sync) and the
+`cairn-computer-desktop.service` unit, which runs Xvfb `:1`, fluxbox and two
+x11vnc servers on Unix sockets only: `/run/cairn-computer/vnc.sock` and the
+view-only `/run/cairn-computer/view.sock`. Chromium keeps its own sandbox
+inside the Orb (measured in spike S1), so it runs without `--no-sandbox`.
+
+Polkit treats `cairn-orb-computer` as a template, like `cairn-orb-base`: `ian`
+cannot remove, rename or start it. Only the template may be cloned to a
+`cairn-orb-computer-*` name, and the template may only be cloned to such a
+name. For `cairn-orb-computer-*` machines, `prepare-machine.sh` runs
+`computer-home.mjs` as root. It creates `/var/lib/cairn-computer/<machine>`
+(`ian:ian 0700`, refusing links and foreign owners) and binds it to
+`/home/agent` with an idmap. The image is disposable and the home persists.
+The idmap maps guest root to host root on that bind, so the installer mounts
+`/var/lib/cairn-computer` on itself with `nosuid,nodev`
+(`var-lib-cairn\x2dcomputer.mount`), and `prepare-machine.sh` refuses to start
+a computer when that mount lacks either option, as it does for `/run/cairn-orb`.

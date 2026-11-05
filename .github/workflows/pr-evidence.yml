@@ -59,6 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -66,14 +67,19 @@ jobs:
 
       - name: Route the head through main's pr-gate rules
         env:
+          GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           if ! git cat-file -e origin/main:scripts/merge-route.mjs; then
             echo "merge-route: main has no merge-route.mjs yet; no PR may enter the merge queue"
             exit 1
           fi
           git show origin/main:scripts/merge-route.mjs > "$RUNNER_TEMP/merge-route.mjs"
-          node "$RUNNER_TEMP/merge-route.mjs" "$HEAD_SHA"
+          label_args=()
+          if [ "$SAME_REPO" = "true" ]; then label_args=(--label-pr "$PR_NUMBER"); fi
+          node "$RUNNER_TEMP/merge-route.mjs" "$HEAD_SHA" "${label_args[@]}"
 
   # Stable job name: it is in the branch-protection required checks.
   pr-evidence:
@@ -96,9 +102,6 @@ jobs:
       - name: Read the PR as it is now
         run: |
           gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
-          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" > "$RUNNER_TEMP/pr-commits.json"
-          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" > "$RUNNER_TEMP/pr-files.json"
-          jq -n --arg repository "$(jq -r '.base.repo.full_name' "$RUNNER_TEMP/pr.json")" --slurpfile pages "$RUNNER_TEMP/pr-commits.json" --slurpfile filePages "$RUNNER_TEMP/pr-files.json" '{repository: $repository, commits: ($pages[0] | add), files: ($filePages[0] | add)}' > "$RUNNER_TEMP/pr-evidence-context.json"
           jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
           echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
           echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
@@ -147,7 +150,7 @@ jobs:
             node "$RUNNER_TEMP/schema-glance.mjs" --base "$MERGE_BASE" --head "$HEAD_SHA" > "$RUNNER_TEMP/schema-glance.md"
             schema_args=(--schema-glance "$RUNNER_TEMP/schema-glance.md")
           fi
-          python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json" "${schema_args[@]}"
+          python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "${schema_args[@]}"
 
       - name: Check PR body tasks (no unchecked task anywhere)
         if: ${{ !cancelled() && steps.pr.outcome == 'success' }}

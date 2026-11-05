@@ -49,8 +49,11 @@ test('account switch: denied-state click lands the preference on-panel + interce
 
 test('team: `设置` routes to the account surface', async ({ page }) => {
   await page.goto('/app/team?scenario=12');
-  await page.getByRole('link', { name: '设置', exact: true }).click();
-  await expect(page).toHaveURL(/\/app\/account/);
+  await page
+    .getByRole('dialog', { name: '设置' })
+    .getByRole('link', { name: '设置', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/app\/settings\/account/);
   await expect(page.locator('.account-card')).toBeVisible();
 });
 

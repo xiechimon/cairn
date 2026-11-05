@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect } from 'react';
 
 const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
 
@@ -9,83 +9,50 @@ export const isEditableOutsideChiefDrawer = (target: EventTarget | null): boolea
   isEditableTarget(target) &&
   !(target instanceof HTMLElement && target.closest('.chief-drawer') !== null);
 
-const TAB_CYCLE_SEATS = ['.new-task-project', '.new-task-spec'];
+const COMPOSE_TARGET_ATTR = 'data-compose-target';
 
-const isTabCycleSeat = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  TAB_CYCLE_SEATS.some((selector) => target.closest(selector) !== null);
+const CHIEF_DRAWER = '.chief-drawer';
 
-function useHotkey(
-  key: string,
-  guard: (target: EventTarget | null) => boolean,
-  onOpen: () => void,
-  enabled = true,
-) {
-  const guardRef = useRef(guard);
-  const onOpenRef = useRef(onOpen);
+const BLOCKING_LAYER =
+  '.overlay, [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+
+const isTypedCharacter = (event: KeyboardEvent): boolean =>
+  (event.key.length === 1 && event.key !== ' ') || event.key === 'Process';
+
+const blockingLayerOpen = (): boolean =>
+  [...document.querySelectorAll(BLOCKING_LAYER)].some(
+    (el) => !el.matches(CHIEF_DRAWER) && el.checkVisibility(),
+  );
+
+function isOnTop(el: HTMLElement): boolean {
+  const box = el.getBoundingClientRect();
+  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+  const surface = el.closest('.composer, .chief-composer') ?? el;
+  return hit !== null && surface.contains(hit);
+}
+
+function visibleComposeTarget(): HTMLTextAreaElement | null {
+  const usable = [
+    ...document.querySelectorAll<HTMLTextAreaElement>(`textarea[${COMPOSE_TARGET_ATTR}]`),
+  ].filter((el) => !el.readOnly && !el.disabled && el.checkVisibility() && isOnTop(el));
+  return usable.find((el) => el.closest(CHIEF_DRAWER) === null) ?? usable[0] ?? null;
+}
+
+export function useTypeToCompose(): void {
   useLayoutEffect(() => {
-    guardRef.current = guard;
-    onOpenRef.current = onOpen;
-  });
-  useLayoutEffect(() => {
-    if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.key !== key) return;
+      if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (guardRef.current(event.target)) return;
-      event.preventDefault();
-      onOpenRef.current();
+      if (!isTypedCharacter(event)) return;
+      if (isEditableTarget(event.target)) return;
+      if (blockingLayerOpen()) return;
+      const target = visibleComposeTarget();
+      if (target === null) return;
+      target.focus({ preventScroll: true });
+      const end = target.value.length;
+      target.setSelectionRange(end, end);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [key, enabled]);
-}
-
-export function useChordHotkey(
-  key: string,
-  guard: (target: EventTarget | null) => boolean,
-  onFire: () => void,
-  enabled = true,
-) {
-  const guardRef = useRef(guard);
-  const onFireRef = useRef(onFire);
-  useLayoutEffect(() => {
-    guardRef.current = guard;
-    onFireRef.current = onFire;
-  });
-  useLayoutEffect(() => {
-    if (!enabled) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.repeat) return;
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.key.toLowerCase() !== key) return;
-      if (guardRef.current(event.target)) return;
-      event.preventDefault();
-      onFireRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [key, enabled]);
-}
-
-export function useNewTaskHotkey(onOpen: () => void): void {
-  useHotkey('c', isEditableTarget, onOpen);
-}
-
-export function useProjectCycleHotkey(active: boolean, onCycle: () => void): void {
-  useLayoutEffect(() => {
-    if (!active) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      if (event.defaultPrevented || event.isComposing) return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-      if (!isTabCycleSeat(event.target)) return;
-      event.preventDefault();
-      onCycle();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [active, onCycle]);
+  }, []);
 }

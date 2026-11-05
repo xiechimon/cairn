@@ -240,8 +240,10 @@ test('permissions tab: zero-secret empty state has an entry to add secrets, clic
   await expect(entry).toBeVisible();
   await expect(entry).toHaveText('去添加密钥');
   await entry.click();
-  await expect(page).toHaveURL(/\/app\/resources\/secrets/);
+  await expect(page).toHaveURL(/\/app\/settings\/secrets/);
   await expect(page.getByRole('heading', { level: 1, name: '密钥' })).toHaveText('密钥');
+  await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '关闭设置' }).click();
+  await expect(page).toHaveURL(/\/app\/resources\/agents\//);
 });
 
 test('permissions tab: with secrets, no `去添加密钥` entry', async ({ page }) => {
@@ -644,7 +646,7 @@ test('overview: with running tasks rows are listed, section header carries the c
 test('overview: clicking a row opens the task page (#1937, #2531)', async ({ page }) => {
   await page.goto(`${DETAIL.replace('agent-detail', 'agent-detail-active')}`);
   await page.locator('.agent-task-row').first().click();
-  await expect(page).toHaveURL(/\/app\/todo\/r3-legacy-12(\?|$)/);
+  await expect(page).toHaveURL(/[?&]thread=r3-legacy-12(&|$)/);
 });
 
 const OVERVIEW_LABELS = ['职责', '默认 skill', '运行时', '模型', '思考强度'];

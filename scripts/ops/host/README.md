@@ -53,6 +53,8 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 
 Allowed: `gh pr view|list|comment|create|close|update-branch`, `gh pr edit` with only `--add-label`/`--remove-label`, `gh pr merge <pr> --disable-auto` (nothing else; the bot never merges), `gh issue view|list|comment|create|edit|pin`, `gh api` reads with one endpoint and only `--method GET`, `--paginate`, `--jq`, `--template`, `--include`, `--silent`, `--slurp`, `--cache` (fields only with an explicit GET), `git fetch origin` with `-q`, `-f`/`--force`, `--prune`, `--no-tags`, `git commit`, `git rebase <upstream>` with `-q` and `-X theirs|ours`, or `git rebase --continue|--abort|--skip`, `git -C <dir> ...`, and `git push origin <src>:<branch>` where the branch is not `main`/`master`, optionally with `--force-with-lease`, `--no-verify`, `-u`, `-q`.
 
+Deploy-lag recovery also permits `gh issue close <positive number> -R xiechimon/cairn -c "Caught up: omarchy runs <40 lowercase hex SHA>."`, with `--repo` and `--comment` as equivalent separate flags. No global or duplicate repository flags, URL/zero issue IDs, other messages or extra flags are accepted. `deploy-watch.sh` identifies the issue through the bot author and lag title; failure to close it fails the recovery tick.
+
 Added beyond the first list because current callers need them: `gh pr close`, `gh pr update-branch`, `gh issue pin`, `gh pr merge --disable-auto` (it only disarms), `git commit`, `git rebase`, `git -C`, and `git push --force-with-lease` (lane branches are rewritten by rebase; a lease never overwrites commits the pusher has not seen).
 
 Flags are matched by an allowlist after splitting `--name=value`, so inline values (`--input=-`, `--field=k=v`, `--exec=cmd`) and git's abbreviated long options (`--exe`, `--upload-p`) are refused like their full spellings.
@@ -77,7 +79,6 @@ Measured with `grep -rn as-bot` over `~/.cairn/tools`, `~/lanes/*.sh` and `~/.co
 | `tools/reminders/resume-1727.sh` | `gh issue create`, `gh issue edit --remove-label`, `gh issue comment` | allowed |
 | `~/.cairn/tools/review-gate/retro-review.sh` (not mirrored) | `gh issue create` | allowed |
 | `tools/schedule/issue-schedule.mjs` | `gh issue create|edit|comment|pin` | allowed |
-| `scripts/ops/review-gate/review-gate.mjs` | `git fetch -q origin main pull/N/head:review-gate-N --force`, `gh pr comment --body-file -`, `gh pr merge --disable-auto` | allowed |
 | `tools/rearm-automerge.sh` | `gh pr merge --disable-auto` | allowed |
 | `tools/weekly/evidence-prune.sh` | `git fetch`, `git commit`, `git push -u origin <branch>`, `gh pr create`, `gh pr comment` (it arms `gh pr merge --squash --auto --match-head-commit <sha>` as the human login, not through `as-bot.sh`) | allowed |
 | `tools/merge-pr.sh` | none: it merges bot-opened PRs with `gh pr merge <n> --rebase --match-head-commit <sha>` as the human login | not through `as-bot.sh` |

@@ -2,6 +2,7 @@ import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@cair
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
@@ -92,9 +93,11 @@ function chiefStepToken(
   const chiefRow = threadRow
     ? deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get()
     : undefined;
-  const agentRow = chiefRow?.agentId
+  const boundAgent = chiefRow?.agentId
     ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
     : undefined;
+  const agentRow =
+    boundAgent && threadRow ? routedChiefAgent(deps.db, threadRow.teamId, boundAgent) : boundAgent;
   return {
     provider: toProviderConfig(bundle.provider, agentRow?.provider),
     secrets: bundle.secrets,

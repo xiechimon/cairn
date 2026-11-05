@@ -53,7 +53,7 @@ test('a spec naming an existing path and an existing exported function reports n
     });
     const result = run('--out', '.gardener');
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /No spec\/ADR drift found/);
+    assert.match(result.stdout, /No spec drift found/);
     const rows = JSON.parse(readFileSync(join(cwd, '.gardener', `drift-${date}.json`), 'utf8'));
     assert.deepEqual(rows, []);
   } finally {

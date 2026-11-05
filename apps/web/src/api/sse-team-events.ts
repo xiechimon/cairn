@@ -20,7 +20,7 @@ export function teamEventInvalidations(
     case 'notification':
       return [['notifications', teamId], ['chiefThreads', teamId], ['todos']];
     case 'machine_presence':
-      return [['machines', teamId], ['todos']];
+      return [['machines', teamId], ['todos'], ['model-routing', teamId]];
     case 'branch_sync': {
       const rec = ev.sync as { buildId: string };
       return [['branchSync', rec.buildId]];

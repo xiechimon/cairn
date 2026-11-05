@@ -1,17 +1,12 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="site/img/banner-dark.webp">
-    <img alt="Cairn: agents stacking a cairn on a mountain path while a person waits at the gate" src="site/img/banner-light.webp" width="100%">
-  </picture>
-
-  <p><b>You write the tickets. Agents build them on your machines. Autonomous merges pass an evidence gate bound to the exact patch.</b></p>
-
-  <p>A self-hosted, open-source multi-agent workspace that also develops itself.</p>
+  <img src="site/logo.svg" alt="Cairn" width="64" height="64">
+  <h1>Cairn</h1>
 
   <p>
+    <b>English</b> ·
+    <a href="./README.zh.md">Simplified Chinese</a> ·
     <a href="https://cairn.xmon.me">Website</a> ·
-    <a href="#quickstart">Quickstart</a> ·
-    <a href="./README.zh.md">Simplified Chinese</a>
+    <a href="#quickstart">Quickstart</a>
   </p>
 
   <p>
@@ -21,53 +16,25 @@
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
     <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
   </p>
+
+  <p><b>Tell one Coordinator what you want. Agents build it in isolated threads on your machines, and nothing merges without evidence.</b></p>
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/img/hero-dark.webp">
+    <img alt="Cairn on desktop: the Coordinator conversation with the decisions waiting on you pinned, and a thread open on a phone" src="site/img/hero-light.webp" width="100%">
+  </picture>
+
+  <img alt="Cairn on a phone: decisions waiting on you, a thread, a project home and all work" src="site/img/phones.webp" width="100%">
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="site/img/board-en-dark.webp">
-  <img alt="Cairn board: tickets move from to-do through planning, running and review to done, each one claimed by an agent" src="site/img/board-en-light.webp">
-</picture>
-
-## Highlights
-
-<table align="center">
-  <tr>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-chief-dark.webp">
-        <img alt="Chief agent" src="site/img/crew-chief-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>Chief</b> dispatches</sub>
-    </td>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-coder-dark.webp">
-        <img alt="Coder agent" src="site/img/crew-coder-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>Coders</b> build</sub>
-    </td>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-reviewer-dark.webp">
-        <img alt="Reviewer agent" src="site/img/crew-reviewer-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>Reviewer</b> checks the diff</sub>
-    </td>
-    <td align="center" width="25%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="site/img/crew-you-dark.webp">
-        <img alt="You" src="site/img/crew-you-light.webp" width="120" height="120">
-      </picture>
-      <br><sub><b>You</b> gate the merge</sub>
-    </td>
-  </tr>
-</table>
-
-- **Multi-agent orchestration.** Each agent has its own model, role, skills, MCP servers, secrets and memory. A chief agent only dispatches, so its context stays clean; coder and reviewer agents do the work.
-- **An evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you; the AI reviewer can block a merge, not just comment on it.
-- **Bootstrap loop.** Cairn claims its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
-- **Eval and trajectory driven.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the chief-dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
-- **Your machines.** Register any host by running the daemon on it. Builds run there in their own git worktree, and the board streams plans, diffs and tool calls back live.
+- **Coordinator.** You talk to a single Coordinator from any device. It listens, opens a thread for each piece of work and reports back in one conversation that never ends.
+- **Threads.** One unit of work, one agent session: Claude Code or Gemini CLI on your subscription, or the built-in pi runtime on any provider. A thread carries the work from plan to pull request, and you can open it in a side chat to steer it.
+- **Only what needs you.** The home page pins the decisions waiting on you and shows what is in progress. A push notification goes out only when a person must act.
+- **Evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you, and the AI reviewer can block a merge, not just comment on it.
+- **Eval-gated harness.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the Coordinator's dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
+- **Your machines.** Register any host by running the daemon on it. A thread runs on any machine that meets its runtime, model and tool constraints, in its own git worktree, or in a throwaway per-task Orb container where the host supports it (`CAIRN_EXECUTOR=orb`, opt-in for now). Plans, diffs and tool calls stream back live.
+- **Projects.** A project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue. Repos are hosted by the server itself or connected from GitHub.
+- **Bootstrap loop.** Cairn takes its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
 
 ## Showcase
 
@@ -81,12 +48,14 @@ Real work that agents shipped inside Cairn, each with a recording, the pull requ
 
 ## Features
 
-- **Tasks & phases** — kanban board with numbered tasks, tags, and schedules that re-run a task on a cycle.
-- **Agents** — execution roles configured with a model, responsibilities, skills, MCP servers, secrets, and memory. A per-user "chief" agent dispatches work.
-- **Machines** — register any host by running the daemon on it; builds execute there under supervision. Your laptop, your box, your rules.
-- **Providers** — model access via API key, OAuth (GitHub Copilot, OpenAI Codex), or a custom endpoint.
+- **Coordinator** — one conversation that never ends: it opens threads and reports back. Context is compacted for you, and memory is kept per project.
+- **Threads** — one unit of work, one agent session, from plan through tests and implementation to a pull request. Open any thread in a side chat to steer it directly.
+- **Projects** — a project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue.
+- **Scheduled tasks** — re-run a thread on a cycle.
+- **Machines and routing** — register hosts with the daemon; routing rules pick the runtime, model, tools and machine for each step.
+- **Providers** — Claude Code and Gemini CLI subscriptions, API keys, OAuth (GitHub Copilot, OpenAI Codex) or a custom endpoint.
 - **Repos** — git repositories hosted by the server itself (push/pull with an API key) or connected from GitHub.
-- **Live everything** — SSE streams for board and conversation updates, notifications, token-usage accounting per build and model.
+- **Live everything** — SSE streams for conversations and threads, Web Push, token-usage accounting per build and model.
 
 ## Quickstart
 
@@ -211,7 +180,7 @@ pnpm test         # vitest
 | `apps/server` | Server: Hono REST + SSE + SQLite (package `@xiechimon/cairn` — directory name differs from package name) |
 | `apps/daemon` | Executor daemon (package `@xiechimon/cairn-cli` — directory name differs from package name) |
 | `packages/shared` | Protocol vocabulary, record shapes, brand-slot single source (`@cairn/shared`) |
-| `docs/spec/` | Implementation canon, volumes 00–26 (Chinese) |
+| `docs/spec/` | Implementation canon, volumes 00–29 (Chinese) |
 | `docs/research/` | r1–r15 site inventories and later product research (historical archive) |
 | `scripts/` | Build-time tools (incl. `generate-icons.mjs`) |
 
@@ -224,7 +193,7 @@ After your team's first pull request merges, Cairn can show a dismissible card l
 ## Third-party credits
 
 - Avatar font [Lorelei](https://www.figma.com/community/file/1198749693280469639) — © Lisa Wischofsky, CC0 1.0
-- Fonts Instrument Sans / Bricolage Grotesque / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
+- Fonts Instrument Sans / Source Serif 4 / JetBrains Mono — SIL Open Font License 1.1
 - Icons [lucide](https://lucide.dev) — ISC License
 - Emoji curation data [gitmoji](https://gitmoji.dev) — MIT License
 - Execution engine [pi SDK](https://github.com/badlogic/pi-mono) — MIT License

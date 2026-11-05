@@ -230,6 +230,41 @@ test('concurrent steering of the same queued message succeeds once', async () =>
   expect(w.s.db.select().from(message).where(eq(message.content, 'A')).all()).toHaveLength(1);
 });
 
+test('editing a queued message rewrites it in place without duplicating or reordering', async () => {
+  const w = await runningTask();
+  await w.send({ content: 'A', mode: 'queue' });
+  await w.send({ content: 'B', mode: 'queue' });
+  const [first] = (await w.face()).queuedMessages!;
+  const edited = await w.send({
+    content: 'A edited',
+    queuedMessageId: first!.id,
+    editQueued: true,
+  });
+  expect(edited.status).toBe(201);
+  expect(await w.face()).toMatchObject({
+    queuedMessages: [{ id: first!.id, content: 'A edited' }, { content: 'B' }],
+  });
+});
+
+test('editing a queued message that was already dispatched is rejected and does not resurrect it', async () => {
+  const w = await runningTask();
+  await w.send({ content: 'A', mode: 'queue' });
+  const queued = (await w.face()).queuedMessages![0]!;
+  await w.finish('success');
+  expect(await w.face()).toMatchObject({ queuedMessages: [] });
+  const edited = await w.send({
+    content: 'A edited',
+    queuedMessageId: queued.id,
+    editQueued: true,
+  });
+  expect(edited.status).toBe(409);
+  expect(await w.face()).toMatchObject({ queuedMessages: [] });
+  expect(w.s.db.select().from(message).where(eq(message.content, 'A edited')).all()).toHaveLength(
+    0,
+  );
+  expect(w.s.db.select().from(message).where(eq(message.content, 'A')).all()).toHaveLength(1);
+});
+
 test('claim failures outside finishStep leave the queue cancellable', async () => {
   const w = await runningTask();
   await w.send({ content: 'A', mode: 'queue' });

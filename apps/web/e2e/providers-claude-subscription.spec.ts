@@ -4,7 +4,7 @@ import { mockLive } from './chief-home-mock';
 const TOKEN = `sk-ant-oat01-${'e'.repeat(64)}`;
 
 for (const locale of ['zh', 'en'] as const) {
-test(`connects, verifies and deletes a subscription (${locale})`, async ({ page }) => {
+test(`connects, verifies and deletes a subscription on the model routing page (${locale})`, async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem('cairn.locale', value), locale);
   let rejectDelete = true;
   const connections: { id: string; kind: string; label: string; expiresAt: number | null; createdAt: number }[] = [];
@@ -27,8 +27,10 @@ test(`connects, verifies and deletes a subscription (${locale})`, async ({ page 
       return route.fulfill({ status: 204 });
     }
   });
-  await page.goto('/app/resources/providers');
-  await page.getByTestId('add-claude-subscription').click();
+  await page.goto('/app/resources/model-routing');
+  await expect(page).toHaveURL(/\/app\/settings\/routing/);
+
+  await page.getByRole('button', { name: locale === 'zh' ? '添加 Claude 账户' : 'Add a Claude account' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add Claude subscription' });
   await expect(dialog).toContainText('claude setup-token');
   await dialog.getByTestId('subscription-label').fill('Personal Claude');
@@ -36,22 +38,29 @@ test(`connects, verifies and deletes a subscription (${locale})`, async ({ page 
   await dialog.getByTestId('subscription-token').fill(TOKEN);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  const row = page.locator('[data-connection-kind="claude-subscription"]');
+  const row = page.locator('[data-account-id="subscription-1"]');
   await expect(row).toContainText('Personal Claude');
   await expect(page.locator('body')).not.toContainText(TOKEN);
-  await row.getByTestId('verify-claude-subscription').click();
-  await expect(row.getByRole('status')).toHaveText('Verified');
+
+  await row.getByTestId('account-more').click();
+  await page.getByRole('menuitem', { name: locale === 'zh' ? /验证/ : /Verify/ }).click();
+  await expect(page.getByText(locale === 'zh' ? '「Personal Claude」验证通过' : 'Personal Claude verified')).toBeVisible();
   await page.screenshot({ path: `/tmp/b1-subscription-before-delete-${locale}.png`, fullPage: true });
-  await row.getByTestId('delete-claude-subscription').click();
+
+  const remove = locale === 'zh' ? '移除' : 'Remove';
+  await row.getByTestId('account-more').click();
+  await page.getByRole('menuitem', { name: new RegExp(remove) }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('Personal Claude');
   await confirm.getByRole('button', { name: locale === 'zh' ? '取消' : 'Cancel', exact: true }).click();
   await expect(row).toBeVisible();
-  await row.getByTestId('delete-claude-subscription').click();
-  await confirm.getByRole('button', { name: locale === 'zh' ? '删除' : 'Delete', exact: true }).click();
-  await expect(row.getByRole('alert')).toHaveText(locale === 'zh' ? '删除 Claude 订阅连接失败，请重试。' : 'Could not delete the Claude subscription. Try again.');
-  await row.getByTestId('delete-claude-subscription').click();
-  await confirm.getByRole('button', { name: locale === 'zh' ? '删除' : 'Delete', exact: true }).click();
+  await row.getByTestId('account-more').click();
+  await page.getByRole('menuitem', { name: new RegExp(remove) }).click();
+  await confirm.getByRole('button', { name: remove, exact: true }).click();
+  await expect(page.getByText(locale === 'zh' ? '移除失败，请重试。' : 'Could not remove. Try again.')).toBeVisible();
+  await row.getByTestId('account-more').click();
+  await page.getByRole('menuitem', { name: new RegExp(remove) }).click();
+  await confirm.getByRole('button', { name: remove, exact: true }).click();
   await expect(row).toHaveCount(0);
   await page.screenshot({ path: `/tmp/b1-subscription-after-delete-${locale}.png`, fullPage: true });
 });

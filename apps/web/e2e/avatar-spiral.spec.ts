@@ -1,26 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { spiralAvatarSvg, spiralAvatarUrl } from '../src/lib/spiral-avatar.js';
-import { pressAndExpect } from './helpers.js';
+import { pressAndExpect, expandTurns } from './helpers.js';
 
 const USER_SRC = spiralAvatarUrl('Xmon Dai');
 const AGENT_SRC = spiralAvatarUrl('r3-builder');
 
 const SVG_BODY =
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
-
-test('sidebar avatar chip (rail) and user-menu head share one seeded src', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=01');
-  await page.locator('.sidebar-user').click();
-  await expect(page.locator('.user-menu-head img')).toHaveAttribute('src', USER_SRC);
-  await expect(page.locator('.user-menu-mail')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-
-  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
-  await page.reload();
-  await expect(page.locator('.rail-user img')).toHaveAttribute('src', USER_SRC);
-});
 
 test('team agent card seeds by agent displayName — user/agent srcs differ (different names, different avatars)', async ({
   page,
@@ -71,17 +57,6 @@ test('live members projection: two agents → two distinct seeded srcs; avatarUr
   await expect(beta.locator('img')).toHaveAttribute('src', spiralAvatarUrl('Beta'));
   expect(spiralAvatarUrl('Alpha')).not.toBe(spiralAvatarUrl('Beta'));
   await expect(gamma.locator('img')).toHaveAttribute('src', override);
-});
-
-test('detail agent picker: the agent row is seeded by its name', async ({ page }) => {
-  await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19');
-  await page.getByTestId('agent-chip').click();
-  const picker = page.getByRole('dialog', { name: '选择执行 Agent' });
-  await expect(picker).toBeVisible();
-  await expect(picker.getByRole('option', { selected: true }).locator('img')).toHaveAttribute(
-    'src',
-    AGENT_SRC,
-  );
 });
 
 test('create-agent dialog: empty name keeps the static asset; typing previews the seeded avatar', async ({
@@ -140,11 +115,12 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   page.on('request', (request) => {
     if (request.url().includes('api.dicebear.com')) hits.push(request.url());
   });
-  await page.goto('/app?scenario=01');
-  await expect(page.locator('.sidebar-user')).toBeVisible();
+  await page.goto('/app/account?scenario=01');
+  await expect(page.locator('.account-avatar img')).toBeVisible();
   await page.goto('/app/team?scenario=12');
   await expect(page.getByTestId('team-agent-card').first().locator('img')).toBeVisible();
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
+  await expandTurns(page);
   await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   expect(hits).toEqual([]);
 });
@@ -172,6 +148,7 @@ test('conversation transcript: replies carry no avatar column, user rows are gra
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
+  await expandTurns(page);
   await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   await expect(page.locator('.chat-row--user').first()).toBeVisible();
   await expect(page.locator('.chat-avatar')).toHaveCount(0);
@@ -190,13 +167,15 @@ test('a working agent shows a pulse under the last line; finished rows stay stil
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=26');
+  await expandTurns(page);
   await expect(page.getByTestId('live-pulse')).toHaveCount(1);
   await expect(page.getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
   await expect(page.locator('.chat-row--agent').first().getByTestId('live-pulse')).toHaveCount(0);
 });
 
 test('the unbound chief reply carries no face and no avatar column', async ({ page }) => {
-  await page.goto('/app?view=board&scenario=114');
+  await page.goto('/app/schedules?scenario=114');
+  await expandTurns(page);
   const reply = page.getByTestId('chief-stream').getByTestId('chief-msg');
   await expect(reply.first()).toBeVisible();
   await expect(reply.locator('> svg')).toHaveCount(0);
@@ -206,7 +185,7 @@ test('the unbound chief reply carries no face and no avatar column', async ({ pa
 test('the chief pulses under the reply it is still typing, finished ones carry none', async ({
   page,
 }) => {
-  await page.goto('/app?view=board&scenario=chief-md');
+  await page.goto('/app/schedules?scenario=chief-md');
   const replies = page.getByTestId('chief-stream').getByTestId('chief-msg');
   await expect(replies.last().getByTestId('live-pulse')).toHaveCSS('animation-name', 'live-pulse');
   await expect(replies.first().getByTestId('live-pulse')).toHaveCount(0);

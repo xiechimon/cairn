@@ -187,14 +187,14 @@ test('the watchlist patterns compile and each has a suggested rule when ungated'
   }
 });
 
-test('with --drift the report appends the spec/ADR drift section and writes the JSON', () => {
+test('with --drift the report appends the spec drift section and writes the JSON', () => {
   const { cwd, commit, run } = fixture();
   try {
     commit(daysAgo(20), baselineFiles(quiet));
     commit(
       daysAgo(2),
       {
-        'docs/adr/0001-test.md': 'Line one\nSee `apps/server/src/services/gone.ts`.\n',
+        'docs/spec/0001-test.md': 'Line one\nSee `apps/server/src/services/gone.ts`.\n',
         'apps/server/src/services/gone.ts': 'export const gone = true;\n',
       },
       'add doc',
@@ -206,15 +206,15 @@ test('with --drift the report appends the spec/ADR drift section and writes the 
     });
     const result = run('--drift', '--out', '.gardener');
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /## Spec\/ADR drift at HEAD/);
+    assert.match(result.stdout, /## Spec drift at HEAD/);
     assert.match(
       result.stdout,
-      /\| docs\/adr\/0001-test\.md \| `apps\/server\/src\/services\/gone\.ts` \| path \| 2 \|/,
+      /\| docs\/spec\/0001-test\.md \| `apps\/server\/src\/services\/gone\.ts` \| path \| 2 \|/,
     );
     const driftJson = readFileSync(join(cwd, '.gardener', 'drift-2026-10-24.json'), 'utf8');
     assert.deepEqual(JSON.parse(driftJson), [
       {
-        doc: 'docs/adr/0001-test.md',
+        doc: 'docs/spec/0001-test.md',
         name: 'apps/server/src/services/gone.ts',
         kind: 'path',
         line: 2,

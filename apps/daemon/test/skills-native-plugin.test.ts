@@ -543,6 +543,8 @@ function baseParts() {
     sessionId: 'sid-1',
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
+    inOrb: true,
+    lockedDown: false,
     abortController: new AbortController(),
   };
 }

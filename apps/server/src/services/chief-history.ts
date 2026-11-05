@@ -13,6 +13,9 @@ const SNIPPET_LEAD_CHARS = 80;
 const SEARCH_BATCH_ROWS = 200;
 export const SEARCH_SCAN_CAP_ROWS = 2000;
 const READ_MAX_IDS = 20;
+export const READ_DEFAULT_CHARS = 8000;
+export const READ_MAX_CHARS = 20000;
+export const READ_CALL_BUDGET_CHARS = 40000;
 
 export interface HistoryScope {
   threadId: string;
@@ -147,7 +150,26 @@ export async function searchHistory(
   }
 }
 
-export function readHistory(db: Db, scope: HistoryScope, ids: string[]) {
+function pagingInt(
+  value: number | undefined,
+  name: string,
+  fallback: number,
+  [min, max]: [number, number],
+) {
+  if (value === undefined) return fallback;
+  if (!Number.isInteger(value) || value < min || value > max)
+    throw new HttpError(400, `invalid params.${name}: expected an integer from ${min} to ${max}`);
+  return value;
+}
+
+export function readHistory(
+  db: Db,
+  scope: HistoryScope,
+  ids: string[],
+  paging: { offset?: number; maxChars?: number } = {},
+) {
+  const offset = pagingInt(paging.offset, 'offset', 0, [0, Number.MAX_SAFE_INTEGER]);
+  const maxChars = pagingInt(paging.maxChars, 'maxChars', READ_DEFAULT_CHARS, [1, READ_MAX_CHARS]);
   if (ids.length === 0) throw new HttpError(400, 'invalid params.ids: expected at least one id');
   if (ids.length > READ_MAX_IDS)
     throw new HttpError(400, `invalid params.ids: at most ${READ_MAX_IDS} ids`);
@@ -163,13 +185,22 @@ export function readHistory(db: Db, scope: HistoryScope, ids: string[]) {
     .where(and(eq(chiefMessage.threadId, scope.threadId), inArray(chiefMessage.id, ids)))
     .orderBy(asc(chiefMessage.createdAt), sql`rowid asc`)
     .all();
+  let budget = READ_CALL_BUDGET_CHARS;
   return {
     trust: HISTORY_TRUST,
-    messages: rows.map((row) => ({
-      id: row.id,
-      role: row.role,
-      content: messageText(row.content),
-      createdAt: row.createdAt,
-    })),
+    messages: rows.map((row) => {
+      const text = messageText(row.content);
+      const content = text.slice(offset, offset + Math.min(maxChars, budget));
+      budget -= content.length;
+      const end = offset + content.length;
+      return {
+        id: row.id,
+        role: row.role,
+        content,
+        createdAt: row.createdAt,
+        totalChars: text.length,
+        nextOffset: end < text.length ? end : null,
+      };
+    }),
   };
 }

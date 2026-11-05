@@ -141,7 +141,7 @@ function scriptedPort(
   };
 }
 
-async function world(): Promise<{
+async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
   s: TestServer;
   buildId: string;
   stepId: string;
@@ -237,7 +237,7 @@ async function world(): Promise<{
     .values({
       id: stepId,
       buildId,
-      kind: 'build',
+      kind: stepKind,
       status: 'claimed',
       checkpointCommit: HEAD,
       createdAt: 1,
@@ -274,7 +274,176 @@ describe('in-product merge gate', () => {
     });
   });
 
-  test('evaluation persists the gate snapshot, records a gate run, and a protected path stays blocked until an independent review is bound', async () => {
+  test.each(['build', 'session'] as const)(
+    'evaluation persists the gate snapshot, records a gate run, and a protected path stays blocked until an independent review is bound (%s author step)',
+    async (stepKind) => {
+      const { s, buildId, stepId } = await world(stepKind);
+      completeStep(s.svc, stepId, { hasChanges: true });
+      s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+      const review = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .find((row) => row.kind === 'review');
+      expect(review).toBeDefined();
+      s.db
+        .update(step)
+        .set({ status: 'done', finishedAt: 2 })
+        .where(eq(step.id, review?.id ?? ''))
+        .run();
+      const statuses: { sha: string; state: string; description: string }[] = [];
+      const missing = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort(statuses) });
+      expect(missing?.ready).toBe(false);
+      expect(missing?.blockers.map((b) => b.code)).toContain('independent-review-missing');
+      expect(missing?.blockers.some((b) => b.code === 'policy-human')).toBe(false);
+      expect(s.db.select().from(gateState).where(eq(gateState.buildId, buildId)).get()?.ready).toBe(
+        false,
+      );
+      expect(
+        s.db.select().from(gateDigest).where(eq(gateDigest.buildId, buildId)).all().length,
+      ).toBe(1);
+      expect(s.db.select().from(gateRound).where(eq(gateRound.buildId, buildId)).all().length).toBe(
+        1,
+      );
+      expect(statuses[0]?.sha).toBe(HEAD);
+      expect(statuses[0]?.state).toBe('pending');
+
+      const compareBody = {
+        files: [
+          {
+            filename: 'apps/server/src/services/merge-gate/readiness.ts',
+            status: 'modified',
+            sha: '1'.repeat(40),
+            additions: 4,
+            deletions: 1,
+            patch: '@@ protected\n+gate\n',
+          },
+          {
+            filename: 'docs/verify/1794/shot.png',
+            status: 'added',
+            sha: '2'.repeat(40),
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+      };
+      const digest = computePatchDigest(compareFilesFromResponse(compareBody) ?? [], {
+        expectedFileCount: 2,
+      }).patchDigest;
+      expect(digest).not.toBeNull();
+      s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: review?.id ?? '',
+          buildId,
+          kind: 'review',
+          perspective: 'code_reviewer',
+          outcome: 'pass',
+          patchDigest: digest,
+          headSha: HEAD,
+          expectedHeadSha: HEAD,
+          createdAt: 3,
+        })
+        .run();
+      s.db
+        .insert(message)
+        .values({
+          id: 'msg-verdict',
+          conversationId: buildId,
+          role: 'system',
+          content: JSON.stringify({
+            kind: REVIEW_VERDICT_KIND,
+            stepId: review?.id ?? '',
+            verdict: {
+              conclusion: 'No blocking findings',
+              gateLoosening: false,
+              evalRulerChange: false,
+              findings: [],
+            },
+          }),
+          createdAt: 3,
+        })
+        .run();
+      s.db
+        .insert(message)
+        .values({
+          id: 'msg-assistant-raw',
+          conversationId: buildId,
+          role: 'assistant',
+          content: [
+            'End with VERDICT: pass or VERDICT: block.',
+            '',
+            'VERDICT: pass',
+            '',
+            'No blocking findings.',
+            '',
+            'VERDICT: pass',
+          ].join('\n'),
+          createdAt: 3,
+        })
+        .run();
+      const bound = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(bound?.blockers.map((b) => b.code)).not.toContain('independent-review-missing');
+      expect(bound?.ready).toBe(false);
+      expect(bound?.blockers.map((b) => b.code)).toEqual(
+        expect.arrayContaining(['verify-missing', 'decision-missing']),
+      );
+
+      const runs = s.db
+        .select()
+        .from(message)
+        .where(eq(message.conversationId, buildId))
+        .all()
+        .flatMap((row) => {
+          let raw = row.content;
+          if (typeof raw === 'string') {
+            try {
+              raw = JSON.parse(raw) as unknown;
+            } catch {
+              return [];
+            }
+          }
+          if (
+            raw !== null &&
+            typeof raw === 'object' &&
+            !Array.isArray(raw) &&
+            (raw as { kind?: unknown }).kind === MERGE_GATE_RUN_KIND
+          ) {
+            return [raw as Record<string, unknown>];
+          }
+          return [];
+        });
+      expect(runs).toHaveLength(1);
+      expect(runs[0]?.modelId).toBe('gpt-5.4');
+      expect(runs[0]?.action).toBe('auto-merge-off');
+      expect(runs[0]?.parsedVerdict).toBe('pass');
+      expect(runs[0]?.structuredOutcome).toBe('pass');
+      expect(runs[0]?.mismatch).toBe(false);
+      expect(String(runs[0]?.rawOutput)).toContain('VERDICT: pass');
+
+      s.db
+        .update(message)
+        .set({
+          content: JSON.stringify({
+            kind: REVIEW_VERDICT_KIND,
+            stepId: review?.id ?? '',
+            verdict: {
+              conclusion: 'Loosens the gate',
+              gateLoosening: true,
+              evalRulerChange: false,
+              findings: [],
+            },
+          }),
+        })
+        .where(eq(message.id, 'msg-verdict'))
+        .run();
+      const loosened = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
+    },
+  );
+
+  test('D71 reviewer identity is the model the review step actually ran: a same-vendor fallback is not independent', async () => {
     const { s, buildId, stepId } = await world();
     completeStep(s.svc, stepId, { hasChanges: true });
     s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
@@ -284,52 +453,42 @@ describe('in-product merge gate', () => {
       .where(eq(step.buildId, buildId))
       .all()
       .find((row) => row.kind === 'review');
-    expect(review).toBeDefined();
     s.db
       .update(step)
-      .set({ status: 'done', finishedAt: 2 })
+      .set({
+        status: 'done',
+        finishedAt: 2,
+        fallback: {
+          model: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+          tried: ['gpt-5.4'],
+          zeroUsageRetried: false,
+        },
+      })
       .where(eq(step.id, review?.id ?? ''))
       .run();
-    const statuses: { sha: string; state: string; description: string }[] = [];
-    const missing = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort(statuses) });
-    expect(missing?.ready).toBe(false);
-    expect(missing?.blockers.map((b) => b.code)).toContain('independent-review-missing');
-    expect(missing?.blockers.some((b) => b.code === 'policy-human')).toBe(false);
-    expect(s.db.select().from(gateState).where(eq(gateState.buildId, buildId)).get()?.ready).toBe(
-      false,
-    );
-    expect(s.db.select().from(gateDigest).where(eq(gateDigest.buildId, buildId)).all().length).toBe(
-      1,
-    );
-    expect(s.db.select().from(gateRound).where(eq(gateRound.buildId, buildId)).all().length).toBe(
-      1,
-    );
-    expect(statuses[0]?.sha).toBe(HEAD);
-    expect(statuses[0]?.state).toBe('pending');
-
-    const compareBody = {
-      files: [
-        {
-          filename: 'apps/server/src/services/merge-gate/readiness.ts',
-          status: 'modified',
-          sha: '1'.repeat(40),
-          additions: 4,
-          deletions: 1,
-          patch: '@@ protected\n+gate\n',
-        },
-        {
-          filename: 'docs/verify/1794/shot.png',
-          status: 'added',
-          sha: '2'.repeat(40),
-          additions: 0,
-          deletions: 0,
-        },
-      ],
-    };
-    const digest = computePatchDigest(compareFilesFromResponse(compareBody) ?? [], {
-      expectedFileCount: 2,
-    }).patchDigest;
-    expect(digest).not.toBeNull();
+    await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    const digest = computePatchDigest(
+      compareFilesFromResponse({
+        files: [
+          {
+            filename: 'apps/server/src/services/merge-gate/readiness.ts',
+            status: 'modified',
+            sha: '1'.repeat(40),
+            additions: 4,
+            deletions: 1,
+            patch: '@@ protected\n+gate\n',
+          },
+          {
+            filename: 'docs/verify/1794/shot.png',
+            status: 'added',
+            sha: '2'.repeat(40),
+            additions: 0,
+            deletions: 0,
+          },
+        ],
+      }) ?? [],
+      { expectedFileCount: 2 },
+    ).patchDigest;
     s.db
       .insert(gateVerdict)
       .values({
@@ -347,7 +506,7 @@ describe('in-product merge gate', () => {
     s.db
       .insert(message)
       .values({
-        id: 'msg-verdict',
+        id: 'msg-verdict-fallback',
         conversationId: buildId,
         role: 'system',
         content: JSON.stringify({
@@ -363,102 +522,37 @@ describe('in-product merge gate', () => {
         createdAt: 3,
       })
       .run();
-    s.db
-      .insert(message)
-      .values({
-        id: 'msg-assistant-raw',
-        conversationId: buildId,
-        role: 'assistant',
-        content: [
-          'End with VERDICT: pass or VERDICT: block.',
-          '',
-          'VERDICT: pass',
-          '',
-          'No blocking findings.',
-          '',
-          'VERDICT: pass',
-        ].join('\n'),
-        createdAt: 3,
-      })
-      .run();
-    const bound = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
-    expect(bound?.blockers.map((b) => b.code)).not.toContain('independent-review-missing');
-    expect(bound?.ready).toBe(false);
-    expect(bound?.blockers.map((b) => b.code)).toEqual(
-      expect.arrayContaining(['verify-missing', 'decision-missing']),
-    );
-
-    const runs = s.db
-      .select()
-      .from(message)
-      .where(eq(message.conversationId, buildId))
-      .all()
-      .flatMap((row) => {
-        let raw = row.content;
-        if (typeof raw === 'string') {
-          try {
-            raw = JSON.parse(raw) as unknown;
-          } catch {
-            return [];
-          }
-        }
-        if (
-          raw !== null &&
-          typeof raw === 'object' &&
-          !Array.isArray(raw) &&
-          (raw as { kind?: unknown }).kind === MERGE_GATE_RUN_KIND
-        ) {
-          return [raw as Record<string, unknown>];
-        }
-        return [];
-      });
-    expect(runs).toHaveLength(1);
-    expect(runs[0]?.modelId).toBe('gpt-5.4');
-    expect(runs[0]?.action).toBe('auto-merge-off');
-    expect(runs[0]?.parsedVerdict).toBe('pass');
-    expect(runs[0]?.structuredOutcome).toBe('pass');
-    expect(runs[0]?.mismatch).toBe(false);
-    expect(String(runs[0]?.rawOutput)).toContain('VERDICT: pass');
-
-    s.db
-      .update(message)
-      .set({
-        content: JSON.stringify({
-          kind: REVIEW_VERDICT_KIND,
-          stepId: review?.id ?? '',
-          verdict: {
-            conclusion: 'Loosens the gate',
-            gateLoosening: true,
-            evalRulerChange: false,
-            findings: [],
-          },
-        }),
-      })
-      .where(eq(message.id, 'msg-verdict'))
-      .run();
-    const loosened = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
-    expect(loosened?.blockers.map((b) => b.code)).toContain('review-blocking');
+    const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(result?.blockers.map((b) => b.code)).toContain('independent-review-missing');
   });
 
-  test("an oversize patch gets one size review carrying the Size justification; only that step's patch-bound acceptance clears the size review, not one volunteered by an ordinary review", async () => {
-    const { s, buildId, stepId, reviewerId } = await world();
+  test('D71 author identity is the model the build step actually ran: a build that fell back to the reviewer vendor is not independent', async () => {
+    const { s, buildId, stepId } = await world();
+    s.db
+      .update(step)
+      .set({
+        fallback: {
+          model: { provider: 'codex', modelId: 'gpt-5.4' },
+          tried: ['claude-opus-4-8'],
+          zeroUsageRetried: false,
+        },
+      })
+      .where(eq(step.id, stepId))
+      .run();
     completeStep(s.svc, stepId, { hasChanges: true });
     s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
-    const reviewsOf = () =>
-      s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, buildId))
-        .all()
-        .filter((row) => row.kind === 'review')
-        .sort((a, b) => a.createdAt - b.createdAt);
-    const generic = reviewsOf()[0];
-    expect(generic).toBeDefined();
+    const review = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .find((row) => row.kind === 'review');
     s.db
       .update(step)
       .set({ status: 'done', finishedAt: 2 })
-      .where(eq(step.id, generic?.id ?? ''))
+      .where(eq(step.id, review?.id ?? ''))
       .run();
+    await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     const digest = computePatchDigest(
       compareFilesFromResponse({
         files: [
@@ -466,7 +560,7 @@ describe('in-product merge gate', () => {
             filename: 'apps/server/src/services/merge-gate/readiness.ts',
             status: 'modified',
             sha: '1'.repeat(40),
-            additions: 900,
+            additions: 4,
             deletions: 1,
             patch: '@@ protected\n+gate\n',
           },
@@ -481,98 +575,62 @@ describe('in-product merge gate', () => {
       }) ?? [],
       { expectedFileCount: 2 },
     ).patchDigest;
-    const bindReview = (id: string, verdict: Record<string, unknown>) => {
-      s.db
-        .insert(gateVerdict)
-        .values({
-          stepId: id,
-          buildId,
-          kind: 'review',
-          perspective: 'code_reviewer',
-          outcome: 'pass',
-          patchDigest: digest,
-          headSha: HEAD,
-          expectedHeadSha: HEAD,
-          createdAt: 3,
-        })
-        .onConflictDoNothing()
-        .run();
-      s.db
-        .delete(message)
-        .where(eq(message.id, `msg-verdict-${id}`))
-        .run();
-      s.db
-        .insert(message)
-        .values({
-          id: `msg-verdict-${id}`,
-          conversationId: buildId,
-          role: 'system',
-          content: JSON.stringify({
-            kind: REVIEW_VERDICT_KIND,
-            stepId: id,
-            verdict: {
-              conclusion: 'No blocking findings',
-              gateLoosening: false,
-              evalRulerChange: false,
-              findings: [],
-              ...verdict,
-            },
-          }),
-          createdAt: 3,
-        })
-        .run();
-    };
-    bindReview(generic?.id ?? '', { sizeAssessment: 'accepted' });
-    const sizeDetail = async (body: string) =>
-      (
-        await evaluateMergeGate(s.svc, buildId, {
-          port: scriptedPort([], { additions: 900, body }),
-        })
-      )?.blockers.find((b) => b.code === 'size-review')?.detail;
-
-    expect(await sizeDetail('')).toEqual([
-      '901 lines, 1 files',
-      'the PR body has no ## Size section',
-      'no passing review on this patch accepts its size',
-    ]);
-    expect(reviewsOf()).toHaveLength(1);
-
-    const SIZE = '\n\n## Size\nThe gate and its callers must change together.\n';
-    expect(await sizeDetail(SIZE)).toEqual([
-      '901 lines, 1 files',
-      'no passing review on this patch accepts its size',
-    ]);
-    const sizeReview = reviewsOf()[1];
-    expect(reviewsOf()).toHaveLength(2);
-    const meta = parseReviewPromptMeta(sizeReview?.prompt ?? null);
-    expect(meta).toMatchObject({ agentId: reviewerId, sizeReview: true, expectedHeadSha: HEAD });
-    expect(sizeReview?.prompt ?? '').toContain('## Size review');
-    expect(sizeReview?.prompt ?? '').toContain('> The gate and its callers must change together.');
-    expect(sizeReview?.prompt ?? '').toContain('901 lines in 1 non-evidence files');
-
-    await sizeDetail(SIZE);
     s.db
-      .update(step)
-      .set({ status: 'done', finishedAt: 4 })
-      .where(eq(step.id, sizeReview?.id ?? ''))
+      .insert(gateVerdict)
+      .values({
+        stepId: review?.id ?? '',
+        buildId,
+        kind: 'review',
+        perspective: 'code_reviewer',
+        outcome: 'pass',
+        patchDigest: digest,
+        headSha: HEAD,
+        expectedHeadSha: HEAD,
+        createdAt: 3,
+      })
       .run();
-    await sizeDetail(SIZE);
-    expect(reviewsOf()).toHaveLength(2);
+    s.db
+      .insert(message)
+      .values({
+        id: 'msg-verdict-author-fallback',
+        conversationId: buildId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: REVIEW_VERDICT_KIND,
+          stepId: review?.id ?? '',
+          verdict: {
+            conclusion: 'No blocking findings',
+            gateLoosening: false,
+            evalRulerChange: false,
+            findings: [],
+          },
+        }),
+        createdAt: 3,
+      })
+      .run();
+    const result = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+    expect(result?.blockers.map((b) => b.code)).toContain('independent-review-missing');
+  });
 
-    bindReview(sizeReview?.id ?? '', {});
-    expect(await sizeDetail(SIZE)).toEqual([
-      '901 lines, 1 files',
-      'no passing review on this patch accepts its size',
-    ]);
-    bindReview(sizeReview?.id ?? '', { sizeAssessment: 'split-needed' });
-    expect(await sizeDetail(SIZE)).toEqual([
-      '901 lines, 1 files',
-      'no passing review on this patch accepts its size',
-      'a review on this patch asks to split it',
-    ]);
-    bindReview(sizeReview?.id ?? '', { sizeAssessment: 'accepted' });
-    expect(await sizeDetail(SIZE)).toBeUndefined();
-    expect(reviewsOf()).toHaveLength(2);
+  test('an oversize patch gets no size blocker and no extra size review (D68)', async () => {
+    const { s, buildId, stepId } = await world();
+    completeStep(s.svc, stepId, { hasChanges: true });
+    s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+    const reviewsOf = () =>
+      s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((row) => row.kind === 'review');
+    const before = reviewsOf().length;
+    for (const body of ['', '\n\n## Size\nThe gate and its callers must change together.\n']) {
+      const readiness = await evaluateMergeGate(s.svc, buildId, {
+        port: scriptedPort([], { additions: 900, body }),
+      });
+      expect(readiness?.blockers.map((b) => b.code) ?? []).not.toContain('size-cap');
+    }
+    expect(reviewsOf()).toHaveLength(before);
   });
 
   test('spoken safety answers bind by step id when reviews finish out of creation order', async () => {

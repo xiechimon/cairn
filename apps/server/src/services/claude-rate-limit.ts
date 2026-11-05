@@ -25,6 +25,7 @@ import {
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { routedChiefAgent } from './coordinator-route.js';
 import {
   agentForStep,
   capabilityGatePasses,
@@ -36,6 +37,7 @@ import { effectiveModel } from './model-fallback.js';
 import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
+import { routeForStep } from './routing-rules.js';
 import { getTodo } from './todos.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -137,10 +139,15 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const model = effectiveModel(agentRow, stepRow);
     const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
+    const pinned =
+      todoRow === null ||
+      stepRow.kind === 'chief' ||
+      routeForStep(deps.db, todoRow, stepRow.kind) === null;
     const claimants = machines.filter(
       (row) =>
         row.online &&
-        (row.id === agentRow.machineId ||
+        (!pinned ||
+          row.id === agentRow.machineId ||
           (stepRuntimeFor(model.provider) === 'claude-code' && ownerBlock !== null)) &&
         runtimeGatePasses(row, model.provider) &&
         capabilityGatePasses(row, agentRow) &&
@@ -263,7 +270,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       ),
     )
     .all();
-  for (const row of chiefs) consider(row.step, row.agent, null);
+  for (const row of chiefs) consider(row.step, routedChiefAgent(deps.db, teamId, row.agent), null);
   if (changed) deps.machineHub.wake(teamId);
 }
 
@@ -304,14 +311,14 @@ export function recoverClaudeRateLimitFailure(
   const block = claudeRateBlock(machineRow?.claudeRateLimits ?? [], now);
   let agentPick: Pick<AgentRow, 'provider' | 'modelId'> | null = null;
   if (isChiefConversation(stepRow.buildId)) {
-    agentPick =
-      deps.db
-        .select({ provider: agent.provider, modelId: agent.modelId })
-        .from(chiefThread)
-        .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-        .innerJoin(agent, eq(chief.agentId, agent.id))
-        .where(eq(chiefThread.id, stepRow.buildId))
-        .get() ?? null;
+    const bound = deps.db
+      .select({ agentRow: agent, teamId: chiefThread.teamId })
+      .from(chiefThread)
+      .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+      .innerJoin(agent, eq(chief.agentId, agent.id))
+      .where(eq(chiefThread.id, stepRow.buildId))
+      .get();
+    agentPick = bound ? routedChiefAgent(deps.db, bound.teamId, bound.agentRow) : null;
   } else {
     const linked = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
     const todoRow = linked

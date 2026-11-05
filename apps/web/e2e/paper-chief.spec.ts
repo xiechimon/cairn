@@ -1,10 +1,11 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
-const GATED = '/app?view=board&scenario=100';
-const READY = '/app?view=board&scenario=111';
-const THREAD = '/app?view=board&scenario=114';
-const QUESTION = '/app?view=board&scenario=chief-question';
-const SETTINGS = (tab: string) => `/app?view=board&scenario=${tab}`;
+const GATED = '/app/schedules?scenario=100';
+const READY = '/app/schedules?scenario=111';
+const THREAD = '/app/schedules?scenario=114';
+const QUESTION = '/app/schedules?scenario=chief-question';
+const SETTINGS = (tab: string) => `/app?scenario=${tab}`;
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
@@ -12,8 +13,6 @@ function setTheme(page: Page, theme: 'light' | 'dark') {
   return page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
 }
 
-/** Resolve a CSS expression for one property through a probe element, so
- *  token values are compared the way the computed style reports them. */
 function probe(page: Page, prop: 'color' | 'backgroundColor' | 'fontFamily', value: string) {
   return page.evaluate(
     ([p, v]) => {
@@ -43,7 +42,6 @@ async function openWindow(page: Page, url: string) {
   await page.goto(url);
   const win = page.locator('aside.chief-drawer');
   await expect(win).toBeVisible();
-  // The entrance is a fade + scale; measure the settled box.
   await win.evaluate((el) =>
     Promise.all(el.getAnimations().map((a) => a.finished)).then(() => undefined),
   );
@@ -91,6 +89,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openWindow(page, THREAD);
+    await expandTurns(page);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
     await expect(note, 'W5').toHaveCSS('font-size', '13px');
     const foot = win.getByTestId('chief-msg-foot').first();
@@ -136,8 +135,6 @@ for (const theme of ['light', 'dark'] as const) {
       .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
     expect(heights.length, 'S2').toBe(2);
     for (const h of heights) expect(h, 'S2').toBeGreaterThanOrEqual(52);
-    // The divider between the two rows is drawn: the agent row is a button,
-    // and a button's own transparent border must not hide the card's rule.
     const agentRow = cards.locator('> .settings-row').first();
     await expect(agentRow, 'S2: divider').toHaveCSS('border-bottom-width', '1px');
     await expect(agentRow, 'S2: divider').toHaveCSS(
@@ -177,7 +174,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     await expect(pending, 'Q1').toHaveCSS('background-color', card);
     const waiting = pending.getByTestId('chief-question-status');
-    await expect(waiting, 'Q1').toHaveText('等你回答');
+    await expect(waiting, 'Q1').toHaveText('待你决定');
     await expect(waiting.locator('svg'), 'Q1').toHaveCount(1);
     await expect(waiting, 'Q1').toHaveCSS('color', accent);
 

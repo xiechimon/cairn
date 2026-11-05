@@ -123,28 +123,22 @@ class ArchiveTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_fresh_api_context_reaches_gate(self):
+    def test_fresh_api_body_reaches_gate(self):
         workflow = Path('.github/workflows/pr-evidence.yml').read_text()
         step = workflow.split('- name: Read the PR as it is now\n', 1)[1]
         script = step.split('        run: |\n', 1)[1].split('        id: pr', 1)[0]
         script = '\n'.join(line[10:] for line in script.splitlines())
         with tempfile.TemporaryDirectory() as directory:
             gh = Path(directory, 'gh')
-            gh.write_text('#!/usr/bin/env python3\nimport json, sys\n'
-                          'if "--paginate" in sys.argv and "--slurp" in sys.argv:\n'
-                          ' print(json.dumps([[{"commit":{"message":"Unrelated change"}}], [{"commit":{"message":"Closes #1983"}}]]))\n'
-                          'else:\n'
-                          ' print(json.dumps({"body":"fresh", "base":{"repo":{"full_name":"xiechimon/cairn"}}, "labels":[], "draft":False}))\n')
+            gh.write_text('#!/usr/bin/env python3\nimport json\n'
+                          'print(json.dumps({"body":"fresh", "base":{"repo":{"full_name":"xiechimon/cairn"}}, "labels":[], "draft":False}))\n')
             gh.chmod(0o755)
             env = {**os.environ, 'PATH': directory + os.pathsep + os.environ['PATH'],
                    'RUNNER_TEMP': directory, 'GITHUB_OUTPUT': str(Path(directory, 'output')),
                    'GITHUB_REPOSITORY': 'xiechimon/cairn', 'PR_NUMBER': '1'}
             subprocess.run(['bash', '-e', '-c', script], env=env, check=True)
-            context = json.loads(Path(directory, 'pr-evidence-context.json').read_text())
-            self.assertEqual(context['repository'], 'xiechimon/cairn')
-            self.assertEqual(context['commits'][1]['commit']['message'], 'Closes #1983')
-            self.assertEqual(len(context['files']), 2)
-        self.assertIn('scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/pr-evidence-context.json"', workflow)
+            self.assertEqual(Path(directory, 'pr-body.md').read_text(), 'fresh\n')
+        self.assertIn('scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "${schema_args[@]}"', workflow)
 
     def test_regressions_run_in_both_prepush_plans(self):
         result = subprocess.run(['node', '--input-type=module', '-e',

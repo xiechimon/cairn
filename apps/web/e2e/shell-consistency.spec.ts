@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { openChiefWindow } from './helpers.js';
 
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 const SIDEBAR_KEY = 'cairn.sidebar-collapsed'; // apps/web/src/board/app-sidebar.tsx
@@ -16,9 +17,7 @@ const rootTheme = (page: Page) =>
  *  makes the measurement below deterministic. */
 const ROUTE_ANCHOR: Record<string, string> = {
   '/app': '[data-route="board"]',
-  '/app/team': '[data-route="team"]',
   '/app/schedules': '[data-route="schedules"]',
-  '/app/resources/skills': '[data-route="/app/resources/skills"]',
 };
 
 /** Assert the sidebar box on `route` matches `box`: wait for the route's
@@ -53,7 +52,7 @@ const headContentX = (page: Page) =>
 
     const row = document.querySelector('[data-testid="team-row"]');
     const mark = row?.querySelector('[data-testid="brand-mark"]');
-    const name = row?.querySelector('a');
+    const name = row?.querySelector('.sidebar-team-name');
     const toggle = row?.querySelector('button[aria-label="收起侧边栏"]');
     if (!row || !mark || !name || !toggle) throw new Error('sidebar brand head missing');
     return {
@@ -63,22 +62,14 @@ const headContentX = (page: Page) =>
     };
   });
 
-test.describe('the root FAB wakes the window on every shell family', () => {
+test.describe('⌘J wakes the window on every shell family', () => {
   const families = [
-    { name: 'board', route: '/app?view=board&scenario=01', gear: true },
+    { name: 'board', route: '/app/schedules?scenario=01', gear: true },
     { name: 'pages', route: '/app/schedules?scenario=11', gear: true },
-    { name: 'resources', route: '/app/resources/skills?scenario=06', gear: true },
-    { name: 'secondary', route: '/app/team?scenario=12', gear: true },
-    {
-      name: 'detail',
-
-      route: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread',
-      gear: true,
-    },
   ] as const;
 
   for (const { name, route, gear } of families) {
-    test(`${name}: the root FAB opens the window, minimize returns to the surface`, async ({
+    test(`${name}: ⌘J opens the window, minimize returns to the surface`, async ({
       page,
     }) => {
       await page.goto(route);
@@ -86,7 +77,7 @@ test.describe('the root FAB wakes the window on every shell family', () => {
       await expect(page.locator('.chief-drawer')).toBeHidden();
       await expect(page.locator('.chief-drawer')).toHaveCount(1);
 
-      await page.locator('.chief-fab').click();
+      await openChiefWindow(page);
       await expect(page.locator('.chief-drawer')).toBeVisible();
 
       await expect(page.locator('.chief-drawer button[aria-label="总管设置"]')).toHaveCount(
@@ -100,67 +91,51 @@ test.describe('the root FAB wakes the window on every shell family', () => {
 });
 
 test.describe('sidebar form is route-invariant', () => {
-  test('expanded sidebar keeps identical geometry across /app ↔ /app/team ↔ resources hops', async ({
+  test('expanded sidebar keeps identical geometry across /app ↔ /app/schedules hops', async ({
     page,
   }) => {
-
-    await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
     await page.goto('/app?scenario=01');
     const sidebar = page.getByRole('complementary');
     const boardBox = await captureSidebarBox(page, sidebar, '/app');
 
-    await page.getByRole('link', { name: 'Cairn' }).click();
-    await expect(page).toHaveURL('/app/team?scenario=01');
-    await expectSidebarBox(page, sidebar, '/app/team', boardBox);
+    await page.goto('/app/schedules?scenario=01');
+    await expectSidebarBox(page, sidebar, '/app/schedules', boardBox);
 
-    await page.getByRole('link', { name: '技能' }).click();
-    await expect(page).toHaveURL('/app/resources/skills?scenario=01');
-    await expectSidebarBox(page, sidebar, '/app/resources/skills', boardBox);
-
-    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' }).click();
+    await page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click();
     await expect(page).toHaveURL('/app?scenario=01');
     await expectSidebarBox(page, sidebar, '/app', boardBox);
   });
 
-  test('the brand head holds its inner geometry across the /app → /app/team hop', async ({
+  test('the brand head holds its inner geometry across the /app → /app/schedules hop', async ({
     page,
   }) => {
     await page.goto('/app?scenario=01');
     await expect(page.locator(ROUTE_ANCHOR['/app'])).toBeVisible();
     const board = await headContentX(page);
 
-    await page.getByRole('link', { name: 'Cairn' }).click();
-    await expect(page).toHaveURL('/app/team?scenario=01');
+    await page.goto('/app/schedules?scenario=01');
     // the active face repaints the row's background only (Paper Grouped
     // sidebar: sheet + hairline); the icon and the name must not drift as it
     // lights.
-    await expect(page.locator(ROUTE_ANCHOR['/app/team'])).toBeVisible();
+    await expect(page.locator(ROUTE_ANCHOR['/app/schedules'])).toBeVisible();
     await expect.poll(() => headContentX(page)).toEqual(board);
   });
 
   test('collapsed rail survives route hops (storage-backed on every shell)', async ({ page }) => {
     await page.addInitScript((k) => {
       localStorage.setItem(k, '1');
-      localStorage.setItem('cairn.sidebarResourcesCollapsed', '0');
     }, SIDEBAR_KEY);
     await page.goto('/app?scenario=03');
     const rail = page.getByRole('complementary');
     const railBox = await captureSidebarBox(page, rail, '/app');
 
-    await page.getByRole('link', { name: '技能' }).click();
-    await expect(page).toHaveURL('/app/resources/skills?scenario=03');
-    // the rail box (40px) doubles as the collapsed-state probe: an
-    // expanded sidebar on the new route would never equal it
-    await expectSidebarBox(page, rail, '/app/resources/skills', railBox);
-
-    await page.getByRole('link', { name: '定时' }).click();
-    await expect(page).toHaveURL('/app/schedules?scenario=03');
+    await page.goto('/app/schedules?scenario=03');
     await expectSidebarBox(page, rail, '/app/schedules', railBox);
   });
 
   test('the collapse toggle works off-board and the state rides back', async ({ page }) => {
-    await page.goto('/app/team?scenario=12');
-    await expect(page.locator('[data-route="team"]')).toBeVisible();
+    await page.goto('/app/schedules?scenario=12');
+    await expect(page.locator('[data-route="schedules"]')).toBeVisible();
     await page.getByRole('button', { name: '收起侧边栏' }).click();
     await expect(page.getByRole('complementary')).toBeVisible();
     // the toggle writes storage synchronously before its state flip; poll
@@ -169,7 +144,7 @@ test.describe('sidebar form is route-invariant', () => {
       .poll(() => page.evaluate((k) => localStorage.getItem(k), SIDEBAR_KEY))
       .toBe('1');
 
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: /^Coordinator/ }).click();
     await expect(page).toHaveURL('/app?scenario=12');
     await expect(page.locator('[data-route="board"]')).toBeVisible();
 

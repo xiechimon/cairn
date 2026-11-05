@@ -10,23 +10,13 @@ async function openPanel(page: Page) {
   await pressAndExpect(page, 'Meta+k', panel(page));
 }
 
-test('board: the fresh task sits in `待开始`, `待处理` holds the review card', async ({ page }) => {
-  await page.goto('/app?scenario=22&view=board');
-  const todoColumn = page.locator('.board-column[data-column="todo"]');
-  const pendingColumn = page.locator('.board-column[data-column="pending"]');
-  await expect(todoColumn.locator('.board-column-name')).toHaveText('待开始');
-  await expect(pendingColumn.locator('.board-column-name')).toHaveText('待处理');
-  await expect(todoColumn.locator('[data-todo-id]', { hasText: FRESH_TITLE })).toHaveCount(1);
-  await expect(pendingColumn.locator('[data-todo-id="r3-legacy-1"]')).toHaveCount(1);
-});
-
-test('detail header: the fresh task chip reads the column word `待开始`', async ({ page }) => {
+test('side chat: the fresh task status reads `空闲`', async ({ page }) => {
   await page.goto('/app/todo/fresh-probe?scenario=23');
-  await expect(page.getByTestId('phase-chip')).toHaveText('待开始');
+  await expect(page.getByTestId('side-chat-status')).toContainText('空闲');
 });
 
 test('search rows: fresh reads `待开始`, review `审核`, done `已完成`', async ({ page }) => {
-  await page.goto('/app?scenario=22&view=board');
+  await page.goto('/app/schedules?scenario=22');
   await openPanel(page);
   await page.keyboard.type('probe');
   const rows = panel(page).locator('[data-row-kind="todo"]');

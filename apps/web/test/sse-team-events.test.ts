@@ -45,6 +45,7 @@ describe('team event → invalidation keys', () => {
     expect(keysOf({ type: 'machine_presence', machineId: 'm-1', online: true })).toEqual([
       `machines/${TEAM}`,
       'todos',
+      `model-routing/${TEAM}`,
     ]);
     expect(keysOf({ type: 'branch_sync', sync: { buildId: 'build-1' } })).toEqual([
       'branchSync/build-1',

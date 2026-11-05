@@ -5,7 +5,15 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -13,6 +21,7 @@ import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
+import { TurnFold, useTurnFold } from '../components/chat/turn-fold.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -46,6 +55,7 @@ import {
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
+import { chiefTurns, groupTurns, latestOpenTurnId } from '../lib/turn-fold.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
@@ -53,17 +63,20 @@ import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highl
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
+import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
+import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const TOOL_BTN_CLS =
+export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
-const PROJECT_CHIP_CLS =
+export const PROJECT_CHIP_CLS =
   "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
@@ -120,7 +133,7 @@ export interface ChiefConversationProps {
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
-  onNewTask?: () => void;
+  earlier?: ChiefEarlier;
   hero?: ReactNode;
   below?: ReactNode;
   heroCollapsed?: boolean;
@@ -134,7 +147,8 @@ export interface ChiefConversationProps {
   placeholder?: string;
   composerError?: string | null;
   composerReplacement?: ReactNode;
-  aboveComposer?: ReactNode;
+  composerTools?: ReactNode;
+  targetPlaceholder?: string | null;
 }
 
 export function ChiefConversation({
@@ -150,7 +164,7 @@ export function ChiefConversation({
   onWithdraw,
   onSteer,
   onStop,
-  onNewTask,
+  earlier,
   hero,
   below,
   heroCollapsed = false,
@@ -164,7 +178,8 @@ export function ChiefConversation({
   placeholder,
   composerError = null,
   composerReplacement,
-  aboveComposer,
+  composerTools,
+  targetPlaceholder = null,
 }: ChiefConversationProps) {
   const projectMark = useProjectMark();
   const { t } = useI18n();
@@ -223,6 +238,9 @@ export function ChiefConversation({
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
   const { scrollToEnd } = useMessageScroller();
+  const followSentRef = useRef(false);
+  const latestUserKeyRef = useRef<string | number | null>(null);
+  const userKeyAtSendRef = useRef<string | number | null>(null);
   const prevThreadRef = useRef(chief.threadTitle);
   useEffect(() => {
     if (prevThreadRef.current === chief.threadTitle) return;
@@ -233,8 +251,9 @@ export function ChiefConversation({
     null,
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
+  const turnFold = useTurnFold();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyText = (key: string, text: string) => {
+  const copyText = useCallback((key: string, text: string) => {
     const clip = navigator.clipboard;
     if (!clip) return;
     void clip.writeText(text).then(
@@ -244,14 +263,21 @@ export function ChiefConversation({
       },
       () => {},
     );
-  };
-  const toggleTools = (i: number) =>
-    setToolsOpen((cur) => {
-      const next = new Set(cur);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
+  }, []);
+  const toggleTools = useCallback(
+    (i: number) =>
+      setToolsOpen((cur) => {
+        const next = new Set(cur);
+        if (next.has(i)) next.delete(i);
+        else next.add(i);
+        return next;
+      }),
+    [],
+  );
+  const requestRewind = useCallback(
+    (index: number, id: string | null) => setRewindConfirm({ index, id }),
+    [],
+  );
   const [liveDraft, setLiveDraft] = useState(() =>
     live ? readStoredChiefDraft(draftStorageKey) : initialDraft,
   );
@@ -262,6 +288,7 @@ export function ChiefConversation({
       else localStorage.setItem(draftStorageKey, liveDraft);
     } catch {}
   }, [live, liveDraft, draftStorageKey]);
+  const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const wire = useComposerWire({
     editable: onSend != null,
     draft: onSend != null ? liveDraft : (chief.draft ?? ''),
@@ -270,15 +297,21 @@ export function ChiefConversation({
       onSend == null
         ? undefined
         : (text: string) => {
-            scrollToEnd();
-            return onSend(text, chipProjectId);
+            followSentRef.current = true;
+            userKeyAtSendRef.current = latestUserKeyRef.current;
+            const sent = onSend(text, chipProjectId);
+            Promise.resolve(sent).catch(() => {
+              followSentRef.current = false;
+            });
+            return sent;
           },
     onAttachment,
     mentionGroups,
     ...(chipVisible ? { onPickProject: (p: { id: string }) => pickProject(p.id) } : {}),
     slash: {
       reviewAvailable: false,
-      stopAvailable: false,
+      stopAvailable: targetPlaceholder === null && chief.running === true && onStop != null,
+      onStop: () => stopTurnRef.current?.(),
     },
     growCap: 120,
   });
@@ -376,9 +409,14 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = home && empty && !heroCollapsed;
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
   const stopMode =
-    chief.running === true && wire.draft === '' && wire.tokens.length === 0 && onStop != null;
+    targetPlaceholder === null &&
+    chief.running === true &&
+    wire.draft === '' &&
+    wire.tokens.length === 0 &&
+    onStop != null;
   const liveTurn =
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
@@ -392,14 +430,44 @@ export function ChiefConversation({
       : (messageId: string, text: string) => {
           onWithdraw(messageId).then(
             () => {
+              followSentRef.current = false;
               setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
               textareaRef.current?.focus({ preventScroll: true });
             },
             () => {},
           );
         };
+  const waitingTurn = chief.waitingTurn;
+  const stopTurn =
+    waitingTurn !== undefined && withdraw !== undefined
+      ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
+      : onStop;
+  stopTurnRef.current = stopTurn;
   const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
+  const latestMessage = rows.findLast(
+    ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
+  );
+  const latestUser = rows.findLast(({ item }) => item.kind === 'user');
+  const latestUserKey =
+    latestUser == null ? null : chiefStreamRowKey(latestUser.item, latestUser.i);
+  latestUserKeyRef.current = latestUserKey;
+  const keyAtSend = userKeyAtSendRef.current;
+  const sentRowPosition =
+    keyAtSend == null
+      ? -1
+      : rows.findIndex(({ item, i }) => chiefStreamRowKey(item, i) === keyAtSend);
+  const latestUserPosition = latestUser == null ? -1 : rows.indexOf(latestUser);
+  useLayoutEffect(() => {
+    if (!followSentRef.current || latestUserPosition < 0) return;
+    if (keyAtSend != null && sentRowPosition < 0) {
+      followSentRef.current = false;
+      return;
+    }
+    if (latestUserPosition <= sentRowPosition) return;
+    followSentRef.current = false;
+    scrollToEnd();
+  }, [latestUserKey, keyAtSend, sentRowPosition, latestUserPosition, scrollToEnd]);
   const queuedCapsules = allRows.flatMap(({ item }) =>
     item.kind === 'user' && item.pending != null && item.id != null
       ? [
@@ -412,11 +480,14 @@ export function ChiefConversation({
         ]
       : [],
   );
+  const outstandingReports = outstandingReportIds(chief.stream ?? []);
   const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
       item={item}
       index={i}
+      latest={i === latestMessage?.i}
+      replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
       bound={chief.bound}
       agent={chief.agent}
       runningTool={chief.runningTool}
@@ -424,11 +495,28 @@ export function ChiefConversation({
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
-      onRewindRequest={(index, id) => setRewindConfirm({ index, id })}
+      onRewindRequest={requestRewind}
       onAnswerQuestion={onAnswerQuestion}
       onCancelQuestion={onCancelQuestion}
     />
   );
+  const openTurnId = latestOpenTurnId(groupTurns(rows, chiefTurns), chiefTurns);
+  const foldedRows = (list: { item: ChiefStreamItem; i: number }[]) =>
+    groupTurns(list, chiefTurns).map((segment) =>
+      segment.kind === 'row' ? (
+        streamRow(segment.row.item)
+      ) : (
+        <TurnFold
+          key={segment.turn.id}
+          turn={segment.turn}
+          open={turnFold.isOpen(segment.turn, openTurnId)}
+          defaultOpenId={openTurnId}
+          onToggle={turnFold.toggle}
+        >
+          {segment.turn.rows.map((row) => streamRow(row.item))}
+        </TurnFold>
+      ),
+    );
   const intro = (
     <>
       {!chief.bound && (
@@ -566,7 +654,7 @@ export function ChiefConversation({
         <>
           {intro}
           <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport data-testid="chief-body">
+            <FadeScrollerViewport ref={viewportRef} data-testid="chief-body">
               <MessageScrollerContent
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"
@@ -575,14 +663,14 @@ export function ChiefConversation({
                   <TodoGlanceContext.Provider value={glances}>
                     {lead}
                     {day == null ? (
-                      rows.map(streamRow)
+                      foldedRows(rows)
                     ) : (
                       <>
                         <div data-testid="chief-earlier" className="opacity-60">
-                          {rows.slice(0, day.earlier).map(streamRow)}
+                          {foldedRows(rows.slice(0, day.earlier))}
                         </div>
                         {day.today}
-                        {rows.slice(day.earlier).map(streamRow)}
+                        {foldedRows(rows.slice(day.earlier))}
                       </>
                     )}
                   </TodoGlanceContext.Provider>
@@ -593,18 +681,25 @@ export function ChiefConversation({
               <ArrowDown width={16} height={16} />
               <span className="sr-only">{t('滚动到最新')}</span>
             </JumpToLatestButton>
+            {earlier != null && (
+              <ChiefEarlierLoader
+                earlier={earlier}
+                hasEarlier={chief.hasEarlier === true}
+                rowCount={rows.length}
+                viewportRef={viewportRef}
+              />
+            )}
           </MessageScroller>
         </>
       )}
 
       {chief.outage != null ? (
-        <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} onNewTask={onNewTask} />
+        <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
       ) : (
         chief.fallbackModel != null && (
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
         )
       )}
-      {aboveComposer}
       {composerReplacement ?? (
         <>
           {composerError != null && (
@@ -619,7 +714,7 @@ export function ChiefConversation({
           )}
           <div
             data-invalid={composerError != null ? '' : undefined}
-            className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+            className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
             style={home ? { viewTransitionName: 'chief-composer' } : undefined}
           >
             <QueuedCapsules
@@ -637,6 +732,7 @@ export function ChiefConversation({
               <Textarea
                 ref={attachComposer}
                 data-testid="chief-composer-input"
+                data-compose-target=""
                 aria-invalid={composerError != null ? true : undefined}
                 className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
                 readOnly={onSend == null}
@@ -650,11 +746,12 @@ export function ChiefConversation({
                 onCompositionEnd={handleCompositionEnd}
                 onBlur={handleBlur}
                 placeholder={
-                  chief.outage != null
+                  targetPlaceholder ??
+                  (chief.outage != null
                     ? t('可以继续说，总管恢复后会按顺序处理…')
                     : chief.running === true
                       ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-                      : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER))
+                      : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
                 }
                 {...(inlineOpen
                   ? {
@@ -732,6 +829,7 @@ export function ChiefConversation({
               >
                 <Plus width={16} height={16} />
               </IconTooltip>
+              {composerTools}
               {chipVisible && (
                 <ProjectMenu
                   title="发给哪个项目"
@@ -746,7 +844,7 @@ export function ChiefConversation({
                       data-testid="chief-project-chip"
                       data-set={pickedProject != null ? '' : undefined}
                       aria-label={t('发给哪个项目：{name}', {
-                        name: pickedProject?.name ?? t('自动，由总管判断'),
+                        name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
                       })}
                       className={PROJECT_CHIP_CLS}
                     />
@@ -781,7 +879,7 @@ export function ChiefConversation({
                   size="icon"
                   aria-label={t('停止总管这次回复')}
                   className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
-                  onClick={onStop}
+                  onClick={stopTurn}
                 >
                   <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
                 </Button>

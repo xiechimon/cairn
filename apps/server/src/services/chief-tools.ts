@@ -1,6 +1,7 @@
-import type { SecretBox, UserRecord } from '@cairn/shared';
+import type { ChiefNoticeContent, SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
+  CHIEF_NOTICE_KIND,
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
@@ -25,7 +26,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { newRecordId } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
 import {
@@ -37,9 +38,21 @@ import {
   startBuilds,
   stopActiveStepsAfterExit,
 } from './builds.js';
-import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
+import {
+  addChiefWatch,
+  clearChiefWake,
+  removeChiefWatches,
+  requireTurnProvenance,
+  setChiefWake,
+  upsertChiefMessage,
+} from './chief.js';
 import { readHistory, searchHistory } from './chief-history.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
+import {
+  assertToolAllowedUnderRouting,
+  executeRouterTool,
+  isRouterTool,
+} from './chief-router-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
@@ -90,6 +103,9 @@ export interface ChiefToolCtx {
   threadId: string;
   chiefAgentId: string | null;
   conversationId: string;
+  turnPrompt?: string | null;
+  turnScopeProjectId?: string | null;
+  turnScopeMixed?: boolean;
 }
 
 function skillAuditActor(ctx: ChiefToolCtx): { type: 'member' | 'agent'; id: string } {
@@ -184,6 +200,9 @@ const PROJECT_WRITE_TOOLS = new Set([
   'confirm_builds',
   'cancel_builds',
   'merge_builds',
+  'open_thread',
+  'message_thread',
+  'stop_thread',
   'save_memory',
 ]);
 
@@ -296,7 +315,9 @@ export async function executeChiefTool(
           .get()?.name
       : undefined;
   const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Chief' };
+  assertToolAllowedUnderRouting(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
+  if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
   switch (name) {
     case 'projects': {
       const rows = db.select().from(project).where(eq(project.teamId, ctx.teamId)).all();
@@ -491,7 +512,12 @@ export async function executeChiefTool(
         }),
       );
     case 'read_history':
-      return json(readHistory(db, ctx, strArr(params, 'ids')));
+      return json(
+        readHistory(db, ctx, strArr(params, 'ids'), {
+          offset: num(params, 'offset'),
+          maxChars: num(params, 'maxChars'),
+        }),
+      );
 
     case 'create_todo': {
       const projectId = str(params, 'projectId');
@@ -758,22 +784,33 @@ export async function executeChiefTool(
     case 'set_secret': {
       const keysvc = { db, box: deps.box };
       const name = str(params, 'name');
-      const existing = listSecrets(keysvc, ctx.teamId).find((s) => s.name === name);
+      const projectId = optStr(params, 'projectId') ?? null;
+      const existing = listSecrets(keysvc, ctx.teamId).find(
+        (s) => s.name === name && s.projectId === projectId,
+      );
       const value = str(params, 'value');
       const description = optStr(params, 'description') ?? null;
       if (existing) {
         return json(updateSecret(keysvc, ctx.teamId, existing.id, { name, value, description }));
       }
-      const record = createSecret(keysvc, { teamId: ctx.teamId, name, description, value });
+      const record = createSecret(keysvc, {
+        teamId: ctx.teamId,
+        name,
+        description,
+        value,
+        projectId,
+      });
       return json(record);
     }
     case 'delete_secrets': {
       const keysvc = { db, box: deps.box };
       const names = strArr(params, 'names');
+      const projectId = optStr(params, 'projectId') ?? null;
       const all = listSecrets(keysvc, ctx.teamId);
       const deleted: string[] = [];
       for (const n of names) {
-        const hit = all.find((s) => s.name === n || s.id === n);
+        const hit =
+          all.find((s) => s.id === n) ?? all.find((s) => s.name === n && s.projectId === projectId);
         if (hit && deleteSecret(keysvc, ctx.teamId, hit.id)) deleted.push(n);
       }
       return json({ deleted });
@@ -951,6 +988,11 @@ export async function executeChiefTool(
     }
 
     case 'ask_user': {
+      const provenance = requireTurnProvenance(
+        ctx.turnPrompt ?? null,
+        params.provenance,
+        'ask_user',
+      );
       const questions = askUserQuestionsOfParams(params);
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
       const { content } = createOrGetQuestion(
@@ -965,6 +1007,7 @@ export async function executeChiefTool(
           threadId: ctx.threadId,
           requestId,
           questions,
+          provenance,
         },
       );
       return json({
@@ -974,7 +1017,25 @@ export async function executeChiefTool(
       });
     }
     case 'notify_user': {
+      const provenance = requireTurnProvenance(
+        ctx.turnPrompt ?? null,
+        params.provenance,
+        'notify_user',
+      );
       const text = str(params, 'message');
+      const notice = {
+        id: newRecordId(),
+        threadId: ctx.threadId,
+        role: 'system' as const,
+        content: JSON.stringify({
+          kind: CHIEF_NOTICE_KIND,
+          message: text,
+          provenance,
+        } satisfies ChiefNoticeContent),
+        createdAt: nowMs(),
+      };
+      upsertChiefMessage(db, notice);
+      deps.convHub?.publishMessage(ctx.threadId, notice);
       const agentRow = ctx.chiefAgentId
         ? db.select().from(agent).where(eq(agent.id, ctx.chiefAgentId)).get()
         : undefined;
@@ -993,9 +1054,19 @@ export async function executeChiefTool(
     case 'save_memory': {
       if (ctx.chiefAgentId === null)
         throw new HttpError(409, 'chief agent not bound — memory has no store');
-      const projectId = optStr(params, 'projectId') ?? null;
+      const explicitProject = optStr(params, 'projectId');
+      if (explicitProject === undefined && ctx.turnScopeMixed === true) {
+        throw new HttpError(
+          400,
+          'this turn now covers more than one project: pass projectId so the memory lands in the right project',
+        );
+      }
+      const projectId = explicitProject ?? ctx.turnScopeProjectId ?? null;
       const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
-      if (projectId !== null) requireProjectRow(db, projectId, ctx.teamId);
+      if (projectId !== null) {
+        requireProjectRow(db, projectId, ctx.teamId);
+        requireUnarchivedTargets(db, ctx.teamId, name, { projectId });
+      }
       if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
       const row = saveMemoryEntry(db, {
         agentId: ctx.chiefAgentId,

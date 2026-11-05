@@ -1,6 +1,5 @@
 import { Play } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
-import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { AgentPickerPanel } from '../components/agent-picker.js';
 import { Button } from '../components/ui/button.js';
@@ -13,7 +12,6 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
-import { NewTaskDialog } from '../overlay/new-task-dialog.js';
 import { type DocView, PaneTitle, PaneViewButtons } from '../overlay/plan-dropdown.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
@@ -24,7 +22,6 @@ import {
   CARD_FACES,
   GALLERY_AGENTS,
   MENTION_GROUPS,
-  PROJECT,
   PROJECT_TITLE,
 } from './product-fixtures.js';
 import { Cell, Section, Specimen } from './specimen.js';
@@ -65,37 +62,6 @@ const INLINE_ROWS = [
 ];
 
 const SEARCH_FIXTURE = { ...BOARD_FIXTURE, todos: CARD_FACES.map((face) => face.todo) };
-
-function NewTaskSpecimen() {
-  const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
-  return (
-    <Specimen
-      title="New task"
-      note={saved ?? 'NewTaskDialog with the project picker and attachments'}
-      stage="canvas"
-    >
-      <Button onClick={() => setOpen(true)}>New task</Button>
-      <NewTaskDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        onSave={(spec) => {
-          setSaved(`Saved: ${spec.slice(0, 60)}`);
-          setOpen(false);
-        }}
-        onSaveAndStart={(spec) => {
-          setSaved(`Saved and started: ${spec.slice(0, 60)}`);
-          setOpen(false);
-        }}
-        projects={[
-          { id: PROJECT, name: PROJECT_TITLE },
-          { id: 'docs-site', name: 'docs-site' },
-        ]}
-        onAttachment={(files) => files.map((f) => f.name)}
-      />
-    </Specimen>
-  );
-}
 
 const SEARCH_CONTEXT: SearchContext = {
   seqNum: 71,
@@ -385,8 +351,6 @@ function ConfirmsSpecimen() {
   const triggers = [
     ['delete', 'Delete task'],
     ['delete-project', 'Delete project'],
-    ['done', 'Mark done'],
-    ['done-inflight', 'Mark done while running'],
     ['reset', 'Move back to To start'],
     ['reset-stale', 'Reset, stale'],
   ] as const;
@@ -415,19 +379,6 @@ function ConfirmsSpecimen() {
         onClose={close}
         onConfirm={() => done('project deleted')}
       />
-      <DoneConfirmDialog
-        open={open === 'done'}
-        onClose={close}
-        onConfirmDone={() => done('done')}
-        onConfirmCanceled={() => done('canceled')}
-      />
-      <DoneConfirmDialog
-        open={open === 'done-inflight'}
-        mode="inflight"
-        onClose={close}
-        onConfirmDone={() => done('done')}
-        onConfirmStopThenDone={() => done('stopped then done')}
-      />
       <ResetConfirmDialog open={open === 'reset'} onClose={close} onConfirm={() => done('reset')} />
       <ResetConfirmDialog
         open={open === 'reset-stale'}
@@ -446,7 +397,6 @@ export function ProductOverlaysSection() {
       title="Overlays and pickers"
       lede="Dialogs, the command palette, pickers and menus the app opens over a page. Each opens from a trigger, as in the app."
     >
-      <NewTaskSpecimen />
       <SearchSpecimen />
       <PickersSpecimen />
       <AttachmentsSpecimen />

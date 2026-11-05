@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { needsYouCount, needsYouThreads } from '../src/board/needs-you.js';
+import { needsYouCount, needsYouThreads, pendingQuestions } from '../src/board/needs-you.js';
 import { todo } from './helpers.js';
 
 const question = (status: 'pending' | 'answered') => ({
@@ -11,7 +11,7 @@ const question = (status: 'pending' | 'answered') => ({
 });
 
 describe('the Needs you set, shared by the home list and the sidebar badge', () => {
-  test('counts confirm, review, failed and awaiting-reply threads, plus pending questions', () => {
+  test('counts confirm, review, failed and awaiting-reply threads, not Chief questions', () => {
     const set = [
       todo(1, 'confirm'),
       todo(2, 'review'),
@@ -21,7 +21,9 @@ describe('the Needs you set, shared by the home list and the sidebar badge', () 
       todo(6, 'done'),
       todo(7, 'todo'),
     ];
-    expect(needsYouCount(set, [question('pending'), question('answered')])).toBe(5);
+    const stream = [question('pending'), question('answered')];
+    expect(needsYouCount(set)).toBe(4);
+    expect(pendingQuestions(stream)).toHaveLength(1);
   });
 
   test('archived threads leave the set, stale ones stay', () => {

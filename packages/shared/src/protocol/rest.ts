@@ -19,6 +19,21 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/server/backup',
     note: 'backup-status.json next to server.db (#2162)',
   },
+  {
+    method: 'GET',
+    path: '/api/server/deploy',
+    note: 'deploy.json next to server.db, written by deploy-self.sh (#2427)',
+  },
+  {
+    method: 'GET',
+    path: '/api/flags',
+    note: 'owner lists registered flags and their global release state (#2427)',
+  },
+  {
+    method: 'POST',
+    path: '/api/flags/{key}/release',
+    note: 'owner releases a feature flag to every user (#2427)',
+  },
   { method: 'GET', path: '/api/teams/{id}/providers', note: 'presets[] 38 项原样（r3 §2）' },
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },
   { method: 'GET', path: '/api/teams/{id}/models' },
@@ -55,7 +70,7 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'POST',
     path: '/api/teams/{id}/coordinator/messages',
-    note: 'body {content, projectId?}; projectId only tags the turn, 409 when that project is archived',
+    note: 'body {content, projectId?, clientMessageId?}; projectId only tags the turn, 409 when that project is archived; a repeated clientMessageId returns the first response and starts no new turn',
   },
   { method: 'GET', path: '/api/projects', query: ['teamId'] },
   { method: 'GET', path: '/api/projects/{id}/todos' },
@@ -83,6 +98,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'body {until: needed|tomorrow|tomorrow-09:00|next-monday|epoch ms|ISO, tz?}',
   },
   { method: 'POST', path: '/api/todos/{id}/unsnooze', note: 'clears the snooze' },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/messages',
+    note: 'body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)',
+  },
   { method: 'POST', path: '/api/projects/{id}/archive', note: 'sets project.archivedAt' },
   { method: 'POST', path: '/api/projects/{id}/unarchive', note: 'clears project.archivedAt' },
   { method: 'GET', path: '/api/builds/{id}' },

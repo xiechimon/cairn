@@ -3,8 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 for (const [name, url] of [
-  ['secondary', '/app/team?scenario=12'],
-  ['resources', '/app/resources/skills?scenario=06'],
+  ['pages', '/app/schedules?scenario=12'],
 ] as const) {
   test(`${name} page: search row opens the shared panel, Esc closes it`, async ({ page }) => {
     await page.goto(url);

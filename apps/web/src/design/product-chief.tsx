@@ -46,6 +46,7 @@ export function ProductChiefSection() {
           <div className="w-160">
             <ChiefQuestionCard
               item={QUESTION_PENDING}
+              numberKeys
               onAnswer={({ answers }) =>
                 setLast(
                   `Answered: ${answers.map((a) => a.choices?.join(' + ') ?? a.text).join(' / ')}`,
@@ -106,7 +107,6 @@ export function ProductChiefSection() {
           <ChiefOutageBanner
             outage={{ reason: 'quota', model: 'claude-opus-5-5', retryAt: NOW + 45 * 60_000 }}
             onSettings={() => setLast('Open chief settings')}
-            onNewTask={() => setLast('New task')}
           />
         </Labeled>
         <Labeled label="Overloaded, no retry time">

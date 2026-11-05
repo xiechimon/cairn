@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
+import { expandTurns } from './helpers.js';
 
-const SCENARIO = '/app?view=board&scenario=chief-agent-chip';
+const SCENARIO = '/app/schedules?scenario=chief-agent-chip';
 const AGENT_HREF = '/app/resources/agents/r3-builder';
 
 function stubDicebear(page: Page) {
@@ -16,6 +17,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
   test.beforeEach(async ({ page }) => {
     await stubDicebear(page);
     await page.goto(SCENARIO);
+    await expandTurns(page);
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
 
@@ -33,7 +35,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     await expect(img).toBeVisible();
     await expect(chip.getByText('r3-builder')).toHaveText('r3-builder');
 
-    await expect(chip).toHaveAttribute('href', `${AGENT_HREF}?view=board&scenario=chief-agent-chip`);
+    await expect(chip).toHaveAttribute('href', `${AGENT_HREF}?scenario=chief-agent-chip`);
 
     const box = await img.boundingBox();
     expect(box?.width).toBe(24);
@@ -81,6 +83,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
   test('F-E5: drawer-face agent mention chips form links with click navigation (same recipe as F-R13)', async ({ page }) => {
     await page.goto(SCENARIO);
+    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const chip = page.getByTestId('chief-stream').locator('.mention-chip--agent');
     await expect(chip).toHaveCount(1);
@@ -91,10 +94,11 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
     await page.waitForURL((u) => u.pathname === '/app/resources/agents/a1');
   });
 
-  test('F-E6: detail page transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
+  test('F-E6: side chat transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
     await page.goto('/app/todo/r3-legacy-1?scenario=chief-agent-chip');
+    await expandTurns(page);
 
-    const chip = page.locator('.detail-center .mention-chip--agent');
+    const chip = page.locator('.side-panel .mention-chip--agent');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveAttribute('href', '/app/resources/agents/a1');
     await chip.click();
@@ -103,6 +107,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
   test('F-E7: skill/project/machine mentions stay lazy spans (literal negative cases)', async ({ page }) => {
     await page.goto(SCENARIO);
+    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
     for (const kind of ['skill', 'project', 'machine'] as const) {
@@ -114,7 +119,7 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
     await expect(stream.locator('.mention-chip--todo')).toHaveAttribute(
       'href',
-      '/app/todo/r3-legacy-1',
+      /^\/app\?(scenario=[^&]+&)?thread=r3-legacy-1$/,
     );
   });
 });
@@ -124,7 +129,7 @@ test.describe('lazy face zero change (#741 negative case)', () => {
     page,
   }) => {
     await stubDicebear(page);
-    await page.goto('/app?view=board&scenario=114');
+    await page.goto('/app/schedules?scenario=114');
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
 

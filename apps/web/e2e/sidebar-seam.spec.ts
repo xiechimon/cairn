@@ -26,23 +26,20 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         };
       });
 
-      expect(m.borderRightW).toBe('1px');
+      expect(m.borderRightW).toBe('0px');
       expect(m.shadow).toBe('none');
       expect(m.sidebarW).toBe(248);
       expect(m.navBorderTopW).toBe('0px');
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
     });
 
-    test(`team page: the active workspace row keeps the board geometry (${theme})`, async ({
+    test(`schedules page: the workspace row keeps the board geometry (${theme})`, async ({
       page,
     }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
-      await page.goto('/app/team?scenario=12');
-      await expect(page.getByRole('link', { name: 'Cairn' })).toHaveAttribute(
-        'aria-current',
-        'page',
-      );
-      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
+      await page.goto('/app/schedules?scenario=12');
+      await expect(page.locator('[data-route="schedules"]')).toBeVisible();
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
     });
 
     test(`rail: no seam either (${theme})`, async ({ page }) => {
@@ -62,15 +59,13 @@ test.describe('sidebar seam (Paper Grouped)', () => {
         };
       });
 
-      expect(m.borderRightW).toBe('1px');
+      expect(m.borderRightW).toBe('0px');
       expect(m.shadow).toBe('none');
       expect(m.railW).toBe(40);
     });
 
     for (const [name, url] of [
       ['pages', '/app/schedules?scenario=11'],
-      ['resources', '/app/resources/skills?scenario=06'],
-      ['detail', '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread'],
     ] as const) {
       test(`${name} shell: no seam, same workspace row (${theme})`, async ({
         page,
@@ -81,9 +76,9 @@ test.describe('sidebar seam (Paper Grouped)', () => {
           const ss = getComputedStyle(document.querySelector('aside')!);
           return { borderRightW: ss.borderRightWidth, shadow: ss.boxShadow };
         });
-        expect(m.borderRightW).toBe('1px');
+        expect(m.borderRightW).toBe('0px');
         expect(m.shadow).toBe('none');
-        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 223, h: 44 });
+        expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 44 });
       });
     }
   }

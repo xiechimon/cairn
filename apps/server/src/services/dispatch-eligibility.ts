@@ -14,6 +14,7 @@ import {
 import { and, eq, like, ne, not } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
+import { applyRoute, policyForStep, routeForStep, ruleAgent } from './routing-rules.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -37,21 +38,20 @@ export interface MachineCapabilityFacts {
 export function missingCapabilityItems(
   machineRow: MachineCapabilityFacts,
   required: RequiredCapabilities | null | undefined,
-): { mcpServers: string[]; models: string[] } {
+): { mcpServers: string[]; models: string[]; executor?: 'orb' } {
   if (required == null) return { mcpServers: [], models: [] };
   const reportedMcp = machineRow.capabilities?.mcpServers;
   const reportedModels = machineRow.claudeCodeReport?.models;
+  const executorMissing =
+    required.executor === 'orb' && machineRow.capabilities?.executor !== 'orb';
   return {
-    mcpServers:
-      reportedMcp === undefined
-        ? []
-        : (required.mcpServers ?? [])
-            .map((slug) => slug.toLowerCase())
-            .filter((slug) => !reportedMcp.includes(slug)),
-    models:
-      reportedModels === undefined
-        ? []
-        : (required.models ?? []).filter((id) => !reportedModels.some((m) => m.id === id)),
+    ...(executorMissing ? { executor: 'orb' as const } : {}),
+    mcpServers: (required.mcpServers ?? [])
+      .map((slug) => slug.toLowerCase())
+      .filter((slug) => !(reportedMcp ?? []).includes(slug)),
+    models: (required.models ?? []).filter(
+      (id) => !(reportedModels ?? []).some((m) => m.id === id),
+    ),
   };
 }
 
@@ -101,8 +101,13 @@ export function agentForStep(
   prompt: string | null = null,
 ): typeof agent.$inferSelect | null {
   const agentId = agentIdForStep(todoRow, kind, prompt);
-  if (agentId === null) return null;
-  return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
+  const route = routeForStep(db, todoRow, kind);
+  const agentRow =
+    agentId === null ? undefined : db.select().from(agent).where(eq(agent.id, agentId)).get();
+  const policy = policyForStep(db, todoRow, kind);
+  const base = agentRow ?? (route === null ? null : ruleAgent(route, policy));
+  if (base === null) return null;
+  return applyRoute(base, route, todoRow.routeOverride, policy);
 }
 
 function planSlotFor(
@@ -155,6 +160,16 @@ export function machineRunningCount(db: Db, machineId: string): number {
     .select({ id: step.id })
     .from(step)
     .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
+    .all().length;
+}
+
+export function projectRunningCount(db: Pick<Db, 'select'>, projectId: string): number {
+  return db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief'), eq(todo.projectId, projectId)))
     .all().length;
 }
 
@@ -215,6 +230,53 @@ export function homeMachineRejectReason(
       return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。`;
     }
   }
+  return null;
+}
+
+export interface EligibilityInput {
+  machine: {
+    id: string;
+    name: string;
+    enabledRuntimes: string[];
+    claudeCodeReport: ClaudeCodeReport | null;
+    capabilities: MachineCapabilities | null;
+  };
+  agent: {
+    machineId: string | null;
+    requiredCapabilities: RequiredCapabilities | null | undefined;
+  };
+  model: { provider: string | null | undefined; modelId: string | null | undefined };
+  catalog: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>;
+  localProject: boolean;
+  claudeRateBlocked: boolean;
+  claudeLoginBlocked: boolean;
+  claudeUsageRefused: boolean;
+}
+
+export type MachineIneligibility =
+  | { kind: 'runtime' | 'local-path' | 'claude-blocked' | 'claude-login' | 'claude-usage' }
+  | { kind: 'model'; reason: string }
+  | { kind: 'capability'; missing: string[] };
+
+export function machineEligibility(input: EligibilityInput): MachineIneligibility | null {
+  const { machine: machineRow, agent: agentRow, model } = input;
+  const runtime = stepRuntimeFor(model.provider);
+  if (!machineRow.enabledRuntimes.includes(runtime)) return { kind: 'runtime' };
+  const modelReject =
+    agentRow.machineId === machineRow.id
+      ? null
+      : homeMachineRejectReason(machineRow, model, input.catalog);
+  if (modelReject !== null) return { kind: 'model', reason: modelReject };
+  const missing = capabilityMissingLabels(
+    missingCapabilityItems(machineRow, agentRow.requiredCapabilities),
+  );
+  if (missing.length > 0) return { kind: 'capability', missing };
+  if (input.localProject && agentRow.machineId !== null && agentRow.machineId !== machineRow.id) {
+    return { kind: 'local-path' };
+  }
+  if (runtime === 'claude-code' && input.claudeRateBlocked) return { kind: 'claude-blocked' };
+  if (runtime === 'claude-code' && input.claudeLoginBlocked) return { kind: 'claude-login' };
+  if (input.claudeUsageRefused) return { kind: 'claude-usage' };
   return null;
 }
 

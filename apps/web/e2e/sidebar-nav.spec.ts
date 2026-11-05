@@ -35,37 +35,32 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
-  const schedules = page.getByRole('complementary').getByRole('button', { name: '定时' });
-  await schedules.click();
+  const project = page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first();
+  await project.click();
 
-  await expect(page).toHaveURL('/app/schedules?scenario=01');
+  await expect(page).toHaveURL(/\/app\?scenario=01&project=/);
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
-  await expect(schedules).toHaveAttribute('aria-current', 'page');
+  await expect(project).toHaveAttribute('aria-current', 'page');
 
   const board = page
     .getByRole('complementary')
-    .locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
   await expect(board).not.toHaveAttribute('aria-current', 'page');
 });
 
-test('subrow and team name hop client-side too', async ({ page }) => {
-
-  await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
+test('settings sections hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
-  await page.getByRole('link', { name: '技能' }).click();
-  await expect(page).toHaveURL('/app/resources/skills?scenario=01');
+  await page.getByTestId('sidebar-settings').click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await settings.getByRole('link', { name: '技能' }).click();
+  await expect(page).toHaveURL('/app/settings/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await page.getByRole('link', { name: 'Cairn' }).click();
-  await expect(page).toHaveURL('/app/team?scenario=01');
+  await settings.getByRole('link', { name: '团队' }).click();
+  await expect(page).toHaveURL('/app/settings/team?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
-
-  await expect(page.getByRole('link', { name: 'Cairn' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
 });
 
 test('rail rows hop client-side', async ({ page }) => {
@@ -73,8 +68,8 @@ test('rail rows hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=03');
   await plantCanary(page);
 
-  await page.getByRole('complementary').getByRole('link', { name: '定时' }).click();
-  await expect(page).toHaveURL('/app/schedules?scenario=03');
+  await page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first().click();
+  await expect(page).toHaveURL(/\/app\?scenario=03&project=/);
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
 
@@ -84,7 +79,7 @@ test('install-app entries are gone from both sidebar states', async ({ page }) =
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /安装/ })).toHaveCount(0);
   await expect(page.locator('a[href^="/zh/install"]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Xmon Dai' })).toBeVisible();
+  await expect(page.getByTestId('sidebar-settings')).toBeVisible();
 });
 
 test('collapsed rail carries no install icon', async ({ page }) => {
@@ -92,7 +87,7 @@ test('collapsed rail carries no install icon', async ({ page }) => {
   await page.goto('/app?scenario=03');
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
   await expect(
-    page.getByRole('complementary').getByRole('link', { name: '定时' }),
+    page.getByRole('complementary').getByRole('link', { name: /^Coordinator/ }),
   ).toBeVisible();
 });
 
@@ -104,7 +99,7 @@ test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async 
 
 test('hover tints the row — dark default + light theme', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const row = page.getByRole('complementary').getByRole('button', { name: '定时' });
+  const row = page.getByRole('complementary').locator('[data-slot="sidebar-project-row"]').first();
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
@@ -112,7 +107,10 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
-  const lightRow = page.getByRole('complementary').getByRole('button', { name: '定时' });
+  const lightRow = page
+    .getByRole('complementary')
+    .locator('[data-slot="sidebar-project-row"]')
+    .first();
   await lightRow.hover();
   await expect.poll(() => pillBg(lightRow)).toBe('rgb(220, 222, 215)');
 });
@@ -120,7 +118,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 test('rail hover tints the row', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
-  const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
+  const row = page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first();
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
@@ -131,7 +129,7 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const board = page
     .getByRole('complementary')
-    .locator('[data-slot="sidebar-nav-row"]', { hasText: '首页' });
+    .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' });
   await expect(board).toHaveAttribute('aria-current', 'page');
 
   const sheet = await tokenBg(page, '--sidebar-active');
@@ -145,8 +143,7 @@ test('selected row keeps its sheet fill under hover', async ({ page }) => {
 for (const locale of ['zh', 'en']) {
   for (const layout of ['expanded', 'rail', 'phone']) {
     test(`navigation names match page titles: ${locale} ${layout}`, async ({ page }) => {
-      const home = locale === 'zh' ? '首页' : 'Home';
-      const schedules = locale === 'zh' ? '定时' : 'Schedules';
+      const home = 'Coordinator';
       await page.addInitScript(({ locale, layout }) => {
         localStorage.setItem('cairn.locale', locale);
         localStorage.setItem('cairn.sidebar-collapsed', layout === 'rail' ? '1' : '0');
@@ -163,10 +160,10 @@ for (const locale of ['zh', 'en']) {
           : locale === 'zh' ? '项目' : 'Project',
         exact: true,
       })).toBeVisible();
-      await sidebar.getByRole(layout === 'rail' ? 'link' : 'button', { name: schedules, exact: true }).click();
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(schedules);
+      await page.goto('/app/schedules?scenario=01');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(locale === 'zh' ? '定时' : 'Schedules');
       if (layout === 'phone') await page.getByRole('button', { name: locale === 'zh' ? '展开侧边栏' : 'Expand sidebar' }).click();
-      await expect(sidebar.locator('[aria-current="page"]')).toHaveAccessibleName(schedules);
+      await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(0);
       if (layout === 'rail') await sidebar.getByRole('link', { name: new RegExp(home) }).click();
       else await sidebar.locator('[data-slot="sidebar-nav-row"]').filter({ hasText: home }).click();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(home);

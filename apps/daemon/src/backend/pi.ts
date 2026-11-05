@@ -18,6 +18,11 @@ import type {
 } from '@cairn/shared';
 import { ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
 import {
+  type BuiltinProvider,
+  getAllBuiltinModels,
+  getBuiltinProviders,
+} from '@earendil-works/pi-ai/providers/all';
+import {
   type AgentSession,
   createAgentSession,
   createBashToolDefinition,
@@ -450,6 +455,7 @@ export interface MapState {
   now: () => number;
   promptSentAt?: number;
   firstToken?: { model: string; ms: number };
+  lastContext?: { model: string; tokens: number };
 }
 
 export const FIRST_TOKEN_EVENTS: ReadonlySet<string> = new Set([
@@ -619,6 +625,8 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
           next.cost = prev.cost;
         }
         state.usage.set(key, next);
+        const context = contextTokensOf(msg);
+        if (context > 0) state.lastContext = { model: key, tokens: context };
       }
       if (msg.stopReason === 'aborted') {
         return [{ type: 'message_stop', message: toMessageRecord(msg) }];
@@ -667,11 +675,24 @@ export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState)
   }
 }
 
+function contextTokensOf(msg: PiMessageLike): number {
+  if (msg.stopReason === 'aborted' || msg.stopReason === 'error' || msg.usage === undefined) {
+    return 0;
+  }
+  const u = msg.usage;
+  return (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+}
+
 function settledUsage(state: MapState): ModelUsage[] {
   const first = state.firstToken;
-  return [...state.usage.values()].map((u) =>
-    first !== undefined && u.model === first.model ? { ...u, ttftMs: first.ms } : u,
-  );
+  const context = state.lastContext;
+  return [...state.usage.values()].map((u) => ({
+    ...u,
+    ...(first !== undefined && u.model === first.model ? { ttftMs: first.ms } : {}),
+    ...(context !== undefined && u.model === context.model
+      ? { contextTokens: context.tokens }
+      : {}),
+  }));
 }
 
 class EventQueue {
@@ -1126,6 +1147,16 @@ function mergedCompat(provider: ProviderConfig): ProviderCompat | undefined {
   return hasAny ? merged : undefined;
 }
 
+function isBuiltinProvider(providerId: string): providerId is BuiltinProvider {
+  const builtin: readonly string[] = getBuiltinProviders();
+  return builtin.includes(providerId);
+}
+
+function builtinModelIds(providerId: string): ReadonlySet<string> {
+  if (!isBuiltinProvider(providerId)) return new Set();
+  return new Set(getAllBuiltinModels(providerId).map((model) => model.id));
+}
+
 export function materializeProvider(modelsPath: string, provider: ProviderConfig): void {
   if (!provider.baseUrl) return;
   const serverCompatKey = JSON.stringify(provider.compat ?? null);
@@ -1143,22 +1174,28 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
     : {};
   const providers = raw.providers ?? {};
   const compat = mergedCompat(provider);
+  const builtin = builtinModelIds(provider.providerId);
+  const declared = (provider.models ?? []).filter((m) => !builtin.has(m.id));
   providers[provider.providerId] = {
     baseUrl: provider.baseUrl,
     api: provider.api ?? 'openai-completions',
     apiKey: MODELS_JSON_KEY_PLACEHOLDER,
     ...(provider.authHeader !== undefined ? { authHeader: provider.authHeader } : {}),
     ...(compat !== undefined ? { compat } : {}),
-    models: (provider.models ?? []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      ...CUSTOM_MODEL_DEFAULTS,
-      ...(m.cost !== undefined ? { cost: m.cost } : {}),
-      ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
-      ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
-      ...(m.input !== undefined ? { input: m.input } : {}),
-      ...customModelReasoning(),
-    })),
+    ...(builtin.size > 0 && declared.length === 0
+      ? {}
+      : {
+          models: declared.map((m) => ({
+            id: m.id,
+            name: m.name,
+            ...CUSTOM_MODEL_DEFAULTS,
+            ...(m.cost !== undefined ? { cost: m.cost } : {}),
+            ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
+            ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
+            ...(m.input !== undefined ? { input: m.input } : {}),
+            ...customModelReasoning(),
+          })),
+        }),
   };
   writeFileSync(modelsPath, `${JSON.stringify({ providers }, null, 2)}\n`, 'utf8');
 }

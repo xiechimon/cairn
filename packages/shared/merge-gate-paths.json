@@ -23,7 +23,6 @@
     "docs/lessons.md",
     "docs/lessons/**",
     "docs/agent-dispatch-prompts.md",
-    "docs/adr/**",
     "docs/spec/**",
     "**/scripts/**",
     "**/*.config.*",
@@ -105,6 +104,8 @@
   ],
   "limits": {
     "maxLines": 800,
-    "maxFiles": 40
+    "maxFiles": 40,
+    "maxQueueFiles": 80,
+    "maxLinesEachWay": 8000
   }
 }

@@ -85,7 +85,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('each rung is its pool plus one ring, ring last', async ({ page }) => {
-      await page.goto('/app?scenario=01&view=board');
+      await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const ringColor = theme === 'light' ? 'border' : 'ring-inset-highlight';
       const borderRing = await ringIn(page, 'border');
@@ -102,7 +102,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('pools hold the faint layered shadows; --top only in dark e2/e3', async ({ page }) => {
-      await page.goto('/app?scenario=01&view=board');
+      await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const top = await slot(page, 'top');
       const e1 = await slot(page, 'e1');
@@ -129,20 +129,13 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test('old slot names alias the ladder', async ({ page }) => {
-      await page.goto('/app?scenario=01&view=board');
+      await page.goto('/app/schedules?scenario=01');
       await page.waitForSelector('.board-sidebar');
       const pairs: Array<[string, string]> = [
         ['panel-shadow', 'e1'],
         ['shadow-popover', 'e2'],
         ['dialog-shadow', 'e3'],
-        ['edge-shadow', 'e2'],
-        ['fab-shadow', 'e2'],
-        ['plate-shadow', 'e2'],
-        ['chief-shadow', 'e2'],
-        // pools, not rungs: their consumers draw their own --edge-ring
-        ['card-shadow', 'cds-shadow-sm'],
         ['floating-shadow', 'cds-shadow-lg'],
-        // a state, not a tier: the lift follows the e1 hover value
         ['card-lift', 'panel-shadow-hover'],
       ];
       for (const [alias, target] of pairs) {
@@ -162,35 +155,20 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('one ring per edge on the rendered surfaces', async ({ page }) => {
       const edgeRing = await (async () => {
-        await page.goto('/app?scenario=01&view=board');
+        await page.goto('/app/schedules?scenario=01');
         await page.waitForSelector('.board-sidebar');
         return slot(page, 'edge-ring');
       })();
 
-      // e1: the card rings once, flat, no inset
-      const card = await surfaceShadow(page, '.todo-card');
-      expect(rings(card)).toBe(1);
-      expect(card).not.toContain('inset');
-
-      await page.goto('/app?scenario=notify-banner&view=board');
+      await page.goto('/app?scenario=notify-banner');
       const banner = await surfaceShadow(page, '.board-notify-banner');
       expect(rings(banner)).toBe(1);
       expect(banner.endsWith(await slot(page, 'e1'))).toBe(true);
 
-      await page.goto('/app?scenario=111&view=board');
+      await page.goto('/app/schedules?scenario=111');
       const drawer = await surfaceShadow(page, '.chief-drawer');
       expect(rings(drawer)).toBe(1);
       expect(drawer).toContain(edgeRing);
-
-      await page.goto(`${DETAIL}?scenario=detail-unread`);
-      const fab = await surfaceShadow(page, '.chief-fab');
-      expect(rings(fab)).toBe(1);
-      expect(fab.endsWith(await slot(page, 'e2'))).toBe(true);
-
-      // e2: the menu rings once
-      await page.goto(`${DETAIL}?scenario=17`);
-      const menu = await surfaceShadow(page, '.user-menu');
-      expect(rings(menu)).toBe(1);
 
       // the composer keeps its inset ring, and only that ring
       await page.goto(`${DETAIL}?scenario=16`);
@@ -206,7 +184,6 @@ for (const theme of ['light', 'dark'] as const) {
       const dialogShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
       expect(rings(dialogShadow)).toBe(1);
       if (theme === 'dark') {
-        expect(menu).toContain(TOP_DARK);
         expect(dialogShadow).toContain(TOP_DARK);
         expect(drawer).toContain(TOP_DARK);
       }

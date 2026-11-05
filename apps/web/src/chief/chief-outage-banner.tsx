@@ -12,11 +12,9 @@ const LINK_BTN_CLS =
 export function ChiefOutageBanner({
   outage,
   onSettings,
-  onNewTask,
 }: {
   outage: NonNullable<ChiefContent['outage']>;
   onSettings?: (() => void) | undefined;
-  onNewTask?: (() => void) | undefined;
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
@@ -63,15 +61,6 @@ export function ChiefOutageBanner({
         >
           {open ? t('收起') : t('详情')}
         </Button>
-        {onNewTask != null && (
-          <Button
-            variant="ghost"
-            className={`${LINK_BTN_CLS} ${open ? '' : 'max-sm:hidden'}`}
-            onClick={onNewTask}
-          >
-            {t('直接建任务')}
-          </Button>
-        )}
         {onSettings != null && (
           <Button size="sm" className="cursor-pointer" onClick={onSettings}>
             {t('给总管换模型')}

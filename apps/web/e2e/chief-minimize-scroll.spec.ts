@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { openChiefWindow, expandTurns } from './helpers.js';
 import { evidencePanelShot } from './evidence';
 
 // #1067: the chief window's parked carrier must not collapse to display:none.
@@ -22,8 +23,7 @@ import { evidencePanelShot } from './evidence';
 //      is visible and its click reopens the window.
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
-const fab = (page: Page) => page.locator('.chief-fab');
-const minimize = (page: Page) => drawer(page).getByRole('button', { name: '最小化' });
+const minimize = (page: Page) => drawer(page).getByRole('button', { name: '最小化', exact: true });
 const viewport = (page: Page) => page.getByTestId('chief-body');
 
 /** scrollTop of the message-flow viewport (the real scroll container,
@@ -36,7 +36,8 @@ async function settled(page: Page) {
 
 test.describe('chief minimize keeps the scroll position (#1067)', () => {
   test('scroll to the middle → minimize → reopen lands at the same spot', async ({ page }) => {
-    await page.goto('/app?view=board&scenario=chief-scroll-long');
+    await page.goto('/app/schedules?scenario=chief-scroll-long');
+    await expandTurns(page);
     await settled(page);
     // the mount-time defaultScrollPosition="end" marks the viewport
     // data-autoscrolling for a 180ms window; a programmatic scrollTop
@@ -89,7 +90,7 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
     const whileParked = await scrollTopOf(page);
     await evidencePanelShot(page, 'scroll-parked-window.png', drawer(page));
 
-    await fab(page).click();
+    await openChiefWindow(page);
     await settled(page);
     await expect(drawer(page)).toBeVisible();
     const reopened = await scrollTopOf(page);
@@ -100,7 +101,8 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
   });
 
   test('the parked window is out of the a11y tree and does not eat focus', async ({ page }) => {
-    await page.goto('/app?view=board&scenario=chief-scroll-long');
+    await page.goto('/app/schedules?scenario=chief-scroll-long');
+    await expandTurns(page);
     await settled(page);
 
     await minimize(page).click();
@@ -108,7 +110,7 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
 
     // role queries go through the accessibility tree: the parked subtree's
     // controls must be unfindable (toBeHidden already pins the DOM axis)
-    await expect(page.getByRole('button', { name: '最小化' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '最小化', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '新主题' })).toHaveCount(0);
 
     // keyboard focus must never enter the parked subtree: walk the page's
@@ -123,14 +125,15 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
   });
 
   test('reopen still focuses the composer (closed→open autofocus law)', async ({ page }) => {
-    await page.goto('/app?view=board&scenario=chief-scroll-long');
+    await page.goto('/app/schedules?scenario=chief-scroll-long');
+    await expandTurns(page);
     await settled(page);
     const composer = page.getByTestId('chief-composer-input');
 
     await minimize(page).click();
     await expect(drawer(page)).toBeHidden();
 
-    await fab(page).click();
+    await openChiefWindow(page);
     await settled(page);
     await expect(drawer(page)).toBeVisible();
     // #389 / ADR 0013 D5: the reopen migration owns the composer focus —
@@ -138,15 +141,15 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
     await expect(composer).toBeFocused();
   });
 
-  test('FAB is visible while the window is parked and reopens it (D4)', async ({ page }) => {
-    await page.goto('/app?view=board&scenario=chief-scroll-long');
+  test('⌘J reopens the window after it is parked (D4)', async ({ page }) => {
+    await page.goto('/app/schedules?scenario=chief-scroll-long');
+    await expandTurns(page);
     await settled(page);
 
     await minimize(page).click();
     await expect(drawer(page)).toBeHidden();
-    await expect(fab(page)).toBeVisible();
 
-    await fab(page).click();
+    await openChiefWindow(page);
     await settled(page);
     await expect(drawer(page)).toBeVisible();
   });

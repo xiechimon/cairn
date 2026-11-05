@@ -25,6 +25,8 @@ import {
   CHIEF_TURN_ERROR_KIND,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
+  chiefNoticeContentSchema,
+  chiefReportContentSchema,
   chiefTurnErrorContentSchema,
   chiefTurnStoppedContentSchema,
   classifySkillFact,
@@ -41,6 +43,7 @@ import {
   stripAnsiEscapes,
   stripSkillRouteSection,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  threadMessageContentSchema,
   threadReportContentSchema,
   transcriptPromptRowId,
   VERIFY_VERDICT_KIND,
@@ -76,6 +79,7 @@ import type {
   WorkStep,
 } from '../fixtures/records.js';
 import { activityLabel } from './activity.js';
+import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -103,6 +107,19 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
           vars: { machine: queue.waitingFor.name, ahead },
         }
       : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
+  }
+  if (queue.waitingFor?.fallbackAt != null) {
+    return {
+      label:
+        '排队中：等首选机器 {machine}（{running}/{cap} 在跑），{time} 起其他机器可接手（前面 {ahead} 个）',
+      vars: {
+        machine: queue.waitingFor.name,
+        running: queue.waitingFor.running,
+        cap: queue.waitingFor.capacity,
+        time: clockTime(queue.waitingFor.fallbackAt),
+        ahead,
+      },
+    };
   }
   return queue.waitingFor != null
     ? {
@@ -175,6 +192,8 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
+    ...(w.verified !== undefined ? { verified: w.verified } : {}),
+    ...(w.awaitingReply === true ? { awaitingReply: true } : {}),
   };
 }
 
@@ -620,6 +639,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       });
       continue;
     }
+    const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
+    if (ask !== null) {
+      entries.push({
+        at: m.createdAt,
+        item: {
+          kind: 'question',
+          id: m.id,
+          requestId: ask.requestId,
+          status: ask.status,
+          questions: ask.questions,
+          answers: ask.answers,
+        },
+      });
+      continue;
+    }
     const text = textOfContent(m.content).trim();
     if (m.role === 'user') {
       if ([...scheduledStepIds].some((id) => m.id === transcriptPromptRowId(id))) continue;
@@ -631,7 +665,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (classifyUserText(text, todo) !== 'user') continue;
-      entries.push({ at: m.createdAt, item: { kind: 'user', text, markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },
+      });
       continue;
     }
     if (m.role === 'system') {
@@ -647,7 +684,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         }
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'review', ...verdict, id: m.id, createdAt: m.createdAt },
+          });
           continue;
         }
         const report = infoReportMessageSchema.safeParse(JSON.parse(m.content as string));
@@ -658,13 +698,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
               kind: 'report',
               markdown: `${report.data.attachmentToken}\n\n${report.data.content}`,
               id: m.id,
+              createdAt: m.createdAt,
             },
           });
           continue;
         }
         const verifyVerdict = verifyVerdictOfContent(m.content);
         if (verifyVerdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'verify', ...verifyVerdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'verify', ...verifyVerdict, id: m.id, createdAt: m.createdAt },
+          });
         }
         continue;
       }
@@ -680,7 +724,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       continue;
     }
     if (text !== '') {
-      entries.push({ at: m.createdAt, item: { kind: 'robot', markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt },
+      });
       continue;
     }
     const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
@@ -704,6 +751,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       item: {
         kind: 'plan',
         title: `方案 · v${p.version}`,
+        createdAt: p.createdAt,
         preview: preview.length > 90 ? `${preview.slice(0, 90)}…` : preview,
       },
     });
@@ -711,7 +759,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   if (build?.withPlan === true) {
     for (const s of steps) {
       if (s.kind === 'build' && !scheduledStepIds.has(s.id)) {
-        entries.push({ at: s.createdAt, item: { kind: 'user', text: '确认' } });
+        entries.push({
+          at: s.createdAt,
+          item: { kind: 'user', text: '确认', createdAt: s.createdAt },
+        });
       }
     }
   }
@@ -721,8 +772,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const entry of entries) {
     if (entry.item.kind === '__work__') {
       const previous = items.at(-1);
-      if (previous?.kind === 'work') previous.steps.push(entry.item.step);
-      else items.push({ kind: 'work', id: entry.item.step.id, steps: [entry.item.step] });
+      if (previous?.kind === 'work') {
+        previous.steps.push(entry.item.step);
+        previous.createdAt = entry.at;
+      } else {
+        items.push({
+          kind: 'work',
+          id: entry.item.step.id,
+          steps: [entry.item.step],
+          createdAt: entry.at,
+        });
+      }
     } else items.push(entry.item);
   }
 
@@ -811,6 +871,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
+      createdAt: todo.phaseAt,
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
     });
   }
@@ -1074,6 +1135,8 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     tz: r.tz,
     nextRunAt: r.nextRunAt ?? 0,
     createdBy: r.createdBy,
+    enabled: r.enabled,
+    pausedReason: r.pausedReason,
     todo: r.todo,
   }));
 }
@@ -1093,8 +1156,8 @@ export function mapTeam(members: TeamMember[]): TeamContent {
       id: m.actorId,
       displayName: a.displayName ?? '',
       avatarUrl: a.avatarUrl ?? null,
-      model: a.modelId ? `${a.modelId} · 默认` : '未配置模型',
-      isDefault: false,
+      model: a.modelId ?? '',
+      isDefault: Boolean(a.modelId),
       role: a.description ?? null,
       provider: a.provider ?? null,
       machineId: a.machineId ?? null,
@@ -1114,7 +1177,9 @@ export function mapApiKeys(rows: ApiKeyRow[]): DisplayApiKey[] {
   }));
 }
 
-export function mapMachines(rows: MachineRecord[]): MachineRow[] {
+export function mapMachines(
+  rows: (MachineRecord & { providers?: MachineProvider[] })[],
+): MachineRow[] {
   const local = rows.filter((m) => m.kind === 'local');
   const attached = rows.filter((m) => m.kind !== 'local');
   return [...local, ...attached].map((m) => ({
@@ -1135,6 +1200,7 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     ...(m.concurrencySource !== undefined ? { concurrencySource: m.concurrencySource } : {}),
     ...(m.concurrencyRange !== undefined ? { concurrencyRange: m.concurrencyRange } : {}),
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
+    ...(m.providers !== undefined ? { providers: m.providers } : {}),
   }));
 }
 
@@ -1234,12 +1300,13 @@ export function askQuestionOfContent(content: unknown): {
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
 } | null {
-  if (typeof content !== 'string') return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    return null;
+  let parsed: unknown = content;
+  if (typeof content === 'string') {
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return null;
+    }
   }
   if (
     parsed === null ||
@@ -1278,19 +1345,19 @@ function handoffTodoOf(call: ToolCallRecord): string | null {
   return typeof todoId === 'string' && todoId !== '' ? todoId : null;
 }
 
-export function mapChiefStream(messages: MessageRow[], inlineTools = false): ChiefStreamItem[] {
-  return collectChiefStream(messages, inlineTools).items;
+export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
+  return collectChiefStream(messages).items;
 }
 
 function collectChiefStream(
   messages: MessageRow[],
-  inlineTools = false,
   pendingIds: ReadonlyMap<string, 'queued' | 'held'> = new Map(),
 ): {
   items: ChiefStreamItem[];
   itemsAt: number[];
   trailingTools: ChiefToolRow[];
   pending: ChiefStreamItem[];
+  eventTurn: boolean;
 } {
   const items: ChiefStreamItem[] = [];
   const itemsAt: number[] = [];
@@ -1302,21 +1369,8 @@ function collectChiefStream(
       .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
       .map((m) => chiefUserText(textOfContent(m.content).trim())),
   );
-  const reportedWakePromptIds = new Set<string>();
-  for (const message of messages) {
-    if (message.role !== 'system' || typeof message.content !== 'string') continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(message.content);
-    } catch {
-      parsed = null;
-    }
-    const report = threadReportContentSchema.safeParse(parsed);
-    if (report.success && report.data.wakeStepId !== undefined) {
-      reportedWakePromptIds.add(transcriptPromptRowId(report.data.wakeStepId));
-    }
-  }
   let pendingTools: ChiefToolRow[] = [];
+  let eventTurn = false;
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
@@ -1326,9 +1380,12 @@ function collectChiefStream(
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
     }
-    if (m.role === 'user' && reportedWakePromptIds.has(m.id)) {
-      pendingTools = [];
-      continue;
+    if (m.role === 'user' && m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+      eventTurn = WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
+      if (eventTurn) {
+        pendingTools = [];
+        continue;
+      }
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (pendingState !== undefined) {
@@ -1361,6 +1418,11 @@ function collectChiefStream(
         items.push({ ...report.data, id: m.id, ...rowProject(m) });
         continue;
       }
+      const direct = threadMessageContentSchema.safeParse(parsed);
+      if (direct.success) {
+        items.push({ ...direct.data, id: m.id, ...rowProject(m) });
+        continue;
+      }
       const stopped = chiefTurnStoppedContentSchema.safeParse(parsed);
       if (stopped.success) {
         pendingTools = [];
@@ -1370,6 +1432,18 @@ function collectChiefStream(
       const switched = chiefModelFallbackContentSchema.safeParse(parsed);
       if (switched.success) {
         fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        continue;
+      }
+      const notice = chiefNoticeContentSchema.safeParse(parsed);
+      if (notice.success) {
+        pendingTools = [];
+        items.push({ kind: 'robot', markdown: notice.data.message, seconds: '', id: m.id });
+        continue;
+      }
+      const dailyReport = chiefReportContentSchema.safeParse(parsed);
+      if (dailyReport.success) {
+        pendingTools = [];
+        items.push({ kind: 'daily-report', id: m.id, report: dailyReport.data });
         continue;
       }
       const digest = chiefDigestContentSchema.safeParse(parsed);
@@ -1387,6 +1461,7 @@ function collectChiefStream(
       }
     }
     const call = toolCallOfContent(m.content);
+    if (call !== null && eventTurn) continue;
     if (call !== null) {
       pendingTools.push({
         label: pillOf(call),
@@ -1394,20 +1469,10 @@ function collectChiefStream(
           ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
           : {}),
         ...(call.isError === true ? { error: true } : {}),
+        ...(call.result === undefined && call.endedAt === undefined && call.isError !== true
+          ? { running: true }
+          : {}),
       });
-      if (inlineTools) {
-        items.push({
-          kind: 'tool',
-          label: pillOf(call),
-          id: m.id,
-          ...(call.startedAt !== undefined ? { startedAt: call.startedAt } : {}),
-          ...(call.startedAt !== undefined && call.endedAt !== undefined
-            ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
-            : {}),
-          ...(call.result === undefined ? { running: true } : {}),
-          ...(call.isError === true ? { error: true } : {}),
-        });
-      }
       const handoffTodoId = handoffTodoOf(call);
       if (handoffTodoId !== null)
         items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
@@ -1415,7 +1480,6 @@ function collectChiefStream(
     }
     const ask = m.role === 'assistant' ? askQuestionOfContent(m.content) : null;
     if (ask !== null) {
-      pendingTools = [];
       items.push({
         kind: 'question',
         id: m.id,
@@ -1426,6 +1490,7 @@ function collectChiefStream(
       });
       continue;
     }
+    if (eventTurn && m.role === 'assistant') continue;
     const rawText = textOfContent(m.content).trim();
     if (rawText === '') {
       const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
@@ -1458,18 +1523,29 @@ function collectChiefStream(
       markdown: rawText,
       seconds: '',
       id: m.id,
-      ...(pendingTools.length > 0 ? { tools: pendingTools } : {}),
+      ...(pendingTools.length > 0
+        ? { tools: pendingTools.map(({ running: _settled, ...tool }) => tool) }
+        : {}),
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
       ...rowProject(m),
     });
     pendingTools = [];
   }
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  items.forEach((item, index) => {
+    if (
+      item.kind === 'user' ||
+      item.kind === 'robot' ||
+      item.kind === 'error' ||
+      item.kind === 'stopped'
+    )
+      item.createdAt = itemsAt[index] ?? lastAt;
+  });
   const pending = [...pendingIds.keys()].flatMap((id) => {
     const item = pendingById.get(id);
     return item === undefined ? [] : [item];
   });
-  return { items, itemsAt, trailingTools: pendingTools, pending };
+  return { items, itemsAt, trailingTools: pendingTools, pending, eventTurn };
 }
 
 function autoCloseStrong(text: string): string {
@@ -1503,9 +1579,11 @@ export function mapChief(
   const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
   const parked = [...pendingIds.values()].includes('held');
   const running = active?.activeRun != null && !parked;
-  const collected = active === null ? null : collectChiefStream(opts.messages, running, pendingIds);
+  const collected = active === null ? null : collectChiefStream(opts.messages, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
-  if (running) {
+  const trailingTools = collected?.trailingTools ?? [];
+  let waitingTurn: ChiefContent['waitingTurn'];
+  if (running && collected?.eventTurn !== true) {
     if ((opts.liveThinking ?? '').trim() !== '') {
       chiefStream.push({ kind: 'thinking', text: opts.liveThinking ?? '' });
     }
@@ -1515,12 +1593,18 @@ export function mapChief(
         markdown: autoCloseStrong(opts.liveText ?? ''),
         typing: true,
         seconds: '',
+        ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
       });
-    } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot') {
+    } else if (chiefStream[chiefStream.length - 1]?.kind !== 'robot' || trailingTools.length > 0) {
       const lastUser = collected?.items.findLastIndex((item) => item.kind === 'user') ?? -1;
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
+        const asked = collected?.items.find(
+          (item) => item.kind === 'user' && item.id !== undefined && item.id === turnQueue.stepId,
+        );
+        if (asked?.kind === 'user' && asked.id !== undefined)
+          waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
         const queued = queueLabel(turnQueue);
         chiefStream.push({
           kind: 'streaming',
@@ -1535,9 +1619,7 @@ export function mapChief(
           label: actLabel?.label ?? '处理中...',
           ...(actLabel?.vars !== undefined ? { labelVars: actLabel.vars } : {}),
           ...(opts.activity != null ? { signalAt: opts.activity.at } : {}),
-          ...((collected?.trailingTools.length ?? 0) > 0
-            ? { tools: collected?.trailingTools }
-            : {}),
+          ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
         });
       }
     }
@@ -1576,6 +1658,7 @@ export function mapChief(
       : active?.activeRun?.tool != null
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
+    ...(waitingTurn !== undefined ? { waitingTurn } : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
