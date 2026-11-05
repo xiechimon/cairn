@@ -21,7 +21,6 @@ import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
-import { TurnFold, useTurnFold } from '../components/chat/turn-fold.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -55,7 +54,6 @@ import {
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
-import { chiefTurns, groupTurns, latestOpenTurnId } from '../lib/turn-fold.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
@@ -251,7 +249,6 @@ export function ChiefConversation({
     null,
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
-  const turnFold = useTurnFold();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const copyText = useCallback((key: string, text: string) => {
     const clip = navigator.clipboard;
@@ -500,23 +497,7 @@ export function ChiefConversation({
       onCancelQuestion={onCancelQuestion}
     />
   );
-  const openTurnId = latestOpenTurnId(groupTurns(rows, chiefTurns), chiefTurns);
-  const foldedRows = (list: { item: ChiefStreamItem; i: number }[]) =>
-    groupTurns(list, chiefTurns).map((segment) =>
-      segment.kind === 'row' ? (
-        streamRow(segment.row.item)
-      ) : (
-        <TurnFold
-          key={segment.turn.id}
-          turn={segment.turn}
-          open={turnFold.isOpen(segment.turn, openTurnId)}
-          defaultOpenId={openTurnId}
-          onToggle={turnFold.toggle}
-        >
-          {segment.turn.rows.map((row) => streamRow(row.item))}
-        </TurnFold>
-      ),
-    );
+  const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
   const intro = (
     <>
       {!chief.bound && (
@@ -663,14 +644,14 @@ export function ChiefConversation({
                   <TodoGlanceContext.Provider value={glances}>
                     {lead}
                     {day == null ? (
-                      foldedRows(rows)
+                      renderRows(rows)
                     ) : (
                       <>
                         <div data-testid="chief-earlier" className="opacity-60">
-                          {foldedRows(rows.slice(0, day.earlier))}
+                          {renderRows(rows.slice(0, day.earlier))}
                         </div>
                         {day.today}
-                        {foldedRows(rows.slice(day.earlier))}
+                        {renderRows(rows.slice(day.earlier))}
                       </>
                     )}
                   </TodoGlanceContext.Provider>

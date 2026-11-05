@@ -5,7 +5,6 @@ import {
   type MessageRow,
   type TranscriptInput,
 } from '../src/api/mappers.js';
-import { chiefTurns, groupTurns, transcriptTurns } from '../src/lib/turn-fold.js';
 import { todo } from './helpers.js';
 
 const START = 1_000;
@@ -41,7 +40,7 @@ const BUILD = {
 
 describe.each([false, true])('terminal timestamps with a preceding tool: %s', (withTool) => {
   test.each(['plan', 'review', 'verify', 'report', 'fail'] as const)(
-    '%s completion supplies the full duration',
+    '%s completion supplies the finish timestamp',
     (kind) => {
       const input: TranscriptInput = {
         messages: [OPENING, ...(withTool ? [TOOL] : [])],
@@ -76,8 +75,6 @@ describe.each([false, true])('terminal timestamps with a preceding tool: %s', (w
       }
       const items = mapTranscript(input);
       expect(items.find((item) => item.kind === kind)).toMatchObject({ createdAt: FINISH });
-      expect(groupTurns(items, transcriptTurns).find((segment) => segment.kind === 'turn'))
-        .toMatchObject({ turn: { seconds: 240, status: kind === 'fail' ? 'failed' : 'done' } });
     },
   );
 });
@@ -92,8 +89,8 @@ test('a synthetic confirmation supplies the real build-step start time', () => {
     plans: [], build: { ...BUILD, withPlan: true }, todo: todo(12, 'done'),
     machineName: null, userName: 'User', liveText: '',
   });
-  expect(groupTurns(items, transcriptTurns).find((segment) => segment.kind === 'turn'))
-    .toMatchObject({ turn: { seconds: 240 } });
+  const confirmation = items.find((item) => item.kind === 'user' && item.text.includes('确认'));
+  expect(confirmation).toMatchObject({ createdAt: START });
 });
 
 test.each(['error', 'stopped'] as const)('Coordinator %s completion retains its timestamp', (kind) => {
@@ -105,7 +102,4 @@ test.each(['error', 'stopped'] as const)('Coordinator %s completion retains its 
     { id: 'terminal', role: 'system', content: JSON.stringify(content), createdAt: FINISH },
   ]);
   expect(items.find((item) => item.kind === kind)).toMatchObject({ createdAt: FINISH });
-  const rows = items.map((item, i) => ({ item, i }));
-  expect(groupTurns(rows, chiefTurns).find((segment) => segment.kind === 'turn'))
-    .toMatchObject({ turn: { seconds: 240 } });
 });

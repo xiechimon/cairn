@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const TEAM_ID = 'team-1';
 const USER_ID = 'user-1';
@@ -226,7 +225,6 @@ test('call details preserve commands, cap output and show edit lines', async ({ 
 
 test('a call cut off by a stopped run shows as cancelled, not done', async ({ page }) => {
   await stubWorld(page, 'stopped');
-  await expandTurns(page);
   const cut = page.getByTestId('work-call').filter({ hasText: 'Check formatting' });
   await expect(cut.getByTestId('work-cancelled')).toBeVisible();
   await expect(cut.getByTestId('work-cancelled')).toHaveText('已取消');

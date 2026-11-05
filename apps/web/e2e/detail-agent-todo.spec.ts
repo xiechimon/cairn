@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=agent-todo';
 
@@ -64,7 +63,6 @@ test('A5: the inline markdown card surface is unchanged without an agent-todo it
   page,
 }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout');
-  await expandTurns(page);
   await expect(page.getByTestId('agent-todo')).toHaveCount(0);
   await expect(page.getByTestId('md-tasks')).toHaveCount(1);
 });
