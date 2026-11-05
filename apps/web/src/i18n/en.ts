@@ -1585,4 +1585,13 @@ export const EN: Record<string, string> = {
   解决: 'Resolve',
   '查看 diff': 'View diff',
   '在 GitHub 打开': 'Open on GitHub',
+  'thread 用量': 'Thread usage',
+  '正在加载用量…': 'Loading usage…',
+  用量加载失败: 'Usage could not load',
+  'Token 数': 'Tokens',
+  总时长: 'Total duration',
+  缓存命中: 'Cache hit',
+  '包含全部运行；未记录总时长。': 'Across all runs. Total duration was not recorded.',
+  未知机器: 'Unknown machine',
+  '{cost} · {tokens} 个 token · — · {models}': '{cost} · {tokens} tokens · — · {models}',
 };

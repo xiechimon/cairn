@@ -32,6 +32,7 @@ import {
   PrCardSection,
   ScheduledSection,
 } from './components-threads.js';
+import { ThreadUsageSection } from './components-thread-usage.js';
 import type { GalleryTheme } from './design-doc.js';
 import {
   ColorSection,
@@ -114,6 +115,7 @@ const NAV = [
       ['thread-row', 'Thread row and bulk bar'],
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
+      ['thread-usage', 'Thread usage footer'],
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
@@ -301,6 +303,7 @@ export function Gallery() {
           <ThreadRowSection />
           <PermissionSection />
           <PlanSection />
+          <ThreadUsageSection />
           <PrBarSection />
           <PrCardSection />
           <ScheduledSection />
