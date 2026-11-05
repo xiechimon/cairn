@@ -25,6 +25,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
+import { holdCodeThreadForPriorResearch } from './research-before-plan.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
 import { answerWorkerQuestionsById, pendingWorkerQuestionIds } from './worker-question-store.js';
 
@@ -86,6 +87,7 @@ export function startThreadBuild(
     prompt,
   });
   if (!started) throw new Error('build missing after start');
+  holdCodeThreadForPriorResearch(deps, row.id, started.id);
   return started.id;
 }
 
