@@ -163,7 +163,7 @@ const summary = [
 
 if (!apply) {
   console.log(body);
-  console.log('\n--- summary ---\n' + summary.join('\n'));
+  console.log(`\n--- summary ---\n${summary.join('\n')}`);
   process.exit(0);
 }
 

@@ -31,9 +31,6 @@ const passedOrSkipped = (check) =>
   `      - or:\n          - check-success = ${check}\n          - check-skipped = ${check}`;
 
 export function mergifyConfig(prGateSource, gatePaths) {
-  const maxLinesEachWay = gatePaths.limits?.maxLinesEachWay;
-  if (!Number.isInteger(maxLinesEachWay) || maxLinesEachWay < 1)
-    throw new Error('limits.maxLinesEachWay must be a positive integer');
   const { maxFiles } = queueLimits(prGateSource, gatePaths);
   const prChecks = [...requiredChecks, ...mustBeGreenJobs];
   const draftChecks = prChecks.filter((check) => !prOnlyChecks.includes(check));
@@ -52,13 +49,11 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '      - check-success = merge-route',
     ...prChecks.map(passedOrSkipped),
     `      - '#files <= ${maxFiles}'`,
-    `      - '#added-lines <= ${maxLinesEachWay}'`,
-    `      - '#deleted-lines <= ${maxLinesEachWay}'`,
   ].join('\n');
   const rule = (name, author, method) => `  - name: ${name}
     queue_conditions:
       - ${author}
-${name === 'bot' ? "      - '#commits = 1'\n" : ''}${queueConditions}
+${queueConditions}
     merge_conditions:
 ${draftChecks.map(passedOrSkipped).join('\n')}
     merge_method: ${method}
