@@ -4,7 +4,7 @@ import {
   RESEARCH_REQUESTED_KIND,
   researchRequestedMessageSchema,
 } from '@cairn/shared';
-import { and, eq, gte, like } from 'drizzle-orm';
+import { and, eq, gte, inArray, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, buildFeedback, message, step } from '../db/schema.js';
 import { CI_FIX_PROMPT_HEAD, researchRoundOf } from './retry-lessons.js';
@@ -56,7 +56,8 @@ export function readStuckBuildState(db: Db, buildId: string): StuckBuildState {
     .where(
       and(
         eq(step.buildId, buildId),
-        eq(step.kind, 'build'),
+        inArray(step.kind, ['build', 'session']),
+        gte(step.createdAt, roundStart),
         like(step.prompt, `${CI_FIX_PROMPT_HEAD}%`),
       ),
     )

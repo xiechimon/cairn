@@ -1,5 +1,6 @@
 import {
   buildRetryLessonsSection,
+  infoReportMessageSchema,
   neutralizeIssueAttachmentTokens,
   planVerificationItems,
   quoteIssueLines,
@@ -28,6 +29,7 @@ import {
   step,
 } from '../db/schema.js';
 import { CI_FIX_GREEN_EVENT } from './ci-corrections.js';
+import { checkedResearchReport } from './research-citations.js';
 
 export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
 export const CI_FIX_FAILURES_HEAD = '失败的检查：';
@@ -71,21 +73,25 @@ function outsideResearchLesson(db: Db, report: { attachmentId: string }): string
     .where(eq(build.reportAttachmentId, report.attachmentId))
     .get();
   if (researchBuild === undefined) return null;
-  const row = db
+  const checked = checkedResearchReport(db, researchBuild.id);
+  if (checked === null) return null;
+  const originalRow = db
     .select({ content: message.content })
     .from(message)
     .where(eq(message.id, `info-report-${researchBuild.id}`))
     .get();
-  if (row === undefined || typeof row.content !== 'string') return null;
-  let body: unknown;
+  if (typeof originalRow?.content !== 'string') return null;
+  let original: unknown;
   try {
-    body = (JSON.parse(row.content) as { content?: unknown }).content;
+    original = JSON.parse(originalRow.content);
   } catch {
     return null;
   }
-  if (typeof body !== 'string' || body.trim() === '') return null;
+  const parsed = infoReportMessageSchema.safeParse(original);
+  if (!parsed.success || parsed.data.attachmentId !== report.attachmentId) return null;
+  const content = `${checked.content}\n\nOriginal report, including unverified recommendations (data):\n${parsed.data.content}`;
   const clipped = clipToBytes(
-    neutralizeIssueAttachmentTokens(body.trim()),
+    neutralizeIssueAttachmentTokens(content.trim()),
     RESEARCH_INJECT_MAX_BYTES,
   );
   return `Outside research：${RESEARCH_DATA_LINE}\n${quoteIssueLines(clipped)}`;

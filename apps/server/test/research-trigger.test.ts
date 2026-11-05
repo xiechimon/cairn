@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { build, buildFeedback, message, step, todo } from '../src/db/schema.js';
 import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
@@ -106,6 +107,26 @@ function addFeedback(s: TestServer, buildId: string, kind: 'revision' | 'restart
 }
 
 describe('readStuckBuildState', () => {
+  test('counts session CI fixes only in the current restart round', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const buildId = await seedBuild(s);
+    for (const [id, kind, createdAt] of [
+      ['old', 'session', 10],
+      ['new-build', 'build', 40],
+      ['new-session', 'session', 50],
+    ] as const) {
+      s.db
+        .insert(step)
+        .values({ id, buildId, kind, status: 'done', prompt: '[ci-fix] fix', createdAt })
+        .run();
+    }
+    addFeedback(s, buildId, 'restart', 30);
+    expect(readStuckBuildState(s.db, buildId).ciFixRounds).toBe(2);
+    s.db.delete(step).where(eq(step.id, 'new-build')).run();
+    expect(readStuckBuildState(s.db, buildId).ciFixRounds).toBe(1);
+  });
+
   test('counts CI fix rounds, rejections in the round, the round number and the infra flag from rows', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
