@@ -38,7 +38,17 @@ else
     home_changes=$("${CAIRN_ORB_NODE:-/usr/local/lib/cairn-orb/node}" "$(dirname -- "${BASH_SOURCE[0]}")/computer-home.mjs" "${home_args[@]}")
     [[ $home_changes =~ ^[01]' changes'$ ]] || { printf 'Invalid computer home preparation result\n' >&2; exit 1; }
     changes=$((changes + ${home_changes%% *}))
-    expected="$expected --bind=/var/lib/cairn-computer/$name:/home/agent:idmap,norbind"
+    computer_dir=$host_root/run/cairn-orb/$name/computer
+    if [[ ! -d $computer_dir ]]; then
+      printf 'install %s mode 700\n' "$computer_dir"
+      if ! $dry_run; then
+        ian_uid=$(id -u ian)
+        ian_gid=$(id -g ian)
+        install -d -o "$ian_uid" -g "$ian_gid" -m 700 "$computer_dir"
+      fi
+      changes=$((changes + 1))
+    fi
+    expected="$expected --bind=/var/lib/cairn-computer/$name:/home/agent:idmap,norbind --bind=/run/cairn-orb/$name/computer:/run/cairn-computer:idmap,norbind"
   fi
 fi
 if [[ ! -f $bind_file || $(cat "$bind_file") != "$expected" ]]; then

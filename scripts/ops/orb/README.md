@@ -690,7 +690,10 @@ point. The build refuses a guest Node major other than the base's. It installs
 a Chromium managed policy (no password manager, autofill or sync) and the
 `cairn-computer-desktop.service` unit, which runs Xvfb `:1`, fluxbox and two
 x11vnc servers on Unix sockets only: `/run/cairn-computer/vnc.sock` and the
-view-only `/run/cairn-computer/view.sock`. Chromium keeps its own sandbox
+view-only `/run/cairn-computer/view.sock`. That guest path is a bind of the
+host `$RUN/cairn-orb/<machine>/computer` directory (created 0700 for `ian`),
+so the daemon can connect without inbound ports and bridge raw RFB over its
+outbound websocket to the sealed noVNC gateway. Chromium keeps its own sandbox
 inside the Orb (measured in spike S1), so it runs without `--no-sandbox`.
 The image also installs `cairn-computer-agent.service` (user `agent`,
 `Restart=always`), which waits for `/run/cairn/computer.sock` and runs

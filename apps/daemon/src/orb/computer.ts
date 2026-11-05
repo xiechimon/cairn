@@ -202,6 +202,7 @@ export class ComputerOrbs {
           throw new Error(
             `Computer runtime directory must be a 0700 directory owned by the daemon: ${directory}`,
           );
+        ensurePrivateDir(join(directory, 'computer'));
         return;
       }
       const remaining = deadline - Date.now();
