@@ -406,17 +406,20 @@ class GuestLink {
       this.pending.delete(id);
       queue.end();
     };
+    let stopReason: 'timeout' | 'aborted' | undefined;
     const forceExit = (code: number, reason: 'timeout' | 'aborted') => {
       if (finished) return;
       queue.push({ kind: 'exit', code, reason });
       settle();
     };
+    const abortTimedOut = (reason: unknown): boolean =>
+      reason === 'timeout' || (reason instanceof Error && reason.name === 'TimeoutError');
     const onAbort = () => {
       this.cancel(id);
-      const timedOut =
-        request.signal.reason instanceof Error && request.signal.reason.name === 'TimeoutError';
+      const reason = abortTimedOut(request.signal.reason) ? 'timeout' : 'aborted';
+      stopReason = reason;
       stopTimer ??= setTimeout(
-        () => forceExit(timedOut ? 124 : 130, timedOut ? 'timeout' : 'aborted'),
+        () => forceExit(reason === 'timeout' ? 124 : 130, reason),
         this.settings.stopGraceMs,
       );
       stopTimer.unref();
@@ -424,14 +427,19 @@ class GuestLink {
     const id = this.register({
       value: (value) => {
         const event = orbComputerEventSchema.safeParse(value);
-        if (event.success && !finished) queue.push(event.data);
+        if (!event.success || finished) return;
+        const reason = stopReason;
+        if (event.data.kind === 'exit' && reason) {
+          forceExit(reason === 'timeout' ? 124 : event.data.code, reason);
+          return;
+        }
+        queue.push(event.data);
       },
       done: () => {
         if (finished) return;
-        if (request.signal.aborted) {
-          const timedOut =
-            request.signal.reason instanceof Error && request.signal.reason.name === 'TimeoutError';
-          forceExit(timedOut ? 124 : 130, timedOut ? 'timeout' : 'aborted');
+        const reason = stopReason;
+        if (reason) {
+          forceExit(reason === 'timeout' ? 124 : 130, reason);
           return;
         }
         settle();
@@ -443,6 +451,7 @@ class GuestLink {
       },
     });
     limitTimer = setTimeout(() => {
+      stopReason = 'timeout';
       this.cancel(id);
       forceExit(124, 'timeout');
     }, request.timeoutMs + this.settings.stopGraceMs);

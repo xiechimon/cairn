@@ -13,6 +13,7 @@ import {
   orbComputerProtectionRefusal,
   protectedComputerLifecycleRefusal,
 } from './guard.js';
+import type { HostScreen } from './host-screen.js';
 import {
   type ComputerFileEntry,
   type ComputerFileOptions,
@@ -71,6 +72,7 @@ export async function rejectComputerCall(
 export interface ComputerDispatcherOptions {
   client: ComputerClient;
   host?: ComputerProvider;
+  screen?: HostScreen;
   orb?: ScopedComputerProviders;
   logger?: Pick<DaemonLogger, 'machine'>;
   now?: () => number;
@@ -115,6 +117,42 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       const oldest = finishedUnsafe.values().next().value;
       if (oldest !== undefined) finishedUnsafe.delete(oldest);
     }
+  }
+
+  async function handleScreen(
+    call: ComputerCall,
+    screen: HostScreen,
+    controller: AbortController,
+  ): Promise<void> {
+    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    const request = { params: call.params, deadlineAt: call.deadlineAt, signal: controller.signal };
+    let outcome: Awaited<ReturnType<HostScreen['act']>>;
+    try {
+      outcome = await (call.tool === 'user_computer_act'
+        ? screen.act(request)
+        : screen.observe(request));
+    } catch {
+      await poster.finish({
+        kind: 'error',
+        message: 'Screen control failed unexpectedly',
+        delivery: 'unknown',
+      });
+      return;
+    }
+    if (poster.abandoned) return;
+    await poster.finish(
+      outcome.kind === 'done'
+        ? {
+            kind: 'done',
+            text: outcome.text,
+            ...(outcome.images.length > 0 ? { images: outcome.images } : {}),
+          }
+        : outcome,
+    );
   }
 
   function routeFor(call: ComputerCall): Route | string {
@@ -335,6 +373,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   }
 
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
+    if (call.tool === 'user_computer_observe' || call.tool === 'user_computer_act') {
+      if (options.screen) await handleScreen(call, options.screen, controller);
+      else await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
+      return;
+    }
     const route = routeFor(call);
     if (typeof route === 'string') {
       await refuse(call, route);
@@ -368,7 +411,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       let deadlineTimer: NodeJS.Timeout | undefined;
       try {
         for (const { controller } of running) controller.abort('shutdown');
-        await Promise.all([options.host?.killAll(), options.orb?.killAll()]);
+        await Promise.all([
+          options.host?.killAll(),
+          options.screen?.killAll(),
+          options.orb?.killAll(),
+        ]);
         await Promise.race([
           Promise.allSettled(running.map(({ settled }) => settled)),
           new Promise<void>((resolve) => {
