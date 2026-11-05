@@ -12,12 +12,22 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { QUOTA_HOLD_BACKOFF_MS } from '../src/services/dispatch-timeouts.js';
+import { QUOTA_HOLD_BACKOFF_MS, quotaHoldBackoffMs } from '../src/services/dispatch-timeouts.js';
 import { toTodoRecord } from '../src/services/todos.js';
 import { bootServer, issueApiKey, postProject } from './helpers.js';
 
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 const NETWORK_ERROR = 'upstream stream disconnected: connection reset by peer';
+
+describe('quota hold backoff', () => {
+  test('clamps the hold count to the backoff table', () => {
+    expect(quotaHoldBackoffMs(0)).toBe(QUOTA_HOLD_BACKOFF_MS[0]);
+    expect(quotaHoldBackoffMs(1)).toBe(QUOTA_HOLD_BACKOFF_MS[0]);
+    expect(quotaHoldBackoffMs(2)).toBe(QUOTA_HOLD_BACKOFF_MS[1]);
+    expect(quotaHoldBackoffMs(3)).toBe(QUOTA_HOLD_BACKOFF_MS[2]);
+    expect(quotaHoldBackoffMs(99)).toBe(QUOTA_HOLD_BACKOFF_MS[2]);
+  });
+});
 
 async function call(
   app: Hono,
