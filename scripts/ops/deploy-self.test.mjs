@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -47,7 +48,7 @@ function fakeTool(bin, name, body) {
   chmodSync(path, 0o700);
 }
 
-function commit(work, message, { allowBuilds = 'esbuild: true', date } = {}) {
+function commit(work, message, { allowBuilds = 'esbuild: true', date, files = {} } = {}) {
   writeFileSync(
     join(work, 'pnpm-workspace.yaml'),
     `packages:\n  - apps/*\n\nallowBuilds:\n  ${allowBuilds}\n\ncatalog:\n  x: 1\n`,
@@ -55,12 +56,17 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date } = {}) {
   writeFileSync(join(work, 'marker.txt'), `${message}\n`);
   mkdirSync(join(work, 'apps/server/src/db'), { recursive: true });
   writeFileSync(join(work, 'apps/server/src/db/client.ts'), '');
+  for (const [rel, contents] of Object.entries(files)) {
+    mkdirSync(join(work, rel, '..'), { recursive: true });
+    writeFileSync(join(work, rel), contents);
+  }
   git(
     work,
     'add',
     'pnpm-workspace.yaml',
     'marker.txt',
     'apps/server/src/db/client.ts',
+    ...Object.keys(files),
     ...(existsSync(join(work, 'package.json')) ? ['package.json'] : []),
   );
   const env = date ? ['-c', `user.name=t`] : [];
@@ -80,7 +86,7 @@ function commit(work, message, { allowBuilds = 'esbuild: true', date } = {}) {
   return git(work, 'rev-parse', 'HEAD');
 }
 
-function fixture({ claimed = 0, heartbeatAgeMs = null } = {}) {
+function fixture({ claimed = 0, heartbeatAgeMs = null, seedFiles = {} } = {}) {
   const dir = makeTestTempDir('deploy-self-');
   const origin = join(dir, 'origin.git');
   const work = join(dir, 'work');
@@ -93,7 +99,7 @@ function fixture({ claimed = 0, heartbeatAgeMs = null } = {}) {
   for (const path of [work, data, fake, bin]) mkdirSync(path, { recursive: true });
   git(dir, 'init', '-q', '--bare', '-b', 'main', origin);
   git(work, 'init', '-q', '-b', 'main');
-  const previous = commit(work, 'previous');
+  const previous = commit(work, 'previous', { files: seedFiles });
   git(work, 'remote', 'add', 'origin', origin);
   git(work, 'push', '-q', 'origin', 'main');
   git(dir, 'clone', '-q', origin, checkout);
@@ -357,6 +363,57 @@ test('keeps waiting below the bound even without a heartbeat', () => {
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 75, result.stderr);
   assert.match(result.stderr, /1 step running for 0s/);
+});
+
+test('installs host tools from the deployed commit and records the installed SHA', () => {
+  const f = fixture();
+  const target = pushTarget(f, 'target', {
+    files: { 'scripts/ops/host/tools/governor/brake.sh': '#!/bin/bash\necho new\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  const host = join(f.dir, '.cairn/tools/governor/brake.sh');
+  assert.equal(readFileSync(host, 'utf8'), '#!/bin/bash\necho new\n');
+  assert.equal(statSync(host).mode & 0o777, 0o644);
+  assert.equal(readFileSync(join(f.state, 'host-tools-sha'), 'utf8').trim(), target);
+});
+
+test('keeps a hand-edited host tool, reports it, and never clobbers it', () => {
+  const f = fixture();
+  const target = pushTarget(f, 'target', {
+    files: { 'scripts/ops/host/tools/governor/brake.sh': '#!/bin/bash\necho new\n' },
+  });
+  mkdirSync(join(f.dir, '.cairn/tools/governor'), { recursive: true });
+  writeFileSync(join(f.dir, '.cairn/tools/governor/brake.sh'), '#!/bin/bash\necho local\n', {
+    mode: 0o755,
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(join(f.dir, '.cairn/tools/governor/brake.sh'), 'utf8'),
+    '#!/bin/bash\necho local\n',
+  );
+  assert.match(result.stdout, /kept hand-edited files/);
+  assert.match(f.log('gh.log'), /issue create.*Host tools differ/);
+  assert.equal(existsSync(join(f.state, 'alarms/host-tools-edited')), true);
+});
+
+test('updates a host tool that still matches the previous revision', () => {
+  const f = fixture({
+    seedFiles: { 'scripts/ops/host/tools/governor/brake.sh': '#!/bin/bash\necho old\n' },
+  });
+  mkdirSync(join(f.dir, '.cairn/tools/governor'), { recursive: true });
+  writeFileSync(join(f.dir, '.cairn/tools/governor/brake.sh'), '#!/bin/bash\necho old\n');
+  const target = pushTarget(f, 'target', {
+    files: { 'scripts/ops/host/tools/governor/brake.sh': '#!/bin/bash\necho new\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(join(f.dir, '.cairn/tools/governor/brake.sh'), 'utf8'),
+    '#!/bin/bash\necho new\n',
+  );
+  assert.doesNotMatch(result.stdout, /kept hand-edited files/);
 });
 
 test('stops before touching services when the migration rehearsal fails', () => {
