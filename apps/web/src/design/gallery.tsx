@@ -30,6 +30,7 @@ import {
   PermissionSection,
   PlanSection,
   PrBarSection,
+  PrCardSection,
   ScheduledSection,
 } from './components-threads.js';
 import type { GalleryTheme } from './design-doc.js';
@@ -115,6 +116,7 @@ const NAV = [
       ['permission', 'Permission and proposal'],
       ['plan', 'Plan approval, usage'],
       ['pr-bar', 'Pull request bar'],
+      ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
@@ -302,6 +304,7 @@ export function Gallery() {
           <PermissionSection />
           <PlanSection />
           <PrBarSection />
+          <PrCardSection />
           <ScheduledSection />
           <SidebarSection />
           <ProjectsSection />

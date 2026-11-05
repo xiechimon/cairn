@@ -435,6 +435,37 @@ test('guest image installs bubblewrap for Claude Code subprocess isolation and v
   assert.match(script, /runuser -u agent -- \/usr\/bin\/bwrap --version/);
 });
 
+test('guest image installs the CLI tools repo scripts call and verifies each as agent', () => {
+  const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
+  for (const pkg of [
+    'jq',
+    'diffutils',
+    'patch',
+    'which',
+    'inetutils',
+    'rsync',
+    'lsof',
+    'ripgrep',
+    'unzip',
+  ])
+    assert.match(script, new RegExp(`^pacstrap -K -M "\\$stage" .*\\b${pkg}\\b`, 'm'));
+  const loop = script.match(
+    /^for tool in ([^;]+); do runuser -u agent -- sh -c 'command -v "\$1"' sh "\$tool"/m,
+  );
+  assert.ok(loop, 'the guest verifies each tool as agent in one loop');
+  assert.deepEqual(loop[1].split(' ').sort(), [
+    'diff',
+    'hostname',
+    'jq',
+    'lsof',
+    'patch',
+    'rg',
+    'rsync',
+    'unzip',
+    'which',
+  ]);
+});
+
 test('guest image installs socat for the Claude Code sandbox and verifies it as agent', () => {
   const script = readFileSync(join(source, 'build-image.sh'), 'utf8');
   assert.match(script, /^pacstrap -K -M "\$stage" .*\bsocat\b/m);

@@ -24,14 +24,14 @@ function trailingTokenStart(query: string): number {
   return start;
 }
 
-const quoteWord = (text: string) => (/\s/.test(text) ? `"${text}"` : text);
-
 export function splitQuery(query: string, nowMs: number): QuerySplit {
   const start = trailingTokenStart(query);
   const head = query.slice(0, start);
   const trailing = query.slice(start);
   const parsed = parseSearchQuery(head, nowMs);
-  const words = parsed.words.map((word) => `${word.negated ? '-' : ''}${quoteWord(word.text)}`);
+  const words = parsed.words.map(
+    (word) => `${word.negated ? '-' : ''}${/\s/.test(word.text) ? `"${word.text}"` : word.text}`,
+  );
   const parts = trailing === '' ? words : [...words, trailing];
   const text = parts.join(' ') + (trailing === '' && words.length > 0 ? ' ' : '');
   return { chips: parsed.filters, text };

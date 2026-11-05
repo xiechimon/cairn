@@ -1,6 +1,8 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
-import { pressAndExpect } from './helpers.js';
+import { evidencePanelShot } from './evidence.js';
+import { pressAndExpect, settleTransitions } from './helpers.js';
 
 const BOARD = '/app?scenario=activity';
 
@@ -157,4 +159,46 @@ test('at 390px the palette stays inside the viewport with chips and help open', 
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBe(0);
+  await evidencePanelShot(page, 'palette-phone.png', panel(page));
 });
+
+test('a long filter value remains removable inside a phone viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openPalette(page);
+  const query = `project:${'a'.repeat(160)} `;
+  await field(page).fill(query);
+  const chip = chips(page);
+  await expect(chip).toBeVisible();
+  const box = await chip.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+  const remove = chip.getByRole('button');
+  const removeBox = await remove.boundingBox();
+  expect((removeBox?.x ?? 0) + (removeBox?.width ?? 0)).toBeLessThanOrEqual(390);
+  const problemOverflow = await panel(page).getByTestId('chip-problems').evaluate(
+    (node) => node.scrollWidth - node.clientWidth,
+  );
+  expect(problemOverflow).toBe(0);
+  await remove.click();
+  await expect(chips(page)).toHaveCount(0);
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`filter errors and syntax help are accessible (${theme})`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openPalette(page);
+    await field(page).fill('is:failed project:cairn cost:lots ');
+    await panel(page).getByRole('button', { name: 'Syntax' }).click();
+    const help = panel(page).getByRole('region', { name: 'Search filters' });
+    await expect(help).toBeVisible();
+    await help.focus();
+    await expect(help).toBeFocused();
+    await settleTransitions(page);
+    const { violations } = await new AxeBuilder({ page })
+      .include('.search-panel')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })) }))).toEqual([]);
+    await evidencePanelShot(page, `palette-${theme}.png`, panel(page));
+  });
+}

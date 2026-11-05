@@ -1,6 +1,7 @@
 import type { ParsedSearchFilter } from '@cairn/shared';
 import { cn } from 'cn';
 import { X } from 'lucide-react';
+import { Button } from '../components/ui/button.js';
 import { MENU_SURFACE_CLS } from '../components/ui/menu.js';
 import { useI18n } from '../i18n/provider.js';
 import { CHIP_PROBLEM_COPY, type ChipProblem, SYNTAX_ROWS } from './search-query.js';
@@ -22,20 +23,23 @@ export function QueryChip({
       data-invalid={problem === null ? undefined : ''}
       title={problem === null ? undefined : t(CHIP_PROBLEM_COPY[problem])}
       className={cn(
-        'inline-flex h-6 flex-none items-center gap-0.5 rounded-(--cds-radius-md) bg-secondary pr-1 pl-2 text-meta',
+        'inline-flex h-6 min-w-0 max-w-full flex-none items-center gap-0.5 rounded-(--cds-radius-md) bg-secondary pr-1 pl-2 text-meta',
         problem !== null && 'text-destructive ring-1 ring-destructive/40',
       )}
     >
-      <span className={problem === null ? 'text-content-tertiary' : ''}>{key}</span>
-      <span className={cn('font-medium', problem === null && 'text-foreground')}>{chip.value}</span>
-      <button
-        type="button"
+      <span className={cn('flex-none', problem === null && 'text-content-tertiary')}>{key}</span>
+      <span className={cn('min-w-0 truncate font-medium', problem === null && 'text-foreground')}>
+        {chip.value}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon-xs"
         aria-label={t('移除筛选 {filter}', { filter: chip.raw })}
-        className="flex size-4.5 flex-none items-center justify-center rounded-sm text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground"
+        className="text-content-tertiary"
         onClick={onRemove}
       >
-        <X width={12} height={12} />
-      </button>
+        <X />
+      </Button>
     </span>
   );
 }
@@ -58,9 +62,10 @@ export function ChipProblems({
       data-testid="chip-problems"
       className="m-0 flex list-none flex-col gap-0.5 border-b border-border px-4 py-1.5 text-meta text-destructive"
     >
-      {flagged.map(({ chip, problem }) => (
-        <li key={chip.raw}>
-          <span className="font-mono text-code">{chip.raw}</span> · {t(CHIP_PROBLEM_COPY[problem])}
+      {flagged.map(({ chip, problem }, index) => (
+        <li key={`${chip.raw}-${index}`}>
+          <span className="break-all font-mono text-code">{chip.raw}</span> ·{' '}
+          {t(CHIP_PROBLEM_COPY[problem])}
         </li>
       ))}
     </ul>
@@ -70,8 +75,9 @@ export function ChipProblems({
 export function SyntaxHelp({ className }: { className?: string }) {
   const { t } = useI18n();
   return (
-    <div
+    <section
       data-testid="syntax-help"
+      aria-label={t('搜索筛选')}
       className={cn(MENU_SURFACE_CLS, 'flex flex-col gap-2 p-3', className)}
     >
       <div className="flex items-center gap-2">
@@ -92,6 +98,6 @@ export function SyntaxHelp({ className }: { className?: string }) {
       <p className="m-0 border-t border-border pt-2 text-meta text-content-tertiary">
         {t('没有筛选的词匹配标题。在筛选前加 - 表示排除。')}
       </p>
-    </div>
+    </section>
   );
 }

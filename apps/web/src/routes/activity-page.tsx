@@ -103,7 +103,8 @@ export function ActivityPage() {
   const [params, setParams] = useSearchParams();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(params);
-  const [query, setQuery] = useState(() => {
+  const queryParam = params.get('q') ?? '';
+  const [query, setQueryState] = useState(() => {
     const initial = (params.get('q') ?? '').trim();
     return initial === '' ? '' : `${initial} `;
   });
@@ -112,11 +113,18 @@ export function ActivityPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    setQueryState((previous) =>
+      previous.trim() === queryParam ? previous : queryParam === '' ? '' : `${queryParam} `,
+    );
+  }, [queryParam]);
+
+  const setQuery = (nextQuery: string) => {
+    setQueryState(nextQuery);
     const next = new URLSearchParams(params);
-    if (query.trim() === '') next.delete('q');
-    else next.set('q', query.trim());
+    if (nextQuery.trim() === '') next.delete('q');
+    else next.set('q', nextQuery.trim());
     if (next.toString() !== params.toString()) setParams(next, { replace: true });
-  }, [query, params, setParams]);
+  };
 
   const todosQ = useTodos(teamId, live);
   const projectsQ = useProjects(teamId, live);
@@ -181,7 +189,7 @@ export function ActivityPage() {
       route="activity"
       fixture={fixture}
       selected="none"
-      title={t('活动')}
+      title={<span className="max-[640px]:pl-8">{t('活动')}</span>}
       bleed
       actions={
         !loading &&
