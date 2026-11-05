@@ -368,13 +368,17 @@ test('keeps waiting below the bound even without a heartbeat', () => {
 test('installs host tools from the deployed commit and records the installed SHA', () => {
   const f = fixture();
   const target = pushTarget(f, 'target', {
-    files: { 'scripts/ops/host/tools/governor/brake.sh': '#!/bin/bash\necho new\n' },
+    files: {
+      'scripts/ops/host/tools/governor/brake.sh': '#!/bin/bash\necho new\n',
+      'scripts/ops/host/tools/governor/notes.md': 'notes\n',
+    },
   });
   const result = f.run(DEPLOY, [target]);
   assert.equal(result.status, 0, result.stderr);
+  assert.equal(statSync(join(f.dir, '.cairn/tools/governor/notes.md')).mode & 0o777, 0o644);
   const host = join(f.dir, '.cairn/tools/governor/brake.sh');
   assert.equal(readFileSync(host, 'utf8'), '#!/bin/bash\necho new\n');
-  assert.equal(statSync(host).mode & 0o777, 0o644);
+  assert.equal(statSync(host).mode & 0o777, 0o755);
   assert.equal(readFileSync(join(f.state, 'host-tools-sha'), 'utf8').trim(), target);
 });
 

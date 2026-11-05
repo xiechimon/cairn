@@ -179,9 +179,13 @@ install_host_tools() {
       continue
     fi
     mkdir -p "$(dirname "$dest")" || continue
-    if cp "$source" "$dest"; then
-      if [ -x "$source" ]; then chmod 755 "$dest"; else chmod 644 "$dest"; fi
+    if cp "$source" "$dest.tmp.$$" && mv "$dest.tmp.$$" "$dest"; then
+      case "$rel" in
+        *.sh) chmod 755 "$dest" ;;
+        *) if [ -x "$source" ]; then chmod 755 "$dest"; else chmod 644 "$dest"; fi ;;
+      esac
     else
+      rm -f "$dest.tmp.$$"
       log "host tools: cannot write $dest"
     fi
   done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes)
