@@ -236,8 +236,13 @@ step_wait_alarm() {
 
 assert_idle() {
   [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
-  local running stale now since waited
-  read -r running stale <<<"$(step_counts)"
+  local running stale now since waited counts
+  counts="$(step_counts)"
+  if ! [[ "$counts" =~ ^([0-9]+)\ ([0-9]+)$ ]]; then
+    busy "cannot read the step counts"
+  fi
+  running="${BASH_REMATCH[1]}"
+  stale="${BASH_REMATCH[2]}"
   if [ "$running" = 0 ]; then
     rm -f "$STATE/steps-waiting-since"
     return 0
