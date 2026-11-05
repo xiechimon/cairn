@@ -36,6 +36,8 @@ const BOARD = [
   'task-panel',
 ];
 const SIDEBAR = [
+  'activity-page',
+  'search-syntax-palette',
   'menu-keys',
   'settings-',
   'sidebar-',
@@ -160,6 +162,7 @@ const OVERLAY = [
   'storage-unavailable',
 ];
 const OVERLAYS = [
+  'activity-page',
   'chip-',
   'hotkeys',
   'search-',
@@ -240,6 +243,8 @@ export const FILE_RULES = new Map([
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
   ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
+  ['apps/web/src/board/sidebar-user-menu.tsx', SIDEBAR],
+  ['apps/web/src/routes/activity-page.tsx', ['activity-page', 'search-syntax-palette']],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
@@ -291,6 +296,7 @@ export const FILE_RULES = new Map([
 ]);
 
 export const DIR_RULES = [
+  { prefix: 'apps/web/src/search/', specs: ['activity-page', 'search-'] },
   { prefix: 'apps/web/src/board/', specs: BOARD },
   {
     prefix: 'apps/web/src/task-panel/',

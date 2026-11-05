@@ -1,4 +1,5 @@
 import { accountsDefault, accountsEmpty } from './accounts.js';
+import { activityFixture, activityManyFixture } from './activity.js';
 import { demoFixture } from './demo.js';
 import {
   agentDelete,
@@ -152,6 +153,9 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'sidebar-snooze': sidebarSnooze,
       'sidebar-groups': sidebarGroups,
       'home-c': homeC,
+      activity: activityFixture,
+      'activity-many': activityManyFixture,
+      'activity-empty': { ...homeC, todos: [] },
       'turn-fold-thread': turnFoldThread,
       'home-c-empty': homeCEmpty,
       'sidebar-thread-statuses': sidebarThreadStatuses,

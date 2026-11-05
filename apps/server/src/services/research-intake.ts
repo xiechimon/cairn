@@ -1,6 +1,7 @@
 import {
   RESEARCH_INTAKE_SOURCE_KIND,
   RESEARCH_INTAKE_THREAD_TITLES_MAX,
+  RESEARCH_STUCK_SOURCE_KIND,
   researchIntakeQuestion,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull, notInArray, or } from 'drizzle-orm';
@@ -9,6 +10,7 @@ import type { BuildDeps } from './builds.js';
 import { localDay, retryPendingIntakeReports } from './chief-report.js';
 import { recentIntakeItems } from './intake-items.js';
 import { planResearchCitationChecks } from './research-citations.js';
+import { releaseResearchReworkHolds } from './research-stuck.js';
 import { openResearchThread } from './research-thread.js';
 import { serverTimezone, wallClockParts } from './schedules.js';
 
@@ -27,6 +29,7 @@ function intakeTimezone(configured: string | null | undefined): string {
 }
 
 export function planResearchIntake(deps: BuildDeps, projectId: string | null, now: number): void {
+  releaseResearchReworkHolds(deps, now);
   planResearchCitationChecks(deps);
   retryPendingIntakeReports(deps, now);
   if (projectId === null) return;
@@ -48,7 +51,11 @@ export function planResearchIntake(deps: BuildDeps, projectId: string | null, no
         isNull(todo.archivedAt),
         or(
           isNull(todo.sourceKind),
-          notInArray(todo.sourceKind, [RESEARCH_INTAKE_SOURCE_KIND, 'research-citation-check']),
+          notInArray(todo.sourceKind, [
+            RESEARCH_INTAKE_SOURCE_KIND,
+            'research-citation-check',
+            RESEARCH_STUCK_SOURCE_KIND,
+          ]),
         ),
       ),
     )

@@ -17,10 +17,12 @@ import { MACHINES_HREF } from './resources/machines-page.js';
 import { MCP_HREF } from './resources/mcp-servers-page.js';
 import { SECRETS_HREF } from './resources/secrets-page.js';
 import { SKILLS_HREF } from './resources/skills-page.js';
+import { ActivityPage } from './routes/activity-page.js';
 import { AGENTS_HREF, AgentDetailPage } from './routes/agent-detail-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
+import { ACTIVITY_PATH } from './search/activity-href.js';
 import { SETTINGS_HREF } from './settings/settings-href.js';
 import { SettingsPage } from './settings/settings-page.js';
 import { SettingsRedirect } from './settings/settings-redirect.js';
@@ -38,6 +40,7 @@ export const router = createBrowserRouter([
               { path: '/app', element: <BoardPage /> },
               { path: '/app/todo/:id', element: <TodoRedirect /> },
               { path: '/app/schedules', element: <SchedulesPage /> },
+              { path: ACTIVITY_PATH, element: <ActivityPage /> },
               { path: '/app/project/new', element: <ProjectNewPage /> },
               { path: '/app/project/:id', element: <ProjectHomeRedirect /> },
               { path: '/app/project/:id/files', element: <ProjectPage /> },
