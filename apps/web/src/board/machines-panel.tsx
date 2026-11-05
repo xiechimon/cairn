@@ -1,6 +1,13 @@
+import type { ComputerRecord } from '@cairn/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { Globe, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import { useAuth } from '../api/auth.js';
+import { acquireComputerControl, releaseComputerControl } from '../api/computer-screen.js';
+import { useComputers } from '../api/hooks.js';
+import { invalidateConverged } from '../api/invalidate.js';
+import { useLiveData } from '../api/provider.js';
 import { ListCard } from '../components/list-card.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
@@ -9,6 +16,12 @@ import { Button } from '../components/ui/button.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { CoordinatorComputer } from './computer-feed.js';
+import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
+import {
+  browserCapabilityInstalled,
+  desktopControlInstalled,
+  desktopControlOnline,
+} from './machine-capabilities.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -80,11 +93,17 @@ function CapabilityRow({
   label,
   hint,
   installed,
+  checked,
+  disabled,
+  onCheckedChange,
 }: {
   icon: ReactNode;
   label: string;
   hint: string;
   installed: boolean;
+  checked: boolean;
+  disabled: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -99,26 +118,107 @@ function CapabilityRow({
         </span>
         <span className="text-meta text-content-tertiary">{hint}</span>
       </span>
-      <ToggleSwitch checked={false} disabled aria-label={label} />
+      <ToggleSwitch
+        checked={checked}
+        disabled={disabled}
+        aria-label={label}
+        onCheckedChange={onCheckedChange}
+      />
     </div>
   );
 }
 
-function MachineCard({ machine, coordinator }: { machine: MachineRow; coordinator: boolean }) {
+function MachineScreen({
+  machine,
+  computer,
+  teamId,
+  leaseId,
+  interactive,
+}: {
+  machine: MachineRow;
+  computer: ComputerRecord | null;
+  teamId: string | undefined;
+  leaseId: string | null;
+  interactive: boolean;
+}) {
   const { t } = useI18n();
   const online = machine.online === true;
+  if (computer !== null && teamId !== undefined && desktopControlOnline(machine, computer)) {
+    return (
+      <MachineScreenSurface
+        teamId={teamId}
+        computer={computer}
+        leaseId={leaseId}
+        interactive={interactive}
+      />
+    );
+  }
+  if (!online) return <ScreenPlaceholder online={false} label={t('电脑离线')} />;
+  if (desktopControlOnline(machine, computer)) {
+    return <ScreenPlaceholder online label={t('桌面控制已上线，屏幕显示在这里')} />;
+  }
+  return <ScreenPlaceholder online label={t('屏幕随桌面控制一起上线，到时显示在这里')} />;
+}
+
+function MachineCard({
+  machine,
+  coordinator,
+  computer,
+  teamId,
+}: {
+  machine: MachineRow;
+  coordinator: boolean;
+  computer: ComputerRecord | null;
+  teamId: string | undefined;
+}) {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const online = machine.online === true;
   const Icon = machine.kind === 'local' ? Laptop : Server;
+  const desktopInstalled = desktopControlInstalled(machine, computer);
+  const browserInstalled = browserCapabilityInstalled(machine, computer);
+  const [leaseId, setLeaseId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
+  const canToggleDesktop =
+    desktopInstalled &&
+    online &&
+    computer !== null &&
+    teamId !== undefined &&
+    !busy &&
+    (leaseId !== null || computer.controlHolder !== 'user');
+
+  useEffect(() => {
+    if (computer?.controlHolder === 'user') return;
+    setLeaseId(null);
+  }, [computer?.controlHolder, computer?.id]);
+
+  const onDesktopToggle = (checked: boolean) => {
+    if (teamId === undefined || computer === null || busy) return;
+    setBusy(true);
+    const run = checked
+      ? acquireComputerControl(teamId, computer.id).then((lease) => {
+          setLeaseId(lease.leaseId);
+        })
+      : leaseId !== null
+        ? releaseComputerControl(teamId, computer.id, leaseId).then(() => {
+            setLeaseId(null);
+          })
+        : Promise.resolve();
+    void run
+      .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <ListCard className="flex-none">
-      <div
-        data-testid="machine-screen"
-        className={`grid place-items-center bg-(--surface-1) px-6 text-center text-meta text-content-tertiary ${online ? 'aspect-[16/10]' : 'h-16'}`}
-      >
-        <span className={`flex items-center gap-2 ${online ? 'flex-col' : ''}`}>
-          <MonitorSmartphone aria-hidden="true" className="size-5 opacity-60" />
-          {online ? t('屏幕随桌面控制一起上线，到时显示在这里') : t('电脑离线')}
-        </span>
-      </div>
+      <MachineScreen
+        machine={machine}
+        computer={computer}
+        teamId={teamId}
+        leaseId={leaseId}
+        interactive={leaseId !== null}
+      />
       <div className="flex items-center gap-3 px-3.5 py-3">
         <Icon aria-hidden="true" className="size-4.5 flex-none text-content-secondary" />
         <span className="flex min-w-0 flex-1 flex-col">
@@ -140,13 +240,18 @@ function MachineCard({ machine, coordinator }: { machine: MachineRow; coordinato
         icon={<MonitorSmartphone aria-hidden="true" className="size-4" />}
         label={t('桌面控制')}
         hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
-        installed={false}
+        installed={desktopInstalled}
+        checked={desktopInstalled && controlHeld}
+        disabled={!canToggleDesktop}
+        onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
       />
       <CapabilityRow
         icon={<Globe aria-hidden="true" className="size-4" />}
         label={t('浏览器')}
         hint={t('让 agent 打开网页、点击和填表。')}
-        installed={false}
+        installed={browserInstalled}
+        checked={false}
+        disabled
       />
     </ListCard>
   );
@@ -160,8 +265,14 @@ export function MachinesPanel({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const { live, teamId } = useLiveData();
+  const auth = useAuth();
+  const computersQ = useComputers(teamId, live && !auth.gateOpen);
+  const computers = computersQ.data ?? [];
   const host = coordinatorMachine(machines);
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
+  const computerFor = (machine: MachineRow): ComputerRecord | null =>
+    computers.find((computer) => computer.machine.id === machine.id) ?? null;
   return (
     <SidePanel label={t('电脑')} onDismiss={onClose}>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
@@ -179,6 +290,8 @@ export function MachinesPanel({
             key={machine.id ?? machine.name}
             machine={machine}
             coordinator={machine === host}
+            computer={computerFor(machine)}
+            teamId={teamId}
           />
         ))}
         <Button

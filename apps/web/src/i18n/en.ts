@@ -105,6 +105,9 @@ export const EN: Record<string, string> = {
   已安装: 'Installed',
   '屏幕随桌面控制一起上线，到时显示在这里':
     'The screen arrives with desktop control and shows here',
+  '桌面控制已上线，屏幕显示在这里': 'Desktop control is online; the screen shows here',
+  正在连接屏幕: 'Connecting to the screen',
+  屏幕暂时连不上: 'The screen could not connect',
   出错: 'Error',
   开着: 'On',
   正在开机: 'Starting up',

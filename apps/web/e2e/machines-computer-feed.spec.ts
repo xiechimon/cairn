@@ -44,6 +44,12 @@ async function open(page: Page, feed: Feed, machines: unknown[] = []) {
         json({ commands: feed.commands }),
       );
     }
+    if (path === '/api/teams/t1/computers/comp-1/screen') {
+      return json({ error: 'the computer is not connected' }, 409);
+    }
+    if (path === '/api/teams/t1/computers/comp-1/control') {
+      return json({ leaseId: 'lease-1', expiresAt: Date.now() + 60_000, controlFence: 1 }, 201);
+    }
     return undefined;
   });
   await page.goto('/app?pane=machines');
@@ -470,8 +476,25 @@ test('with a machine listed the panel still shows its card and the screen placeh
     [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
   );
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
-  await expect(panel.getByTestId('machine-screen')).toContainText('屏幕随桌面控制一起上线');
-  await expect(panel.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
+  const card = panel.locator('[data-slot="list-card"]').nth(1);
+  await expect(card.getByTestId('machine-screen')).toContainText(/桌面控制已上线|正在连接屏幕|屏幕/);
+  await expect(card.getByText('已安装').first()).toBeVisible();
+  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
+  await expect(card.getByRole('switch', { name: '浏览器' })).toBeDisabled();
+});
+
+test('without a computer row the machine keeps the waiting placeholder and 未安装', async ({
+  page,
+}) => {
+  const panel = await open(
+    page,
+    { computers: [], commands: [] },
+    [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
+  );
+  const card = panel.locator('[data-slot="list-card"]').nth(0);
+  await expect(card.getByTestId('machine-screen')).toContainText('屏幕随桌面控制一起上线');
+  await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
+  await expect(card.getByText('未安装').first()).toBeVisible();
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);
