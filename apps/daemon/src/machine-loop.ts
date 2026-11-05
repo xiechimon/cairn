@@ -533,6 +533,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   closedOrbTimer.unref?.();
   const orbTimer = setInterval(sweepOrbs, 1_000);
   orbTimer.unref?.();
+  const computerSweepTimer = computerOrbs
+    ? setInterval(() => {
+        if (computerOrbs.known().length === 0) return;
+        void computerOrbs
+          .sweep()
+          .catch((error: unknown) => logger.workspace(`computer sweep failed: ${String(error)}`));
+      }, 60_000)
+    : undefined;
+  computerSweepTimer?.unref?.();
 
   const recovered = await client.recover();
   if (recovered.steps.length === 0) {
@@ -800,6 +809,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);
     clearInterval(orbTimer);
+    clearInterval(computerSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
