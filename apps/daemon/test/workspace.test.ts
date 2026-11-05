@@ -2,13 +2,11 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   BRAND,
@@ -16,7 +14,8 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   RemoteBranchDivergedError,
 } from '@cairn/shared';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
@@ -83,10 +82,29 @@ function seedHook(name: 'setup' | 'resume', body: string): void {
   chmodSync(p, 0o755);
 }
 
+const fixtureDirectories: string[] = [];
+
+afterAll(() => {
+  try {
+    expect(fixtureDirectories.filter((directory) => existsSync(directory))).toEqual([]);
+  } finally {
+    for (const directory of fixtureDirectories) rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function fixtureDirectory(prefix: string): string {
+  const directory = makeTestTempDir(prefix);
+  fixtureDirectories.push(directory);
+  onTestFinished(() => {
+    releaseTestTempDir(directory);
+  });
+  return directory;
+}
+
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'cairn-ws-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-origin-')), 'repo.git');
-  seedDir = join(tmpdir(), `cairn-ws-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  root = fixtureDirectory('ws-root-');
+  originDir = join(fixtureDirectory('ws-origin-'), 'repo.git');
+  seedDir = fixtureDirectory('ws-seed-');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedOrigin();
@@ -518,3 +536,7 @@ test('a remote conversation branch can resume when origin HEAD fallback names a 
     spy.mockRestore();
   }
 }, 30_000);
+
+test.fails('workspace fixture cleanup survives a failed test', () => {
+  throw new Error('deliberate workspace fixture assertion failure');
+});

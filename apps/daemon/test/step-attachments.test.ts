@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 import type { MachineAttachmentResponse } from '@cairn/shared';
 import { buildTaskPromptText, formatAttachmentToken } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, onTestFinished, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MachineClient } from '../src/machine-client.js';
 import { materializeFile, resolveStepImages } from '../src/step-attachments.js';
 
@@ -37,8 +37,22 @@ function pngResponse(): MachineAttachmentResponse {
   };
 }
 
+const fixtureHomes: string[] = [];
+
+afterAll(() => {
+  try {
+    expect(fixtureHomes.filter((home) => existsSync(home))).toEqual([]);
+  } finally {
+    for (const home of fixtureHomes) rmSync(home, { recursive: true, force: true });
+  }
+});
+
 function setup() {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-step-att-'));
+  const home = makeTestTempDir('step-att-');
+  onTestFinished(() => {
+    releaseTestTempDir(home);
+  });
+  fixtureHomes.push(home);
   const materializeDir = join(home, 'step-attachments');
   const worktree = join(home, 'workspaces', 'conv-1');
   mkdirSync(worktree, { recursive: true });
@@ -705,4 +719,9 @@ describe('#1406 token lines inside the issue-body fence', () => {
     expect(out.text.endsWith(after)).toBe(true);
     expect(fenceInner(out.text)).toContain('> [image attached: shot.png]');
   });
+});
+
+test.fails('attachment fixture cleanup survives a failed test', () => {
+  setup();
+  throw new Error('deliberate attachment fixture assertion failure');
 });

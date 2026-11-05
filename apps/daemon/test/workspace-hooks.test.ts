@@ -1,8 +1,8 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
-import { describe, expect, test, vi } from 'vitest';
+import { afterAll, describe, expect, onTestFinished, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
   runWorkspaceHook,
@@ -16,8 +16,23 @@ const CREDS: BoundGitCredentials = {
   url: 'https://github.com/o/r.git',
 };
 
+const fixtureDirectories: string[] = [];
+
+afterAll(() => {
+  try {
+    expect(fixtureDirectories.filter((directory) => existsSync(directory))).toEqual([]);
+  } finally {
+    for (const directory of fixtureDirectories) rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 function tmpRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-hook-'));
+  const root = makeTestTempDir('hook-');
+  onTestFinished(() => {
+    releaseTestTempDir(root);
+  });
+  fixtureDirectories.push(root);
+  return root;
 }
 
 function writeHook(dir: string, name: string, body: string, opts: { exec?: boolean } = {}): string {
@@ -247,4 +262,9 @@ describe('workspace hook primitive (#1149)', () => {
     expect(note!.name).toBe('resume');
     expect(note!.output).toContain('resume-ran');
   });
+});
+
+test.fails('fixture cleanup survives a failed test', () => {
+  tmpRoot();
+  throw new Error('deliberate fixture assertion failure');
 });

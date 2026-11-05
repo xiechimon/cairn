@@ -1,8 +1,17 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  onTestFinished,
+  test,
+  vi,
+} from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, gitPrim, runGit, runGitOk } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
@@ -89,14 +98,30 @@ function cloneSpyFailsForToken(): { calls: (BoundGitCredentials | null)[] } {
   return { calls };
 }
 
+const fixtureDirectories: string[] = [];
+
+afterAll(() => {
+  try {
+    expect(fixtureDirectories.filter((directory) => existsSync(directory))).toEqual([]);
+  } finally {
+    for (const directory of fixtureDirectories) rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function fixtureDirectory(prefix: string): string {
+  const directory = makeTestTempDir(prefix);
+  fixtureDirectories.push(directory);
+  onTestFinished(() => {
+    releaseTestTempDir(directory);
+  });
+  return directory;
+}
+
 beforeEach(async () => {
   vi.restoreAllMocks();
-  root = mkdtempSync(join(tmpdir(), 'cairn-ws-cred-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-cred-origin-')), 'repo.git');
-  seedDir = join(
-    tmpdir(),
-    `cairn-ws-cred-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
+  root = fixtureDirectory('ws-cred-root-');
+  originDir = join(fixtureDirectory('ws-cred-origin-'), 'repo.git');
+  seedDir = fixtureDirectory('ws-cred-seed-');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedOrigin();
@@ -234,4 +259,8 @@ describe('#2006 closing push of a work branch the remote already contains', () =
 
     expect(logger.lines.filter((l) => l.includes('already contained'))).toEqual([]);
   }, 30_000);
+});
+
+test.fails('fixture cleanup survives a failed test', () => {
+  throw new Error('deliberate fixture assertion failure');
 });

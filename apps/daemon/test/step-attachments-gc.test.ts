@@ -1,13 +1,28 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, onTestFinished, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { STEP_ATTACHMENTS_TTL_MS, sweepStepAttachments } from '../src/step-attachments.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
+const fixtureDirectories: string[] = [];
+
+afterAll(() => {
+  try {
+    expect(fixtureDirectories.filter((directory) => existsSync(directory))).toEqual([]);
+  } finally {
+    for (const directory of fixtureDirectories) rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 function tmpRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-step-att-'));
+  const root = makeTestTempDir('step-att-');
+  onTestFinished(() => {
+    releaseTestTempDir(root);
+  });
+  fixtureDirectories.push(root);
+  return root;
 }
 
 function putStep(root: string, stepId: string, mtimeAgoMs: number): void {
@@ -51,4 +66,9 @@ describe('sweepStepAttachments', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+});
+
+test.fails('fixture cleanup survives a failed test', () => {
+  tmpRoot();
+  throw new Error('deliberate fixture assertion failure');
 });
