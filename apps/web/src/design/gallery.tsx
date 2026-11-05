@@ -53,6 +53,7 @@ import { ProductOverlaysSection } from './product-overlays.js';
 import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
+import { QuestionDraftsSection } from './proposals-questions.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -103,6 +104,7 @@ const NAV = [
       ['product-overlays', 'Overlays and pickers'],
       ['product-pages', 'Page parts'],
       ['product-add-provider', 'Add provider'],
+      ['question-drafts', 'Pending question drafts'],
     ],
   },
   {
@@ -290,6 +292,7 @@ export function Gallery() {
             <ProductOverlaysSection />
             <ProductPagesSection theme={theme} />
             <ProductAddProviderSection />
+            <QuestionDraftsSection />
           </ProductProviders>
           <GroupTitle
             id="inbox-threads"
