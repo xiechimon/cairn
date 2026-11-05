@@ -478,12 +478,13 @@ test('with a machine listed the panel still shows its card and the screen placeh
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
   const card = panel.locator('[data-slot="list-card"]').nth(1);
   await expect(card.getByTestId('machine-screen')).toContainText(/桌面控制已上线|正在连接屏幕|屏幕/);
-  await expect(card.getByText('已安装').first()).toBeVisible();
+  await expect(card.getByText('已安装')).toHaveCount(0);
+  await expect(card.getByText('未安装')).toHaveCount(0);
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
   await expect(card.getByRole('switch', { name: '浏览器' })).toBeDisabled();
 });
 
-test('without a computer row the machine keeps the waiting placeholder and 未安装', async ({
+test('without a computer row the machine keeps the waiting placeholder and disabled toggles', async ({
   page,
 }) => {
   const panel = await open(
@@ -494,7 +495,8 @@ test('without a computer row the machine keeps the waiting placeholder and 未�
   const card = panel.locator('[data-slot="list-card"]').nth(0);
   await expect(card.getByTestId('machine-screen')).toContainText('屏幕随桌面控制一起上线');
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
-  await expect(card.getByText('未安装').first()).toBeVisible();
+  await expect(card.getByText('已安装')).toHaveCount(0);
+  await expect(card.getByText('未安装')).toHaveCount(0);
 });
 
 const LONG_OUTPUT = `${'x'.repeat(4000)}\n${'line of output\n'.repeat(300)}`.slice(-4096);

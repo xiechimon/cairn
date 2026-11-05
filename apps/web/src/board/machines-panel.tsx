@@ -17,11 +17,7 @@ import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
-import {
-  browserCapabilityInstalled,
-  desktopControlInstalled,
-  desktopControlOnline,
-} from './machine-capabilities.js';
+import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
   return (
@@ -92,7 +88,6 @@ function CapabilityRow({
   icon,
   label,
   hint,
-  installed,
   checked,
   disabled,
   onCheckedChange,
@@ -100,22 +95,15 @@ function CapabilityRow({
   icon: ReactNode;
   label: string;
   hint: string;
-  installed: boolean;
   checked: boolean;
   disabled: boolean;
   onCheckedChange?: (checked: boolean) => void;
 }) {
-  const { t } = useI18n();
   return (
     <div className="flex items-center gap-3 px-3.5 py-2.5">
       <span className="flex-none text-content-tertiary">{icon}</span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex items-center gap-1.5 text-ui text-foreground">
-          {label}
-          <Badge variant="secondary" className="font-normal text-content-tertiary">
-            {installed ? t('已安装') : t('未安装')}
-          </Badge>
-        </span>
+        <span className="text-ui text-foreground">{label}</span>
         <span className="text-meta text-content-tertiary">{hint}</span>
       </span>
       <ToggleSwitch
@@ -176,7 +164,6 @@ function MachineCard({
   const online = machine.online === true;
   const Icon = machine.kind === 'local' ? Laptop : Server;
   const desktopInstalled = desktopControlInstalled(machine, computer);
-  const browserInstalled = browserCapabilityInstalled(machine, computer);
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
@@ -240,7 +227,6 @@ function MachineCard({
         icon={<MonitorSmartphone aria-hidden="true" className="size-4" />}
         label={t('桌面控制')}
         hint={t('让 agent 操作这台电脑上的应用。macOS 要在辅助功能里授权。')}
-        installed={desktopInstalled}
         checked={desktopInstalled && controlHeld}
         disabled={!canToggleDesktop}
         onCheckedChange={canToggleDesktop ? onDesktopToggle : undefined}
@@ -249,7 +235,6 @@ function MachineCard({
         icon={<Globe aria-hidden="true" className="size-4" />}
         label={t('浏览器')}
         hint={t('让 agent 打开网页、点击和填表。')}
-        installed={browserInstalled}
         checked={false}
         disabled
       />
