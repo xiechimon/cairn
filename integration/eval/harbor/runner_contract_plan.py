@@ -1,5 +1,6 @@
 import hashlib
 import re
+from pathlib import PurePosixPath
 
 URL_PATTERN = re.compile(r"https?://[^\s`'\"<>]+")
 BUILD_MODE_PATTERN = re.compile(r"--mode\s+([A-Za-z0-9_-]+)")
@@ -205,6 +206,68 @@ def _grading_path(path):
         or "snapshots" in path
         or path.endswith((".png", ".jpg", ".webp"))
     )
+
+
+def unverified_partition(paths, plan):
+    record = {
+        "blocked": True,
+        "blockers": ["runner plan is blocked"],
+        "productPaths": [],
+        "graderPaths": [],
+        "commands": [],
+        "trustedInputs": [],
+        "complete": False,
+        "qualifiedTask": False,
+        "qualificationCredit": 0,
+        "verified": False,
+    }
+    if not isinstance(plan, dict) or plan.get("blocked"):
+        return record
+    trusted = {
+        item["path"]: item
+        for item in plan.get("trustedInputs") or []
+        if item.get("role") in ("helper", "asset", "config")
+    }
+    command_paths = []
+    for command in plan.get("commands") or []:
+        command_paths.extend(command.get("paths") or [])
+    command_set = set(command_paths)
+    blockers = []
+    grader = []
+    product = []
+    for path in paths:
+        if path in trusted or path in command_set:
+            grader.append(path)
+        elif _looks_like_grading_material(path):
+            blockers.append(f"unclassified grading path: {path}")
+        else:
+            product.append(path)
+    for path in command_paths:
+        if path not in grader:
+            blockers.append(f"command path missing from grader inputs: {path}")
+    if blockers:
+        record["blockers"] = blockers
+        return record
+    record.update(
+        blocked=False,
+        blockers=[],
+        productPaths=product,
+        graderPaths=grader,
+        commands=list(plan.get("commands") or []),
+        trustedInputs=[
+            item
+            for item in plan.get("trustedInputs") or []
+            if item.get("role") in ("helper", "asset", "config")
+        ],
+    )
+    return record
+
+
+def _looks_like_grading_material(path):
+    if _grading_path(path):
+        return True
+    parts = PurePosixPath(path).parts
+    return any(part in ("test", "tests", "__tests__", "e2e", "fixtures") for part in parts)
 
 
 def _covered_paths(plan):
