@@ -8,6 +8,8 @@ import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import { Segments } from './segments.js';
 
+export type TableAlign = 'left' | 'center' | 'right' | null;
+
 export type ChatBlock =
   | { kind: 'para'; segments: DocSegment[] }
   | { kind: 'head'; level: number; segments: DocSegment[] }
@@ -15,7 +17,13 @@ export type ChatBlock =
   | { kind: 'bullet'; depth: number; segments: DocSegment[] }
   | { kind: 'tasks'; items: TaskItem[] }
   | { kind: 'code'; lang?: string; text: string }
-  | { kind: 'attachment'; name: string; key: string };
+  | { kind: 'attachment'; name: string; key: string }
+  | {
+      kind: 'table';
+      header: DocSegment[][];
+      align: TableAlign[];
+      rows: DocSegment[][][];
+    };
 
 export type TaskState = AgentTodoState;
 export type TaskItem = { state: TaskState; segments: DocSegment[] };
@@ -30,6 +38,109 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})\s*(\S*)\s*$/;
 const HEADING = /^ {0,3}(#{1,6})\s+(.*)$/;
 const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
 const BULLET = /^(\s*)[-*•]\s+(.*)$/;
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_SEP_CELL = /^:?-{1,}:?$/;
+
+export function splitTableCells(line: string): string[] {
+  const trimmed = line.trim();
+  const parts = trimmed.split('|');
+  if (parts[0]?.trim() === '') parts.shift();
+  if (parts.length > 0 && parts[parts.length - 1]?.trim() === '') parts.pop();
+  return parts.map((part) => part.trim());
+}
+
+function isSeparatorCells(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((cell) => TABLE_SEP_CELL.test(cell));
+}
+
+export function parseTableAlign(cell: string): TableAlign {
+  const left = cell.startsWith(':');
+  const right = cell.endsWith(':');
+  if (left && right) return 'center';
+  if (right) return 'right';
+  if (left) return 'left';
+  return null;
+}
+
+function tableRowSegments(cells: string[]): DocSegment[][] {
+  return cells.map((cell) => inlineSegments(cell));
+}
+
+function sameColumnCount(rows: string[][], cols: number): boolean {
+  return rows.every((row) => row.length === cols);
+}
+
+export function expandCollapsedTableLine(line: string): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed.includes('||') || !TABLE_ROW.test(trimmed)) return null;
+  const expanded = trimmed.replace(/\|\|/g, '|\n|').split('\n');
+  if (expanded.length < 2) return null;
+  const parsed = expanded.map(splitTableCells);
+  const sepIdx = parsed.findIndex(isSeparatorCells);
+  if (sepIdx < 1) return null;
+  const cols = parsed[sepIdx]?.length ?? 0;
+  if (cols === 0 || !sameColumnCount(parsed, cols)) return null;
+  return expanded;
+}
+
+function tryConsumeTable(
+  lines: string[],
+  start: number,
+): { block: Extract<ChatBlock, { kind: 'table' }>; next: number } | null {
+  const headerLine = lines[start] ?? '';
+  const fromCollapsed = expandCollapsedTableLine(headerLine);
+  const tableLines = fromCollapsed ?? [headerLine];
+  let next = start + 1;
+
+  if (fromCollapsed === null) {
+    const sepLine = lines[start + 1] ?? '';
+    if (!TABLE_ROW.test(headerLine) || !TABLE_ROW.test(sepLine)) return null;
+    const headerCells = splitTableCells(headerLine);
+    const sepCells = splitTableCells(sepLine);
+    if (
+      !isSeparatorCells(sepCells) ||
+      headerCells.length === 0 ||
+      headerCells.length !== sepCells.length
+    ) {
+      return null;
+    }
+    tableLines.push(sepLine);
+    next = start + 2;
+    while (next < lines.length) {
+      const body = lines[next] ?? '';
+      if (!TABLE_ROW.test(body)) break;
+      const cells = splitTableCells(body);
+      if (cells.length !== headerCells.length) break;
+      tableLines.push(body);
+      next += 1;
+    }
+  }
+
+  const headerCells = splitTableCells(tableLines[0] ?? '');
+  const sepCells = splitTableCells(tableLines[1] ?? '');
+  if (
+    !isSeparatorCells(sepCells) ||
+    headerCells.length === 0 ||
+    headerCells.length !== sepCells.length
+  ) {
+    return null;
+  }
+  const rows: DocSegment[][][] = [];
+  for (let r = 2; r < tableLines.length; r += 1) {
+    const cells = splitTableCells(tableLines[r] ?? '');
+    if (cells.length !== headerCells.length) return null;
+    rows.push(tableRowSegments(cells));
+  }
+  return {
+    block: {
+      kind: 'table',
+      header: tableRowSegments(headerCells),
+      align: sepCells.map(parseTableAlign),
+      rows,
+    },
+    next,
+  };
+}
 
 export function parseChatMarkdown(text: string): ChatBlock[] {
   const lines = text.split('\n');
@@ -131,6 +242,16 @@ export function parseChatMarkdown(text: string): ChatBlock[] {
       });
       i += 1;
       continue;
+    }
+
+    if (TABLE_ROW.test(raw) || trimmed.includes('||')) {
+      const table = tryConsumeTable(lines, i);
+      if (table !== null) {
+        flushPara();
+        blocks.push(table.block);
+        i = table.next;
+        continue;
+      }
     }
 
     para.push(trimmed);
@@ -282,6 +403,48 @@ export function TaskCard({ items }: { items: TaskItem[] }) {
   );
 }
 
+const TABLE_ALIGN_CLS: Record<Exclude<TableAlign, null>, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+};
+
+function cellAlignClass(align: TableAlign | undefined): string {
+  return align != null ? TABLE_ALIGN_CLS[align] : 'text-left';
+}
+
+function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }> }) {
+  return (
+    <div className="chat-md-table my-2 max-w-full overflow-x-auto" data-testid="md-table">
+      <table className="w-full border-collapse text-ui text-(--foreground)">
+        <thead>
+          <tr className="border-b border-(--border)">
+            {block.header.map((cell, ci) => (
+              <th
+                key={ci}
+                className={`px-2.5 py-1.5 font-semibold ${cellAlignClass(block.align[ci])}`}
+              >
+                <Segments segments={cell} codeClassName="chat-code" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, ri) => (
+            <tr key={ri} className="border-b border-(--border) last:border-b-0">
+              {row.map((cell, ci) => (
+                <td key={ci} className={`px-2.5 py-1.5 ${cellAlignClass(block.align[ci])}`}>
+                  <Segments segments={cell} codeClassName="chat-code" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ChatMarkdown({ text }: { text: string }) {
   const blocks = useMemo(() => parseChatMarkdown(text), [text]);
   const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
@@ -355,6 +518,8 @@ export function ChatMarkdown({ text }: { text: string }) {
                 />
               </div>
             );
+          case 'table':
+            return <MarkdownTable key={i} block={block} />;
           case 'para':
             return (
               <p key={i} className="chat-para m-0">
