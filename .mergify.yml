@@ -38,8 +38,8 @@ queue_rules:
       - '-files ~= (?ai)^(?!(?:apps\/[^/]*\/src\/.*|apps\/[^/]*\/test\/.*|apps\/[^/]*\/e2e\/.*|packages\/[^/]*\/src\/.*|packages\/[^/]*\/test\/.*|integration\/test\/.*|docs\/verify\/.*|docs\/(?:.*\/)?[^/]*\.md)$)'
       - '-removed-files ~= (?i)(^|/)(e2e|test|tests|__tests__)/|[.](test|spec)[.][cm]?[jt]sx?$'
       - '#files <= 40'
-      - '#added-lines <= 400'
-      - '#deleted-lines <= 400'
+      - '#added-lines <= 2000'
+      - '#deleted-lines <= 2000'
     merge_conditions:
       - or:
           - check-success = check
@@ -105,8 +105,8 @@ queue_rules:
       - '-files ~= (?ai)^(?!(?:apps\/[^/]*\/src\/.*|apps\/[^/]*\/test\/.*|apps\/[^/]*\/e2e\/.*|packages\/[^/]*\/src\/.*|packages\/[^/]*\/test\/.*|integration\/test\/.*|docs\/verify\/.*|docs\/(?:.*\/)?[^/]*\.md)$)'
       - '-removed-files ~= (?i)(^|/)(e2e|test|tests|__tests__)/|[.](test|spec)[.][cm]?[jt]sx?$'
       - '#files <= 40'
-      - '#added-lines <= 400'
-      - '#deleted-lines <= 400'
+      - '#added-lines <= 2000'
+      - '#deleted-lines <= 2000'
     merge_conditions:
       - or:
           - check-success = check

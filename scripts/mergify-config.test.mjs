@@ -24,8 +24,32 @@ test('negative control: a list or limit changed in merge-gate-paths.json changes
     { ...gatePaths, protected: [...gatePaths.protected, 'zz-extra/**'] },
     { ...gatePaths, autoMerge: gatePaths.autoMerge.slice(1) },
     { ...gatePaths, limits: { ...gatePaths.limits, maxFiles: gatePaths.limits.maxFiles + 1 } },
+    {
+      ...gatePaths,
+      limits: { ...gatePaths.limits, maxLinesEachWay: gatePaths.limits.maxLinesEachWay + 1 },
+    },
   ])
     assert.notEqual(mergifyConfig(prGate, changed), config);
+});
+
+test('a queue line cap that is not a positive integer fails closed', () => {
+  assert.throws(
+    () =>
+      mergifyConfig(prGate, {
+        ...gatePaths,
+        limits: { ...gatePaths.limits, maxLinesEachWay: 0 },
+      }),
+    /maxLinesEachWay/,
+  );
+});
+
+test('the queue admits 2000 lines each way from merge-gate-paths.json', () => {
+  assert.equal(gatePaths.limits.maxLinesEachWay, 2000);
+  for (const name of ['default', 'bot']) {
+    const [queue] = rules[name].split('    merge_conditions:\n');
+    assert.match(queue, /- '#added-lines <= 2000'\n/, name);
+    assert.match(queue, /- '#deleted-lines <= 2000'\n/, name);
+  }
 });
 
 test('protected paths never enter the queue', () => {
