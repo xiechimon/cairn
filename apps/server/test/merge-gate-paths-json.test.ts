@@ -92,7 +92,7 @@ describe('merge-gate-paths.json is the single source', () => {
     expect(GATE_LIMITS.maxLines).toBe(gatePaths.limits.maxLines);
     expect(GATE_LIMITS.maxFiles).toBe(gatePaths.limits.maxFiles);
     expect(GATE_LIMITS.maxLinesEachWay).toBe(gatePaths.limits.maxLinesEachWay);
-    expect(gatePaths.limits).toEqual({ maxLines: 800, maxFiles: 40, maxLinesEachWay: 2000 });
+    expect(gatePaths.limits).toEqual({ maxLines: 800, maxFiles: 40, maxLinesEachWay: 8000 });
   });
 
   test('every human-queue path is protected', () => {

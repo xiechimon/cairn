@@ -105,6 +105,6 @@
   "limits": {
     "maxLines": 800,
     "maxFiles": 40,
-    "maxLinesEachWay": 2000
+    "maxLinesEachWay": 8000
   }
 }

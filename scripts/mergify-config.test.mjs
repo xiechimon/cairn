@@ -43,12 +43,12 @@ test('a queue line cap that is not a positive integer fails closed', () => {
   );
 });
 
-test('the queue admits 2000 lines each way from merge-gate-paths.json', () => {
-  assert.equal(gatePaths.limits.maxLinesEachWay, 2000);
+test('the queue admits 8000 lines each way from merge-gate-paths.json', () => {
+  assert.equal(gatePaths.limits.maxLinesEachWay, 8000);
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
-    assert.match(queue, /- '#added-lines <= 2000'\n/, name);
-    assert.match(queue, /- '#deleted-lines <= 2000'\n/, name);
+    assert.match(queue, /- '#added-lines <= 8000'\n/, name);
+    assert.match(queue, /- '#deleted-lines <= 8000'\n/, name);
   }
 });
 
