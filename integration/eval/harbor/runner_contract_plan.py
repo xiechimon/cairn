@@ -270,6 +270,65 @@ def _looks_like_grading_material(path):
     return any(part in ("test", "tests", "__tests__", "e2e", "fixtures") for part in parts)
 
 
+def bind_frozen_issue(partition, issue):
+    blank = {
+        "blocked": True,
+        "blockers": ["unverified partition is blocked"],
+        "instruction": "",
+        "issueBody": "",
+        "productPaths": [],
+        "graderPaths": [],
+        "commands": [],
+        "trustedInputs": [],
+        "complete": False,
+        "qualifiedTask": False,
+        "qualificationCredit": 0,
+        "verified": False,
+        "labelSha256": "",
+    }
+    if not isinstance(partition, dict) or partition.get("blocked"):
+        return blank
+    if not isinstance(issue, dict) or "latestBody" in issue:
+        blank["blockers"] = ["latest issue text is not a frozen snapshot"]
+        return blank
+    body = issue.get("body")
+    if not isinstance(body, str):
+        blank["blockers"] = ["frozen issue body is missing"]
+        return blank
+    if hashlib.sha256(body.encode()).hexdigest() != issue.get("bodySha256"):
+        blank["blockers"] = ["issue body does not match the frozen snapshot"]
+        return blank
+    if not _sha256_text(issue.get("labelSha256")):
+        blank["blockers"] = ["frozen label binding is missing"]
+        return blank
+    instruction = (
+        f"# Issue {issue.get('number')}\n\n"
+        f"Base revision: `{issue.get('baseSha')}`\n\n"
+        + (body if body.endswith("\n") else body + "\n")
+    )
+    if hashlib.sha256(instruction.encode()).hexdigest() != issue.get("promptSha256"):
+        blank["blockers"] = ["prompt does not match the frozen issue snapshot"]
+        return blank
+    blank.update(
+        blocked=False,
+        blockers=[],
+        instruction=instruction,
+        issueBody=body,
+        productPaths=list(partition.get("productPaths") or []),
+        graderPaths=list(partition.get("graderPaths") or []),
+        commands=list(partition.get("commands") or []),
+        trustedInputs=list(partition.get("trustedInputs") or []),
+        labelSha256=issue["labelSha256"],
+    )
+    return blank
+
+
+def _sha256_text(value):
+    return isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
 def _covered_paths(plan):
     covered = set()
     for command in plan.get("commands") or []:
