@@ -4,7 +4,6 @@ import { useLocation } from 'react-router';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -110,9 +109,8 @@ export function AppSidebar({
     [pathname, locationSearch],
   );
   useTypeToCompose();
-  const chiefStream = useOptionalChiefRoot()?.surface.chiefData.stream ?? [];
   const sidebarProps = {
-    attention: needsYouCount(resolvedTodos, chiefStream),
+    attention: needsYouCount(resolvedTodos),
     machinesOnline,
     machinesOffline,
     todos: resolvedTodos,

@@ -25,9 +25,6 @@ export function pendingQuestions(stream: readonly ChiefStreamItem[]): ChiefQuest
   );
 }
 
-export function needsYouCount(
-  todos: readonly TodoRecord[],
-  stream: readonly ChiefStreamItem[],
-): number {
-  return needsYouThreads(todos).length + pendingQuestions(stream).length;
+export function needsYouCount(todos: readonly TodoRecord[]): number {
+  return needsYouThreads(todos).length;
 }

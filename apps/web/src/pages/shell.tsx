@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
+import { ChiefQuestionEntry, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -82,7 +83,7 @@ export function PageShell({
       data-route={route}
     >
       {!embedded && <AppSidebar fixture={fixture} selected={selected} />}
-      <div className={embedded ? 'flex min-w-0 flex-1' : `page-main ${SHEET_PANEL}`}>
+      <div className={embedded ? 'relative flex min-w-0 flex-1' : `page-main ${SHEET_PANEL}`}>
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
           <header
             data-testid="page-topbar"
@@ -101,9 +102,10 @@ export function PageShell({
               {title}
             </h1>
             {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
-            {actions != null && (
-              <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
-            )}
+            <div className="ml-auto flex flex-none items-center gap-0.5">
+              <ChiefQuestionEntry />
+              {actions}
+            </div>
           </header>
           <div
             className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto${bleed ? '' : ' px-4'}`}
@@ -117,6 +119,7 @@ export function PageShell({
             )}
           </div>
         </div>
+        <ChiefQuestionPanel />
       </div>
     </div>
   );

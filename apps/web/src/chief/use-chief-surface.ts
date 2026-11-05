@@ -40,6 +40,7 @@ import {
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
+import { questionActionThread, questionDraftKey, questionDraftStore } from './question-drafts.js';
 
 export type { ChiefView };
 
@@ -60,8 +61,12 @@ export interface ChiefSurface {
   chiefBusy: boolean;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
+  onAnswerQuestion?: (input: {
+    requestId: string;
+    answers: AskUserAnswer[];
+    threadId?: string;
+  }) => void;
+  onCancelQuestion?: (requestId: string, threadId?: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
@@ -251,19 +256,36 @@ export function useChiefSurface(
       }
     : undefined;
   const onAnswerQuestion = live
-    ? (input: { requestId: string; answers: AskUserAnswer[] }) => {
-        if (activeThread === null) return;
+    ? (input: { requestId: string; answers: AskUserAnswer[]; threadId?: string }) => {
+        const threadId = questionActionThread(input.threadId, activeThread?.id ?? null);
+        if (threadId === null) return;
+        const key = questionDraftKey({
+          teamId: teamId ?? 'local',
+          conversationId: threadId,
+          requestId: input.requestId,
+        });
+        questionDraftStore.patch(key, { submitting: true, error: null });
         mutations.chiefAnswerQuestion.mutate(
-          { threadId: activeThread.id, ...input },
-          { onError: (e) => toastError(t('提交回答失败，请重试。'), e) },
+          { threadId, requestId: input.requestId, answers: input.answers },
+          {
+            onSuccess: () => questionDraftStore.clear(key),
+            onError: (e) => {
+              questionDraftStore.patch(key, {
+                submitting: false,
+                error: t('提交回答失败，草稿还在，请再试一次。'),
+              });
+              toastError(t('提交回答失败，请重试。'), e);
+            },
+          },
         );
       }
     : undefined;
   const onCancelQuestion = live
-    ? (requestId: string) => {
-        if (activeThread === null) return;
+    ? (requestId: string, threadId?: string) => {
+        const id = questionActionThread(threadId, activeThread?.id ?? null);
+        if (id === null) return;
         mutations.chiefCancelQuestion.mutate(
-          { threadId: activeThread.id, requestId },
+          { threadId: id, requestId },
           { onError: (e) => toastError(t('取消提问失败，请重试。'), e) },
         );
       }
