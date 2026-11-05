@@ -415,7 +415,7 @@ function cellAlignClass(align: TableAlign | undefined): string {
 
 function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }> }) {
   return (
-    <div className="chat-md-table my-2 max-w-full overflow-x-auto" data-testid="md-table">
+    <div className="my-2 max-w-full overflow-x-auto" data-testid="md-table">
       <table className="w-full border-collapse text-ui text-(--foreground)">
         <thead>
           <tr className="border-b border-(--border)">
