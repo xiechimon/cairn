@@ -567,7 +567,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       const row = me(c);
       const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
       const body = parseWith(machineComputerFramesBodySchema, await jsonBody(c), 'body');
-      return c.json(receiveComputerFrames(ctx.db, row.id, callId, body.frames));
+      return c.json(receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames));
     },
   );
 }
