@@ -166,6 +166,7 @@ export class NspawnOrbProvider implements OrbProvider {
   private readonly runtimeDirectoryTimeoutMs: number;
   private publishing: Promise<void> = Promise.resolve();
   private readonly starting = new Set<Promise<void>>();
+  private readonly computerReleases = new Map<string, string>();
   private readonly retainDistReleases = process.env.CAIRN_ORB_RETAIN_RELEASES === '1';
 
   constructor(
@@ -233,36 +234,54 @@ export class NspawnOrbProvider implements OrbProvider {
     return handle;
   }
 
+  private async publishDist(): Promise<string> {
+    for (const [name, root] of [
+      ['dist', this.distRoot],
+      ['seed', this.seedRoot],
+    ] as const) {
+      if (!checkOrbDirectory(root, `Orb ${name} root`))
+        throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
+    }
+    return publishOrbDist(this.distSource, this.distRoot, this.runner, () => {
+      if (this.retainDistReleases) return undefined;
+      const running = [...this.handles.values()].filter((machine) => machine.running);
+      if (running.some((machine) => !machine.releaseKey)) return undefined;
+      return new Set([
+        ...running.flatMap((machine) =>
+          [machine.releaseKey, machine.expectedReleaseKey].filter(
+            (key): key is string => key !== undefined,
+          ),
+        ),
+        ...this.computerReleases.values(),
+      ]);
+    });
+  }
+
+  async publishRelease(): Promise<string> {
+    const starting = [...this.starting];
+    let key = '';
+    const publish = this.publishing.then(async () => {
+      await Promise.allSettled(starting);
+      key = await this.publishDist();
+      this.computerReleases.set('published', key);
+    });
+    this.publishing = publish.catch(() => {});
+    await publish;
+    return key;
+  }
+
+  retainComputerRelease(name: string, release: string): void {
+    orbReleaseKeySchema.parse(release);
+    this.computerReleases.set(name, release);
+  }
+
   async prepare(handle: OrbHandle, seed?: string): Promise<string> {
     this.validate(handle);
     const directory = join(this.runtimeRoot, handle.id);
     const starting = [...this.starting];
     const publish = this.publishing.then(async () => {
       await Promise.allSettled(starting);
-      for (const [name, root] of [
-        ['dist', this.distRoot],
-        ['seed', this.seedRoot],
-      ] as const) {
-        if (!checkOrbDirectory(root, `Orb ${name} root`))
-          throw new Error(`Orb ${name} root must exist: ${root}; run the installer`);
-      }
-      handle.expectedReleaseKey = await publishOrbDist(
-        this.distSource,
-        this.distRoot,
-        this.runner,
-        () => {
-          if (this.retainDistReleases) return undefined;
-          const running = [...this.handles.values()].filter((machine) => machine.running);
-          if (running.some((machine) => !machine.releaseKey)) return undefined;
-          return new Set(
-            running.flatMap((machine) =>
-              [machine.releaseKey, machine.expectedReleaseKey].filter(
-                (key): key is string => key !== undefined,
-              ),
-            ),
-          );
-        },
-      );
+      handle.expectedReleaseKey = await this.publishDist();
       this.save();
       if (seed)
         await publishOrbSeed({

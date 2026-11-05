@@ -1154,6 +1154,28 @@ test('computer image builds from the base with the host mirrorlist read-only and
       'utf8',
     );
     assert.match(unit, /^User=agent$/m);
+    const agent = readFileSync(
+      join(f.image, 'etc/systemd/system/cairn-computer-agent.service'),
+      'utf8',
+    );
+    assert.match(agent, /^User=agent$/m);
+    assert.match(agent, /^Restart=always$/m);
+    assert.match(agent, /^ExecStartPre=.*-S \/run\/cairn\/computer\.sock/m);
+    assert.match(
+      agent,
+      /^ExecStart=\/usr\/bin\/node \/opt\/cairn\/daemon\/cli\.mjs orb-computer --socket \/run\/cairn\/computer\.sock$/m,
+    );
+    const systemctl = f.calls().filter((call) => call.includes('systemctl'));
+    assert.ok(
+      systemctl.some(
+        (call) => call.includes('enable') && call.includes('cairn-computer-agent.service'),
+      ),
+    );
+    assert.ok(
+      systemctl.some(
+        (call) => call.includes('disable') && call.includes('cairn-orb-worker.service'),
+      ),
+    );
     const desktop = readFileSync(join(f.image, 'usr/local/lib/cairn-computer/desktop.sh'), 'utf8');
     assert.match(desktop, /-unixsock \/run\/cairn-computer\/view\.sock -viewonly/);
     assert.match(desktop, /-nolisten tcp/);

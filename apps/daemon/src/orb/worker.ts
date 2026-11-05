@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, rmSync } from 'node:fs';
 import { userInfo } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
 import { createGeminiBackend } from '../backend/acp.js';
@@ -16,7 +16,7 @@ import { readSessionJsonlForUpload } from '../session-jsonl.js';
 import { ensureStateDirs, recordSession, resolveSessionFile, statePaths } from '../state.js';
 import { StepStops, type StopRequest } from '../step-stops.js';
 import { WorkspaceManager } from '../workspace.js';
-import { type OrbFrame, orbReleaseKeySchema } from './protocol.js';
+import { type OrbFrame, orbReleaseFromEntry } from './protocol.js';
 import { OrbStaleReleaseError, RelayMachineApi } from './relay.js';
 
 export function orbAgentHome(): string {
@@ -74,15 +74,7 @@ export async function runOrbWorker(options: {
   outboxRoot?: string;
 }): Promise<void> {
   const entry = realpathSync(options.entryPath ?? fileURLToPath(import.meta.url));
-  const directory = dirname(entry);
-  const releaseRoot = dirname(directory);
-  if (
-    basename(entry) !== 'cli.mjs' ||
-    basename(directory) !== 'dist' ||
-    basename(dirname(releaseRoot)) !== 'releases'
-  )
-    throw new Error('Orb worker entry must resolve to releases/<key>/dist/cli.mjs');
-  const release = orbReleaseKeySchema.parse(basename(releaseRoot));
+  const release = orbReleaseFromEntry(entry);
   let relay: RelayMachineApi | undefined;
   const send = (frame: OrbFrame) => relay?.send(frame);
   const sessions = new (class extends Map<string, AgentSessionHandle> {

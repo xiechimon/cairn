@@ -1,3 +1,4 @@
+import { basename, dirname } from 'node:path';
 import { type ClaimedStep, machineDoneBodySchema, transcriptUploadSchema } from '@cairn/shared';
 import { z } from 'zod';
 import type { MachineApi } from '../machine-client.js';
@@ -12,6 +13,18 @@ export const orbReleaseKeySchema = z
   .regex(
     /^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?-[a-f0-9]{4,40}-dist-[a-f0-9]{16}(?:-dirty-[a-f0-9]{16})?$/,
   );
+
+export function orbReleaseFromEntry(entry: string): string {
+  const directory = dirname(entry);
+  const releaseRoot = dirname(directory);
+  if (
+    basename(entry) !== 'cli.mjs' ||
+    basename(directory) !== 'dist' ||
+    basename(dirname(releaseRoot)) !== 'releases'
+  )
+    throw new Error('Orb worker entry must resolve to releases/<key>/dist/cli.mjs');
+  return orbReleaseKeySchema.parse(basename(releaseRoot));
+}
 
 export function isOrbPathId(id: string): boolean {
   return /^[A-Za-z0-9_-]{1,128}$/.test(id);

@@ -1,12 +1,30 @@
-import type { ComputerCall } from '@cairn/shared';
+import {
+  COMPUTER_FRAME_TEXT_MAX_CHARS,
+  COMPUTER_REPLAY_SAFE_TOOLS,
+  type ComputerCall,
+  type ComputerTool,
+} from '@cairn/shared';
 import { z } from 'zod';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
 import { FramePoster } from './frame-poster.js';
-import { desktopProtectionGuardMessage, protectedComputerLifecycleRefusal } from './guard.js';
-import { type ComputerProcessEvent, type ComputerProvider, ComputerRefusal } from './provider.js';
+import {
+  desktopProtectionGuardMessage,
+  orbComputerProtectionRefusal,
+  protectedComputerLifecycleRefusal,
+} from './guard.js';
+import {
+  type ComputerFileEntry,
+  type ComputerFileOptions,
+  type ComputerProcessEvent,
+  type ComputerProvider,
+  ComputerRefusal,
+  type ScopedComputerProviders,
+} from './provider.js';
 
 export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provider';
+export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
+export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
 
 export const COMPUTER_COMMAND_TIMEOUT_MS = 5 * 60_000;
 export const COMPUTER_OUTPUT_CAP_CHARS = 2 * 1024 * 1024;
@@ -21,6 +39,22 @@ const shellParams = z.object({
   command: z.string().min(1).max(100_000),
   cwd: z.string().max(4096).optional(),
 });
+
+const pathParams = z.object({ path: z.string().max(4096) });
+const listParams = z.object({ path: z.string().max(4096).optional() });
+const writeParams = z.object({ path: z.string().max(4096), content: z.string() });
+
+const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
+  'shell',
+  'list_files',
+  'read_file',
+  'write_file',
+]);
+
+interface Route {
+  provider: ComputerProvider;
+  guard: (command: string) => string | undefined;
+}
 
 type ComputerClient = Pick<MachineApi, 'computerFrames'>;
 
@@ -37,6 +71,7 @@ export async function rejectComputerCall(
 export interface ComputerDispatcherOptions {
   client: ComputerClient;
   host?: ComputerProvider;
+  orb?: ScopedComputerProviders;
   logger?: Pick<DaemonLogger, 'machine'>;
   now?: () => number;
   flushMs?: number;
@@ -52,19 +87,48 @@ export interface ComputerDispatcher {
   close(): Promise<void>;
 }
 
+function listingText(entries: ComputerFileEntry[]): string {
+  const lines: string[] = [];
+  let length = 0;
+  for (const entry of entries) {
+    const line = `${entry.kind}\t${entry.size}\t${entry.path}${entry.executable ? '\t*' : ''}\n`;
+    if (length + line.length > COMPUTER_FRAME_TEXT_MAX_CHARS - 64) {
+      lines.push(`[${entries.length - lines.length} more entries not shown]\n`);
+      break;
+    }
+    lines.push(line);
+    length += line.length;
+  }
+  return lines.join('');
+}
+
 export function createComputerDispatcher(options: ComputerDispatcherOptions): ComputerDispatcher {
   const now = options.now ?? Date.now;
   const inFlight = new Map<string, { controller: AbortController; settled: Promise<void> }>();
-  const seen = new Set<string>();
+  const finishedUnsafe = new Set<string>();
   let closing = false;
   const postingLifetime = new AbortController();
 
   function remember(callId: string): void {
-    seen.add(callId);
-    if (seen.size > REMEMBERED_CALLS) {
-      const oldest = seen.values().next().value;
-      if (oldest !== undefined) seen.delete(oldest);
+    finishedUnsafe.add(callId);
+    if (finishedUnsafe.size > REMEMBERED_CALLS) {
+      const oldest = finishedUnsafe.values().next().value;
+      if (oldest !== undefined) finishedUnsafe.delete(oldest);
     }
+  }
+
+  function routeFor(call: ComputerCall): Route | string {
+    if (call.tool === 'user_computer_shell') {
+      return options.host
+        ? { provider: options.host, guard: protectedComputerLifecycleRefusal }
+        : NO_COMPUTER_PROVIDER_MESSAGE;
+    }
+    if (!ORB_TOOLS.has(call.tool) || !options.orb) return NO_COMPUTER_PROVIDER_MESSAGE;
+    if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
+    return {
+      provider: options.orb.forScope(call.scopeKey),
+      guard: orbComputerProtectionRefusal,
+    };
   }
 
   function posterFor(call: ComputerCall, controller: AbortController): FramePoster {
@@ -131,7 +195,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         if (event.kind === 'exit') exit = event;
         else poster.output(event.kind, event.text);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof ComputerRefusal) {
+        await poster.finish({ kind: 'error', message: error.message, delivery: 'not_delivered' });
+        return;
+      }
       await poster.finish({
         kind: 'error',
         message: 'The command failed after it started',
@@ -172,12 +240,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
   }
 
-  async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
-    const host = options.host;
-    if (call.tool !== 'user_computer_shell' || !host) {
-      await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
-      return;
-    }
+  async function handleShell(
+    call: ComputerCall,
+    route: Route,
+    controller: AbortController,
+  ): Promise<void> {
     const params = shellParams.safeParse(call.params);
     if (!params.success) {
       await refuse(call, 'The shell call needs a non-empty command and an optional cwd string');
@@ -188,7 +255,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, 'The call deadline had already passed, so nothing ran');
       return;
     }
-    const refusal = protectedComputerLifecycleRefusal(params.data.command);
+    const refusal = route.guard(params.data.command);
     if (refusal !== undefined) {
       await refuse(call, desktopProtectionGuardMessage(refusal));
       return;
@@ -202,13 +269,88 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
       return;
     }
-    await runShell(call, host, params.data, timeoutMs, executionDeadline, controller);
+    await runShell(call, route.provider, params.data, timeoutMs, executionDeadline, controller);
+  }
+
+  async function fileText(
+    call: ComputerCall,
+    provider: ComputerProvider,
+    file: ComputerFileOptions,
+  ): Promise<string> {
+    if (call.tool === 'list_files') {
+      const params = listParams.parse(call.params);
+      return listingText(await provider.listFiles(params.path ?? '', file));
+    }
+    if (call.tool === 'read_file') {
+      const content = await provider.readFile(pathParams.parse(call.params).path, file);
+      if (content.length <= COMPUTER_FRAME_TEXT_MAX_CHARS) return content;
+      return (
+        content.slice(0, COMPUTER_FRAME_TEXT_MAX_CHARS - FILE_TRUNCATED_MARKER.length) +
+        FILE_TRUNCATED_MARKER
+      );
+    }
+    const params = writeParams.parse(call.params);
+    await provider.writeFile(params.path, params.content, file);
+    return `wrote ${Buffer.byteLength(params.content)} bytes`;
+  }
+
+  async function handleFile(
+    call: ComputerCall,
+    route: Route,
+    controller: AbortController,
+  ): Promise<void> {
+    const parsed = {
+      list_files: listParams,
+      read_file: pathParams,
+      write_file: writeParams,
+    }[call.tool as 'list_files' | 'read_file' | 'write_file'].safeParse(call.params);
+    if (!parsed.success) {
+      await refuse(call, `The ${call.tool} call has invalid arguments, so nothing ran`);
+      return;
+    }
+    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    let text: string;
+    try {
+      text = await fileText(call, route.provider, {
+        timeoutMs: call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      await poster.finish(
+        error instanceof ComputerRefusal
+          ? { kind: 'error', message: error.message, delivery: 'not_delivered' }
+          : {
+              kind: 'error',
+              message: 'The file operation failed',
+              delivery: 'unknown',
+            },
+      );
+      return;
+    }
+    await poster.finish({ kind: 'done', text });
+  }
+
+  async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
+    const route = routeFor(call);
+    if (typeof route === 'string') {
+      await refuse(call, route);
+      return;
+    }
+    if (call.tool === 'shell' || call.tool === 'user_computer_shell') {
+      await handleShell(call, route, controller);
+    } else {
+      await handleFile(call, route, controller);
+    }
   }
 
   return {
     async dispatch(call) {
-      if (closing || inFlight.has(call.callId) || seen.has(call.callId)) return;
-      remember(call.callId);
+      if (closing || inFlight.has(call.callId) || finishedUnsafe.has(call.callId)) return;
+      if (!COMPUTER_REPLAY_SAFE_TOOLS.has(call.tool)) remember(call.callId);
       const controller = new AbortController();
       const settled = handle(call, controller)
         .catch((error: unknown) => {
@@ -226,7 +368,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       let deadlineTimer: NodeJS.Timeout | undefined;
       try {
         for (const { controller } of running) controller.abort('shutdown');
-        await options.host?.killAll();
+        await Promise.all([options.host?.killAll(), options.orb?.killAll()]);
         await Promise.race([
           Promise.allSettled(running.map(({ settled }) => settled)),
           new Promise<void>((resolve) => {

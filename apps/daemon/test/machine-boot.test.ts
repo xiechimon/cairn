@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
+import type { ScopedComputerProviders } from '../src/computer/provider.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
 
@@ -151,5 +152,34 @@ describe('D75 own computer opt-in', () => {
   test('without the switch the machine does not report ownComputer', async () => {
     expect((await report({}))?.ownComputer).toBeUndefined();
     expect((await report({ CAIRN_OWN_COMPUTER: 'true' }))?.ownComputer).toBeUndefined();
+  });
+});
+
+describe('D75 orb computer capability', () => {
+  const report = async (orbComputer?: ScopedComputerProviders) => {
+    const { handle, api } = await boot({
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
+      capEnv: {},
+      ...(orbComputer ? { orbComputer } : {}),
+    });
+    await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
+    const caps = (api.enrollBodies[0] as { capabilities?: { computer?: true } }).capabilities;
+    await handle.stop();
+    await handle.done;
+    return caps;
+  };
+
+  test('a daemon with an Orb computer provider reports computer', async () => {
+    const orbComputer: ScopedComputerProviders = {
+      forScope: () => {
+        throw new Error('unused');
+      },
+      killAll: async () => {},
+    };
+    expect((await report(orbComputer))?.computer).toBe(true);
+  });
+
+  test('a daemon without one does not', async () => {
+    expect((await report())?.computer).toBeUndefined();
   });
 });

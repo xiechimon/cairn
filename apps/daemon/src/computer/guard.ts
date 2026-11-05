@@ -570,6 +570,11 @@ export function protectedComputerLifecycleRefusal(command: string): string | und
   return protectedWordRefusal(tokenized.words);
 }
 
+/** Orb computer uses the same lifecycle refusals as host (including cairn host rules). */
+export function orbComputerProtectionRefusal(command: string): string | undefined {
+  return protectedComputerLifecycleRefusal(command);
+}
+
 export function isProtectedComputerLifecycleCommand(command: string): boolean {
   return protectedComputerLifecycleRefusal(command) !== undefined;
 }
