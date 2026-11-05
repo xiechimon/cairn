@@ -149,7 +149,6 @@ test('Load more reveals the next page and then goes away', async ({ page }) => {
 
 test('a row opens its thread and the sidebar Activity link opens the page', async ({ page }) => {
   await page.goto('/app?scenario=activity');
-  await page.getByTestId('sidebar-user-menu').click();
   await page.getByTestId('sidebar-activity').click();
   await expect(page).toHaveURL(/\/app\/activity/);
   await expect(groups(page).first()).toBeVisible();
@@ -157,35 +156,31 @@ test('a row opens its thread and the sidebar Activity link opens the page', asyn
   await expect(page).toHaveURL(/thread=act-gallery/);
 });
 
-test('the expanded user row keeps its name readable alongside offline status', async ({ page }) => {
+test('the footer keeps Activity and Settings next to the offline status', async ({ page }) => {
   await page.goto('/app?scenario=activity');
-  const trigger = page.getByTestId('sidebar-user-menu');
-  await expect(trigger).toContainText('Xmon Dai');
-  const nameWidth = await trigger.locator('span.truncate').evaluate((node) => node.getBoundingClientRect().width);
-  expect(nameWidth).toBeGreaterThan(80);
+  const footer = page.getByTestId('sidebar-footer');
+  await expect(footer.getByTestId('sidebar-settings')).toBeVisible();
+  await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
+  await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.getByTestId('sidebar-attention')).toBeVisible();
 });
 
-test('the collapsed user menu supports keyboard navigation and keeps Settings reachable', async ({ page }) => {
+test('the collapsed rail keeps Activity and Settings as direct links', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=activity');
-  const trigger = page.getByTestId('sidebar-user-menu');
-  await trigger.focus();
-  await trigger.press('Enter');
-  await expect(page.getByRole('menuitem', { name: 'Activity', exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(trigger).toBeFocused();
-  await trigger.click();
-  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+  const activity = page.getByTestId('sidebar-activity');
+  await activity.focus();
+  await activity.press('Enter');
+  await expect(page).toHaveURL(/\/app\/activity/);
+  await page.getByTestId('sidebar-settings').click();
   await expect(page).toHaveURL(/\/app\/settings/);
 });
 
-test('the phone user menu opens Activity and dismisses the sidebar', async ({ page }) => {
+test('the phone drawer Activity link opens the page and dismisses the sidebar', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?scenario=activity');
   await page.locator('.app-menu-trigger').click();
-  await page.getByTestId('sidebar-user-menu').click();
-  await page.getByRole('menuitem', { name: 'Activity', exact: true }).click();
+  await page.getByTestId('sidebar-activity').click();
   await expect(page).toHaveURL(/\/app\/activity/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(groups(page).first()).toBeVisible();
