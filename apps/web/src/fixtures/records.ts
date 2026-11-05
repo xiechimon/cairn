@@ -141,7 +141,12 @@ export interface ScheduleRecord {
   kind: 'hourly' | 'daily' | 'weekly' | 'once' | 'cron';
   at: number;
   tz: string;
-  nextRunAt: number;
+  nextRunAt: number | null;
+  cron?: string | null;
+  prompt?: string;
+  lastRunAt?: number | null;
+  lastRunStatus?: string | null;
+  lastRunError?: string | null;
   createdBy: string;
   enabled?: boolean;
   pausedReason?: string | null;
