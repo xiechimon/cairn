@@ -237,7 +237,7 @@ step_wait_alarm() {
 assert_idle() {
   [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
   local running stale now since waited counts
-  counts="$(step_counts)"
+  counts="$(step_counts)" || busy "cannot read the step counts"
   if ! [[ "$counts" =~ ^([0-9]+)\ ([0-9]+)$ ]]; then
     busy "cannot read the step counts"
   fi
