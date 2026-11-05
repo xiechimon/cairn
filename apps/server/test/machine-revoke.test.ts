@@ -13,7 +13,6 @@ import {
   team as teamTable,
 } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
-import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { routeVerdict, targetUnavailable } from '../src/services/machine-routing.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { seedLocalMachine } from '../src/services/machines.js';

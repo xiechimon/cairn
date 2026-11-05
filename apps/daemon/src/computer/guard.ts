@@ -524,12 +524,15 @@ function tokenizeProtectedShellCommand(
   }
 }
 
-function protectedWordRefusal(words: readonly string[]): string | undefined {
+function protectedWordRefusal(
+  words: readonly string[],
+  cairnHostRules: boolean,
+): string | undefined {
   for (const word of words) {
     const base = (word.split('/').at(-1) ?? '').toLowerCase();
     if (/^(?:kill|pkill|killall|xkill)$/.test(base)) return `protected command ${base}`;
   }
-  const cairn = cairnHostRefusal(words);
+  const cairn = cairnHostRules ? cairnHostRefusal(words) : undefined;
   if (cairn) return cairn;
   for (let index = 0; index < words.length; index += 1) {
     const word = words[index] ?? '';
@@ -556,23 +559,26 @@ function protectedWordRefusal(words: readonly string[]): string | undefined {
     if (!SHELL_INTERPRETER_NAMES.test(name)) continue;
     const program = shellCFlagProgram(words, index);
     if (!program) continue;
-    const nested = protectedComputerLifecycleRefusal(program);
+    const nested = lifecycleRefusal(program, cairnHostRules);
     if (nested) return nested;
   }
   return undefined;
 }
 
-export function protectedComputerLifecycleRefusal(command: string): string | undefined {
+function lifecycleRefusal(command: string, cairnHostRules: boolean): string | undefined {
   const prepared = prepareDesktopGuardCommand(command);
   if ('reason' in prepared) return prepared.reason;
   const tokenized = tokenizeProtectedShellCommand(prepared.command, prepared.literals);
   if ('reason' in tokenized) return tokenized.reason;
-  return protectedWordRefusal(tokenized.words);
+  return protectedWordRefusal(tokenized.words, cairnHostRules);
 }
 
-/** Orb computer uses the same lifecycle refusals as host (including cairn host rules). */
+export function protectedComputerLifecycleRefusal(command: string): string | undefined {
+  return lifecycleRefusal(command, true);
+}
+
 export function orbComputerProtectionRefusal(command: string): string | undefined {
-  return protectedComputerLifecycleRefusal(command);
+  return lifecycleRefusal(command, false);
 }
 
 export function isProtectedComputerLifecycleCommand(command: string): boolean {
