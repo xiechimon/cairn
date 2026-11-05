@@ -9,6 +9,11 @@ import { useI18n } from '../i18n/provider.js';
 type ScreenStatus = 'connecting' | 'connected' | 'placeholder' | 'failed';
 type NovncRfb = import('@novnc/novnc').default;
 
+function resyncScale(rfb: NovncRfb) {
+  rfb.scaleViewport = false;
+  rfb.scaleViewport = true;
+}
+
 export function ScreenPlaceholder({ online, label }: { online: boolean; label: string }) {
   return (
     <div
@@ -69,16 +74,21 @@ export function MachineScreenSurface({
           wsProtocols: opened.wsProtocols,
         });
         rfb.viewOnly = !interactive;
+        rfb.clipViewport = false;
         rfb.scaleViewport = true;
-        rfb.clipViewport = true;
         rfb.focusOnClick = interactive;
         rfb.showDotCursor = interactive;
         rfb.background = 'transparent';
         rfbRef.current = rfb;
         rfb.addEventListener('connect', () => {
-          if (cancelled) return;
+          if (cancelled || rfb == null) return;
           setStatus('connected');
-          if (interactive && autoFocus) rfb?.focus({ preventScroll: true });
+          resyncScale(rfb);
+          requestAnimationFrame(() => {
+            if (cancelled || rfbRef.current == null) return;
+            resyncScale(rfbRef.current);
+            if (interactive && autoFocus) rfbRef.current.focus({ preventScroll: true });
+          });
         });
         rfb.addEventListener('disconnect', () => {
           if (!cancelled) setStatus('placeholder');
@@ -129,12 +139,10 @@ export function MachineScreenSurface({
       data-testid="machine-screen"
       data-status={status}
       data-interactive={interactive ? 'true' : 'false'}
-      className={`relative overflow-hidden bg-(--surface-1) ${fill ? 'min-h-0 flex-1 rounded-md ring-1 ring-border/60' : 'aspect-[16/10]'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
+      data-fill={fill ? 'true' : 'false'}
+      className={`relative overflow-hidden bg-(--surface-1) ${fill ? 'h-full min-h-0 w-full rounded-md ring-1 ring-border/60' : 'aspect-[16/10]'} ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
-      <div
-        ref={host}
-        className="absolute inset-0 [&_canvas]:h-full [&_canvas]:w-full [&_canvas]:outline-none"
-      />
+      <div ref={host} className="h-full w-full overflow-hidden [&_canvas]:outline-none" />
       {status !== 'connected' && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-meta text-content-tertiary">
           <span className="flex flex-col items-center gap-2">

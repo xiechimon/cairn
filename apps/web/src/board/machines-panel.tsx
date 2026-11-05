@@ -1,7 +1,7 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Globe, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import {
@@ -176,6 +176,8 @@ function MachineCard({
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [expandAfterLease, setExpandAfterLease] = useState(false);
+  const reclaiming = useRef(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
@@ -188,7 +190,10 @@ function MachineCard({
   }, [computer?.controlHolder, computer?.id]);
 
   useEffect(() => {
-    if (!screenLive) setExpanded(false);
+    if (!screenLive) {
+      setExpanded(false);
+      setExpandAfterLease(false);
+    }
   }, [screenLive]);
 
   useEffect(() => {
@@ -197,24 +202,22 @@ function MachineCard({
       computer === null ||
       computer.controlHolder !== 'user' ||
       leaseId !== null ||
-      busy
+      reclaiming.current
     )
       return;
-    let cancelled = false;
+    const computerId = computer.id;
+    reclaiming.current = true;
     setBusy(true);
-    void acquireComputerControl(teamId, computer.id)
+    void acquireComputerControl(teamId, computerId)
       .then((lease) => {
-        if (cancelled) return;
         setLeaseId(lease.leaseId);
         return invalidateConverged(qc, { queryKey: ['computers', teamId] });
       })
       .finally(() => {
-        if (!cancelled) setBusy(false);
+        reclaiming.current = false;
+        setBusy(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [teamId, computer?.id, computer?.controlHolder, leaseId, busy, qc, computer]);
+  }, [teamId, computer?.id, computer?.controlHolder, leaseId, qc, computer]);
 
   useEffect(() => {
     if (teamId === undefined || computer === null || leaseId === null) return;
@@ -225,6 +228,12 @@ function MachineCard({
     }, 10 * 60_000);
     return () => window.clearInterval(tick);
   }, [teamId, computer, leaseId]);
+
+  useEffect(() => {
+    if (!expandAfterLease || leaseId === null) return;
+    setExpanded(true);
+    setExpandAfterLease(false);
+  }, [expandAfterLease, leaseId]);
 
   const onDesktopToggle = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
@@ -248,19 +257,23 @@ function MachineCard({
   };
 
   const openEnlarged = () => {
-    if (!screenLive) return;
-    if (leaseId === null && teamId !== undefined && computer !== null && !busy) {
-      setBusy(true);
-      void acquireComputerControl(teamId, computer.id)
-        .then((lease) => {
-          setLeaseId(lease.leaseId);
-          setExpanded(true);
-          return invalidateConverged(qc, { queryKey: ['computers', teamId] });
-        })
-        .finally(() => setBusy(false));
+    if (!screenLive || teamId === undefined || computer === null) return;
+    if (leaseId !== null) {
+      setExpanded(true);
       return;
     }
-    setExpanded(true);
+    setExpandAfterLease(true);
+    if (busy) return;
+    setBusy(true);
+    void acquireComputerControl(teamId, computer.id)
+      .then((lease) => {
+        setLeaseId(lease.leaseId);
+        return invalidateConverged(qc, { queryKey: ['computers', teamId] });
+      })
+      .catch(() => {
+        setExpandAfterLease(false);
+      })
+      .finally(() => setBusy(false));
   };
 
   return (
@@ -283,8 +296,8 @@ function MachineCard({
           open={expanded}
           onClose={() => setExpanded(false)}
           title={machine.name}
-          width="min(100vw - 1.5rem, 1120px)"
-          height="min(100dvh - 1.5rem, 820px)"
+          width="min(100vw - 1.5rem, 1280px)"
+          height="min(100dvh - 1.5rem, 900px)"
           className="flex max-h-[calc(100dvh-1.5rem)] flex-col"
         >
           <div className="relative flex shrink-0 items-start gap-3 px-4 pt-4 pr-12 pb-2 sm:px-5 sm:pt-4.5 sm:pr-13">
@@ -309,16 +322,26 @@ function MachineCard({
           </div>
           <div
             data-testid="machine-screen-enlarged"
-            className="flex min-h-0 flex-1 flex-col px-2 pb-2 sm:px-3 sm:pb-3"
+            className="grid min-h-0 flex-1 place-items-center px-2 pb-2 sm:px-3 sm:pb-3"
+            style={{ containerType: 'size' }}
           >
-            <MachineScreenSurface
-              teamId={teamId}
-              computer={computer}
-              leaseId={leaseId}
-              interactive={leaseId !== null}
-              fill
-              autoFocus
-            />
+            <div
+              className="max-h-full max-w-full"
+              style={{
+                aspectRatio: '16 / 10',
+                width: 'min(100cqw, calc(100cqh * 16 / 10))',
+                height: 'min(100cqh, calc(100cqw * 10 / 16))',
+              }}
+            >
+              <MachineScreenSurface
+                teamId={teamId}
+                computer={computer}
+                leaseId={leaseId}
+                interactive={leaseId !== null}
+                fill
+                autoFocus
+              />
+            </div>
           </div>
         </DialogShell>
       )}
