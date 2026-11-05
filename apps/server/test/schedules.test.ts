@@ -271,7 +271,7 @@ describe('periodic-slot nextRunAt (cron tz-aware; the hourly/daily/weekly enum w
 });
 
 describe('scheduled thread continuation', () => {
-  test('a once schedule starts an unbuilt task and is removed after its step completes', async () => {
+  test('a once schedule retains its completed run without scheduling another wake', async () => {
     const s = await withTodo();
     const at = new Date('2026-09-23T00:00:00+08:00').getTime();
     await req(s.app, 'POST', '/api/schedules', {
@@ -299,7 +299,18 @@ describe('scheduled thread continuation', () => {
     expect(steps[0]?.kind).toBe('build');
     setTodoPhase(s.svc, s.todoDoc.id, 'building');
     completeStep(s.svc, steps[0]!.id);
-    expect(await (await req(s.app, 'GET', '/api/schedules')).json()).toEqual([]);
+    const completed = scheduleRecordSchema.parse(
+      ((await (await req(s.app, 'GET', '/api/schedules')).json()) as ScheduleRecord[])[0],
+    );
+    expect(completed).toMatchObject({
+      enabled: true,
+      nextRunAt: null,
+      lastRunAt: expect.any(Number),
+      lastRunStatus: 'completed',
+      lastRunError: null,
+    });
+    await s.scheduler.tick(Date.now() + 86_400_000);
+    expect(listSteps(s.svc, builds[0]!.id)).toHaveLength(1);
   });
 
   test('a done task continues its existing build and history', async () => {
