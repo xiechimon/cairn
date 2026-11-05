@@ -302,6 +302,58 @@ describe('flag on', () => {
       expect(released?.prompt ?? '').toContain('Use a streaming export.');
     });
 
+    test('a tier-2 report in review stays held until the citation audit exists', async () => {
+      H.s.db
+        .insert(agent)
+        .values({
+          id: 'agent-claude',
+          teamId: H.teamId,
+          displayName: 'Claude',
+          description: 'research',
+          status: 'active',
+          avatarUrl: null,
+          provider: 'claude-code',
+          modelId: 'claude-sonnet-5-5',
+          thinkingLevel: null,
+          tools: [],
+          secrets: [],
+          defaultSkill: null,
+          skillsAllowlist: null,
+          mcpServers: [],
+        })
+        .run();
+      const id = seedTodo({
+        title: 'make the export faster',
+        spec: `The board export is slow. ${'detail '.repeat(800)}`,
+      });
+      const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
+      const research = H.s.db
+        .select()
+        .from(todo)
+        .where(eq(todo.sourceKind, 'research-before-plan'))
+        .get();
+      if (!research?.latestBuildId) throw new Error('research build missing');
+      const tier = H.s.db
+        .select()
+        .from(message)
+        .where(eq(message.id, `research-tier-${research.latestBuildId}`))
+        .get();
+      expect(tier?.content).toContain('"tier":2');
+      H.s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, research.id)).run();
+      storeInfoReport(
+        { db: H.s.db, attachmentsDir: H.s.attachmentsDir },
+        {
+          buildId: research.latestBuildId,
+          teamId: H.teamId,
+          createdBy: toolDeps().user.id,
+          report: 'Stream the rows.\nhttps://example.com/export',
+        },
+      );
+      releaseResearchBeforePlanHolds(toolDeps());
+      const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get();
+      expect(session?.holdReason).toBe('research-before-plan');
+    });
+
     test('resuming a stopped faster thread holds the replacement session', async () => {
       H.s.db
         .insert(agent)

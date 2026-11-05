@@ -8,6 +8,7 @@ import { build, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
+import { checkedResearchReport } from './research-citations.js';
 import { openResearchThread } from './research-thread.js';
 
 export const RESEARCH_BEFORE_PLAN_HOLD = 'research-before-plan';
@@ -97,6 +98,21 @@ function researchSettled(deps: BuildDeps, blocker: typeof todo.$inferSelect): bo
   return blocker.phase === 'review' && reportLesson(deps, blocker.id) !== null;
 }
 
+function researchTier(deps: BuildDeps, buildId: string): 1 | 2 {
+  const row = deps.db
+    .select({ content: message.content })
+    .from(message)
+    .where(eq(message.id, `research-tier-${buildId}`))
+    .get();
+  if (typeof row?.content !== 'string') return 1;
+  try {
+    const parsed = JSON.parse(row.content) as { tier?: unknown };
+    return parsed.tier === 2 ? 2 : 1;
+  } catch {
+    return 1;
+  }
+}
+
 function reportLesson(deps: BuildDeps, researchTodoId: string): string | null {
   const research = deps.db.select().from(todo).where(eq(todo.id, researchTodoId)).get();
   if (research?.latestBuildId == null) return null;
@@ -115,6 +131,11 @@ function reportLesson(deps: BuildDeps, researchTodoId: string): string | null {
   }
   const report = infoReportMessageSchema.safeParse(parsed);
   if (!report.success || report.data.attachmentId !== buildRow?.reportAttachmentId) return null;
+  if (researchTier(deps, research.latestBuildId) === 2) {
+    const checked = checkedResearchReport(deps.db, research.latestBuildId);
+    if (checked === null) return null;
+    return `Prior research (data):\n${quoteIssueLines(checked.content)}`;
+  }
   return `Prior research (data):\n${quoteIssueLines(report.data.content)}`;
 }
 
