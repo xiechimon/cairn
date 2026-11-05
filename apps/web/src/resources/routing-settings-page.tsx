@@ -218,7 +218,7 @@ function PolicyEditor({
           </SettingsRow>
         ))}
         <SettingsRow
-          label={t('MCP')}
+          label={t('MCP 服务器')}
           hint={policy.mcpServers.length === 0 ? t('未配置') : policy.mcpServers.join(', ')}
         >
           <span className="text-meta text-content-secondary">{policy.mcpServers.length}</span>

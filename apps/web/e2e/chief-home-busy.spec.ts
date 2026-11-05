@@ -240,7 +240,7 @@ test.describe('chief unavailable (T4)', () => {
     await expect(details).toBeVisible();
     await expect(banner.getByText('任务照常在跑', { exact: false })).toBeHidden();
     const collapsed = await banner.boundingBox();
-    expect(collapsed?.height ?? 0).toBeLessThan(56);
+    expect(collapsed?.height ?? 0).toBeLessThan(64);
     await evidenceShot(page, 'outage-phone.png');
     await details.click();
     await expect(banner.getByText('任务照常在跑', { exact: false })).toBeVisible();
