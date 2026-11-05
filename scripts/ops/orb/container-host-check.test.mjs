@@ -357,11 +357,15 @@ test('the real filesystem and connect checks accept a live 0600 socket and refus
 }, async (t) => {
   const root = makeTestTempDir('orb-host-check-');
   t.after(() => releaseTestTempDir(root));
-  const directory = join(root, 'cairn-orb-egress');
-  mkdirSync(directory, { mode: 0o700 });
+  const directory = join('/private/tmp', `cairn-orb-egress-${process.pid}`);
+  mkdirSync(directory, { mode: 0o700, recursive: true });
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'egress.sock');
   const server = createServer((socket) => socket.destroy());
-  await new Promise((resolve) => server.listen(path, resolve));
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(path, resolve);
+  });
   t.after(() => server.close());
   const real = () =>
     deps({
