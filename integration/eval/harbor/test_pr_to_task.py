@@ -1,6 +1,11 @@
 import importlib.util
+import json
 from pathlib import Path
+import re
 import subprocess
+import sys
+import tarfile
+import tomllib
 
 import pytest
 
@@ -47,7 +52,7 @@ def test_separates_answers_and_runs_both_controls(repository, tmp_path):
         head,
         "Add positive numbers.\n",
         task,
-        ["python3", "-m", "pytest", "test_add.py"],
+        [sys.executable, "-m", "pytest", "test_add.py"],
         42,
     )
     assert "Add positive numbers.\n" in (task / "instruction.md").read_text()
@@ -77,7 +82,7 @@ def test_separates_answers_and_runs_both_controls(repository, tmp_path):
                 check=True,
             )
         run = subprocess.run(
-            ["python3", "-m", "pytest", "test_add.py"],
+            [sys.executable, "-m", "pytest", "test_add.py"],
             cwd=work,
             capture_output=True,
             text=True,
@@ -105,14 +110,34 @@ def test_selection_rejects_ambiguous_and_ineligible_candidates():
     assert converter.selection_reason(**common) is None
     for changed in [
         dict(message="Closes #42\nCloses #43"),
-        dict(product_lines=19),
-        dict(product_lines=401),
+        dict(product_lines=0),
+        dict(product_lines=1001),
         dict(paths=["apps/web/e2e/a.spec.ts", "a.ts"]),
         dict(paths=["integration/eval/a.ts", "a.test.ts"]),
         dict(merged="2026-06-30T00:00:00Z"),
         dict(paths=["a.ts"]),
     ]:
         assert converter.selection_reason(**(common | changed))
+
+
+@pytest.mark.parametrize("product_lines", [1, 19, 20, 400, 401, 1000])
+def test_selection_accepts_inclusive_expanded_non_test_diff_bounds(product_lines):
+    assert converter.selection_reason(
+        merged="2026-07-01T00:00:00Z",
+        message="Closes #42",
+        product_lines=product_lines,
+        paths=["a.ts", "a.test.ts"],
+    ) is None
+
+
+@pytest.mark.parametrize("product_lines", [0, 1001])
+def test_selection_rejects_outside_expanded_non_test_diff_bounds(product_lines):
+    assert converter.selection_reason(
+        merged="2026-07-01T00:00:00Z",
+        message="Closes #42",
+        product_lines=product_lines,
+        paths=["a.ts", "a.test.ts"],
+    ) == "Non-test diff outside 1-1000 lines"
 
 
 def test_control_classification_refuses_infrastructure_failures():
@@ -179,3 +204,498 @@ def test_rejects_non_array_test_commands(repository, tmp_path, command):
     repo, base, head = repository
     with pytest.raises(ValueError):
         converter.convert(repo, base, head, "Fixture", tmp_path / "task", command, 42)
+
+
+def test_missing_reward_is_infrastructure_for_both_controls():
+    for agent in ("oracle", "nop"):
+        assert (
+            converter.classify_control(
+                {"verifier_result": None, "exception_info": None},
+                "AssertionError: expected 5",
+                agent,
+            )
+            == "infrastructure"
+        )
+
+
+def test_nop_that_passes_is_not_a_failed_control():
+    assert (
+        converter.classify_control(
+            {"verifier_result": {"rewards": {"reward": 1}}, "exception_info": None},
+            "",
+            "nop",
+        )
+        == "pass"
+    )
+
+
+@pytest.fixture
+def edited_test_repository(tmp_path):
+    repo = tmp_path / "edited-repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.check_output(
+            ["git", "-C", str(repo), *args], text=True
+        ).strip()
+
+    git("init")
+    git("config", "user.email", "fixture@example.com")
+    git("config", "user.name", "Fixture")
+    (repo / "add.py").write_text("def add(a, b):\n    return a - b\n")
+    (repo / "test_add.py").write_text(
+        "from add import add\ndef test_zero():\n    assert add(0, 0) == 0\n"
+    )
+    git("add", "add.py", "test_add.py")
+    git("commit", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    (repo / "add.py").write_text("def add(a, b):\n    return a + b\n")
+    (repo / "test_add.py").write_text(
+        "from add import add\ndef test_zero():\n    assert add(0, 0) == 0\n"
+        "def test_add():\n    assert add(2, 3) == 5\n"
+    )
+    git("add", "add.py", "test_add.py")
+    git("commit", "-m", "fix\n\nCloses #42")
+    return repo, base, git("rev-parse", "HEAD")
+
+
+@pytest.fixture
+def edited_task(edited_test_repository, tmp_path):
+    repo, base, head = edited_test_repository
+    task = tmp_path / "edited-task"
+    converter.convert(
+        repo,
+        base,
+        head,
+        "Add positive numbers.\n",
+        task,
+        [sys.executable, "-m", "pytest", "-q", "test_add.py"],
+        42,
+    )
+    return task
+
+
+def grade(task, tmp_path, agent_files, preseed=None):
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir(parents=True)
+    app, tests, logs = sandbox / "app", sandbox / "tests", sandbox / "logs"
+    app.mkdir()
+    subprocess.run(
+        ["tar", "xf", str(task / "environment/base.tar"), "-C", str(app)], check=True
+    )
+    tests.mkdir()
+    for name in ("tests.patch", "grader-paths.txt", "protected-regex.txt", "protected-paths.txt", "solution-paths.txt", "test.sh"):
+        (tests / name).write_bytes((task / "tests" / name).read_bytes())
+    workspace = logs / "artifacts" / "workspace"
+    workspace.mkdir(parents=True)
+    (logs / "verifier").mkdir()
+    for name, text in agent_files.items():
+        (workspace / name).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / name).write_text(text)
+    for name, text in (preseed or {}).items():
+        (logs / "verifier" / name).write_text(text)
+    script = re.sub(
+        r"(?<![\w/.])/(app|tests|logs)\b",
+        lambda match: f"{sandbox}/{match.group(1)}",
+        (task / "tests/test.sh").read_text(),
+    )
+    run = subprocess.run(["sh", "-c", script], capture_output=True, text=True)
+    reward = (logs / "verifier/reward.txt").read_text().strip()
+    return reward, run, logs
+
+
+FIXED_ADD = "def add(a, b):\n    return a + b\n"
+BASE_TEST = (
+    "from add import add\ndef test_zero():\n    assert add(0, 0) == 0\n"
+)
+
+
+def test_task_grades_in_a_separate_verifier_that_receives_the_workspace(edited_task):
+    config = tomllib.loads((edited_task / "task.toml").read_text())
+    assert config["verifier"]["environment_mode"] == "separate"
+    assert config["artifacts"] == ["/logs/artifacts"]
+    [hook] = config["verifier"]["collect"]
+    assert "--exclude=node_modules" in hook["command"]
+    assert "--exclude=.git" in hook["command"]
+    assert "/logs/artifacts/workspace" in hook["command"]
+    assert "network_mode: none" in (
+        edited_task / "environment/docker-compose.yaml"
+    ).read_text()
+
+
+def test_grader_inputs_live_only_in_the_tests_directory(edited_task):
+    assert (edited_task / "tests/grader-paths.txt").read_text() == "test_add.py\n"
+    assert (edited_task / "tests/protected-paths.txt").read_text() == (
+        "test_add.py\n"
+    )
+    assert (edited_task / "tests/solution-paths.txt").read_text() == "add.py\n"
+    for name in ("environment", "solution"):
+        for path in (edited_task / name).rglob("*"):
+            assert path.name not in (
+                "grader-paths.txt",
+                "protected-paths.txt",
+                "protected-regex.txt",
+                "tests.patch",
+            )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "vitest.config.ts",
+        "apps/web/vitest.config.mts",
+        "apps/web/vitest.setup.ts",
+        "vite.config.ts",
+        "jest.config.js",
+        "playwright.config.ts",
+        "package.json",
+        "apps/server/package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "tsconfig.json",
+        "packages/a/tsconfig.build.json",
+        "src/a.test.ts",
+        "src/a.spec.mjs",
+        "conftest.py",
+        "pytest.ini",
+        "test_add.py",
+        "test/helper.mjs",
+        "apps/x/__tests__/a.ts",
+        "e2e/a.ts",
+        "src/fixtures/a.json",
+    ],
+)
+def test_protected_pattern_covers_test_infrastructure(path):
+    assert converter.is_protected(path)
+    grep = subprocess.run(
+        ["grep", "-E", converter.PROTECTED_REGEX], input=path + "\n", text=True
+    )
+    assert grep.returncode == 0
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["src/add.py", "docs/guide.md", "scripts/gate.mjs", "apps/web/src/App.tsx"],
+)
+def test_protected_pattern_leaves_product_code_alone(path):
+    assert not converter.is_protected(path)
+
+
+PYTEST_PASS_ALL = (
+    "import pytest\n\n@pytest.hookimpl(hookwrapper=True)\n"
+    "def pytest_runtest_makereport(item, call):\n"
+    "    outcome = yield\n    outcome.get_result().outcome = 'passed'\n"
+)
+
+
+@pytest.fixture
+def infrastructure_task(tmp_path):
+    repo = tmp_path / "infra-repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.check_output(
+            ["git", "-C", str(repo), *args], text=True
+        ).strip()
+
+    git("init")
+    git("config", "user.email", "fixture@example.com")
+    git("config", "user.name", "Fixture")
+    (repo / "add.py").write_text("def add(a, b):\n    return a - b\n")
+    (repo / "package.json").write_text('{"version": 1}\n')
+    (repo / "conftest.py").write_text("")
+    (repo / "vitest.config.ts").write_text("export default {}\n")
+    (repo / "test_add.py").write_text(BASE_TEST)
+    git("add", "-A")
+    git("commit", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    (repo / "add.py").write_text(FIXED_ADD)
+    (repo / "package.json").write_text('{"version": 2}\n')
+    (repo / "test_add.py").write_text(
+        BASE_TEST + "def test_add():\n    assert add(2, 3) == 5\n"
+    )
+    git("add", "-A")
+    git("commit", "-m", "fix\n\nCloses #42")
+    task = tmp_path / "infra-task"
+    converter.convert(
+        repo,
+        base,
+        git("rev-parse", "HEAD"),
+        "Fix.\n",
+        task,
+        [sys.executable, "-m", "pytest", "-q", "test_add.py"],
+        42,
+    )
+    return task
+
+
+def test_protected_list_is_auditable_and_excludes_solution_paths(infrastructure_task):
+    listed = (infrastructure_task / "tests/protected-paths.txt").read_text().split()
+    assert listed == ["conftest.py", "test_add.py", "vitest.config.ts"]
+    assert (infrastructure_task / "tests/solution-paths.txt").read_text().split() == [
+        "add.py",
+        "package.json",
+    ]
+
+
+def test_edited_test_infrastructure_is_restored(infrastructure_task, tmp_path):
+    reward, _, logs = grade(
+        infrastructure_task,
+        tmp_path,
+        {"conftest.py": PYTEST_PASS_ALL, "vitest.config.ts": "export default {exclude: ['*']}\n"},
+    )
+    assert reward == "0"
+    assert "AssertionError" in (logs / "verifier/test-output.txt").read_text()
+    app = tmp_path / "sandbox/app"
+    assert (app / "conftest.py").read_text() == ""
+    assert (app / "vitest.config.ts").read_text() == "export default {}\n"
+
+
+def test_planted_test_infrastructure_is_removed(infrastructure_task, tmp_path):
+    reward, _, logs = grade(
+        infrastructure_task,
+        tmp_path,
+        {
+            "pytest.ini": "[pytest]\naddopts = --collect-only\n",
+            "tests/helper.py": "x = 1\n",
+            "vitest.setup.ts": "stub\n",
+        },
+    )
+    app = tmp_path / "sandbox/app"
+    assert reward == "0"
+    assert not (app / "pytest.ini").exists()
+    assert not (app / "tests/helper.py").exists()
+    assert not (app / "vitest.setup.ts").exists()
+
+
+def test_solution_touched_files_are_not_restored(infrastructure_task, tmp_path):
+    reward, _, _ = grade(
+        infrastructure_task,
+        tmp_path,
+        {"add.py": FIXED_ADD, "package.json": '{"version": 2}\n'},
+    )
+    assert reward == "1"
+    assert (tmp_path / "sandbox/app/package.json").read_text() == '{"version": 2}\n'
+
+
+def test_empty_protected_set_still_grades(repository, tmp_path):
+    repo, base, head = repository
+    task = tmp_path / "plain-task"
+    converter.convert(
+        repo,
+        base,
+        head,
+        "Add.\n",
+        task,
+        [sys.executable, "-m", "pytest", "-q", "test_add.py"],
+        42,
+    )
+    assert (task / "tests/protected-paths.txt").read_text() == ""
+    reward, _, _ = grade(task, tmp_path / "run", {"add.py": FIXED_ADD})
+    assert reward == "1"
+
+
+def test_verifier_passes_a_real_fix_and_fails_the_unfixed_workspace(edited_task, tmp_path):
+    reward, _, _ = grade(edited_task, tmp_path / "fixed", {"add.py": FIXED_ADD})
+    assert reward == "1"
+    reward, run, logs = grade(edited_task, tmp_path / "unfixed", {})
+    assert reward == "0"
+    assert "AssertionError" in (logs / "verifier/test-output.txt").read_text()
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        {"test_add.py": "def test_add():\n    assert True\n"},
+        {"test_add.py": ""},
+        {"test_add.py": BASE_TEST + "def test_add():\n    assert True\n"},
+    ],
+)
+def test_verifier_restores_the_grader_before_scoring(edited_task, tmp_path, tamper):
+    reward, _, logs = grade(edited_task, tmp_path, tamper)
+    assert reward == "0"
+    assert "AssertionError" in (logs / "verifier/test-output.txt").read_text()
+
+
+def test_verifier_ignores_preseeded_rewards(edited_task, tmp_path):
+    reward, _, logs = grade(
+        edited_task,
+        tmp_path,
+        {},
+        preseed={"reward.txt": "1\n", "reward.json": '{"reward": 1}'},
+    )
+    assert reward == "0"
+    assert not (logs / "verifier/reward.json").exists()
+
+
+def test_verifier_drops_planted_dependency_and_git_directories(edited_task, tmp_path):
+    reward, _, logs = grade(
+        edited_task,
+        tmp_path,
+        {"node_modules/evil/index.js": "x", ".git/config": "x", "add.py": FIXED_ADD},
+    )
+    app = tmp_path / "sandbox/app"
+    assert reward == "1"
+    assert not (app / "node_modules").exists()
+    assert not (app / ".git").exists()
+
+
+def test_collect_command_publishes_the_workspace_without_dependencies(edited_task, tmp_path):
+    config = tomllib.loads((edited_task / "task.toml").read_text())
+    command = config["verifier"]["collect"][0]["command"]
+    sandbox = tmp_path / "collect"
+    (sandbox / "app/node_modules/dep").mkdir(parents=True)
+    (sandbox / "app/node_modules/dep/index.js").write_text("x")
+    (sandbox / "app/.git").mkdir()
+    (sandbox / "app/pkg/node_modules").mkdir(parents=True)
+    (sandbox / "app/add.py").write_text(FIXED_ADD)
+    (sandbox / "logs/artifacts").mkdir(parents=True)
+    script = re.sub(
+        r"(?<![\w/.])/(app|logs)\b",
+        lambda match: f"{sandbox}/{match.group(1)}",
+        command,
+    )
+    subprocess.run(["sh", "-c", script], check=True)
+    published = sandbox / "logs/artifacts/workspace"
+    assert (published / "add.py").read_text() == FIXED_ADD
+    assert not list(published.rglob("node_modules"))
+    assert not (published / ".git").exists()
+
+
+def test_cheat_arguments_carry_base_sha_needle_and_grader_paths(edited_task):
+    arguments = converter.cheat_arguments(edited_task, "bash")
+    assert arguments[:2] == ["-a", "cheat_agent:CheatAgent"]
+    values = [arguments[index + 1] for index in range(2, len(arguments), 2)]
+    assert "mode=bash" in values
+    assert "needle=return a + b" in values
+    assert "tests=test_add.py" in values
+    assert any(value.startswith("base_sha=") and len(value) == 49 for value in values)
+
+
+def test_cheat_trials_are_classified_like_a_nop_control():
+    failed = {"verifier_result": {"rewards": {"reward": 0}}, "exception_info": None}
+    assert converter.classify_control(failed, "AssertionError: x", "cheatgit") == "fail"
+    passed = {"verifier_result": {"rewards": {"reward": 1}}, "exception_info": None}
+    assert converter.classify_control(passed, "", "cheatbash") == "pass"
+
+
+def test_trial_environment_is_passed_through_the_privileged_prefix(monkeypatch):
+    monkeypatch.setenv("CAIRN_DOCKER_PREFIX", '["sudo","env","A=1"]')
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    command = converter.prefix_with_env(
+        ["sudo", "env", "A=1", "uv", "tool"], {"PYTHONPATH": "/x", "HOME": "/h"}
+    )
+    assert command[:3] == ["sudo", "env", "A=1"]
+    assert "PYTHONPATH=/x" in command
+    assert command[-2:] == ["uv", "tool"]
+
+
+def test_trial_prefix_is_unchanged_without_a_privileged_prefix(monkeypatch):
+    monkeypatch.delenv("CAIRN_DOCKER_PREFIX", raising=False)
+    assert converter.prefix_with_env(["uv"], {"PYTHONPATH": "/x"}) == ["uv"]
+
+
+@pytest.fixture
+def binary_change_repository(tmp_path):
+    def create(binary_path, product=True, text_evidence=False):
+        repo = tmp_path / "binary-repo"
+        repo.mkdir()
+
+        def git(*args):
+            return subprocess.check_output(
+                ["git", "-C", str(repo), *args], text=True
+            ).strip()
+
+        git("init")
+        git("config", "user.email", "fixture@example.com")
+        git("config", "user.name", "Fixture")
+        (repo / "add.py").write_text("def add(a, b):\n    return a - b\n")
+        git("add", "add.py")
+        git("commit", "-m", "base")
+        base = git("rev-parse", "HEAD")
+        image = repo / binary_path
+        image.parent.mkdir(parents=True, exist_ok=True)
+        image.write_bytes(b"\x89PNG\r\n\x1a\n\x00evidence")
+        paths = [binary_path]
+        if product:
+            (repo / "add.py").write_text(FIXED_ADD)
+            (repo / "test_add.py").write_text(
+                "from add import add\ndef test_add():\n    assert add(2, 3) == 5\n"
+            )
+            paths += ["add.py", "test_add.py"]
+        else:
+            (repo / "README.md").write_text("Evidence archive.\n")
+            paths.append("README.md")
+        if text_evidence:
+            notes = repo / "docs/verify/42/notes.txt"
+            notes.parent.mkdir(parents=True, exist_ok=True)
+            notes.write_text("Observed fixed addition.\n")
+            paths.append("docs/verify/42/notes.txt")
+        git("add", *paths)
+        git("commit", "-m", "fix\n\nCloses #42")
+        return repo, base, git("rev-parse", "HEAD")
+
+    return create
+
+
+def test_binary_verification_evidence_is_excluded_from_selection_and_solution(
+    binary_change_repository, monkeypatch, tmp_path
+):
+    image = "docs/verify/42/after.png"
+    repo, base, head = binary_change_repository(image)
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Fix"}
+    )
+    assert row["reason"] is None
+    assert row["paths"] == ["add.py", "test_add.py"]
+    assert row["productLines"] == 2
+    task = tmp_path / "task"
+    metadata = converter.convert(
+        repo, base, head, "Fix addition.", task,
+        [sys.executable, "-m", "pytest", "test_add.py"], 42,
+    )
+    assert image not in (task / "solution/solution.patch").read_text()
+    assert (task / "tests/solution-paths.txt").read_text() == "add.py\n"
+    assert image not in json.dumps(row | metadata)
+
+
+@pytest.mark.parametrize(
+    "binary_path", ["src/image.png", "docs/verification/after.png", "docs/verify-other/after.png"]
+)
+def test_binary_outside_exact_verification_prefix_is_still_rejected(
+    binary_change_repository, monkeypatch, binary_path
+):
+    repo, _, head = binary_change_repository(binary_path)
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Fix"}
+    )
+    assert row["reason"] == "Binary non-test diff"
+
+
+def test_binary_verification_evidence_does_not_make_documentation_eligible(
+    binary_change_repository, monkeypatch
+):
+    repo, _, head = binary_change_repository("docs/verify/42/after.png", product=False)
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Evidence"}
+    )
+    assert row["reason"] == "Only documentation or tests change"
+
+
+def test_text_verification_evidence_remains_in_product_paths_and_line_count(
+    binary_change_repository, monkeypatch
+):
+    repo, base, head = binary_change_repository(
+        "docs/verify/42/after.png", text_evidence=True
+    )
+    monkeypatch.setattr(converter, "ROOT", repo)
+    row = converter.inspect_pr(
+        {"number": 42, "mergedAt": "2026-07-01T00:00:00Z", "mergeCommit": {"oid": head}, "title": "Fix"}
+    )
+    assert row["reason"] is None
+    assert row["productLines"] == 3
+    assert "docs/verify/42/notes.txt" in row["paths"]
+    assert "docs/verify/42/notes.txt" in converter.patch_paths(repo, base, head)

@@ -1,0 +1,57 @@
+{
+  "oracle": {
+    "status": "pass",
+    "log": "~/cairn-eval/controls-e1-c/oracle.log",
+    "exitCode": 0,
+    "timing": {
+      "lockWaitSeconds": 0.0,
+      "harborWallSeconds": 74.348,
+      "imageBuildSeconds": 17.391,
+      "agentSeconds": 0.209,
+      "verifierSeconds": 36.268,
+      "cpuSeconds": 3.770499
+    },
+    "isolation": [
+      {
+        "id": "9483251d3d15811ffa23b7f20b2fc6b8ee1ff067898dbd996bd5ca818b9dd636",
+        "name": "task-1562-e1__wwyz8th__env-main-1",
+        "networkMode": "none"
+      },
+      {
+        "id": "012d9130e7ae06b1bd059493d1cb83b15bdc500fd7b01fad0f5c88620d3a20fd",
+        "name": "task-1562-e1__wwyz8th__verifier__trial-main-1",
+        "networkMode": "none"
+      }
+    ]
+  },
+  "nop": {
+    "status": "fail",
+    "log": "~/cairn-eval/controls-e1-c/nop.log",
+    "exitCode": 0,
+    "timing": {
+      "lockWaitSeconds": 24.23,
+      "harborWallSeconds": 89.185,
+      "imageBuildSeconds": 18.439,
+      "agentSeconds": 0.001,
+      "verifierSeconds": 47.977,
+      "cpuSeconds": 2.258992
+    },
+    "isolation": [
+      {
+        "id": "f54dfd2792315ab34befe6b496d43c5076dedc2b91e6d131c62a16b52524922b",
+        "name": "task-1562-e1__e3k9vo3__env-main-1",
+        "networkMode": "none"
+      },
+      {
+        "id": "9c2b8c1ca4ba8b163a1779862d8f1704655148d1e4ecf40afda8d1f07a74f7e3",
+        "name": "task-1562-e1__e3k9vo3__verifier__trial-main-1",
+        "networkMode": "none"
+      }
+    ],
+    "failureKind": "assertion"
+  },
+  "probe": {
+    "passed": true,
+    "reasons": []
+  }
+}

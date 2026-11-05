@@ -42,3 +42,33 @@ test('bench-v0 records only independently agreed tasks with paired control evide
     expect(manifest.blockers.length).toBeGreaterThan(0);
   }
 });
+
+test('bench-v0 conversion status is consistent and keeps the benchmark incomplete until controls run', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'bench-v0.json'), 'utf8'));
+  const { conversion } = manifest;
+  expect(conversion.taskRepoCommit).toMatch(/^[a-f0-9]{40}$/);
+  expect(conversion.perPr).toHaveLength(conversion.converted + conversion.failed);
+  const accepted = conversion.perPr.filter(
+    (row: { openaiLabel: string }) => row.openaiLabel === 'accept',
+  );
+  expect(accepted).toHaveLength(conversion.openaiAccepted);
+  expect(conversion.openaiAccepted + conversion.openaiRejected).toBe(conversion.converted);
+  expect(conversion.labelRubric).toBe('graded-v1');
+  for (const row of conversion.perPr) {
+    expect(row.partition).toBe(row.issue % 2 === 0 ? 'optimize' : 'holdout');
+    expect(row.openaiLabel).toBe(
+      row.underspecification <= 1 && row.testValidity <= 1 ? 'accept' : 'reject',
+    );
+  }
+  for (const key of ['underspecificationDistribution', 'testValidityDistribution']) {
+    const total = Object.values(conversion[key] as Record<string, number>).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    expect(total).toBe(conversion.converted);
+  }
+  if (conversion.controls === 'pending') {
+    expect(manifest.complete).toBe(false);
+    expect(manifest.tasks).toHaveLength(0);
+  }
+});

@@ -1,6 +1,9 @@
 import argparse
+import fcntl
 import hashlib
+import importlib.util
 import json
+import os
 from pathlib import Path, PurePosixPath
 import posixpath
 import re
@@ -8,11 +11,87 @@ import shlex
 import subprocess
 import tarfile
 import time
+import tomllib
 
 
 HARBOR_VERSION = "0.25.0"
+HEAVY_LOCK = os.environ.get("CAIRN_HEAVY_LOCK", "/tmp/cairn-heavy.lock")
 ROOT = Path(__file__).resolve().parents[3]
 REPOSITORY = "xiechimon/cairn"
+_PROBE_SPEC = importlib.util.spec_from_file_location(
+    "control_probe", Path(__file__).with_name("control_probe.py")
+)
+probe = importlib.util.module_from_spec(_PROBE_SPEC)
+_PROBE_SPEC.loader.exec_module(probe)
+_CHEAT_SPEC = importlib.util.spec_from_file_location(
+    "cheat_controls", Path(__file__).with_name("cheat_controls.py")
+)
+cheats = importlib.util.module_from_spec(_CHEAT_SPEC)
+_CHEAT_SPEC.loader.exec_module(cheats)
+
+
+WORKSPACE_COLLECT = (
+    "rm -rf /logs/artifacts/workspace && mkdir -p /logs/artifacts/workspace && cd /app "
+    "&& tar --exclude=node_modules --exclude=.git -cf - . "
+    "| tar -xf - -C /logs/artifacts/workspace"
+)
+
+
+PROTECTED_REGEX = (
+    r"(^|/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|"
+    r"pnpm-workspace\.yaml|\.npmrc|conftest\.py|pytest\.ini|tox\.ini|setup\.cfg|"
+    r"pyproject\.toml)$"
+    r"|(^|/)(vitest|vite|jest|playwright)[^/]*\.(config|setup|workspace)[^/]*$"
+    r"|(^|/)(\.mocharc|\.babelrc|babel\.config)[^/]*$"
+    r"|(^|/)tsconfig[^/]*\.json$"
+    r"|\.(test|spec)\.[^/]+$"
+    r"|(^|/)test_[^/]+\.py$"
+    r"|(^|/)(test|tests|__tests__|e2e|fixtures)/"
+)
+
+
+def is_protected(path):
+    return bool(re.search(PROTECTED_REGEX, path))
+
+
+def verifier_script(command):
+    return (
+        "#!/bin/sh\nset -eu\nmkdir -p /logs/verifier\n"
+        "printf '0\\n' > /logs/verifier/reward.txt\n"
+        "rm -f /logs/verifier/reward.json\ncd /app\n"
+        "workspace=/logs/artifacts/workspace\n"
+        'if [ -d "$workspace" ]; then\n'
+        '  find "$workspace" \\( -name node_modules -o -name .git \\) '
+        "-prune -exec rm -rf {} +\n"
+        '  (cd "$workspace" && find . ! -type d | sed \'s|^\\./||\' '
+        "| grep -E -f /tests/protected-regex.txt "
+        "| grep -vxF -f /tests/solution-paths.txt || true) "
+        '| while IFS= read -r path; do rm -f -- "$workspace/$path"; done\n'
+        '  cp -a "$workspace"/. /app/\n'
+        "fi\n"
+        "git apply /tests/tests.patch\n"
+        + shlex.join(command)
+        + " > /logs/verifier/test-output.txt 2>&1\n"
+        "printf '1\\n' > /logs/verifier/reward.txt\n"
+    )
+
+
+def write_grader_inputs(repo, base, tests, product, directory):
+    def listing(name, paths):
+        (directory / name).write_text("".join(f"{path}\n" for path in paths))
+
+    listing("grader-paths.txt", tests)
+    listing("solution-paths.txt", product)
+    (directory / "protected-regex.txt").write_text(PROTECTED_REGEX + "\n")
+    tracked = run("git", "ls-tree", "-r", "--name-only", "-z", base, cwd=repo)
+    listing(
+        "protected-paths.txt",
+        sorted(
+            path
+            for path in tracked.rstrip("\0").split("\0")
+            if path and is_protected(path) and path not in product
+        ),
+    )
 
 
 def run(*args, cwd=None):
@@ -66,30 +145,24 @@ def selection_reason(merged, message, product_lines, paths):
         return "Only documentation or tests change"
     if not any(is_test(path) for path in paths):
         return "No added or changed regression tests"
-    if not 20 <= product_lines <= 400:
-        return "Non-test diff outside 20-400 lines"
+    if not 1 <= product_lines <= 1000:
+        return "Non-test diff outside 1-1000 lines"
     return None
 
 
 def patch_paths(repo, base, head):
-    names = (
-        run(
-            "git",
-            "diff",
-            "--no-renames",
-            "--name-only",
-            "-z",
-            "--diff-filter=ACDMRT",
-            base,
-            head,
-            cwd=repo,
-        )
-        .rstrip("\0")
-        .split("\0")
+    stats = run(
+        "git", "diff", "--no-renames", "--numstat", "-z",
+        "--diff-filter=ACDMRT", base, head, cwd=repo,
     )
-    for name in names:
-        validate_path(name)
-    return names
+    paths = []
+    for line in stats.rstrip("\0").split("\0"):
+        added, deleted, path = line.split("\t", 2)
+        validate_path(path)
+        if path.startswith("docs/verify/") and (added == "-" or deleted == "-"):
+            continue
+        paths.append(path)
+    return paths
 
 
 def convert(repo, base, head, issue_body, destination, command, issue):
@@ -170,21 +243,18 @@ def convert(repo, base, head, issue_body, destination, command, issue):
         "services:\n  main:\n    network_mode: none\n"
     )
     (destination / "task.toml").write_text(
-        'schema_version = "1.4"\n\n[metadata]\n'
+        'schema_version = "1.4"\nartifacts = ["/logs/artifacts"]\n\n[metadata]\n'
         f'issue = {issue}\nbase_sha = "{base}"\nharbor_version = "{HARBOR_VERSION}"\n\n'
-        "[agent]\ntimeout_sec = 600\n\n[verifier]\ntimeout_sec = 300\n\n"
+        "[agent]\ntimeout_sec = 600\n\n[verifier]\ntimeout_sec = 300\n"
+        'environment_mode = "separate"\n\n'
+        f"[[verifier.collect]]\ncommand = {json.dumps(WORKSPACE_COLLECT)}\n\n"
         "[environment]\nbuild_timeout_sec = 1200\n"
     )
     (destination / "solution/solve.sh").write_text(
         "#!/bin/sh\nset -eu\ncd /app\ngit apply /solution/solution.patch\n"
     )
-    (destination / "tests/test.sh").write_text(
-        "#!/bin/sh\nset -eu\nmkdir -p /logs/verifier\nprintf '0\\n' > /logs/verifier/reward.txt\ncd /app\n"
-        "git apply /tests/tests.patch\n"
-        + shlex.join(command)
-        + " > /logs/verifier/test-output.txt 2>&1\n"
-        "printf '1\\n' > /logs/verifier/reward.txt\n"
-    )
+    (destination / "tests/test.sh").write_text(verifier_script(command))
+    write_grader_inputs(repo, base, tests, product, destination / "tests")
     return {
         "issue": issue,
         "baseSha": base,
@@ -225,7 +295,7 @@ def inspect_pr(number):
     product_lines = 0
     for line in stats.rstrip("\0").split("\0"):
         added, deleted, path = line.split("\t", 2)
-        if not is_test(path):
+        if path in paths and not is_test(path):
             if not added.isdigit() or not deleted.isdigit():
                 return {
                     "pr": number,
@@ -259,61 +329,148 @@ def classify_control(result, output, agent):
         return "pass"
     if (
         reward == 0
-        and agent == "nop"
+        and agent != "oracle"
         and re.search(r"AssertionError|assert .* ==|expected .* to", output, re.I)
     ):
         return "fail"
     return "infrastructure"
 
 
-def check_controls(task, output):
-    prefix = ["uv", "tool", "run", "--from", f"harbor=={HARBOR_VERSION}", "harbor"]
+def harbor_prefix():
+    prefix = probe.privileged(
+        ["uv", "tool", "run", "--from", f"harbor=={HARBOR_VERSION}", "harbor"]
+    )
     version = run(*prefix, "--version").strip()
     if version != HARBOR_VERSION:
         raise ValueError(f"Expected Harbor {HARBOR_VERSION}, got {version}")
-    output.mkdir(parents=True, exist_ok=False)
-    controls = {}
-    for agent in ("oracle", "nop"):
-        started = time.monotonic()
-        log = output / f"{agent}.log"
+    return prefix
+
+
+def prefix_with_env(prefix, env):
+    if not os.environ.get("CAIRN_DOCKER_PREFIX") or not env:
+        return prefix
+    extra = {key: value for key, value in env.items() if os.environ.get(key) != value}
+    split = len(json.loads(os.environ["CAIRN_DOCKER_PREFIX"]))
+    return [*prefix[:split], *(f"{key}={value}" for key, value in extra.items()), *prefix[split:]]
+
+
+def run_trial(prefix, task, name, agent_args, output, env=None):
+    log = output / f"{name}.log"
+    state, stop, sampler = probe.start_sampler(task.resolve().name)
+    lock_requested = time.monotonic()
+    with open(HEAVY_LOCK, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        lock_acquired = time.monotonic()
         with log.open("w") as stream:
             trial = subprocess.run(
                 [
-                    *prefix,
+                    *prefix_with_env(prefix, env),
                     "run",
                     "-p",
                     str(task.resolve()),
-                    "-a",
-                    agent,
+                    *agent_args,
                     "-n",
                     "1",
                     "--max-retries",
                     "0",
                     "--jobs-dir",
-                    str(output.resolve() / agent),
+                    str(output.resolve() / name),
                     "--yes",
                 ],
                 stdout=stream,
                 stderr=subprocess.STDOUT,
                 timeout=1800,
+                env=None if os.environ.get("CAIRN_DOCKER_PREFIX") else env,
             )
-        results = list((output / agent).glob("*/*/result.json"))
-        status = "infrastructure"
-        if len(results) == 1:
-            result = json.loads(results[0].read_text())
-            logs = list(results[0].parent.glob("verifier/test-output.txt"))
-            output_text = "\n".join(path.read_text() for path in logs)
-            status = classify_control(result, output_text, agent)
-        controls[agent] = {
-            "status": status,
-            "log": str(log),
-            "exitCode": trial.returncode,
-            "wallSeconds": round(time.monotonic() - started, 3),
-        }
-        if status == "fail":
-            controls[agent]["failureKind"] = "assertion"
+        harbor_finished = time.monotonic()
+    stop.set()
+    sampler.join()
+    results = list((output / name).glob("*/*/result.json"))
+    status = "infrastructure"
+    result = {}
+    if len(results) == 1:
+        result = json.loads(results[0].read_text())
+        logs = list(results[0].parent.glob("verifier/test-output.txt"))
+        output_text = "\n".join(path.read_text() for path in logs)
+        status = classify_control(result, output_text, name)
+    control = {
+        "status": status,
+        "log": str(log),
+        "exitCode": trial.returncode,
+        "timing": probe.timing_record(
+            lock_requested, lock_acquired, harbor_finished, result, state.cpu_seconds()
+        ),
+        "isolation": state.isolation(),
+    }
+    if status == "fail":
+        control["failureKind"] = "assertion"
+    if len(results) == 1:
+        probe.write_outcome(results[0].parent, name, {"status": status})
+    return control, (results[0].parent if len(results) == 1 else None)
+
+
+def check_controls(task, output):
+    prefix = harbor_prefix()
+    output.mkdir(parents=True, exist_ok=False)
+    controls = {}
+    wrote_outcome = False
+    for agent in ("oracle", "nop"):
+        controls[agent], trial = run_trial(
+            prefix, task, agent, ["-a", agent], output
+        )
+        if trial:
+            wrote_outcome = wrote_outcome or probe.agent_wrote_outcome(trial)
         (output / "controls.json").write_text(json.dumps(controls, indent=2) + "\n")
+    controls["probe"] = probe.probe_verdict(controls["oracle"], controls["nop"], wrote_outcome)
+    (output / "controls.json").write_text(json.dumps(controls, indent=2) + "\n")
     return controls
+
+
+def cheat_arguments(task, mode):
+    metadata = tomllib.loads((task / "task.toml").read_text())["metadata"]
+    tests = (task / "tests/grader-paths.txt").read_text().split()
+    needle = cheats.fix_needle(
+        (task / "solution/solution.patch").read_text(), task / "environment/base.tar"
+    )
+    kwargs = {"mode": mode, "base_sha": metadata["base_sha"], "needle": needle}
+    kwargs["tests"] = ",".join(tests)
+    flags = [arg for key, value in kwargs.items() for arg in ("--ak", f"{key}={value}")]
+    return ["-a", "cheat_agent:CheatAgent", *flags]
+
+
+def check_cheats(task, output):
+    prefix = harbor_prefix()
+    output.mkdir(parents=True, exist_ok=False)
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parent)}
+    report = {}
+    for mode in cheats.MODES:
+        control, trial = run_trial(
+            prefix, task, f"cheat{mode}", cheat_arguments(task, mode), output, env
+        )
+        evidence_file = trial / "agent" / f"cheat-{mode}.txt" if trial else None
+        evidence = (
+            cheats.parse_evidence(evidence_file.read_text())
+            if evidence_file and evidence_file.is_file()
+            else {}
+        )
+        outcome = json.loads((trial / "outcome.json").read_text()) if trial else {}
+        report[mode] = {
+            "control": control,
+            "evidence": evidence,
+            "agentWroteOutcome": probe.agent_wrote_outcome(trial) if trial else False,
+            "outcome": outcome,
+        }
+        report[mode]["verdict"] = cheats.cheat_verdict(
+            mode,
+            control,
+            evidence,
+            report[mode]["agentWroteOutcome"],
+            outcome,
+        )
+        (output / "cheats.json").write_text(json.dumps(report, indent=2) + "\n")
+    report["passed"] = all(report[mode]["verdict"]["blocked"] for mode in cheats.MODES)
+    (output / "cheats.json").write_text(json.dumps(report, indent=2) + "\n")
+    return report
 
 
 def main():
@@ -324,6 +481,11 @@ def main():
         "--check",
         type=Path,
         help="Run fresh oracle and nop controls for a generated task",
+    )
+    parser.add_argument(
+        "--cheat-controls",
+        type=Path,
+        help="Run the four cheat agents against a generated task",
     )
     parser.add_argument("--pr", type=int)
     parser.add_argument("--discover", action="store_true")
@@ -336,6 +498,8 @@ def main():
     args = parser.parse_args()
     if args.check:
         print(json.dumps(check_controls(args.check, args.output), indent=2))
+    elif args.cheat_controls:
+        print(json.dumps(check_cheats(args.cheat_controls, args.output), indent=2))
     elif args.discover:
         prs = gh_json(
             "pr",
