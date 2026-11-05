@@ -34,6 +34,7 @@ async function openGalleryMenu(page: Page) {
   await page.getByRole('button', { name: 'Task actions' }).click();
   const menu = page.getByTestId('gallery-task-menu');
   await expect(menu).toBeVisible();
+  await expectFocusWithin(menu);
   return menu;
 }
 

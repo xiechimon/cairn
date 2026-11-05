@@ -6675,6 +6675,33 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
       ],
       "type": "object",
     },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "computerId": {
+          "type": "string",
+        },
+        "state": {
+          "enum": [
+            "stopped",
+            "starting",
+            "running",
+            "failed",
+          ],
+          "type": "string",
+        },
+        "type": {
+          "const": "computer.state",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "computerId",
+        "state",
+      ],
+      "type": "object",
+    },
   ],
 }
 `;

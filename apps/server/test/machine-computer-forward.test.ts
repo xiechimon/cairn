@@ -630,7 +630,8 @@ describe('feed and redaction', () => {
     receiveComputerFrames(ctx.s.db, 'omarchy', id, [
       { kind: 'output', seq: 1, stream: 'stdout', text: `first line\n${prefix}` },
     ]);
-    expect(feed).toHaveLength(2);
+    const commands = () => feed.filter((event) => event.type === 'computer.command');
+    expect(commands()).toHaveLength(2);
     expect(feed.at(-1)).toMatchObject({
       type: 'computer.command',
       command: {
@@ -647,13 +648,13 @@ describe('feed and redaction', () => {
       text: `${FAKE_TOKEN.slice(15)}\nsecond line\n`,
     };
     receiveComputerFrames(ctx.s.db, 'omarchy', id, [next]);
-    expect(feed).toHaveLength(3);
+    expect(commands()).toHaveLength(3);
     expect(feed.at(-1)).toMatchObject({
       command: { status: 'running', output: 'first line\n[REDACTED]\nsecond line\n' },
     });
     expect(JSON.stringify(feed)).not.toContain(FAKE_TOKEN);
     receiveComputerFrames(ctx.s.db, 'omarchy', id, [next]);
-    expect(feed).toHaveLength(3);
+    expect(commands()).toHaveLength(3);
     receiveComputerFrames(ctx.s.db, 'omarchy', id, [done(3, 'finished')]);
     expect((await result).text).toBe('finished');
     expect(feed.at(-1)).toMatchObject({ command: { status: 'done' } });
@@ -704,10 +705,53 @@ describe('feed and redaction', () => {
       toolCallId: 'r1',
       params: { path: 'a' },
     });
-    expect(feed).toHaveLength(1);
-    expect(feed[0]).toMatchObject({
-      type: 'computer.command',
-      command: { tool: 'launch_app', command: 'firefox https://example.com' },
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual([
+      expect.objectContaining({
+        type: 'computer.command',
+        command: expect.objectContaining({
+          tool: 'launch_app',
+          command: 'firefox https://example.com',
+        }),
+      }),
+    ]);
+  });
+
+  test('a read_file reports starting, running and stopped without a feed command', async () => {
+    const ctx = boot();
+    addMachine(ctx.s, 'omarchy', { computer: true });
+    connect(ctx.s, 'omarchy');
+    const feed = watchFeed(ctx.s);
+    const stranger: Record<string, unknown>[] = [];
+    ctx.s.hub.subscribe(
+      ctx.s.team.id,
+      {
+        nextSeq: () => 1,
+        send: async (payload) => {
+          stranger.push(payload as Record<string, unknown>);
+        },
+      },
+      'someone-else',
+    );
+    const result = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'read_file',
+      toolCallId: 'r-state',
+      params: { path: 'a' },
     });
+    const id = computerCallId('step-a', 'r-state');
+    const states = () =>
+      feed.filter((event) => event.type === 'computer.state').map((event) => event.state);
+    expect(feed.filter((event) => event.type === 'computer.command')).toEqual([]);
+    expect(states()).toEqual(['starting']);
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [
+      { kind: 'output', seq: 1, stream: 'stdout', text: 'file' },
+    ]);
+    expect(states()).toEqual(['starting', 'running']);
+    receiveComputerFrames(ctx.s.db, 'omarchy', id, [
+      { kind: 'done', seq: 2, text: 'file', exitCode: 0 },
+    ]);
+    await result;
+    expect(states()).toEqual(['starting', 'running', 'stopped']);
+    expect(stranger).toEqual([]);
   });
 });

@@ -14,7 +14,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
+import { chief, chiefThread, computer, computerCall, machine, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
@@ -221,10 +221,11 @@ export function receiveComputerFrames(
   });
   if (result.pending === '') pendingOutput.delete(callId);
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
-  syncObservedComputerState(
-    db,
-    db.select().from(computerCall).where(eq(computerCall.id, callId)).get()?.computerId ?? null,
-  );
+  const computerId =
+    db.select().from(computerCall).where(eq(computerCall.id, callId)).get()?.computerId ?? null;
+  if (syncObservedComputerState(db, computerId)) {
+    publishObservedComputerState(db, pendingCalls.get(callId)?.hub, computerId);
+  }
   if (result.finished) settleComputerCall(db, callId);
   else if (result.publishOutput) {
     const pending = pendingCalls.get(callId);
@@ -384,7 +385,9 @@ export function settleComputerCall(db: Db, callId: string): void {
   if (!row || !isFinalState(row.state)) return;
   pendingCalls.delete(callId);
   live.dispose();
-  syncObservedComputerState(db, row.computerId);
+  if (syncObservedComputerState(db, row.computerId)) {
+    publishObservedComputerState(db, live.hub, row.computerId);
+  }
   publishFeed(db, live.hub, row);
   live.resolve(resultOfRow(row));
 }
@@ -433,8 +436,14 @@ function openPending(
   return pending;
 }
 
-function syncObservedComputerState(db: Db, computerId: string | null): void {
-  if (!computerId) return;
+function syncObservedComputerState(db: Db, computerId: string | null): boolean {
+  if (!computerId) return false;
+  const current = db
+    .select({ state: computer.state })
+    .from(computer)
+    .where(eq(computer.id, computerId))
+    .get();
+  if (!current) return false;
   const open = db
     .select({ state: computerCall.state, startedAt: computerCall.startedAt })
     .from(computerCall)
@@ -451,7 +460,30 @@ function syncObservedComputerState(db: Db, computerId: string | null): void {
       : open.some((row) => row.state === 'running' || row.startedAt !== null)
         ? 'running'
         : 'starting';
+  if (current.state === state) return false;
   db.update(computer).set({ state, updatedAt: nowMs() }).where(eq(computer.id, computerId)).run();
+  return true;
+}
+
+function publishObservedComputerState(
+  db: Db,
+  hub: TeamStreamHub | undefined,
+  computerId: string | null,
+): void {
+  if (!hub || !computerId) return;
+  const row = db.select().from(computer).where(eq(computer.id, computerId)).get();
+  if (!row?.scopeKey.startsWith('chief:')) return;
+  const owner = db
+    .select({ userId: chief.userId, teamId: chief.teamId })
+    .from(chief)
+    .where(eq(chief.id, row.scopeKey.slice('chief:'.length)))
+    .get();
+  if (!owner || owner.teamId !== row.teamId || owner.userId === '') return;
+  hub.publishPrivate(row.teamId, owner.userId, () => ({
+    type: 'computer.state',
+    computerId: row.id,
+    state: row.state,
+  }));
 }
 
 function releaseExecutionLease(db: Db, stepId: string): void {
@@ -729,9 +761,12 @@ export async function forwardComputerCall(
   syncObservedComputerState(db, target.computerId);
   if (!deps.machineHub.pushComputer(target.machineId, call)) {
     db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
-    syncObservedComputerState(db, target.computerId);
+    if (syncObservedComputerState(db, target.computerId)) {
+      publishObservedComputerState(db, deps.hub, target.computerId);
+    }
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
+  publishObservedComputerState(db, deps.hub, target.computerId);
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishFeed(db, deps.hub, row);
