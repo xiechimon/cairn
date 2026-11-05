@@ -22,6 +22,28 @@ test('settings work-routing renders seeded rules and policies from the fixture',
   await expect(settings.getByTestId('routing-rule-review')).toBeVisible();
   await expect(settings.getByTestId('work-policy-session')).toBeVisible();
   await expect(settings.getByTestId('work-policy-review')).toBeVisible();
-  await expect(settings.getByLabel('运行时').first()).toHaveValue('claude-code');
-  await expect(settings.getByLabel('模型').first()).toHaveValue('claude-sonnet-5-5');
+  const session = settings.getByTestId('routing-rule-session');
+  await expect(session.locator('.routing-rule-runtime-select')).toContainText('Claude Code');
+  await expect(session.locator('.routing-rule-model-select')).toContainText('claude-sonnet-5');
+});
+
+test('settings work-routing rule pickers list catalog runtimes and models', async ({ page }) => {
+  await page.goto('/app/settings/work-routing?scenario=routing-settings');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const session = settings.getByTestId('routing-rule-session');
+
+  await session.locator('.routing-rule-runtime-select').click();
+  const runtimeMenu = page.locator('.routing-rule-runtime-menu');
+  await expect(runtimeMenu).toBeVisible();
+  await expect(runtimeMenu.locator('.routing-rule-runtime-row', { hasText: 'Claude Code' })).toBeVisible();
+  await expect(runtimeMenu.locator('.routing-rule-runtime-row', { hasText: 'pi' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await session.locator('.routing-rule-model-select').click();
+  const modelMenu = page.locator('.routing-rule-model-menu');
+  await expect(modelMenu).toBeVisible();
+  await expect(modelMenu.locator('.routing-rule-model-row', { hasText: 'claude-sonnet-5' })).toBeVisible();
+  await expect(modelMenu.locator('.routing-rule-model-row', { hasText: 'claude-opus-4-5' })).toBeVisible();
+  await modelMenu.locator('.routing-rule-model-row', { hasText: 'claude-haiku-4-5' }).click();
+  await expect(session.locator('.routing-rule-model-select')).toContainText('claude-haiku-4-5');
 });

@@ -12,11 +12,11 @@ import { cn } from 'cn';
 import { Route } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useMachines } from '../api/hooks.js';
+import { useMachines, useModelSources } from '../api/hooks.js';
+import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { EmptyState } from '../components/empty-state.js';
-import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -24,7 +24,6 @@ import {
 } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
-import { Input } from '../components/ui/input.js';
 import {
   Select,
   SelectContent,
@@ -33,9 +32,11 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
+import { AgentModelSelect, AgentRuntimeSelect } from '../routes/agent-model-select.js';
 
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 
@@ -60,11 +61,13 @@ function fixtureSettings(search: URLSearchParams): TeamRoutingSettings | null {
 function RuleEditor({
   rule,
   machines,
+  options,
   live,
   onSave,
 }: {
   rule: RoutingRuleRecord;
   machines: { id: string; name: string }[];
+  options: ModelOption[];
   live: boolean;
   onSave?: (body: {
     provider: string;
@@ -74,8 +77,8 @@ function RuleEditor({
   }) => void;
 }) {
   const { t } = useI18n();
-  const [provider, setProvider] = useState(rule.provider);
-  const [modelId, setModelId] = useState(rule.modelId);
+  const [provider, setProvider] = useState<string | null>(rule.provider);
+  const [modelId, setModelId] = useState<string | null>(rule.modelId);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(
     (rule.thinkingLevel as ThinkingLevel | null) ?? 'off',
   );
@@ -92,29 +95,33 @@ function RuleEditor({
           <span className="font-mono text-meta text-content-tertiary">{rule.use}</span>
         </SettingsRow>
         <SettingsRow label={t('运行时')}>
-          <Input
-            aria-label={t('运行时')}
-            className={cn(FORM_CONTROL_CLS, 'w-44')}
+          <AgentRuntimeSelect
+            ariaLabel={t('运行时')}
             value={provider}
-            disabled={!live || onSave === undefined}
-            onChange={(event) => setProvider(event.target.value)}
+            options={options}
+            unsetLabel={t('选择运行时')}
+            onPick={(next) => {
+              if (next === provider) return;
+              setProvider(next);
+              setModelId(null);
+            }}
+            prefix="routing-rule-runtime"
+            triggerClassName={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
           />
         </SettingsRow>
         <SettingsRow label={t('模型')}>
-          <Input
-            aria-label={t('模型')}
-            className={cn(FORM_CONTROL_CLS, 'w-56')}
-            value={modelId}
-            disabled={!live || onSave === undefined}
-            onChange={(event) => setModelId(event.target.value)}
+          <AgentModelSelect
+            ariaLabel={t('模型')}
+            provider={provider}
+            modelId={modelId}
+            options={options}
+            onPick={(next) => setModelId(next)}
+            prefix="routing-rule-model"
+            triggerClassName={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-56')}
           />
         </SettingsRow>
         <SettingsRow label={t('思考强度')}>
-          <Select
-            value={thinkingLevel}
-            onValueChange={(next) => setThinkingLevel(next ?? 'off')}
-            disabled={!live || onSave === undefined}
-          >
+          <Select value={thinkingLevel} onValueChange={(next) => setThinkingLevel(next ?? 'off')}>
             <SelectTrigger
               aria-label={t('思考强度')}
               className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-36')}
@@ -131,11 +138,7 @@ function RuleEditor({
           </Select>
         </SettingsRow>
         <SettingsRow label={t('首选机器')}>
-          <Select
-            value={machineId}
-            onValueChange={(next) => setMachineId(next)}
-            disabled={!live || onSave === undefined}
-          >
+          <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
             <SelectTrigger
               aria-label={t('首选机器')}
               className={cn(SETTINGS_SELECT_TRIGGER_CLS, 'w-44')}
@@ -159,15 +162,16 @@ function RuleEditor({
         {live && onSave !== undefined && (
           <SettingsRow label={t('保存')} hint={dirty ? t('有未保存的改动') : t('已与服务器一致')}>
             <Button
-              disabled={!dirty || provider.trim() === '' || modelId.trim() === ''}
-              onClick={() =>
+              disabled={!dirty || provider == null || modelId == null}
+              onClick={() => {
+                if (provider == null || modelId == null) return;
                 onSave({
-                  provider: provider.trim(),
-                  modelId: modelId.trim(),
+                  provider,
+                  modelId,
                   thinkingLevel: thinkingLevel === 'off' ? null : thinkingLevel,
                   machineId,
-                })
-              }
+                });
+              }}
             >
               {t('保存')}
             </Button>
@@ -248,6 +252,7 @@ export function RoutingSettingsPage() {
   const { live, teamId } = useLiveData();
   const settingsQ = useRoutingSettings(teamId, live);
   const machinesQ = useMachines(teamId, live);
+  const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
   const settings: TeamRoutingSettings = live
     ? (settingsQ.data ?? { enabled: false, rules: [], policies: [] })
@@ -257,6 +262,9 @@ export function RoutingSettingsPage() {
     : (fixture.resources?.machines ?? [])
         .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
         .map((machine) => ({ id: machine.id, name: machine.name }));
+  const modelOptions = live
+    ? toModelOptions(modelSourcesQ.data?.sources ?? [])
+    : toModelOptions(fixture.resources?.providerSources ?? []);
   const empty = settings.rules.length === 0 && settings.policies.length === 0;
   return (
     <PageShell
@@ -327,6 +335,7 @@ export function RoutingSettingsPage() {
                   key={rule.id}
                   rule={rule}
                   machines={machines}
+                  options={modelOptions}
                   live={live}
                   onSave={
                     live
