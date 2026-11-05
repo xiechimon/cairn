@@ -495,12 +495,17 @@ test('the live screen enlarges and becomes interactive after desktop control is 
   const card = panel.locator('[data-slot="list-card"]').nth(1);
   await expect(card.getByTestId('machine-screen-expand')).toBeVisible();
   await card.getByRole('switch', { name: '桌面控制' }).click();
+  await expect(card.getByRole('switch', { name: '桌面控制' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
   await card.getByTestId('machine-screen-expand').click();
   const enlarged = page.getByTestId('machine-screen-enlarged');
   await expect(enlarged).toBeVisible();
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute(
     'data-interactive',
     'true',
+    { timeout: 15_000 },
   );
   await expect(enlarged.getByTestId('machine-screen')).toHaveAttribute('data-fill', 'true');
   await expect(page.getByText('在大屏里点击和键入')).toBeVisible();

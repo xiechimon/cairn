@@ -176,6 +176,7 @@ function MachineCard({
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [expandAfterLease, setExpandAfterLease] = useState(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
@@ -188,7 +189,10 @@ function MachineCard({
   }, [computer?.controlHolder, computer?.id]);
 
   useEffect(() => {
-    if (!screenLive) setExpanded(false);
+    if (!screenLive) {
+      setExpanded(false);
+      setExpandAfterLease(false);
+    }
   }, [screenLive]);
 
   useEffect(() => {
@@ -226,6 +230,12 @@ function MachineCard({
     return () => window.clearInterval(tick);
   }, [teamId, computer, leaseId]);
 
+  useEffect(() => {
+    if (!expandAfterLease || leaseId === null) return;
+    setExpanded(true);
+    setExpandAfterLease(false);
+  }, [expandAfterLease, leaseId]);
+
   const onDesktopToggle = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
     setBusy(true);
@@ -248,19 +258,23 @@ function MachineCard({
   };
 
   const openEnlarged = () => {
-    if (!screenLive) return;
-    if (leaseId === null && teamId !== undefined && computer !== null && !busy) {
-      setBusy(true);
-      void acquireComputerControl(teamId, computer.id)
-        .then((lease) => {
-          setLeaseId(lease.leaseId);
-          setExpanded(true);
-          return invalidateConverged(qc, { queryKey: ['computers', teamId] });
-        })
-        .finally(() => setBusy(false));
+    if (!screenLive || teamId === undefined || computer === null) return;
+    if (leaseId !== null) {
+      setExpanded(true);
       return;
     }
-    setExpanded(true);
+    setExpandAfterLease(true);
+    if (busy) return;
+    setBusy(true);
+    void acquireComputerControl(teamId, computer.id)
+      .then((lease) => {
+        setLeaseId(lease.leaseId);
+        return invalidateConverged(qc, { queryKey: ['computers', teamId] });
+      })
+      .catch(() => {
+        setExpandAfterLease(false);
+      })
+      .finally(() => setBusy(false));
   };
 
   return (
