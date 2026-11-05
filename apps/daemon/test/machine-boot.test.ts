@@ -130,3 +130,26 @@ describe('server migration diagnosis (#519 control-plane move: machine.json serv
     await handle.done;
   });
 });
+
+describe('D75 own computer opt-in', () => {
+  const report = async (capEnv: NodeJS.ProcessEnv) => {
+    const { handle, api } = await boot({
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
+      capEnv,
+    });
+    await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
+    const caps = (api.enrollBodies[0] as { capabilities?: { ownComputer?: true } }).capabilities;
+    await handle.stop();
+    await handle.done;
+    return caps;
+  };
+
+  test('CAIRN_OWN_COMPUTER=1 reports ownComputer', async () => {
+    expect((await report({ CAIRN_OWN_COMPUTER: '1' }))?.ownComputer).toBe(true);
+  });
+
+  test('without the switch the machine does not report ownComputer', async () => {
+    expect((await report({}))?.ownComputer).toBeUndefined();
+    expect((await report({ CAIRN_OWN_COMPUTER: 'true' }))?.ownComputer).toBeUndefined();
+  });
+});
