@@ -44,10 +44,10 @@ const NAV_ROWS = [
   { label: '模型路由', Icon: Route, href: '/app/resources/model-routing' },
 ];
 
-const ROW_BASE =
+export const ROW_BASE =
   'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
 
-const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
+export const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
 function rowLitClasses(selected: boolean, kbd: boolean): string {
   if (selected) return ROW_LIT;
@@ -55,8 +55,9 @@ function rowLitClasses(selected: boolean, kbd: boolean): string {
   return 'hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 }
 
-const GROUP_LABEL = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
-const ROW_END = 'ml-auto flex flex-none items-center gap-1.5 pl-3 text-meta text-content-tertiary';
+export const GROUP_LABEL = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
+export const ROW_END =
+  'ml-auto flex flex-none items-center gap-1.5 pl-3 text-meta text-content-tertiary';
 
 export interface SearchCommand {
   id: string;

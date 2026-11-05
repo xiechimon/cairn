@@ -52,6 +52,7 @@ import { ProductOverlaysSection } from './product-overlays.js';
 import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
+import { ProposalPagesSections } from './proposals-pages.js';
 import { ScreensSection } from './screens.js';
 import { GroupTitle } from './specimen.js';
 
@@ -121,6 +122,16 @@ const NAV = [
       ['side-panel', 'Side panel, title menus'],
       ['routing', 'Model routing'],
       ['accounts', 'Accounts'],
+    ],
+  },
+  {
+    id: 'page-drafts',
+    title: 'Page drafts',
+    items: [
+      ['draft-schedule', 'Schedule detail'],
+      ['draft-palette', 'Palette syntax'],
+      ['draft-activity', 'Activity, not found'],
+      ['draft-settings', 'Project settings'],
     ],
   },
   {
@@ -307,6 +318,14 @@ export function Gallery() {
           <PanelSection />
           <RoutingSection />
           <AccountsSection />
+          <GroupTitle
+            id="page-drafts"
+            title="Page drafts"
+            lede="Proposals for review, not shipped features. Each section shows two or three options with their states; nothing here is wired to the server."
+          />
+          <ProductProviders>
+            <ProposalPagesSections />
+          </ProductProviders>
           <GroupTitle
             id="patterns"
             title="Patterns"
