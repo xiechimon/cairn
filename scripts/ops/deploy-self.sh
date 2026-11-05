@@ -68,6 +68,9 @@ NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
 STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
 STEP_STALE_SECONDS="${CAIRN_DEPLOY_STEP_STALE_SECONDS:-600}"
 STEPS_ALARM_TITLE="Deploy forced past a claimed step with no heartbeat"
+HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
+HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
+HOST_TOOLS_ALARM_TITLE="Host tools differ from main"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
@@ -140,6 +143,7 @@ write_record() {
   local record
   if [ "$result" = deployed ]; then
     rm -f "$STATE/steps-waiting-since" "$STATE/alarms/deploy-forced-past-stale-steps"
+    install_host_tools "$sha" "$previous"
   fi
   record="$(printf '{"sha":"%s","previous":"%s","result":"%s","failed":"%s","snapshot":"%s","at":"%s","host":"%s"}\n' \
     "$sha" "$previous" "$result" "$failed" "$snapshot" "$(date -u +%FT%TZ)" "$MACHINE_NAME")"
@@ -151,6 +155,62 @@ write_record() {
 mark_failed() {
   mkdir -p "$STATE/failed"
   echo "$2" >"$STATE/failed/$1"
+}
+
+install_host_tools() {
+  local target="$1" previous="${2:-}" rel dest source kept=""
+  mkdir -p "$HOST_TOOLS_ROOT" "$HOST_LANES_ROOT" || { log "host tools: cannot create the host roots"; return 0; }
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    case "$rel" in
+      scripts/ops/host/tools/*) dest="$HOST_TOOLS_ROOT/${rel#scripts/ops/host/tools/}" ;;
+      scripts/ops/host/lanes/*) dest="$HOST_LANES_ROOT/${rel#scripts/ops/host/lanes/}" ;;
+      *) continue ;;
+    esac
+    source="$CHECKOUT/$rel"
+    if [ -f "$dest" ] && cmp -s "$source" "$dest"; then
+      continue
+    fi
+    if [ -f "$dest" ] && [ -n "$previous" ] && git -C "$CHECKOUT" cat-file -e "$previous:$rel" 2>/dev/null &&
+      [ "$(git -C "$CHECKOUT" rev-parse "$previous:$rel" 2>/dev/null)" = "$(git hash-object "$dest")" ]; then
+      :
+    elif [ -f "$dest" ]; then
+      kept="$kept $dest"
+      continue
+    fi
+    mkdir -p "$(dirname "$dest")" || continue
+    if cp "$source" "$dest.tmp.$$" && mv "$dest.tmp.$$" "$dest"; then
+      case "$rel" in
+        *.sh) chmod 755 "$dest" ;;
+        *) if [ -x "$source" ]; then chmod 755 "$dest"; else chmod 644 "$dest"; fi ;;
+      esac
+    else
+      rm -f "$dest.tmp.$$"
+      log "host tools: cannot write $dest"
+    fi
+  done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes)
+  printf '%s\n' "$target" >"$HOST_TOOLS_ROOT/.installed-sha" 2>/dev/null || true
+  printf '%s\n' "$target" >"$STATE/host-tools-sha" 2>/dev/null || true
+  if [ -n "$kept" ]; then
+    log "host tools: kept hand-edited files:$kept"
+    host_tools_alarm "$kept"
+  else
+    rm -f "$STATE/alarms/host-tools-edited"
+  fi
+}
+
+host_tools_alarm() {
+  local kept="$1" reason="host-tools-edited" open_issue body
+  mkdir -p "$STATE/alarms" || return 0
+  [ ! -e "$STATE/alarms/$reason" ] || return 0
+  body="$reason: on $MACHINE_NAME these host files differ from both the previous and the new main:$(printf ' %s' $kept). They were kept; move the change upstream or delete them by hand."
+  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$HOST_TOOLS_ALARM_TITLE\" in:title" --json number --jq '.[0].number // empty')" || return 0
+  if [ -n "$open_issue" ]; then
+    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null || return 0
+  else
+    gh issue create -R "$REPO" -t "$HOST_TOOLS_ALARM_TITLE" -b "$body" -a xiechimon >/dev/null || return 0
+  fi
+  touch "$STATE/alarms/$reason" || true
 }
 
 claimed_steps() {
