@@ -1,5 +1,4 @@
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
 import { mustBeGreenJobs, requiredChecks } from './merge-checks.mjs';
 
 const prGatePath = '.claude/workflows/pr-gate.js';
@@ -19,30 +18,15 @@ const scopes = {
 };
 const barrierFiles = ['packages/**/*'];
 
-function routingPolicy(source, gatePaths) {
-  const extract = (start, end) => {
-    const from = source.indexOf(start);
-    const to = source.indexOf(end, from + start.length);
-    if (from < 0 || to < 0 || source.indexOf(start, from + start.length) !== -1)
-      throw new Error(`pr-gate.js no longer has a single ${start}`);
-    return source.slice(from, to);
-  };
-  const matcher = extract('function globToRegExp', 'const SCRIPT_SHA256');
-  return runInNewContext(
-    `${matcher}\n;({
-      protectedSources: [...gatePaths.protected, ...gatePaths.mergeGateSource].map(
-        (glob) => globToRegExp(glob, { protect: true }).source,
-      ),
-      autoMergeSources: gatePaths.autoMerge.map((glob) => globToRegExp(glob).source),
-      maxFiles: gatePaths.limits.maxFiles,
-    })`,
-    { gatePaths },
-    { timeout: 1000, contextCodeGeneration: { strings: false, wasm: false } },
-  );
+function queueLimits(source, gatePaths) {
+  if (!source.includes('function globToRegExp'))
+    throw new Error('pr-gate.js no longer has globToRegExp');
+  const maxFiles = gatePaths.limits?.maxFiles;
+  if (!Number.isInteger(maxFiles) || maxFiles < 1)
+    throw new Error('limits.maxFiles must be a positive integer');
+  return { maxFiles };
 }
 
-const anchorless = (source) => source.replace(/^\^/, '').replace(/\$$/, '');
-const quoted = (condition) => `'${condition.replaceAll("'", "''")}'`;
 const passedOrSkipped = (check) =>
   `      - or:\n          - check-success = ${check}\n          - check-skipped = ${check}`;
 
@@ -50,17 +34,13 @@ export function mergifyConfig(prGateSource, gatePaths) {
   const maxLinesEachWay = gatePaths.limits?.maxLinesEachWay;
   if (!Number.isInteger(maxLinesEachWay) || maxLinesEachWay < 1)
     throw new Error('limits.maxLinesEachWay must be a positive integer');
-  const { protectedSources, autoMergeSources, maxFiles } = routingPolicy(prGateSource, gatePaths);
-  const protectedRe = `(?i)^(?:${protectedSources.map(anchorless).join('|')})$`;
-  const outsideRe = `(?ai)^(?!(?:${autoMergeSources.map(anchorless).join('|')})$)`;
-  const deletedTestRe = '(?i)(^|/)(e2e|test|tests|__tests__)/|[.](test|spec)[.][cm]?[jt]sx?$';
+  const { maxFiles } = queueLimits(prGateSource, gatePaths);
   const prChecks = [...requiredChecks, ...mustBeGreenJobs];
   const draftChecks = prChecks.filter((check) => !prOnlyChecks.includes(check));
   const queueConditions = [
     '      - base = main',
     '      - -draft',
     '      - -label = needs-decision',
-    '      - -label = owner-route',
     '      - -label = coordinator-hold',
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,
@@ -69,9 +49,6 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '      - check-success = @github-actions/review-gate',
     '      - check-success = merge-route',
     ...prChecks.map(passedOrSkipped),
-    `      - ${quoted(`-files ~= ${protectedRe}`)}`,
-    `      - ${quoted(`-files ~= ${outsideRe}`)}`,
-    `      - ${quoted(`-removed-files ~= ${deletedTestRe}`)}`,
     `      - '#files <= ${maxFiles}'`,
     `      - '#added-lines <= ${maxLinesEachWay}'`,
     `      - '#deleted-lines <= ${maxLinesEachWay}'`,

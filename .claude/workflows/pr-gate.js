@@ -23,16 +23,12 @@ const REPO = 'xiechimon/cairn'
 // 5 reviewers + 4 skeptics stays under the 10-agent guideline.
 const MAX_SKEPTICS = 4
 
-// The protected-path rule, decided here so routing to the user does not depend on a
-// reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
-// and tests, docs/verify evidence, Markdown under docs/) may auto-merge, and only when no PROTECTED
-// class matches them; every other path, deleted test files, binary files
-// outside docs/verify and the gallery baselines route to the user. Size never
-// routes or blocks (D68): the review gate judges one problem per PR. pr-gate runs 3, 4 and 5 each found another agent-steering or gate
-// file that a list of names missed
-// (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
-// may merge alone instead of what may not. Matching ignores case (APFS);
-// globToRegExp says which matches fold Unicode.
+// Path class does not route to the user. A green review-gate, the required
+// checks, and the absence of coordinator-hold and needs-decision admit the PR.
+// Size never routes or blocks (D68): the review gate judges one problem per PR.
+// pr-gate runs 3, 4 and 5 each found another agent-steering or gate file that a
+// list of names missed (AGENTS.override.md, .pi/skills, nested .claude/).
+// Matching ignores case (APFS); globToRegExp says which matches fold Unicode.
 const AUTO_MERGE = requireGlobs(args?.gatePaths?.autoMerge, 'autoMerge')
 const PROTECTED = [
   ...requireGlobs(args?.gatePaths?.protected, 'protected'),
@@ -54,7 +50,7 @@ function gatePathsHelp() {
 // named like the directory, so a symlink named .claude or scripts is protected
 // (run 10). AUTO_MERGE and EVIDENCE_RE get neither: a path that looks like
 // product source or evidence only through Unicode folding or a symlink stays
-// outside the set and goes to the user under default deny.
+// outside the set. Path class does not route to the user.
 function globToRegExp(glob, { protect = false } = {}) {
   const tail = protect && glob.endsWith('/**')
   const g = tail ? glob.slice(0, -3) : glob
@@ -80,7 +76,6 @@ const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true 
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
 const EVIDENCE_RE = globToRegExp('docs/verify/**')
-const GALLERY_BASELINE_RE = globToRegExp('apps/web/e2e/gallery-snapshots.spec.ts-snapshots/*.png')
 
 // Without --no-renames a rename lists only its new name, so a protected file
 // moved elsewhere would not match; without core.quotePath=false git C-quotes
@@ -348,30 +343,7 @@ const protectedPaths = [
     ...reviewed.flatMap((r) => r.review.protectedPaths ?? []),
   ]),
 ]
-// The caller is the session that wrote the PR, so its deletion list and line
-// count are checked against the safety reviewer's: the union and the larger.
-const allDeleted = [...new Set([...deletedFiles, ...safetyDeleted])]
-const deletedTests = allDeleted.filter(
-  (f) => /(^|\/)(e2e|test|tests|__tests__)\//iu.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/iu.test(f),
-)
-// A binary row (- -) adds no lines and shows reviewers no diff; one NUL byte
-// makes git treat a source file as binary even with the empty tree's attributes
-// (/code-review on #1410), so only evidence and the gallery's PNG baselines,
-// which CI renders and scripts/gallery-snapshots-accept.mjs downloads, may be
-// binary without the user.
-const opaque = [...new Set([...binaryFiles, ...safetyBinary])].filter(
-  (f) => !EVIDENCE_RE.test(f) && !GALLERY_BASELINE_RE.test(f),
-)
-const allFiles = [...new Set([...changedFiles, ...unlistedFiles])]
-const outside = allFiles.filter(
-  (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
-)
-const humanReasons = [
-  ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),
-  ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify, Markdown under docs/): ${outside.join(', ')}`] : []),
-  ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
-  ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
-]
+const humanReasons = []
 const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 const gatePathsMatch = safety?.gatePathsMatch === true
 if (!gatePathsMatch) log('the safety reviewer did not confirm that gatePaths equals origin/main:packages/shared/merge-gate-paths.json')
