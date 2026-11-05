@@ -1,5 +1,4 @@
 import type { ComputerRecord } from '@cairn/shared';
-import RFB from '@novnc/novnc';
 import { MonitorSmartphone } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
@@ -7,6 +6,7 @@ import { computerScreenWsUrl, openComputerScreen } from '../api/computer-screen.
 import { useI18n } from '../i18n/provider.js';
 
 type ScreenStatus = 'connecting' | 'connected' | 'placeholder' | 'failed';
+type NovncRfb = import('@novnc/novnc').default;
 
 export function ScreenPlaceholder({ online, label }: { online: boolean; label: string }) {
   return (
@@ -45,7 +45,7 @@ export function MachineScreenSurface({
     }
     const target = host.current;
     let cancelled = false;
-    let rfb: InstanceType<typeof RFB> | null = null;
+    let rfb: NovncRfb | null = null;
     setStatus('connecting');
     const connect = async () => {
       try {
@@ -54,6 +54,8 @@ export function MachineScreenSurface({
           computer.id,
           interactive && leaseId !== null ? { kind: 'control', leaseId } : { kind: 'view' },
         );
+        if (cancelled) return;
+        const { default: RFB } = await import('@novnc/novnc');
         if (cancelled) return;
         rfb = new RFB(target, computerScreenWsUrl(opened.path), {
           wsProtocols: opened.wsProtocols,
