@@ -204,19 +204,19 @@ function MachineCard({
       busy
     )
       return;
-    let cancelled = false;
+    let alive = true;
     setBusy(true);
     void acquireComputerControl(teamId, computer.id)
       .then((lease) => {
-        if (cancelled) return;
+        if (!alive) return;
         setLeaseId(lease.leaseId);
         return invalidateConverged(qc, { queryKey: ['computers', teamId] });
       })
       .finally(() => {
-        if (!cancelled) setBusy(false);
+        setBusy(false);
       });
     return () => {
-      cancelled = true;
+      alive = false;
     };
   }, [teamId, computer?.id, computer?.controlHolder, leaseId, busy, qc, computer]);
 
