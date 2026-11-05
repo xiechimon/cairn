@@ -53,7 +53,7 @@ export const chiefWatchSchema = z.object({
 export type ChiefWatch = z.infer<typeof chiefWatchSchema>;
 
 export const CHIEF_WATCH_REASON_DISPATCH =
-  'Dispatched by the chief: report back when it parks at a gate or settles.';
+  'Dispatched by the Coordinator: report back when it parks at a gate or settles.';
 
 export const activeRunSchema = z
   .object({
@@ -243,15 +243,15 @@ export function chiefThreadTitle(firstMessage: string): string {
 }
 
 export const CHIEF_REBIND_CONFIRM_COPY =
-  '更换总管的 agent？总管的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。';
+  '更换 Coordinator 的 agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。';
 
 export const CHIEF_SETTINGS_TABS = ['Agent', '章程', '记忆', '关注与提醒'] as const;
 
 export const CHIEF_WATCHES_EMPTY_COPY =
-  '暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。';
+  '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING = '发出的话会直接插进总管这一轮';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING = '发出的话会直接插进 Coordinator 这一轮';
 
 export const COORDINATOR_SUMMARY_MAX_CHARS = 20_000;
 export const COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS = 40_000;

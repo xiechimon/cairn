@@ -126,8 +126,8 @@ test('typing in the composer does not re-render the conversation rows', async ({
         rerendered: props.filter((p, i) => p === null || p !== before[i]).length,
       };
     });
-  expect((await rowProps()).rows).toBe(22);
+  expect((await rowProps()).rows).toBe(40);
   await page.getByTestId('home-c').getByTestId('chief-composer-input').pressSequentially('hello');
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('hello');
-  expect(await rowProps()).toEqual({ rows: 22, rerendered: 0 });
+  expect(await rowProps()).toEqual({ rows: 40, rerendered: 0 });
 });

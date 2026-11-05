@@ -10,7 +10,7 @@ const ORCH = `${ROW} [data-orchestration]`;
 test('chief host badge: pinned on the host row (data-orchestration=host + copy)', async ({ page }) => {
   await page.goto(CHIEF_STATE);
   const host = page.locator(HOST_ROW).locator('[data-orchestration="host"]');
-  await expect(host).toHaveText('总管主机');
+  await expect(host).toHaveText('Coordinator 主机');
 
   await expect(page.locator(`${ROW} [data-orchestration="host"]`)).toHaveCount(1);
 });
@@ -18,14 +18,14 @@ test('chief host badge: pinned on the host row (data-orchestration=host + copy)'
 test('chief mid-turn: running status row on the online remote row', async ({ page }) => {
   await page.goto(CHIEF_STATE);
   const running = page.locator(ROW).filter({ hasText: 'mea-wsl' }).locator('[data-orchestration="running"]');
-  await expect(running).toHaveText('总管回合进行中');
+  await expect(running).toHaveText('Coordinator 回合进行中');
 });
 
 test('chief waiting for a machine: waiting status row on the offline remote row (coexists orthogonally with the offline grey dot)', async ({ page }) => {
   await page.goto(CHIEF_STATE);
   const row = page.locator(ROW).filter({ hasText: 'vps-relay' });
   const waiting = row.locator('[data-orchestration="waiting"]');
-  await expect(waiting).toHaveText('总管等待机器');
+  await expect(waiting).toHaveText('Coordinator 等待机器');
 
   await expect(row.locator('[data-on]')).toHaveAttribute('data-on', 'false');
 });

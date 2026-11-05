@@ -112,7 +112,7 @@ import {
 } from './fixtures.js';
 import { homeC, homeCEmpty } from './home-c.js';
 import type { FixtureSet } from './records.js';
-import { turnFoldThread } from './turn-fold.js';
+import { RESOURCES } from './resources.js';
 
 export const SCENARIO_PARAM = 'scenario';
 
@@ -156,7 +156,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       activity: activityFixture,
       'activity-many': activityManyFixture,
       'activity-empty': { ...homeC, todos: [] },
-      'turn-fold-thread': turnFoldThread,
       'home-c-empty': homeCEmpty,
       'sidebar-thread-statuses': sidebarThreadStatuses,
       'board-inbox': boardInbox,
@@ -297,6 +296,73 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'providers-empty': providersEmpty,
       'model-routing': accountsDefault,
       'model-routing-empty': accountsEmpty,
+      'routing-settings': {
+        ...resourcesDefault,
+        resources: {
+          ...RESOURCES,
+          routingSettings: {
+            enabled: false,
+            rules: [
+              {
+                id: 'rule-session',
+                teamId: 't1',
+                use: 'session',
+                provider: 'claude-code',
+                modelId: 'claude-sonnet-5-5',
+                thinkingLevel: 'high',
+                fallbackModels: null,
+                machineId: null,
+                requiredCapabilities: null,
+                seededFromAgentId: 'agent-impl',
+                createdAt: 1,
+                updatedAt: 1,
+              },
+              {
+                id: 'rule-review',
+                teamId: 't1',
+                use: 'review',
+                provider: 'openai',
+                modelId: 'gpt-5.4',
+                thinkingLevel: 'medium',
+                fallbackModels: null,
+                machineId: null,
+                requiredCapabilities: null,
+                seededFromAgentId: 'agent-review',
+                createdAt: 1,
+                updatedAt: 1,
+              },
+            ],
+            policies: [
+              {
+                id: 'policy-session',
+                teamId: 't1',
+                use: 'session',
+                tools: ['推送分支'],
+                mcpServers: ['github'],
+                skillsAllowlist: null,
+                defaultSkill: null,
+                secrets: ['OPENAI_API_KEY'],
+                seededFromAgentId: 'agent-impl',
+                createdAt: 1,
+                updatedAt: 1,
+              },
+              {
+                id: 'policy-review',
+                teamId: 't1',
+                use: 'review',
+                tools: [],
+                mcpServers: [],
+                skillsAllowlist: null,
+                defaultSkill: null,
+                secrets: [],
+                seededFromAgentId: 'agent-review',
+                createdAt: 1,
+                updatedAt: 1,
+              },
+            ],
+          },
+        },
+      },
       'r8-78': boardR8Overlay,
       'r8-79': detailR8Confirm(),
       'r8-80': detailR8Confirm(),

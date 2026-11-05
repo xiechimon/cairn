@@ -79,7 +79,7 @@ export function ChiefAgentDialog({
   confirmRebind = true,
 }: ChiefAgentDialogProps) {
   const { t } = useI18n();
-  const dlgTitle = title ?? t('选择总管 Agent');
+  const dlgTitle = title ?? t('选择 Coordinator Agent');
   const [query, setQuery] = useState('');
   const [confirming, setConfirming] = useState<ChiefAgentOption | null>(null);
   useEffect(() => {

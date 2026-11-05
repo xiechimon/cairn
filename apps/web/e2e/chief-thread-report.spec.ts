@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const STATUS = {
@@ -89,7 +88,6 @@ test('a notify_user notice from an event turn shows in the conversation', async 
     todos: [],
   });
   await page.goto('/app');
-  await expandTurns(page);
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-msg').last()).toContainText(
     '#9 failed twice on the same machine. Move it to another machine?',
@@ -223,7 +221,7 @@ test('a thread-message marker names the sender', async ({ page }) => {
   const rows = stream.getByTestId('thread-message-marker');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toHaveText('你直接对 #9 说：JSON please');
-  await expect(rows.nth(1)).toHaveText('总管直接对 #9 说：Use CSV instead');
+  await expect(rows.nth(1)).toHaveText('Coordinator 直接对 #9 说：Use CSV instead');
 });
 
 test('a parked question keeps its reply after a later review report', async ({ page }) => {

@@ -23,7 +23,7 @@ const questions = [
   { options: [] },
 ];
 
-describe('Chief question drafts stay on their own request', () => {
+describe('Coordinator question drafts stay on their own request', () => {
   test('a key keeps team, conversation and request apart when ids contain separators', () => {
     const first = questionDraftKey({
       teamId: 'team:a',

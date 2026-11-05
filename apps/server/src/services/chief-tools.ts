@@ -333,7 +333,7 @@ export async function executeChiefTool(
           .where(eq(agent.id, ctx.chiefAgentId))
           .get()?.name
       : undefined;
-  const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Chief' };
+  const chiefActor: TransitionActor = { kind: 'agent', name: boundChiefName ?? 'Coordinator' };
   assertToolAllowedUnderRouting(name);
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);

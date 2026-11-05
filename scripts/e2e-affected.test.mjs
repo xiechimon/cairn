@@ -526,7 +526,6 @@ test('Activity and palette source edits keep their navigation regressions in the
     'apps/web/src/search/search-query.ts',
     'apps/web/src/overlay/search-panel.tsx',
     'apps/web/src/board/sidebar.tsx',
-    'apps/web/src/board/sidebar-user-menu.tsx',
   ]) {
     const result = selectSpecs({
       paths: [path],

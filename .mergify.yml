@@ -36,8 +36,6 @@ queue_rules:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
       - '#files <= 80'
-      - '#added-lines <= 8000'
-      - '#deleted-lines <= 8000'
     merge_conditions:
       - or:
           - check-success = check
@@ -66,7 +64,6 @@ queue_rules:
   - name: bot
     queue_conditions:
       - author = cairnwright[bot]
-      - '#commits = 1'
       - or:
           - base = main
           - "#depends-on > 0"
@@ -101,8 +98,6 @@ queue_rules:
           - check-success = ops-backup-test
           - check-skipped = ops-backup-test
       - '#files <= 80'
-      - '#added-lines <= 8000'
-      - '#deleted-lines <= 8000'
     merge_conditions:
       - or:
           - check-success = check

@@ -369,7 +369,7 @@ export function SchedulesPage() {
           }}
           hint={{
             icon: Lightbulb,
-            text: t('也可以直接告诉总管某个任务要多久重跑一次，它会替你写好规则。'),
+            text: t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则。'),
           }}
         />
       ) : (

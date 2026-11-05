@@ -24,7 +24,7 @@ const PROJECTS = [
   { id: 'mobile', name: 'mobile' },
 ];
 
-const CHIEF = { id: 'chief', displayName: 'Chief', avatarUrl: null };
+const CHIEF = { id: 'chief', displayName: 'Coordinator', avatarUrl: null };
 
 export function ProductChiefSection() {
   const [last, setLast] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export function ProductChiefSection() {
     <Section
       id="product-chief"
       title="Coordinator"
-      lede="The chief's parts: questions it asks you, the conversation digest, the home summary line, its identity, outage banners and the project picker."
+      lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, outage banners and the project picker."
     >
       <Specimen
         title="Question card"
@@ -94,7 +94,7 @@ export function ProductChiefSection() {
           <ChiefIdentity agent={CHIEF} busy />
         </Cell>
         <Cell label="Identity, not linked">
-          <ChiefIdentity agent={{ displayName: 'Chief', avatarUrl: null }} />
+          <ChiefIdentity agent={{ displayName: 'Coordinator', avatarUrl: null }} />
         </Cell>
       </Specimen>
       <Specimen
@@ -106,13 +106,13 @@ export function ProductChiefSection() {
         <Labeled label="Quota used up, retry time known">
           <ChiefOutageBanner
             outage={{ reason: 'quota', model: 'claude-opus-5-5', retryAt: NOW + 45 * 60_000 }}
-            onSettings={() => setLast('Open chief settings')}
+            onSettings={() => setLast('Open Coordinator settings')}
           />
         </Labeled>
         <Labeled label="Overloaded, no retry time">
           <ChiefOutageBanner
             outage={{ reason: 'capacity', model: null, retryAt: null }}
-            onSettings={() => setLast('Open chief settings')}
+            onSettings={() => setLast('Open Coordinator settings')}
           />
         </Labeled>
         <Labeled label="Answered by the fallback model">

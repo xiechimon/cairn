@@ -10,7 +10,7 @@ const SCREENS = [
   {
     title: 'Workbench',
     url: '/app?scenario=01',
-    parts: 'Sidebar, chief greeting, composer, needs-you inbox',
+    parts: 'Sidebar, Coordinator greeting, composer, needs-you inbox',
   },
   {
     title: 'Side chat: confirm the plan',
@@ -23,9 +23,9 @@ const SCREENS = [
     parts: 'Agent turns, tool activity rows, live row',
   },
   {
-    title: 'Chief window',
+    title: 'Coordinator window',
     url: '/app/schedules?scenario=100',
-    parts: 'Floating chief conversation over a page',
+    parts: 'Floating Coordinator conversation over a page',
   },
   {
     title: 'Project tasks',

@@ -445,7 +445,7 @@ export function MachinesPage() {
                           className="text-meta font-medium whitespace-nowrap text-content-secondary"
                           data-orchestration="host"
                         >
-                          {t('总管主机')}
+                          {t('Coordinator 主机')}
                         </span>
                       )}
                       {chief.running && (
@@ -453,7 +453,7 @@ export function MachinesPage() {
                           className="inline-flex items-center gap-1.5 text-meta whitespace-nowrap text-running-text before:block before:size-1.5 before:rounded-full before:bg-running before:content-['']"
                           data-orchestration="running"
                         >
-                          {t('总管回合进行中')}
+                          {t('Coordinator 回合进行中')}
                         </span>
                       )}
                       {chief.waiting && (
@@ -461,7 +461,7 @@ export function MachinesPage() {
                           className="inline-flex items-center gap-1.5 text-meta whitespace-nowrap text-content-tertiary before:block before:size-1.5 before:rounded-full before:bg-content-dim before:content-['']"
                           data-orchestration="waiting"
                         >
-                          {t('总管等待机器')}
+                          {t('Coordinator 等待机器')}
                         </span>
                       )}
                     </span>

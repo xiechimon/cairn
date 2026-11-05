@@ -283,7 +283,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             <ThreadLink todoId={item.todoId} className="hover:underline">
               {t(
                 item.by === 'coordinator'
-                  ? '总管直接对 #{n} 说：{excerpt}'
+                  ? 'Coordinator 直接对 #{n} 说：{excerpt}'
                   : '你直接对 #{n} 说：{excerpt}',
                 { n: item.seqNum, excerpt: item.excerpt },
               )}
@@ -296,7 +296,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Marker role="alert" className={MARKER_ERROR_CLS}>
-          <MarkerContent>{t('总管本轮执行失败')}</MarkerContent>
+          <MarkerContent>{t('Coordinator 本轮执行失败')}</MarkerContent>
           <span className="mt-0.5 block break-all text-(--text-tertiary)">{item.text}</span>
         </Marker>
       </MessageScrollerItem>

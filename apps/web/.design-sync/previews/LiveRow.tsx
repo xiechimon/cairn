@@ -6,7 +6,7 @@ export const Detail = () => (
   </div>
 );
 
-export const Chief = () => (
+export const Coordinator = () => (
   <div style={{ width: 420 }}>
     <LiveRow variant="chief" label="Checking Task #104 status" seconds={7} disclosure={{ expand: 'Show live steps', collapse: 'Hide live steps' }} />
   </div>

@@ -12,7 +12,7 @@ export const Conversation = () => (
       </Message>
       <Message>
         <MessageContent>
-          <MessageHeader>Chief</MessageHeader>
+          <MessageHeader>Coordinator</MessageHeader>
           <Bubble variant="ghost">
             <BubbleContent>
               I created task #104 in cairn and assigned it to the implementer. It will run the web e2e suite before opening the PR, and I will report back when CI is green.

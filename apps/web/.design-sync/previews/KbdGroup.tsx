@@ -7,7 +7,7 @@ export const Shortcuts = () => (
       <KbdGroup><Kbd>⌘</Kbd><Kbd>K</Kbd></KbdGroup>
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', width: 260 }}>
-      <span>Send to Chief</span>
+      <span>Send to Coordinator</span>
       <KbdGroup><Kbd>⌘</Kbd><Kbd>Enter</Kbd></KbdGroup>
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', width: 260 }}>

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { findLowContrast } from './contrast-probe.js';
-import { expandTurns, pressAndExpect, settleTransitions } from './helpers.js';
+import { pressAndExpect, settleTransitions } from './helpers.js';
 
 // #1442: axe-core (WCAG 2.1 A/AA) over the main pages, light and dark. Any
 // violation fails the test with its rule id, impact and first targets.
@@ -82,7 +82,6 @@ const PAGES: AuditPage[] = [
     name: 'side chat tool calls',
     url: '/app?scenario=28&thread=7ve0iOkQ-JBpSL98zSiGc',
     open: async (p) => {
-      await expandTurns(p);
       await p.mouse.move(0, 0);
       await p.waitForTimeout(500);
     },

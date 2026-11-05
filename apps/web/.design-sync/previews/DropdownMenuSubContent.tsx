@@ -27,7 +27,7 @@ export const Submenu = () => (
           <DropdownMenuSubContent>
             <DropdownMenuItem>Implementer</DropdownMenuItem>
             <DropdownMenuItem>Reviewer</DropdownMenuItem>
-            <DropdownMenuItem>Chief</DropdownMenuItem>
+            <DropdownMenuItem>Coordinator</DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuItem>Copy link</DropdownMenuItem>

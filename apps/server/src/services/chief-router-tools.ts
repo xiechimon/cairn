@@ -95,7 +95,7 @@ function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): str
   const projectRow = deps.db.select().from(project).where(eq(project.id, row.projectId)).get();
   if (projectRow?.teamId !== ctx.teamId) throw new HttpError(404, `project ${row.projectId}`);
   try {
-    const buildId = startThreadBuild(deps, row, { origin: 'coordinator', actor: 'Chief' });
+    const buildId = startThreadBuild(deps, row, { origin: 'coordinator', actor: 'Coordinator' });
     return json({ todoId: row.id, seqNum: row.seqNum, buildId });
   } catch (error) {
     if (error instanceof PhaseTransitionError) throw new HttpError(409, error.message);
@@ -124,7 +124,7 @@ async function messageThread(
   return json(
     await messageThreadAsUser(deps, ctx.teamId, str(params, 'todoId'), body, {
       origin: 'coordinator',
-      actor: chiefName ?? 'Chief',
+      actor: chiefName ?? 'Coordinator',
     }),
   );
 }

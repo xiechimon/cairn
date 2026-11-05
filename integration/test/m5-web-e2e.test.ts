@@ -359,9 +359,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     const transcript = (await api(server.url, 'GET', `/api/conversations/${buildId}/messages`))
       .body as { messages: TranscriptRow[] };
     expect(transcript.messages.some((row) => row.content === MERGE_ANNOUNCEMENT)).toBe(true);
-    const foldedTurns = page.locator('[data-testid=turn-header][aria-expanded=false]');
-    await pexpect(foldedTurns.first()).toBeVisible();
-    while ((await foldedTurns.count()) > 0) await foldedTurns.first().click();
     await pexpect(page.locator('.chat-note', { hasText: '发起了合并' })).toBeVisible();
     await pexpect(page.locator('.chat-note', { hasText: '🎉 任务已完成' })).toBeVisible({
       timeout: 30_000,

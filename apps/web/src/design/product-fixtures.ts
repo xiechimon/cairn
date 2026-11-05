@@ -446,7 +446,7 @@ export const DIGEST_ITEMS: ChiefDigestItem[] = [
   {
     group: 'remembered',
     text: 'Prefer small PRs that touch one page.',
-    reason: 'Saved to the chief memory.',
+    reason: 'Saved to the Coordinator memory.',
     memory: { id: 'mem-1', agentId: 'chief' },
   },
 ];

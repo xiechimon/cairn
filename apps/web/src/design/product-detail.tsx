@@ -289,7 +289,7 @@ export function ProductDetailSection() {
         stage="sheet"
         className="flex-col"
       >
-        <Cell label="From a chief orchestration">
+        <Cell label="From a Coordinator orchestration">
           <SourceIssueLine
             todo={sharedTodo({
               title: 'x',

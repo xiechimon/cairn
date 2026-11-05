@@ -57,7 +57,7 @@ export function SecretsPage() {
           action={{ label: t('添加密钥'), onClick: () => setCreateOpen(true) }}
           hint={{
             icon: Lightbulb,
-            text: t('也可以让总管添加：它会开一张安全输入卡填写值，值不会进入对话。'),
+            text: t('也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。'),
           }}
         />
       ) : (

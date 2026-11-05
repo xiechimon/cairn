@@ -91,7 +91,7 @@ test('Space no longer opens the drawer; ⌘J does, composer focused, default con
   await expect(drawer(page)).toBeHidden();
 });
 
-test('⌘J wakes the chief drawer on a non-home route', async ({ page }) => {
+test('⌘J wakes the Coordinator drawer on a non-home route', async ({ page }) => {
   await page.goto(SCHEDULES);
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressAndExpect(page, 'Meta+j', drawer(page));

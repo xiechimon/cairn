@@ -21,7 +21,6 @@ import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
-import { TurnFold, useTurnFold } from '../components/chat/turn-fold.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
@@ -55,7 +54,6 @@ import {
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
-import { chiefTurns, groupTurns, latestOpenTurnId } from '../lib/turn-fold.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
@@ -251,7 +249,6 @@ export function ChiefConversation({
     null,
   );
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
-  const turnFold = useTurnFold();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const copyText = useCallback((key: string, text: string) => {
     const clip = navigator.clipboard;
@@ -474,7 +471,7 @@ export function ChiefConversation({
           {
             id: item.id,
             content: item.text,
-            ...(item.pending === 'held' ? { note: t('已存下，总管恢复后会处理') } : {}),
+            ...(item.pending === 'held' ? { note: t('已存下，Coordinator 恢复后会处理') } : {}),
             held: item.pending === 'held',
           },
         ]
@@ -500,23 +497,7 @@ export function ChiefConversation({
       onCancelQuestion={onCancelQuestion}
     />
   );
-  const openTurnId = latestOpenTurnId(groupTurns(rows, chiefTurns), chiefTurns);
-  const foldedRows = (list: { item: ChiefStreamItem; i: number }[]) =>
-    groupTurns(list, chiefTurns).map((segment) =>
-      segment.kind === 'row' ? (
-        streamRow(segment.row.item)
-      ) : (
-        <TurnFold
-          key={segment.turn.id}
-          turn={segment.turn}
-          open={turnFold.isOpen(segment.turn, openTurnId)}
-          defaultOpenId={openTurnId}
-          onToggle={turnFold.toggle}
-        >
-          {segment.turn.rows.map((row) => streamRow(row.item))}
-        </TurnFold>
-      ),
-    );
+  const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
   const intro = (
     <>
       {!chief.bound && (
@@ -524,7 +505,7 @@ export function ChiefConversation({
           data-testid="chief-gate"
           className={`${home ? 'mx-auto mt-4 w-[calc(100%-2rem)] max-w-182' : 'mx-4'} flex h-14 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)`}
         >
-          <span>{t('请先为总管选择一个 Agent。')}</span>
+          <span>{t('请先为 Coordinator 选择一个 Agent。')}</span>
           <Button
             className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`}
             onClick={onSettings}
@@ -579,7 +560,7 @@ export function ChiefConversation({
         >
           <div className="flex items-center">
             <h2 className="m-0 min-w-0 truncate font-heading text-heading font-title text-(--foreground)">
-              {t('总管')}
+              {t('Coordinator')}
             </h2>
             <div className="ml-auto flex items-center gap-2.5">
               {onSettings != null && (
@@ -587,7 +568,7 @@ export function ChiefConversation({
                   variant="ghost"
                   size="icon"
                   className={HEAD_ICON_BTN_CLS}
-                  aria-label={t('总管设置')}
+                  aria-label={t('Coordinator 设置')}
                   onClick={onSettings}
                 >
                   <ChiefGear />
@@ -663,14 +644,14 @@ export function ChiefConversation({
                   <TodoGlanceContext.Provider value={glances}>
                     {lead}
                     {day == null ? (
-                      foldedRows(rows)
+                      renderRows(rows)
                     ) : (
                       <>
                         <div data-testid="chief-earlier" className="opacity-60">
-                          {foldedRows(rows.slice(0, day.earlier))}
+                          {renderRows(rows.slice(0, day.earlier))}
                         </div>
                         {day.today}
-                        {foldedRows(rows.slice(day.earlier))}
+                        {renderRows(rows.slice(day.earlier))}
                       </>
                     )}
                   </TodoGlanceContext.Provider>
@@ -748,7 +729,7 @@ export function ChiefConversation({
                 placeholder={
                   targetPlaceholder ??
                   (chief.outage != null
-                    ? t('可以继续说，总管恢复后会按顺序处理…')
+                    ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
                     : chief.running === true
                       ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
                       : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
@@ -877,7 +858,7 @@ export function ChiefConversation({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={t('停止总管这次回复')}
+                  aria-label={t('停止 Coordinator 这次回复')}
                   className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
                   onClick={stopTurn}
                 >
@@ -940,7 +921,7 @@ export function ChiefConversation({
       >
         <div className="flex flex-col gap-4">
           <p className="m-0 text-ui text-foreground">
-            {t('恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。', {
+            {t('恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。', {
               n: Math.max(0, (chief.stream?.length ?? 0) - (rewindConfirm?.index ?? 0) - 1),
             })}
           </p>

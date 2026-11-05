@@ -25,7 +25,7 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 
 The implementer templates incorporate the same checklist in `docs/agent-dispatch-prompts.md#evidence-limits-checklist`. Apply it to every workflow below, including the stub LLM custom probes and fixture regressions.
 
-## Fact base (interrogated 2026-09-25; after the feature faces evolve, run `/maintain-verification-skill` to correct)
+## Fact base (interrogated 2026-09-25; after the feature faces evolve, run `/maintain-verify-cairn` to correct)
 
 | Dimension | Fact |
 |---|---|

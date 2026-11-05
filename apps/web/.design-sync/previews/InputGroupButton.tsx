@@ -14,7 +14,7 @@ export const CopyKey = () => (
 export const Variants = () => (
   <div style={{ width: 320 }}>
     <InputGroup>
-      <InputGroupInput placeholder="Ask Chief about task #104" />
+      <InputGroupInput placeholder="Ask Coordinator about task #104" />
       <InputGroupAddon align="inline-end">
         <InputGroupButton variant="ghost">Attach</InputGroupButton>
         <InputGroupButton variant="default">Send</InputGroupButton>

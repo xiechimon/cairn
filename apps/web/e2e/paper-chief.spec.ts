@@ -1,5 +1,4 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const GATED = '/app/schedules?scenario=100';
 const READY = '/app/schedules?scenario=111';
@@ -56,7 +55,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await probe(page, 'backgroundColor', 'var(--card)');
     const secondary = await probe(page, 'backgroundColor', 'var(--secondary)');
 
-    const title = win.getByRole('heading', { name: '总管', level: 2 });
+    const title = win.getByRole('heading', { name: 'Coordinator', level: 2 });
     await expect(title, 'W1').toHaveCSS('font-family', display);
     await expect(title, 'W1').toHaveCSS('font-size', '17px');
     await expect(title, 'W1').toHaveCSS('font-weight', '650');
@@ -89,7 +88,6 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(win.getByTestId('chief-composer-input'), 'W5').toHaveCSS('font-size', '15px');
 
     win = await openWindow(page, THREAD);
-    await expandTurns(page);
     const note = win.getByTestId('chief-stream').locator('[data-slot="marker"]').first();
     await expect(note, 'W5').toHaveCSS('font-size', '13px');
     const foot = win.getByTestId('chief-msg-foot').first();
@@ -106,7 +104,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(SETTINGS('101'));
     const serif = await probe(page, 'fontFamily', 'var(--font-source-serif)');
 
-    const heading = page.getByRole('heading', { name: '总管设置' });
+    const heading = page.getByRole('heading', { name: 'Coordinator 设置' });
     await expect(heading, 'S1').toHaveCSS('font-family', serif);
     await expect(heading, 'S1').toHaveCSS('font-size', '20px');
     const bar = page.getByTestId('chief-settings-topbar');

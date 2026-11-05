@@ -15,7 +15,7 @@ test('org chart: every member agent renders as one node', async ({ page }) => {
   await expect(page.getByText('暂无成员')).toHaveCount(0);
 });
 
-test('org chart: the root node is the agent bound to the chief', async ({ page }) => {
+test('org chart: the root node is the agent bound to the Coordinator', async ({ page }) => {
   await openChart(page, 'team-org-chart');
 
   const root = page

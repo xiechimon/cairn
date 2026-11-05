@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 import { HISTORY, mockLive, THREAD } from './chief-home-mock';
 
 const HOUR = 60 * 60 * 1000;
@@ -71,7 +70,6 @@ test('home stays quiet for a fresh backup and for a server without one', async (
   });
   const fresh = page.waitForResponse('**/api/server/backup');
   await page.goto('/app');
-  await expandTurns(page);
   await fresh;
   await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText('已经补给它了');
   await expect(page.getByTestId('backup-warning')).toHaveCount(0);
@@ -79,7 +77,6 @@ test('home stays quiet for a fresh backup and for a server without one', async (
   await mockLive(page, { threads: [THREAD], messages: MESSAGES, backup: { state: 'none' } });
   const none = page.waitForResponse('**/api/server/backup');
   await page.goto('/app');
-  await expandTurns(page);
   await none;
   await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText('已经补给它了');
   await expect(page.getByTestId('backup-warning')).toHaveCount(0);

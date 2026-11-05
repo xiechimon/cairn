@@ -4,7 +4,7 @@ export const Agents = () => (
   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
     <SeededAvatar name="Implementer" fallback="I" />
     <SeededAvatar name="Reviewer" fallback="R" />
-    <SeededAvatar name="Chief" fallback="C" />
+    <SeededAvatar name="Coordinator" fallback="C" />
     <SeededAvatar name="Planner" fallback="P" />
   </div>
 );

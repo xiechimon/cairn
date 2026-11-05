@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
-import { openChiefWindow, expandTurns } from './helpers.js';
+import { openChiefWindow } from './helpers.js';
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
 
@@ -17,7 +17,7 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(row).toBeVisible();
     await expect(modelName(page)).toHaveText('claude-sonnet-5 · 默认');
 
-    await expect(page.getByRole('button', { name: '总管主模型' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Coordinator 主模型' })).toHaveCount(0);
     await row.click();
     await expect(page.getByRole('dialog', { name: '模型' })).toHaveCount(0);
     await expect(drawer(page)).toBeVisible();
@@ -82,7 +82,6 @@ test.describe('chief drawer model row (#615)', () => {
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/app/schedules?scenario=114');
-    await expandTurns(page);
     await expect(drawer(page)).toBeVisible();
 
     const copy = page.getByTestId('chief-msg-tools').getByRole('button', { name: '复制' });
@@ -107,7 +106,6 @@ test.describe('chief drawer model row (#615)', () => {
     page,
   }) => {
     await page.goto('/app/schedules?scenario=114');
-    await expandTurns(page);
     await expect(drawer(page)).toBeVisible();
 
     const restore = page
@@ -137,17 +135,17 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(tools).toHaveCount(0);
   });
 
-  test('the gear reaches the chief settings from a wake surface', async ({ page }) => {
+  test('the gear reaches the Coordinator settings from a wake surface', async ({ page }) => {
     await page.goto('/app/schedules?scenario=12');
     await openChiefWindow(page);
     await expect(drawer(page)).toBeVisible();
-    const gear = drawer(page).locator('button[aria-label="总管设置"]');
+    const gear = drawer(page).locator('button[aria-label="Coordinator 设置"]');
     await expect(gear).toBeVisible();
 
     await gear.click();
     // the deep-link param is consumed (stripped) once the view lands — the
     // stable contract is the settings view itself, not the URL mid-consumption
-    await expect(page.getByRole('heading', { name: '总管设置' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Coordinator 设置' })).toBeVisible();
   });
 
 });

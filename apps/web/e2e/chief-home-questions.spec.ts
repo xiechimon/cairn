@@ -33,7 +33,7 @@ const TWO = {
   todos: [],
 };
 
-test('a pending Chief question stays quiet in the header until the user opens it (#2853)', async ({
+test('a pending Coordinator question stays quiet in the header until the user opens it (#2853)', async ({
   page,
 }) => {
   const posts: string[] = [];

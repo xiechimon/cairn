@@ -7631,6 +7631,26 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "note": "D60 PR8: routing_rule + work_policy settings (flag state included)",
+    "path": "/api/teams/{id}/routing-settings",
+  },
+  {
+    "method": "POST",
+    "note": "D60 PR8: seed missing session/review rules and policies from agents",
+    "path": "/api/teams/{id}/routing-settings/seed",
+  },
+  {
+    "method": "PATCH",
+    "note": "D60 PR8: upsert a routing_rule by use",
+    "path": "/api/teams/{id}/routing-rules/{use}",
+  },
+  {
+    "method": "PATCH",
+    "note": "D60 PR8: upsert a work_policy by use",
+    "path": "/api/teams/{id}/work-policies/{use}",
+  },
+  {
+    "method": "GET",
     "note": "→ {unreadThreadIds}（02 §9.1）",
     "path": "/api/teams/{id}/notifications",
   },

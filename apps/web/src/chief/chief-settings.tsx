@@ -112,7 +112,7 @@ export function ChiefSettings({
           <ChevronLeft width={16} height={16} />
         </Button>
         <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
-          {t('总管设置')}
+          {t('Coordinator 设置')}
         </h1>
         <div className="ml-auto">
           <ChiefQuestionEntry />
@@ -181,7 +181,7 @@ export function ChiefSettings({
                   </div>
                 ) : (
                   <div className={EMPTY_ROW_CLS}>
-                    {t('尚无章程。点击编辑，为总管添加常设指示。')}
+                    {t('尚无章程。点击编辑，为 Coordinator 添加常设指示。')}
                   </div>
                 )}
               </SettingsCard>
@@ -248,7 +248,9 @@ export function ChiefSettings({
                 </>
               ) : (
                 <div className={EMPTY_ROW_CLS}>
-                  {t('暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。')}
+                  {t(
+                    '暂无跟进事项。Coordinator 关注某个任务，或约定到点回头核实时，会按主题列在这里。',
+                  )}
                 </div>
               )}
             </SettingsCard>

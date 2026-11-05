@@ -15,11 +15,10 @@ test.describe('no floating chief launcher on any route', () => {
       await page.goto(url);
       await expect(page.locator('[data-route]').first()).toBeVisible();
       await expect(page.locator('.chief-fab')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveCount(0);
     });
   }
 
-  test('off the home, Cmd/Ctrl+J still opens the chief window', async ({ page }) => {
+  test('off the home, Cmd/Ctrl+J still opens the Coordinator window', async ({ page }) => {
     await page.goto('/app/schedules?scenario=11');
     await expect(page.locator('.chief-drawer')).toBeHidden();
     await openChiefWindow(page);

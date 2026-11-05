@@ -1,6 +1,6 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow, expandTurns } from './helpers.js';
+import { openChiefWindow } from './helpers.js';
 
 // #732: the chief drawer composer gets the detail composer's tool face
 // (ruling (a), issue comment 2026-10-03). The interaction set is the same
@@ -485,7 +485,6 @@ test('transcript: mention and attachment tokens in a user row render as chips, n
   page,
 }) => {
   const drawer = await openChiefThread(page);
-  await expandTurns(page);
 
   const bubble = drawer.getByTestId('chief-bubble').first();
   await expect(bubble).toHaveAttribute('data-md', '');
