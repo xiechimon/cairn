@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const SCENARIO = '/app/schedules?scenario=chief-agent-chip';
 const AGENT_HREF = '/app/resources/agents/r3-builder';
@@ -17,7 +16,6 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
   test.beforeEach(async ({ page }) => {
     await stubDicebear(page);
     await page.goto(SCENARIO);
-    await expandTurns(page);
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
 
@@ -83,7 +81,6 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
   test('F-E5: drawer-face agent mention chips form links with click navigation (same recipe as F-R13)', async ({ page }) => {
     await page.goto(SCENARIO);
-    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const chip = page.getByTestId('chief-stream').locator('.mention-chip--agent');
     await expect(chip).toHaveCount(1);
@@ -96,7 +93,6 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
   test('F-E6: side chat transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
     await page.goto('/app/todo/r3-legacy-1?scenario=chief-agent-chip');
-    await expandTurns(page);
 
     const chip = page.locator('.side-panel .mention-chip--agent');
     await expect(chip).toHaveCount(1);
@@ -107,7 +103,6 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
   test('F-E7: skill/project/machine mentions stay lazy spans (literal negative cases)', async ({ page }) => {
     await page.goto(SCENARIO);
-    await expandTurns(page);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const stream = page.getByTestId('chief-stream');
     for (const kind of ['skill', 'project', 'machine'] as const) {

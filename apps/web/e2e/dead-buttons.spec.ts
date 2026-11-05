@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 test('feedback route is gone — old URL redirects to the home', async ({ page }) => {
   await page.goto('/app/feedback');
@@ -279,7 +278,6 @@ test('account drops the `更换` button, keeps the avatar head (#306 wontfix shi
 
 test('transcript work summary collapses and re-expands call rows', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28');
-  await expandTurns(page);
   const summary = page.getByTestId('work-summary');
   await expect(page.getByTestId('work-call')).toHaveCount(2);
   await expect(summary).toHaveAttribute('aria-expanded', 'true');
@@ -354,7 +352,6 @@ test('project task rows and cards are real links that open the todo detail (#318
 
 test('detail transcript action rows carry no restore glyph (#884)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
-  await expandTurns(page);
   await expect(page.locator('.chat-row-icons .chat-copy').first()).toBeVisible();
   await expect(page.locator('.chat-col path[d^="M3 12a9"]')).toHaveCount(0);
   const userRow = page.locator('.chat-row:has(.chat-bubble) ~ .chat-row-icons').first();
@@ -366,7 +363,6 @@ test('fail row `查看原始错误` opens the raw-error dialog with the full tex
   page,
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
-  await expandTurns(page);
 
   await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的机器已离线');
   await page.getByRole('button', { name: '查看原始错误' }).click();
@@ -385,7 +381,6 @@ test('fail row drops the `排查指南` dead link — no doc target, no shape (#
   page,
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
-  await expandTurns(page);
 
   await expect(page.locator('.chat-para--fail')).toBeVisible();
 

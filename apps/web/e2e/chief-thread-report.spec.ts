@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const STATUS = {
@@ -89,7 +88,6 @@ test('a notify_user notice from an event turn shows in the conversation', async 
     todos: [],
   });
   await page.goto('/app');
-  await expandTurns(page);
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-msg').last()).toContainText(
     '#9 failed twice on the same machine. Move it to another machine?',

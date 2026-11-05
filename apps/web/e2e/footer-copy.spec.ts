@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { expandTurns } from './helpers.js';
 
 const REVIEW = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28';
 
@@ -20,7 +19,6 @@ test('C1: robot row copy puts the row text on the clipboard', async ({ page }) =
 
 test('C2: plan card copy puts title + preview on the clipboard', async ({ page }) => {
   await page.goto(REVIEW);
-  await expandTurns(page);
   await readClipboard(page);
   await page.locator('.chat-preview + .chat-row-icons .chat-copy').first().click();
   const clip = await readClipboard(page);
@@ -53,7 +51,6 @@ for (const phone of [false, true]) {
       test('completion stays aligned before copy through hover and focus', async ({ page }) => {
         await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
         await page.goto(REVIEW);
-        await expandTurns(page);
         const row = page.locator('[data-slot="message-scroller-item"]').filter({ has: page.locator('.chat-preview') }).first();
         const label = row.locator('.chat-row-icons > span');
         const copy = row.locator('.chat-copy');

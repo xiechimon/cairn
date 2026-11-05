@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { expandTurns } from './helpers.js';
 
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=skills-routing';
 
@@ -7,7 +6,6 @@ const ROUTE_NO_SKILLS = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
 test('the durable summary row names reads and denials in two columns', async ({ page }) => {
   await page.goto(ROUTE);
-  await expandTurns(page);
   const summary = page.getByTestId('skills-summary');
   await expect(summary).toBeVisible();
   await expect(summary).toContainText('技能：haiku-helper');
