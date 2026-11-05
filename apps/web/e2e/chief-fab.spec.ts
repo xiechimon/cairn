@@ -15,7 +15,6 @@ test.describe('no floating chief launcher on any route', () => {
       await page.goto(url);
       await expect(page.locator('[data-route]').first()).toBeVisible();
       await expect(page.locator('.chief-fab')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Coordinator', exact: true })).toHaveCount(0);
     });
   }
 

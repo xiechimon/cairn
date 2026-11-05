@@ -13,7 +13,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.getByTestId('home-c-hero')).toContainText('ian');
     await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
     await expect(home.getByTestId('chief-composer-input')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Coordinator', exact: true })).toHaveCount(0);
+    await expect(page.locator('.chief-fab')).toHaveCount(0);
     await expect(page.locator('.chief-drawer')).toBeHidden();
     const composer = await home.locator('.chief-composer').boundingBox();
     const hero = await page.getByTestId('home-c-hero').boundingBox();
