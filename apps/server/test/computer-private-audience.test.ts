@@ -227,7 +227,7 @@ describe('private computer principal boundary with two server-bound AppContexts'
       });
       const call = calls.at(-1);
       if (!call) throw new Error('machine did not receive call');
-      receiveComputerFrames(s.db, 'worker', call.callId, [
+      receiveComputerFrames(s.db, s.hub, 'worker', call.callId, [
         {
           kind: 'output',
           seq: 1,
@@ -235,10 +235,10 @@ describe('private computer principal boundary with two server-bound AppContexts'
           text: `private-output-${owner.id} ${TOKEN.slice(0, 15)}`,
         },
       ]);
-      receiveComputerFrames(s.db, 'worker', call.callId, [
+      receiveComputerFrames(s.db, s.hub, 'worker', call.callId, [
         { kind: 'output', seq: 2, stream: 'stdout', text: `${TOKEN.slice(15)}\n` },
       ]);
-      receiveComputerFrames(s.db, 'worker', call.callId, [
+      receiveComputerFrames(s.db, s.hub, 'worker', call.callId, [
         { kind: 'done', seq: 3, text: 'done', exitCode: 0 },
       ]);
       await result;
@@ -305,7 +305,7 @@ describe('private computer principal boundary with two server-bound AppContexts'
     );
     const call = calls.at(-1);
     if (!call) throw new Error('machine did not receive host call');
-    receiveComputerFrames(s.db, 'worker', call.callId, [
+    receiveComputerFrames(s.db, s.hub, 'worker', call.callId, [
       { kind: 'done', seq: 1, text: 'host-bob', exitCode: 0 },
     ]);
     await result;

@@ -172,6 +172,7 @@ export function clearPendingComputerOutput(callId: string): void {
 
 export function receiveComputerFrames(
   db: Db,
+  hub: TeamStreamHub,
   machineId: string,
   callId: string,
   frames: readonly ComputerFrame[],
@@ -221,16 +222,17 @@ export function receiveComputerFrames(
   });
   if (result.pending === '') pendingOutput.delete(callId);
   else if (result.pending !== null) pendingOutput.set(callId, result.pending);
+  const live = pendingCalls.get(callId);
+  const publishHub = live?.hub ?? hub;
   const computerId =
     db.select().from(computerCall).where(eq(computerCall.id, callId)).get()?.computerId ?? null;
   if (syncObservedComputerState(db, computerId)) {
-    publishObservedComputerState(db, pendingCalls.get(callId)?.hub, computerId);
+    publishObservedComputerState(db, publishHub, computerId);
   }
-  if (result.finished) settleComputerCall(db, callId);
+  if (result.finished) settleComputerCall(db, callId, hub);
   else if (result.publishOutput) {
-    const pending = pendingCalls.get(callId);
     const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-    if (pending && row) publishFeed(db, pending.hub, row);
+    if (row) publishFeed(db, publishHub, row);
   }
   return result.response;
 }
@@ -378,18 +380,24 @@ function publishFeed(db: Db, hub: TeamStreamHub, row: CallRow): void {
   if (userId) hub.publishPrivate(row.teamId, userId, () => ({ type: 'computer.command', command }));
 }
 
-export function settleComputerCall(db: Db, callId: string): void {
+export function settleComputerCall(db: Db, callId: string, hub?: TeamStreamHub): void {
   const live = pendingCalls.get(callId);
-  if (!live) return;
   const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
   if (!row || !isFinalState(row.state)) return;
-  pendingCalls.delete(callId);
-  live.dispose();
-  if (syncObservedComputerState(db, row.computerId)) {
-    publishObservedComputerState(db, live.hub, row.computerId);
+  if (live) {
+    pendingCalls.delete(callId);
+    live.dispose();
   }
-  publishFeed(db, live.hub, row);
-  live.resolve(resultOfRow(row));
+  const publishHub = live?.hub ?? hub;
+  if (publishHub) {
+    if (syncObservedComputerState(db, row.computerId)) {
+      publishObservedComputerState(db, publishHub, row.computerId);
+    }
+    publishFeed(db, publishHub, row);
+  } else {
+    syncObservedComputerState(db, row.computerId);
+  }
+  live?.resolve(resultOfRow(row));
 }
 
 function expireComputerCall(db: Db, callId: string): void {
@@ -690,6 +698,13 @@ export async function forwardComputerCall(
         })
         .where(eq(computerCall.id, callId))
         .run();
+      const interrupted = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+      if (interrupted) {
+        if (syncObservedComputerState(db, interrupted.computerId)) {
+          publishObservedComputerState(db, deps.hub, interrupted.computerId);
+        }
+        publishFeed(db, deps.hub, interrupted);
+      }
       return resultOfRow({ ...existing, state: 'interrupted' });
     }
     return resultOfRow(existing);
