@@ -1,7 +1,7 @@
 import type { ComputerRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Globe, Laptop, MonitorSmartphone, Plus, Server } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import {
@@ -177,6 +177,7 @@ function MachineCard({
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandAfterLease, setExpandAfterLease] = useState(false);
+  const reclaiming = useRef(false);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
   const canToggleDesktop =
     desktopInstalled && online && computer !== null && teamId !== undefined && !busy;
@@ -201,24 +202,22 @@ function MachineCard({
       computer === null ||
       computer.controlHolder !== 'user' ||
       leaseId !== null ||
-      busy
+      reclaiming.current
     )
       return;
-    let alive = true;
+    const computerId = computer.id;
+    reclaiming.current = true;
     setBusy(true);
-    void acquireComputerControl(teamId, computer.id)
+    void acquireComputerControl(teamId, computerId)
       .then((lease) => {
-        if (!alive) return;
         setLeaseId(lease.leaseId);
         return invalidateConverged(qc, { queryKey: ['computers', teamId] });
       })
       .finally(() => {
+        reclaiming.current = false;
         setBusy(false);
       });
-    return () => {
-      alive = false;
-    };
-  }, [teamId, computer?.id, computer?.controlHolder, leaseId, busy, qc, computer]);
+  }, [teamId, computer?.id, computer?.controlHolder, leaseId, qc, computer]);
 
   useEffect(() => {
     if (teamId === undefined || computer === null || leaseId === null) return;
