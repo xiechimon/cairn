@@ -1,26 +1,19 @@
+import type { CreateScheduleBody } from '@cairn/shared';
 import { cn } from 'cn';
-import { Clock, Lightbulb, Plus } from 'lucide-react';
+import { Clock, Lightbulb, Plus, TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useProjects, useSchedules, useTodos } from '../api/hooks.js';
-import { mapSchedules, toDisplayTodo } from '../api/mappers.js';
+import { useApiMutations, useProjects, useSchedules, useTeams, useTodos } from '../api/hooks.js';
+import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FormActions } from '../components/form-layout.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
-import { SegmentedRadio } from '../components/segmented.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
 import { StatusChip } from '../components/ui/status-chip.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
@@ -36,154 +29,111 @@ import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
-import { pad, scheduleSummary, TZ_OFFSET } from './schedule-summary.js';
+import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
+import { ScheduleFields } from '../schedules/schedule-fields.js';
+import { type ScheduleDraft, scheduleBody, scheduleDraft } from '../schedules/schedule-model.js';
+import { scheduleSummary } from './schedule-summary.js';
 import { PageShell } from './shell.js';
-
-type ScheduleKind = Exclude<ScheduleRecord['kind'], 'cron'>;
-
-const FREQ_LABEL: Record<ScheduleKind, string> = {
-  hourly: '每小时',
-  daily: '每天',
-  weekly: '每周',
-  once: '单次',
-};
-const MINUTE_STEPS = ['00', '15', '30', '45'];
-const HOURS = Array.from({ length: 24 }, (_, h) => pad(h));
-
-const FORM_ROW_CLS =
-  'sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30';
-
-const FORM_ROW_VALUE_CLS = 'min-w-0 truncate text-ui text-foreground';
-
-const FORM_LABEL_CLS = 'text-ui font-medium text-foreground';
-
-function SchedSelect({
-  value,
-  options,
-  label,
-  menuLabel,
-  triggerLabel,
-  onPick,
-}: {
-  value: string;
-  options: { value: string; label: string }[];
-  label: string;
-  menuLabel: string;
-  triggerLabel: string;
-  onPick: (value: string) => void;
-}) {
-  return (
-    <Select
-      value={value}
-      onValueChange={(next) => {
-        if (next !== null) onPick(next as string);
-      }}
-    >
-      <SelectTrigger aria-label={triggerLabel} className="min-w-14">
-        <SelectValue>{label}</SelectValue>
-      </SelectTrigger>
-      <SelectContent aria-label={menuLabel}>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 function ScheduleCard({
   schedule,
   now,
+  onOpen,
   onDelete,
 }: {
   schedule: ScheduleRecord;
   now: number;
+  onOpen: () => void;
   onDelete: () => void;
 }) {
   const { t } = useI18n();
   const ui = PHASE_UI[schedule.todo.phase];
   return (
     <div className={cn('sched-card', SETTINGS_ROW_CLS)}>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-ui text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</span>
-        <span className="truncate text-meta text-content-tertiary">
-          {`${scheduleSummary(schedule, now, t)} · ${schedule.todo.projectName}`}
+      <Button
+        variant="ghost"
+        aria-label={t('Open schedule {title}', { title: schedule.todo.title })}
+        onClick={onOpen}
+        className="h-auto min-w-0 flex-1 justify-start rounded-none p-0 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
+      >
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-ui text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</span>
+          <span className="truncate text-meta text-content-tertiary">{`${schedule.enabled === false ? (schedule.pausedReason ?? t('已暂停')) : scheduleSummary(schedule, now, t)} · ${schedule.todo.projectName}`}</span>
         </span>
-      </div>
+      </Button>
       <StatusChip tone={ui.tone} className="flex-none">
         {t(ui.chip)}
       </StatusChip>
-      <span className="relative flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="sched-card-more cursor-pointer text-muted-foreground"
-                aria-label={t('更多')}
-              />
-            }
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="sched-card-more cursor-pointer text-muted-foreground"
+              aria-label={t('更多')}
+            />
+          }
+        >
+          <EllipsisVertical />
+        </DropdownMenuTrigger>
+        <KeyedMenuContent
+          align="end"
+          sideOffset={4}
+          aria-label={t('更多')}
+          className="sched-card-menu w-40"
+        >
+          <KeyedMenuItem
+            shortcut="D"
+            confirms
+            variant="destructive"
+            className="sched-card-menu-row cursor-pointer"
+            data-action="delete"
+            onClick={onDelete}
           >
-            <EllipsisVertical />
-          </DropdownMenuTrigger>
-          <KeyedMenuContent
-            align="end"
-            sideOffset={4}
-            aria-label={t('更多')}
-            className="sched-card-menu w-40"
-          >
-            <KeyedMenuItem
-              shortcut="D"
-              confirms
-              variant="destructive"
-              className="sched-card-menu-row cursor-pointer"
-              data-action="delete"
-              onClick={onDelete}
-            >
-              <Trash2 />
-              {t('删除')}
-            </KeyedMenuItem>
-          </KeyedMenuContent>
-        </DropdownMenu>
-      </span>
+            <Trash2 />
+            {t('删除')}
+          </KeyedMenuItem>
+        </KeyedMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
 
+type SetupState = 'ready' | 'loading' | 'error' | 'no-team' | 'no-thread' | 'no-project';
+
 function ScheduleForm({
-  kind,
-  onKind,
-  hour,
-  onHour,
-  minute,
-  onMinute,
-  date,
-  onDate,
+  value,
+  onChange,
   todo,
   repo,
+  tz,
   open,
+  busy,
+  error,
+  setupState,
+  retryBusy,
+  onRetry,
   onClose,
   onSave,
 }: {
-  kind: ScheduleKind;
-  onKind: (kind: ScheduleKind) => void;
-  hour: string;
-  onHour: (hour: string) => void;
-  minute: string;
-  onMinute: (minute: string) => void;
-  date: string | null;
-  onDate: (date: string) => void;
+  value: ScheduleDraft;
+  onChange: (value: ScheduleDraft) => void;
   todo: { seqNum: number; title: string } | undefined;
   repo: string;
+  tz: string;
   open: boolean;
+  busy: boolean;
+  error: string | null;
+  setupState: SetupState;
+  retryBusy: boolean;
+  onRetry: () => void;
   onClose: () => void;
   onSave: () => void;
 }) {
   const { t } = useI18n();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const cronValid = value.trigger !== 'custom' || value.cron.trim().split(/\s+/).length === 5;
   return (
     <DialogShell
       title={t('新建定时')}
@@ -196,70 +146,53 @@ function ScheduleForm({
       footer={
         <FormActions
           className="pt-0"
-          primary={{ label: t('保存'), onClick: onSave }}
+          primary={{
+            label: t('保存'),
+            onClick: onSave,
+            disabled: busy || todo === undefined || !cronValid || setupState !== 'ready',
+          }}
           secondary={{ label: t('取消'), onClick: onClose }}
         />
       }
     >
       <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-3 outline-none">
-        <div className={FORM_ROW_CLS}>
+        <div className="sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30">
           <span className="text-ui text-content-secondary">{t('项目')}</span>
-          <span className={FORM_ROW_VALUE_CLS}>{repo}</span>
+          <span className="min-w-0 truncate text-ui text-foreground">{repo}</span>
         </div>
-        <div className={FORM_ROW_CLS}>
+        <div className="sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30">
           <span className="text-ui text-content-secondary">{t('任务')}</span>
-          <span className={FORM_ROW_VALUE_CLS}>
-            {todo == null ? '' : `#${todo.seqNum} ${todo.title}`}
+          <span className="min-w-0 truncate text-ui text-foreground">
+            {todo === undefined ? '—' : `#${todo.seqNum} ${todo.title}`}
           </span>
         </div>
-        <div className={FORM_LABEL_CLS}>{t('频率')}</div>
-        <SegmentedRadio
-          optionHandle="sched-form-freq-tab"
-          label={t('频率')}
-          value={kind}
-          onChange={onKind}
-          options={(['hourly', 'daily', 'weekly', 'once'] as const).map((k) => ({
-            value: k,
-            label: t(FREQ_LABEL[k]),
-          }))}
-        />
-        {kind === 'once' && (
-          <>
-            <div className={FORM_LABEL_CLS}>{t('日期')}</div>
-            <div>
-              <SchedSelect
-                value={date ?? t('今天')}
-                options={[{ value: t('今天'), label: t('今天') }]}
-                label={date ?? t('今天')}
-                menuLabel={t('日期')}
-                triggerLabel={t('日期')}
-                onPick={onDate}
-              />
-            </div>
-          </>
+        {setupState !== 'ready' && (
+          <div
+            role={setupState === 'error' ? 'alert' : 'status'}
+            className="flex flex-col gap-2 text-meta text-content-secondary"
+          >
+            {setupState === 'error'
+              ? t('Schedule setup could not be loaded.')
+              : setupState === 'loading'
+                ? t('Loading schedule setup…')
+                : setupState === 'no-team'
+                  ? t('No team is available for this schedule.')
+                  : setupState === 'no-thread'
+                    ? t('Create a thread before scheduling it.')
+                    : t('The project for this thread is unavailable.')}
+            {setupState !== 'loading' && (
+              <Button variant="outline" size="sm" disabled={retryBusy} onClick={onRetry}>
+                {t('重试')}
+              </Button>
+            )}
+          </div>
         )}
-        <div className={FORM_LABEL_CLS}>{t('时间')}</div>
-        <div className="flex items-center gap-2">
-          <SchedSelect
-            value={hour}
-            options={HOURS.map((h) => ({ value: h, label: h }))}
-            label={hour}
-            menuLabel={t('时')}
-            triggerLabel={t('时')}
-            onPick={onHour}
-          />
-          <SchedSelect
-            value={minute}
-            options={MINUTE_STEPS.map((m) => ({ value: m, label: m }))}
-            label={minute}
-            menuLabel={t('分')}
-            triggerLabel={t('分')}
-            onPick={onMinute}
-          />
-        </div>
-        <div className="text-meta text-content-tertiary">
-          {t('按你的本地时区运行（Asia/Shanghai）')}
-        </div>
+        <ScheduleFields value={value} onChange={onChange} tz={tz} disabled={busy} />
+        {error !== null && (
+          <p role="alert" className="m-0 break-words text-meta text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     </DialogShell>
   );
@@ -270,94 +203,111 @@ export function SchedulesPage() {
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
+  const teamsQ = useTeams(live);
   const schedulesQ = useSchedules(live);
   const todosQ = useTodos(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const mutations = useApiMutations(teamId);
+  const now = live ? Date.now() : fixture.now;
+  const tz = live ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Shanghai';
   const [formOpen, setFormOpen] = useState(false);
   const [fixtureFormOpen, setFixtureFormOpen] = useState<boolean | null>(null);
-  const [formKind, setFormKind] = useState<ScheduleKind>('daily');
-  const [formHour, setFormHour] = useState('09');
-  const [formMinute, setFormMinute] = useState('00');
-  const [fixtureKind, setFixtureKind] = useState<ScheduleKind>(fixture.scheduleForm ?? 'daily');
-  const [fixtureHour, setFixtureHour] = useState('09');
-  const [fixtureMinute, setFixtureMinute] = useState('00');
-  const [formDate, setFormDate] = useState<string | null>(null);
+  const [liveDraft, setLiveDraft] = useState(() => scheduleDraft(null, Date.now(), tz));
+  const [fixtureDraft, setFixtureDraft] = useState<ScheduleDraft>(() => ({
+    ...scheduleDraft(null, fixture.now, 'Asia/Shanghai'),
+    trigger: fixture.scheduleForm ?? 'daily',
+  }));
+  const [formError, setFormError] = useState<string | null>(null);
   const schedules = withoutDeleted(
-    live ? mapSchedules(schedulesQ.data ?? []) : withCreatedSchedules(fixture.schedules ?? []),
+    live
+      ? (schedulesQ.data ?? []).map((row) => ({ ...row, at: row.at ?? now }))
+      : withCreatedSchedules(fixture.schedules ?? []),
   );
-  const now = live ? Date.now() : fixture.now;
+  const [selected, setSelected] = useState<ScheduleRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ScheduleRecord | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const liveTodos = (todosQ.data ?? []).map(toDisplayTodo);
   const liveTodo = todosQ.data?.[0];
-  const saveSchedule = () => {
-    if (!liveTodo) {
-      setFormOpen(false);
+  const todo = live ? liveTodo : fixture.todos[0];
+  const draft = live ? liveDraft : fixtureDraft;
+  const setupState: SetupState = !live
+    ? 'ready'
+    : teamsQ.isError || (teamId !== undefined && (todosQ.isError || projectsQ.isError))
+      ? 'error'
+      : teamsQ.isPending || (teamId !== undefined && (todosQ.isPending || projectsQ.isPending))
+        ? 'loading'
+        : teamId === undefined
+          ? 'no-team'
+          : liveTodo === undefined
+            ? 'no-thread'
+            : projectsQ.data?.some((project) => project.id === liveTodo.projectId) !== true
+              ? 'no-project'
+              : 'ready';
+  const retrySetup = () => {
+    if (teamsQ.isError || teamId === undefined) {
+      void teamsQ.refetch();
       return;
     }
-    const base = new Date();
-    base.setHours(Number(formHour), Number(formMinute), 0, 0);
-    if (formKind === 'once' && base.getTime() < Date.now()) {
-      base.setDate(base.getDate() + 1);
-    }
-    mutations.createSchedule.mutate(
-      {
-        todoId: liveTodo.id,
-        projectId: liveTodo.projectId,
-        kind: formKind,
-        at: base.getTime(),
-        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-      { onError: (error) => toastError(t('新建定时失败，请重试。'), error) },
-    );
-    setFormOpen(false);
+    if (todosQ.isError || todosQ.data?.length === 0) void todosQ.refetch();
+    if (
+      projectsQ.isError ||
+      projectsQ.data?.some((project) => project.id === liveTodo?.projectId) !== true
+    )
+      void projectsQ.refetch();
   };
-  const saveScheduleFixture = () => {
+  const closeForm = () => {
+    if (!mutations.createSchedule.isPending) {
+      if (live) setFormOpen(false);
+      else setFixtureFormOpen(false);
+    }
+  };
+  const saveSchedule = async () => {
+    if (todo === undefined || setupState !== 'ready') return;
     if (blockDemoWrite()) {
-      setFixtureFormOpen(false);
+      closeForm();
       return;
     }
-    const todo = fixture.todos[0];
-    if (todo == null) {
-      setFixtureFormOpen(false);
-      return;
+    setFormError(null);
+    try {
+      const body: CreateScheduleBody = scheduleBody(
+        draft,
+        { todoId: todo.id, projectId: todo.projectId, tz, enabled: true },
+        now,
+      );
+      if (live) await mutations.createSchedule.mutateAsync(body);
+      else {
+        const at = body.at ?? now;
+        const interval = {
+          once: 86_400_000,
+          hourly: 3_600_000,
+          daily: 86_400_000,
+          weekly: 604_800_000,
+          cron: 0,
+        }[body.kind];
+        let nextRunAt: number | null = body.kind === 'cron' ? null : at;
+        while (nextRunAt !== null && nextRunAt <= now) nextRunAt += interval;
+        markScheduleCreated({
+          ...body,
+          projectId: todo.projectId,
+          at,
+          tz,
+          nextRunAt,
+          teamId: todo.teamId,
+          createdBy: 'u-xmon-dai',
+          todo: {
+            seqNum: todo.seqNum,
+            title: todo.title,
+            phase: todo.phase,
+            projectName: fixture.project?.name ?? '',
+            ownerId: 'u-xmon-dai',
+          },
+        });
+      }
+      if (live) setFormOpen(false);
+      else setFixtureFormOpen(false);
+    } catch (failure) {
+      setFormError(failure instanceof Error ? t(failure.message) : t('新建定时失败，请重试。'));
     }
-    const d = new Date(fixture.now + TZ_OFFSET);
-    const at =
-      Date.UTC(
-        d.getUTCFullYear(),
-        d.getUTCMonth(),
-        d.getUTCDate(),
-        Number(fixtureHour),
-        Number(fixtureMinute),
-      ) - TZ_OFFSET;
-    const step = {
-      hourly: 3_600_000,
-      daily: 86_400_000,
-      weekly: 604_800_000,
-      once: 86_400_000,
-    }[fixtureKind];
-    let nextRunAt = at;
-    while (nextRunAt <= fixture.now) nextRunAt += step;
-    markScheduleCreated({
-      teamId: todo.teamId,
-      projectId: todo.projectId,
-      todoId: todo.id,
-      kind: fixtureKind,
-      at,
-      tz: 'Asia/Shanghai',
-      nextRunAt,
-      createdBy: 'u-xmon-dai',
-      todo: {
-        seqNum: todo.seqNum,
-        title: todo.title,
-        phase: todo.phase,
-        projectName: fixture.project?.name ?? '',
-        ownerId: 'u-xmon-dai',
-      },
-    });
-    setFixtureFormOpen(false);
   };
   return (
     <PageShell
@@ -369,7 +319,11 @@ export function SchedulesPage() {
         schedules.length > 0 && (
           <Button
             className={`page-new-action ${TOPBAR_PRIMARY_BUTTON}`}
-            onClick={() => (live ? setFormOpen(true) : setFixtureFormOpen(true))}
+            onClick={() => {
+              setFormError(null);
+              if (live) setFormOpen(true);
+              else setFixtureFormOpen(true);
+            }}
           >
             <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
             {t('新建')}
@@ -377,7 +331,27 @@ export function SchedulesPage() {
         )
       }
     >
-      {schedules.length === 0 ? (
+      {live && schedulesQ.isError ? (
+        <EmptyState
+          testId="schedules-error"
+          className="mt-6"
+          icon={TriangleAlert}
+          title={t('Scheduled tasks could not be loaded.')}
+          action={{
+            label: t('重试'),
+            disabled: schedulesQ.isFetching,
+            onClick: () => void schedulesQ.refetch(),
+          }}
+        />
+      ) : live && schedulesQ.isPending ? (
+        <div
+          data-testid="schedules-loading"
+          role="status"
+          className="py-12 text-center text-ui text-content-secondary"
+        >
+          {t('Loading scheduled tasks…')}
+        </div>
+      ) : schedules.length === 0 ? (
         <EmptyState
           className="sched-empty mt-6"
           icon={Clock}
@@ -387,7 +361,11 @@ export function SchedulesPage() {
           )}
           action={{
             label: t('新建定时'),
-            onClick: () => (live ? setFormOpen(true) : setFixtureFormOpen(true)),
+            onClick: () => {
+              setFormError(null);
+              if (live) setFormOpen(true);
+              else setFixtureFormOpen(true);
+            },
           }}
           hint={{
             icon: Lightbulb,
@@ -396,71 +374,55 @@ export function SchedulesPage() {
         />
       ) : (
         <SettingsCard className="mt-4">
-          {schedules.map((s) => (
+          {schedules.map((schedule) => (
             <ScheduleCard
-              key={s.id}
-              schedule={s}
+              key={schedule.id}
+              schedule={schedule}
               now={now}
+              onOpen={() => setSelected(schedule)}
               onDelete={() => {
-                setDeleteTarget(s);
+                setDeleteTarget(schedule);
                 setConfirmOpen(true);
               }}
             />
           ))}
         </SettingsCard>
       )}
-      {live ? (
-        <ScheduleForm
-          kind={formKind}
-          onKind={setFormKind}
-          hour={formHour}
-          onHour={setFormHour}
-          minute={formMinute}
-          onMinute={setFormMinute}
-          date={formDate}
-          onDate={setFormDate}
-          todo={liveTodo ? { seqNum: liveTodo.seqNum, title: liveTodo.title } : undefined}
-          repo={projectsQ.data?.[0]?.name ?? ''}
-          open={formOpen}
-          onClose={() => setFormOpen(false)}
-          onSave={saveSchedule}
-        />
-      ) : (
-        <ScheduleForm
-          kind={fixtureKind}
-          onKind={setFixtureKind}
-          hour={fixtureHour}
-          onHour={setFixtureHour}
-          minute={fixtureMinute}
-          onMinute={setFixtureMinute}
-          date={formDate}
-          onDate={setFormDate}
-          todo={
-            fixture.todos[0]
-              ? { seqNum: fixture.todos[0].seqNum, title: fixture.todos[0].title }
-              : undefined
-          }
-          repo={fixture.project?.repoName ?? ''}
-          open={fixtureFormOpen ?? fixture.scheduleForm != null}
-          onClose={() => setFixtureFormOpen(false)}
-          onSave={saveScheduleFixture}
-        />
-      )}
+      <ScheduleForm
+        value={draft}
+        onChange={live ? setLiveDraft : setFixtureDraft}
+        todo={todo}
+        repo={
+          live
+            ? (projectsQ.data?.find((project) => project.id === liveTodo?.projectId)?.name ?? '')
+            : (fixture.project?.repoName ?? '')
+        }
+        tz={tz}
+        open={live ? formOpen : (fixtureFormOpen ?? fixture.scheduleForm !== undefined)}
+        busy={mutations.createSchedule.isPending}
+        error={formError}
+        setupState={setupState}
+        retryBusy={live && (teamsQ.isFetching || todosQ.isFetching || projectsQ.isFetching)}
+        onRetry={retrySetup}
+        onClose={closeForm}
+        onSave={() => void saveSchedule()}
+      />
+      <ScheduleDetailController schedule={selected} now={now} onClose={() => setSelected(null)} />
       <DeleteConfirm
         open={confirmOpen}
         title={t('确定删除该定时？此操作不可撤销。')}
         summary={
-          deleteTarget != null ? (
+          deleteTarget === null ? null : (
             <>
               <span className="text-content-tertiary">#{deleteTarget.todo.seqNum}</span>
               {deleteTarget.todo.title}
             </>
-          ) : null
+          )
         }
         ariaLabel={t('删除定时')}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
-          if (deleteTarget == null) return;
+          if (deleteTarget === null) return;
           if (live)
             mutations.deleteSchedule.mutate(deleteTarget.id, {
               onError: (error) => toastError(t('删除定时失败，请重试。'), error),

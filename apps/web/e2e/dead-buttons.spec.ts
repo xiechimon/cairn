@@ -59,7 +59,7 @@ test('schedules fixture face: topbar `新建` opens the dialog, freq tabs respon
   await expect(dialog).toBeVisible();
 
   await dialog.getByRole('radio', { name: '每周' }).click();
-  await expect(dialog.locator('.sched-form-freq-tab[aria-checked="true"]')).toHaveText('每周');
+  await expect(dialog.getByRole('radio', { checked: true })).toHaveText('每周');
   await dialog.getByRole('button', { name: '保存' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator('.sched-card')).toHaveCount(1);

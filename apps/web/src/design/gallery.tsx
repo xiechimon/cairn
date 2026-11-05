@@ -20,6 +20,7 @@ import {
 import { IdentitySection, StreamSection, StructureSection } from './components-more.js';
 import { DialogSection, MenuSection, ToastSection } from './components-overlays.js';
 import { PanelSection } from './components-panel.js';
+import { ScheduleDetailSection } from './components-schedule-detail.js';
 import {
   CoordinatorStreamSection,
   ProjectsSection,
@@ -123,6 +124,7 @@ const NAV = [
       ['pr-bar', 'Pull request bar'],
       ['pr-card', 'PR card'],
       ['scheduled', 'Scheduled task row'],
+      ['schedule-detail', 'Scheduled task detail'],
       ['thread-automation', 'Thread automation badge'],
       ['sidebar', 'Sidebar parts'],
       ['projects-lists', 'Projects, lists, phone'],
@@ -314,6 +316,7 @@ export function Gallery() {
           <PrBarSection />
           <PrCardSection />
           <ScheduledSection />
+          <ScheduleDetailSection />
           <AutomationSection />
           <SidebarSection />
           <ProjectsSection />
