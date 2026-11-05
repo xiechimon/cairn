@@ -673,6 +673,47 @@ test('a rejected quota connection is destroyed after the 503', async (t) => {
   extra.destroy();
 });
 
+test('relay close destroys paused sockets refused before they were tracked', async (t) => {
+  const closeSoon = (relay, label) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`relay close hung on ${label}`)), 1000);
+      relay.close((error) => {
+        clearTimeout(timer);
+        error ? reject(error) : resolve();
+      });
+    });
+  const quota = await fixture(
+    t,
+    {
+      idleTimeout: 5000,
+      maxConnections: 4,
+      maxConnectionsPerClient: 1,
+      clientIdentity: () => 'orb:held',
+    },
+    { unix: true },
+  );
+  const held = connect(quota.socketPath);
+  const extra = connect(quota.socketPath);
+  held.on('error', () => {});
+  extra.on('error', () => {});
+  t.after(() => {
+    held.destroy();
+    extra.destroy();
+  });
+  await once(held, 'connect');
+  await once(extra, 'connect');
+  extra.pause();
+  await closeSoon(quota.relay, 'refused quota socket');
+
+  const subnet = await fixture(t, { idleTimeout: 5000, subnet: relayDefaults.subnet });
+  const foreign = connect(subnet.port, '127.0.0.1');
+  foreign.on('error', () => {});
+  t.after(() => foreign.destroy());
+  await once(foreign, 'connect');
+  foreign.pause();
+  await closeSoon(subnet.relay, 'refused subnet socket');
+});
+
 test('unix peers outside a container share one unknown quota', async (t) => {
   const seen = [];
   const f = await fixture(
