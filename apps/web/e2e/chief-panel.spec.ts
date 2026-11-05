@@ -40,7 +40,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
   test('chief header and composer tools retain 24px header and 28px composer-tool targets after conversation extraction', async ({ page }, testInfo) => {
     await page.goto('/app/schedules?scenario=111');
     await settled(page);
-    for (const name of ['总管设置', '最小化', '添加附件']) {
+    for (const name of ['Coordinator 设置', '最小化', '添加附件']) {
       const control = drawer(page).getByRole('button', { name, exact: true });
       await expect(control).toBeVisible();
       const box = await control.boundingBox();
@@ -202,7 +202,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       return composer.getAttribute('placeholder');
     };
 
-    expect(await placeholderAt('113')).toBe('发出的话会直接插进总管这一轮');
+    expect(await placeholderAt('113')).toBe('发出的话会直接插进 Coordinator 这一轮');
     expect(await placeholderAt('111')).toBe('有什么可以帮你的？');
     expect(await placeholderAt('114')).toBe('有什么可以帮你的？');
   });

@@ -12,7 +12,7 @@ export const Agents = () => (
     <Avatar><AvatarImage src={PHOTOS[0]} alt="Implementer" /><AvatarFallback>IM</AvatarFallback></Avatar>
     <Avatar><AvatarImage src={PHOTOS[1]} alt="Reviewer" /><AvatarFallback>RV</AvatarFallback></Avatar>
     <Avatar><AvatarImage src={PHOTOS[2]} alt="Planner" /><AvatarFallback>PL</AvatarFallback></Avatar>
-    <Avatar><AvatarImage src={PHOTOS[3]} alt="Chief" /><AvatarFallback>CH</AvatarFallback></Avatar>
+    <Avatar><AvatarImage src={PHOTOS[3]} alt="Coordinator" /><AvatarFallback>CH</AvatarFallback></Avatar>
   </AvatarGroup>
 );
 

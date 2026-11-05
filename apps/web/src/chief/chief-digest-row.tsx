@@ -44,8 +44,8 @@ export function ChiefDigestRow({
   const known = memoriesQ.data === undefined ? null : new Set(memoriesQ.data.map((m) => m.id));
   const label =
     reason === 'daily'
-      ? t('总管把昨天的对话整理成了 {n} 条摘要', { n: items.length })
-      : t('对话太长了，总管把上面的内容整理成了 {n} 条摘要', { n: items.length });
+      ? t('Coordinator 把昨天的对话整理成了 {n} 条摘要', { n: items.length })
+      : t('对话太长了，Coordinator 把上面的内容整理成了 {n} 条摘要', { n: items.length });
   return (
     <MessageScrollerItem style={{ contentVisibility: 'visible' }}>
       <div className={DIVIDER_CLS} data-testid="chief-digest">
@@ -122,7 +122,7 @@ export function ChiefDigestRow({
                             variant="ghost"
                             size="icon"
                             className={ICON_BTN_CLS}
-                            aria-label={t('让总管忘掉这条')}
+                            aria-label={t('让 Coordinator 忘掉这条')}
                             onClick={() => {
                               const markGone = () =>
                                 setForgotten((prev) => new Set(prev).add(memory.id));
@@ -151,7 +151,7 @@ export function ChiefDigestRow({
         })}
         <p className="m-0 border-t border-border pt-2.5 text-meta text-content-tertiary">
           {t(
-            '原文都还在，往上滑就能看到。总管接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉总管。',
+            '原文都还在，往上滑就能看到。Coordinator 接着聊时用的是这份摘要；任务的进度它会直接去任务里查，不靠记对话。摘要漏了或写错了，直接在下面告诉 Coordinator。',
           )}
         </p>
       </section>

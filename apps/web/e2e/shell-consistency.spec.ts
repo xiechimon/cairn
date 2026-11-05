@@ -80,7 +80,7 @@ test.describe('⌘J wakes the window on every shell family', () => {
       await openChiefWindow(page);
       await expect(page.locator('.chief-drawer')).toBeVisible();
 
-      await expect(page.locator('.chief-drawer button[aria-label="总管设置"]')).toHaveCount(
+      await expect(page.locator('.chief-drawer button[aria-label="Coordinator 设置"]')).toHaveCount(
         gear ? 1 : 0,
       );
 

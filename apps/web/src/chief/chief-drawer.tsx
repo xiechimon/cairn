@@ -39,7 +39,9 @@ export function ChiefDrawer(props: DrawerProps) {
     <DialogPrimitive.Root open={open} modal={false} disablePointerDismissal>
       <DialogPrimitive.Portal keepMounted>
         <DialogPrimitive.Popup
-          render={<aside className={`${WINDOW_CLS} ${WINDOW_MOTION_CLS}`} aria-label={t('总管')} />}
+          render={
+            <aside className={`${WINDOW_CLS} ${WINDOW_MOTION_CLS}`} aria-label={t('Coordinator')} />
+          }
           initialFocus={false}
           finalFocus={false}
         >

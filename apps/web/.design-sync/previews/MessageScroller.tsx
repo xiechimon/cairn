@@ -14,11 +14,11 @@ import {
 
 const messages = [
   { id: 'm1', from: 'you', text: 'Add a dark mode toggle to the settings page and open a PR.' },
-  { id: 'm2', from: 'Chief', text: 'Created task #104 in cairn and assigned it to the implementer.' },
+  { id: 'm2', from: 'Coordinator', text: 'Created task #104 in cairn and assigned it to the implementer.' },
   { id: 'm3', from: 'Implementer', text: 'Branch claude/dark-mode-toggle is up. Running pnpm typecheck and the affected e2e set now.' },
   { id: 'm4', from: 'Implementer', text: 'Typecheck passed. 12 of 12 affected e2e specs are green.' },
   { id: 'm5', from: 'Reviewer', text: 'Reviewed PR #2156: one finding about the missing i18n key, fixed in the follow-up commit.' },
-  { id: 'm6', from: 'Chief', text: 'PR #2156 is merged into main. Task #104 is done.' },
+  { id: 'm6', from: 'Coordinator', text: 'PR #2156 is merged into main. Task #104 is done.' },
 ];
 
 function ChatThread({ position }: { position: 'start' | 'end' }) {

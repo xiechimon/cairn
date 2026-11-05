@@ -214,7 +214,7 @@ export function ChiefQuestionCard({
         className={`${CARD_CLS}${item.status === 'cancelled' ? ' opacity-70' : ''}`}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-ui font-medium text-foreground">{t('总管提问')}</span>
+          <span className="text-ui font-medium text-foreground">{t('Coordinator 提问')}</span>
           <QuestionStatus status={item.status} />
         </div>
         <div className="flex flex-col gap-3">

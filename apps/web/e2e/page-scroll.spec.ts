@@ -110,7 +110,7 @@ function wireChief(charter: string, watchCount: number) {
       title: `关注条目 ${i}`,
       projectName: 'cairn',
       phase: 'building',
-      reason: 'Dispatched by the chief: report back when it parks at a gate or settles.',
+      reason: 'Dispatched by the Coordinator: report back when it parks at a gate or settles.',
       createdAt: 0,
       threadId: `chief-thread-${i}`,
       threadTitle: '滚动探针线程',
@@ -135,10 +135,10 @@ const MEMORIES = Array.from({ length: 40 }, (_, i) => ({
 async function openChiefSettings(page: Page) {
   await page.goto('/app/schedules');
   await openChiefWindow(page);
-  const drawer = page.getByRole('dialog', { name: '总管' });
+  const drawer = page.getByRole('dialog', { name: 'Coordinator' });
   await expect(drawer).toBeVisible();
-  await drawer.locator('button[aria-label="总管设置"]').click();
-  await expect(page.getByRole('heading', { name: '总管设置' })).toBeVisible();
+  await drawer.locator('button[aria-label="Coordinator 设置"]').click();
+  await expect(page.getByRole('heading', { name: 'Coordinator 设置' })).toBeVisible();
 }
 
 test('all three long-content tabs of chief settings scroll to the bottom (#1032)', async ({ page }) => {

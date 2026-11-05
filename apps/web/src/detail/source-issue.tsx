@@ -39,7 +39,7 @@ export function SourceIssueLine({
           }
           disabled={parsed === null || onOpenThread === undefined}
         >
-          {t('总管编排会话')}
+          {t('Coordinator 编排会话')}
         </Button>
       </div>
     );

@@ -182,7 +182,7 @@ test('the unbound chief reply carries no face and no avatar column', async ({ pa
   await expect(reply.locator('> img, > span > img')).toHaveCount(0);
 });
 
-test('the chief pulses under the reply it is still typing, finished ones carry none', async ({
+test('the Coordinator pulses under the reply it is still typing, finished ones carry none', async ({
   page,
 }) => {
   await page.goto('/app/schedules?scenario=chief-md');

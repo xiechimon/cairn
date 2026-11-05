@@ -9,7 +9,7 @@
       "file": "apps/web/src/chief/chief-settings.tsx",
       "anchor": "rounded-none border-0 border-b border-border",
       "kind": "deviation",
-      "reason": "总管设置 agent row (#1398): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule, and a divider on a rounded box would curl up at both ends, so the box stays square. Its paint is that one bottom rule; the card's --radius-card corners stay the visible shape."
+      "reason": "Coordinator 设置 agent row (#1398): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule, and a divider on a rounded box would curl up at both ends, so the box stays square. Its paint is that one bottom rule; the card's --radius-card corners stay the visible shape."
     },
     {
       "file": "apps/web/src/resources/parts.tsx",
@@ -56,7 +56,7 @@
       "file": "apps/web/src/chief/chief-question-card.tsx",
       "anchor": "const STATUS_WAITING_INK = 'text-(--card-button)';",
       "role": "indicator",
-      "reason": "Chief question card status for a question waiting on the user (icon + 等你回答, #1398). A needs-you state: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label. 已回答 / 已取消 stay ink-3.",
+      "reason": "Coordinator question card status for a question waiting on the user (icon + 等你回答, #1398). A needs-you state: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label. 已回答 / 已取消 stay ink-3.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 12px text)"
     },
     {
@@ -84,7 +84,7 @@
       "file": "apps/web/src/chief/chief-outage-banner.tsx",
       "anchor": "size-4.5 flex-none text-(--card-button)",
       "role": "indicator",
-      "reason": "Chief outage banner alert glyph: non-text 18px icon, same warning tone as NoticeBanner.",
+      "reason": "Coordinator outage banner alert glyph: non-text 18px icon, same warning tone as NoticeBanner.",
       "contrast": "docs/verify/988/ (sealed) re-attested in docs/verify/1055/colors/incremental.md"
     }
   ]

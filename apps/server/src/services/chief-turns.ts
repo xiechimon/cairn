@@ -181,7 +181,7 @@ function waitingStepOf(db: Db, threadId: string, messageId: string): StepRow {
     .where(and(eq(step.id, messageId), eq(step.buildId, threadId)))
     .get();
   if (row === undefined || (row.status !== 'pending' && row.status !== 'waiting_quota')) {
-    throw new HttpError(409, 'chief turn already started (总管已经开始处理这条了)');
+    throw new HttpError(409, 'chief turn already started (Coordinator 已经开始处理这条了)');
   }
   return row;
 }
@@ -355,7 +355,7 @@ export function stopChiefTurn(
   const thread = requireThread(deps.db, teamId, threadId);
   const head = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (head === undefined) {
-    throw new HttpError(409, 'no chief turn in flight (总管当前没有在回复)');
+    throw new HttpError(409, 'no chief turn in flight (Coordinator 当前没有在回复)');
   }
   return stopClaimedChiefStep(deps, thread, head, nowMs());
 }

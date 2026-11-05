@@ -53,9 +53,9 @@ describe('direct thread messages in the Coordinator conversation', () => {
   });
 
   test('a coordinator-origin marker uses the Coordinator label, not the user label', () => {
-    const key = '总管直接对 #{n} 说：{excerpt}';
+    const key = 'Coordinator 直接对 #{n} 说：{excerpt}';
     const vars = { n: 7, excerpt: 'Split it' };
-    expect(translate('zh', EN, key, vars)).toBe('总管直接对 #7 说：Split it');
+    expect(translate('zh', EN, key, vars)).toBe('Coordinator 直接对 #7 说：Split it');
     expect(translate('en', EN, key, vars)).toBe('The Coordinator told #7 directly: Split it');
   });
 });

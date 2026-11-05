@@ -223,7 +223,7 @@ test('a thread-message marker names the sender', async ({ page }) => {
   const rows = stream.getByTestId('thread-message-marker');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toHaveText('你直接对 #9 说：JSON please');
-  await expect(rows.nth(1)).toHaveText('总管直接对 #9 说：Use CSV instead');
+  await expect(rows.nth(1)).toHaveText('Coordinator 直接对 #9 说：Use CSV instead');
 });
 
 test('a parked question keeps its reply after a later review report', async ({ page }) => {

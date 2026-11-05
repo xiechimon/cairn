@@ -29,7 +29,7 @@ const out = await page.evaluate(
     g.fillRect(0, 0, w, h);
     g.fillStyle = '#111111';
     g.font = '600 30px system-ui, sans-serif';
-    g.fillText('抽屉面（总管主模型）行内缩实测 20px', pad, labelH - 14);
+    g.fillText('抽屉面（Coordinator 主模型）行内缩实测 20px', pad, labelH - 14);
     g.drawImage(id, pad, labelH);
     const y2 = labelH + id.naturalHeight + pad + labelH;
     g.fillText('设置面（压缩模型）行内缩实测 12px', pad, y2 - 14);

@@ -668,7 +668,7 @@ export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
   if (!children.every((c) => c.phase === 'done')) return;
   setTodoPhase(deps, parent.id, 'done', { lastRunAt: nowMs() });
   if (parent.latestBuildId !== null) {
-    insertGateAnnouncement(deps, parent.latestBuildId, DONE_ANNOUNCEMENT, 'Chief');
+    insertGateAnnouncement(deps, parent.latestBuildId, DONE_ANNOUNCEMENT, 'Coordinator');
   }
 }
 

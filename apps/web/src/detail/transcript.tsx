@@ -297,7 +297,7 @@ function Row({
     case 'chief':
       return (
         <div className={`${ROW_BASE} ${margin}`}>
-          <TurnRule className="w-full">{t('由总管发起')}</TurnRule>
+          <TurnRule className="w-full">{t('由 Coordinator 发起')}</TurnRule>
         </div>
       );
     case 'user':

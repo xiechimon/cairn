@@ -66,7 +66,7 @@ const CHIEF_DIGEST_TEXT_MAX = 400;
 const DIGEST_META_RE = /\nDigest thread=(\S+) until=(\d+) last=(\S+) reason=(daily|threshold)$/;
 
 export const CHIEF_DIGEST_SYSTEM_PROMPT = [
-  '你是总管的整理助手：只读地把总管和用户的对话整理成摘要，每天早上还复盘昨天的对话和线程记录，提出改进建议。',
+  '你是 Coordinator 的整理助手：只读地把 Coordinator 和用户的对话整理成摘要，每天早上还复盘昨天的对话和线程记录，提出改进建议。',
   '你只能用只读工具核实任务的当前状态，不建任务、不改任何东西、不给用户发消息。',
   '用与对话相同的语言写，白话短句。',
 ].join('\n');
@@ -100,9 +100,9 @@ type ThreadRow = typeof chiefThread.$inferSelect;
 const WAKE_MARKER_RE = /^\[wake:\w+\]\s*/;
 
 const DIGEST_PROMPT_HEAD = [
-  '请把下面这段总管和用户的对话整理成摘要。只输出一个 ```json 代码块，格式：',
+  '请把下面这段 Coordinator 和用户的对话整理成摘要。只输出一个 ```json 代码块，格式：',
   '{"items":[{"group":"decided|done|open|remembered","text":"…","reason":"…"}]}',
-  '- decided：用户拍板的决定；done：已经做完的事；open：还开着、在等人或还在跑的事；remembered：以后还用得上的事实或偏好，会写进总管的记忆。',
+  '- decided：用户拍板的决定；done：已经做完的事；open：还开着、在等人或还在跑的事；remembered：以后还用得上的事实或偏好，会写进 Coordinator 的记忆。',
   '- text 一句白话；reason 写为什么这样记（谁说的、依据是什么）。提到任务时用 [#序号](todo:<id>) 引用。',
   `- 一共不超过 ${CHIEF_DIGEST_ITEMS_MAX} 条，没有内容的组就不写；寒暄和重复的话不写，什么都不值得记时输出 {"items":[]}。`,
   '- 写任务进度前先用 todos 工具查当前状态，以工具查到的为准，不照抄对话里的旧状态。',
@@ -236,7 +236,9 @@ export function chiefTranscriptLines(rows: readonly ChiefMessageRow[]): Coordina
         call?: { name?: unknown; arguments?: unknown };
       };
       if (kind === 'toolcall' && typeof call?.name === 'string')
-        push(`总管调用工具 ${call.name} ${JSON.stringify(call.arguments ?? {}).slice(0, 200)}`);
+        push(
+          `Coordinator 调用工具 ${call.name} ${JSON.stringify(call.arguments ?? {}).slice(0, 200)}`,
+        );
       continue;
     }
     const text = (extractText(content) ?? '').trim();
@@ -246,10 +248,10 @@ export function chiefTranscriptLines(rows: readonly ChiefMessageRow[]): Coordina
       try {
         kind = (JSON.parse(text) as { kind?: unknown }).kind;
       } catch {}
-      if (kind === ASK_USER_QUESTION_KIND) push(`总管向用户提问：${text.slice(0, 600)}`);
+      if (kind === ASK_USER_QUESTION_KIND) push(`Coordinator 向用户提问：${text.slice(0, 600)}`);
       if (typeof kind === 'string') continue;
     }
-    if (row.role === 'assistant') push(`总管：${text}`);
+    if (row.role === 'assistant') push(`Coordinator：${text}`);
     if (row.role !== 'user') continue;
     const wake = WAKE_MARKER_RE.exec(text);
     if (wake) push(`系统通知：${text.slice(wake[0].length)}`);

@@ -198,11 +198,11 @@ test('write: the primary action and the delete confirm are blocked', async ({ pa
   expectQuiet(traffic);
 });
 
-test('write: sending to the chief drawer is blocked', async ({ page }) => {
+test('write: sending to the Coordinator drawer is blocked', async ({ page }) => {
   const traffic = watchTraffic(page);
   await page.goto(`${demo.base}/app/schedules`);
   await openChiefWindow(page);
-  const chief = page.getByRole('dialog', { name: /总管/ });
+  const chief = page.getByRole('dialog', { name: /Coordinator/ });
   const input = chief.getByRole('textbox');
   await input.fill('把购物车那张票提到最前面');
   await input.press('Enter');

@@ -25,7 +25,7 @@ test('R2: C at load focuses the home composer', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: '新建任务' })).toHaveCount(0);
 });
 
-test('R3: ⌘J at load opens the chief drawer', async ({ page }) => {
+test('R3: ⌘J at load opens the Coordinator drawer', async ({ page }) => {
   await pressAtLoad(page, { key: 'j', metaKey: true });
   await page.goto('/app/schedules?scenario=01');
   await expect(page.locator('.chief-drawer')).toBeVisible();
