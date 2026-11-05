@@ -443,6 +443,19 @@ export const schedule = sqliteTable(
   ],
 );
 
+export const dueEvent = sqliteTable(
+  'due_event',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull(),
+    dueAt: epochMs('dueAt').notNull(),
+    intervalMs: integer('intervalMs'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('lastError'),
+  },
+  (t) => [index('due_event_dueAt_idx').on(t.dueAt)],
+);
+
 export const notification = sqliteTable(
   'notification',
   {

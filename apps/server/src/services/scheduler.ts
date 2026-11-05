@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { ENV_VARS, type Scheduler } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { ServerConfig } from '../config.js';
-import { build, schedule, step, todo } from '../db/schema.js';
+import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { exportTrajectories } from '../trajectory-export.js';
@@ -40,6 +40,7 @@ import { planChiefDigests } from './chief-digest.js';
 import { planChiefSummaries } from './chief-summary.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
+import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import {
@@ -65,6 +66,7 @@ import {
   isWorkerSchedule,
   pauseSchedule,
   recordScheduleFailure,
+  setScheduleClockListener,
   updateNextRunAt,
   WORKER_SCHEDULE_MIN_INTERVAL_MS,
   WORKER_SCHEDULE_RUN_LIMIT,
@@ -79,6 +81,7 @@ export interface SchedulerOptions {
   tickMs: number;
   pushDigestTimes?: readonly string[];
   researchIntakeProjectId?: string | null;
+  clock?: DueClock;
 }
 
 export interface CiPollRun {
@@ -217,7 +220,6 @@ export function createScheduler(
   reflectCurate?: TrajectoryReflectCurateRun | null,
   scheduling?: SchedulingRun | null,
 ): Scheduler {
-  let timer: NodeJS.Timeout | null = null;
   const lastDigestRun = new Map<string, number>();
   let digestSweeping = false;
   let lastResearchIntakeFailure: string | null = null;
@@ -226,15 +228,12 @@ export function createScheduler(
     ci !== undefined && ci !== null
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
       : null;
-  let ciTimer: NodeJS.Timeout | null = null;
   const feedbackPoller = ci ? createPrFeedbackPoller(deps, ci) : null;
-  let feedbackTimer: NodeJS.Timeout | null = null;
   const correctionIntake = intake
     ? createIssueIntake(deps, { ...intake, label: 'correction' })
     : null;
   const issueIntake =
     intake !== undefined && intake !== null ? createIssueIntake(deps, intake) : null;
-  let intakeTimer: NodeJS.Timeout | null = null;
   const schedulingSweep =
     scheduling !== undefined && scheduling !== null
       ? createScheduling(deps, {
@@ -242,16 +241,13 @@ export function createScheduler(
           logger: scheduling.logger,
         })
       : null;
-  let scheduleTimer: NodeJS.Timeout | null = null;
   let lastGcAt = 0;
   let gcImmediate: NodeJS.Immediate | null = null;
   let gcBatches: ReturnType<typeof sweepAttachmentBatches> | null = null;
-  let outcomeTimer: NodeJS.Timeout | null = null;
   let outcomeSweeping = false;
-  let exportTimer: NodeJS.Timeout | null = null;
   let exportSweeping = false;
-  let reflectCurateTimer: NodeJS.Timeout | null = null;
   let reflectCurateSweeping = false;
+  let dueStarted = false;
 
   function advanceGc(): void {
     if (!gc || !gcBatches) return;
@@ -413,6 +409,66 @@ export function createScheduler(
     updateNextRunAt(deps, row.id, isRecurring(row.kind) ? nextRunAt : null);
   }
 
+  function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {
+    if (firing.has(row.id)) return Promise.resolve();
+    firing.add(row.id);
+    return fireSchedule(row, now)
+      .catch((err: unknown) => {
+        const current = deps.db.select().from(schedule).where(eq(schedule.id, row.id)).get();
+        if (
+          !current?.enabled ||
+          current.lastRunStepId !== row.lastRunStepId ||
+          current.nextRunAt !== row.nextRunAt
+        )
+          return;
+        const task = deps.db
+          .select({ phase: todo.phase })
+          .from(todo)
+          .where(eq(todo.id, row.todoId))
+          .get();
+        if (isWorkerSchedule(row.createdBy) && task && SCHEDULE_GATE_PHASES.has(task.phase)) {
+          updateNextRunAt(
+            deps,
+            row.id,
+            isRecurring(row.kind)
+              ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
+              : now + WORKER_SCHEDULE_MIN_INTERVAL_MS,
+          );
+          return;
+        }
+        if (
+          !isWorkerSchedule(row.createdBy) &&
+          (err instanceof BuildContinuationPhaseError || err instanceof PhaseTransitionError)
+        ) {
+          if (isRecurring(row.kind))
+            updateNextRunAt(
+              deps,
+              row.id,
+              computeNextRunAt(row.kind, row.at, row.tz, now, row.cron),
+            );
+          else
+            deps.db
+              .update(schedule)
+              .set({
+                nextRunAt: null,
+                lastRunStatus: 'skipped',
+                lastRunError: err.message,
+                retryNotBefore: null,
+              })
+              .where(eq(schedule.id, row.id))
+              .run();
+          return;
+        }
+        const reason = err instanceof Error ? err.message : String(err);
+        recordScheduleFailure(deps, row.id, reason, now);
+        process.stderr.write(`Schedule ${row.id} failed: ${reason}\n`);
+      })
+      .catch(() => {
+        process.stderr.write(`Schedule ${row.id} failure could not be recorded\n`);
+      })
+      .finally(() => firing.delete(row.id));
+  }
+
   function runTick(now: number): Promise<void> {
     const pending: Promise<void>[] = [];
     if (!alertsSweeping) {
@@ -425,67 +481,7 @@ export function createScheduler(
           alertsSweeping = false;
         });
     }
-    for (const row of dueSchedules(deps, now)) {
-      if (firing.has(row.id)) continue;
-      firing.add(row.id);
-      pending.push(
-        fireSchedule(row, now)
-          .catch((err: unknown) => {
-            const current = deps.db.select().from(schedule).where(eq(schedule.id, row.id)).get();
-            if (
-              !current?.enabled ||
-              current.lastRunStepId !== row.lastRunStepId ||
-              current.nextRunAt !== row.nextRunAt
-            )
-              return;
-            const task = deps.db
-              .select({ phase: todo.phase })
-              .from(todo)
-              .where(eq(todo.id, row.todoId))
-              .get();
-            if (isWorkerSchedule(row.createdBy) && task && SCHEDULE_GATE_PHASES.has(task.phase)) {
-              updateNextRunAt(
-                deps,
-                row.id,
-                isRecurring(row.kind)
-                  ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
-                  : now + WORKER_SCHEDULE_MIN_INTERVAL_MS,
-              );
-              return;
-            }
-            if (
-              !isWorkerSchedule(row.createdBy) &&
-              (err instanceof BuildContinuationPhaseError || err instanceof PhaseTransitionError)
-            ) {
-              if (isRecurring(row.kind))
-                updateNextRunAt(
-                  deps,
-                  row.id,
-                  computeNextRunAt(row.kind, row.at, row.tz, now, row.cron),
-                );
-              else
-                deps.db
-                  .update(schedule)
-                  .set({
-                    nextRunAt: null,
-                    lastRunStatus: 'skipped',
-                    lastRunError: err.message,
-                    retryNotBefore: null,
-                  })
-                  .where(eq(schedule.id, row.id))
-                  .run();
-              return;
-            }
-            const reason = err instanceof Error ? err.message : String(err);
-            recordScheduleFailure(deps, row.id, reason, now);
-            process.stderr.write(`Schedule ${row.id} failed: ${reason}\n`);
-          })
-          .catch(() => {
-            process.stderr.write(`Schedule ${row.id} failure could not be recorded\n`);
-          })
-          .finally(() => firing.delete(row.id)),
-      );
-    }
+    for (const row of dueSchedules(deps, now)) pending.push(runSchedule(row, now));
     sweepIdleChiefUnread(deps, now);
     sweepSnoozeExpiry(deps, now);
     fireDueChiefWakes(deps, now);
@@ -564,165 +560,219 @@ export function createScheduler(
     }
   }
 
+  const clock: DueClock = opts.clock ?? {
+    now: nowMs,
+    setTimer(callback, delayMs) {
+      const handle = setTimeout(() => void callback(), delayMs);
+      handle.unref?.();
+      return handle;
+    },
+    clearTimer(handle) {
+      clearTimeout(handle as ReturnType<typeof setTimeout>);
+    },
+  };
+  const openReflectGuards =
+    reflectCurate?.openGuardIssues && deps.githubFetch !== undefined
+      ? (guards: Parameters<typeof openGuardCandidateIssues>[1]) =>
+          openGuardCandidateIssues(
+            {
+              db: deps.db,
+              githubFetch: deps.githubFetch as FetchLike,
+              tokenForTeam: (teamId) => githubTokenOrNull(deps, teamId),
+              logger: reflectCurate.logger,
+            },
+            guards,
+          )
+      : undefined;
+
+  function scheduleDeadline(row: { nextRunAt: number; retryNotBefore: number | null }): number {
+    if (row.retryNotBefore !== null && row.retryNotBefore > row.nextRunAt)
+      return row.retryNotBefore;
+    return row.nextRunAt;
+  }
+
+  function archivedProject(projectId: string): boolean {
+    const projectRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+    return projectRow?.archivedAt != null;
+  }
+
+  function syncDueSources(): void {
+    const liveSchedules = new Set<string>();
+    for (const row of deps.db.select().from(schedule).all()) {
+      if (!row.enabled || row.nextRunAt === null || archivedProject(row.projectId)) continue;
+      const id = `schedule:${row.id}`;
+      liveSchedules.add(id);
+      const deadline = scheduleDeadline({
+        nextRunAt: row.nextRunAt,
+        retryNotBefore: row.retryNotBefore,
+      });
+      const existing = deps.db.select().from(dueEvent).where(eq(dueEvent.id, id)).get();
+      const now = clock.now();
+      const deferred = existing !== undefined && deadline <= now && existing.dueAt > now;
+      if (!deferred && (!existing || existing.dueAt !== deadline)) {
+        dueRunner.upsert({ id, kind: 'schedule', dueAt: deadline });
+      }
+    }
+    for (const event of deps.db.select().from(dueEvent).all()) {
+      if (event.kind === 'schedule' && !liveSchedules.has(event.id)) {
+        deps.db.delete(dueEvent).where(eq(dueEvent.id, event.id)).run();
+      }
+    }
+    let wakeAt: number | null = null;
+    for (const row of deps.db.select().from(chief).all()) {
+      for (const wake of row.wakes) {
+        const at = wake.at;
+        if (typeof at !== 'number') continue;
+        if (wakeAt === null || at < wakeAt) wakeAt = at;
+      }
+    }
+    if (wakeAt === null) {
+      deps.db.delete(dueEvent).where(eq(dueEvent.id, 'wake:next')).run();
+      return;
+    }
+    const existingWake = deps.db.select().from(dueEvent).where(eq(dueEvent.id, 'wake:next')).get();
+    const now = clock.now();
+    const backedOff =
+      existingWake !== undefined && existingWake.attempts > 0 && existingWake.dueAt > now;
+    if (
+      !backedOff &&
+      (!existingWake ||
+        wakeAt < existingWake.dueAt ||
+        (existingWake.attempts === 0 && existingWake.dueAt !== wakeAt))
+    ) {
+      dueRunner.upsert({ id: 'wake:next', kind: 'wake', dueAt: wakeAt });
+    }
+  }
+
+  const dueRunner = createDueRunner(
+    deps.db,
+    clock,
+    {
+      sweep: (_event, now) => runTick(now),
+      schedule: async (event, now) => {
+        const id = event.id.slice('schedule:'.length);
+        const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+        if (!row?.enabled || row.nextRunAt === null || archivedProject(row.projectId)) {
+          return { rescheduleAt: null };
+        }
+        if (row.retryNotBefore !== null && row.retryNotBefore > now) {
+          return { rescheduleAt: row.retryNotBefore };
+        }
+        if (row.nextRunAt > now) return { rescheduleAt: row.nextRunAt };
+        await runSchedule(row, now);
+        const after = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+        if (!after?.enabled || after.nextRunAt === null) return { rescheduleAt: null };
+        if (after.retryNotBefore !== null && after.retryNotBefore > now) {
+          return { rescheduleAt: Math.max(after.nextRunAt, after.retryNotBefore) };
+        }
+        if (after.nextRunAt <= now) return { rescheduleAt: now + opts.tickMs };
+        return { rescheduleAt: after.nextRunAt };
+      },
+      wake: (_event, now) => {
+        fireDueChiefWakes(deps, now);
+        return { rescheduleAt: null };
+      },
+      ci: () => ciPoller?.sweep(),
+      feedback: () => feedbackPoller?.sweep(),
+      intake: async () => {
+        await issueIntake?.sweep();
+        await correctionIntake?.sweep();
+      },
+      scheduling: () => schedulingSweep?.sweep(),
+      outcome: () => {
+        if (outcome === undefined || outcome === null || deps.reposDir === undefined) return;
+        if (outcomeSweeping) return;
+        const reposDir = deps.reposDir;
+        outcomeSweeping = true;
+        return sweepOutcomeBackfill({ db: deps.db, reposDir, logger: outcome.logger })
+          .catch(() => undefined)
+          .finally(() => {
+            outcomeSweeping = false;
+          });
+      },
+      export: () => {
+        if (exportRun === undefined || exportRun === null || exportSweeping) return;
+        exportSweeping = true;
+        const date = new Date().toISOString().slice(0, 10);
+        const out = join(exportRun.config.dataDir, 'trajectory-exports', `${date}.jsonl`);
+        try {
+          const res = exportTrajectories(exportRun.config, { out });
+          exportRun.logger.info({ ...res, date }, 'trajectory daily export');
+        } catch (err) {
+          exportRun.logger.info(
+            { err: err instanceof Error ? err.message : String(err), date },
+            'trajectory daily export failed (scheduler continues)',
+          );
+        } finally {
+          exportSweeping = false;
+        }
+      },
+      reflect: () => {
+        if (reflectCurate === undefined || reflectCurate === null || reflectCurateSweeping) return;
+        const run = reflectCurate;
+        reflectCurateSweeping = true;
+        return sweepReflectCurate({
+          config: run.config,
+          db: deps.db,
+          logger: run.logger,
+          model: run.model,
+          endpoint: run.endpoint,
+          openNewGuards: openReflectGuards,
+        })
+          .then((summary) => {
+            run.logger.info(summary, 'trajectory reflect-curate');
+          })
+          .catch((err) => {
+            run.logger.info(
+              { err: err instanceof Error ? err.message : String(err) },
+              'trajectory reflect-curate failed (scheduler continues)',
+            );
+          })
+          .finally(() => {
+            reflectCurateSweeping = false;
+          });
+      },
+    },
+    syncDueSources,
+  );
+
+  function ensureDue(id: string, kind: string, intervalMs: number): void {
+    const existing = deps.db.select().from(dueEvent).where(eq(dueEvent.id, id)).get();
+    if (existing) return;
+    dueRunner.upsert({ id, kind, dueAt: clock.now(), intervalMs });
+  }
+
   return {
     tick,
     start() {
-      if (timer !== null) return;
-      void tick();
-      timer = setInterval(() => void tick(), opts.tickMs);
-      timer.unref?.();
-      if (ciPoller !== null) {
-        void ciPoller.sweep().catch(() => {});
-        ciTimer = setInterval(() => {
-          void ciPoller.sweep().catch(() => {});
-        }, CI_POLL_INTERVAL_MS);
-        ciTimer.unref?.();
-      }
-      if (feedbackPoller !== null) {
-        void feedbackPoller.sweep().catch(() => {});
-        feedbackTimer = setInterval(() => {
-          void feedbackPoller.sweep().catch(() => {});
-        }, PR_FEEDBACK_INTERVAL_MS);
-        feedbackTimer.unref?.();
-      }
-      if (issueIntake !== null) {
-        void issueIntake
-          .sweep()
-          .then(() => correctionIntake?.sweep())
-          .catch(() => {});
-        intakeTimer = setInterval(() => {
-          void issueIntake
-            .sweep()
-            .then(() => correctionIntake?.sweep())
-            .catch(() => {});
-        }, ISSUE_INTAKE_INTERVAL_MS);
-        intakeTimer.unref?.();
-      }
+      if (dueStarted) return;
+      dueStarted = true;
+      setScheduleClockListener(() => dueRunner.arm());
+      ensureDue('sweep:main', 'sweep', opts.tickMs);
+      if (ciPoller !== null) ensureDue('poll:ci', 'ci', CI_POLL_INTERVAL_MS);
+      if (feedbackPoller !== null) ensureDue('poll:feedback', 'feedback', PR_FEEDBACK_INTERVAL_MS);
+      if (issueIntake !== null) ensureDue('poll:intake', 'intake', ISSUE_INTAKE_INTERVAL_MS);
       if (schedulingSweep !== null) {
-        void schedulingSweep.sweep().catch(() => {});
-        scheduleTimer = setInterval(() => {
-          void schedulingSweep.sweep().catch(() => {});
-        }, SCHEDULE_INTERVAL_MS);
-        scheduleTimer.unref?.();
+        ensureDue('poll:scheduling', 'scheduling', SCHEDULE_INTERVAL_MS);
       }
       if (outcome !== undefined && outcome !== null && deps.reposDir !== undefined) {
-        const reposDir = deps.reposDir;
-        const sweep = () => {
-          if (outcomeSweeping) return;
-          outcomeSweeping = true;
-          void sweepOutcomeBackfill({ db: deps.db, reposDir, logger: outcome.logger })
-            .catch(() => {})
-            .finally(() => {
-              outcomeSweeping = false;
-            });
-        };
-        sweep();
-        outcomeTimer = setInterval(sweep, OUTCOME_BACKFILL_INTERVAL_MS);
-        outcomeTimer.unref?.();
+        ensureDue('poll:outcome', 'outcome', OUTCOME_BACKFILL_INTERVAL_MS);
       }
       if (exportRun !== undefined && exportRun !== null) {
-        const cfg = exportRun.config;
-        const sweep = () => {
-          if (exportSweeping) return;
-          exportSweeping = true;
-          const date = new Date().toISOString().slice(0, 10);
-          const out = join(cfg.dataDir, 'trajectory-exports', `${date}.jsonl`);
-          try {
-            const res = exportTrajectories(cfg, { out });
-            exportRun.logger.info({ ...res, date }, 'trajectory daily export');
-          } catch (err) {
-            exportRun.logger.info(
-              { err: err instanceof Error ? err.message : String(err), date },
-              'trajectory daily export failed (scheduler continues)',
-            );
-          } finally {
-            exportSweeping = false;
-          }
-        };
-        sweep();
-        exportTimer = setInterval(sweep, OUTCOME_BACKFILL_INTERVAL_MS);
-        exportTimer.unref?.();
+        ensureDue('poll:export', 'export', OUTCOME_BACKFILL_INTERVAL_MS);
       }
       if (reflectCurate !== undefined && reflectCurate !== null) {
-        const run = reflectCurate;
-        const openNewGuards =
-          run.openGuardIssues && deps.githubFetch !== undefined
-            ? (guards: Parameters<typeof openGuardCandidateIssues>[1]) =>
-                openGuardCandidateIssues(
-                  {
-                    db: deps.db,
-                    githubFetch: deps.githubFetch as FetchLike,
-                    tokenForTeam: (teamId) => githubTokenOrNull(deps, teamId),
-                    logger: run.logger,
-                  },
-                  guards,
-                )
-            : undefined;
-        const sweep = () => {
-          if (reflectCurateSweeping) return;
-          reflectCurateSweeping = true;
-          void sweepReflectCurate({
-            config: run.config,
-            db: deps.db,
-            logger: run.logger,
-            model: run.model,
-            endpoint: run.endpoint,
-            openNewGuards,
-          })
-            .then((summary) => {
-              run.logger.info(summary, 'trajectory reflect-curate');
-            })
-            .catch((err) => {
-              run.logger.info(
-                { err: err instanceof Error ? err.message : String(err) },
-                'trajectory reflect-curate failed (scheduler continues)',
-              );
-            })
-            .finally(() => {
-              reflectCurateSweeping = false;
-            });
-        };
-        sweep();
-        reflectCurateTimer = setInterval(sweep, REFLECT_CURATE_INTERVAL_MS);
-        reflectCurateTimer.unref?.();
+        ensureDue('poll:reflect', 'reflect', REFLECT_CURATE_INTERVAL_MS);
       }
+      dueRunner.arm();
     },
     stop() {
-      if (feedbackTimer !== null) {
-        clearInterval(feedbackTimer);
-        feedbackTimer = null;
-      }
-      if (reflectCurateTimer !== null) {
-        clearInterval(reflectCurateTimer);
-        reflectCurateTimer = null;
-      }
-      if (exportTimer !== null) {
-        clearInterval(exportTimer);
-        exportTimer = null;
-      }
-      if (outcomeTimer !== null) {
-        clearInterval(outcomeTimer);
-        outcomeTimer = null;
-      }
+      dueStarted = false;
+      setScheduleClockListener(null);
+      dueRunner.stop();
       if (gcImmediate !== null) clearImmediate(gcImmediate);
       gcImmediate = null;
       gcBatches = null;
-      if (timer !== null) {
-        clearInterval(timer);
-        timer = null;
-      }
-      if (ciTimer !== null) {
-        clearInterval(ciTimer);
-        ciTimer = null;
-      }
-      if (intakeTimer !== null) {
-        clearInterval(intakeTimer);
-        intakeTimer = null;
-      }
-      if (scheduleTimer !== null) {
-        clearInterval(scheduleTimer);
-        scheduleTimer = null;
-      }
     },
   };
 }
