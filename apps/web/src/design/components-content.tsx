@@ -443,8 +443,8 @@ export function TraceSection() {
         />
       </Specimen>
       <Specimen
-        title="Chief turn tools"
-        note="the same group at compact density under a chief reply"
+        title="Coordinator turn tools"
+        note="the same group at compact density under a Coordinator reply"
       >
         <TraceGroup steps={TRACE_TOOLS} density="compact" defaultOpen className="w-120" />
       </Specimen>

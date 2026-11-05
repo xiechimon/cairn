@@ -316,9 +316,9 @@ describe('mapTranscript gate-announcement row actor slot (#902)', () => {
 
   test('F15 the actor slot wins over the current user — a chief-passed gate is not booked under a person', () => {
     const items = render({
-      messages: [msg('user', CONFIRM_ANNOUNCEMENT, NOW - 50_000, '总管甲')],
+      messages: [msg('user', CONFIRM_ANNOUNCEMENT, NOW - 50_000, 'Coordinator 甲')],
     });
-    expect(noteItems(items).map((n) => n.text)).toEqual([`总管甲 ${CONFIRM_ANNOUNCEMENT}`]);
+    expect(noteItems(items).map((n) => n.text)).toEqual([`Coordinator 甲 ${CONFIRM_ANNOUNCEMENT}`]);
   });
 
   test('F16 legacy rows (actor null / absent) fall back to the current user, presentation verbatim unchanged', () => {

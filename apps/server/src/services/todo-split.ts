@@ -359,7 +359,7 @@ function renderSplitPlan(
   const lines: string[] = [
     `# 拆解方案：${parentTitle}`,
     '',
-    `由 Chief 拆为 ${children.length} 张子卡（blocking 依赖边）。确认后：无阻塞子卡自动派发直执行；后续波次随阻塞子卡 done 自动推进；子卡全 done 时父卡自动收口。各子卡独立走 build→review→merge 流水线（合并闸逐卡留人）。`,
+    `由 Coordinator 拆为 ${children.length} 张子卡（blocking 依赖边）。确认后：无阻塞子卡自动派发直执行；后续波次随阻塞子卡 done 自动推进；子卡全 done 时父卡自动收口。各子卡独立走 build→review→merge 流水线（合并闸逐卡留人）。`,
     '',
     '## 子卡清单',
   ];

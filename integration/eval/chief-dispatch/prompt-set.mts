@@ -43,7 +43,8 @@ export function promptSetIdentity(effectivePrompt: string): string {
 }
 
 export function cairnRuntimePromptFromRelay(systemText: string): string {
-  const start = systemText.indexOf('你是「总管」');
+  let start = systemText.indexOf('你是「Coordinator」');
+  if (start === -1) start = systemText.indexOf('你是「总管」');
   if (start === -1) return systemText;
   const end = systemText.indexOf('<!-- END CAIRN-RUNTIME -->', start);
   if (end === -1) return systemText.slice(start);

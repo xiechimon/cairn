@@ -201,7 +201,7 @@ test('chief drawer drops the ⋮ `更多` button and the new-topic button — th
   const drawer = page.locator('.chief-drawer');
 
   const actions = drawer
-    .getByRole('button', { name: '总管设置', exact: true })
+    .getByRole('button', { name: 'Coordinator 设置', exact: true })
     .locator('xpath=..')
     .getByRole('button');
 
@@ -209,7 +209,7 @@ test('chief drawer drops the ⋮ `更多` button and the new-topic button — th
   await expect(drawer.getByRole('button', { name: '新主题', exact: true })).toHaveCount(0);
   await expect(drawer.getByRole('button', { name: '全屏', exact: true })).toHaveCount(0);
   await expect(actions).toHaveCount(2);
-  await expect(actions.nth(0)).toHaveAttribute('aria-label', '总管设置');
+  await expect(actions.nth(0)).toHaveAttribute('aria-label', 'Coordinator 设置');
   await expect(actions.nth(1)).toHaveAttribute('aria-label', '最小化');
 });
 

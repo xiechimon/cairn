@@ -289,7 +289,7 @@ const results = {};
 try {
   results.drawer = await probeFace(browser, {
     scenario: '111',
-    triggerName: '总管主模型',
+    triggerName: 'Coordinator 主模型',
     dialogName: '模型',
     key: 'drawer',
   });

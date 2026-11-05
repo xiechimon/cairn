@@ -177,7 +177,7 @@ export function useChiefSurface(
       onMessage: (row: TranscriptRow) => {
         const reason = chiefTurnErrorOfContent(row.content);
         if (reason === null) return;
-        toast.error(t('总管本轮执行失败'), { description: reason });
+        toast.error(t('Coordinator 本轮执行失败'), { description: reason });
       },
     }),
     [t],
@@ -298,7 +298,7 @@ export function useChiefSurface(
           .mutateAsync({ threadId: activeThread.id, messageId })
           .then(() => undefined)
           .catch((error: unknown) => {
-            toastError(t('撤回失败，总管可能已经开始处理这条了。'), error);
+            toastError(t('撤回失败，Coordinator 可能已经开始处理这条了。'), error);
             throw error;
           });
       }

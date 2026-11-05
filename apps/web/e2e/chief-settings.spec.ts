@@ -3,7 +3,7 @@ import { evidencePanelShot } from './evidence';
 
 const AGENT_TAB = '/app?scenario=101';
 
-const settingsView = (page: Page) => page.getByRole('heading', { name: '总管设置' });
+const settingsView = (page: Page) => page.getByRole('heading', { name: 'Coordinator 设置' });
 
 test('back button works: click returns to the home conversation (#811)', async ({ page }) => {
   await page.goto(AGENT_TAB);
@@ -18,16 +18,16 @@ async function openAgentDialog(page: Page) {
   await page.goto(AGENT_TAB);
 
   await page.getByRole('button', { name: '未设置' }).click();
-  const dialog = page.getByRole('dialog', { name: '选择总管 Agent' });
+  const dialog = page.getByRole('dialog', { name: '选择 Coordinator Agent' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
 
-test('agent row opens the `选择总管 Agent` dialog with search + canon default row', async ({
+test('agent row opens the `选择 Coordinator Agent` dialog with search + canon default row', async ({
   page,
 }) => {
   const dialog = await openAgentDialog(page);
-  await expect(dialog).toHaveAttribute('aria-label', '选择总管 Agent');
+  await expect(dialog).toHaveAttribute('aria-label', '选择 Coordinator Agent');
   await expect(dialog.getByPlaceholder('搜索 Agent…')).toHaveAttribute(
     'placeholder',
     '搜索 Agent…',
@@ -62,7 +62,7 @@ test('agent dialog family law: X, Escape and backdrop dismiss; panel clicks do n
   await expect(dialog).toBeHidden();
 
   dialog = await openAgentDialog(page);
-  await dialog.getByText('选择总管 Agent').click();
+  await dialog.getByText('选择 Coordinator Agent').click();
   await expect(dialog).toBeVisible();
   await page.mouse.click(20, 20);
   await expect(dialog).toBeHidden();

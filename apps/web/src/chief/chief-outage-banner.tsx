@@ -21,10 +21,14 @@ export function ChiefOutageBanner({
   const model = outage.model;
   const why =
     model == null
-      ? t(outage.reason === 'quota' ? '总管用的模型额度已用完' : '总管用的模型暂时过载')
+      ? t(
+          outage.reason === 'quota'
+            ? 'Coordinator 用的模型额度已用完'
+            : 'Coordinator 用的模型暂时过载',
+        )
       : outage.reason === 'quota'
-        ? t('总管用的模型 {model} 额度已用完', { model })
-        : t('总管用的模型 {model} 暂时过载', { model });
+        ? t('Coordinator 用的模型 {model} 额度已用完', { model })
+        : t('Coordinator 用的模型 {model} 暂时过载', { model });
   const retryAt = outage.retryAt != null ? new Date(outage.retryAt) : null;
   const when =
     retryAt !== null
@@ -47,7 +51,9 @@ export function ChiefOutageBanner({
     >
       <CircleAlert aria-hidden="true" className="mt-0.5 size-4.5 flex-none text-(--card-button)" />
       <span className={`min-w-0 flex-1 ${open ? 'max-sm:basis-full' : ''}`}>
-        <b className="block text-ui font-semibold text-(--foreground)">{t('总管暂时不可用')}</b>
+        <b className="block text-ui font-semibold text-(--foreground)">
+          {t('Coordinator 暂时不可用')}
+        </b>
         <span className={`block ${open ? '' : 'max-sm:hidden'}`}>
           {t('{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。', { why, when })}
         </span>
@@ -63,7 +69,7 @@ export function ChiefOutageBanner({
         </Button>
         {onSettings != null && (
           <Button size="sm" className="cursor-pointer" onClick={onSettings}>
-            {t('给总管换模型')}
+            {t('给 Coordinator 换模型')}
           </Button>
         )}
       </span>
@@ -87,7 +93,7 @@ export function ChiefFallbackBanner({
     >
       <Info aria-hidden="true" className="size-4.5 flex-none text-icon" />
       <span className="min-w-0 flex-1">
-        {t('总管的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。', {
+        {t('Coordinator 的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。', {
           model,
         })}
       </span>

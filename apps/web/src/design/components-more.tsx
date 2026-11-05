@@ -250,7 +250,7 @@ export function StreamSection() {
         <Cell label="detail: in the task transcript">
           <LiveRow variant="detail" label="Running tests" />
         </Cell>
-        <Cell label="chief: under a reply, click to expand">
+        <Cell label="Coordinator: under a reply, click to expand">
           <LiveRow
             variant="chief"
             label="Planning the next step"

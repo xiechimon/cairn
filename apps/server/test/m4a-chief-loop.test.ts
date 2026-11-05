@@ -144,7 +144,7 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(claimed.step.kind).toBe('chief');
     expect(claimed.conversationId).toBe(w.threadId);
     expect(claimed.chief?.threadId).toBe(w.threadId);
-    expect(claimed.chief?.systemPrompt).toContain('总管');
+    expect(claimed.chief?.systemPrompt).toContain('Coordinator');
     expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT);
     expect(claimed.agent?.id).toBe(AGENT_ID);
     expect(claimed.agent?.modelId).toBe('stub-model');

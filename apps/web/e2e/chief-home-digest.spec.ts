@@ -35,7 +35,7 @@ const digestRow = (reason: 'daily' | 'threshold', memoryId = MEMORY.id): Row => 
       {
         group: 'remembered',
         text: '发布卡住时先查 npm 源，再看代码',
-        reason: '从这次发布学到的，已写进总管的记忆',
+        reason: '从这次发布学到的，已写进 Coordinator 的记忆',
         memory: { id: memoryId, agentId: 'agent-1' },
       },
     ],
@@ -76,7 +76,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     await page.goto('/app');
     await expandTurns(page);
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    const toggle = stream.getByRole('button', { name: '总管把昨天的对话整理成了 4 条摘要' });
+    const toggle = stream.getByRole('button', { name: 'Coordinator 把昨天的对话整理成了 4 条摘要' });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(stream).toContainText('看板拖完卡片计数不对，修一下');
     await expect(stream).toContainText('已经补给它了');
@@ -84,7 +84,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
       const text = el.textContent ?? '';
       return [
         text.indexOf('看板拖完卡片计数不对'),
-        text.indexOf('总管把昨天的对话'),
+        text.indexOf('Coordinator 把昨天的对话'),
         text.indexOf('顺便把空列的提示'),
       ];
     });
@@ -105,7 +105,7 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     await expect(groups.nth(1)).toContainText('不是代码问题');
     await expect(groups.nth(2)).toContainText('还开着');
     await expect(groups.nth(3)).toContainText('记住了');
-    await expect(groups.nth(3)).toContainText('已写进总管的记忆');
+    await expect(groups.nth(3)).toContainText('已写进 Coordinator 的记忆');
     await expect(card).toContainText('原文都还在');
     await expect(card.locator('a.mention-chip--todo').first()).toHaveAttribute('data-phase', 'building');
     await toggle.evaluate((el) => el.scrollIntoView({ block: 'start' }));
@@ -124,11 +124,11 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
       'href',
       '/app/resources/agents/agent-1?tab=memory#memory-mem-1',
     );
-    await item.getByRole('button', { name: '让总管忘掉这条' }).click();
+    await item.getByRole('button', { name: '让 Coordinator 忘掉这条' }).click();
     await expect.poll(() => deleted).toEqual(['mem-1']);
     await expect(item).toHaveAttribute('data-gone', '');
     await expect(item).toContainText('已忘掉');
-    await expect(item.getByRole('button', { name: '让总管忘掉这条' })).toHaveCount(0);
+    await expect(item.getByRole('button', { name: '让 Coordinator 忘掉这条' })).toHaveCount(0);
     await evidenceShot(page, 'digest-forgot.png');
   });
 
@@ -150,14 +150,14 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
     const item = stream.getByTestId('chief-digest-item').filter({ hasText: '先查 npm 源' });
     await expect(item).toHaveAttribute('data-gone', '');
-    await expect(item.getByRole('button', { name: '让总管忘掉这条' })).toHaveCount(0);
+    await expect(item.getByRole('button', { name: '让 Coordinator 忘掉这条' })).toHaveCount(0);
   });
 
   test('a threshold digest says the chat got long', async ({ page }) => {
     await mockDigest(page, withDigest('threshold'));
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    await stream.getByRole('button', { name: '对话太长了，总管把上面的内容整理成了 4 条摘要' }).click();
+    await stream.getByRole('button', { name: '对话太长了，Coordinator 把上面的内容整理成了 4 条摘要' }).click();
     await expect(stream.getByTestId('chief-digest-card')).toContainText('上面内容的摘要');
   });
 

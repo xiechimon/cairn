@@ -13,7 +13,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.getByTestId('home-c-hero')).toContainText('ian');
     await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
     await expect(home.getByTestId('chief-composer-input')).toBeVisible();
-    await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Coordinator', exact: true })).toHaveCount(0);
     await expect(page.locator('.chief-drawer')).toBeHidden();
     const composer = await home.locator('.chief-composer').boundingBox();
     const hero = await page.getByTestId('home-c-hero').boundingBox();
@@ -94,7 +94,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(page.locator('.chief-drawer')).toBeHidden();
   });
 
-  test('a page other than home keeps the chief drawer', async ({ page }) => {
+  test('a page other than home keeps the Coordinator drawer', async ({ page }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app/schedules');
     await expect(page.getByTestId('home-c')).toHaveCount(0);

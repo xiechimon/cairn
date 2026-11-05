@@ -56,7 +56,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await probe(page, 'backgroundColor', 'var(--card)');
     const secondary = await probe(page, 'backgroundColor', 'var(--secondary)');
 
-    const title = win.getByRole('heading', { name: '总管', level: 2 });
+    const title = win.getByRole('heading', { name: 'Coordinator', level: 2 });
     await expect(title, 'W1').toHaveCSS('font-family', display);
     await expect(title, 'W1').toHaveCSS('font-size', '17px');
     await expect(title, 'W1').toHaveCSS('font-weight', '650');
@@ -106,7 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(SETTINGS('101'));
     const serif = await probe(page, 'fontFamily', 'var(--font-source-serif)');
 
-    const heading = page.getByRole('heading', { name: '总管设置' });
+    const heading = page.getByRole('heading', { name: 'Coordinator 设置' });
     await expect(heading, 'S1').toHaveCSS('font-family', serif);
     await expect(heading, 'S1').toHaveCSS('font-size', '20px');
     const bar = page.getByTestId('chief-settings-topbar');

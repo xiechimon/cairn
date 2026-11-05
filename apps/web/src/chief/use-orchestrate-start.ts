@@ -31,7 +31,7 @@ export function useOrchestrateStart(): OrchestrateStart {
         todo,
       );
       if (existing !== null) {
-        toast.warning(t('总管正在编排这张任务，等这一轮结束再发起。'), {
+        toast.warning(t('Coordinator 正在编排这张任务，等这一轮结束再发起。'), {
           description: t('重复发起只会多排一轮编排，不会更快开始。'),
           action: {
             label: t('查看会话'),
@@ -50,8 +50,8 @@ export function useOrchestrateStart(): OrchestrateStart {
               : [res.thread, ...old.filter((x) => x.id !== res.thread.id)],
           );
           const threadId = res.thread.id;
-          toast.success(opts?.savedTitle ?? t('已交给总管编排'), {
-            description: t('总管将直接规划，并按活的类型派发执行。'),
+          toast.success(opts?.savedTitle ?? t('已交给 Coordinator 编排'), {
+            description: t('Coordinator 将直接规划，并按活的类型派发执行。'),
             action: {
               label: t('查看会话'),
               onClick: () => navigate(`/app?chief=${encodeURIComponent(threadId)}`),

@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectScro
 const agents = [
   { value: 'implementer', label: 'Implementer' },
   { value: 'reviewer', label: 'Reviewer' },
-  { value: 'chief', label: 'Chief' },
+  { value: 'chief', label: 'Coordinator' },
 ];
 
 const OpenMenu = () => (
@@ -18,7 +18,7 @@ const OpenMenu = () => (
           <SelectItem value="implementer">Implementer</SelectItem>
           <SelectItem value="reviewer">Reviewer</SelectItem>
           <SelectSeparator />
-          <SelectItem value="chief">Chief</SelectItem>
+          <SelectItem value="chief">Coordinator</SelectItem>
         </SelectGroup>
       </SelectContent>
     </Select>

@@ -199,23 +199,23 @@ test.describe('chief unavailable (T4)', () => {
     await page.goto('/app');
     const home = page.getByTestId('home-c');
     const banner = home.getByTestId('chief-outage');
-    await expect(banner).toContainText('总管暂时不可用');
+    await expect(banner).toContainText('Coordinator 暂时不可用');
     await expect(banner).toContainText('relay-a/claude-opus');
     await expect(banner).toContainText('任务照常在跑');
-    await expect(banner.getByRole('button', { name: '给总管换模型' })).toBeVisible();
+    await expect(banner.getByRole('button', { name: '给 Coordinator 换模型' })).toBeVisible();
     const held = home.getByTestId('queued-message');
     await expect(held).toHaveCount(2);
-    await expect(held.first()).toHaveAttribute('title', '已存下，总管恢复后会处理');
+    await expect(held.first()).toHaveAttribute('title', '已存下，Coordinator 恢复后会处理');
     await expect(held.first().getByRole('button', { name: '撤回' })).toBeVisible();
     await expect(held.first().getByRole('button', { name: '现在插话' })).toHaveCount(0);
     await expect(home.getByTestId('chief-stream').getByTestId('queued-message')).toHaveCount(0);
-    await expect(home.getByRole('button', { name: '停止总管这次回复' })).toHaveCount(0);
+    await expect(home.getByRole('button', { name: '停止 Coordinator 这次回复' })).toHaveCount(0);
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
-      '可以继续说，总管恢复后会按顺序处理…',
+      '可以继续说，Coordinator 恢复后会按顺序处理…',
     );
     await evidenceShot(page, 'outage-desktop.png');
-    await banner.getByRole('button', { name: '给总管换模型' }).click();
+    await banner.getByRole('button', { name: '给 Coordinator 换模型' }).click();
     await expect(page.getByTestId('chief-settings-col')).toBeVisible();
   });
 
@@ -297,7 +297,7 @@ test.describe('chief unavailable (T4)', () => {
   });
 });
 
-test.describe('queue, steer and stop while the chief is replying (T5)', () => {
+test.describe('queue, steer and stop while the Coordinator is replying (T5)', () => {
   test('messages sent while busy are queued after the live reply, in server order', async ({
     page,
   }) => {
@@ -331,14 +331,14 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     const calls = await mockLive(page, busyState());
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    const stop = home.getByRole('button', { name: '停止总管这次回复' });
+    const stop = home.getByRole('button', { name: '停止 Coordinator 这次回复' });
     await expect(stop).toBeVisible();
     const input = home.getByTestId('chief-composer-input');
     await input.fill('再加一句');
     await expect(stop).toHaveCount(0);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
     await input.fill('');
-    await home.getByRole('button', { name: '停止总管这次回复' }).click();
+    await home.getByRole('button', { name: '停止 Coordinator 这次回复' }).click();
     await expect.poll(() => calls).toContain('POST /stop');
   });
 
@@ -357,7 +357,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     expect(calls).not.toContain('send');
   });
 
-  test('typing 停止 sends it as a message to the chief, it does not press stop', async ({
+  test('typing 停止 sends it as a message to the Coordinator, it does not press stop', async ({
     page,
   }) => {
     const calls = await mockLive(page, busyState());
@@ -387,7 +387,7 @@ test.describe('queue, steer and stop while the chief is replying (T5)', () => {
     await page.goto('/app');
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-msg').last()).toContainText('studio-mac.local');
-    await home.getByRole('button', { name: '停止总管这次回复' }).click();
+    await home.getByRole('button', { name: '停止 Coordinator 这次回复' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m1');
     expect(calls).not.toContain('POST /stop');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);

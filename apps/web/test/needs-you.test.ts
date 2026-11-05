@@ -11,7 +11,7 @@ const question = (status: 'pending' | 'answered') => ({
 });
 
 describe('the Needs you set, shared by the home list and the sidebar badge', () => {
-  test('counts confirm, review, failed and awaiting-reply threads, not Chief questions', () => {
+  test('counts confirm, review, failed and awaiting-reply threads, not Coordinator questions', () => {
     const set = [
       todo(1, 'confirm'),
       todo(2, 'review'),

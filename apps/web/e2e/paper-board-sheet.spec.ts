@@ -56,7 +56,7 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('chief settings swaps in inside the same sheet', async ({ page }) => {
   await page.goto('/app?scenario=101');
-  const heading = page.locator('.board-sheet').getByRole('heading', { name: '总管设置' });
+  const heading = page.locator('.board-sheet').getByRole('heading', { name: 'Coordinator 设置' });
   await expect(heading).toBeVisible();
   await expect(page.getByTestId('home-c')).toHaveCount(0);
   const sheet = await sheetOf(page, '.board-sheet');

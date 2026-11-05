@@ -42,11 +42,11 @@ Boundary rulings:
 |---|---|---|---|
 | `机器` | Machine | `machine` | A registered execution host (`cairn` daemon + embedded pi runtime) that claims and runs build steps. One machine can carry steps of multiple Agents; it is not a property of an Agent. |
 | `Agent` | Agent | `agent` | An execution role configured with model, responsibilities, skills, tools, keys, MCP, and memory; runs on some machine. |
-| `总管` | Chief | `chief` | The dispatch-and-conversation agent, one per "user × team", responsible for assigning tasks; domain-wise distinct from worker Agents that do the work. |
-| `主力机` | Primary machine | `chief.machineId` | The chief's default execution machine (#895): the second level of the chief new-thread pinning default chain (`todo.machineId` → this slot → null); pinning semantics are the same as `todo.machineId` — deterministic, no automatic fallback, unpinning belongs to the user; null = automatic (any online machine claims it + conversation affinity). It governs only the chief thread's pinning, not worker dispatch. The setting surface is the "machine" slot in the Agent tab of chief settings (PATCH /chief); the machines page shows a read-only three-state marker (chief host / round in progress / waiting for machine). |
+| `Coordinator` | Coordinator | `chief` | The dispatch-and-conversation agent, one per "user × team", responsible for assigning tasks; domain-wise distinct from worker Agents that do the work. |
+| `主力机` | Primary machine | `chief.machineId` | The Coordinator's default execution machine (#895): the second level of the Coordinator new-thread pinning default chain (`todo.machineId` → this slot → null); pinning semantics are the same as `todo.machineId` — deterministic, no automatic fallback, unpinning belongs to the user; null = automatic (any online machine claims it + conversation affinity). It governs only the Coordinator thread's pinning, not worker dispatch. The setting surface is the "machine" slot in the Agent tab of Coordinator settings (PATCH /chief); the machines page shows a read-only three-state marker (Coordinator host / round in progress / waiting for machine). |
 | `记忆` | Memory | `memory` | Experience entries an agent accumulates while working. The todos.dev write path is unmeasured [black box]; the replica uses a minimal mechanism (02-architecture-parity §4.4, all marked [inferred], pending #46 calibration). |
 
-Boundary: Agent ≠ Machine (one is a configured role, the other the physical host that carries it). Chief is its own concept, never called a kind of Agent. The chief panel is a floating window (ADR 0013, superseding ADR 0004's right-docked column); its vocabulary is in "Chief panel and machine binding" below.
+Boundary: Agent ≠ Machine (one is a configured role, the other the physical host that carries it). Coordinator is its own concept, never called a kind of Agent. The Coordinator panel is a floating window (ADR 0013, superseding ADR 0004's right-docked column); its vocabulary is in "Coordinator panel and machine binding" below.
 
 ## Resources and configuration
 
@@ -74,14 +74,14 @@ Boundary rulings:
 | `段` | Segment | `segment` (row form `msg-<stepId>-<n>`) | **One continuous run of same-type deltas** output by the model within a single turn (`text` or `thinking`). Tool calls are independent records, not segments. A segment is closed at the **write side** (type change / tool arrival / message end / step wrap-up); the streaming period and the persisted period share one source — the same segment is both the row that appears immediately during streaming and the row in the final version. |
 | `Token 用量` | Token usage | `tokenUsage` | The accounting reading aggregated by "build × model × input/output/cache-read/cache-write"; a value object with no lifecycle of its own. |
 
-## Chief panel and machine binding
+## Coordinator panel and machine binding
 
 Moved from the former `GLOSSARY.md`. Each entry names the canonical UI word and the words to avoid.
 
 | UI word | English | Definition | Avoid |
 |---|---|---|---|
-| `总管` | Chief | The resident orchestration agent, one per user × team: it plans tasks, dispatches builds and talks with people. | `主管`, boss |
-| `总管面板` | Chief panel | The chief's only conversation surface, shaped as a floating window (ADR 0013). | `抽屉`, drawer, `竖板`, `主管` pane (the first three name the retired right-docked panel; code identifiers such as `chief-drawer.tsx` are cleaned up with #1009 A0) |
+| `Coordinator` | Coordinator | The resident orchestration agent, one per user × team: it plans tasks, dispatches builds and talks with people. | `主管`, boss |
+| `Coordinator 面板` | Coordinator panel | The Coordinator's only conversation surface, shaped as a floating window (ADR 0013). | `抽屉`, drawer, `竖板`, `主管` pane (the first three name the retired right-docked panel; code identifiers such as `chief-drawer.tsx` are cleaned up with #1009 A0) |
 | `悬浮窗` | Floating window | A floating card window anchored to the bottom right of the content area: no modal, no scrim, resident across pages, open state persisted (closed by default). Follows the Multica floating chat window. | `悬浮卡`, `浮窗`, `浮层` |
 | `常驻` | Resident | How the floating window exists: mounted once in the root layout, not remounted on route change, kept (inert) when closed, open state kept across reloads. | `常开`, `永挂` |
 | `最小化` | Minimize | The floating window's only way to collapse: it returns to the bottom-right FAB and keeps its draft, scroll and thread. It is not a destructive close. | `关闭` (for the floating window), `收起` |

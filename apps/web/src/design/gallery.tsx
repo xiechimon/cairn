@@ -290,7 +290,7 @@ export function Gallery() {
           <GroupTitle
             id="product"
             title="Product"
-            lede="The app's own components from board, detail, chief, overlay and pages, rendered with sample data in every state they ship."
+            lede="The app's own components from board, detail, Coordinator, overlay and pages, rendered with sample data in every state they ship."
           />
           <ProductProviders>
             <ProductBoardSection />
