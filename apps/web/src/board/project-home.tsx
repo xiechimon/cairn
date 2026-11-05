@@ -10,7 +10,7 @@ import {
   MessageSquare,
   Settings2,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
 import { ListCard, ListRow } from '../components/list-card.js';
@@ -23,6 +23,7 @@ import { Button } from '../components/ui/button.js';
 import type { ScheduleRecord, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
+import { ScheduleDetailController } from '../schedules/schedule-detail-dialog.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
@@ -75,6 +76,7 @@ export function ProjectHome({
   const { t } = useI18n();
   const navigate = useNavigate();
   const threadHref = useThreadHref();
+  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleRecord | null>(null);
   const own = todos.filter((todo) => todo.projectId === project.id && todo.archivedAt == null);
   const needsYou = needsYouThreads(own);
   const running = own.filter((todo) => threadStatus(todo) === 'running');
@@ -269,8 +271,8 @@ export function ProjectHome({
                               ? (schedule.pausedReason ?? t('已暂停'))
                               : scheduleSummary(schedule, now, t)
                           }
-                          state={schedule.enabled === false ? 'paused' : 'active'}
-                          onOpen={() => navigate(threadHref(schedule.todoId))}
+                          state={schedule.enabled === false ? schedule.pausedReason == null ? 'paused' : 'disabled' : 'active'}
+                          onOpen={() => setSelectedSchedule(schedule)}
                         />
                       ))}
                     </div>
@@ -300,6 +302,7 @@ export function ProjectHome({
           </div>
         </div>
       </section>
+      <ScheduleDetailController schedule={selectedSchedule} now={now} onClose={() => setSelectedSchedule(null)} />
     </div>
   );
 }

@@ -43,6 +43,7 @@ const RUN_WORD: Record<ScheduleRecord['kind'], string> = {
 export function scheduleSummary(schedule: ScheduleRecord, now: number, t: TFunc): string {
   const start =
     schedule.kind === 'cron' ? '' : `${monthDay(schedule.at, t)} ${hourMinute(schedule.at)} `;
+  if (schedule.nextRunAt === null) return `${start}${t(RUN_WORD[schedule.kind])} · ${t(schedule.kind === 'once' ? 'No upcoming runs' : 'Next run unavailable')}`;
   return `${start}${t(RUN_WORD[schedule.kind])} · ${t('下次 {day} {time}', {
     day: dayWord(schedule.nextRunAt, now, t),
     time: hourMinute(schedule.nextRunAt),
