@@ -168,13 +168,15 @@ test(`usage errors offer retry without claiming an unvalidated cost (${theme})`,
   await setup(page, options);
   await page.goto('/app?thread=todo-1');
   await expect(footer(page)).toHaveAttribute('data-state', 'error');
+  await expect(footer(page).getByTestId('thread-usage-retry')).toBeVisible();
   await toggle(page).click();
   await expect(footer(page).getByTestId('thread-usage-stats').locator('dd').first()).toHaveText('—');
   await expect(footer(page)).not.toContainText('$4.00');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await evidencePanelShot(page, `thread-usage-error-${theme}.png`, page.locator('.side-panel'));
   options.error = false;
-  await footer(page).getByRole('button', { name: 'Retry' }).click();
+  await expect(footer(page).getByTestId('thread-usage-retry')).toBeVisible();
+  await footer(page).getByTestId('thread-usage-retry').click();
   await expect(footer(page)).toHaveAttribute('data-state', 'ready');
   await expect(toggle(page)).toContainText('2.5k');
 });
@@ -195,13 +197,13 @@ for (const teams of ['error', 'empty'] as const) {
 
     delete options.teams;
     options.machinesError = true;
-    await footer(page).getByRole('button', { name: 'Retry' }).click();
+    await footer(page).getByTestId('thread-usage-retry').click();
     await expect.poll(() => requests.filter((path) => path === '/api/teams/t1/machines').length).toBe(2);
     await expect(footer(page)).toHaveAttribute('data-state', 'error');
     const teamRequestsAfterRecovery = requests.filter((path) => path === '/api/teams').length;
 
     options.machinesError = false;
-    await footer(page).getByRole('button', { name: 'Retry' }).click();
+    await footer(page).getByTestId('thread-usage-retry').click();
     await expect(footer(page)).toHaveAttribute('data-state', 'ready');
     await expect(footer(page)).toContainText('omarchy');
     await expect(footer(page)).toContainText('Mac');
