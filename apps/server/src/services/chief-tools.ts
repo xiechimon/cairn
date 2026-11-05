@@ -5,7 +5,9 @@ import {
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   IN_PROGRESS_PHASES,
+  MEMORY_LAYERS,
   MERGE_HUMAN_ONLY_COPY,
+  type MemoryLayer,
   MODEL_SOURCE_RUNTIME_LABELS,
   snoozeTodoBodySchema,
   todoOutputSchema,
@@ -157,6 +159,23 @@ function bool(params: Params, key: string, fallback: boolean): boolean {
   if (v === undefined || v === null) return fallback;
   if (typeof v !== 'boolean') throw new HttpError(400, `invalid params.${key}: expected boolean`);
   return v;
+}
+
+function memoryLayer(params: Params): MemoryLayer {
+  const v = params.layer;
+  if (v === undefined || v === null) return 'core';
+  if (typeof v !== 'string' || !(MEMORY_LAYERS as readonly string[]).includes(v)) {
+    throw new HttpError(400, 'invalid params.layer');
+  }
+  return v as MemoryLayer;
+}
+
+function agentSourceName(db: Db, agentId: string | null): string | null {
+  if (agentId === null) return null;
+  return (
+    db.select({ name: agent.displayName }).from(agent).where(eq(agent.id, agentId)).get()?.name ??
+    null
+  );
 }
 
 function json(result: unknown): string {
@@ -1068,6 +1087,7 @@ export async function executeChiefTool(
         requireUnarchivedTargets(db, ctx.teamId, name, { projectId });
       }
       if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
+      const layer = memoryLayer(params);
       const row = saveMemoryEntry(db, {
         agentId: ctx.chiefAgentId,
         teamId: ctx.teamId,
@@ -1077,6 +1097,9 @@ export async function executeChiefTool(
         projectId,
         sourceTodoId,
         sourceBuildId: ctx.conversationId,
+        source: agentSourceName(db, ctx.chiefAgentId),
+        layer,
+        threadId: layer === 'scratchpad' ? ctx.threadId : null,
       });
       return json(row);
     }
@@ -1088,6 +1111,7 @@ export async function executeChiefTool(
           memoryId,
           agentId: ctx.chiefAgentId,
           teamId: ctx.teamId,
+          threadId: ctx.threadId,
           content: str(params, 'content'),
         }),
       );
@@ -1101,6 +1125,7 @@ export async function executeChiefTool(
               memoryId,
               agentId: ctx.chiefAgentId,
               teamId: ctx.teamId,
+              threadId: ctx.threadId,
             });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
@@ -1110,7 +1135,7 @@ export async function executeChiefTool(
       return json(
         listMemoryEntries(
           db,
-          { agentId: ctx.chiefAgentId, teamId: ctx.teamId },
+          { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
           bool(params, 'includeInvalid', false),
         ),
       );
@@ -1284,10 +1309,12 @@ export async function confirmBuild(
 export interface WorkerMemoryCtx {
   teamId: string;
   agentId: string;
+  sourceAgentId?: string;
   todoId: string;
   projectId: string | null;
   buildId: string;
   attachmentsDir: string;
+  teamScoped?: boolean;
 }
 
 export async function executeWorkerMemoryTool(
@@ -1302,6 +1329,7 @@ export async function executeWorkerMemoryTool(
       const sourceTodoId = optStr(params, 'sourceTodoId');
       if (projectId !== undefined) requireProjectRow(db, projectId, ctx.teamId);
       if (sourceTodoId !== undefined) requireTeamTodo(db, sourceTodoId, ctx.teamId);
+      const layer = memoryLayer(params);
       const row = saveMemoryEntry(db, {
         agentId: ctx.agentId,
         teamId: ctx.teamId,
@@ -1311,6 +1339,10 @@ export async function executeWorkerMemoryTool(
         projectId: projectId ?? ctx.projectId,
         sourceTodoId: sourceTodoId ?? ctx.todoId,
         sourceBuildId: ctx.buildId,
+        source: agentSourceName(db, ctx.sourceAgentId ?? ctx.agentId),
+        layer,
+        threadId: layer === 'scratchpad' ? ctx.todoId : null,
+        teamScoped: ctx.teamScoped,
       });
       return json(row);
     }
@@ -1320,7 +1352,9 @@ export async function executeWorkerMemoryTool(
           memoryId: str(params, 'memoryId'),
           agentId: ctx.agentId,
           teamId: ctx.teamId,
+          threadId: ctx.todoId,
           content: str(params, 'content'),
+          teamScoped: ctx.teamScoped,
         }),
       );
     }
@@ -1330,6 +1364,8 @@ export async function executeWorkerMemoryTool(
         memoryId,
         agentId: ctx.agentId,
         teamId: ctx.teamId,
+        threadId: ctx.todoId,
+        teamScoped: ctx.teamScoped,
       });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
@@ -1338,7 +1374,12 @@ export async function executeWorkerMemoryTool(
       return json(
         listMemoryEntries(
           db,
-          { agentId: ctx.agentId, teamId: ctx.teamId },
+          {
+            agentId: ctx.agentId,
+            teamId: ctx.teamId,
+            threadId: ctx.todoId,
+            teamScoped: ctx.teamScoped,
+          },
           bool(params, 'includeInvalid', false),
         ),
       );

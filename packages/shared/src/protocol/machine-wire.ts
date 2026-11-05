@@ -23,6 +23,8 @@ import {
   machineComputerFramesBodySchema,
   machineComputerFramesResponseSchema,
 } from './computer.js';
+import { computerPresenceListSchema } from './computer-presence.js';
+import { computerScreenRequestSchema } from './computer-screen.js';
 import { machineJsonSchema } from './executor.js';
 
 export const MACHINE_AUTH_HEADER = 'authorization';
@@ -79,10 +81,12 @@ export const machineClosedOrbsResponseSchema = z
   .max(MACHINE_ORB_CONVERSATIONS_LIMIT);
 
 export const machinePresenceBodySchema = z.object({
+  computers: computerPresenceListSchema.optional(),
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
 });
+export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });
 
 export const machineRecoverResponseSchema = z.object({
@@ -251,6 +255,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stop'), stepId: recordId }),
   z.object({ type: z.literal('sync'), sync: machineSyncCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
+  z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 

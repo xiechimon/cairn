@@ -1,4 +1,5 @@
 import { cairnHostRefusal } from './guard-cairn.js';
+import { shellExecutablePatternRefusal } from './guard-executable.js';
 import { skipPlainParameter } from './guard-heredoc.js';
 
 function matchingBrace(body: string, openIndex: number): number | undefined {
@@ -270,6 +271,9 @@ function normalizedHeredocWords(body: string): string[] {
 }
 
 export function quotedHeredocLifecycleHazard(body: string): boolean {
+  try {
+    if (shellExecutablePatternRefusal(body)) return true;
+  } catch {}
   const words = quotedHeredocWords(body);
   if (words && wordsHaveLifecycleHazard(words)) return true;
   if (wordsHaveLifecycleHazard(normalizedHeredocWords(body))) return true;

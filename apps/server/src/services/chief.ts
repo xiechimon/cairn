@@ -1397,7 +1397,12 @@ export function buildChiefSystemPrompt(
   const agents = router ? [] : deps.db.select().from(agent).where(eq(agent.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
   const memories = agentRow
-    ? injectMemories(deps.db, { agentId: agentRow.id, projectId: null })
+    ? injectMemories(deps.db, {
+        agentId: agentRow.id,
+        teamId,
+        threadId: threadId ?? undefined,
+        projectId: null,
+      })
     : [];
 
   const digestRows = deps.db

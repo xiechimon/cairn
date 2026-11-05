@@ -14,6 +14,7 @@ import {
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
+  type MachinePresenceBody,
   type MachineRecord,
   type MachineRecoverResponse,
   type MachineSkillsManifestResponse,
@@ -90,11 +91,7 @@ export interface MachineApi {
     capabilities?: MachineCapabilities;
   }): Promise<MachineEnrollResponse>;
   me(): Promise<MachineRecord>;
-  presence(body: {
-    cliVersion?: string;
-    claudeCode?: ClaudeCodeReport;
-    capabilities?: MachineCapabilities;
-  }): Promise<void>;
+  presence(body: MachinePresenceBody, signal?: AbortSignal): Promise<void>;
   recover(): Promise<MachineRecoverResponse>;
   closedOrbConversations?(
     conversationIds: MachineClosedOrbsBody['conversationIds'],
@@ -241,13 +238,10 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async presence(body: {
-    cliVersion?: string;
-    claudeCode?: ClaudeCodeReport;
-    capabilities?: MachineCapabilities;
-  }): Promise<void> {
+  async presence(body: MachinePresenceBody, signal?: AbortSignal): Promise<void> {
     await this.request('POST', '/api/machine/presence', {
       body,
+      signal,
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

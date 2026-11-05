@@ -32,7 +32,7 @@ test('the chip opens one card per computer, the Coordinator machine first, with 
   await expect(cards.nth(1)).toContainText('omarchy');
   await expect(cards.nth(1)).toContainText('离线');
   await expect(cards.nth(1).getByTestId('machine-screen')).toContainText('电脑离线');
-  await expect(cards.nth(0).getByTestId('machine-screen')).toContainText('打开桌面控制后');
+  await expect(cards.nth(0).getByTestId('machine-screen')).toContainText('屏幕随桌面控制一起上线');
 
   for (const name of ['桌面控制', '浏览器']) {
     const toggles = panel(page).getByRole('switch', { name });

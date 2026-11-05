@@ -234,6 +234,7 @@ export function steerChiefMessage(
               .where(eq(chief.id, thread.chiefId))
               .get()?.agentId ?? null,
           projectId: scope,
+          threadId,
         })
       : null;
   const content = [

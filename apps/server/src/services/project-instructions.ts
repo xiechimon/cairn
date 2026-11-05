@@ -5,7 +5,12 @@ import { injectMemories } from './memory.js';
 
 export function projectTurnContext(
   db: Db,
-  scope: { teamId: string; agentId: string | null; projectId: string | null },
+  scope: {
+    teamId: string;
+    agentId: string | null;
+    projectId: string | null;
+    threadId?: string;
+  },
 ): string | null {
   if (scope.projectId === null) return null;
   const row = db
@@ -20,8 +25,10 @@ export function projectTurnContext(
       ? []
       : injectMemories(db, {
           agentId: scope.agentId,
+          teamId: scope.teamId,
           projectId: scope.projectId,
           projectOnly: true,
+          ...(scope.threadId !== undefined ? { threadId: scope.threadId } : {}),
         });
   const sections = [
     ...(row.instructions != null ? [`## 项目说明（${name}）\n${row.instructions}`] : []),

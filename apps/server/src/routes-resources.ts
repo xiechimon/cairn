@@ -44,6 +44,7 @@ import {
   teamGithubToken,
 } from './services/github-connection.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
+import { revokeMachineToken } from './services/machine-revoke.js';
 import {
   machineConcurrencyPatch,
   machineRunningCount,
@@ -199,6 +200,16 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
     releasePendingOutput();
+    ctx.machineHub.revokeMachine(id);
+    return c.body(null, 204);
+  });
+
+  app.post('/api/machines/:id/revoke', (c) => {
+    const id = c.req.param('id');
+    const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
+    if (!row) throw notFound(`machine ${id}`);
+    requireTeam(ctx, row.teamId);
+    revokeMachineToken(ctx, id);
     return c.body(null, 204);
   });
 

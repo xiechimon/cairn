@@ -1,4 +1,5 @@
 import { cairnHostRefusal } from './guard-cairn.js';
+import { executablePatternRefusal, shellExecutablePatternRefusal } from './guard-executable.js';
 import {
   braceExpansionHazard,
   executesWrittenHeredoc,
@@ -17,7 +18,7 @@ import {
   teeDestinationPaths,
 } from './guard-heredoc.js';
 import { quotedHeredocLifecycleHazard } from './guard-quoted.js';
-import { parseShellWords } from './guard-shell-parse.js';
+import { parseShellWords, preserveShellCommandBoundaries } from './guard-shell-parse.js';
 import {
   assignmentEntries,
   commandBaseAt,
@@ -318,6 +319,12 @@ function prepareDesktopGuardCommand(source: string): PreparedDesktopCommand {
         } else {
           const hazard = heredocBodyHazard(body.content);
           if (hazard) return { reason: hazard };
+          try {
+            const pattern = shellExecutablePatternRefusal(body.content);
+            if (pattern) return { reason: pattern };
+          } catch {
+            return { reason: 'uninspectable shell syntax' };
+          }
           out += body.content;
         }
         cursor = body.end;
@@ -431,31 +438,6 @@ function shellCFlagProgram(words: readonly string[], interpreterIndex: number): 
   return undefined;
 }
 
-function preserveShellCommandBoundaries(command: string): string {
-  let quote: "'" | '"' | undefined;
-  let result = '';
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index];
-    const next = command[index + 1];
-    if (character === '\\' && quote !== "'") {
-      if (next === '\n') {
-        index += 1;
-        continue;
-      }
-      result += character;
-      if (next !== undefined) {
-        result += next;
-        index += 1;
-      }
-      continue;
-    }
-    if (character === quote) quote = undefined;
-    else if (!quote && (character === "'" || character === '"')) quote = character;
-    result += character === '\n' && !quote ? '\n;' : character;
-  }
-  return result;
-}
-
 function shellTokenReason(entry: object): string | undefined {
   if ('comment' in entry) return 'comment';
   if ('expansion' in entry && typeof entry.expansion === 'string') {
@@ -480,6 +462,8 @@ function tokenizeProtectedShellCommand(
       separated,
       (name) => literals[name] ?? STATIC_SHELL_EXPANSIONS[name] ?? { expansion: name },
     );
+    const patternRefusal = executablePatternRefusal(parsed);
+    if (patternRefusal) return { reason: patternRefusal };
     const words: string[] = [];
     let commandPosition = true;
     let redirectTarget = false;
@@ -540,15 +524,12 @@ function tokenizeProtectedShellCommand(
   }
 }
 
-function protectedWordRefusal(
-  words: readonly string[],
-  cairnHostRules: boolean,
-): string | undefined {
+function protectedWordRefusal(words: readonly string[]): string | undefined {
   for (const word of words) {
     const base = (word.split('/').at(-1) ?? '').toLowerCase();
     if (/^(?:kill|pkill|killall|xkill)$/.test(base)) return `protected command ${base}`;
   }
-  const cairn = cairnHostRules ? cairnHostRefusal(words) : undefined;
+  const cairn = cairnHostRefusal(words);
   if (cairn) return cairn;
   for (let index = 0; index < words.length; index += 1) {
     const word = words[index] ?? '';
@@ -575,26 +556,23 @@ function protectedWordRefusal(
     if (!SHELL_INTERPRETER_NAMES.test(name)) continue;
     const program = shellCFlagProgram(words, index);
     if (!program) continue;
-    const nested = lifecycleRefusal(program, cairnHostRules);
+    const nested = protectedComputerLifecycleRefusal(program);
     if (nested) return nested;
   }
   return undefined;
 }
 
-function lifecycleRefusal(command: string, cairnHostRules: boolean): string | undefined {
+export function protectedComputerLifecycleRefusal(command: string): string | undefined {
   const prepared = prepareDesktopGuardCommand(command);
   if ('reason' in prepared) return prepared.reason;
   const tokenized = tokenizeProtectedShellCommand(prepared.command, prepared.literals);
   if ('reason' in tokenized) return tokenized.reason;
-  return protectedWordRefusal(tokenized.words, cairnHostRules);
+  return protectedWordRefusal(tokenized.words);
 }
 
-export function protectedComputerLifecycleRefusal(command: string): string | undefined {
-  return lifecycleRefusal(command, true);
-}
-
+/** Orb computer uses the same lifecycle refusals as host (including cairn host rules). */
 export function orbComputerProtectionRefusal(command: string): string | undefined {
-  return lifecycleRefusal(command, false);
+  return protectedComputerLifecycleRefusal(command);
 }
 
 export function isProtectedComputerLifecycleCommand(command: string): boolean {

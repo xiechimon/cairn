@@ -76,6 +76,7 @@ import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
+  memoryInjectTeamId,
   memoryOwnerOf,
   routeForStep,
   routingRulesEnabled,
@@ -289,13 +290,19 @@ function chiefClaimPayload(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemories(deps.db, { agentId: agentRow.id, projectId: null });
+  const memories = injectMemories(deps.db, {
+    agentId: agentRow.id,
+    teamId: threadRow.teamId,
+    threadId: threadRow.id,
+    projectId: null,
+  });
   const projectSection = digest
     ? null
     : projectTurnContext(deps.db, {
         teamId: threadRow.teamId,
         agentId: agentRow.id,
         projectId: stepScopeProjectId(stepRow),
+        threadId: threadRow.id,
       });
   const instruction =
     stepRow.prompt === null
@@ -462,8 +469,10 @@ async function tryClaim(
   machineId: string,
   teamId: string,
   origin: string,
-  maxWorkers?: number,
+  maxWorkers: number | undefined,
+  stillAuthorized: () => boolean,
 ): Promise<ClaimedStep | null> {
+  if (!stillAuthorized()) return null;
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
@@ -488,6 +497,7 @@ async function tryClaim(
 
   for (const cand of workerCands) {
     const shipRefusal = await reverifyShip(deps, cand.stepRow);
+    if (!stillAuthorized()) return null;
     if (shipRefusal !== null) {
       failStepWithEvents(deps, cand.stepRow, `Ship refused: ${shipRefusal}`);
       continue;
@@ -583,7 +593,9 @@ async function tryClaim(
       cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)
         ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
         : null;
+    if (!stillAuthorized()) return null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
+    if (!stillAuthorized()) return null;
     if (localMerge !== null) {
       const currentProject = projectOfTodo(db, cand.todoRow);
       if (!currentProject) continue;
@@ -600,6 +612,7 @@ async function tryClaim(
     let won = false;
     try {
       won = db.transaction((tx) => {
+        if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
         const res = tx
           .update(step)
@@ -727,6 +740,8 @@ async function tryClaim(
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         memories: injectMemories(db, {
           agentId: memoryOwnerOf(db, teamId, agentRow.id, cand.stepRow.kind),
+          teamId: memoryInjectTeamId(cand.stepRow.kind, teamId),
+          threadId: cand.todoRow.id,
           projectId: cand.todoRow.projectId,
         }),
         defaultSkill: agentRow.defaultSkill,
@@ -759,20 +774,21 @@ export async function claimStep(
   origin: string,
   signal?: AbortSignal,
   body?: MachineClaimBody,
+  stillAuthorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
-  if (signal?.aborted) return null;
+  if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   if (body?.role === 'coordinator') {
     if (machineId !== coordinatorMachineId()) return null;
     const first = claimCoordinatorTurn(deps, machineId, teamId);
     if (first) return first;
     await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
-    if (signal?.aborted) return null;
+    if (signal?.aborted || !stillAuthorized()) return null;
     return claimCoordinatorTurn(deps, machineId, teamId);
   }
-  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
+  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
-  if (signal?.aborted) return null;
-  return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
+  if (signal?.aborted || !stillAuthorized()) return null;
+  return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
 }

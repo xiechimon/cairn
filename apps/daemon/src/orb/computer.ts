@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import type { ComputerPresence } from '@cairn/shared';
+import { COMPUTER_PRESENCE_LIMIT } from '@cairn/shared';
 import { z } from 'zod';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { type OrbCommandRunner, runOrbCommand } from './provider.js';
@@ -38,6 +40,8 @@ export class ComputerOrbs {
   private readonly computers = new Map<string, ComputerState>();
   private readonly pending = new Map<string, Promise<string>>();
   private readonly stopping = new Map<string, Promise<void>>();
+  private readonly failed = new Set<string>();
+  private readonly listeners = new Set<() => void>();
 
   constructor(
     options: {
@@ -72,13 +76,48 @@ export class ComputerOrbs {
     return [...this.computers.values()].map((computer) => computer.name);
   }
 
+  async presence(signal?: AbortSignal): Promise<ComputerPresence[]> {
+    const running = await this.runningMachines(signal);
+    const scopes = new Set([...this.pending.keys(), ...this.failed, ...this.computers.keys()]);
+    return [...scopes].slice(0, COMPUTER_PRESENCE_LIMIT).map((scopeKey) => {
+      const providerRef = computerMachineName(scopeKey);
+      return {
+        scopeKey,
+        providerRef,
+        state: this.pending.has(scopeKey)
+          ? 'starting'
+          : this.failed.has(scopeKey)
+            ? 'failed'
+            : running.has(providerRef)
+              ? 'running'
+              : 'stopped',
+      };
+    });
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   ensure(scopeKey: string): Promise<string> {
     const running = this.pending.get(scopeKey);
     if (running) return running;
+    this.failed.delete(scopeKey);
     const operation = (this.stopping.get(scopeKey) ?? Promise.resolve())
       .then(() => this.ensureRunning(scopeKey))
-      .finally(() => this.pending.delete(scopeKey));
+      .catch((error: unknown) => {
+        this.failed.add(scopeKey);
+        throw error;
+      })
+      .finally(() => {
+        this.pending.delete(scopeKey);
+        for (const listener of this.listeners) listener();
+      });
     this.pending.set(scopeKey, operation);
+    for (const listener of this.listeners) listener();
     return operation;
   }
 
@@ -108,6 +147,7 @@ export class ComputerOrbs {
         await stop;
       } finally {
         this.stopping.delete(computer.scopeKey);
+        for (const listener of this.listeners) listener();
       }
     }
   }
@@ -191,8 +231,10 @@ export class ComputerOrbs {
     return new Set(result.stdout.split('\n').map((line) => line.trim().split(/\s+/)[0] ?? ''));
   }
 
-  private async runningMachines(): Promise<Set<string>> {
-    const result = await this.runner(['machinectl', 'list', '--no-legend', '--no-pager']);
+  private async runningMachines(signal?: AbortSignal): Promise<Set<string>> {
+    const result = await this.runner(['machinectl', 'list', '--no-legend', '--no-pager'], {
+      signal,
+    });
     if (result.code !== 0) throw new Error(`machinectl list failed: ${result.stderr}`);
     return new Set(result.stdout.split('\n').map((line) => line.trim().split(/\s+/)[0] ?? ''));
   }

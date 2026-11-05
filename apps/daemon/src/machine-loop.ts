@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -32,7 +32,10 @@ import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
 import { ComputerInputFence } from './computer/input-fence.js';
 import { OrbComputerProvider } from './computer/orb.js';
+import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
+import { OutboundComputerScreens } from './computer/screen-channel.js';
+import { hostComputerScreen } from './computer/screen-provider.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -42,8 +45,8 @@ import { ComputerOrbs } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
 import { createOrbProvider } from './orb/select.js';
-import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
+import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { setupProxy } from './proxy.js';
 import { resumePendingUpload } from './runner.js';
 import {
@@ -76,6 +79,7 @@ export interface MachineLoopOpts {
   claimTimeoutMs?: number;
   presenceIntervalMs?: number;
   presenceTimeoutMs?: number;
+  computerPresence?: ComputerPresenceSource;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
@@ -329,12 +333,49 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
   enrolledIdentity.machineId = machineId;
-
-  await client.presence({
-    cliVersion: DAEMON_VERSION,
-    claudeCode: claudeReport(),
-    capabilities: capabilitiesReport(),
+  const screens = new OutboundComputerScreens({
+    serverUrl: config.serverUrl,
+    getToken: () => inMemoryToken,
+    provider: hostComputerScreen,
   });
+
+  let networkFailures = 0;
+  const presenceReporter = new ComputerPresenceReporter({
+    source: opts.computerPresence,
+    body: () => ({
+      cliVersion: DAEMON_VERSION,
+      claudeCode: claudeReport(),
+      capabilities: capabilitiesReport(),
+    }),
+    timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
+    send: (body, signal) => client.presence(body, signal),
+    onSuccess: () => {
+      networkFailures = 0;
+    },
+    onFailure: (err) => {
+      if (err instanceof MachineApiError) {
+        networkFailures = 0;
+      } else {
+        networkFailures += 1;
+        if (networkFailures >= DISPATCHER_RESET_FAILURE_THRESHOLD) {
+          networkFailures = 0;
+          proxyHandle.reset();
+          logger.machine(
+            `http dispatcher reset after ${DISPATCHER_RESET_FAILURE_THRESHOLD} network failures`,
+          );
+        }
+      }
+    },
+    onError: (err) => {
+      logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
+    },
+  });
+  try {
+    await presenceReporter.send();
+  } catch (error) {
+    await presenceReporter.close();
+    throw error;
+  }
   logger.raw(`Online (machineId=${machineId}); polling ${config.serverUrl}`);
 
   let localCap = 1;
@@ -489,15 +530,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   closedOrbTimer.unref?.();
   const orbTimer = setInterval(sweepOrbs, 1_000);
   orbTimer.unref?.();
-  const computerSweepTimer = computerOrbs
-    ? setInterval(() => {
-        if (computerOrbs.known().length === 0) return;
-        void computerOrbs
-          .sweep()
-          .catch((error: unknown) => logger.workspace(`computer sweep failed: ${String(error)}`));
-      }, 60_000)
-    : undefined;
-  computerSweepTimer?.unref?.();
 
   const recovered = await client.recover();
   if (recovered.steps.length === 0) {
@@ -639,6 +671,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'sync') void deliverSync(ev.sync);
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
+            if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
           },
           () => {
             if (!announced) {
@@ -655,48 +688,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   })();
 
-  const presenceTimeoutMs = opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS;
-  let networkFailures = 0;
-  const sendPresence = async () => {
-    let timer: NodeJS.Timeout | undefined;
-    const timedOut = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`presence timed out after ${presenceTimeoutMs}ms`)),
-        presenceTimeoutMs,
-      );
-    });
-    try {
-      await Promise.race([
-        client.presence({
-          cliVersion: DAEMON_VERSION,
-          claudeCode: claudeReport(),
-          capabilities: capabilitiesReport(),
-        }),
-        timedOut,
-      ]);
-      networkFailures = 0;
-    } catch (err) {
-      if (err instanceof MachineApiError) {
-        networkFailures = 0;
-      } else {
-        networkFailures += 1;
-        if (networkFailures >= DISPATCHER_RESET_FAILURE_THRESHOLD) {
-          networkFailures = 0;
-          proxyHandle.reset();
-          logger.machine(
-            `http dispatcher reset after ${DISPATCHER_RESET_FAILURE_THRESHOLD} network failures`,
-          );
-        }
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
-  };
   const presenceTimer = setInterval(() => {
     void refreshCap();
     void probeAuthAndRemember()
-      .then(sendPresence)
+      .then(() => presenceReporter.send())
       .catch((err: unknown) => {
         logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
       });
@@ -801,11 +796,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     orbCleanupStopped = true;
     clearInterval(closedOrbTimer);
     clearInterval(orbTimer);
-    clearInterval(computerSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
+    void screens.close();
     caffeinate?.kill();
+    await presenceReporter.close();
     await computerDispatcher.close();
     if (orbComputer instanceof OrbComputerProvider) await orbComputer.close();
   }
