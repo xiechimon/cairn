@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { parseGithubRepoRef } from './project.js';
+import { routeOverrideSchema } from './routing-rule.js';
 import { snoozeModeSchema } from './snooze.js';
 import { quotaWaitSchema } from './step.js';
 
@@ -123,6 +124,7 @@ export const todoRecordSchema = z.object({
   usageCost: usageCostSchema.optional(),
   verified: z.boolean().optional(),
   awaitingReply: z.boolean().optional(),
+  routeOverride: routeOverrideSchema.nullable().optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;

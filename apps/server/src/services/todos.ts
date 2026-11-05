@@ -2,6 +2,7 @@ import type {
   Assignment,
   GithubRepoRef,
   Phase,
+  RouteOverride,
   SecretBox,
   TodoOutputKind,
   TodoRecord,
@@ -36,7 +37,7 @@ import {
   todoTag,
   tokenUsage,
 } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubCloseIssue, githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -186,6 +187,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
           },
         }
       : {}),
+    ...(row.routeOverride != null ? { routeOverride: row.routeOverride } : {}),
   };
 }
 
@@ -391,6 +393,7 @@ export function updateTodo(
       review?: NonNullable<Assignment['review']>;
       verify?: NonNullable<Assignment['verify']>;
     };
+    routeOverride?: RouteOverride | null;
   },
   opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
 ): TodoRecord | null {
@@ -410,6 +413,18 @@ export function updateTodo(
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
   }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
+  if (patch.routeOverride !== undefined) {
+    const machineId = patch.routeOverride?.machineId;
+    if (machineId !== undefined) {
+      const owned = db
+        .select({ id: machine.id })
+        .from(machine)
+        .where(and(eq(machine.id, machineId), eq(machine.teamId, row.teamId)))
+        .get();
+      if (owned === undefined) throw notFound(`machine ${machineId}`);
+    }
+    sets.routeOverride = patch.routeOverride;
+  }
   if (patch.assignment !== undefined) {
     const merged: NonNullable<TodoRow['assignment']> = {
       plan:

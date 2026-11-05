@@ -1,4 +1,4 @@
-import { Archive, CircleStop, Undo2 } from 'lucide-react';
+import { Archive, CircleStop, Route, Undo2 } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
@@ -17,6 +17,7 @@ interface MoreMenuProps {
   onStop?: () => void;
   onReject?: () => void;
   onDiscard?: () => void;
+  onRouteOverride?: () => void;
   anchor?: ComponentProps<typeof KeyedMenuContent>['anchor'];
 }
 
@@ -34,6 +35,7 @@ export function MoreMenu({
   onStop,
   onReject,
   onDiscard,
+  onRouteOverride,
   anchor,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -73,6 +75,19 @@ export function MoreMenu({
             action: 'stop',
             disabled: false,
             onClick: onStop,
+          },
+        ]
+      : []),
+    ...(onRouteOverride !== undefined
+      ? [
+          {
+            key: 'route-override',
+            shortcut: 'O',
+            label: t('路由覆盖'),
+            Icon: Route,
+            action: 'route-override',
+            disabled: false,
+            onClick: onRouteOverride,
           },
         ]
       : []),
