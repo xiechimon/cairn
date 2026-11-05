@@ -31,6 +31,7 @@ interface AgentRuntimeSelectProps {
   ariaLabel?: string;
   value: string | null;
   options: ModelOption[];
+  disabled?: boolean;
   onPick?: (provider: string | null) => void;
   prefix: string;
   triggerClassName?: string;
@@ -42,6 +43,7 @@ export function AgentRuntimeSelect({
   ariaLabel,
   value,
   options,
+  disabled = false,
   onPick,
   prefix,
   triggerClassName,
@@ -54,7 +56,11 @@ export function AgentRuntimeSelect({
   const label = providerEchoLabel(value, groups, unset);
 
   return (
-    <Select value={value} onValueChange={(next) => onPick?.(next as string | null)}>
+    <Select
+      value={value}
+      disabled={disabled}
+      onValueChange={(next) => onPick?.(next as string | null)}
+    >
       <SelectTrigger
         id={id}
         aria-label={ariaLabel}
