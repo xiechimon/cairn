@@ -312,6 +312,8 @@ export function enrollMachine(
       })
       .where(eq(machine.id, byKey.id))
       .run();
+    markOffline(deps, byKey.id);
+    deps.machineHub.revokeMachine(byKey.id);
     return {
       machineId: byKey.id,
       token: token.plain,
@@ -367,6 +369,8 @@ export function authorizeEnrollmentMachine(
       .set({ tokenHash: token.hash, kind: 'local' })
       .where(eq(machine.id, existing.id))
       .run();
+    markOffline(deps, existing.id);
+    deps.machineHub.revokeMachine(existing.id);
     return {
       machineId: existing.id,
       token: token.plain,

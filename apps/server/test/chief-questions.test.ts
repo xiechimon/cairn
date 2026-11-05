@@ -1,13 +1,16 @@
-import type { AskUserQuestion, MachineAskResponse } from '@cairn/shared';
+import { existsSync } from 'node:fs';
+import { type AskUserQuestion, type MachineAskResponse, SESSION_FILE_NAME } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   chiefMessage,
+  machine as machineTable,
   notification as notificationTable,
   step as stepTable,
 } from '../src/db/schema.js';
+import { sha256Hex } from '../src/lib/crypto.js';
 import {
   ASK_HOLD_MS,
   answerQuestion,
@@ -15,7 +18,14 @@ import {
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';
-import { bindAgentHome, bootServer, machineIdByName, type TestServer } from './helpers.js';
+import { stepSessionPath } from '../src/services/machine-uploads.js';
+import {
+  bindAgentHome,
+  bootServer,
+  issueApiKey,
+  machineIdByName,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-ask-unit';
 
@@ -48,6 +58,7 @@ interface World {
   threadId: string;
   stepId: string;
   machineToken: string;
+  machineId: string;
 }
 
 const QUESTIONS = [
@@ -83,7 +94,7 @@ async function makeWorld(): Promise<World> {
   });
   expect(msgRes.status).toBe(201);
   const { thread } = (await msgRes.json()) as { thread: { id: string } };
-  const key = await import('./helpers.js').then((h) => h.issueApiKey(s));
+  const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId, name: 'ask-mbp', cliVersion: '0.1.0' },
@@ -102,6 +113,7 @@ async function makeWorld(): Promise<World> {
     threadId: thread.id,
     stepId: claimed.step?.step.id ?? '',
     machineToken: token,
+    machineId: machineIdByName(s, 'ask-mbp'),
   };
 }
 
@@ -119,6 +131,168 @@ async function machineAsk(
 }
 
 describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up)', () => {
+  test.each(['valid', 'revoke', 'rotate'] as const)(
+    'a held ask revalidates its %s token before returning a human answer',
+    async (change) => {
+      const w = await makeWorld();
+      const requestId = 'ask-77777777-8888-9999-aaaa-bbbbbbbbbbbb';
+      const waiting = machineAsk(w, requestId, { holdMs: 5_000 });
+      await vi.waitFor(() => {
+        expect(
+          w.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get(),
+        ).toBeDefined();
+      });
+      if (change === 'revoke') {
+        const revoked = await call(w.s.app, 'POST', `/api/machines/${w.machineId}/revoke`);
+        expect(revoked.status).toBe(204);
+      } else if (change === 'rotate') {
+        w.s.db
+          .update(machineTable)
+          .set({ tokenHash: sha256Hex('replacement-machine-token') })
+          .where(eq(machineTable.id, w.machineId))
+          .run();
+      }
+      const privateAnswer = 'answer-created-after-token-change';
+      answerQuestion(
+        { db: w.s.db },
+        {
+          threadId: w.threadId,
+          requestId,
+          answers: [
+            { header: '缩进', choices: ['Tabs'] },
+            { header: '备注', text: privateAnswer },
+          ],
+        },
+      );
+      const result = await waiting;
+      expect(result.status).toBe(change === 'valid' ? 200 : 401);
+      if (change === 'valid') {
+        expect(JSON.stringify(result.body)).toContain(privateAnswer);
+      } else {
+        expect(JSON.stringify(result.body)).not.toContain(privateAnswer);
+      }
+      const saved = w.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get();
+      expect(saved?.content).toContain(privateAnswer);
+    },
+  );
+
+  for (const path of [
+    'presence',
+    'heartbeat',
+    'tool',
+    'session-upload',
+    'transcript-upload',
+  ] as const) {
+    test.each(['valid', 'revoke', 'rotate'] as const)(
+      `a delayed ${path} body revalidates a %s credential before any mutation`,
+      async (change) => {
+        const w = await makeWorld();
+        w.s.db
+          .update(stepTable)
+          .set({ lastHeartbeatAt: 1 })
+          .where(eq(stepTable.id, w.stepId))
+          .run();
+        let url =
+          path === 'presence' ? '/api/machine/presence' : `/api/machine/${path}/${w.stepId}`;
+        if (path.endsWith('upload')) {
+          const response = await call(w.s.app, 'POST', `/api/machine/upload-urls/${w.stepId}`, {
+            cred: w.machineToken,
+            body: {
+              files: [{ name: path === 'session-upload' ? SESSION_FILE_NAME : 'transcript.json' }],
+            },
+          });
+          expect(response.status).toBe(200);
+          const uploaded = (await response.json()) as { uploads: { url: string }[] };
+          url = uploaded.uploads[0]?.url ?? '';
+          expect(url).not.toBe('');
+        }
+        const transcriptRow = {
+          id: 'late-transcript-row',
+          role: 'assistant',
+          content: 'late body',
+          createdAt: 1,
+        };
+        const payloads = {
+          presence: { cliVersion: 'late-body-version' },
+          heartbeat: {},
+          tool: { kind: 'transcript_row', row: transcriptRow },
+          'transcript-upload': { stepId: w.stepId, messages: [transcriptRow] },
+        };
+        const text =
+          path === 'session-upload' ? 'late-session-body' : JSON.stringify(payloads[path]);
+        let reading = false;
+        let released = false;
+        let finishBody = () => {};
+        const body = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              reading = true;
+              return new Promise<void>((resolve) => {
+                finishBody = () => {
+                  if (released) return;
+                  released = true;
+                  controller.enqueue(new TextEncoder().encode(text));
+                  controller.close();
+                  resolve();
+                };
+              });
+            },
+          },
+          { highWaterMark: 0 },
+        );
+        const init: RequestInit & { duplex: 'half' } = {
+          method: path.endsWith('upload') ? 'PUT' : 'POST',
+          headers: {
+            authorization: `Bearer ${w.machineToken}`,
+            'content-type': 'application/json',
+          },
+          body,
+          duplex: 'half',
+        };
+        const waiting = w.s.app.request(new Request(new URL(url, 'http://localhost'), init));
+        try {
+          await vi.waitFor(() => expect(reading).toBe(true));
+          if (change === 'revoke') {
+            expect(
+              (await call(w.s.app, 'POST', `/api/machines/${w.machineId}/revoke`)).status,
+            ).toBe(204);
+          } else if (change === 'rotate') {
+            w.s.db
+              .update(machineTable)
+              .set({ tokenHash: sha256Hex('replacement-machine-token') })
+              .where(eq(machineTable.id, w.machineId))
+              .run();
+          }
+          finishBody();
+          const response = await waiting;
+          expect(response.status).toBe(change === 'valid' ? 200 : 401);
+          const machine = w.s.db
+            .select()
+            .from(machineTable)
+            .where(eq(machineTable.id, w.machineId))
+            .get();
+          const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+          const transcript = w.s.db
+            .select()
+            .from(chiefMessage)
+            .where(eq(chiefMessage.id, 'late-transcript-row'))
+            .get();
+          const written = {
+            presence: machine?.latestCliVersion === 'late-body-version',
+            heartbeat: step?.lastHeartbeatAt !== 1,
+            tool: transcript !== undefined,
+            'transcript-upload': transcript !== undefined,
+            'session-upload': existsSync(stepSessionPath(w.s.attachmentsDir, w.stepId)),
+          }[path];
+          expect(written).toBe(change === 'valid');
+        } finally {
+          finishBody();
+          await waiting;
+        }
+      },
+    );
+  }
+
   test('creating a question: assistant row + content kind + notification; same requestId re-posted idempotently (no stacked card, no duplicate notification)', async () => {
     const w = await makeWorld();
     const first = await machineAsk(w, 'ask-11111111-2222-3333-4444-555555555555');
