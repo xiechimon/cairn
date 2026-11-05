@@ -42,6 +42,7 @@ import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
+import { enrollThroughBrowser } from './machine-enroll.js';
 import { ComputerOrbs } from './orb/computer.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import { NspawnOrbProvider, type OrbProvider } from './orb/provider.js';
@@ -312,26 +313,36 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   if (!machineJson) {
     if (!config.apiKey || !config.teamId) {
-      throw new Error(
-        'machine not enrolled: pass --api-key <k> --team <id> (browser enroll path lands with web wiring)',
-      );
+      const enrolled = await enrollThroughBrowser(client, paths, config.serverUrl, config.name, {
+        now: () => Date.now(),
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        log: (line) => logger.raw(line),
+      });
+      machineJson = {
+        machineId: enrolled.machineId,
+        token: enrolled.token,
+        teamId: enrolled.teamId,
+        serverUrl: enrolled.serverUrl,
+      };
+      logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
+    } else {
+      const enrolled = await client.enroll({
+        apiKey: config.apiKey,
+        teamId: config.teamId,
+        name: config.name,
+        cliVersion: DAEMON_VERSION,
+        claudeCode: claudeReport(),
+        capabilities: capabilitiesReport(),
+      });
+      machineJson = {
+        machineId: enrolled.machineId,
+        token: enrolled.token,
+        teamId: enrolled.teamId,
+        serverUrl: enrolled.serverUrl,
+      };
+      saveMachineJson(paths, machineJson);
+      logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
     }
-    const enrolled = await client.enroll({
-      apiKey: config.apiKey,
-      teamId: config.teamId,
-      name: config.name,
-      cliVersion: DAEMON_VERSION,
-      claudeCode: claudeReport(),
-      capabilities: capabilitiesReport(),
-    });
-    machineJson = {
-      machineId: enrolled.machineId,
-      token: enrolled.token,
-      teamId: enrolled.teamId,
-      serverUrl: enrolled.serverUrl,
-    };
-    saveMachineJson(paths, machineJson);
-    logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
   }
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
