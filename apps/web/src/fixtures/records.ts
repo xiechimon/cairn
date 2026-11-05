@@ -300,6 +300,7 @@ export interface ResourcesContent {
   memories?: MemoryRecord[];
   secrets?: SecretRecord[];
   accounts?: AccountsContent;
+  routingSettings?: import('@cairn/shared').TeamRoutingSettings;
 }
 
 export interface DocSegment {

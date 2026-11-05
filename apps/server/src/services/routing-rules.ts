@@ -7,11 +7,19 @@ import {
   AGENT_TOOL_TAG,
   CHIEF_REMOTE_TOOLS,
   CHIEF_ROUTER_TOOLS,
+  filterAgentTools,
   isSessionStepKind,
+  type PatchRoutingRuleBody,
+  type PatchWorkPolicyBody,
+  type PolicyUse,
   type RemoteToolDef,
   type RequiredCapabilities,
   type RouteOverride,
+  type RouteUse,
+  type RoutingRuleRecord,
   type StepKind,
+  type TeamRoutingSettings,
+  type WorkPolicyRecord,
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -25,6 +33,7 @@ import {
   todo,
   workPolicy,
 } from '../db/schema.js';
+import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
 type AgentRow = typeof agent.$inferSelect;
@@ -391,6 +400,183 @@ function sessionAgentIds(db: Db, rule: RoutingRuleRow): string[] {
     }
   }
   return [...ids].filter((id) => !chiefAgents.has(id)).sort();
+}
+
+function toRoutingRuleRecord(row: RoutingRuleRow): RoutingRuleRecord {
+  return {
+    id: row.id,
+    teamId: row.teamId,
+    use: row.use,
+    provider: row.provider,
+    modelId: row.modelId,
+    thinkingLevel: row.thinkingLevel,
+    fallbackModels: row.fallbackModels,
+    machineId: row.machineId,
+    requiredCapabilities: row.requiredCapabilities,
+    seededFromAgentId: row.seededFromAgentId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toWorkPolicyRecord(row: WorkPolicyRow): WorkPolicyRecord {
+  return {
+    id: row.id,
+    teamId: row.teamId,
+    use: row.use,
+    tools: row.tools,
+    mcpServers: row.mcpServers,
+    skillsAllowlist: row.skillsAllowlist,
+    defaultSkill: row.defaultSkill,
+    secrets: row.secrets,
+    seededFromAgentId: row.seededFromAgentId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function requireRoutingRule(db: Db, id: string): RoutingRuleRecord {
+  const row = db.select().from(routingRule).where(eq(routingRule.id, id)).get();
+  if (row === undefined) throw notFound(`routing_rule ${id}`);
+  return toRoutingRuleRecord(row);
+}
+
+function requireWorkPolicy(db: Db, id: string): WorkPolicyRecord {
+  const row = db.select().from(workPolicy).where(eq(workPolicy.id, id)).get();
+  if (row === undefined) throw notFound(`work_policy ${id}`);
+  return toWorkPolicyRecord(row);
+}
+
+export function listRoutingSettings(db: Db, teamId: string): TeamRoutingSettings {
+  const rules = db
+    .select()
+    .from(routingRule)
+    .where(eq(routingRule.teamId, teamId))
+    .all()
+    .map(toRoutingRuleRecord)
+    .sort((a, b) => a.use.localeCompare(b.use));
+  const policies = db
+    .select()
+    .from(workPolicy)
+    .where(eq(workPolicy.teamId, teamId))
+    .all()
+    .map(toWorkPolicyRecord)
+    .sort((a, b) => a.use.localeCompare(b.use));
+  return { enabled: routingRulesOn, rules, policies };
+}
+
+export function seedRoutingSettings(db: Db, teamId: string): TeamRoutingSettings {
+  const teamRow = db.select({ id: team.id }).from(team).where(eq(team.id, teamId)).get();
+  if (teamRow === undefined) throw notFound(`team ${teamId}`);
+  seedRoutingRules(db);
+  seedReviewRules(db);
+  seedWorkPolicies(db);
+  return listRoutingSettings(db, teamId);
+}
+
+function requireTeamMachine(db: Db, teamId: string, machineId: string): void {
+  const row = db
+    .select({ id: machine.id })
+    .from(machine)
+    .where(and(eq(machine.id, machineId), eq(machine.teamId, teamId)))
+    .get();
+  if (row === undefined) throw notFound(`machine ${machineId}`);
+}
+
+export function upsertRoutingRule(
+  db: Db,
+  teamId: string,
+  use: RouteUse,
+  body: PatchRoutingRuleBody,
+): RoutingRuleRecord {
+  const existing = db
+    .select()
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, use)))
+    .get();
+  if (body.machineId != null) requireTeamMachine(db, teamId, body.machineId);
+  const now = nowMs();
+  if (existing === undefined) {
+    if (body.provider === undefined || body.modelId === undefined) {
+      throw new HttpError(400, 'provider and modelId are required to create a routing rule');
+    }
+    const id = newRecordId();
+    db.insert(routingRule)
+      .values({
+        id,
+        teamId,
+        use,
+        provider: body.provider,
+        modelId: body.modelId,
+        thinkingLevel: body.thinkingLevel ?? null,
+        fallbackModels: body.fallbackModels ?? null,
+        machineId: body.machineId ?? null,
+        requiredCapabilities: body.requiredCapabilities ?? null,
+        tools: null,
+        mcpServers: null,
+        skillsAllowlist: null,
+        defaultSkill: null,
+        secrets: null,
+        adoptedAgentIds: null,
+        seededFromAgentId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    return requireRoutingRule(db, id);
+  }
+  const sets: Partial<RoutingRuleRow> = { updatedAt: now };
+  if (body.provider !== undefined) sets.provider = body.provider;
+  if (body.modelId !== undefined) sets.modelId = body.modelId;
+  if (body.thinkingLevel !== undefined) sets.thinkingLevel = body.thinkingLevel;
+  if (body.fallbackModels !== undefined) sets.fallbackModels = body.fallbackModels;
+  if (body.machineId !== undefined) sets.machineId = body.machineId;
+  if (body.requiredCapabilities !== undefined) {
+    sets.requiredCapabilities = body.requiredCapabilities;
+  }
+  db.update(routingRule).set(sets).where(eq(routingRule.id, existing.id)).run();
+  return requireRoutingRule(db, existing.id);
+}
+
+export function upsertWorkPolicy(
+  db: Db,
+  teamId: string,
+  use: PolicyUse,
+  body: PatchWorkPolicyBody,
+): WorkPolicyRecord {
+  const existing = db
+    .select()
+    .from(workPolicy)
+    .where(and(eq(workPolicy.teamId, teamId), eq(workPolicy.use, use)))
+    .get();
+  const now = nowMs();
+  if (existing === undefined) {
+    const id = newRecordId();
+    db.insert(workPolicy)
+      .values({
+        id,
+        teamId,
+        use,
+        tools: filterAgentTools(body.tools ?? []),
+        mcpServers: body.mcpServers ?? [],
+        skillsAllowlist: body.skillsAllowlist ?? null,
+        defaultSkill: body.defaultSkill ?? null,
+        secrets: body.secrets ?? [],
+        seededFromAgentId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    return requireWorkPolicy(db, id);
+  }
+  const sets: Partial<WorkPolicyRow> = { updatedAt: now };
+  if (body.tools !== undefined) sets.tools = filterAgentTools(body.tools);
+  if (body.mcpServers !== undefined) sets.mcpServers = body.mcpServers;
+  if (body.skillsAllowlist !== undefined) sets.skillsAllowlist = body.skillsAllowlist;
+  if (body.defaultSkill !== undefined) sets.defaultSkill = body.defaultSkill;
+  if (body.secrets !== undefined) sets.secrets = body.secrets;
+  db.update(workPolicy).set(sets).where(eq(workPolicy.id, existing.id)).run();
+  return requireWorkPolicy(db, existing.id);
 }
 
 export function adoptAgentMemories(db: Db): number {

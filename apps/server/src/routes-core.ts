@@ -1,4 +1,12 @@
-import { patchTeamBodySchema, patchUserBodySchema, type TeamMember } from '@cairn/shared';
+import {
+  patchRoutingRuleBodySchema,
+  patchTeamBodySchema,
+  patchUserBodySchema,
+  patchWorkPolicyBodySchema,
+  policyUseSchema,
+  routeUseSchema,
+  type TeamMember,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
@@ -19,6 +27,12 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from './services/notifications.js';
+import {
+  listRoutingSettings,
+  seedRoutingSettings,
+  upsertRoutingRule,
+  upsertWorkPolicy,
+} from './services/routing-rules.js';
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
@@ -60,6 +74,34 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     return c.json(getModelRouting(ctx.db, id));
+  });
+
+  app.get('/api/teams/:id/routing-settings', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(listRoutingSettings(ctx.db, id));
+  });
+
+  app.post('/api/teams/:id/routing-settings/seed', (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    return c.json(seedRoutingSettings(ctx.db, id));
+  });
+
+  app.patch('/api/teams/:id/routing-rules/:use', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const use = parseWith(routeUseSchema, c.req.param('use'), 'use');
+    const body = parseWith(patchRoutingRuleBodySchema, await jsonBody(c), 'body');
+    return c.json(upsertRoutingRule(ctx.db, id, use, body));
+  });
+
+  app.patch('/api/teams/:id/work-policies/:use', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const use = parseWith(policyUseSchema, c.req.param('use'), 'use');
+    const body = parseWith(patchWorkPolicyBodySchema, await jsonBody(c), 'body');
+    return c.json(upsertWorkPolicy(ctx.db, id, use, body));
   });
 
   app.patch('/api/teams/:id', async (c) => {

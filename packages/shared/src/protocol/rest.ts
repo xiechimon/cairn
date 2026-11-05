@@ -65,6 +65,26 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },
   { method: 'GET', path: '/api/teams/{id}/models' },
   { method: 'GET', path: '/api/teams/{id}/model-routing' },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/routing-settings',
+    note: 'D60 PR8: routing_rule + work_policy settings (flag state included)',
+  },
+  {
+    method: 'POST',
+    path: '/api/teams/{id}/routing-settings/seed',
+    note: 'D60 PR8: seed missing session/review rules and policies from agents',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/teams/{id}/routing-rules/{use}',
+    note: 'D60 PR8: upsert a routing_rule by use',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/teams/{id}/work-policies/{use}',
+    note: 'D60 PR8: upsert a work_policy by use',
+  },
   { method: 'GET', path: '/api/teams/{id}/notifications', note: '→ {unreadThreadIds}（02 §9.1）' },
   { method: 'GET', path: '/api/teams/{id}/progress' },
   { method: 'GET', path: '/api/teams/{id}/stream', note: 'SSE，见 protocol/sse.ts' },

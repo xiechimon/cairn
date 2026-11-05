@@ -71,6 +71,7 @@ export * from './todo.js';
 export * from './token-usage.js';
 export * from './user.js';
 export * from './verify.js';
+export * from './work-policy.js';
 
 export const RECORD_SCHEMAS = {
   user: userRecordSchema,
