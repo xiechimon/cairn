@@ -324,6 +324,96 @@ def test_date_issue_surface_and_size_rules_survive_a_covering_plan():
         assert expected in (decision["reason"], remaining)
 
 
+def mixed_paths():
+    return [*BROWSER_SPECS, *UNIT_SUITES, HELPER, SNAPSHOT, "apps/web/src/board.tsx"]
+
+
+def test_helpers_and_snapshots_stay_out_of_the_product_patch():
+    assert converter.is_test(SNAPSHOT) is False
+    plan = planner.plan_runner_contract(contract())
+    record = planner.unverified_partition(mixed_paths(), plan)
+    assert record["blocked"] is False
+    assert record["productPaths"] == ["apps/web/src/board.tsx"]
+    trusted = {item["path"]: item for item in record["trustedInputs"]}
+    assert trusted[HELPER]["role"] == "helper"
+    assert trusted[SNAPSHOT]["role"] == "asset"
+    assert HELPER in record["graderPaths"]
+    assert SNAPSHOT in record["graderPaths"]
+    assert BROWSER_SPECS[0] in record["graderPaths"]
+    assert UNIT_SUITES[0] in record["graderPaths"]
+    assert record["complete"] is False
+    assert record["qualifiedTask"] is False
+    assert record["qualificationCredit"] == 0
+    assert record["verified"] is False
+    categories = {command["category"]: command for command in record["commands"]}
+    assert categories["browser"]["paths"] == BROWSER_SPECS
+    assert categories["unit"]["paths"] == UNIT_SUITES
+
+
+def test_an_unlisted_test_directory_file_does_not_become_product():
+    plan = planner.plan_runner_contract(contract())
+    paths = mixed_paths() + ["apps/web/test/i18n-extra.ts"]
+    record = planner.unverified_partition(paths, plan)
+    assert record["blocked"] is True
+    assert record["productPaths"] == []
+    assert record["graderPaths"] == []
+    assert record["qualifiedTask"] is False
+    assert record["complete"] is False
+    assert "apps/web/test/i18n-extra.ts" in record["blockers"][0]
+
+
+def test_supported_test_suffixes_outside_test_directories_do_not_become_product():
+    plan = planner.plan_runner_contract(contract())
+    for extra in (
+        "apps/web/src/board.test.mjs",
+        "apps/web/src/board.test.cjs",
+        "apps/web/src/board.test.jsx",
+        "apps/web/src/board.spec.js",
+    ):
+        record = planner.unverified_partition([*mixed_paths(), extra], plan)
+        assert record["blocked"] is True
+        assert record["productPaths"] == []
+        assert extra in record["blockers"][0]
+
+
+def test_integration_files_stay_grader_inputs_without_a_browser_command():
+    unit = "apps/server/test/m4b-memory.test.ts"
+    integration = "integration/test/m4b-memory-e2e.test.ts"
+    plan = planner.plan_runner_contract(
+        contract(
+            pr=1498,
+            workspace="@pacman/web",
+            changedBrowserSpecPaths=[],
+            changedUnitRegressionPaths=[unit],
+            changedIntegrationPaths=[integration],
+            changedTestHelperOrAssetPaths=[],
+            requiredPaths=[unit, integration],
+            pins={**contract()["pins"], "workspace": "@pacman/web"},
+        )
+    )
+    record = planner.unverified_partition(
+        [unit, integration, "apps/server/src/memory.ts"], plan
+    )
+    categories = {command["category"]: command for command in record["commands"]}
+    assert record["blocked"] is False
+    assert categories["browser"]["argv"] is None
+    assert record["graderPaths"] == [unit, integration]
+    assert record["productPaths"] == ["apps/server/src/memory.ts"]
+    assert record["complete"] is False
+    assert record["qualificationCredit"] == 0
+
+
+def test_a_blocked_plan_emits_no_product_or_grader_paths():
+    record = planner.unverified_partition(
+        mixed_paths(), {"blocked": True, "commands": [], "trustedInputs": []}
+    )
+    assert record["blocked"] is True
+    assert record["productPaths"] == []
+    assert record["graderPaths"] == []
+    assert record["complete"] is False
+    assert record["qualifiedTask"] is False
+
+
 def test_plan_is_deterministic_and_does_not_execute_the_config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     first = planner.plan_runner_contract(contract())
