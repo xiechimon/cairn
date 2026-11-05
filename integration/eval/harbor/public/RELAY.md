@@ -7,7 +7,10 @@ host transport supplies the real key, fixes the upstream origin, refuses redirec
 and never forwards task-supplied authentication.
 
 The parent validates the model, output ceiling and custom-tool-only request before
-sending it. Token-count preflight bounds input to 100,000 tokens, preserving the
+sending it. Offline content validation refuses URL images/documents, stored Files
+references, server-tool results and unknown server content before contacting the
+provider. Embedded text/base64 content and ordinary custom-tool arguments remain
+data. Token-count preflight bounds input to 100,000 tokens, preserving the
 verified pricing tier. A pessimistic reservation covers input at the highest cache
 write price plus the requested maximum output. The existing shared monthly ledger
 refuses a paid request that would pass its cap. A file lock shared by the logical run prevents concurrent sessions from

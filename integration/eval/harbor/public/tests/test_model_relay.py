@@ -232,3 +232,81 @@ def test_interrupted_settlement_keeps_the_reservation_in_run_cap(session, monkey
     with pytest.raises(RelayRefused, match="run cap"):
         invoke(resumed)
     assert sum(path == "/v1/messages" for path, _ in provider.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        [
+            {
+                "type": "image",
+                "source": {"type": "url", "url": "https://example.com/answer.png"},
+            }
+        ],
+        [{"type": "document", "source": {"type": "file", "file_id": "file-other-run"}}],
+        [
+            {
+                "type": "tool_result",
+                "tool_use_id": "tool-one",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "url",
+                            "url": "https://example.com/answer.pdf",
+                        },
+                    }
+                ],
+            }
+        ],
+        [{"type": "container_upload", "file_id": "file-other-run"}],
+        [
+            {
+                "type": "server_tool_use",
+                "id": "tool-one",
+                "name": "web_fetch",
+                "input": {"url": "https://example.com"},
+            }
+        ],
+    ],
+)
+def test_offline_channel_refuses_remote_sources_and_server_content(session, content):
+    relay, provider = session
+    with pytest.raises(RelayRefused, match="offline"):
+        invoke(relay, messages=[{"role": "user", "content": content}])
+    assert not provider.calls
+
+
+def test_inline_images_and_custom_tool_inputs_remain_local_message_data(session):
+    relay, _ = session
+    invoke(
+        relay,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": "fixture",
+                        },
+                    }
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "tool-one",
+                        "name": "write",
+                        "input": {
+                            "source": {"type": "url", "url": "literal code data"}
+                        },
+                    }
+                ],
+            },
+        ],
+    )

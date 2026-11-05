@@ -138,12 +138,53 @@ class RelaySession:
             raise RelayRefused("messages must be a nonempty array")
         if type(body.get("stream", False)) is not bool:
             raise RelayRefused("stream must be a boolean")
+        if "system" in body:
+            self._offline_content(body["system"])
+        for message in body["messages"]:
+            if not isinstance(message, dict):
+                raise RelayRefused("offline Messages entries must be objects")
+            self._offline_content(message.get("content"))
         tools = body.get("tools", [])
         if not isinstance(tools, list) or any(
             not isinstance(tool, dict) or tool.get("type", "custom") != "custom"
             for tool in tools
         ):
             raise RelayRefused("only client-side custom tools are permitted")
+
+    def _offline_content(self, content) -> None:
+        if isinstance(content, str):
+            return
+        if not isinstance(content, list):
+            raise RelayRefused(
+                "offline Messages content must be text or embedded blocks"
+            )
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") not in {
+                "text",
+                "image",
+                "document",
+                "thinking",
+                "redacted_thinking",
+                "tool_use",
+                "tool_result",
+            }:
+                raise RelayRefused(
+                    "offline channel refuses server and unknown content blocks"
+                )
+            if block["type"] in {"image", "document"}:
+                source = block.get("source")
+                if not isinstance(source, dict) or source.get("type") not in {
+                    "base64",
+                    "text",
+                    "content",
+                }:
+                    raise RelayRefused(
+                        "offline channel refuses remote and stored file sources"
+                    )
+                if source["type"] == "content":
+                    self._offline_content(source.get("content"))
+            elif block["type"] == "tool_result" and "content" in block:
+                self._offline_content(block["content"])
 
     def _write(self, record: dict) -> None:
         record = {
