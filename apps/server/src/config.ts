@@ -9,6 +9,7 @@ import {
   CLAUDE_CONFIG_FILE_NAME,
   ENV_VARS,
   parseAccessTokenFile,
+  routingRulesFlagOn,
   SKILLS_DIR_DEFAULT,
   TEAM_STREAM_PING_INTERVAL_MS,
 } from '@cairn/shared';
@@ -174,7 +175,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     scheduling: envFlag(ENV_VARS.scheduling),
     coordinatorServerContext: envFlag(ENV_VARS.coordinatorServerContext),
     coordinatorMachineId: envStr(ENV_VARS.coordinatorMachineId),
-    routingRules: envFlag(ENV_VARS.routingRules),
+    routingRules: routingRulesFlagOn(process.env[ENV_VARS.routingRules]),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
     trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),

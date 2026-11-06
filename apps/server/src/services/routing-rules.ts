@@ -35,6 +35,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { modelsAreIndependent } from './merge-gate/model-identity.js';
 
 type AgentRow = typeof agent.$inferSelect;
 type RoutingRuleRow = typeof routingRule.$inferSelect;
@@ -346,7 +347,12 @@ export function seedReviewRules(db: Db): number {
       .from(agent)
       .where(and(eq(agent.teamId, teamId), eq(agent.persona, 'code_reviewer')))
       .get();
-    if (reviewer !== undefined) inserted += seedRule(db, teamId, 'review', reviewer);
+    if (reviewer === undefined) continue;
+    const sessionModel = sessionRuleOf(db, teamId)?.modelId;
+    if (sessionModel !== undefined && !modelsAreIndependent(sessionModel, reviewer.modelId ?? '')) {
+      continue;
+    }
+    inserted += seedRule(db, teamId, 'review', reviewer);
   }
   return inserted;
 }
