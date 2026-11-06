@@ -76,3 +76,70 @@ test('a floating side panel still slides in over the scrim', async ({ page }) =>
   await expect(panel).toBeVisible();
   expect(await panel.evaluate((el) => getComputedStyle(el).animationName)).toBe('side-panel-in');
 });
+
+const PRESS_SURFACES = [
+  '/app?scenario=home-c',
+  '/app?scenario=home-c&pane=tasks',
+  '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16',
+];
+
+for (const surface of PRESS_SURFACES) {
+  test(`pressing a control does not dim or fade it on ${surface}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(surface);
+    await expect(page.locator('button:visible').first()).toBeVisible();
+    const controls = page.locator('button:visible, a[href]:visible, [role="button"]:visible');
+    const handles = (await controls.elementHandles()).slice(0, 40);
+    expect(handles.length).toBeGreaterThan(5);
+    const dimmed: string[] = [];
+    for (const control of handles) {
+      const box = await control.boundingBox();
+      if (box === null) continue;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(250);
+      const resting = await control.evaluate((el) => getComputedStyle(el).opacity);
+      await page.mouse.down();
+      const sample = await control.evaluate(async (el) => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const opacityAnimations = el
+          .getAnimations()
+          .filter((animation) => animation instanceof CSSTransition)
+          .filter((animation) => (animation as CSSTransition).transitionProperty === 'opacity');
+        return {
+          label: `${el.tagName.toLowerCase()}[${el.getAttribute('aria-label') ?? el.getAttribute('data-testid') ?? ''}]`,
+          opacity: getComputedStyle(el).opacity,
+          fading: opacityAnimations.length,
+        };
+      });
+      await page.mouse.move(0, 0);
+      await page.mouse.up();
+      if (sample.opacity !== resting || sample.fading > 0) dimmed.push(JSON.stringify(sample));
+      await page.keyboard.press('Escape');
+    }
+    expect(dimmed).toEqual([]);
+  });
+}
+
+test('a pressed control under a coarse pointer has no transition', async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 1000, height: 900 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  await page.goto('/app?scenario=home-c');
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+  const control = page.getByTestId('machines-button');
+  await expect(control).toBeVisible();
+  const box = await control.boundingBox();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  const pressed = await control.evaluate((el) => ({
+    active: el.matches(':active'),
+    duration: getComputedStyle(el).transitionDuration,
+  }));
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await context.close();
+  expect(pressed).toEqual({ active: true, duration: '0s' });
+});
