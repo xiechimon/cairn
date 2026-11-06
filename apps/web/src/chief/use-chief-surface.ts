@@ -10,7 +10,7 @@ import {
 import { useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
-import { isCoordinatorNotReady } from '../api/coordinator-not-ready.js';
+import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
 import {
   useApiMutations,
   useChief,
@@ -25,7 +25,7 @@ import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
-import { toastError, toastErrorWithHint } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
@@ -336,7 +336,7 @@ export function useChiefSurface(
           .then(() => sendKey.settle())
           .catch((error: unknown) => {
             if (isCoordinatorNotReady(error)) {
-              toastErrorWithHint(
+              toastCoordinatorNotReady(
                 t('Coordinator 还不能回答'),
                 t('按首页清单把模型服务、机器和 Coordinator 接上，再发一次。'),
               );

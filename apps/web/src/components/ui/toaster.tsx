@@ -10,10 +10,6 @@ export function toastError(title: string, error: unknown): void {
   toast.error(title, reason !== null ? { description: reason } : undefined);
 }
 
-export function toastErrorWithHint(title: string, hint: string): void {
-  toast.error(title, { description: hint });
-}
-
 export function toastSuccess(title: string, action?: { label: string; onClick: () => void }): void {
   toast.success(title, action ? { action } : undefined);
 }
