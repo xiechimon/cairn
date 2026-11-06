@@ -47,3 +47,19 @@ test('is idempotent', () => {
   const once = replaceSchemaSection('## Proof\nran\n## What\nx\n', glance);
   assert.equal(replaceSchemaSection(once, glance), once);
 });
+
+test('ignores headings inside HTML comments', () => {
+  const body =
+    '## Proof\nran\n<!--\n### Schema changes\n| a |\n## What\n-->\n## What\nx\n<!-- ## What -->\n';
+  const result = replaceSchemaSection(body, glance);
+  assert.ok(result.includes('<!--\n### Schema changes\n| a |\n## What\n-->'));
+  assert.match(result, /-->\n\n?### Schema changes[\s\S]*integer \|\n\n## What\nx/);
+  assert.equal(result.split('### Schema changes').length, 3);
+});
+
+test('a commented-out schema heading does not hide the real section', () => {
+  const body = `<!-- ### Schema changes -->\n## Proof\n\n${stale}\n## What\nx\n`;
+  const result = replaceSchemaSection(body, glance);
+  assert.ok(!result.includes('+ due_at | text'));
+  assert.ok(result.includes('<!-- ### Schema changes -->'));
+});

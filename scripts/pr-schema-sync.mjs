@@ -11,41 +11,91 @@ const GLANCE_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'schema-glan
 
 const isRowLine = (line) => line.trim().startsWith('|') || line.trim() === NO_SCHEMA_CHANGES;
 
-function sectionEnd(lines, headingIndex) {
-  let index = headingIndex + 1;
-  while (index < lines.length && lines[index].trim() === '') index += 1;
-  while (index < lines.length && isRowLine(lines[index])) index += 1;
-  return index;
-}
+const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const CODE_OR_COMMENT = /(?<ticks>`+)(?!`).*?(?<!`)\k<ticks>(?!`)|<!--/g;
+const blank = (length) => ' '.repeat(length);
 
-function fencedLines(lines) {
-  const fenced = new Set();
-  let open = false;
-  lines.forEach((line, index) => {
-    if (/^\s*(```|~~~)/.test(line)) {
-      open = !open;
-      fenced.add(index);
-    } else if (open) {
-      fenced.add(index);
+export function visibleLines(lines) {
+  let fence = null;
+  let insideComment = false;
+  return lines.map((line) => {
+    const marker = FENCE.exec(line);
+    if (fence !== null) {
+      if (
+        marker &&
+        marker[1][0] === fence[0] &&
+        marker[1].length >= fence.length &&
+        !marker[2].trim()
+      ) {
+        fence = null;
+      }
+      return blank(line.length);
     }
+    if (marker && !insideComment) {
+      fence = marker[1];
+      return blank(line.length);
+    }
+    let visible = '';
+    let cursor = 0;
+    while (cursor < line.length) {
+      if (insideComment) {
+        const end = line.indexOf('-->', cursor);
+        if (end === -1) {
+          visible += blank(line.length - cursor);
+          break;
+        }
+        visible += blank(end + 3 - cursor);
+        cursor = end + 3;
+        insideComment = false;
+        continue;
+      }
+      CODE_OR_COMMENT.lastIndex = cursor;
+      const token = CODE_OR_COMMENT.exec(line);
+      if (token === null) {
+        visible += line.slice(cursor);
+        break;
+      }
+      const start = token.index;
+      const end = start + token[0].length;
+      const close = line.indexOf('-->', start + 2);
+      if (
+        token.groups.ticks !== undefined ||
+        !(/^ {0,3}$/.test(line.slice(0, start)) || close !== -1)
+      ) {
+        visible += line.slice(cursor, end);
+        cursor = end;
+        continue;
+      }
+      if (close !== -1) {
+        visible += line.slice(cursor, start) + blank(close + 3 - start);
+        cursor = close + 3;
+        continue;
+      }
+      visible += line.slice(cursor, start) + blank(line.length - start);
+      insideComment = true;
+      break;
+    }
+    return visible;
   });
-  return fenced;
 }
 
-function findLine(lines, matches) {
-  const fenced = fencedLines(lines);
-  return lines.findIndex((line, index) => !fenced.has(index) && matches(line));
+function sectionEnd(visible, headingIndex) {
+  let index = headingIndex + 1;
+  while (index < visible.length && visible[index].trim() === '') index += 1;
+  while (index < visible.length && isRowLine(visible[index])) index += 1;
+  return index;
 }
 
 export function replaceSchemaSection(body, glance) {
   const section = glance.trim().split('\n');
   const lines = body.replace(/\r\n/g, '\n').split('\n');
-  const heading = findLine(lines, (line) => line.trim() === HEADING);
+  const visible = visibleLines(lines);
+  const heading = visible.findIndex((line) => line.trim() === HEADING);
   if (heading !== -1) {
-    const end = sectionEnd(lines, heading);
+    const end = sectionEnd(visible, heading);
     return [...lines.slice(0, heading), ...section, ...lines.slice(end)].join('\n');
   }
-  const what = findLine(lines, (line) => line.trim() === WHAT_HEADING);
+  const what = visible.findIndex((line) => line.trim() === WHAT_HEADING);
   if (what !== -1) {
     const before = lines.slice(0, what);
     const gap = before.length && before[before.length - 1].trim() !== '' ? [''] : [];
