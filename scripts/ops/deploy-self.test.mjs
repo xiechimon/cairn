@@ -1005,3 +1005,53 @@ test('watch reports failed lag recovery when the identified issue cannot be clos
   assert.doesNotMatch(result.stdout, /closed lag issue/);
   assert.match(f.log('gh.log'), /issue list .*--author @me .*deploy lag/);
 });
+
+test('installs bin scripts and user units, reloads systemd and enables only a new timer', () => {
+  const f = fixture({
+    seedFiles: { 'scripts/ops/host/units/old.service': '[Service]\nExecStart=/bin/true\n' },
+  });
+  mkdirSync(join(f.dir, '.config/systemd/user'), { recursive: true });
+  writeFileSync(
+    join(f.dir, '.config/systemd/user/old.service'),
+    '[Service]\nExecStart=/bin/true\n',
+  );
+  const target = pushTarget(f, 'target', {
+    files: {
+      'scripts/ops/host/bin/cairn-heavy': '#!/bin/bash\necho heavy\n',
+      'scripts/ops/host/units/sweep.service': '[Service]\nExecStart=/bin/true\n',
+      'scripts/ops/host/units/sweep.timer': '[Timer]\nOnBootSec=5min\n',
+      'scripts/ops/host/units/old.service': '[Service]\nExecStart=/bin/false\n',
+    },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  const bin = join(f.dir, '.local/bin/cairn-heavy');
+  assert.equal(readFileSync(bin, 'utf8'), '#!/bin/bash\necho heavy\n');
+  assert.equal(statSync(bin).mode & 0o777, 0o755);
+  assert.equal(
+    readFileSync(join(f.dir, '.config/systemd/user/old.service'), 'utf8'),
+    '[Service]\nExecStart=/bin/false\n',
+  );
+  const calls = f.log('systemctl.log');
+  assert.match(calls, /systemctl --user daemon-reload/);
+  assert.match(calls, /systemctl --user enable --now sweep\.timer/);
+  assert.doesNotMatch(calls, /enable --now old/);
+});
+
+test('keeps a hand-edited bin script and reports it', () => {
+  const f = fixture();
+  mkdirSync(join(f.dir, '.local/bin'), { recursive: true });
+  writeFileSync(join(f.dir, '.local/bin/cairn-heavy'), '#!/bin/bash\necho local\n', {
+    mode: 0o755,
+  });
+  const target = pushTarget(f, 'target', {
+    files: { 'scripts/ops/host/bin/cairn-heavy': '#!/bin/bash\necho heavy\n' },
+  });
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(join(f.dir, '.local/bin/cairn-heavy'), 'utf8'),
+    '#!/bin/bash\necho local\n',
+  );
+  assert.match(f.log('gh.log'), /issue create.*Host tools differ/);
+});
