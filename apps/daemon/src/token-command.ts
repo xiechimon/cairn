@@ -46,7 +46,7 @@ export function runTokenCommand(opts: { rotate: boolean }, io: TokenCommandIo): 
   const token = envToken ?? fileToken;
   if (token === null) {
     io.writeOut(
-      `No access token configured — token auth is off. Set ${ENV_VARS.token} or run \`cairn token --rotate\` to create ${filePath}.\n`,
+      `No access token found yet. The server creates ${filePath} on its first start; to create it now, set ${ENV_VARS.token} or run \`cairn token --rotate\`.\n`,
     );
     return 0;
   }

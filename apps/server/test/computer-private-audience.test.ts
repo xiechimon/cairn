@@ -59,7 +59,6 @@ function principalApp(s: TestServer, principal: UserRecord) {
     oauthStates: new Map(),
     oauthClient: null,
     authToken: AUTH,
-    tailscaleUsers: [],
     mcpConfigPath: '/tmp/private-audience-absent.json',
   });
 }
