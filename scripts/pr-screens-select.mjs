@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const SOURCES_FILE = 'apps/web/pr-screens/route-sources.json';
 const AUDIT_PAGES = 'apps/web/e2e/audit-pages.ts';
+const STATE_PAGES = 'apps/web/pr-screens/state-pages.ts';
 const IGNORED = [
   'apps/web/e2e/',
   'apps/web/test/',
@@ -71,16 +72,20 @@ function main(argv) {
     .split('\n')
     .filter(Boolean);
   const sources = JSON.parse(readFileSync(resolve(REPO_ROOT, SOURCES_FILE), 'utf8'));
-  const slugs = [
-    ...new Set(
-      pageNames(readFileSync(resolve(REPO_ROOT, 'apps/web/e2e/audit-pages.ts'), 'utf8')).map(
-        slugOf,
-      ),
-    ),
+  const slugsIn = (file) => [
+    ...new Set(pageNames(readFileSync(resolve(REPO_ROOT, file), 'utf8')).map(slugOf)),
   ];
+  const stateSlugs = slugsIn(STATE_PAGES);
+  const slugs = [...slugsIn(AUDIT_PAGES), ...stateSlugs];
   const { all, pages } = selectPages({ changed, sources, slugs });
   process.stdout.write(
-    `${JSON.stringify({ all, count: pages.length, total: slugs.length, pages: pages.join(',') })}\n`,
+    `${JSON.stringify({
+      all,
+      count: pages.length,
+      live: pages.filter((slug) => stateSlugs.includes(slug)).length,
+      total: slugs.length,
+      pages: pages.join(','),
+    })}\n`,
   );
 }
 

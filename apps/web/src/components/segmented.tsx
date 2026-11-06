@@ -32,8 +32,7 @@ const OPTION_CLS =
 
 const OPTION_ICON_CLS = 'w-7 px-0';
 
-const RADIO_BUTTON_NEUTRAL_CLS =
-  'hover:bg-transparent dark:hover:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+const RADIO_BUTTON_NEUTRAL_CLS = 'hover:bg-transparent dark:hover:bg-transparent';
 
 const OPTION_SELECTED_CLS =
   'data-active:font-medium data-active:text-foreground dark:data-active:text-foreground';

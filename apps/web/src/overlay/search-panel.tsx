@@ -41,7 +41,7 @@ const NAV_ROWS = [
 ];
 
 export const ROW_BASE =
-  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
+  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
 
 export const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 

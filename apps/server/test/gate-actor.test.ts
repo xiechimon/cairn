@@ -5,6 +5,7 @@ import {
   agent as agentTable,
   build as buildTable,
   message as messageTable,
+  plan as planTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -109,6 +110,25 @@ describe('#902 gate-passing action records the actor (announcement row)', () => 
   test('failure mode 3: chief confirm_builds -> confirm row actor = chief Agent displayName (not recorded as the user name)', async () => {
     const s = await withConfirmTodo();
     try {
+      const task = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()!;
+      expect(
+        (
+          await req(s.app, 'PATCH', `/api/projects/${task.projectId}/merge-policy`, {
+            mergePolicy: 'autonomous',
+          })
+        ).status,
+      ).toBe(200);
+      s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.buildId, s.buildId)).run();
+      s.db
+        .insert(planTable)
+        .values({
+          id: 'chief-confirm-plan',
+          buildId: s.buildId,
+          version: 1,
+          content: 'Kind: fix\n## Verification\n- `pnpm test` passes\n',
+          createdAt: Date.now(),
+        })
+        .run();
       const agentId = seedChiefAgent(s, '总管甲');
       const out = (await runChiefTool(s, agentId, 'confirm_builds', {
         buildIds: [s.buildId],

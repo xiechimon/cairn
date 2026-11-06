@@ -20,6 +20,7 @@ export function PanelSection() {
       lede="The right-hand panel every page opens beside its main column, and the title that opens a menu. Pages use these instead of building their own aside, header or title trigger."
     >
       <Specimen
+        id="side-panel"
         title="Side panel"
         note="420px, a 52px head with the close button last; below 1100px it floats over a scrim"
         stage="canvas"
@@ -56,6 +57,7 @@ export function PanelSection() {
         </div>
       </Specimen>
       <Specimen
+        id="title-menu"
         title="Title menu"
         note={picked == null ? 'Open a title' : `Picked: ${picked}`}
         code={`<DropdownMenu>\n  <TitleMenuTrigger media={<ProjectAvatar name="cairn" tone={0} bare />}>cairn</TitleMenuTrigger>\n  <KeyedMenuContent align="start">…</KeyedMenuContent>\n</DropdownMenu>\n<TitleMenuTrigger size="pane">Plan</TitleMenuTrigger>`}
@@ -110,6 +112,7 @@ export function PanelSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="greeting-as-a-headline"
         title="Greeting as a headline"
         note="as h2 with wrap: a page's first question, balanced over two lines"
         code={`<Greeting as="h2" wrap>New project: cairn. Where should we start?</Greeting>`}
