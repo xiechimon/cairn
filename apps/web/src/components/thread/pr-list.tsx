@@ -49,10 +49,7 @@ function CheckCount({ checks, unread }: { checks: PrPanelRow['checks']; unread: 
     >
       <span
         aria-hidden
-        className={cn(
-          'size-1.5 rounded-full',
-          failed ? 'bg-destructive' : running ? 'bg-running' : 'bg-content-tertiary',
-        )}
+        className={cn('size-1.5 rounded-full', failed ? 'bg-destructive' : 'bg-content-tertiary')}
       />
       {text}
     </span>
@@ -89,8 +86,8 @@ export function PrList({ rows, onOpenThread, onViewChanges }: PrListProps) {
               <span className="truncate tabular-nums">
                 {row.repo.split('/').at(-1)} #{row.number}
               </span>
-              <span className="text-(--diff-add-fg) tabular-nums">+{row.additions}</span>
-              <span className="text-destructive tabular-nums">−{row.deletions}</span>
+              <span className="tabular-nums">+{row.additions}</span>
+              <span className="tabular-nums">−{row.deletions}</span>
               <span className="ml-auto">
                 <CheckCount checks={row.checks} unread={prCiUnread(row)} />
               </span>

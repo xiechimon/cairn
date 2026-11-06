@@ -216,8 +216,8 @@ export function PrCard(props: PrCardProps) {
                     data-slot="pr-card-diff"
                     className="flex w-full flex-none items-center gap-1.5 tabular-nums @min-[22rem]/pr:w-auto"
                   >
-                    <span className="text-(--diff-add-fg)">+{pr.additions}</span>
-                    <span className="text-destructive">−{pr.deletions}</span>
+                    <span>+{pr.additions}</span>
+                    <span>−{pr.deletions}</span>
                   </span>
                 </>
               )}
@@ -247,7 +247,7 @@ export function PrCard(props: PrCardProps) {
                 data-slot="pr-card-late"
                 className="m-0 flex items-center gap-1.5 text-meta text-content-tertiary"
               >
-                <Clock className="size-3 flex-none" aria-hidden />
+                <Clock className="size-3.5 flex-none" aria-hidden />
                 {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
               </p>
             )}
