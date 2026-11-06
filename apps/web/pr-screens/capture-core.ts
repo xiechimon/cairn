@@ -3,13 +3,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { settleTransitions } from '../e2e/helpers.js';
+import { FROZEN_AT } from './frozen-time.mjs';
 import { runRules } from './rules.js';
 
 export const OUT = process.env.PR_SCREENS_OUT ?? 'pr-screens-out';
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
 
-const FROZEN_AT = new Date('2026-10-31T14:00:00+08:00');
 const WCAG_22_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 export const ONLY = process.env.PR_SCREENS_PAGES
