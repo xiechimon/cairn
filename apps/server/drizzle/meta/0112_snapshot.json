@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "cb41e9a1-56ae-44f5-afef-4fbb945c491f",
+  "id": "1ca2cf3b-ea26-422e-a390-58bc913a2d3d",
   "prevId": "cb96e6a9-7f83-4608-aa4e-d702d612eed0",
   "tables": {
     "agent": {
@@ -3643,87 +3643,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "paired_device": {
-      "name": "paired_device",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "teamId": {
-          "name": "teamId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tokenHash": {
-          "name": "tokenHash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "masked": {
-          "name": "masked",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastSeenAt": {
-          "name": "lastSeenAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "paired_device_tokenHash_unique": {
-          "name": "paired_device_tokenHash_unique",
-          "columns": [
-            "tokenHash"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "paired_device_teamId_team_id_fk": {
-          "name": "paired_device_teamId_team_id_fk",
-          "tableFrom": "paired_device",
-          "tableTo": "team",
-          "columnsFrom": [
-            "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "plan": {
       "name": "plan",
       "columns": {
@@ -3760,6 +3679,13 @@
         "stepId": {
           "name": "stepId",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "autoApprovePausedAt": {
+          "name": "autoApprovePausedAt",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4230,13 +4156,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "pairedDeviceId": {
-          "name": "pairedDeviceId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "createdAt": {

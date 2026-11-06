@@ -1,5 +1,6 @@
 import type {
   Assignment,
+  BuildMergePermission,
   BuildRecord,
   GithubRepoRef,
   MergeReadiness,
@@ -1625,6 +1626,10 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'confirm') {
+    if (origin === 'automatic' && todoRecord.phase === 'confirm') {
+      const eligibility = planAutoConfirmation(deps, buildId);
+      if (!eligibility.eligible) throw new HttpError(409, eligibility.reason);
+    }
     applyBuildConfirm(deps, buildId, actorName);
     return;
   }
@@ -1927,16 +1932,38 @@ function githubPrOf(
   return repoRef === null ? null : { repoRef, prNumber };
 }
 
+export function buildMergePermission(deps: BuildDeps, buildId: string): BuildMergePermission {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (!buildRow) throw new NotFoundError(`build ${buildId}`);
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
+  const { missingTools } = mergeToolPermission(deps, todoRow);
+  return { permitted: missingTools.length === 0, missingTools, prUrl: buildRow.prUrl };
+}
+
+function mergeToolPermission(
+  deps: BuildDeps,
+  todoRow: TodoRow,
+): { agentName: string | null; missingTools: string[] } {
+  const agentId = todoRow.assignment?.build?.agentId;
+  const agentRow = agentId
+    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
+    : undefined;
+  return {
+    agentName: agentRow?.displayName ?? null,
+    missingTools:
+      agentRow === undefined
+        ? []
+        : [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !agentRow.tools.includes(tool)),
+  };
+}
+
 function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
-  const buildAgentId = todoRow.assignment?.build?.agentId;
-  if (!buildAgentId) return;
-  const agentRow = deps.db.select().from(agent).where(eq(agent.id, buildAgentId)).get();
-  if (!agentRow) return;
-  const missing = [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((t) => !agentRow.tools.includes(t));
-  if (missing.length > 0) {
+  const { agentName, missingTools } = mergeToolPermission(deps, todoRow);
+  if (missingTools.length > 0) {
     throw new HttpError(
       403,
-      `Agent ${agentRow.displayName} 未获「${missing.join('」「')}」授权（Agent 详情页权限 tab），无法发起合并`,
+      `Agent ${agentName} 未获「${missingTools.join('」「')}」授权（Agent 详情页权限 tab），无法发起合并`,
     );
   }
 }
@@ -2796,9 +2823,9 @@ function stepArtifactGate(
 function latestPlanRow(
   deps: BuildDeps,
   buildId: string,
-): { content: string; stepId: string | null } | undefined {
+): typeof planTable.$inferSelect | undefined {
   return deps.db
-    .select({ content: planTable.content, stepId: planTable.stepId })
+    .select()
     .from(planTable)
     .where(eq(planTable.buildId, buildId))
     .orderBy(desc(planTable.version))
@@ -2818,67 +2845,110 @@ function planContractOfStep(
 
 export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
 
+type PlanAutoConfirmation =
+  | { eligible: true; planId: string; deadline: number }
+  | { eligible: false; reason: string };
+
+function planAutoConfirmation(deps: BuildDeps, buildId: string): PlanAutoConfirmation {
+  const latestPlan = latestPlanRow(deps, buildId);
+  if (latestPlan === undefined)
+    return { eligible: false, reason: 'No plan is available for automatic confirmation' };
+  if (latestPlan.autoApprovePausedAt !== null)
+    return {
+      eligible: false,
+      reason: 'Plan auto-approve is paused; explicit user approval is required',
+    };
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (buildRow === undefined || buildRow.errorMessage !== null)
+    return { eligible: false, reason: 'Build is missing or has an error' };
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (
+    todoRow === undefined ||
+    todoRow.phase !== 'confirm' ||
+    todoRow.archivedAt !== null ||
+    todoRow.latestBuildId !== buildId
+  )
+    return {
+      eligible: false,
+      reason: 'Build is not the current unarchived task awaiting confirmation',
+    };
+  const liveStep = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
+    )
+    .get();
+  if (liveStep !== undefined) return { eligible: false, reason: 'Build still has an active step' };
+  if (!checkPlanContract(latestPlan.content).ok)
+    return { eligible: false, reason: 'Plan does not satisfy the verification contract' };
+  if (planHasOpenDecisions(latestPlan.content))
+    return {
+      eligible: false,
+      reason: 'Plan has unresolved decisions; explicit user approval is required',
+    };
+  const config = projectMergeConfigSchema.parse(projectOfTodo(deps.db, todoRow)?.autonomy ?? {});
+  if (!config.planAutoApproveEnabled)
+    return {
+      eligible: false,
+      reason: 'Plan auto-approve is disabled for this project; explicit user approval is required',
+    };
+  const mergePolicy = config.mergePolicy;
+  if (mergePolicy === 'human')
+    return { eligible: false, reason: 'Project requires explicit user approval' };
+  if (childrenOfTodo(deps.db, todoRow.id).length > 0)
+    return { eligible: false, reason: 'Split plans require explicit user approval' };
+  const latestFeedback = deps.db
+    .select({ kind: buildFeedback.kind, side: buildFeedback.side })
+    .from(buildFeedback)
+    .where(eq(buildFeedback.buildId, buildId))
+    .orderBy(desc(buildFeedback.createdAt), desc(buildFeedback.id))
+    .get();
+  if (latestFeedback?.kind === 'revision' && latestFeedback.side === 'plan')
+    return { eligible: false, reason: 'Revised plans require explicit user approval' };
+  const threadIds = [
+    ...new Set(
+      deps.db
+        .select({ watches: chief.watches })
+        .from(chief)
+        .where(eq(chief.teamId, todoRow.teamId))
+        .all()
+        .flatMap((row) =>
+          row.watches.filter((watch) => watch.todoId === todoRow.id).map((watch) => watch.threadId),
+        ),
+    ),
+  ];
+  const pendingQuestion =
+    threadIds.length > 0 &&
+    deps.db
+      .select({ content: chiefMessage.content })
+      .from(chiefMessage)
+      .where(inArray(chiefMessage.threadId, threadIds))
+      .all()
+      .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
+  if (pendingQuestion)
+    return { eligible: false, reason: 'A pending Chief question requires a user answer' };
+  return {
+    eligible: true,
+    planId: latestPlan.id,
+    deadline: todoRow.phaseAt + PLAN_AUTO_CONFIRM_GRACE_MS,
+  };
+}
+
+export function planAutoApproveAt(deps: BuildDeps, planId: string): number | null {
+  const planRow = deps.db.select().from(planTable).where(eq(planTable.id, planId)).get();
+  if (planRow === undefined) return null;
+  const eligibility = planAutoConfirmation(deps, planRow.buildId);
+  return eligibility.eligible && eligibility.planId === planId ? eligibility.deadline : null;
+}
+
 export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
   const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
   for (const todoRow of waiting) {
-    if (
-      todoRow.archivedAt !== null ||
-      todoRow.latestBuildId === null ||
-      now - todoRow.phaseAt < PLAN_AUTO_CONFIRM_GRACE_MS
-    ) {
-      continue;
-    }
+    if (todoRow.latestBuildId === null) continue;
     const buildId = todoRow.latestBuildId;
-    const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-    if (buildRow === undefined || buildRow.errorMessage !== null) continue;
-    const liveStep = deps.db
-      .select({ id: step.id })
-      .from(step)
-      .where(
-        and(
-          eq(step.buildId, buildId),
-          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
-        ),
-      )
-      .get();
-    if (liveStep !== undefined) continue;
-    const latestPlan = latestPlanRow(deps, buildId);
-    if (latestPlan === undefined || !checkPlanContract(latestPlan.content).ok) continue;
-    if (planHasOpenDecisions(latestPlan.content)) continue;
-    const mergePolicy = projectMergeConfigSchema.parse({
-      mergePolicy: projectOfTodo(deps.db, todoRow)?.autonomy?.mergePolicy,
-    }).mergePolicy;
-    if (mergePolicy === 'human' || childrenOfTodo(deps.db, todoRow.id).length > 0) continue;
-    const latestFeedback = deps.db
-      .select({ kind: buildFeedback.kind, side: buildFeedback.side })
-      .from(buildFeedback)
-      .where(eq(buildFeedback.buildId, buildId))
-      .orderBy(desc(buildFeedback.createdAt), desc(buildFeedback.id))
-      .get();
-    if (latestFeedback?.kind === 'revision' && latestFeedback.side === 'plan') continue;
-    const threadIds = [
-      ...new Set(
-        deps.db
-          .select({ watches: chief.watches })
-          .from(chief)
-          .where(eq(chief.teamId, todoRow.teamId))
-          .all()
-          .flatMap((row) =>
-            row.watches
-              .filter((watch) => watch.todoId === todoRow.id)
-              .map((watch) => watch.threadId),
-          ),
-      ),
-    ];
-    const pendingQuestion =
-      threadIds.length > 0 &&
-      deps.db
-        .select({ content: chiefMessage.content })
-        .from(chiefMessage)
-        .where(inArray(chiefMessage.threadId, threadIds))
-        .all()
-        .some((row) => askQuestionContentOf(row.content)?.status === 'pending');
-    if (pendingQuestion) continue;
+    const eligibility = planAutoConfirmation(deps, buildId);
+    if (!eligibility.eligible || now < eligibility.deadline) continue;
     try {
       applyBuildConfirm(deps, buildId, 'server');
     } catch (error) {
