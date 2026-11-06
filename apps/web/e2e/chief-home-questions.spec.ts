@@ -723,9 +723,21 @@ test('answer drafts per request and the thread draft stay separate through every
 }) => {
   const answered: { path: string; body: { answers: unknown[] } }[] = [];
   const messaged: { content?: string }[] = [];
-  const state = { ...structuredClone(TWO), todos: [{ ...TASK, phase: 'confirm' }] };
+  const state = {
+    ...structuredClone(TWO),
+    threads: [
+      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'queued' }] },
+    ],
+    todos: [{ ...TASK, phase: 'confirm' }],
+  };
+  state.messages = [...state.messages, { id: 'q1', role: 'user', content: 'queued note', createdAt: 30 }];
   const answer = answerRoute(state, answered as { path: string; body: unknown }[]);
   await mockLive(page, state, (path, route, json) => {
+    if (path === `/api/teams/t1/chief/threads/${THREAD.id}/messages/q1` && route.request().method() === 'DELETE') {
+      state.threads = [{ ...THREAD, activeRun: null, pending: [] }];
+      state.messages = state.messages.filter((row) => row.id !== 'q1');
+      return json({ ok: true });
+    }
     if (/^\/api\/todos\/[^/]+\/messages$/.test(path) && route.request().method() === 'POST') {
       messaged.push(route.request().postDataJSON());
       return json({ todoId: 'todo-1', conversationId: 'build-1', delivered: 'revision' }, 201);
@@ -754,6 +766,15 @@ test('answer drafts per request and the thread draft stay separate through every
       }
     }
   };
+  let releaseLoad: () => void = () => undefined;
+  const loadGate = new Promise<void>((resolve) => {
+    releaseLoad = resolve;
+  });
+  await page.route('**/api/**', async (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    await loadGate;
+    return route.fallback();
+  });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
@@ -784,6 +805,48 @@ test('answer drafts per request and the thread draft stay separate through every
     composer: string;
     extra?: () => Promise<void>;
   }[] = [
+    {
+      name: 'text typed while loading lands in the thread composer while a question is pending',
+      run: async () => {
+        await page.getByTestId('loading-composer').getByRole('textbox').fill('typed while loading');
+        releaseLoad();
+        await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+      },
+      composer: 'typed while loading',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
+        await expect(page.getByTestId('chief-question-dock').getByRole('button', { name: /^提交回答/ })).toBeVisible();
+      },
+    },
+    {
+      name: 'emptying the thread text returns the composer to the answer',
+      run: () => composer.fill(''),
+      composer: '',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-primary')).toBeVisible();
+        await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('输入你自己的回答，或留空使用选中的选项');
+      },
+    },
+    {
+      name: 'withdrawing a queued message while answering shows it in the focused thread composer',
+      run: () =>
+        page.getByTestId('home-c').getByTestId('queued-message').getByRole('button', { name: '撤回' }).click(),
+      composer: 'queued note',
+      extra: async () => {
+        await expect(composer).toBeFocused();
+        await expect(page.getByTestId('home-c').getByTestId('queued-message')).toHaveCount(0);
+        await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+        await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
+      },
+    },
+    {
+      name: 'emptying the restored text returns to the answer, whose draft is untouched',
+      run: () => composer.fill(''),
+      composer: '',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-primary')).toBeVisible();
+      },
+    },
     {
       name: 'slash and mention in the answer are plain text with no menu',
       run: async () => {
