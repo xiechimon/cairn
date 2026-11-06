@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
-import { openChiefWindow } from './helpers.js';
+import { openChiefWindow, verticalGap } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
@@ -426,10 +426,8 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await expect(reply).toHaveCount(1);
     await reply.getByTestId('chief-tools-toggle').click();
     await evidenceShot(page, 'tools-once.png');
-    const replyBox = await reply.boundingBox();
     const question = home.getByTestId('chief-msg').filter({ hasText: '？' }).first();
-    const questionBox = await question.boundingBox();
-    expect(replyBox!.y - (questionBox!.y + questionBox!.height)).toBeLessThan(40);
+    expect(await verticalGap(page, question, reply)).toBeLessThan(40);
     for (const name of ['pull_requests', 'issues', 'run_builds']) {
       await expect(home.getByText(name, { exact: true })).toHaveCount(1);
     }

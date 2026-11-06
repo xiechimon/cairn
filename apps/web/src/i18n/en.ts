@@ -1833,4 +1833,6 @@ export const EN: Record<string, string> = {
   撤销设备: 'Revoke',
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
   '配对失败，请在电脑上重新生成二维码。': 'Pairing failed. Create a new QR code on your computer.',
+  '连接断开，正在重连…': 'Connection lost, reconnecting…',
+  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };
