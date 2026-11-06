@@ -958,8 +958,6 @@ export const EN: Record<string, string> = {
   '模型额度已用尽，请等待额度恢复后重试。':
     'Model quota exhausted — wait for it to recover, then retry.',
   '请求被限流，请稍后重试。': 'Rate limited — retry later.',
-  '运行失败，请查看原始错误排查原因后重试。':
-    'Run failed — check the raw error to diagnose the cause, then retry.',
   重试: 'Retry',
   失败: 'Failed',
   默认: 'Default',
@@ -1817,4 +1815,13 @@ export const EN: Record<string, string> = {
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
   'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  等你审阅: 'Ready for review',
+  '选择 {title}': 'Select {title}',
+  '最后在线 {time}': 'Last seen {time}',
+  '在这台机器上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
+    'On this machine, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
+  '额度空了，等额度恢复后自动续跑。': 'Out of quota. It resumes by itself when quota returns.',
+  '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
+  '第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子':
+    'The first PR merged on day one. You can post about it in GitHub Discussions',
 };

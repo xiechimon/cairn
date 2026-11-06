@@ -57,12 +57,7 @@ export function ClaudeLoginBanner({
       body={
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {warnings.map((warning) => (
-            <li
-              key={warning.key}
-              data-testid="claude-login-warning"
-              data-login={warning.kind}
-              role="status"
-            >
+            <li key={warning.key} data-testid="claude-login-warning" data-login={warning.kind}>
               {withCodeSpans(warning.text)}
             </li>
           ))}

@@ -3,6 +3,7 @@ import { GitMerge } from 'lucide-react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 
 export interface FirstPrCardInfo {
   href: string;
@@ -26,9 +27,17 @@ export function firstPrCardInfo(
     body:
       daysToFirstPr === null
         ? 'Cairn can open a prefilled post in GitHub Discussions. Nothing is sent unless you submit it.'
-        : `Cairn can open a prefilled post in GitHub Discussions. Nothing is sent unless you submit it. First PR: ${daysToFirstPr} days after starting.`,
+        : daysToFirstPr === 0
+          ? 'Cairn can open a prefilled post in GitHub Discussions. Nothing is sent unless you submit it. First PR: merged on the first day.'
+          : `Cairn can open a prefilled post in GitHub Discussions. Nothing is sent unless you submit it. First PR: ${daysToFirstPr} days after starting.`,
     daysToFirstPr,
   };
+}
+
+export function firstPrBodyCopy(days: number | null, t: TFunc): string {
+  if (days === null) return t('可以在 GitHub Discussions 发一条帖子，说明第一支 PR 用了多久');
+  if (days === 0) return t('第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子');
+  return t('第一支 PR 用了 {days} 天。可以在 GitHub Discussions 发一条帖子', { days });
 }
 
 export function FirstPrCard({ info, onDismiss }: { info: FirstPrCardInfo; onDismiss: () => void }) {
@@ -40,13 +49,7 @@ export function FirstPrCard({ info, onDismiss }: { info: FirstPrCardInfo; onDism
       tone="info"
       icon={GitMerge}
       title={t('首个 PR 已合并')}
-      body={
-        info.daysToFirstPr === null
-          ? t('可以在 GitHub Discussions 发一条帖子，说明第一支 PR 用了多久')
-          : t('第一支 PR 用了 {days} 天。可以在 GitHub Discussions 发一条帖子', {
-              days: info.daysToFirstPr,
-            })
-      }
+      body={firstPrBodyCopy(info.daysToFirstPr, t)}
       actions={
         <>
           <Button variant="ghost" size="sm" className="text-content-secondary" onClick={onDismiss}>

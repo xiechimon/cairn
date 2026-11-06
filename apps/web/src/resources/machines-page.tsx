@@ -10,6 +10,7 @@ import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -517,7 +518,7 @@ export function MachinesPage() {
                     data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
                     role="status"
                   >
-                    {loginWarning}
+                    {withCodeSpans(loginWarning)}
                   </span>
                 )}
               </ResourceRow>

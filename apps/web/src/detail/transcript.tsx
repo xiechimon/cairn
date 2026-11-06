@@ -610,7 +610,9 @@ function FailRow({
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
-        <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
+        {item.body !== '' && (
+          <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
+        )}
         {item.title !== '' && (
           <p className={`${PARA} ${PARA_GAP} flex gap-3 text-meta text-(--text-tertiary)`}>
             <Button
@@ -623,7 +625,7 @@ function FailRow({
           </p>
         )}
       </span>
-      <ActionRow copy={[item.title, item.body].join('\n')} t={t} />
+      <ActionRow copy={[item.title, item.body].filter((part) => part !== '').join('\n')} t={t} />
       <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
         <pre
           className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"

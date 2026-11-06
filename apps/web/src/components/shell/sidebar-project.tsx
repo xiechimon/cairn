@@ -53,7 +53,9 @@ export function SidebarProjectRow({
         bare
         className="rounded-sm"
       />
-      <span className="min-w-0 truncate">{name}</span>
+      <span className="min-w-0 truncate" title={name}>
+        {name}
+      </span>
       {waiting > 0 && (
         <span
           data-slot="sidebar-project-count"

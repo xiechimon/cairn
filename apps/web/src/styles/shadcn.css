@@ -183,9 +183,9 @@
   --sidebar-active: rgb(230 232 226 / 0.09);
   --surface-tertiary: #2e3430;
   --text-secondary: #b4bab3;
-  --text-tertiary: #959c96;
+  --text-tertiary: #a3aaa4;
   --text-dim: #5d655f;
-  --icon: #959c96;
+  --icon: #a3aaa4;
   --card-button: #ebb550;
   --focus-ring: var(--ring);
   --col-dot-building: var(--running);
