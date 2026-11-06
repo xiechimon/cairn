@@ -358,6 +358,30 @@ class SchemaGlanceTests(unittest.TestCase):
         result, output = self.verdict(self.base, expected)
         self.assertEqual(result, 1, output)
 
+    def test_trailing_prose_and_table_after_the_schema_table_are_ignored(self):
+        trailing = '\nVerified against the live stack:\n\n| step | result |\n|---|---|\n| migrate | ok |\n'
+        result, output = self.verdict(self.base + self.table + trailing, self.table)
+        self.assertEqual(result, 0, output)
+        self.assertIn('schema-changes: matches', output)
+
+    def test_only_the_first_table_block_counts(self):
+        second = '\n| table | change | detail |\n|---|---|---|\n| `x` | + y | text |\n'
+        result, output = self.verdict(self.base + self.table + second, self.table)
+        self.assertEqual(result, 0, output)
+
+    def test_no_schema_changes_line_ignores_a_following_table(self):
+        expected = '### Schema changes\n\nNo schema changes\n'
+        body = self.base + expected + '\nChecked:\n\n| a | b |\n|---|---|\n| 1 | 2 |\n'
+        result, output = self.verdict(body, expected)
+        self.assertEqual(result, 0, output)
+
+    def test_stale_and_missing_messages_name_the_sync_helper(self):
+        stale = self.table.replace('+ due_at | integer', '+ due_at | text')
+        for body in (self.base + stale, self.base):
+            result, output = self.verdict(body, self.table)
+            self.assertEqual(result, 1, output)
+            self.assertIn('scripts/pr-schema-sync.mjs <pr-number>', output)
+
     def test_non_drizzle_body_is_unaffected(self):
         result, output = self.verdict(self.base)
         self.assertEqual(result, 0, output)

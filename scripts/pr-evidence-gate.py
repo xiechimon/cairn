@@ -62,7 +62,10 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
-Schema evidence: with `--schema-glance <file>` (the output of
+Schema evidence: only the first contiguous block of table lines (or the
+No schema changes line) directly under the heading is compared; later prose
+and tables are ignored. `node scripts/pr-schema-sync.mjs <pr-number>` rewrites
+the section in a body file. With `--schema-glance <file>` (the output of
 scripts/schema-glance.mjs from the merge base of base and head to head,
 passed by the workflow only when base...head touches apps/server/drizzle/**,
 so migrations merged into main after the PR branched never count), the body
@@ -307,11 +310,15 @@ def schema_rows(markdown):
     heading = SCHEMA_HEADING.search(text)
     if heading is None:
         return None
-    rest = text[heading.end():]
-    following = ANY_HEADING.search(rest)
-    section = rest[:following.start()] if following else rest
-    return [' '.join(line.split()) for line in section.splitlines()
-            if line.strip().startswith('|') or line.strip() == NO_SCHEMA_CHANGES]
+    rows = []
+    for line in text[heading.end():].splitlines():
+        stripped = line.strip()
+        is_row = stripped.startswith('|') or stripped == NO_SCHEMA_CHANGES
+        if is_row:
+            rows.append(' '.join(stripped.split()))
+        elif stripped or rows:
+            break
+    return rows
 
 
 def schema_verdict(body, expected_markdown):
@@ -438,7 +445,7 @@ def main():
             print("pr-evidence: schema-changes: matches the schema-glance output")
         else:
             failures.append('schema-changes')
-            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
+            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes', or run: node scripts/pr-schema-sync.mjs <pr-number> and apply the printed file with gh pr edit --body-file")
 
     if changed_file is not None:
         with open(changed_file, encoding='utf-8') as f:
