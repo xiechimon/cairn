@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8').replace(
@@ -25,6 +26,7 @@ export function workspacePackages(rootDir = root) {
     }
   }
   return dirs
+    .filter((dir) => existsSync(resolve(rootDir, dir, 'package.json')))
     .map((dir) => ({
       ...JSON.parse(readFileSync(resolve(rootDir, dir, 'package.json'), 'utf8')),
       directory: dir,
@@ -385,4 +387,20 @@ test('the publish job refuses anything but a push to main twice over', () => {
   );
   assert.match(publishJob, /^ {4}steps:\n {6}- name: Refuse to publish outside a push to main\n/m);
   assert.match(publishJob, /"\$EVENT_NAME" != "push" \|\| "\$REF" != "refs\/heads\/main"/);
+});
+
+test('workspace directories without a package.json are not packages, as in pnpm', (t) => {
+  const fixture = makeTestTempDir('release-config-');
+  t.after(() => releaseTestTempDir(fixture));
+  writeFileSync(resolve(fixture, 'pnpm-workspace.yaml'), 'packages:\n  - apps/*\n');
+  mkdirSync(resolve(fixture, 'apps/node-app'), { recursive: true });
+  mkdirSync(resolve(fixture, 'apps/go-sidecar'), { recursive: true });
+  writeFileSync(
+    resolve(fixture, 'apps/node-app/package.json'),
+    JSON.stringify({ name: 'node-app' }),
+  );
+  assert.deepEqual(
+    workspacePackages(fixture).map((pkg) => pkg.directory),
+    ['apps/node-app'],
+  );
 });

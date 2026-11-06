@@ -1,9 +1,10 @@
 ----------------------------- MODULE MergeGate -----------------------------
 EXTENDS Naturals
 
-CONSTANTS Protected, BindingBound, ReviewHeadBound, MergeRechecksDigest, MaxVerdicts
+CONSTANTS Protected, BindingBound, ReviewHeadBound, MergeRechecksDigest,
+          RequireUpToDate, AllowCodePush, AllowEvidencePush, MaxVerdicts
 
-VARIABLES head, base, dgst,
+VARIABLES head, base, dgst, used, carriers, updates,
           verdictRows,
           lastEval, satVerify, satDecision, satReview, satReviewHead,
           landed,
@@ -11,7 +12,7 @@ VARIABLES head, base, dgst,
 
 Kinds    == {"verify", "review", "decision"}
 Digests  == {"d1", "d2"}
-Heads    == {"h1", "h2"}
+Heads    == {"h1", "h2", "h3"}
 Bases    == {"b1", "b2"}
 Outcomes == {"none", "pass", "block"}
 VerdictRow == [kind : Kinds, digest : Digests, outcome : {"pass", "block"},
@@ -27,7 +28,7 @@ LandingVal == [h : HeadsOrNone, d : DigestsOrNone,
 NoLanding == [h |-> "none", d |-> "none", v |-> "pass", rv |-> "pass",
               dv |-> "pass", indep |-> FALSE, rh |-> "none"]
 
-vars == <<head, base, dgst, verdictRows, lastEval,
+vars == <<head, base, dgst, used, carriers, updates, verdictRows, lastEval,
           satVerify, satDecision, satReview, satReviewHead, landed,
           verdicts, codePushes, evidencePushes, benignMoves, interactingMoves>>
 
@@ -35,6 +36,10 @@ TypeOK ==
   /\ head \in Heads
   /\ base \in Bases
   /\ dgst \in Digests
+  /\ used \subseteq Heads
+  /\ carriers \subseteq used
+  /\ head \in carriers
+  /\ updates \in 0..1
   /\ verdictRows \subseteq VerdictRow
   /\ lastEval \in EvalVal
   /\ satVerify \in Digests \cup {"none"}
@@ -50,6 +55,7 @@ TypeOK ==
 
 Init ==
   /\ head = "h1" /\ base = "b1" /\ dgst = "d1"
+  /\ used = {"h1"} /\ carriers = {"h1"} /\ updates = 0
   /\ verdictRows = {}
   /\ lastEval = NoEval
   /\ satVerify = "none" /\ satDecision = "none"
@@ -89,8 +95,11 @@ ReviewHeadAt(h, d) ==
   IF IndependentRows(h, d) = {} THEN "none"
   ELSE (CHOOSE v \in IndependentRows(h, d) : TRUE).recordedHead
 
-ReadyAt(h, b, d) ==
-  /\ b = "b1"
+FreshHead == IF "h2" \notin used THEN "h2" ELSE "h3"
+Synced == base = "b1" \/ updates = 1
+
+ReadyAt(h, d) ==
+  /\ (~RequireUpToDate \/ Synced)
   /\ VerifyOk(d) /\ DecisionOk(d) /\ ReviewOk(d)
   /\ (~Protected \/ IndependentOk(h, d))
 
@@ -98,41 +107,58 @@ ReadyAt(h, b, d) ==
 
 RecordVerdict(k) ==
   /\ verdicts < MaxVerdicts
-  /\ \E o \in {"pass", "block"}, indep \in BOOLEAN,
-        rh \in (IF evidencePushes = 1 THEN Heads ELSE {head}) :
+  /\ \E o \in {"pass", "block"}, indep \in BOOLEAN, rh \in carriers :
        /\ verdictRows' = verdictRows \cup
             {[kind |-> k, digest |-> dgst, outcome |-> o,
               independent |-> IF k = "review" THEN indep ELSE FALSE,
               recordedHead |-> IF k = "review" THEN rh ELSE "h1"]}
        /\ verdicts' = verdicts + 1
   /\ lastEval' = NoEval
-  /\ UNCHANGED <<head, base, dgst,
+  /\ UNCHANGED <<head, base, dgst, used, carriers, updates,
                  satVerify, satDecision, satReview, satReviewHead, landed,
                  codePushes, evidencePushes, benignMoves, interactingMoves>>
 
 PushCode ==
-  /\ codePushes < 1 /\ head = "h1" /\ dgst = "d1"
-  /\ head' = "h2" /\ dgst' = "d2"
+  /\ AllowCodePush
+  /\ codePushes + evidencePushes < 1 /\ dgst = "d1" /\ used /= Heads
+  /\ head' = FreshHead /\ dgst' = "d2"
+  /\ used' = used \cup {FreshHead}
+  /\ carriers' = {FreshHead}
   /\ codePushes' = codePushes + 1
   /\ lastEval' = NoEval
-  /\ UNCHANGED <<base, verdictRows,
+  /\ UNCHANGED <<base, updates, verdictRows,
                  satVerify, satDecision, satReview, satReviewHead, landed,
                  verdicts, evidencePushes, benignMoves, interactingMoves>>
 
 PushEvidence ==
-  /\ evidencePushes < 1 /\ head = "h1"
-  /\ head' = "h2"
+  /\ AllowEvidencePush
+  /\ codePushes + evidencePushes < 1 /\ used /= Heads
+  /\ head' = FreshHead
+  /\ used' = used \cup {FreshHead}
+  /\ carriers' = carriers \cup {FreshHead}
   /\ evidencePushes' = evidencePushes + 1
+  /\ lastEval' = NoEval
+  /\ UNCHANGED <<base, dgst, updates, verdictRows,
+                 satVerify, satDecision, satReview, satReviewHead, landed,
+                 verdicts, codePushes, benignMoves, interactingMoves>>
+
+UpdateBranch ==
+  /\ updates < 1 /\ ~Synced /\ used /= Heads
+  /\ head' = FreshHead
+  /\ used' = used \cup {FreshHead}
+  /\ carriers' = carriers \cup {FreshHead}
+  /\ updates' = updates + 1
   /\ lastEval' = NoEval
   /\ UNCHANGED <<base, dgst, verdictRows,
                  satVerify, satDecision, satReview, satReviewHead, landed,
-                 verdicts, codePushes, benignMoves, interactingMoves>>
+                 verdicts, codePushes, evidencePushes, benignMoves,
+                 interactingMoves>>
 
 BaseMoveBenign ==
   /\ benignMoves < 1 /\ base = "b1"
   /\ base' = "b2"
   /\ benignMoves' = benignMoves + 1
-  /\ UNCHANGED <<head, dgst, verdictRows, lastEval,
+  /\ UNCHANGED <<head, dgst, used, carriers, updates, verdictRows, lastEval,
                  satVerify, satDecision, satReview, satReviewHead, landed,
                  verdicts, codePushes, evidencePushes, interactingMoves>>
 
@@ -140,14 +166,14 @@ BaseMoveInteracting ==
   /\ interactingMoves < 1 /\ base = "b1" /\ dgst = "d1"
   /\ base' = "b2" /\ dgst' = "d2"
   /\ interactingMoves' = interactingMoves + 1
-  /\ UNCHANGED <<head, verdictRows, lastEval,
+  /\ UNCHANGED <<head, used, carriers, updates, verdictRows, lastEval,
                  satVerify, satDecision, satReview, satReviewHead, landed,
                  verdicts, codePushes, evidencePushes, benignMoves>>
 
 Evaluate ==
   /\ lastEval' = [h |-> head, b |-> base, d |-> dgst,
-                  ready |-> ReadyAt(head, base, dgst)]
-  /\ IF ReadyAt(head, base, dgst)
+                  ready |-> ReadyAt(head, dgst)]
+  /\ IF ReadyAt(head, dgst)
        THEN /\ satVerify' = SatDigest("verify", dgst)
             /\ satDecision' = SatDigest("decision", dgst)
             /\ satReview' = SatDigest("review", dgst)
@@ -158,7 +184,7 @@ Evaluate ==
             /\ satDecision' = "none"
             /\ satReview' = "none"
             /\ satReviewHead' = "none"
-  /\ UNCHANGED <<head, base, dgst, verdictRows, landed,
+  /\ UNCHANGED <<head, base, dgst, used, carriers, updates, verdictRows, landed,
                  verdicts, codePushes, evidencePushes, benignMoves,
                  interactingMoves>>
 
@@ -174,7 +200,7 @@ ExecuteMergeGithub ==
                  dv |-> OutcomeAt("decision", dgst),
                  indep |-> IndependentOk(head, dgst),
                  rh |-> ReviewHeadAt(head, SatDigest("review", dgst))]
-  /\ UNCHANGED <<head, base, dgst, verdictRows, lastEval,
+  /\ UNCHANGED <<head, base, dgst, used, carriers, updates, verdictRows, lastEval,
                  satVerify, satDecision, satReview, satReviewHead,
                  verdicts, codePushes, evidencePushes, benignMoves,
                  interactingMoves>>
@@ -183,6 +209,7 @@ ExecuteMergeGithub ==
 
 Next ==
   \/ PushCode \/ PushEvidence \/ BaseMoveBenign \/ BaseMoveInteracting
+  \/ UpdateBranch
   \/ \E k \in Kinds : RecordVerdict(k)
   \/ Evaluate
   \/ ExecuteMergeGithub
@@ -203,5 +230,16 @@ StaleVerdictNeverSatisfies ==
      /\ satDecision = lastEval.d
      /\ satReview = lastEval.d
      /\ ~Protected \/ satReviewHead = lastEval.h
+
+NeverReadyOnMovedBase == ~(lastEval.ready /\ lastEval.b = "b2")
+
+NeverReadyOnInteractingUpdate ==
+  ~(lastEval.ready /\ lastEval.b = "b2" /\ lastEval.d = "d2" /\ updates = 1)
+
+NeverReadyOnBenignUpdate ==
+  ~(lastEval.ready /\ lastEval.b = "b2" /\ lastEval.d = "d1" /\ updates = 1)
+
+NeverMergedAfterUpdate ==
+  ~(landed.h /= "none" /\ landed.h = head /\ updates = 1 /\ Synced)
 
 =============================================================================

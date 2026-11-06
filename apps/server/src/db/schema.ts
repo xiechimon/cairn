@@ -1016,6 +1016,23 @@ export const attachment = sqliteTable('attachment', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
+export const composerDraft = sqliteTable(
+  'composer_draft',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    scope: text('scope').notNull(),
+    content: text('content').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('composer_draft_owner_scope_idx').on(t.teamId, t.userId, t.scope)],
+);
+
 export const githubConnection = sqliteTable('github_connection', {
   teamId: text('teamId')
     .primaryKey()
