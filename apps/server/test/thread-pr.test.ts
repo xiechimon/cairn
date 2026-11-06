@@ -48,6 +48,7 @@ class GithubMock {
   failing = new Set<string>();
   remaining: number | null = null;
   limit = 5000;
+  resetAtSeconds: number | null = null;
   requests: string[] = [];
   authorizations: string[] = [];
   notModified = 0;
@@ -61,6 +62,8 @@ class GithubMock {
       if (this.remaining !== null) {
         headers['x-ratelimit-remaining'] = String(this.remaining);
         headers['x-ratelimit-limit'] = String(this.limit);
+        if (this.resetAtSeconds !== null)
+          headers['x-ratelimit-reset'] = String(this.resetAtSeconds);
       }
       const lookup = (name: string) => headers[name.toLowerCase()] ?? null;
       if (status === 200 && init?.headers?.['if-none-match'] === etag) {
@@ -397,6 +400,24 @@ describe('F2 duplicate PR rows cannot exist', () => {
     await watch.sweep(70_000);
     expect(rows(s).map((r) => [r.buildId, r.number])).toEqual([['build-next', 341]]);
   });
+
+  test('a build whose PR association was cleared drops its row and frees the PR', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s, { prNumber: 350 });
+    mock.pulls.set('octo/demo#350', {});
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    expect(rows(s)).toHaveLength(1);
+    s.db
+      .update(buildTable)
+      .set({ prNumber: null, prUrl: null })
+      .where(eq(buildTable.id, t.buildId))
+      .run();
+    const tally = await watch.sweep(70_000);
+    expect(tally.pruned).toBe(1);
+    expect(rows(s)).toHaveLength(0);
+  });
 });
 
 describe('F3 a PR whose thread was deleted disappears', () => {
@@ -664,6 +685,39 @@ describe('F7 the poll backs off when the rate limit runs low', () => {
     expect(mock.count('/pulls/822')).toBeGreaterThan(0);
     expect(mock.count('/pulls/820')).toBe(0);
     expect(idle.prNumber).toBe(820);
+  });
+
+  test('armed-only pacing ends once the rate window has reset', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, { prNumber: 830 });
+    mock.pulls.set('octo/demo#830', {});
+    const watch = watchFor(s, mock);
+    mock.remaining = 100;
+    mock.resetAtSeconds = 400;
+    await watch.sweep(1_000);
+    const limited = await watch.sweep(1_000 + PR_WATCH_SLOW_INTERVAL_MS);
+    expect(limited.pacing).toBe('armed-only');
+    mock.remaining = 5000;
+    mock.requests.length = 0;
+    const recovered = await watch.sweep(500_000);
+    expect(recovered.pacing).toBe('normal');
+    expect(mock.count('/pulls/830')).toBeGreaterThan(0);
+  });
+
+  test('armed-only pacing without a reset header ends after one hour', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, { prNumber: 831 });
+    mock.pulls.set('octo/demo#831', {});
+    const watch = watchFor(s, mock);
+    mock.remaining = 100;
+    await watch.sweep(1_000);
+    const limited = await watch.sweep(1_000 + PR_WATCH_SLOW_INTERVAL_MS);
+    expect(limited.pacing).toBe('armed-only');
+    mock.remaining = 5000;
+    const recovered = await watch.sweep(1_000 + 3_600_000 + PR_WATCH_SLOW_INTERVAL_MS);
+    expect(recovered.pacing).toBe('normal');
   });
 });
 

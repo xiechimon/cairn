@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or } from 'drizzle-orm';
 import { build, gateVerdict, project, step, team, threadPr, todo } from '../db/schema.js';
 import {
   type FetchLike,
@@ -22,6 +22,8 @@ export const PR_WATCH_STRETCH_BELOW = 0.2;
 
 export const PR_WATCH_ARMED_ONLY_BELOW = 0.05;
 
+const RATE_WINDOW_FALLBACK_MS = 3_600_000;
+
 export type PrWatchPacing = 'normal' | 'stretched' | 'armed-only';
 
 export interface PrWatchTally {
@@ -43,6 +45,7 @@ export interface PrWatch {
 interface RateWindow {
   remaining: number;
   limit: number;
+  expiresAt: number;
 }
 
 interface Target {
@@ -57,8 +60,8 @@ interface Target {
 
 type PanelState = 'open' | 'draft' | 'merged' | 'closed';
 
-function pacingOf(rate: RateWindow | undefined): PrWatchPacing {
-  if (rate === undefined || rate.limit <= 0) return 'normal';
+function pacingOf(rate: RateWindow | undefined, now: number): PrWatchPacing {
+  if (rate === undefined || rate.limit <= 0 || now >= rate.expiresAt) return 'normal';
   const ratio = rate.remaining / rate.limit;
   if (ratio < PR_WATCH_ARMED_ONLY_BELOW) return 'armed-only';
   if (ratio < PR_WATCH_STRETCH_BELOW) return 'stretched';
@@ -83,12 +86,19 @@ export function createPrWatch(
   const closedSeenAt = new Map<string, number>();
   let sweeping = false;
 
-  function observing(teamId: string): FetchLike {
+  function observing(teamId: string, now: number): FetchLike {
     return async (input, init) => {
       const response = await run.githubFetch(input, init);
       const remaining = headerNumber(response.headers, 'x-ratelimit-remaining');
       const limit = headerNumber(response.headers, 'x-ratelimit-limit');
-      if (remaining !== null && limit !== null) rates.set(teamId, { remaining, limit });
+      if (remaining !== null && limit !== null) {
+        const resetSeconds = headerNumber(response.headers, 'x-ratelimit-reset');
+        rates.set(teamId, {
+          remaining,
+          limit,
+          expiresAt: resetSeconds !== null ? resetSeconds * 1000 : now + RATE_WINDOW_FALLBACK_MS,
+        });
+      }
       return response;
     };
   }
@@ -130,7 +140,13 @@ export function createPrWatch(
       .select({ id: threadPr.id })
       .from(threadPr)
       .innerJoin(todo, eq(todo.id, threadPr.threadId))
-      .where(and(eq(threadPr.teamId, teamId), ne(todo.latestBuildId, threadPr.buildId)))
+      .innerJoin(build, eq(build.id, threadPr.buildId))
+      .where(
+        and(
+          eq(threadPr.teamId, teamId),
+          or(ne(todo.latestBuildId, threadPr.buildId), isNull(build.prNumber)),
+        ),
+      )
       .all();
     for (const row of stale) deps.db.delete(threadPr).where(eq(threadPr.id, row.id)).run();
     return stale.length;
@@ -363,7 +379,7 @@ export function createPrWatch(
             tally.pruned += pruneSuperseded(teamId);
             const token = await githubTokenOrNull(deps, teamId);
             if (token === null) continue;
-            const pacing = pacingOf(rates.get(teamId));
+            const pacing = pacingOf(rates.get(teamId), now);
             tally.pacing = pacing;
             const last = lastReadAt.get(teamId);
             if (
@@ -374,7 +390,7 @@ export function createPrWatch(
               continue;
             }
             lastReadAt.set(teamId, now);
-            const fetchImpl = observing(teamId);
+            const fetchImpl = observing(teamId, now);
             let targets = targetsOf(teamId);
             if (pacing === 'armed-only') {
               targets = targets.filter((target) => {
