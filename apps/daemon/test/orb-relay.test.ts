@@ -1,13 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { type MachineApi, MachineApiError, MachineClient } from '../src/machine-client.js';
 import { ORB_STEP_METHODS } from '../src/orb/protocol.js';
 import { RelayMachineApi, RelayMachineError, RelayMachineServer } from '../src/orb/relay.js';
 import { orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 async function fixture() {
-  const home = mkdtempSync(join(tmpdir(), 'relay-'));
+  const home = testTempDir('relay-');
   const socketPath = join(home, 'step.sock');
   const forwarded = vi.fn(async (method: string, args: unknown[]): Promise<unknown> => {
     if (method === 'skillFile') return Buffer.from('skill');
@@ -172,7 +172,7 @@ test('refuses a second completion while the first is in flight and after it sett
 });
 
 test('replaces stale socket and token files left by a dead daemon', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-stale-relay-'));
+  const root = testTempDir('orb-stale-relay-');
   const socketPath = join(root, 'step.sock');
   execFileSync(process.execPath, [
     '-e',
@@ -325,7 +325,7 @@ test.each([
 });
 
 test('destroys a socket when an unterminated frame exceeds the byte limit', async () => {
-  const home = mkdtempSync(join(tmpdir(), 'relay-limit-'));
+  const home = testTempDir('relay-limit-');
   const socketPath = join(home, 'step.sock');
   const server = new RelayMachineServer({
     socketPath,
@@ -349,7 +349,7 @@ test('destroys a socket when an unterminated frame exceeds the byte limit', asyn
 });
 
 test('disconnects a non-reading worker when queued output exceeds the frame budget', async () => {
-  const home = mkdtempSync(join(tmpdir(), 'relay-output-limit-'));
+  const home = testTempDir('relay-output-limit-');
   const socketPath = join(home, 'step.sock');
   const upstream = new MachineClient({ serverUrl: 'http://unused.test' });
   const heartbeat = vi.spyOn(upstream, 'heartbeat').mockResolvedValue(undefined);
@@ -395,7 +395,7 @@ test.each(['step.sock', 'step.sock.token'])(
 );
 
 test('caps pre-auth connections at four and releases capacity after disconnect', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'relay-auth-cap-'));
+  const root = testTempDir('relay-auth-cap-');
   const socketPath = join(root, 'step.sock');
   const server = new RelayMachineServer({
     socketPath,

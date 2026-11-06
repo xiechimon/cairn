@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentBackend, MachineDoneBody, SessionOpts } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
@@ -16,12 +15,13 @@ import {
 } from './machine-loop-harness.js';
 import { FakeOrbProvider, type FakeOrbRunner, type FakeWorkerOptions } from './orb-fake.js';
 import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function workerRunner(
   backend: AgentBackend,
   observe?: (options: FakeWorkerOptions, runtimeHome: string) => void,
 ): FakeOrbRunner {
-  const root = mkdtempSync(join(tmpdir(), 'orb-worker-'));
+  const root = testTempDir('orb-worker-');
   return async (argv, options) => {
     if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
     const runtimeHome = join(root, argv[2] ?? 'agent');

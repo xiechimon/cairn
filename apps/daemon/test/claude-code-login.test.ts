@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
   parseClaudeOauthExpiresAt,
   readDefaultClaudeOauthExpiresAt,
 } from '../src/claude-code-auth.js';
+import { testTempDir } from './test-temp-dir.js';
 
 describe('parseClaudeOauthExpiresAt', () => {
   test('reads the refresh expiry and never returns token material', () => {
@@ -69,7 +69,7 @@ describe('parseClaudeOauthExpiresAt', () => {
 
 describe('readDefaultClaudeOauthExpiresAt', () => {
   test('uses the active config directory without falling back to the default account', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-auth-home-'));
+    const home = testTempDir('cairn-auth-home-');
     const custom = join(home, 'custom');
     const defaultDir = join(home, '.claude');
     mkdirSync(custom);
