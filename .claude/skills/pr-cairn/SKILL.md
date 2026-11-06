@@ -156,6 +156,16 @@ Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
 
+## Snapshot baselines
+
+When the diff adds or modifies any `*-snapshots/*.png` baseline, the workflow passes the list to the gate as `--changed-baselines`, and `baseline-evidence` reds the PR until the body shows every one of them. Per baseline, give either a table row naming the file with two embedded images, old baseline then new render, or a `<file>: <verdict>` line saying what changed and whether it is intended (a ```` ```text ```` fence keeps long lists out of the cap). Name the file exactly, with or without `.png`. Do not accept a baseline you have not looked at; if no one read it, the verdict says so.
+
+```markdown
+| Baseline | Old baseline | New render |
+| --- | --- | --- |
+| `pr-card-dark-linux.png` | ![old](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<n>/pr-card-dark-old.png) | ![new](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<n>/pr-card-dark-new.png) |
+```
+
 ## UI reference comparison
 
 A PR that changes `apps/web/src` adds a reference table under Proof, one row per state that has a reference shot (D120):
@@ -226,5 +236,6 @@ Do not run a local `codex exec` or `claude -p` review before pushing. Codex clou
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | a diff touching `apps/server/src/routes*.ts` carries `### Requirement` (internal link plus quote, or a doc screenshot; third-party needs the screenshot) and `### Requests` (a call screenshot, a Before row, a row with an HTTP status) | pr-evidence (required check, `--changed-files`) |
 | a diff changing more than docs has non-empty `Live:`, `Mocked:` and `Not covered:` lines | pr-evidence (required check, `--changed-files`) |
+| every added or modified `*-snapshots/*.png` baseline has an old / new image pair row or a `<file>: <verdict>` line (`baseline-evidence`) | pr-evidence (required check, `--changed-baselines`) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |
