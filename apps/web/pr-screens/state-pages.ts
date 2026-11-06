@@ -23,7 +23,7 @@ export const STATE_PAGES: StatePage[] = [
     name: 'first run home',
     url: () => '/app',
     world: 'empty',
-    ready: (page) => page.getByText('请先为 Coordinator 选择一个 Agent'),
+    ready: (page) => page.getByText('0 台在线'),
   },
   {
     name: 'pending question',
