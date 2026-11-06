@@ -1,0 +1,1 @@
+ALTER TABLE `todo` ADD `planAutoHold` integer DEFAULT false NOT NULL;

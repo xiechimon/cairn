@@ -426,3 +426,103 @@ describe('#1791 server auto-confirm after plan step', () => {
     }
   });
 });
+
+describe('D121 plan auto-approve is visible and can be held', () => {
+  async function planReady() {
+    const w = await setupWorld();
+    await w.startBuild();
+    const planStep = await w.claim();
+    await w.uploadPlan(planStep.step.id, GOOD_PLAN);
+    await w.done(planStep.step.id, { status: 'success' });
+    expect(w.todoRow().phase).toBe('confirm');
+    return w;
+  }
+
+  test('the todo record carries the auto-approve deadline', async () => {
+    const w = await planReady();
+    try {
+      const record = getTodo(w.s.svc, w.todoId)!;
+      expect(record.planAutoApproveAt).toBe(w.todoRow().phaseAt + 600_000);
+      expect(record.planAutoHold).toBeUndefined();
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('holding one plan stops its auto-approve and clears the deadline', async () => {
+    const w = await planReady();
+    try {
+      const res = await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, {
+        body: { planAutoHold: true },
+      });
+      expect(res.status).toBe(200);
+      const record = (await res.json()) as { planAutoHold?: boolean; planAutoApproveAt?: number };
+      expect(record.planAutoHold).toBe(true);
+      expect(record.planAutoApproveAt).toBeUndefined();
+      const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });
+      scheduler.tick(w.todoRow().phaseAt + 600_000 * 2);
+      scheduler.stop();
+      expect(w.todoRow().phase).toBe('confirm');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('releasing the hold brings the countdown back', async () => {
+    const w = await planReady();
+    try {
+      await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { planAutoHold: true } });
+      const res = await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, {
+        body: { planAutoHold: false },
+      });
+      const record = (await res.json()) as { planAutoApproveAt?: number };
+      expect(record.planAutoApproveAt).toBe(w.todoRow().phaseAt + 600_000);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('the project setting turns auto-approve off for every plan', async () => {
+    const w = await planReady();
+    try {
+      const res = await call(w.s.app, 'PATCH', `/api/projects/${w.projectId}/autonomy`, {
+        body: { planAutoApprove: false },
+      });
+      expect(res.status).toBe(200);
+      expect(getTodo(w.s.svc, w.todoId)!.planAutoApproveAt).toBeUndefined();
+      const scheduler = createScheduler(w.s.svc, { tickMs: 15_000 });
+      scheduler.tick(w.todoRow().phaseAt + 600_000 * 2);
+      scheduler.stop();
+      expect(w.todoRow().phase).toBe('confirm');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a human merge policy shows no countdown', async () => {
+    const w = await planReady();
+    try {
+      w.setMergePolicy('human');
+      expect(getTodo(w.s.svc, w.todoId)!.planAutoApproveAt).toBeUndefined();
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('approving the plan clears the hold', async () => {
+    const w = await planReady();
+    try {
+      await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { planAutoHold: true } });
+      const res = await call(
+        w.s.app,
+        'POST',
+        `/api/builds/${w.s.db.select().from(todoTable).get()!.latestBuildId}/steps`,
+        { body: { action: 'confirm' } },
+      );
+      expect(res.status).toBeLessThan(300);
+      expect(w.todoRow().planAutoHold).toBe(false);
+    } finally {
+      w.s.dispose();
+    }
+  });
+});

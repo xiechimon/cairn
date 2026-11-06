@@ -65,6 +65,7 @@ export const patchTodoBodySchema = z.object({
     })
     .optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),
+  planAutoHold: z.boolean().optional(),
 });
 
 export const patchSecretBodySchema = z.object({

@@ -194,6 +194,8 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     usageCost: w.usageCost,
     ...(w.verified !== undefined ? { verified: w.verified } : {}),
     ...(w.awaitingReply === true ? { awaitingReply: true } : {}),
+    ...(w.planAutoHold === true ? { planAutoHold: true } : {}),
+    ...(w.planAutoApproveAt !== undefined ? { planAutoApproveAt: w.planAutoApproveAt } : {}),
     ...(w.routeOverride !== undefined ? { routeOverride: w.routeOverride } : {}),
   };
 }

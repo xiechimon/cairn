@@ -58,6 +58,7 @@ async function world(prime = true) {
         quietMinutes: 0,
         cooldownMinutes: 0,
         dailyBudgetUsd: 0,
+        planAutoApprove: true,
       },
     })
     .where(eq(project.id, projectId))

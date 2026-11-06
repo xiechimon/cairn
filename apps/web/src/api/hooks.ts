@@ -688,6 +688,7 @@ export function useApiMutations(teamId: string | undefined) {
           title?: string;
           spec?: string;
           phase?: string;
+          planAutoHold?: boolean;
           orderIndex?: number;
           tagIds?: string[];
           projectId?: string;

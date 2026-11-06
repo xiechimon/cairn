@@ -143,6 +143,7 @@ export const todo = sqliteTable(
     sourceRef: text('sourceRef'),
     output: text('output').$type<TodoOutputKind>().notNull().default('code'),
     awaitingReply: bool('awaitingReply').notNull().default(false),
+    planAutoHold: bool('planAutoHold').notNull().default(false),
     userSpecAttachmentIds: json<string[]>('userSpecAttachmentIds').notNull().default(sql`'[]'`),
     userMessageAttachmentIds: json<string[]>('userMessageAttachmentIds')
       .notNull()

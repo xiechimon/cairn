@@ -37,6 +37,7 @@ import {
   isBuildStepKind,
   isPlanContractRewritePrompt,
   MERGE_ANNOUNCEMENT,
+  PLAN_AUTO_CONFIRM_GRACE_MS,
   PLAN_PRIOR_ART_RULE,
   type PlanContractCheck,
   parseGithubIssueSourceRef,
@@ -170,6 +171,7 @@ import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
   getTodo,
+  planAutoApproveEnabled,
   setTodoPhase,
   settleSplitOnDone,
   splitBlockersSatisfied,
@@ -2816,14 +2818,14 @@ function planContractOfStep(
   return checkPlanContract(latest.content);
 }
 
-export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
-
 export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): void {
   const waiting = deps.db.select().from(todo).where(eq(todo.phase, 'confirm')).all();
   for (const todoRow of waiting) {
     if (
       todoRow.archivedAt !== null ||
       todoRow.latestBuildId === null ||
+      todoRow.planAutoHold ||
+      !planAutoApproveEnabled(deps.db, todoRow) ||
       now - todoRow.phaseAt < PLAN_AUTO_CONFIRM_GRACE_MS
     ) {
       continue;

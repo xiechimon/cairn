@@ -148,3 +148,36 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
     </section>
   );
 }
+
+export function ProjectPlanApproveCard({
+  projectId,
+  teamId,
+}: {
+  projectId: string;
+  teamId: string;
+}) {
+  const { t } = useI18n();
+  const q = useProjectAutonomy(projectId, true);
+  const mutations = useApiMutations(teamId);
+  if (q.data === undefined) return null;
+  return (
+    <SettingsCard>
+      <SettingsRow
+        label={t('计划超时自动开工')}
+        hint={t('计划就绪后 10 分钟没人处理，自动批准并开工。关掉后只在你批准时开工。')}
+      >
+        <ToggleSwitch
+          aria-label={t('计划超时自动开工')}
+          checked={q.data.settings.planAutoApprove}
+          disabled={mutations.patchAutonomy.isPending}
+          onCheckedChange={(planAutoApprove) =>
+            mutations.patchAutonomy.mutate(
+              { id: projectId, body: { planAutoApprove } },
+              { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+            )
+          }
+        />
+      </SettingsRow>
+    </SettingsCard>
+  );
+}

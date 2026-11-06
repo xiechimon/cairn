@@ -21,6 +21,7 @@ export const autonomySettingsSchema = z.object({
   quietMinutes: z.number().int().min(0).max(1440),
   cooldownMinutes: z.number().int().min(0).max(1440),
   dailyBudgetUsd: z.number().min(0).max(10_000),
+  planAutoApprove: z.boolean(),
 });
 export type AutonomySettings = z.infer<typeof autonomySettingsSchema>;
 
@@ -29,6 +30,7 @@ export const DEFAULT_AUTONOMY_SETTINGS: AutonomySettings = {
   quietMinutes: 10,
   cooldownMinutes: 15,
   dailyBudgetUsd: 10,
+  planAutoApprove: true,
 };
 
 export const patchAutonomyBodySchema = autonomySettingsSchema.partial().strict();

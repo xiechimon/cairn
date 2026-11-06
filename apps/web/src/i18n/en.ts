@@ -1817,4 +1817,20 @@ export const EN: Record<string, string> = {
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
   'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  '{time} 后自动开工': 'Starts automatically in {time}',
+  '。要改计划，直接在下面回复。': '. To change it, reply below.',
+  '已暂停自动开工，批准后才会开工。要改计划，直接在下面回复。':
+    'Auto-start is paused. It starts only when you approve. To change the plan, reply below.',
+  先别动: 'Hold',
+  现在批准: 'Approve now',
+  恢复自动开工: 'Resume auto-start',
+  '操作失败，请重试。': 'That did not work. Try again.',
+  计划超时自动开工: 'Auto-start plans after the wait',
+  '计划就绪后 10 分钟没人处理，自动批准并开工。关掉后只在你批准时开工。':
+    'Ten minutes after a plan is ready with no response, approve it and start. Off means work starts only when you approve.',
+  '缺少「{tools}」授权，这次不能合并。现在完成，改动保留在会话分支。':
+    'Missing the "{tools}" permission, so this cannot merge. Finish now and the changes stay on the session branch.',
+  去开授权: 'Grant permission',
+  'PR #{n}': 'PR #{n}',
+  '查看 PR': 'View PR',
 };

@@ -198,7 +198,15 @@ describe('createScheduling sweep', () => {
     const w = world([openIssue(1)]);
     w.s.db
       .update(projectTable)
-      .set({ autonomy: { enabled: false, quietMinutes: 0, cooldownMinutes: 0, dailyBudgetUsd: 0 } })
+      .set({
+        autonomy: {
+          enabled: false,
+          quietMinutes: 0,
+          cooldownMinutes: 0,
+          dailyBudgetUsd: 0,
+          planAutoApprove: true,
+        },
+      })
       .where(eq(projectTable.id, w.projectId))
       .run();
     const scheduling = createScheduling(

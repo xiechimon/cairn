@@ -18,6 +18,7 @@ import {
   isStartedTodo,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
+  PLAN_AUTO_CONFIRM_GRACE_MS,
   parseGithubIssueSourceRef,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
@@ -28,6 +29,7 @@ import {
   machine,
   message,
   plan as planTable,
+  project,
   schedule,
   steerPending,
   step,
@@ -85,6 +87,18 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   if (isNotifiedPhase(to)) notifyTodoPhase(deps, record, to);
   triggerChiefWakes(deps, record, to);
   notifyThreadPhase(deps, record, to);
+}
+
+export function planAutoApproveEnabled(db: Db, row: TodoRow): boolean {
+  const owner = db
+    .select({ autonomy: project.autonomy })
+    .from(project)
+    .where(eq(project.id, row.projectId))
+    .get();
+  return (
+    owner?.autonomy?.planAutoApprove !== false &&
+    (owner?.autonomy?.mergePolicy ?? 'autonomous') !== 'human'
+  );
 }
 
 export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoRecord {
@@ -151,6 +165,13 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     snoozedUntil: row.snoozedUntil,
     snoozeMode: row.snoozeMode,
     ...(row.awaitingReply ? { awaitingReply: true } : {}),
+    ...(row.phase === 'confirm' && row.archivedAt === null
+      ? row.planAutoHold
+        ? { planAutoHold: true }
+        : planAutoApproveEnabled(db, row)
+          ? { planAutoApproveAt: row.phaseAt + PLAN_AUTO_CONFIRM_GRACE_MS }
+          : {}
+      : {}),
     seqNum: row.seqNum,
     orderIndex: row.orderIndex,
     tagIds,
@@ -394,6 +415,7 @@ export function updateTodo(
       verify?: NonNullable<Assignment['verify']>;
     };
     routeOverride?: RouteOverride | null;
+    planAutoHold?: boolean;
   },
   opts: { manualPhase?: boolean; userSpecAttachmentIds?: string[] } = {},
 ): TodoRecord | null {
@@ -413,6 +435,7 @@ export function updateTodo(
     sets.userSpecAttachmentIds = opts.userSpecAttachmentIds ?? [];
   }
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
+  if (patch.planAutoHold !== undefined) sets.planAutoHold = patch.planAutoHold;
   if (patch.routeOverride !== undefined) {
     const machineId = patch.routeOverride?.machineId;
     if (machineId !== undefined) {
@@ -468,6 +491,7 @@ export function updateTodo(
     if (patch.phase === 'done') assertCorrectionDone(db, row);
     sets.phase = patch.phase;
     sets.phaseAt = nowMs();
+    if (patch.planAutoHold === undefined) sets.planAutoHold = false;
   }
   if (Object.keys(sets).length > 0) {
     sets.v = row.v + 1;
@@ -634,6 +658,7 @@ export function setTodoPhase(
       .set({
         ...extra,
         ...(leavesQuestion ? { awaitingReply: false } : {}),
+        planAutoHold: false,
         phase: to,
         phaseAt: nowMs(),
         v: row.v + 1,

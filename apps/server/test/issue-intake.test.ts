@@ -220,6 +220,7 @@ const GATES_OFF: AutonomySettings = {
   quietMinutes: 0,
   cooldownMinutes: 0,
   dailyBudgetUsd: 0,
+  planAutoApprove: true,
 };
 
 async function postGithubProject(s: TestServer, name: string, githubRepo: string): Promise<string> {

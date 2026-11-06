@@ -1,7 +1,7 @@
 import { canOrchestrate } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useChiefThreads } from '../api/hooks.js';
+import { useApiMutations, useBuild, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -17,6 +17,8 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import { planAutoState } from './plan-auto-approve.js';
+import { PlanAutoReason } from './plan-auto-reason.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
@@ -76,6 +78,11 @@ export function useThreadActions({
   const moreRef = useRef<HTMLButtonElement | null>(null);
   const { buildId, running } = chat;
   const missingTools = useMergeGate(live ? chat.buildAgentId : null);
+  const buildQ = useBuild(live ? buildId : null, live);
+  const buildPr =
+    buildQ.data?.prUrl != null
+      ? { url: buildQ.data.prUrl, number: buildQ.data.prNumber ?? null }
+      : null;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
 
@@ -92,6 +99,13 @@ export function useThreadActions({
       { onError: (error) => toastError(t('批准失败，请重试。'), error) },
     );
   });
+  const setPlanHold = (hold: boolean) =>
+    guard(() => {
+      mutations.patchTodo.mutate(
+        { id: todo.id, body: { planAutoHold: hold } },
+        { onError: (error) => toastError(t('操作失败，请重试。'), error) },
+      );
+    });
   const setArchived = (next: boolean) =>
     guard(() => {
       setMenuOpen(false);
@@ -170,6 +184,7 @@ export function useThreadActions({
     })();
 
   const kind = threadActionOf(todo, running);
+  const planAuto = planAutoState(todo, Date.now());
   const orchestrating =
     (kind === 'start' || kind === 'retry') &&
     live &&
@@ -196,12 +211,28 @@ export function useThreadActions({
         className="mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-card) bg-card px-3.5 py-2.5 shadow-(--e1)"
       >
         <p className="m-0 min-w-0 flex-1 basis-48 text-meta text-content-secondary">
-          {t(ACTION_COPY[kind].reason)}
+          {kind === 'approve' && planAuto.kind !== 'off' ? (
+            <PlanAutoReason state={planAuto} deadline={todo.planAutoApproveAt} />
+          ) : (
+            t(ACTION_COPY[kind].reason)
+          )}
         </p>
         <div className="flex flex-none gap-2">
           {kind === 'approve' && onViewPlan !== undefined && (
             <Button size="sm" variant="outline" onClick={onViewPlan} className="h-7 px-2.5">
               {t('查看计划')}
+            </Button>
+          )}
+          {kind === 'approve' && planAuto.kind !== 'off' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={setPlanHold(planAuto.kind === 'counting')}
+              disabled={mutations.patchTodo.isPending}
+              data-testid="plan-auto-hold"
+              className="h-7 px-2.5"
+            >
+              {planAuto.kind === 'counting' ? t('先别动') : t('恢复自动开工')}
             </Button>
           )}
           {canFinishFailed && (
@@ -217,7 +248,11 @@ export function useThreadActions({
             className="h-7 px-2.5"
           >
             {(pending || orchestrating) && <Spinner data-icon="inline-start" />}
-            {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
+            {orchestrating
+              ? t('编排中')
+              : kind === 'approve' && planAuto.kind === 'counting'
+                ? t('现在批准')
+                : t(ACTION_COPY[kind].primary)}
           </Button>
         </div>
       </div>
@@ -294,6 +329,8 @@ export function useThreadActions({
         }
         mergeLocked={phase === 'failed'}
         infoOutput={chat.infoOutput}
+        agentId={chat.buildAgentId}
+        pr={buildPr}
         confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}
         {...(live ? { onConfirm: confirmAccept } : {})}
       />

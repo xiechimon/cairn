@@ -124,8 +124,12 @@ export const todoRecordSchema = z.object({
   usageCost: usageCostSchema.optional(),
   verified: z.boolean().optional(),
   awaitingReply: z.boolean().optional(),
+  planAutoHold: z.boolean().optional(),
+  planAutoApproveAt: epochMs.optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),
 });
+export const PLAN_AUTO_CONFIRM_GRACE_MS = 10 * 60_000;
+
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
 

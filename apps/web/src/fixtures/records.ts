@@ -69,6 +69,8 @@ export interface TodoRecord {
   sourceTodo: string | null;
   v: number;
   awaitingReply?: boolean;
+  planAutoHold?: boolean;
+  planAutoApproveAt?: number;
   chiefCreated?: boolean;
   waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
   quotaWait?: QuotaWait | null;

@@ -28,7 +28,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, SquarePen } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
-import { ProjectAutonomyCard } from './project-autonomy-card.js';
+import { ProjectAutonomyCard, ProjectPlanApproveCard } from './project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
 import { ProjectConcurrencySelect } from './project-concurrency-select.js';
 import { PageShell, TabGroup } from './shell.js';
@@ -435,6 +435,9 @@ export function ProjectSettingsPage() {
               </div>
             </div>
           </SettingsCard>
+        )}
+        {live && id !== undefined && teamId !== undefined && (
+          <ProjectPlanApproveCard projectId={id} teamId={teamId} />
         )}
         {live && wireProject?.repoKind === 'github' && id !== undefined && teamId !== undefined && (
           <ProjectAutonomyCard projectId={id} teamId={teamId} />

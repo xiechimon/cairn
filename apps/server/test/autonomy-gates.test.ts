@@ -18,6 +18,7 @@ const SETTINGS: AutonomySettings = {
   quietMinutes: 10,
   cooldownMinutes: 15,
   dailyBudgetUsd: 5,
+  planAutoApprove: true,
 };
 
 function input(over: Partial<AutonomyGateInput> = {}): AutonomyGateInput {
