@@ -98,6 +98,7 @@ async function start(
   home: string,
   overrides: Partial<TsnetSettings> = {},
   parentEnv: NodeJS.ProcessEnv = { PATH: '/usr/bin', CAIRN_TOKEN: 'secret' },
+  authToken: string | null = TOKEN,
 ) {
   const spawner = fakeSpawner();
   const s = bootServer({ authToken: TOKEN });
@@ -105,6 +106,7 @@ async function start(
     settings: settings(home, overrides),
     homeDir: home,
     app: s.app,
+    authToken,
     logger: silentLogger,
     parentEnv,
     spawnProcess: spawner.spawnProcess,
@@ -198,6 +200,7 @@ describe('default off: no process, no listener, no files', () => {
       settings: settings(home, { enabled: false }),
       homeDir: home,
       app: s.app,
+      authToken: TOKEN,
       logger: silentLogger,
       parentEnv: {},
       spawnProcess: spawner.spawnProcess,
@@ -301,6 +304,16 @@ describe('enabled', () => {
 });
 
 describe('failure modes leave the server running with no listener and no process', () => {
+  test('token auth disabled refuses tailnet access: no spawn, no socket, no files', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = await start(home, {}, {}, null);
+    expect(remote?.status().state).toBe('failed');
+    expect(remote?.status().lastError).toMatch(/access token/);
+    expect(spawner.spawned).toHaveLength(0);
+    expect(existsSync(paths.root)).toBe(false);
+  });
+
   test('a missing sidecar binary fails without spawning, listening or creating files', async () => {
     const home = freshHome();
     const { remote, spawner, paths } = await start(home);

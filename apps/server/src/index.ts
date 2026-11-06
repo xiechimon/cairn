@@ -205,6 +205,7 @@ const tsnetRemote = startTsnetRemote({
   settings: config.tsnet,
   homeDir: config.homeDir,
   app,
+  authToken: config.authToken,
   logger,
 });
 

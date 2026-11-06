@@ -31,6 +31,7 @@ export interface StartTsnetRemoteInput {
   settings: TsnetSettings;
   homeDir: string;
   app: Hono;
+  authToken: string | null;
   logger: SidecarLogger;
   parentEnv?: NodeJS.ProcessEnv;
   spawnProcess?: SpawnSidecar;
@@ -96,6 +97,11 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
   const paths = tsnetPathsOf(input.homeDir);
   let listener: TailnetListener;
   try {
+    if (input.authToken === null) {
+      throw new Error(
+        'tailnet access requires the access token, but token auth is disabled (CAIRN_AUTH=off); unset CAIRN_AUTH',
+      );
+    }
     verifyBinary(settings.binaryPath);
     verifySocketPathFits(paths.socketPath);
     ensurePrivateDir(paths.root, 'tsnet directory');

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
@@ -25,6 +25,7 @@ export function workspacePackages(rootDir = root) {
     }
   }
   return dirs
+    .filter((dir) => existsSync(resolve(rootDir, dir, 'package.json')))
     .map((dir) => ({
       ...JSON.parse(readFileSync(resolve(rootDir, dir, 'package.json'), 'utf8')),
       directory: dir,
