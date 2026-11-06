@@ -69,7 +69,9 @@ export function SidebarProjectRow({
       )}
     >
       <ProjectGlyph icon={icon} />
-      <span className="min-w-0 truncate">{name}</span>
+      <span className="min-w-0 truncate" title={name}>
+        {name}
+      </span>
     </Button>
   );
   if (menu == null) return button;
