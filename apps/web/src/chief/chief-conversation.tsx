@@ -332,6 +332,7 @@ export function ChiefConversation({
   const wire = useComposerWire({
     editable: onSend != null,
     draft: answerDraft ?? (onSend != null ? liveDraft : (chief.draft ?? '')),
+    readDraft: answerKey === null ? undefined : () => questionDockState.answerText(answerKey),
     onDraftChange:
       answerKey !== null
         ? (value: string) => questionDockState.setAnswerText(answerKey, value)

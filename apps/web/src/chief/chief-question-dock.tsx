@@ -143,7 +143,8 @@ export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boole
     total > 1
       ? {
           label: t('{n} / {total}', { n: position, total }),
-          canPrev: step > 0 || previous !== undefined,
+          canPrev:
+            !(bound && questionDockState.uploading()) && (step > 0 || previous !== undefined),
           canNext:
             !(bound && questionDockState.uploading()) &&
             (step < lastStep

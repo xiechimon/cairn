@@ -823,6 +823,60 @@ test('answer drafts per request and the thread draft stay separate through every
     },
     { name: 'type the answer for B', run: () => composer.fill('ansB'), composer: 'ansB' },
     {
+      name: 'start a slow upload on B',
+      run: async () => {
+        await page.locator('input[type="file"]').first().setInputFiles({
+          name: 'notes.log',
+          mimeType: 'text/plain',
+          buffer: Buffer.from('boom'),
+        });
+        await expect(page.getByTestId('attachment-pending')).toBeVisible();
+      },
+      composer: 'ansB',
+    },
+    {
+      name: 'Previous and the destination switch are blocked while it uploads',
+      run: async () => {
+        await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
+        await expect(page.getByRole('button', { name: '对某个 thread 说' })).toBeDisabled();
+        await expect(page.getByTitle('附件上传中').first()).toBeVisible();
+      },
+      composer: 'ansB',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+      },
+    },
+    {
+      name: 'the upload finishes into B',
+      run: async () => {
+        await expect(async () => {
+          await releaseUploads();
+          await expect(page.getByTestId('attachment-pending')).toHaveCount(0, { timeout: 500 });
+        }).toPass();
+      },
+      composer: 'ansB',
+      extra: async () => {
+        await expect(page.getByTestId('composer-attachments')).toContainText('notes.log');
+        await expect(page.getByTestId('chief-question-prev')).toBeEnabled();
+      },
+    },
+    {
+      name: 'A is unchanged after the upload on B',
+      run: () => page.getByTestId('chief-question-prev').click(),
+      composer: 'ansA2',
+      extra: async () => {
+        await expect(page.getByTestId('composer-attachments')).toHaveCount(0);
+      },
+    },
+    {
+      name: 'B kept its attachment',
+      run: () => page.getByTestId('chief-question-next').click(),
+      composer: 'ansB',
+      extra: async () => {
+        await expect(page.getByTestId('composer-attachments')).toContainText('notes.log');
+      },
+    },
+    {
       name: 'back to A: its answer is intact',
       run: () => page.getByTestId('chief-question-prev').click(),
       composer: 'ansA2',

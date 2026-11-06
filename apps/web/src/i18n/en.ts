@@ -1346,6 +1346,7 @@ export const EN: Record<string, string> = {
   取消提问: 'Dismiss question',
   已取消提问: 'Question dismissed',
   问题: 'Question',
+  附件上传中: 'Uploading attachment',
   '输入你自己的回答，或留空使用选中的选项':
     'Type your own answer, or leave blank to use the selected option',
   展开提问: 'Expand question',

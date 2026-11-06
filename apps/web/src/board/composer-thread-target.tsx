@@ -1,8 +1,9 @@
-import { type RefObject, useMemo, useRef, useState } from 'react';
+import { type RefObject, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useSendKey } from '../api/use-send-key.js';
 import { PROJECT_CHIP_CLS, TOOL_BTN_CLS } from '../chief/chief-conversation.js';
+import { questionDockState } from '../chief/question-dock-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { THREAD_REPLY_HINT, type ThreadReplyDelivery } from '../components/thread/thread-reply.js';
 import { Button } from '../components/ui/button.js';
@@ -114,6 +115,8 @@ export function ComposerThreadTarget({
   onPick: (todoId: string | null) => void;
 }) {
   const { t } = useI18n();
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const uploading = questionDockState.uploading();
   if (picked === null && targets.length === 0) return null;
   const trigger =
     picked === null ? (
@@ -121,6 +124,8 @@ export function ComposerThreadTarget({
         variant="ghost"
         size="icon"
         aria-label={t('对某个 thread 说')}
+        disabled={uploading}
+        title={uploading ? t('附件上传中') : undefined}
         className={TOOL_BTN_CLS}
       />
     ) : (
@@ -129,6 +134,8 @@ export function ComposerThreadTarget({
         data-testid="composer-thread-target"
         data-set=""
         aria-label={t('正在对 #{seq} 说', { seq: picked.seq })}
+        disabled={uploading}
+        title={uploading ? t('附件上传中') : undefined}
         className={PROJECT_CHIP_CLS}
       />
     );

@@ -422,7 +422,10 @@ export function ChiefQuestionCard({
           )}
         </Button>
         {shownPager !== undefined && (
-          <div className="flex flex-none items-center">
+          <div
+            className="flex flex-none items-center"
+            title={blockedByUpload ? t('附件上传中') : undefined}
+          >
             <Button
               variant="ghost"
               size="icon-xs"

@@ -57,6 +57,7 @@ export interface ComposerWireOptions {
   editable?: boolean;
   draft?: string;
   onDraftChange?: (next: string) => void;
+  readDraft?: () => string;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
   onStopAndSend?: (text: string) => void | Promise<void>;
@@ -128,6 +129,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     editable = false,
     draft: draftProp,
     onDraftChange,
+    readDraft,
     onSend,
     onQueue,
     onStopAndSend,
@@ -362,7 +364,14 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     void Promise.resolve(onAttachment(files))
       .then((tokens) => {
         if (tokens.length === 0) return;
-        writeFull(joinDraft([...tokensRef.current, ...tokens], draftRef.current));
+        const base =
+          readDraft === undefined ? undefined : splitDraft(toDisplay(readDraft(), registry));
+        writeFull(
+          joinDraft(
+            [...(base?.tokens ?? tokensRef.current), ...tokens],
+            base?.text ?? draftRef.current,
+          ),
+        );
       })
       .catch((err) => {
         console.error('attachment delegate failed', err);
