@@ -235,7 +235,7 @@ jobs:
 
       # #765: pnpm forwards `--` to the script, so `e2e -- --shard=...` makes Playwright ignore sharding.
       # Flags after the script name are forwarded without the extra positional `--`.
-      - name: E2E (shard ${{ matrix.shard }}/4, #693)
+      - name: "E2E (shard ${{ matrix.shard }}/4, #693)"
         run: pnpm prepush --e2e-shard ${{ matrix.shard }}/4
 
       - name: Upload gallery snapshot renders
@@ -467,7 +467,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Comment discipline gate (advisory, #1520)
+      - name: "Comment discipline gate (advisory, #1520)"
         continue-on-error: true
         if: ${{ !cancelled() }}
         env:
@@ -477,7 +477,7 @@ jobs:
           node --test scripts/comment-discipline-gate.test.mjs
           node scripts/comment-discipline-gate.mjs
 
-      - name: Probe reach gate (advisory, #1542)
+      - name: "Probe reach gate (advisory, #1542)"
         if: ${{ !cancelled() }}
         env:
           VP_REACH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -492,7 +492,7 @@ jobs:
 
       - name: Mergify queue config follows pr-gate routing
         if: ${{ !cancelled() }}
-        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs scripts/workflow-concurrency.test.mjs scripts/autonomy-brake.test.mjs scripts/autonomy-brake-workflow.test.mjs
+        run: node --test scripts/mergify-config.test.mjs scripts/merge-route.test.mjs scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/autonomy-brake.test.mjs scripts/autonomy-brake-workflow.test.mjs
 
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() }}
