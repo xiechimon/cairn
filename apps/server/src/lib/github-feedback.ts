@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HttpError } from './errors.js';
 import type { FetchLike } from './github.js';
+import { githubApiBaseUrl } from './github-api-base.js';
 
 const feedbackSchema = z.object({
   id: z.number().int().positive(),
@@ -37,7 +38,7 @@ export async function githubPrFeedback(
   repo: string,
   prNumber: number,
 ): Promise<{ comments: GithubFeedback[]; highWater: z.infer<typeof feedbackHighWaterSchema> }> {
-  const base = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const base = `${githubApiBaseUrl()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
   const out: GithubFeedback[] = [];
   const highWater = { comment: 0, 'review-comment': 0, review: 0 };
   for (const [kind, path] of [

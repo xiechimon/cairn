@@ -2,6 +2,7 @@ import type { GithubRepoRef, ProjectBranchesResponse } from '@cairn/shared';
 import { z } from 'zod';
 import { HttpError } from './errors.js';
 import type { FetchLike } from './github.js';
+import { githubApiBaseUrl } from './github-api-base.js';
 
 const repositorySchema = z.object({ default_branch: z.string().min(1).nullable() });
 const branchesSchema = z.array(z.object({ name: z.string().min(1) }));
@@ -11,7 +12,7 @@ export async function githubBranches(
   token: string | null,
   ref: GithubRepoRef,
 ): Promise<ProjectBranchesResponse> {
-  const base = `https://api.github.com/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.repo)}`;
+  const base = `${githubApiBaseUrl()}/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.repo)}`;
   const read = async (url: string): Promise<unknown> => {
     try {
       const response = await fetchImpl(url, {
