@@ -114,8 +114,10 @@ export function Specimen({
 
 export function Cell({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-2.5">
-      <div className="flex min-h-8 flex-1 flex-wrap items-center gap-2">{children}</div>
+    <div className="flex max-w-full min-w-0 flex-col items-start gap-2.5">
+      <div className="flex max-w-full min-h-8 min-w-0 flex-1 flex-wrap items-center gap-2">
+        {children}
+      </div>
       <span className="text-caption text-content-tertiary">{label}</span>
     </div>
   );
