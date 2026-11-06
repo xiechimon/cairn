@@ -1896,6 +1896,7 @@ export const EN: Record<string, string> = {
   等你审阅: 'Ready for review',
   '选择 {title}': 'Select {title}',
   '最后在线 {time}': 'Last seen {time}',
+  选择这台机器接哪些运行时: 'Choose which runtimes this machine takes work for',
   '重新连接 {name} 后才能修改它的设置。': 'Reconnect {name} to change its settings.',
   '订阅账户和工作路由按团队生效，{name} 沿用团队设置。':
     'Subscription accounts and work routing apply to the whole team, so the team settings also cover {name}.',

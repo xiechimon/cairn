@@ -61,8 +61,11 @@ test('an offline machine says when it was last online', async ({ page }) => {
   await expect(row.getByTestId('machine-last-seen')).toHaveText('最后在线 12 分钟前');
 });
 
-test('pausing a machine and resuming it restores its runtime set', async ({ page }) => {
+test('the accept switch is derived: off clears runtimes, on only opens the runtime switches and saves nothing', async ({
+  page,
+}) => {
   const patches: unknown[] = [];
+  let enabledRuntimes = ['pi'];
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
@@ -86,38 +89,39 @@ test('pausing a machine and resuming it restores its runtime set', async ({ page
           online: true,
           latestCliVersion: null,
           kind: 'remote',
-          enabledRuntimes: ['pi'],
+          enabledRuntimes,
         },
       ],
     }),
   );
   await page.route('**/api/machines/m-1', (route, request) => {
     if (request.method() !== 'PATCH') return route.fallback();
-    patches.push(request.postDataJSON());
+    const body = request.postDataJSON() as { enabledRuntimes: string[] };
+    patches.push(body);
+    enabledRuntimes = body.enabledRuntimes;
     return route.fulfill({ json: {} });
   });
   await page.goto('/app/settings/machines');
   const toggle = settings(page).getByTestId('machine-accept-toggle');
+  await expect(toggle).toBeChecked();
   await toggle.click();
   await expect.poll(() => patches.length).toBe(1);
   expect(patches[0]).toEqual({ enabledRuntimes: [] });
-  await page.route('**/api/teams/team-1/machines', (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: 'm-1',
-          name: 'alpha',
-          teamId: 'team-1',
-          online: true,
-          latestCliVersion: null,
-          kind: 'remote',
-          enabledRuntimes: [],
-        },
-      ],
-    }),
+  await expect(toggle).not.toBeChecked();
+
+  await toggle.click();
+  await expect(settings(page).getByTestId('machine-pick-runtimes')).toHaveText(
+    '选择这台机器接哪些运行时',
   );
-  await page.reload();
-  await settings(page).getByTestId('machine-accept-toggle').click();
+  await expect(settings(page).getByTestId('machine-item')).toHaveAttribute(
+    'data-expanded',
+    'true',
+  );
+  await expect(settings(page).getByTestId('provider-toggle').first()).toBeFocused();
+  expect(patches).toHaveLength(1);
+  await expect(toggle).not.toBeChecked();
+
+  await settings(page).getByTestId('provider-toggle').first().click();
   await expect.poll(() => patches.length).toBe(2);
   expect(patches[1]).toEqual({ enabledRuntimes: ['pi'] });
 });

@@ -308,6 +308,11 @@ export function MachineDetailPane({
         title={t('运行时')}
         description={t('这台机器上能接任务的执行器，以及它们的登录状态。')}
       >
+        {online && !(machine.enabledRuntimes ?? []).some(isMachineRuntime) && (
+          <p data-testid="machine-pick-runtimes" className="m-0 text-meta text-content-secondary">
+            {t('选择这台机器接哪些运行时')}
+          </p>
+        )}
         <SettingsCard>
           {runtimes.map((runtime) => (
             <RuntimeRow
