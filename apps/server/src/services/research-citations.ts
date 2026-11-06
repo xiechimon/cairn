@@ -13,12 +13,15 @@ import { agent, build, chief, message, todo, tokenUsage } from '../db/schema.js'
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
 import { modelsAreIndependent } from './merge-gate/model-identity.js';
-import { CITATION_PARKED_MARK, failureNeedsHuman } from './needs-you.js';
+import {
+  CITATION_CHECK_SOURCE_KIND,
+  CITATION_PARKED_MARK,
+  failureNeedsHuman,
+} from './needs-you.js';
 import { runnableResearchAgentIds } from './research-dispatch.js';
 import { routeForStep } from './routing-rules.js';
 import { createTodo } from './todos.js';
 
-const CHECK_SOURCE_KIND = 'research-citation-check';
 const TIER_MARKER_KIND = 'research-tier';
 const CHECKS_PER_TICK = 5;
 const CITATION_RETRY_MS = 60_000;
@@ -119,7 +122,7 @@ function checkerTodo(db: Db, source: SourceReport) {
     .where(
       and(
         eq(todo.teamId, source.teamId),
-        eq(todo.sourceKind, CHECK_SOURCE_KIND),
+        eq(todo.sourceKind, CITATION_CHECK_SOURCE_KIND),
         eq(todo.sourceRef, source.sourceRef),
         isNull(todo.archivedAt),
       ),
@@ -312,7 +315,7 @@ export function openCitationCheck(
       output: 'info',
       createdBy: deps.user.id,
       ownerId: deps.user.id,
-      sourceKind: CHECK_SOURCE_KIND,
+      sourceKind: CITATION_CHECK_SOURCE_KIND,
       sourceRef: source.sourceRef,
     });
   const [started] = startBuilds(deps, {
@@ -417,7 +420,7 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
     .where(
       and(
         eq(checker.teamId, todo.teamId),
-        eq(checker.sourceKind, CHECK_SOURCE_KIND),
+        eq(checker.sourceKind, CITATION_CHECK_SOURCE_KIND),
         isNull(checker.archivedAt),
         isNotNull(checker.latestBuildId),
         notInArray(checker.phase, [...RETRYABLE_CHECKER_PHASES]),

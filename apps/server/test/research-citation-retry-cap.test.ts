@@ -5,7 +5,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import * as dbClient from '../src/db/client.js';
 import { agent, build, todo, tokenUsage } from '../src/db/schema.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
-import { failureNeedsHuman } from '../src/services/needs-you.js';
+import { failureNeedsHuman, sweepFailedRetries } from '../src/services/needs-you.js';
 import {
   CITATION_MAX_ATTEMPTS,
   checkedResearchReport,
@@ -125,6 +125,34 @@ describe('citation checker retry cap', () => {
     planResearchCitationChecks(s.svc);
     expect(openCitationCheck(s.svc, opened.buildId)?.buildId).toBe(latest.buildId);
     expect(checkerBuildCount(s, latest.todoId)).toBe(CITATION_MAX_ATTEMPTS);
+  });
+
+  test('the scheduler tick sequence runs a dead-model checker once, then parks', async () => {
+    const { s, opened } = await world();
+    const first = openCitationCheck(s.svc, opened.buildId)!;
+    fail(s, first, deadModel);
+    planResearchCitationChecks(s.svc);
+    await sweepFailedRetries(s.svc);
+    planResearchCitationChecks(s.svc);
+    await sweepFailedRetries(s.svc);
+    expect(checkerBuildCount(s, first.todoId)).toBe(1);
+  });
+
+  test('the scheduler tick sequence never exceeds the cap on transient failures', async () => {
+    const { s, opened } = await world();
+    let latest = openCitationCheck(s.svc, opened.buildId)!;
+    for (let i = 0; i < CITATION_MAX_ATTEMPTS + 2; i++) {
+      fail(s, latest, transient);
+      await sweepFailedRetries(s.svc);
+      const row = s.db.select().from(todo).where(eq(todo.id, latest.todoId)).get()!;
+      if (row.latestBuildId !== latest.buildId) {
+        latest = { todoId: latest.todoId, buildId: row.latestBuildId! };
+        continue;
+      }
+      const next = openCitationCheck(s.svc, opened.buildId)!;
+      latest = { todoId: next.todoId, buildId: next.buildId };
+    }
+    expect(checkerBuildCount(s, latest.todoId)).toBeLessThanOrEqual(CITATION_MAX_ATTEMPTS);
   });
 
   test('a successful check still completes within the cap', async () => {
