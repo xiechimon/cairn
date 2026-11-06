@@ -1,12 +1,12 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProviderConfig } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { materializeProvider } from '../src/backend/pi.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function materialized(provider: ProviderConfig): Record<string, unknown> {
-  const path = join(mkdtempSync(join(tmpdir(), 'cairn-builtin-')), 'models.json');
+  const path = join(testTempDir('cairn-builtin-'), 'models.json');
   materializeProvider(path, provider);
   const raw = JSON.parse(readFileSync(path, 'utf8')) as {
     providers: Record<string, Record<string, unknown>>;

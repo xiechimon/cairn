@@ -1,5 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
@@ -7,6 +6,7 @@ import {
   parseClaudeCodeAuthStatus,
   probeClaudeCodeAuth,
 } from '../src/claude-code-auth.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function statusJson(fields: Record<string, unknown>): string {
   return JSON.stringify({
@@ -79,7 +79,7 @@ describe('probeClaudeCodeAuth', () => {
   });
 
   test('failure mode 6b: real subprocess rc=1 + JSON stdout → verdict as usual (not folded into unknown by the exit code)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-auth-'));
+    const dir = testTempDir('cairn-cc-auth-');
     const stub = join(dir, 'claude');
     writeFileSync(
       stub,

@@ -1,12 +1,12 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MCP_NOT_IN_CONFIG_CANON } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { notInConfigLine, resolveMcpEndpoints } from '../src/backend/mcp-config.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function cfg(content: unknown): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-mcp-daemon-cfg-'));
+  const dir = testTempDir('cairn-mcp-daemon-cfg-');
   const p = join(dir, 'claude.json');
   writeFileSync(p, typeof content === 'string' ? content : JSON.stringify(content), 'utf8');
   return p;
@@ -58,7 +58,7 @@ describe('resolveMcpEndpoints — slug → local config resolution (spec 13)', (
 
   test('missing file / bad JSON = empty set, everything goes through onMissing, no throw', () => {
     const missing: string[] = [];
-    const absent = join(tmpdir(), 'cairn-no-such-claude.json');
+    const absent = join(testTempDir('daemon-cwd-'), 'cairn-no-such-claude.json');
     expect(resolveMcpEndpoints(absent, ['a'], { onMissing: (s) => missing.push(s) })).toEqual([]);
     expect(missing).toEqual(['a']);
     expect(resolveMcpEndpoints(cfg('{{{ not json'), ['a'])).toEqual([]);

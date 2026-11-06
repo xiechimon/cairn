@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { gitPrim, runGit } from '../src/git.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const PROXY_ENV_NAMES = [
   'HTTP_PROXY',
@@ -77,7 +77,7 @@ describe('git subprocess reaches the loopback server bypassing the global http.p
   beforeEach(async () => {
     stubOutInheritedGitConfig();
     for (const name of PROXY_ENV_NAMES) vi.stubEnv(name, undefined);
-    tmp = mkdtempSync(join(tmpdir(), 'cairn-git-loopback-proxy-'));
+    tmp = testTempDir('cairn-git-loopback-proxy-');
 
     const work = join(tmp, 'work');
     mkdirSync(work);
