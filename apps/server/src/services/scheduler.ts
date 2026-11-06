@@ -40,6 +40,7 @@ import { planChiefDigests } from './chief-digest.js';
 import { planChiefSummaries } from './chief-summary.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
+import { sweepIdleComposerDrafts } from './composer-drafts.js';
 import { createDueRunner, type DueClock } from './due-events.js';
 import { projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
@@ -536,6 +537,7 @@ export function createScheduler(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
           now,
         );
+        sweepIdleComposerDrafts(deps.db, now);
         advanceGc();
         sweepStepSessions(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },

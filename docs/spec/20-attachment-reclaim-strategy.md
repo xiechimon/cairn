@@ -9,7 +9,7 @@
   `<dataDir>/attachments/<teamId>/<id>.<ext>` only grows.
 - The token `![name](attachment:<key>)` is persisted in task bodies: `todo.spec`
   (text), `message.content` / `chief_message.content` (json), `steer_pending.content`,
-  `plan.content`. The token is referenced by already-stored content ⇒ the
+  `plan.content`, `composer_draft.content`. The token is referenced by already-stored content ⇒ the
   attachment is data, not cache — must not be moved to /tmp (a restart breaks
   the whole chain into dead links, and silently).
 - The web write-side token is constructed only after the upload 201
@@ -47,6 +47,7 @@
   referenced files cannot keep "false deletion = 0", so the quota only gates at
   grant time (over limit 400), the reclaim only collects zero-reference files,
   no rate limiting.
+- **R6: a composer draft is a reference.** The server-side composer draft (`composer_draft.content`, D110) holds the same `![name](attachment:<key>)` tokens the composer inserts after upload, so it joins the reference scan: an attachment in an unsent draft is kept past `ORPHAN_GRACE`. Removing the token from the draft, or clearing it after a send, drops that reference (a sent message takes over the reference). A draft untouched for `COMPOSER_DRAFT_IDLE_TTL` (30d) is deleted in the same hourly sweep, before the attachment scan, so an abandoned draft cannot pin files forever.
 
 ## 3. Mechanism: scheduler tick piggyback (server) + startup/daily sweep (daemon)
 
@@ -62,7 +63,7 @@
   costs extra bytes, not a false deletion; under team isolation another team
   cannot see your key anyway):
   `todo.spec` + `message.content` + `chief_message.content` +
-  `steer_pending.content` + `plan.content` (json columns go through stringify).
+  `steer_pending.content` + `plan.content` + `composer_draft.content` (json columns go through stringify).
   Matching uses the key-syntax substring regex (a superset of whole-line tokens
   — an inline token also counts as a reference, only over-keep, never over-delete).
 - Deletion order: first delete the DB row, then unlink the file (within the same
@@ -104,6 +105,8 @@
 10. over `SESSION_JSONL_MAX_BYTES` → daemon skips, server PUT 413, not stored.
 11. session file absent / read failed / upload failed → the step still success, log visible.
 12. step alive → the session attachment kept; step deleted and over `ORPHAN_GRACE` → reclaimed.
+13. an attachment referenced only by a composer draft is kept past grace; once the token leaves the draft (edit, or clear after send) it is reclaimed.
+14. a composer draft idle past 30d is deleted; a fresh one is kept.
 
 ## 7. Session Attachment (#1512)
 

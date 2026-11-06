@@ -61,6 +61,7 @@ import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highl
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
+import { useServerDraft } from '../overlay/use-server-draft.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
@@ -99,14 +100,6 @@ const EXAMPLE_ICONS = {
 
 export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
 export const CHIEF_PROJECT_STORAGE_KEY = 'cairn.chief-project';
-
-function readStoredChiefDraft(key: string): string {
-  try {
-    return localStorage.getItem(key) ?? '';
-  } catch {
-    return '';
-  }
-}
 
 export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolean) => void }) {
   const scrollable = useMessageScrollerScrollable();
@@ -275,16 +268,13 @@ export function ChiefConversation({
     (index: number, id: string | null) => setRewindConfirm({ index, id }),
     [],
   );
-  const [liveDraft, setLiveDraft] = useState(() =>
-    live ? readStoredChiefDraft(draftStorageKey) : initialDraft,
-  );
-  useEffect(() => {
-    if (!live) return;
-    try {
-      if (liveDraft === '') localStorage.removeItem(draftStorageKey);
-      else localStorage.setItem(draftStorageKey, liveDraft);
-    } catch {}
-  }, [live, liveDraft, draftStorageKey]);
+  const [liveDraft, setLiveDraft] = useServerDraft({
+    teamId,
+    scope: 'chief',
+    localKey: draftStorageKey,
+    enabled: live,
+    initial: initialDraft,
+  });
   const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const wire = useComposerWire({
     editable: onSend != null,
