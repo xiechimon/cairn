@@ -183,7 +183,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(done, 'Q1').toHaveCSS('color', ink3);
 
     await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
-    await expect(pending.getByTestId('chief-question-step'), 'Q2').toHaveCSS(
+    await expect(pending.getByTestId('chief-question-position'), 'Q2').toHaveCSS(
       'font-size',
       '12px',
     );

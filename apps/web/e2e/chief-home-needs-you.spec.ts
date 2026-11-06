@@ -58,7 +58,7 @@ test('two pending decisions are answered one at a time above the composer; the r
   });
   await page.goto('/app');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
   const panel = page.getByTestId('chief-question-dock');
   const card = panel.getByTestId('chief-question-card');
   await expect(card.getByTestId('chief-question-status')).toHaveText('待你决定');
@@ -127,7 +127,7 @@ test('the question dock steps between pending questions', async ({ page }) => {
   await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
   await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
   await page.getByTestId('chief-question-next').click();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('2/2');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
   await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
   await expect(page.getByTestId('chief-question-next')).toBeDisabled();
   await page.getByTestId('chief-question-prev').click();

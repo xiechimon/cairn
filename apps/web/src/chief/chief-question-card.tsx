@@ -22,6 +22,7 @@ import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { Kbd } from '../components/ui/kbd.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -41,6 +42,15 @@ export interface ChiefQuestionCardProps {
   onCancel?: (requestId: string) => void;
   numberKeys?: boolean;
   draftKey?: string;
+  pager?: QuestionPager;
+}
+
+export interface QuestionPager {
+  label: string;
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
 }
 
 const CARD_CLS =
@@ -84,6 +94,8 @@ function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
 }
 
 type Question = ChiefQuestionItem['questions'][number];
+
+const MOD_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
 function digitsReachCard(target: HTMLElement): boolean {
   if (target.isContentEditable) return false;
@@ -161,6 +173,7 @@ export function ChiefQuestionCard({
   onCancel,
   numberKeys = false,
   draftKey,
+  pager,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
@@ -214,6 +227,27 @@ export function ChiefQuestionCard({
     });
   };
 
+  const primaryEnabled = pending && (last ? allComplete : stepComplete);
+  const advance = () => {
+    if (!primaryEnabled) return;
+    if (last) submit();
+    else setStep((s) => Math.min(lastStep, s + 1));
+  };
+
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
+  useEffect(() => {
+    const node = cardRef.current;
+    if (node === null) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      advanceRef.current();
+    };
+    node.addEventListener('keydown', handler);
+    return () => node.removeEventListener('keydown', handler);
+  }, [item.status]);
+
   if (question === undefined) return null;
 
   if (item.status !== 'pending') {
@@ -260,6 +294,17 @@ export function ChiefQuestionCard({
           ? t('已选 {n} 项', { n: pickedCount })
           : t('未选')
         : '';
+  const shownPager: QuestionPager | undefined =
+    pager ??
+    (total > 1
+      ? {
+          label: t('{n} / {total}', { n: step + 1, total }),
+          canPrev: step > 0,
+          canNext: !last && stepComplete,
+          onPrev: () => setStep((s) => Math.max(0, s - 1)),
+          onNext: () => setStep((s) => Math.min(lastStep, s + 1)),
+        }
+      : undefined);
   const pick = (optionIndex: number) =>
     setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
 
@@ -277,31 +322,31 @@ export function ChiefQuestionCard({
             {question.question}
           </div>
         </div>
-        {total > 1 && (
+        {shownPager !== undefined && (
           <div className="flex flex-none items-center gap-1">
             <Button
               variant="ghost"
               size="icon-sm"
-              data-testid="chief-question-step-prev"
+              data-testid="chief-question-prev"
               aria-label={t('上一步')}
-              disabled={!pending || step === 0}
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={!pending || !shownPager.canPrev}
+              onClick={shownPager.onPrev}
             >
               <ChevronLeft aria-hidden className="size-4" />
             </Button>
             <span
-              data-testid="chief-question-step"
+              data-testid="chief-question-position"
               className="text-caption tabular-nums text-content-tertiary"
             >
-              {t('{n} / {total}', { n: step + 1, total })}
+              {shownPager.label}
             </span>
             <Button
               variant="ghost"
               size="icon-sm"
-              data-testid="chief-question-step-next"
+              data-testid="chief-question-next"
               aria-label={t('下一步')}
-              disabled={!pending || last || !stepComplete}
-              onClick={() => setStep((s) => Math.min(lastStep, s + 1))}
+              disabled={!pending || !shownPager.canNext}
+              onClick={shownPager.onNext}
             >
               <ChevronRight aria-hidden className="size-4" />
             </Button>
@@ -416,15 +461,11 @@ export function ChiefQuestionCard({
           >
             {t('取消提问')}
           </Button>
-          <Button
-            className={DIALOG_PRIMARY_BUTTON}
-            disabled={!pending || !(last ? allComplete : stepComplete)}
-            onClick={() => {
-              if (last) submit();
-              else setStep((s) => Math.min(lastStep, s + 1));
-            }}
-          >
+          <Button className={DIALOG_PRIMARY_BUTTON} disabled={!primaryEnabled} onClick={advance}>
             {last ? t('提交回答') : t('下一步')}
+            <Kbd className="pointer-coarse:hidden bg-primary-foreground/15 text-primary-foreground">
+              {MOD_KEY} ↵
+            </Kbd>
           </Button>
         </div>
       </div>

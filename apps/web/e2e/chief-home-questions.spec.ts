@@ -113,7 +113,7 @@ test('answering removes the card and the badge count; the next question takes it
   await page.goto('/app');
   const dock = page.getByTestId('chief-question-dock');
   const badge = page.getByRole('complementary').getByTestId('attention-badge');
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
   await expect(badge).toHaveText('2');
   await dock.getByTestId('chief-question-option-0-0').click();
   await dock.getByRole('button', { name: '提交回答' }).click();
@@ -155,7 +155,7 @@ test('the sidebar Coordinator badge counts pending questions and opens the card 
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await expect(page.getByTestId('chief-question-dock').getByTestId('chief-question-card')).toBeVisible();
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
 });
 
 test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ page }) => {
@@ -178,7 +178,7 @@ test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ 
   await card.getByRole('button', { name: '提交回答' }).click();
   await expect(page.getByTestId('chief-question-error')).toBeVisible();
   await expect(card.getByTestId('chief-question-input-0')).toHaveValue('Keep this text');
-  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
 });
 
 test('at 375px the card sits above the composer and the last message stays visible', async ({
@@ -300,3 +300,80 @@ for (const size of [
     await expect(dock.getByRole('button', { name: '提交回答' })).toBeVisible();
   });
 }
+
+const MIXED = {
+  threads: [THREAD],
+  messages: [
+    { id: 'request', role: 'user', content: 'Ship the relay fix', createdAt: 10 },
+    {
+      id: 'row-ask-0000000a',
+      role: 'assistant',
+      createdAt: 20,
+      content: JSON.stringify({
+        kind: 'ask_user_question',
+        requestId: 'ask-0000000a',
+        status: 'pending',
+        questions: [
+          { header: 'Theme', question: 'Which theme?', options: [{ label: 'Light' }, { label: 'Dark' }] },
+          { header: 'Sections', question: 'Which sections?', multiSelect: true, options: [{ label: 'Intro' }, { label: 'Details' }] },
+        ],
+        answers: null,
+      }),
+    },
+    question('ask-0000000b', 'Merge · #2271', 'Who merges it?', [{ label: 'Hold it' }, { label: 'Send it to ian' }]),
+  ],
+  todos: [],
+};
+
+test('one pager in the card header counts every question across requests, with no second pager', async ({
+  page,
+}) => {
+  await mockLive(page, structuredClone(MIXED));
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await expect(dock.getByTestId('chief-question-position')).toHaveCount(1);
+  await expect(page.getByTestId('chief-question-card').getByTestId('chief-question-position')).toHaveText('1 / 3');
+  await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
+  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
+  await dock.getByTestId('chief-question-option-0-0').click();
+  await page.getByTestId('chief-question-next').click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 3');
+  await expect(dock.getByTestId('chief-question-text')).toContainText('Which sections?');
+  await page.getByTestId('chief-question-next').click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('3 / 3');
+  await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
+  await page.getByTestId('chief-question-prev').click();
+  await page.getByTestId('chief-question-prev').click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 3');
+  await expect(dock.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a picked option fills only its mark, with no row background', async ({ page }) => {
+  await mockLive(page, structuredClone(ONE));
+  await page.goto('/app');
+  const option = page.getByTestId('chief-question-option-0-0');
+  await option.click();
+  await page.mouse.move(0, 0);
+  await expect(option).toHaveAttribute('aria-pressed', 'true');
+  await expect(option).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+});
+
+test('the primary button shows its shortcut and Ctrl+Enter or Cmd+Enter submits from inside the card', async ({
+  page,
+}) => {
+  const answered: unknown[] = [];
+  const state = structuredClone(ONE);
+  await mockLive(page, state, (path, route, json) => {
+    if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
+    answered.push(route.request().postDataJSON());
+    return json({});
+  });
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await expect(dock.getByRole('button', { name: /提交回答/ }).locator('kbd')).toBeVisible();
+  await dock.getByTestId('chief-question-option-0-1').click();
+  await dock.getByTestId('chief-question-option-0-1').press('Control+Enter');
+  await expect.poll(() => answered.length).toBe(1);
+  expect(answered[0]).toEqual({ answers: [{ header: 'Model · #74', choices: ['wokey · deepseek-v4.1-flash'] }] });
+});

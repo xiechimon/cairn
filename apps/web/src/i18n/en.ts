@@ -1325,8 +1325,6 @@ export const EN: Record<string, string> = {
   '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
   'Coordinator 提问': 'Coordinator question',
   待回答的提问: 'Pending questions',
-  上一条提问: 'Previous question',
-  下一条提问: 'Next question',
   '提交回答失败，草稿还在，请再试一次。':
     'Could not send your answer. Your draft is still here. Try Submit again.',
   已回答: 'Answered',
