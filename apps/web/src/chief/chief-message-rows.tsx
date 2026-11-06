@@ -1,5 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
+import { relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -18,6 +19,7 @@ import type {
   ChiefStreamItem,
   ChiefToolRow,
 } from '../fixtures/records.js';
+import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
@@ -30,6 +32,34 @@ import { ThreadReportReply } from './thread-report-reply.js';
 
 const MSG_TOOL_BTN_CLS =
   "size-6 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+
+const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
+
+function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: string }) {
+  const { t, locale } = useI18n();
+  const now = useMinuteClock();
+  if (createdAt == null) {
+    return fallback == null ? null : (
+      <span className={STAMP_CLS} data-testid="chief-msg-stamp">
+        {fallback}
+      </span>
+    );
+  }
+  const absolute = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(createdAt);
+  return (
+    <time
+      className={STAMP_CLS}
+      data-testid="chief-msg-stamp"
+      dateTime={new Date(createdAt).toISOString()}
+      title={absolute}
+    >
+      {relativeTime(createdAt, Math.max(now, createdAt), t)}
+    </time>
+  );
+}
 
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
@@ -340,11 +370,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               className={`mt-1 flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"
             >
-              {item.at != null && (
-                <span className="mr-1.5 text-caption tabular-nums" data-testid="chief-msg-stamp">
-                  {item.at}
-                </span>
-              )}
+              <MessageStamp createdAt={item.createdAt} fallback={item.at} />
               <Button
                 variant="ghost"
                 size="icon"
@@ -505,6 +531,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   <Copy width={13} height={13} />
                 )}
               </Button>
+              <MessageStamp createdAt={item.createdAt} />
               {showElapsed && item.seconds !== '' && (
                 <span>{t('完成 {n}', { n: item.seconds })}</span>
               )}

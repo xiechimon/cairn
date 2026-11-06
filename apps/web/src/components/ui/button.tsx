@@ -36,6 +36,13 @@ const buttonVariants = cva(
         'icon-lg': 'size-9',
       },
     },
+    compoundVariants: [
+      {
+        variant: 'ghost',
+        size: ['icon', 'icon-xs', 'icon-sm', 'icon-lg'],
+        className: 'shadow-none focus-visible:ring-0',
+      },
+    ],
     defaultVariants: {
       variant: 'default',
       size: 'default',

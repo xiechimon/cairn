@@ -91,7 +91,7 @@ console.log('ALLOCATION:' + JSON.stringify({ dir: makeTestTempDir(), runId: test
       assert.equal(result.status, 0, result.stderr + result.stdout);
       const allocation = JSON.parse(result.stdout.match(/ALLOCATION:(\{[^\n]+\})/)[1]);
       assert.equal(allocation.runId, run.runId);
-      assert.ok(allocation.dir.includes(run.runId));
+      assert.ok(allocation.dir.includes(run.runId.slice(0, 8)));
       assert.equal(existsSync(allocation.dir), false);
     }
   } finally {

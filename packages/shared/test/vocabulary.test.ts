@@ -450,6 +450,11 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       requireToken,
       auth,
       tailscaleUsers,
+      tsnet,
+      tsnetBinary,
+      tsnetHostname,
+      tsnetUploadLogs,
+      tsnetControlUrl,
       mcpConfig,
       skillsDir,
       customModelReasoning,
@@ -481,6 +486,11 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
     expect(auth).toBe('CAIRN_AUTH');
     expect(tailscaleUsers).toBe('CAIRN_TAILSCALE_USERS');
+    expect(tsnet).toBe('CAIRN_TSNET');
+    expect(tsnetBinary).toBe('CAIRN_TSNET_BINARY');
+    expect(tsnetHostname).toBe('CAIRN_TSNET_HOSTNAME');
+    expect(tsnetUploadLogs).toBe('CAIRN_TSNET_UPLOAD_LOGS');
+    expect(tsnetControlUrl).toBe('CAIRN_TSNET_CONTROL_URL');
     expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
     expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
@@ -521,7 +531,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
 
 describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*; #1491 +autonomy_state +member_activity; #1686 +push_subscription; #2243 +claude_subscription; #2233 +queued_message; #2592 +chief_report +retro_proposal; D75 +computer +computer_call; #2501 +client_message)', () => {
   it('DB table registry keeps schedules and drops whats_new, webhook_token, and shell_command (#1796)', () => {
-    expect(DB_TABLES).toHaveLength(59);
+    expect(DB_TABLES).toHaveLength(60);
     expect(INTERNAL_ONLY_TABLES).toContain('computer');
     expect(INTERNAL_ONLY_TABLES).toContain('computer_call');
     expect(INTERNAL_ONLY_TABLES).toContain('feature_flag');
@@ -567,6 +577,8 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(INTERNAL_ONLY_TABLES).toContain('due_event');
     expect(DB_TABLES).toContain('harness_profile');
     expect(INTERNAL_ONLY_TABLES).toContain('harness_profile');
+    expect(DB_TABLES).toContain('thread_pr');
+    expect(INTERNAL_ONLY_TABLES).toContain('thread_pr');
     expect(DB_TABLES).toContain('composer_draft');
     expect(INTERNAL_ONLY_TABLES).toContain('composer_draft');
     expect(DB_TABLES).not.toContain('shell_command');

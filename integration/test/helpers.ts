@@ -7,7 +7,7 @@ import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { and, eq, isNull } from 'drizzle-orm';
-import { onTestFinished } from 'vitest';
+import { afterAll, onTestFinished } from 'vitest';
 import { z } from 'zod';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
@@ -30,6 +30,38 @@ import { setTodoPhase } from '../../apps/server/src/services/todos.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
+
+const liveServers = new Set<() => Promise<void>>();
+
+const pendingReleases = new Set<() => void>();
+
+function releasePending(): void {
+  for (const release of [...pendingReleases]) release();
+}
+
+process.once('exit', releasePending);
+
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    releasePending();
+    process.kill(process.pid, signal);
+  });
+}
+
+let sweepRegistered = false;
+
+function registerSweep(): void {
+  if (sweepRegistered) return;
+  sweepRegistered = true;
+  try {
+    afterAll(async () => {
+      sweepRegistered = false;
+      await Promise.allSettled([...liveServers].map((close) => close()));
+    });
+  } catch {
+    sweepRegistered = false;
+  }
+}
 
 export interface RealServer {
   url: string;
@@ -79,8 +111,10 @@ export async function bootRealServer(opts: {
   if (ownMcpConfig) writeFileSync(mcpConfigPath, '{}\n');
   let closed = false;
   const releaseOwned = (): void => {
+    pendingReleases.delete(releaseOwned);
     for (const dir of ownedDirs.splice(0)) releaseTestTempDir(dir);
   };
+  pendingReleases.add(releaseOwned);
   try {
     const app = createApp({
       db,
@@ -212,12 +246,18 @@ export async function bootRealServer(opts: {
       if (closed) return;
       closed = true;
       scheduler?.stop();
-      (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => (err ? reject(err) : resolve()));
-      });
-      releaseOwned();
+      liveServers.delete(close);
+      try {
+        (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+        await new Promise<void>((resolve, reject) => {
+          server.close((err) => (err ? reject(err) : resolve()));
+        });
+      } finally {
+        releaseOwned();
+      }
     };
+    liveServers.add(close);
+    registerSweep();
     try {
       onTestFinished(close);
     } catch {

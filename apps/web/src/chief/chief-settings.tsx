@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useApiMutations, useChief, useMachines, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SETTINGS_HINT_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -83,15 +84,20 @@ export function ChiefSettings({
         data-testid="chief-settings-topbar"
         className="flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="-mr-1 -ml-2 size-7 flex-none cursor-pointer text-content-tertiary"
-          aria-label={t('返回')}
-          onClick={onBack}
+        <IconTooltip
+          label={t('返回')}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mr-1 -ml-2 size-7 flex-none cursor-pointer text-content-tertiary"
+              onClick={onBack}
+            />
+          }
         >
           <ChevronLeft width={16} height={16} />
-        </Button>
+        </IconTooltip>
         <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
           {t('Coordinator 设置')}
         </h1>

@@ -66,6 +66,7 @@ export * from './snooze.js';
 export * from './step.js';
 export * from './tag.js';
 export * from './team.js';
+export * from './thread-pr.js';
 export * from './ticket-dedupe.js';
 export * from './todo.js';
 export * from './token-usage.js';

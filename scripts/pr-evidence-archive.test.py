@@ -138,7 +138,7 @@ class WorkflowTests(unittest.TestCase):
                    'GITHUB_REPOSITORY': 'xiechimon/cairn', 'PR_NUMBER': '1'}
             subprocess.run(['bash', '-e', '-c', script], env=env, check=True)
             self.assertEqual(Path(directory, 'pr-body.md').read_text(), 'fresh\n')
-        self.assertIn('scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" "${schema_args[@]}"', workflow)
+        self.assertIn('scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md" --changed-files "$RUNNER_TEMP/changed-files.txt" "${schema_args[@]}"', workflow)
 
     def test_regressions_run_in_both_prepush_plans(self):
         result = subprocess.run(['node', '--input-type=module', '-e',

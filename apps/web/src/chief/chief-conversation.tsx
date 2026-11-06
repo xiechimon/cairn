@@ -19,7 +19,7 @@ import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
-import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
+import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
@@ -32,6 +32,7 @@ import {
 import {
   MessageScroller,
   MessageScrollerContent,
+  MessageScrollerProvider,
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
@@ -107,6 +108,26 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
     onAtBottom(!scrollable.end);
   }, [scrollable.end, onAtBottom]);
   return null;
+}
+
+export function ChiefScrollProvider({
+  open = true,
+  children,
+}: {
+  open?: boolean;
+  children: React.ReactNode;
+}) {
+  const [atBottom, setAtBottom] = useState(true);
+  return (
+    <MessageScrollerProvider
+      autoScroll={open && atBottom}
+      scrollEdgeThreshold={FOLLOW_THRESHOLD}
+      defaultScrollPosition="end"
+    >
+      <ChiefFollowArmed onAtBottom={setAtBottom} />
+      {children}
+    </MessageScrollerProvider>
+  );
 }
 
 export type ChiefConversationVariant = 'drawer' | 'global';
@@ -554,26 +575,36 @@ export function ChiefConversation({
             </h2>
             <div className="ml-auto flex items-center gap-2.5">
               {onSettings != null && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={HEAD_ICON_BTN_CLS}
-                  aria-label={t('Coordinator 设置')}
-                  onClick={onSettings}
+                <IconTooltip
+                  label={t('Coordinator 设置')}
+                  side="bottom"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={HEAD_ICON_BTN_CLS}
+                      onClick={onSettings}
+                    />
+                  }
                 >
                   <ChiefGear />
-                </Button>
+                </IconTooltip>
               )}
               {onClose != null && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={HEAD_ICON_BTN_CLS}
-                  aria-label={t('最小化')}
-                  onClick={onClose}
+                <IconTooltip
+                  label={t('最小化')}
+                  side="bottom"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={HEAD_ICON_BTN_CLS}
+                      onClick={onClose}
+                    />
+                  }
                 >
                   <Minus width={16} height={16} />
-                </Button>
+                </IconTooltip>
               )}
             </div>
           </div>

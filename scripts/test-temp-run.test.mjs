@@ -6,6 +6,24 @@ import test from 'node:test';
 import { fixture, helper, leaked, runner } from './test-temp-run-fixture.mjs';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
+test('the supervised layout keeps the longest fixture socket path under the unix limit', () => {
+  const run =
+    fixture(`import { makeTestTempDir, releaseTestTempDir } from ${JSON.stringify(helper)};
+const home = makeTestTempDir('cif-');
+console.log('TEMP:' + JSON.stringify({ home, runId: process.env.CAIRN_TEST_RUN_ID }));
+releaseTestTempDir(home);`);
+  try {
+    assert.equal(run.result.status, 0, run.result.stderr);
+    const longestSocketTail = '/c1/computer.sock'.length;
+    assert.ok(
+      Buffer.byteLength(run.allocation.home) + longestSocketTail < 108 - 8,
+      `${run.allocation.home} leaves too little room for a socket path`,
+    );
+  } finally {
+    run.cleanup();
+  }
+});
+
 test('an exit-zero child with skipped cleanup fails and its survivor is reclaimed', () => {
   const run = fixture(leaked);
   try {

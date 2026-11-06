@@ -26,8 +26,11 @@ import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
+import { fleetStatusLine } from './fleet-status.js';
 import { needsYouThreads } from './needs-you.js';
+import { splitProjectsByArchive } from './project-archive.js';
 import { ProjectAvatar } from './project-avatar.js';
+import { SidebarProjectMenu } from './sidebar-project-menu.js';
 
 export type SidebarSelected =
   | 'board'
@@ -46,6 +49,7 @@ export interface SidebarProject {
   name: string;
   icon?: ProjectIcon | null | undefined;
   color?: ProjectColor | null | undefined;
+  archivedAt?: number | null | undefined;
 }
 
 const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
@@ -56,11 +60,13 @@ interface BoardSidebarProps {
   attention?: number;
   machinesOnline?: number;
   machinesOffline?: number;
+  offlineMachineNames?: string[];
   onSearch?: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   todos?: TodoRecord[];
+  onArchiveProject?: (id: string, archived: boolean) => void;
 }
 
 export const GROUP_STORAGE_KEYS = {
@@ -158,11 +164,14 @@ export function BoardSidebar({
   onToggle,
   attention = 0,
   machinesOffline = 0,
+  machinesOnline = 0,
+  offlineMachineNames = [],
   onSearch,
   usageNav = false,
   selected = 'board',
   projects,
   todos,
+  onArchiveProject,
 }: BoardSidebarProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -177,11 +186,23 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
-  const projectRows = useMemo(
-    () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
+  const { active: projectRows, archived: archivedRows } = useMemo(
+    () => splitProjectsByArchive((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
     [projects],
   );
-  const activeProject = projectRows.some((row) => row.id === projectParam) ? projectParam : null;
+  const activeProject = [...projectRows, ...archivedRows].some((row) => row.id === projectParam)
+    ? projectParam
+    : null;
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const archivedExpanded = archivedOpen || archivedRows.some((row) => row.id === activeProject);
+  const projectMenu = (row: SidebarProject, archived: boolean) =>
+    onArchiveProject === undefined ? undefined : (
+      <SidebarProjectMenu
+        name={row.name}
+        archived={archived}
+        onToggleArchive={() => onArchiveProject(row.id, !archived)}
+      />
+    );
   const waitingByProject = useMemo(() => {
     const counts = new Map<string, number>();
     for (const todo of needsYouThreads(todos ?? [])) {
@@ -210,7 +231,11 @@ export function BoardSidebar({
   const activityLink = {
     to: { pathname: ACTIVITY_PATH, search: plain },
   };
-  const offlineLabel = t('{n} 台机器离线', { n: machinesOffline });
+  const offlineLabel =
+    fleetStatusLine(
+      { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
+      t,
+    ) ?? '';
 
   if (collapsed) {
     const railLink = (
@@ -403,8 +428,43 @@ export function BoardSidebar({
               waiting={waitingByProject.get(row.id) ?? 0}
               active={activeProject === row.id}
               onClick={() => navigate(projectHref(row.id))}
+              menu={projectMenu(row, false)}
             />
           ))}
+        {archivedRows.length > 0 && (
+          <div data-testid="archived-group" className="mt-2 flex flex-col gap-px">
+            <Button
+              variant="ghost"
+              className={`sidebar-group group h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 ${FOCUS} ${
+                archivedExpanded ? '' : 'sidebar-group--collapsed'
+              }`}
+              aria-expanded={archivedExpanded}
+              onClick={() => setArchivedOpen((prev) => !prev)}
+            >
+              {t('已归档')}
+              <span className="tabular-nums">{archivedRows.length}</span>
+              <ChevronDown
+                aria-hidden
+                className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+                strokeWidth={STROKE}
+              />
+            </Button>
+            {archivedExpanded &&
+              archivedRows.map((row, i) => (
+                <SidebarProjectRow
+                  key={row.id}
+                  name={row.name}
+                  tone={projectRows.length + i}
+                  icon={row.icon}
+                  color={row.color}
+                  muted
+                  active={activeProject === row.id}
+                  onClick={() => navigate(projectHref(row.id))}
+                  menu={projectMenu(row, true)}
+                />
+              ))}
+          </div>
+        )}
       </nav>
 
       <div data-testid="sidebar-footer" className="flex flex-none flex-col gap-1 pt-2">
@@ -420,17 +480,18 @@ export function BoardSidebar({
               <ChartColumn className={ICON} strokeWidth={STROKE} />
             </SidebarFooterIcon>
           )}
-          {machinesOffline > 0 && (
-            <Link
-              data-testid="sidebar-attention"
-              to={{ pathname: settingsHref('machines'), search: plain }}
-              className={`ml-auto flex h-6 min-w-0 items-center gap-1.5 rounded-full bg-(--chip-confirm-bg) px-2 text-caption font-medium whitespace-nowrap text-(--chip-confirm-fg) no-underline ${FOCUS}`}
-            >
-              <span aria-hidden className="size-1.5 flex-none rounded-full bg-current" />
-              <span className="truncate">{offlineLabel}</span>
-            </Link>
-          )}
         </div>
+        {machinesOffline > 0 && (
+          <Link
+            data-testid="sidebar-attention"
+            to={{ pathname: settingsHref('machines'), search: plain }}
+            title={offlineLabel}
+            className={`flex min-h-6 w-full min-w-0 items-start gap-1.5 rounded-md bg-(--chip-confirm-bg) px-2 py-1 text-caption font-medium text-(--chip-confirm-fg) no-underline ${FOCUS}`}
+          >
+            <span aria-hidden className="mt-1 size-1.5 flex-none rounded-full bg-current" />
+            <span className="min-w-0 break-words">{offlineLabel}</span>
+          </Link>
+        )}
       </div>
     </aside>
   );

@@ -54,6 +54,7 @@ import { sweepFailedRetries } from './needs-you.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
 import { createPrFeedbackPoller, PR_FEEDBACK_INTERVAL_MS } from './pr-feedback.js';
+import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
 import { digestSlotDueAt, digestSlotsDue, sweepPushDigest } from './push.js';
 import { sweepPendingPushAlerts } from './push-alerts.js';
 import { sweepQuotaWaitSteps } from './quota-wait.js';
@@ -228,6 +229,7 @@ export function createScheduler(
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
       : null;
   const feedbackPoller = ci ? createPrFeedbackPoller(deps, ci) : null;
+  const prWatch = ci ? createPrWatch(deps, ci) : null;
   const correctionIntake = intake
     ? createIssueIntake(deps, { ...intake, label: 'correction' })
     : null;
@@ -673,6 +675,9 @@ export function createScheduler(
       },
       ci: () => ciPoller?.sweep(),
       feedback: () => feedbackPoller?.sweep(),
+      'pr-watch': async () => {
+        await prWatch?.sweep();
+      },
       intake: async () => {
         await issueIntake?.sweep();
         await correctionIntake?.sweep();
@@ -750,6 +755,7 @@ export function createScheduler(
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       if (ciPoller !== null) ensureDue('poll:ci', 'ci', CI_POLL_INTERVAL_MS);
       if (feedbackPoller !== null) ensureDue('poll:feedback', 'feedback', PR_FEEDBACK_INTERVAL_MS);
+      if (prWatch !== null) ensureDue('poll:pr-watch', 'pr-watch', PR_WATCH_INTERVAL_MS);
       if (issueIntake !== null) ensureDue('poll:intake', 'intake', ISSUE_INTAKE_INTERVAL_MS);
       if (schedulingSweep !== null) {
         ensureDue('poll:scheduling', 'scheduling', SCHEDULE_INTERVAL_MS);

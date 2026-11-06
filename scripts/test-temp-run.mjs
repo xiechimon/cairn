@@ -11,7 +11,7 @@ if (separator !== '--' || !command) {
 }
 
 const runId = randomUUID();
-const root = join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `cairn-test-${runId}-run`);
+const root = join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `ct-${runId.slice(0, 8)}`);
 mkdirSync(root, { mode: 0o700 });
 const report = join(root, 'allocations.jsonl');
 writeFileSync(report, '', { flag: 'wx', mode: 0o600 });
@@ -59,7 +59,7 @@ function finish(code) {
         typeof record.runId !== 'string' ||
         !/^[a-f0-9-]{36}$/.test(record.runId) ||
         dirname(record.path) !== root ||
-        !basename(record.path).startsWith(`cairn-test-${record.runId}-`)
+        !basename(record.path).startsWith(`ct-${record.runId.slice(0, 8)}-`)
       )
         throw new Error('Invalid owned temporary allocation report');
       owned.add(record.path);

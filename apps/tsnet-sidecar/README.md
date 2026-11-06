@@ -17,6 +17,7 @@ CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o tsnet-sidecar .
 | `--hostname` | Node name on the tailnet, default `cairn`. |
 | `--control-url` | Coordination server, default Tailscale. |
 | `--poll-interval` | Status poll interval, default 1s. |
+| `--upload-logs` | Allow tsnet to upload node logs to Tailscale. Off by default: the sidecar sets `TS_NO_LOGS_NO_SUPPORT=true` before starting tsnet. |
 
 ## Protocol
 

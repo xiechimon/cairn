@@ -86,6 +86,7 @@ const INFERRED_ROUTES = [
   'GET /api/builds/{id}/changes/file',
   'GET /api/builds/{id}/usage',
   'GET /api/builds/{id}/gate',
+  'GET /api/prs',
   'POST /api/uploads/grant',
   'POST /api/uploads/upload',
   'GET /api/attachments/{id}',

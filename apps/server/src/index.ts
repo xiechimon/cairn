@@ -41,6 +41,7 @@ import {
 } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
+import { startTsnetRemote } from './services/tsnet-remote.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
@@ -180,13 +181,29 @@ const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
 computerScreens.attach(server);
 
+const tsnetRemote = startTsnetRemote({
+  settings: config.tsnet,
+  homeDir: config.homeDir,
+  app,
+  authToken: config.authToken,
+  logger,
+});
+
+let shuttingDown = false;
+async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  scheduler.stop();
+  killInFlightPick();
+  computerScreens.close();
+  server.close();
+  await (await tsnetRemote)?.stop();
+  close();
+  process.exit(0);
+}
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    scheduler.stop();
-    killInFlightPick();
-    computerScreens.close();
-    server.close();
-    close();
-    process.exit(0);
+    void shutdown();
   });
 }

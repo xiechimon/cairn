@@ -6828,6 +6828,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "trajectoryOutcomeBackfill": "CAIRN_TRAJ_OUTCOME_BACKFILL",
     "trajectoryReflectCurate": "CAIRN_TRAJ_REFLECT_CURATE",
     "trajectoryReflectOpenGuardIssues": "CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES",
+    "tsnet": "CAIRN_TSNET",
+    "tsnetBinary": "CAIRN_TSNET_BINARY",
+    "tsnetControlUrl": "CAIRN_TSNET_CONTROL_URL",
+    "tsnetHostname": "CAIRN_TSNET_HOSTNAME",
+    "tsnetUploadLogs": "CAIRN_TSNET_UPLOAD_LOGS",
     "webDir": "CAIRN_WEB_DIR",
     "workspacesDir": "CAIRN_WORKSPACES_DIR",
   },
@@ -7316,6 +7321,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "client_message",
   "harness_profile",
   "composer_draft",
+  "thread_pr",
 ]
 `;
 
