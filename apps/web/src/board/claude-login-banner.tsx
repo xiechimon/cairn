@@ -8,10 +8,12 @@ import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { MODEL_ROUTING_HREF } from '../resources/hrefs.js';
 import { MACHINES_HREF } from '../resources/machines-page.js';
 
 export interface ClaudeLoginWarning {
   key: string;
+  source: 'machine' | 'subscription';
   kind: 'expired' | 'expiring';
   text: string;
 }
@@ -31,6 +33,7 @@ export function useClaudeLoginWarnings(
         : [
             {
               key: machine.id ?? machine.name,
+              source: 'machine' as const,
               kind: notice.kind,
               text: formatClaudeLoginWarning(notice, machine.name, t),
             },
@@ -43,6 +46,7 @@ export function useClaudeLoginWarnings(
         : [
             {
               key: connection.id,
+              source: 'subscription' as const,
               kind:
                 connection.expiresAt !== null && connection.expiresAt <= now
                   ? ('expired' as const)
@@ -52,6 +56,19 @@ export function useClaudeLoginWarnings(
           ];
     }),
   ];
+}
+
+export type LoginBannerLinkId = 'machines' | 'subscriptions';
+
+export function loginBannerLinks(
+  warnings: readonly Pick<ClaudeLoginWarning, 'source'>[],
+): { id: LoginBannerLinkId; href: string }[] {
+  const links: { id: LoginBannerLinkId; href: string }[] = [];
+  if (warnings.some((warning) => warning.source === 'machine'))
+    links.push({ id: 'machines', href: MACHINES_HREF });
+  if (warnings.some((warning) => warning.source === 'subscription'))
+    links.push({ id: 'subscriptions', href: MODEL_ROUTING_HREF });
+  return links;
 }
 
 export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLoginWarning[] }) {
@@ -76,6 +93,7 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
   }
   const expired = warnings.filter((warning) => warning.kind === 'expired').length;
   const expiring = warnings.length - expired;
+  const links = loginBannerLinks(warnings);
   const title =
     expiring === 0
       ? t('{count} 处 Claude 登录已过期', { count: expired })
@@ -95,9 +113,23 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
       title={title}
       body={<span data-testid="claude-login-summary">{body}</span>}
       actions={
-        <Button variant="outline" size="sm" className="px-3" render={<Link to={MACHINES_HREF} />}>
-          {t('查看')}
-        </Button>
+        <>
+          {links.map((link) => (
+            <Button
+              key={link.id}
+              variant="outline"
+              size="sm"
+              className="px-3"
+              render={<Link to={link.href} />}
+            >
+              {links.length === 1
+                ? t('查看')
+                : link.id === 'machines'
+                  ? t('查看机器')
+                  : t('查看订阅')}
+            </Button>
+          ))}
+        </>
       }
     />
   );

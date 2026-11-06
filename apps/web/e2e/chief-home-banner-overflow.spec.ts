@@ -34,6 +34,14 @@ test('five expired machines and three expired subscriptions stay one banner and 
   const banner = home.getByTestId('claude-login-banner');
   await expect(banner).toContainText('8 处 Claude 登录已过期');
   await expect(banner.getByTestId('claude-login-warning')).toHaveCount(0);
+  await expect(banner.getByRole('link', { name: '查看机器' })).toHaveAttribute(
+    'href',
+    '/app/resources/machines',
+  );
+  await expect(banner.getByRole('link', { name: '查看订阅' })).toHaveAttribute(
+    'href',
+    '/app/resources/model-routing',
+  );
   const composer = home.getByTestId('chief-composer-input');
   await expect(composer).toBeVisible();
   const box = await composer.boundingBox();

@@ -513,7 +513,10 @@ export function MachinesPage() {
                 </span>
                 {loginWarning !== null && (
                   <span
-                    className="basis-full text-meta"
+                    className={cn(
+                      'basis-full text-meta',
+                      notice?.kind === 'expired' && 'font-medium text-foreground',
+                    )}
                     data-testid="claude-login-warning"
                     data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
                     role="status"

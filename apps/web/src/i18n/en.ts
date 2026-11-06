@@ -1846,4 +1846,6 @@ export const EN: Record<string, string> = {
     'Sign in again before they expire so tasks are not interrupted.',
   '重新登录前，这些机器和订阅不会接新任务。':
     'Until you sign in again, these machines and subscriptions take no new tasks.',
+  查看机器: 'View machines',
+  查看订阅: 'View subscriptions',
 };
