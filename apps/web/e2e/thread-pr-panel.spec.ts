@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, TASK } from './chief-home-mock.js';
+import { mockLive, PROJECT, TASK } from './chief-home-mock.js';
 import { evidencePanelShot } from './evidence.js';
 
 const HEAD = '4f8e2c1d9b0a63e57c1f08a2d4b6e9137a5c80de';
@@ -59,12 +59,24 @@ const CASES: Case[] = [
 
 type PrsMode = { rows: unknown[] } | 'error';
 
-async function setup(page: Page, prs: PrsMode, theme: 'light' | 'dark' = 'light') {
+async function setup(
+  page: Page,
+  prs: PrsMode,
+  theme: 'light' | 'dark' = 'light',
+  more: { todos?: unknown[]; projects?: unknown[] } = {},
+) {
   await page.addInitScript((value) => {
     localStorage.setItem('cairn.locale', 'en');
     localStorage.setItem('cairn-theme', value);
   }, theme);
-  await mockLive(page, { threads: [], messages: [], todos: [REVIEW_TASK] }, (path, _route, json) => {
+  await mockLive(
+    page,
+    {
+      threads: [],
+      messages: [],
+      todos: [REVIEW_TASK, ...(more.todos ?? [])],
+      ...(more.projects !== undefined ? { projects: more.projects } : {}),
+    }, (path, _route, json) => {
     if (path === '/api/prs') return prs === 'error' ? json({ error: 'boom' }, 500) : json(prs.rows);
     if (path === '/api/todos/todo-1') return json(REVIEW_TASK);
     if (path === '/api/builds/build-1') return json({ id: 'build-1', todoId: 'todo-1', createdAt: 1, triggerSource: 'user' });
@@ -151,7 +163,10 @@ test('the PR list shows every thread-owned PR with counts, a row menu and Show m
       deletions: 8,
     }),
   );
-  await setup(page, { rows });
+  const extraTodos = rows
+    .filter((r) => r.threadId !== 'todo-1')
+    .map((r, i) => ({ ...TASK, id: r.threadId, title: `Thread ${i}`, phase: 'review', phaseAt: Date.now(), seqNum: 20 + i }));
+  await setup(page, { rows }, 'light', { todos: extraTodos });
   await page.goto('/app?pane=tasks');
   const list = page.getByTestId('work-prs');
   await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(5);
@@ -169,6 +184,36 @@ test('the PR list shows every thread-owned PR with counts, a row menu and Show m
   await list.getByRole('button', { name: 'Show more' }).click();
   await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(7);
   await evidencePanelShot(page, 'pr-list-light.png', page.locator('.side-panel'));
+});
+
+test('a project-filtered tasks pane lists only that project’s PRs, the unfiltered home lists all', async ({ page }) => {
+  const other = { ...TASK, id: 'todo-2', projectId: 'proj-2', title: 'Other project thread', phase: 'review', phaseAt: Date.now(), seqNum: 10 };
+  const rows = [
+    prRow({ buildId: 'build-1', threadId: 'todo-1', number: 42, title: 'docs(1): project one change' }),
+    prRow({ buildId: 'build-2', threadId: 'todo-2', number: 77, title: 'docs(2): project two change' }),
+  ];
+  await setup(page, { rows }, 'light', {
+    todos: [other],
+    projects: [PROJECT, { ...PROJECT, id: 'proj-2', name: 'other' }],
+  });
+  await page.goto('/app?project=proj-2&pane=tasks&chat=1');
+  const list = page.getByTestId('work-prs');
+  await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(1);
+  await expect(list).toContainText('project two change');
+  await expect(list).not.toContainText('project one change');
+  await expect(list.getByRole('heading')).toContainText('1');
+  await page.goto('/app?pane=tasks');
+  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toHaveCount(2);
+});
+
+test('a project with no PRs shows the empty line even when other projects have some', async ({ page }) => {
+  const other = { ...TASK, id: 'todo-2', projectId: 'proj-2', title: 'Other project thread', phase: 'review', phaseAt: Date.now(), seqNum: 10 };
+  await setup(page, { rows: [prRow()] }, 'light', {
+    todos: [other],
+    projects: [PROJECT, { ...PROJECT, id: 'proj-2', name: 'other' }],
+  });
+  await page.goto('/app?project=proj-2&pane=tasks&chat=1');
+  await expect(page.getByTestId('work-prs')).toContainText('PRs opened by threads are listed here.');
 });
 
 test('the PR list says what is missing when no thread has a PR', async ({ page }) => {

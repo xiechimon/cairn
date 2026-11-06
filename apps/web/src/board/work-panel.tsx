@@ -46,7 +46,9 @@ export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }
   const title = pane === 'tasks' ? t('任务') : t('成果');
   const { live: connected, teamId } = useLiveData();
   const prs = usePrs(teamId, undefined, connected);
-  const prOf = prByThread(prs.data);
+  const scopedIds = new Set(todos.map((todo) => todo.id));
+  const scopedPrs = (prs.data ?? []).filter((pr) => scopedIds.has(pr.threadId));
+  const prOf = prByThread(scopedPrs);
   const [, setSearchParams] = useSearchParams();
   const row = (todo: TodoRecord, tone = threadTone(todo)) => (
     <ThreadRow
@@ -123,7 +125,7 @@ export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }
                 <h3 className="m-0 flex h-8 items-center gap-2 px-2.5 text-meta font-medium text-content-secondary">
                   {t('拉取请求')}
                   <span className="font-normal text-content-tertiary tabular-nums">
-                    {prs.data?.length ?? 0}
+                    {scopedPrs.length}
                   </span>
                 </h3>
                 {prs.status === 'error' ? (
@@ -138,13 +140,13 @@ export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }
                       {t('重试')}
                     </Button>
                   </p>
-                ) : prs.data?.length === 0 ? (
+                ) : scopedPrs.length === 0 ? (
                   <p className="m-0 pb-2 pl-2.5 text-meta text-content-tertiary">
                     {t('任务开出 PR 后会列在这里。')}
                   </p>
                 ) : (
                   <PrList
-                    rows={prs.data ?? []}
+                    rows={scopedPrs}
                     onOpenThread={onOpenThread}
                     onViewChanges={(pr) =>
                       setSearchParams((prev) => {
