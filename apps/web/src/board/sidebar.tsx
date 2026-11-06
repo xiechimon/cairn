@@ -9,7 +9,7 @@ import {
   Server,
   Settings,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
@@ -32,6 +32,9 @@ import { needsYouThreads } from './needs-you.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
+import { SidebarProjectThreads } from './sidebar-project-threads.js';
+import { projectThreads } from './sidebar-threads.js';
+import { THREAD_PARAM, threadHref } from './thread-copy.js';
 
 export type SidebarSelected =
   | 'board'
@@ -191,6 +194,7 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
   const { active: projectRows, archived: archivedRows } = useMemo(
     () => splitProjectsByArchive((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
     [projects],
@@ -455,17 +459,23 @@ export function BoardSidebar({
         )}
         {!projectsCollapsed &&
           projectRows.map((row, i) => (
-            <SidebarProjectRow
-              key={row.id}
-              name={row.name}
-              tone={i}
-              icon={row.icon}
-              color={row.color}
-              waiting={waitingByProject.get(row.id) ?? 0}
-              active={activeProject === row.id}
-              onClick={() => navigate(projectHref(row.id))}
-              menu={projectMenu(row, false)}
-            />
+            <Fragment key={row.id}>
+              <SidebarProjectRow
+                name={row.name}
+                tone={i}
+                icon={row.icon}
+                color={row.color}
+                waiting={waitingByProject.get(row.id) ?? 0}
+                active={activeProject === row.id}
+                onClick={() => navigate(projectHref(row.id))}
+                menu={projectMenu(row, false)}
+              />
+              <SidebarProjectThreads
+                threads={projectThreads(todos ?? [], row.id)}
+                openThreadId={openThreadId}
+                onOpen={(id) => navigate(threadHref(id, baseParams.toString()))}
+              />
+            </Fragment>
           ))}
         {archivedRows.length > 0 && (
           <div data-testid="archived-group" className="mt-2 flex flex-col gap-px">

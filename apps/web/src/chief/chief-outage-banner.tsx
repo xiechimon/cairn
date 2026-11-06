@@ -1,4 +1,4 @@
-import { CircleAlert, Info } from 'lucide-react';
+import { CircleAlert, Info, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import type { ChiefContent } from '../fixtures/records.js';
@@ -102,6 +102,25 @@ export function ChiefFallbackBanner({
           {t('换模型')}
         </Button>
       )}
+    </div>
+  );
+}
+
+export function ChiefConnectionBanner() {
+  const { t } = useI18n();
+  return (
+    <div
+      role="status"
+      data-testid="connection-lost"
+      className={`${BANNER_CLS} items-center shadow-(--e1)`}
+    >
+      <WifiOff aria-hidden="true" className="size-4.5 flex-none text-(--card-button)" />
+      <span className="min-w-0 flex-1">
+        <b className="block text-ui font-semibold text-(--foreground)">
+          {t('连接断开，正在重连…')}
+        </b>
+        <span className="block">{t('恢复连接前，新消息可能发不出去。')}</span>
+      </span>
     </div>
   );
 }

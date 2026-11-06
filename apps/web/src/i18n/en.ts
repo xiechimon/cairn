@@ -178,6 +178,9 @@ export const EN: Record<string, string> = {
   还没有完成的工作: 'Nothing finished yet',
   '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
   新建项目: 'New project',
+  '{n} 分': '{n}m',
+  '{n} 小时': '{n}h',
+  '{n} 天': '{n}d',
   已归档: 'Archived',
   归档: 'Archive',
   '{name} 的菜单': '{name} menu',
@@ -1841,4 +1844,6 @@ export const EN: Record<string, string> = {
   正在加载电脑: 'Loading computers',
   电脑没能加载: 'Computers did not load',
   '搜索没能完成，下面只是本地匹配的结果。': 'Search did not finish. These are local matches only.',
+  '连接断开，正在重连…': 'Connection lost, reconnecting…',
+  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };
