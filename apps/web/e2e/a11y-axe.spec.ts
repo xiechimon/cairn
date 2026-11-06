@@ -1,7 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { findLowContrast } from './contrast-probe.js';
-import { pressAndExpect, settleTransitions } from './helpers.js';
+import { PAGES } from './audit-pages.js';
+import { settleTransitions } from './helpers.js';
 
 // #1442: axe-core (WCAG 2.1 A/AA) over the main pages, light and dark. Any
 // violation fails the test with its rule id, impact and first targets.
@@ -21,112 +22,6 @@ import { pressAndExpect, settleTransitions } from './helpers.js';
 // Every test opens its own page, so the file runs in parallel (the config
 // default is one worker per file).
 test.describe.configure({ mode: 'parallel' });
-
-interface AuditPage {
-  name: string;
-  url: string;
-  /** Body content that proves the page rendered (failure mode 4). */
-  ready: (page: Page) => Locator;
-  open?: (page: Page) => Promise<void>;
-}
-
-const row = (page: Page) => page.getByTestId('resource-row').first();
-const card = (page: Page) => page.getByTestId('page-col').locator('.settings-card').first();
-const sideChat = (page: Page) => page.getByTestId('side-chat');
-const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
-
-const PAGES: AuditPage[] = [
-  {
-    name: 'search',
-    url: '/app/schedules?scenario=01',
-    open: async (page) => {
-      await pressAndExpect(page, 'Meta+k', searchDialog(page));
-      await page.keyboard.type('probe');
-    },
-    ready: (p) => searchDialog(p).locator('[data-row-kind="todo"]').first(),
-  },
-  {
-    name: 'new task home composer',
-    url: '/app/schedules?scenario=01',
-    open: (page) =>
-      page.getByRole('complementary').locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' }).click(),
-    ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
-  },
-  {
-    name: 'new task home composer filled',
-    url: '/app/schedules?scenario=01',
-    open: async (page) => {
-      await page
-        .getByRole('complementary')
-        .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
-        .click();
-      const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-      await expect(input).toBeVisible();
-      await page.keyboard.type('probe');
-      await expect(input).toBeFocused();
-    },
-    ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
-  },
-  { name: 'side chat fresh', url: '/app?scenario=23&thread=fresh-probe', ready: sideChat },
-  {
-    name: 'side chat confirm',
-    url: '/app?scenario=17b&thread=7ve0iOkQ-JBpSL98zSiGc',
-    ready: sideChat,
-  },
-  {
-    name: 'side chat review',
-    url: '/app?scenario=27&thread=7ve0iOkQ-JBpSL98zSiGc',
-    ready: sideChat,
-  },
-  {
-    name: 'side chat tool calls',
-    url: '/app?scenario=28&thread=7ve0iOkQ-JBpSL98zSiGc',
-    open: async (p) => {
-      await p.mouse.move(0, 0);
-      await p.waitForTimeout(500);
-    },
-    ready: (p) => p.getByTestId('work-call').first(),
-  },
-  { name: 'chief window', url: '/app/schedules?scenario=100', ready: (p) => p.locator('.chief-drawer') },
-  { name: 'schedules list', url: '/app/schedules?scenario=r3-93', ready: (p) => p.locator('.sched-card').first() },
-  { name: 'schedules form', url: '/app/schedules?scenario=r3-92', ready: (p) => p.getByRole('dialog', { name: '新建定时' }) },
-  {
-    name: 'project tasks',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks',
-    ready: (p) => p.getByTestId('task-row').first(),
-  },
-  {
-    name: 'project settings',
-    url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
-    ready: (p) => p.locator('.prj-set-avatar'),
-  },
-  { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agent-card').first() },
-  {
-    name: 'agent detail',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
-    ready: (p) => p.locator('.agent-skill-select'),
-  },
-  { name: 'machines', url: '/app/resources/machines?scenario=06', ready: row },
-  {
-    name: 'machine detail',
-    url: '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
-    ready: (p) => p.getByTestId('team-agent-grid'),
-  },
-  { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
-  {
-    name: 'providers',
-    url: '/app/resources/providers?scenario=01',
-    ready: (p) => p.getByTestId('provider-editor'),
-  },
-  {
-    name: 'secrets',
-    url: '/app/resources/secrets?scenario=01',
-    ready: (p) => p.getByTestId('resource-empty'),
-  },
-  { name: 'mcp servers', url: '/app/resources/mcp-servers?scenario=07', ready: row },
-  { name: 'api keys', url: '/app/api-keys?scenario=api-keys-created', ready: card },
-  { name: 'account', url: '/app/account?scenario=13', ready: card },
-];
 
 for (const theme of ['light', 'dark'] as const) {
   for (const p of PAGES) {
