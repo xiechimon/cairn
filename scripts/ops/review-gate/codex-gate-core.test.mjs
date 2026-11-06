@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
+  attemptStart,
   BLOCK_ROUND_CAP,
   badgeOf,
   blockingThreads,
@@ -9,7 +10,6 @@ import {
   blockRounds,
   decide,
   LIMIT_RETRY_AFTER_MS,
-  limitAnchor,
   markPreExisting,
   parseState,
   REQUEST_AFTER_MS,
@@ -354,15 +354,14 @@ test('every incomplete-state path past its deadline ends in a decision', () => {
           if (notice === 'after')
             comments.push({ id: id++, body: LIMIT_BODY, user: CODEX, created_at: iso(age) });
           const stateEntry = trustedStateComment(comments);
-          const retries = retryStatus(comments, SHA, stateEntry?.comment.updated_at ?? null);
+          const retries = retryStatus(comments, SHA, stateEntry?.comment ?? null);
           const limit = usageLimitHit(comments, stateEntry, SHA);
-          const anchor = limitAnchor(comments, stateEntry, SHA);
-          const current = stateEntry?.state.commitSha === SHA;
+          const start = attemptStart(comments, stateEntry, SHA);
           const result = decide(pr, state, [], retries, limit, {
             waitedMs: age * 2,
             requested: reviewRequested(comments, SHA),
-            sinceRequestMs: anchor ? now - Date.parse(anchor.created_at) : 0,
-            idleMs: Math.max(age, current ? now - Date.parse(stateEntry.comment.updated_at) : 0),
+            sinceRequestMs: start ? now - start.time : 0,
+            idleMs: Math.max(age, start ? now - start.time : 0),
           });
           const outcome = result.request
             ? 'request'
@@ -378,6 +377,42 @@ test('every incomplete-state path past its deadline ends in a decision', () => {
             assert.notEqual(outcome, 'waiting', `${stateName}/${markerName}/${notice}/${ageName}`);
         }
   assert.equal(outcomes.length, 6 * 4 * 3 * 3);
+});
+
+test('a reused summary comment updated for this head after an old notice is no limit and waits', () => {
+  const now = Date.parse('2026-01-02T00:00:00Z');
+  const iso = (agoMs) => new Date(now - agoMs).toISOString();
+  const minute = 60_000;
+  const comments = [
+    {
+      id: 1,
+      body: stateBody({ commit_sha: SHA, status: 'running' }),
+      user: CODEX,
+      created_at: iso(300 * minute),
+      updated_at: iso(2 * minute),
+    },
+    { id: 2, body: LIMIT_BODY, user: CODEX, created_at: iso(60 * minute) },
+  ];
+  const stateEntry = trustedStateComment(comments);
+  const start = attemptStart(comments, stateEntry, SHA);
+  assert.equal(start.time, now - 2 * minute);
+  assert.equal(usageLimitHit(comments, stateEntry, SHA), false);
+  const result = decide(
+    pr,
+    stateEntry.state,
+    [],
+    retryStatus(comments, SHA, stateEntry.comment),
+    false,
+    { waitedMs: 5 * minute, requested: false, sinceRequestMs: 2 * minute, idleMs: 2 * minute },
+  );
+  assert.equal(result.status, 'in_progress');
+  assert.equal(result.retry, undefined);
+  assert.equal(result.request, undefined);
+  const otherHead = trustedStateComment([
+    { ...comments[0], body: stateBody({ commit_sha: OTHER, status: 'running' }) },
+    comments[1],
+  ]);
+  assert.equal(attemptStart(comments, otherHead, SHA), null);
 });
 
 test('decide retries a limited head once the last request is two hours old', () => {
@@ -406,8 +441,11 @@ test('retryStatus counts only github-actions markers for the head', () => {
     { body: retryMarker(OTHER, 1), user: actions, created_at: '2026-01-01T00:00:11Z' },
     { body: retryMarker(SHA, 2), user: { login: 'mallory' }, created_at: '2026-01-01T00:00:12Z' },
   ];
-  assert.deepEqual(retryStatus(comments, SHA, '2026-01-01T00:00:05Z'), { count: 1, pending: true });
-  assert.deepEqual(retryStatus(comments, SHA, '2026-01-01T00:00:20Z'), {
+  assert.deepEqual(retryStatus(comments, SHA, { updated_at: '2026-01-01T00:00:05Z' }), {
+    count: 1,
+    pending: true,
+  });
+  assert.deepEqual(retryStatus(comments, SHA, { updated_at: '2026-01-01T00:00:20Z' }), {
     count: 1,
     pending: false,
   });

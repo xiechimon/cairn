@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import {
+  attemptStart,
   blockingThreads,
   blockRounds,
   decide,
   GATE_CHECK,
   HUMAN_LABEL,
-  limitAnchor,
   markPreExisting,
   preExistingThreads,
   QUEUED_LABEL,
@@ -180,13 +180,9 @@ function evaluate(repo, number) {
   const stateEntry = trustedStateComment(comments);
   const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
   const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
-  const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
-  const anchor = limitAnchor(comments, stateEntry, sha);
-  const lastActivity = Math.max(
-    check ? Date.parse(check.started_at) : 0,
-    anchor ? Date.parse(anchor.created_at) : 0,
-    stateEntry?.state.commitSha === sha ? Date.parse(stateEntry.comment.updated_at) : 0,
-  );
+  const retries = retryStatus(comments, sha, stateEntry?.comment ?? null);
+  const start = attemptStart(comments, stateEntry, sha);
+  const lastActivity = Math.max(check ? Date.parse(check.started_at) : 0, start?.time ?? 0);
   const result = decide(
     pr,
     stateEntry?.state ?? null,
@@ -196,7 +192,7 @@ function evaluate(repo, number) {
     {
       waitedMs: check ? Date.now() - Date.parse(check.started_at) : 0,
       requested: reviewRequested(comments, sha),
-      sinceRequestMs: anchor ? Date.now() - Date.parse(anchor.created_at) : 0,
+      sinceRequestMs: start ? Date.now() - start.time : 0,
       idleMs: lastActivity > 0 ? Date.now() - lastActivity : 0,
     },
     blockRounds(comments, sha),

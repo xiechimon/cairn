@@ -74,7 +74,8 @@ export function trustedStateComment(comments, kind = 'code_review') {
     });
   return trusted.reduce(
     (latest, entry) =>
-      !latest || commentOrder(entry.comment, latest.comment, 'updated_at', 'updated_at') >= 0
+      !latest ||
+      stampOrder(stampOf(entry.comment, 'updated_at'), stampOf(latest.comment, 'updated_at')) >= 0
         ? entry
         : latest,
     null,
@@ -83,44 +84,48 @@ export function trustedStateComment(comments, kind = 'code_review') {
 
 const idOf = (comment) => (Number.isFinite(Number(comment.id)) ? Number(comment.id) : 0);
 
-export function commentOrder(a, b, field = 'created_at', otherField = 'created_at') {
-  return Date.parse(a[field]) - Date.parse(b[otherField]) || idOf(a) - idOf(b);
+export function stampOf(comment, field = 'created_at') {
+  return { time: Date.parse(comment[field]), id: idOf(comment) };
 }
 
-export function lastGateRequest(comments, sha) {
+export function stampOrder(a, b) {
+  return a.time - b.time || a.id - b.id;
+}
+
+const latestStamp = (stamps) =>
+  stamps.reduce(
+    (latest, stamp) => (!latest || stampOrder(stamp, latest) > 0 ? stamp : latest),
+    null,
+  );
+
+const gateRequestStamps = (comments, sha) => {
   const prefixes = [`<!-- review-gate-request:${sha} -->`, `<!-- review-gate-retry:${sha}:`];
-  const gateComments = comments.filter(
-    (comment) =>
-      comment.user?.login === ACTIONS_LOGIN &&
-      prefixes.some((prefix) => comment.body?.startsWith(prefix)),
-  );
-  return gateComments.reduce(
-    (latest, comment) => (!latest || commentOrder(comment, latest) > 0 ? comment : latest),
-    null,
-  );
-}
+  return comments
+    .filter(
+      (comment) =>
+        comment.user?.login === ACTIONS_LOGIN &&
+        prefixes.some((prefix) => comment.body?.startsWith(prefix)),
+    )
+    .map((comment) => stampOf(comment));
+};
 
-export function limitAnchor(comments, stateEntry, sha) {
-  const anchors = [
-    lastGateRequest(comments, sha),
-    stateEntry?.state?.commitSha === sha ? stateEntry.comment : null,
-  ].filter(Boolean);
-  return anchors.reduce(
-    (latest, comment) => (!latest || commentOrder(comment, latest) > 0 ? comment : latest),
-    null,
-  );
+export function attemptStart(comments, stateEntry, sha) {
+  const stamps = gateRequestStamps(comments, sha);
+  if (stateEntry?.state?.commitSha === sha) stamps.push(stampOf(stateEntry.comment, 'updated_at'));
+  return latestStamp(stamps);
 }
 
 export function usageLimitHit(comments, stateEntry, sha) {
   const newest = comments
     .filter((comment) => isCodexAuthor(comment.user?.login, comment.user?.type))
     .reduce(
-      (latest, comment) => (!latest || commentOrder(comment, latest) >= 0 ? comment : latest),
+      (latest, comment) =>
+        !latest || stampOrder(stampOf(comment), stampOf(latest)) >= 0 ? comment : latest,
       null,
     );
   if (!newest || !LIMIT_RE.test(newest.body ?? '')) return false;
-  const anchor = limitAnchor(comments, stateEntry, sha);
-  return anchor !== null && commentOrder(newest, anchor) > 0;
+  const start = attemptStart(comments, stateEntry, sha);
+  return start !== null && stampOrder(stampOf(newest), start) > 0;
 }
 
 export function badgeOf(body) {
@@ -219,18 +224,18 @@ export function retryMarker(sha, k) {
   return `<!-- review-gate-retry:${sha}:${k} -->`;
 }
 
-export function retryStatus(comments, sha, stateUpdatedAt) {
+export function retryStatus(comments, sha, stateComment) {
   const prefix = `<!-- review-gate-retry:${sha}:`;
   const mine = comments.filter(
     (comment) => comment.user?.login === ACTIONS_LOGIN && comment.body?.startsWith(prefix),
   );
-  const last = mine.reduce(
-    (latest, comment) => Math.max(latest, Date.parse(comment.created_at)),
-    Number.NEGATIVE_INFINITY,
-  );
+  const last = latestStamp(mine.map((comment) => stampOf(comment)));
   return {
     count: mine.length,
-    pending: mine.length > 0 && stateUpdatedAt !== null && last > Date.parse(stateUpdatedAt),
+    pending:
+      last !== null &&
+      Boolean(stateComment) &&
+      stampOrder(last, stampOf(stateComment, 'updated_at')) > 0,
   };
 }
 
