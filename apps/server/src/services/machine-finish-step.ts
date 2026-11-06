@@ -4,7 +4,6 @@ import {
   buildSecondPrWarningNote,
   CHANGES_DIFF_MAX_BYTES,
   CHIEF_MODEL_FALLBACK_KIND,
-  CHIEF_TURN_ERROR_KIND,
   type ChiefModelFallbackContent,
   classifyStepFailure,
   conversationBranch,
@@ -47,11 +46,9 @@ import {
   reportedVerdictHeads,
   toBuildRecord,
 } from './builds.js';
-import { finishChiefTurn, notifyChiefTurn, recoverGateWake } from './chief.js';
 import { finishChiefDigest, isChiefDigestStep } from './chief-digest.js';
-import { cancelPendingQuestions } from './chief-questions.js';
 import { finishChiefSummary, isChiefSummaryStep } from './chief-summary.js';
-import { recordChiefStop, releaseUnconsumedSteer } from './chief-turns.js';
+import { releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
   CI_FIX_PROMPT_HEAD,
@@ -62,6 +59,7 @@ import {
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { routedChiefAgent } from './coordinator-route.js';
+import { finishCoordinatorTurn } from './coordinator-steps.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
@@ -550,43 +548,7 @@ async function finishStepReport(
     return;
   }
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
-    db.update(step)
-      .set({
-        status:
-          outcome.status === 'success'
-            ? 'done'
-            : outcome.status === 'stopped'
-              ? 'stopped'
-              : 'failed',
-        ...(outcome.status === 'stopped' ? { finishedAt: nowMs() } : {}),
-      })
-      .where(eq(step.id, stepId))
-      .run();
-    if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
-    publishStepStatus(deps, stepId);
-    cancelPendingQuestions(
-      {
-        db: deps.db,
-        hub: deps.hub,
-        user: deps.user,
-        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-      },
-      stepRow.buildId,
-      '回合已结束',
-    );
-    finishChiefTurn(deps, stepRow.buildId, outcome);
-    if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId, stepRow.prompt);
-    if (outcome.status === 'failed') recoverGateWake(deps, stepRow);
-    if (outcome.status === 'failed' && outcome.errorMessage) {
-      upsertChiefRow(deps, {
-        id: `chief-err-${stepId}`,
-        threadId: stepRow.buildId,
-        role: 'system',
-        content: JSON.stringify({ kind: CHIEF_TURN_ERROR_KIND, message: outcome.errorMessage }),
-        createdAt: nowMs(),
-      });
-    }
-    emitRuntimeStepSpan(deps.db, stepId);
+    finishCoordinatorTurn(deps, stepRow, outcome);
     return;
   }
   const verdictReport = reportedVerdictHeads(stepRow, {
