@@ -55,7 +55,7 @@ import {
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import { splitQuery } from '../search/search-query.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
-import { Cell, Section, Specimen } from './specimen.js';
+import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
 const LANGS = [
   { value: 'en', label: 'English' },
@@ -498,15 +498,15 @@ export function TraceSection() {
         note="collapsed to a one-line preview, a long first line cut at 150 characters, then opened to the full reasoning"
       >
         <div className="flex w-full max-w-160 flex-col gap-5">
-          <Cell label="Collapsed: first line as the preview">
+          <Labeled label="Collapsed: first line as the preview">
             <ThinkingRow text={THINKING_SHORT} />
-          </Cell>
-          <Cell label="Collapsed: a long first line is cut with an ellipsis">
+          </Labeled>
+          <Labeled label="Collapsed: a long first line is cut with an ellipsis">
             <ThinkingRow text={THINKING_LONG} />
-          </Cell>
-          <Cell label="Open: the title becomes Thinking, the full text follows">
+          </Labeled>
+          <Labeled label="Open: the title becomes Thinking, the full text follows">
             <ThinkingRow text={THINKING_MULTILINE} defaultOpen />
-          </Cell>
+          </Labeled>
         </div>
       </Specimen>
       <Specimen
