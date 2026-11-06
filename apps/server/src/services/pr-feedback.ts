@@ -1,6 +1,6 @@
 import { isBuildStepKind, neutralizeIssueAttachmentTokens } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { build, message, project, steerPending, step, team, todo } from '../db/schema.js';
+import { build, message, project, steerPending, step, team, threadPr, todo } from '../db/schema.js';
 import { type FetchLike, githubCollaboratorPermission, githubPull } from '../lib/github.js';
 import { feedbackHighWaterSchema, githubPrFeedback } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
@@ -65,6 +65,8 @@ export function createPrFeedbackPoller(
           .all();
         for (const target of targets) {
           try {
+            if (deps.db.select().from(threadPr).where(eq(threadPr.buildId, target.build.id)).get())
+              continue;
             const ref = githubRepoOfProject(target.project);
             if (ref === null || target.build.prNumber === null) continue;
             const access = await teamGithubToken(deps, target.todo.teamId);
