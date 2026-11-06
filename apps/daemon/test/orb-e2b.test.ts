@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import type { AgentBackend } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import type { MachineApi } from '../src/machine-client.js';
 import { orbDistRelease } from '../src/orb/dist.js';
 import {
@@ -129,9 +129,16 @@ class FakeE2b implements E2bClient {
   }
 }
 
+function ownedTempDir(prefix: string): string {
+  const dir = makeTestTempDir(prefix);
+  cleanup.push(async () => {
+    releaseTestTempDir(dir);
+  });
+  return dir;
+}
+
 function checkout() {
-  const root = makeTestTempDir('orb-e2b-');
-  return createOrbCheckout(root);
+  return createOrbCheckout(ownedTempDir('orb-e2b-'));
 }
 
 function provider(client: E2bClient, overrides: { sessionTimeoutMs?: number } = {}) {
@@ -616,7 +623,7 @@ describe('a whole step in a fake sandbox', () => {
   }) {
     const { distSource, runner } = checkout();
     const { key } = await orbDistRelease(distSource, runner);
-    const root = makeTestTempDir('orb-e2b-step-');
+    const root = ownedTempDir('orb-e2b-step-');
     const entryPath = releaseEntryFor(root, key);
     const backend = options.backend ?? fakeBackend([{ type: 'done', usage: [] }]).backend;
     const worker: FakeSandboxOptions['worker'] =
