@@ -739,6 +739,7 @@ test('answer drafts per request and the thread draft stay separate through every
   await page.route('**/api/uploads/upload', (route) => {
     heldUploads.push(route);
   });
+  let uploadsDone = 0;
   const releaseUploads = async () => {
     let n = 0;
     for (const route of heldUploads.splice(0)) {
@@ -747,7 +748,10 @@ test('answer drafts per request and the thread draft stay separate through every
         await route.fulfill({
           json: { uploadUrl: '/api/uploads', grant: `grant-${n}`, key: `t1/att-${n}.log`, attachmentId: `att-${n}` },
         });
-      else await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 3 } });
+      else {
+        await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 3 } });
+        uploadsDone += 1;
+      }
     }
   };
   await page.goto('/app');
@@ -765,6 +769,11 @@ test('answer drafts per request and the thread draft stay separate through every
     await page.getByRole('menuitemradio').filter({ hasText: '默认，由它安排' }).click();
     await expect(page.getByRole('menu')).toHaveCount(0);
   };
+  const goInApp = (path: string) =>
+    page.evaluate((to) => {
+      window.history.pushState({}, '', to);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, path);
   const focusComposer = async () => {
     await composer.click();
     await expect(composer).toBeFocused();
@@ -835,6 +844,31 @@ test('answer drafts per request and the thread draft stay separate through every
       composer: '',
     },
     { name: 'type the answer for B', run: () => composer.fill('ansB'), composer: 'ansB' },
+    {
+      name: 'an answer upload finishes into its answer while the user is on another page',
+      run: async () => {
+        await activeComposer.locator('input[type="file"]').setInputFiles({
+          name: 'away.log',
+          mimeType: 'text/plain',
+          buffer: Buffer.from('away'),
+        });
+        await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
+        await goInApp('/app/schedules');
+        await expect(page.getByTestId('home-c')).toHaveCount(0);
+        const before = uploadsDone;
+        await expect(async () => {
+          await releaseUploads();
+          expect(uploadsDone).toBeGreaterThan(before);
+        }).toPass();
+        await goInApp('/app');
+        await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+      },
+      composer: 'ansB',
+      extra: async () => {
+        await expect(activeComposer.getByTestId('composer-attachments')).toContainText('away.log');
+        await expect(page.getByTestId('chief-question-prev')).toBeEnabled();
+      },
+    },
     {
       name: 'start a slow upload on B',
       run: async () => {

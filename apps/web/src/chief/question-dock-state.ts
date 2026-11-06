@@ -33,11 +33,16 @@ const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
 let focusIndex = 0;
-let uploading = false;
+let uploads = 0;
 const answers = new Map<string, string>();
+const closed = new Set<string>();
 
 export function answerKeyOf(draftKey: string, step: number): string {
   return `${draftKey}#${step}`;
+}
+
+export function draftKeyOfAnswer(answerKey: string): string {
+  return answerKey.slice(0, answerKey.lastIndexOf('#'));
 }
 
 function emit(): void {
@@ -56,12 +61,16 @@ export const questionDockState = {
     return version;
   },
   uploading(): boolean {
-    return uploading;
+    return uploads > 0;
   },
-  setUploading(next: boolean): void {
-    if (next === uploading) return;
-    uploading = next;
-    emit();
+  beginUpload(): void {
+    uploads += 1;
+    if (uploads === 1) emit();
+  },
+  endUpload(): void {
+    if (uploads === 0) return;
+    uploads -= 1;
+    if (uploads === 0) emit();
   },
   focus(): number {
     return focusIndex;
@@ -80,7 +89,11 @@ export const questionDockState = {
     else answers.set(key, text);
     emit();
   },
+  isClosed(draftKey: string): boolean {
+    return closed.has(draftKey);
+  },
   clearAnswers(draftKey: string): void {
+    closed.add(draftKey);
     let changed = false;
     for (const key of [...answers.keys()]) {
       if (!key.startsWith(`${draftKey}#`)) continue;

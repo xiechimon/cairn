@@ -3,9 +3,10 @@ import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import { joinDraft, splitDraft } from '../overlay/attachment-paste.js';
 import { keyedBinding } from './composer-binding.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
-import { questionDockState } from './question-dock-state.js';
+import { draftKeyOfAnswer, questionDockState } from './question-dock-state.js';
 
 const answerStore = {
   get: (key: string) => questionDockState.answerText(key),
@@ -52,27 +53,27 @@ export function AnswerComposer({
   const { t } = useI18n();
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const aliveRef = useRef(true);
-  const inFlightRef = useRef(0);
   useEffect(() => {
     aliveRef.current = true;
     return () => {
       aliveRef.current = false;
-      if (inFlightRef.current > 0) questionDockState.setUploading(false);
     };
   }, []);
   const attach =
     onAttachment === undefined
       ? undefined
       : async (files: File[]) => {
-          inFlightRef.current += 1;
-          questionDockState.setUploading(true);
+          questionDockState.beginUpload();
           try {
             const tokens = await onAttachment(files);
-            return aliveRef.current ? tokens : [];
+            if (aliveRef.current) return tokens;
+            if (tokens.length > 0 && !questionDockState.isClosed(draftKeyOfAnswer(answerKey))) {
+              const current = splitDraft(answerStore.get(answerKey));
+              answerStore.set(answerKey, joinDraft([...current.tokens, ...tokens], current.text));
+            }
+            return [];
           } finally {
-            inFlightRef.current -= 1;
-            if (inFlightRef.current === 0 && aliveRef.current)
-              questionDockState.setUploading(false);
+            questionDockState.endUpload();
           }
         };
   const primary = active ? questionDockState.primary() : null;

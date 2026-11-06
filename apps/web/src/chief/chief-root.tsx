@@ -1,8 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { ChiefDrawer } from './chief-drawer.js';
+import { questionDockState } from './question-dock-state.js';
+import { questionDraftKey } from './question-drafts.js';
 import { type OriginChiefQuestion, originChiefQuestions } from './question-origin.js';
 import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
 
@@ -59,6 +61,16 @@ export function ChiefRoot() {
       }),
     [surface.chiefData.stream, surface.chiefData.threadId, surface.chiefData.threadTitle, teamId],
   );
+  const conversationId = surface.chiefData.threadId ?? 'chief';
+  const stream = surface.chiefData.stream;
+  useEffect(() => {
+    for (const item of stream ?? []) {
+      if (item.kind !== 'question' || item.status === 'pending') continue;
+      questionDockState.clearAnswers(
+        questionDraftKey({ teamId: teamId ?? 'local', conversationId, requestId: item.requestId }),
+      );
+    }
+  }, [stream, conversationId, teamId]);
   const onSettings = useCallback(() => {
     if (pathname === '/app') surface.setChiefView('settings');
     else navigate('/app?chief=settings');
