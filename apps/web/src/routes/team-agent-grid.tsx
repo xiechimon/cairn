@@ -29,6 +29,7 @@ interface TeamAgentGridProps {
   onCreate?: () => void;
   search: string;
   isDeleted?: (id: string) => boolean;
+  rows?: boolean;
 }
 
 export function TeamAgentsEmpty({ onCreate }: { onCreate?: () => void }) {
@@ -50,6 +51,7 @@ export function TeamAgentGrid({
   onCreate,
   search,
   isDeleted,
+  rows = false,
 }: TeamAgentGridProps) {
   const { t } = useI18n();
   const visible = agents.filter((agent) => !(isDeleted?.(agent.id) ?? false));
@@ -57,8 +59,75 @@ export function TeamAgentGrid({
     machineId == null ? undefined : machines?.find((m) => m.id === machineId);
   return (
     <div className="flex flex-col gap-3" data-testid="team-agent-grid">
-      {visible.length === 0 ? (
+      {visible.length === 0 && rows ? (
+        <div
+          data-testid="team-agents-empty"
+          className="settings-flat-block flex items-center justify-between gap-3 border-t border-border py-3 text-meta text-content-tertiary"
+        >
+          <span>{t('暂无成员')}</span>
+          {onCreate !== undefined && (
+            <Button
+              variant="ghost"
+              className={cn(TOPBAR_TEXT_BUTTON, 'text-foreground')}
+              onClick={onCreate}
+            >
+              {t('创建 Agent')}
+            </Button>
+          )}
+        </div>
+      ) : visible.length === 0 ? (
         <TeamAgentsEmpty onCreate={onCreate} />
+      ) : rows ? (
+        <div className="flex flex-col divide-y divide-border border-y border-border">
+          {visible.map((agent) => {
+            const machine = machineOf(agent.machineId);
+            const status: MachineStatus | null =
+              machines === undefined
+                ? null
+                : machine === undefined
+                  ? 'unassigned'
+                  : machine.online === false
+                    ? 'offline'
+                    : 'online';
+            const face = status === null ? null : STATUS_FACE[status];
+            const meta = [
+              (agent.model === '' ? t('未配置模型') : agent.model) +
+                (agent.isDefault ? t(' · 默认') : ''),
+              machine?.name,
+            ].filter((part) => part != null && part !== '');
+            return (
+              <Link
+                key={agent.id}
+                className="flex min-h-13 items-center justify-between gap-4 py-1.5 text-inherit no-underline hover:bg-menu-hover"
+                data-testid="team-agent-card"
+                to={{ pathname: `${AGENTS_HREF}/${agent.id}`, search }}
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-ui text-foreground">{agent.displayName}</span>
+                  <span
+                    className="truncate text-meta text-content-tertiary"
+                    data-testid="team-agent-meta"
+                  >
+                    {meta.join(' · ')}
+                  </span>
+                </span>
+                {face !== null && (
+                  <span
+                    className={cn(
+                      'flex flex-none items-center justify-end gap-1 text-meta md:w-56',
+                      face.cls,
+                    )}
+                    data-testid="team-card-status"
+                    data-status={status}
+                  >
+                    <face.icon className="size-3.25" strokeWidth={1.75} aria-hidden="true" />
+                    {t(face.label)}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visible.map((agent) => {

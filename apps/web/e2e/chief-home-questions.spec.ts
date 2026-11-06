@@ -86,8 +86,8 @@ test('the draft survives leaving home and returning from another page (#2853)', 
   await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
   await page.getByTestId('sidebar-settings').click();
   await expect(page.getByTestId('settings-content')).toBeVisible();
-  await expect(page.getByTestId('page-topbar').getByTestId('chief-question-count')).toHaveText('2');
-  await page.getByTestId('page-topbar').getByTestId('chief-question-entry').click();
+  await expect(page.getByTestId('page-toolbar').getByTestId('chief-question-count')).toHaveText('2');
+  await page.getByTestId('page-toolbar').getByTestId('chief-question-entry').click();
   const panel = page.getByTestId('chief-question-panel');
   await expect(panel.getByTestId('chief-question-other-0')).toHaveAttribute('aria-pressed', 'true');
   await expect(panel.getByTestId('chief-question-input-0')).toHaveValue(

@@ -1835,4 +1835,6 @@ export const EN: Record<string, string> = {
   接任务中: 'Taking tasks',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
+  '无法加载，请重试。': 'Could not load. Try again.',
+  正在加载: 'Loading',
 };

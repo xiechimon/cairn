@@ -1,5 +1,6 @@
 import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
+import { stubEmptyApiKeys } from './helpers.js';
 
 test('the existing key flow submits MCP grant labels for Coordinator Thread entry', async ({
   page,
@@ -48,6 +49,7 @@ test('the existing key flow submits MCP grant labels for Coordinator Thread entr
 });
 
 test('grant all submits each tool only in its registry kind column', async ({ page }) => {
+  await stubEmptyApiKeys(page);
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥' }).first().click();
   const dialog = page.getByRole('dialog', { name: '新建密钥' });

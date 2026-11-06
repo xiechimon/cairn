@@ -69,7 +69,7 @@ test('settings opens model routing from the providers section', async ({ page })
   await page.goto('/app/resources/providers?scenario=10');
   await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '订阅与路由' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=10/);
-  await expect(page.getByRole('heading', { name: '模型路由' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '订阅与路由' })).toBeVisible();
 });
 
 test('live: rename, verify, remove and the Claude usage switch hit the agreed routes', async ({

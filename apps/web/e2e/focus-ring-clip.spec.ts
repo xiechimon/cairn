@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { keyboardFocus, readRing, settleTransitions } from './helpers.js';
+import { keyboardFocus, readRing, settleTransitions, stubEmptyApiKeys } from './helpers.js';
 
 test('api key permission checkboxes keep whole focus rings while the list scrolls', async ({
   page,
 }) => {
+  await stubEmptyApiKeys(page);
   await page.goto('/app/api-keys');
   await page.getByRole('button', { name: '新建密钥' }).first().click();
   const boxes = page.getByRole('dialog').getByRole('checkbox', { name: /^(读|写) / });

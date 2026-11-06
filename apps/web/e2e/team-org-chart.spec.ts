@@ -80,7 +80,7 @@ test('org chart: nodes are Paper cards, `创建 Agent` only in the top bar', asy
   expect(shape.width).toBe(220);
   await expect(page.getByRole('button', { name: '创建 Agent' })).toHaveCount(1);
   await expect(
-    page.getByTestId('page-topbar').getByRole('button', { name: '创建 Agent' }),
+    page.getByTestId('page-toolbar').getByRole('button', { name: '创建 Agent' }),
   ).toBeVisible();
   await expect(page.getByTestId('team-chart-nodes').getByRole('button')).toHaveCount(0);
 });

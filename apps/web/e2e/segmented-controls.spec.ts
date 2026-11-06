@@ -155,7 +155,7 @@ test('files seg + tasks view toggle: hover steps the unselected ink (dark)', asy
 test('team layout toggle: segmented face (paper track, white ringed chip)', async ({ page }) => {
   await themed(page, 'light', '/app/team?scenario=12');
 
-  const bar = page.getByTestId('page-topbar');
+  const bar = page.getByTestId('page-toolbar');
   const group = await bar.getByRole('tablist').evaluate((g) => ({
     border: getComputedStyle(g).borderTopWidth,
     groupBg: getComputedStyle(g).backgroundColor,

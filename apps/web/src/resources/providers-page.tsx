@@ -9,6 +9,7 @@ import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
+import { QueryGate } from '../components/query-gate.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
@@ -279,22 +280,24 @@ export function ProvidersPage() {
             ]}
           />
         </div>
-        <ProviderPanel
-          items={entries.map((e) => e.item)}
-          selectedId={selected?.item.id ?? null}
-          onSelect={(id) => setParams({ item: id })}
-          onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
-          empty={
-            <EmptyState
-              testId="providers-empty"
-              icon={Cpu}
-              title={t('尚未添加服务商。')}
-              description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
-            />
-          }
-        >
-          {selected?.editor}
-        </ProviderPanel>
+        <QueryGate query={providersQ} live={live}>
+          <ProviderPanel
+            items={entries.map((e) => e.item)}
+            selectedId={selected?.item.id ?? null}
+            onSelect={(id) => setParams({ item: id })}
+            onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
+            empty={
+              <EmptyState
+                testId="providers-empty"
+                icon={Cpu}
+                title={t('尚未添加服务商。')}
+                description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
+              />
+            }
+          >
+            {selected?.editor}
+          </ProviderPanel>
+        </QueryGate>
       </div>
       <CreateProviderDialog
         open={createOpen}

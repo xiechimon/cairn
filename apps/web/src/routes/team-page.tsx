@@ -13,6 +13,7 @@ import {
 import { mapMachines, mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
+import { QueryGate } from '../components/query-gate.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { Button, buttonVariants } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -111,23 +112,25 @@ export function TeamPage() {
         </>
       }
     >
-      {layout === 'grid' ? (
-        <>
-          {team.agents.length > 0 && (
-            <p className="m-0 mb-3 text-meta text-content-tertiary">
-              {t('{n} 个成员', { n: team.members })}
-            </p>
-          )}
-          <TeamAgentGrid
-            agents={team.agents}
-            machines={cardMachines}
-            search={search}
-            isDeleted={isDeleted}
-          />
-        </>
-      ) : (
-        <TeamChart agents={team.agents} chiefAgentId={chiefAgentId} />
-      )}
+      <QueryGate query={membersQ} live={live}>
+        {layout === 'grid' ? (
+          <>
+            {team.agents.length > 0 && (
+              <p className="m-0 mb-3 text-meta text-content-tertiary">
+                {t('{n} 个成员', { n: team.members })}
+              </p>
+            )}
+            <TeamAgentGrid
+              agents={team.agents}
+              machines={cardMachines}
+              search={search}
+              isDeleted={isDeleted}
+            />
+          </>
+        ) : (
+          <TeamChart agents={team.agents} chiefAgentId={chiefAgentId} />
+        )}
+      </QueryGate>
       <CreateAgentDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}

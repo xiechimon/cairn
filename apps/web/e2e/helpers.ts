@@ -126,3 +126,20 @@ export async function openChiefWindow(page: Page): Promise<void> {
   });
   await page.keyboard.press('ControlOrMeta+j');
 }
+
+export async function stubEmptyApiKeys(page: Page): Promise<void> {
+  await page.route('**/api/**', (route, request) =>
+    request.method() === 'GET'
+      ? route.fulfill({ status: 500, json: { error: 'Unrelated API surface' } })
+      : route.fallback(),
+  );
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null } }),
+  );
+  await page.route('**/api/teams/team-1/api-keys', (route) => route.fulfill({ json: [] }));
+}

@@ -8,6 +8,8 @@ import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
+import { QueryGate } from '../components/query-gate.js';
+import { SettingsPanel } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
@@ -146,86 +148,93 @@ export function MachinesPage() {
         data-testid="machines-scroll"
         className="flex w-full min-w-0 flex-col gap-3 px-4 py-4 md:px-6"
       >
-        {machines.length === 0 || selected === undefined ? (
-          <EmptyState
-            testId="resource-empty"
-            className="mt-6"
-            icon={Monitor}
-            title={t('尚无机器。')}
-            description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
-            action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
-          />
-        ) : (
-          <>
-            <div className="flex min-h-7 items-center justify-between gap-3 px-1">
-              <div className="flex items-center gap-1">
-                <h2 className="m-0 text-card-title font-semibold text-foreground">
-                  {t('已接入的机器')}
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('添加机器')}
-                  title={t('添加机器')}
-                  onClick={() => setAddOpen(true)}
-                >
-                  <Plus aria-hidden strokeWidth={1.75} />
-                </Button>
-              </div>
-              {live ? (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  data-testid="machines-checked"
-                  className="gap-1.5 text-content-tertiary"
-                  onClick={() => void machinesQ.refetch()}
-                >
-                  <RefreshCw
-                    aria-hidden
-                    strokeWidth={1.75}
-                    className={cn('size-3', machinesQ.isFetching && 'animate-spin')}
-                  />
-                  {t('已检查 {ago}', { ago: checkedAgo })}
-                </Button>
-              ) : (
-                <span
-                  data-testid="machines-checked"
-                  className="inline-flex items-center gap-1.5 text-meta text-content-tertiary"
-                >
-                  <RefreshCw aria-hidden strokeWidth={1.75} className="size-3" />
-                  {t('已检查 {ago}', { ago: checkedAgo })}
-                </span>
-              )}
-            </div>
-            <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:gap-2">
-              <nav
-                data-testid="machine-list"
-                aria-label={t('已接入的机器')}
-                className="flex w-full flex-none flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border md:w-64"
+        <QueryGate query={machinesQ} live={live}>
+          {machines.length === 0 || selected === undefined ? (
+            <EmptyState
+              testId="resource-empty"
+              className="mt-6"
+              icon={Monitor}
+              title={t('尚无机器。')}
+              description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+              action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
+            />
+          ) : (
+            <>
+              <SettingsPanel
+                header={
+                  <>
+                    <div className="flex items-center gap-1">
+                      <h2 className="m-0 text-card-title font-semibold text-foreground">
+                        {t('已接入的机器')}
+                      </h2>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t('添加机器')}
+                        title={t('添加机器')}
+                        onClick={() => setAddOpen(true)}
+                      >
+                        <Plus aria-hidden strokeWidth={1.75} />
+                      </Button>
+                    </div>
+                    {live ? (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        data-testid="machines-checked"
+                        className="gap-1.5 text-content-tertiary"
+                        onClick={() => void machinesQ.refetch()}
+                      >
+                        <RefreshCw
+                          aria-hidden
+                          strokeWidth={1.75}
+                          className={cn('size-3', machinesQ.isFetching && 'animate-spin')}
+                        />
+                        {t('已检查 {ago}', { ago: checkedAgo })}
+                      </Button>
+                    ) : (
+                      <span
+                        data-testid="machines-checked"
+                        className="inline-flex items-center gap-1.5 text-meta text-content-tertiary"
+                      >
+                        <RefreshCw aria-hidden strokeWidth={1.75} className="size-3" />
+                        {t('已检查 {ago}', { ago: checkedAgo })}
+                      </span>
+                    )}
+                  </>
+                }
               >
-                {machines.map((machine) => (
-                  <MachineItem
-                    key={rowKey(machine)}
-                    machine={machine}
-                    href={hrefFor(machine)}
-                    selected={machine === selected}
-                    host={chiefState(machine).host}
-                  />
-                ))}
-              </nav>
-              <div className="min-w-0 flex-1">
-                <MachineDetailPane
-                  key={rowKey(selected)}
-                  machine={selected}
-                  machines={machines}
-                  chief={chiefState(selected)}
-                  fixture={fixture}
-                  search={`?${searchParams.toString()}`}
-                />
-              </div>
-            </div>
-          </>
-        )}
+                <div className="flex min-w-0 flex-col md:flex-row">
+                  <nav
+                    data-testid="machine-list"
+                    aria-label={t('已接入的机器')}
+                    className="flex w-full flex-none flex-col border-b border-border md:w-64 md:border-r md:border-b-0"
+                  >
+                    {machines.map((machine) => (
+                      <MachineItem
+                        key={rowKey(machine)}
+                        machine={machine}
+                        href={hrefFor(machine)}
+                        selected={machine === selected}
+                        host={chiefState(machine).host}
+                      />
+                    ))}
+                  </nav>
+                  <div className="min-w-0 flex-1">
+                    <MachineDetailPane
+                      key={rowKey(selected)}
+                      machine={selected}
+                      machines={machines}
+                      chief={chiefState(selected)}
+                      fixture={fixture}
+                      search={`?${searchParams.toString()}`}
+                    />
+                  </div>
+                </div>
+              </SettingsPanel>
+            </>
+          )}
+        </QueryGate>
       </div>
       <CreateMachineDialog
         open={addOpen}

@@ -325,7 +325,7 @@ export function MachineDetailPane({
           {!online && (
             <div
               data-testid="machine-recover"
-              className="flex flex-col gap-1 px-4 py-3 text-meta text-content-secondary"
+              className="flex flex-col gap-1 settings-flat-block px-4 py-3 text-meta text-content-secondary"
             >
               <span>
                 {t('在这台机器上运行')}{' '}
@@ -341,7 +341,7 @@ export function MachineDetailPane({
               data-testid="claude-login-warning"
               data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
               role="status"
-              className="flex items-start gap-2 px-4 py-3 text-meta text-content-secondary"
+              className="flex items-start gap-2 settings-flat-block px-4 py-3 text-meta text-content-secondary"
             >
               <TriangleAlert
                 aria-hidden
@@ -454,6 +454,7 @@ export function MachineDetailPane({
 
       <SettingsSection title={t('归属的 Agent')}>
         <TeamAgentGrid
+          rows
           agents={homeAgents}
           machines={machines}
           onCreate={() => setCreateOpen(true)}

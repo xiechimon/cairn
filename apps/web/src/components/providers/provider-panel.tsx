@@ -2,7 +2,7 @@ import { cn } from 'cn';
 import { Plus, X } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { SettingsCard } from '../settings-list.js';
+import { SettingsCard, SettingsFlat } from '../settings-list.js';
 import { ToggleSwitch } from '../toggle-switch.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
@@ -61,7 +61,7 @@ export function ProviderInstanceRow({
       aria-current={selected ? 'true' : undefined}
       className={cn(
         'flex items-start gap-3 px-3.5 py-3 transition-colors duration-(--dur-fast)',
-        selected ? 'bg-(--sidebar-active)' : 'hover:bg-sidebar-hover',
+        selected ? 'bg-secondary' : 'hover:bg-menu-hover',
       )}
     >
       <Button
@@ -146,7 +146,7 @@ export function ProviderPanel({
         )}
       </div>
       <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
-        {items.length === 0 ? empty : children}
+        <SettingsFlat>{items.length === 0 ? empty : children}</SettingsFlat>
       </div>
     </SettingsCard>
   );

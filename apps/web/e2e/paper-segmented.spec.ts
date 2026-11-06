@@ -18,7 +18,7 @@ const CONTROLS: Control[] = [
   {
     name: 'team switch',
     url: '/app/team?scenario=12',
-    track: (page) => page.getByTestId('page-topbar').getByRole('tablist'),
+    track: (page) => page.getByTestId('page-toolbar').getByRole('tablist'),
   },
   {
     name: 'project tabs',

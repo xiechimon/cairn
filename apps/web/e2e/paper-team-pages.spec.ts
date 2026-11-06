@@ -62,7 +62,7 @@ test('`创建 Agent` is the top-bar primary, not a card in the grid', async ({ p
   await page.goto(ROSTER);
   const create = page.getByRole('button', { name: '创建 Agent' });
   await expect(create).toHaveCount(1);
-  await expect(page.getByTestId('page-topbar').getByRole('button', { name: '创建 Agent' })).toBeVisible();
+  await expect(page.getByTestId('page-toolbar').getByRole('button', { name: '创建 Agent' })).toBeVisible();
   await expect(page.getByTestId('team-agent-grid').getByRole('button')).toHaveCount(0);
   await create.click();
   await expect(page.getByRole('dialog', { name: '创建 agent' })).toBeVisible();

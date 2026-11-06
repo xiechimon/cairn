@@ -455,7 +455,13 @@ export function VendorTabs({
           return {
             value: vendor,
             label: `${short} ${counts[vendor]}`,
-            icon: <Mark width={14} height={14} className="block flex-none text-foreground" />,
+            icon: (
+              <Mark
+                width={14}
+                height={14}
+                className="block flex-none text-foreground [&_path]:fill-current"
+              />
+            ),
             data: { 'data-vendor': vendor },
           };
         })}
