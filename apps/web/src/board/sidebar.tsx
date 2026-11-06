@@ -26,6 +26,7 @@ import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
+import { fleetStatusLine } from './fleet-status.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
 
@@ -56,6 +57,7 @@ interface BoardSidebarProps {
   attention?: number;
   machinesOnline?: number;
   machinesOffline?: number;
+  offlineMachineNames?: string[];
   onSearch?: () => void;
   usageNav?: boolean;
   selected?: SidebarSelected;
@@ -158,6 +160,8 @@ export function BoardSidebar({
   onToggle,
   attention = 0,
   machinesOffline = 0,
+  machinesOnline = 0,
+  offlineMachineNames = [],
   onSearch,
   usageNav = false,
   selected = 'board',
@@ -210,7 +214,11 @@ export function BoardSidebar({
   const activityLink = {
     to: { pathname: ACTIVITY_PATH, search: plain },
   };
-  const offlineLabel = t('{n} 台机器离线', { n: machinesOffline });
+  const offlineLabel =
+    fleetStatusLine(
+      { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
+      t,
+    ) ?? '';
 
   if (collapsed) {
     const railLink = (
@@ -420,17 +428,18 @@ export function BoardSidebar({
               <ChartColumn className={ICON} strokeWidth={STROKE} />
             </SidebarFooterIcon>
           )}
-          {machinesOffline > 0 && (
-            <Link
-              data-testid="sidebar-attention"
-              to={{ pathname: settingsHref('machines'), search: plain }}
-              className={`ml-auto flex h-6 min-w-0 items-center gap-1.5 rounded-full bg-(--chip-confirm-bg) px-2 text-caption font-medium whitespace-nowrap text-(--chip-confirm-fg) no-underline ${FOCUS}`}
-            >
-              <span aria-hidden className="size-1.5 flex-none rounded-full bg-current" />
-              <span className="truncate">{offlineLabel}</span>
-            </Link>
-          )}
         </div>
+        {machinesOffline > 0 && (
+          <Link
+            data-testid="sidebar-attention"
+            to={{ pathname: settingsHref('machines'), search: plain }}
+            title={offlineLabel}
+            className={`flex min-h-6 w-full min-w-0 items-start gap-1.5 rounded-md bg-(--chip-confirm-bg) px-2 py-1 text-caption font-medium text-(--chip-confirm-fg) no-underline ${FOCUS}`}
+          >
+            <span aria-hidden className="mt-1 size-1.5 flex-none rounded-full bg-current" />
+            <span className="min-w-0 break-words">{offlineLabel}</span>
+          </Link>
+        )}
       </div>
     </aside>
   );

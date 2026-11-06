@@ -23,6 +23,7 @@ import { useI18n } from '../i18n/provider.js';
 import { X } from '../icons/index.js';
 import { CoordinatorComputer } from './computer-feed.js';
 import { MachineScreenSurface, ScreenPlaceholder } from './computer-screen.js';
+import { machineStateLabel } from './fleet-status.js';
 import { desktopControlInstalled, desktopControlOnline } from './machine-capabilities.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
@@ -32,15 +33,6 @@ export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow 
     machines[0] ??
     null
   );
-}
-
-function runningLabel(machine: MachineRow, t: ReturnType<typeof useI18n>['t']): string {
-  if (machine.online !== true) return t('离线');
-  const running = machine.runningSteps ?? 0;
-  if (running === 0) return t('空闲');
-  return machine.maxConcurrent != null
-    ? t('{n}/{max} 在跑', { n: running, max: machine.maxConcurrent })
-    : t('{n} 在跑', { n: running });
 }
 
 function OnlineDot({ online }: { online: boolean }) {
@@ -63,7 +55,8 @@ export function MachineChip({
 }) {
   const { t } = useI18n();
   const host = coordinatorMachine(machines);
-  const running = machines.reduce((sum, machine) => sum + (machine.runningSteps ?? 0), 0);
+  const hostOnline = host?.online === true;
+  const running = hostOnline ? (host?.runningSteps ?? 0) : 0;
   return (
     <Button
       variant="ghost"
@@ -71,19 +64,18 @@ export function MachineChip({
       aria-pressed={open}
       onClick={onToggle}
       data-testid="machines-button"
+      title={host === null ? undefined : `${host.name} · ${machineStateLabel(host, t)}`}
       className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
     >
       <Laptop aria-hidden="true" className="size-3.5" />
       <span className="max-w-32 truncate max-[640px]:sr-only">{host?.name ?? t('电脑')}</span>
       <OnlineDot online={host?.online === true} />
+      {host != null && !hostOnline && (
+        <span className="text-content-tertiary max-[640px]:hidden">{t('离线')}</span>
+      )}
       {running > 0 && (
         <span className="text-content-tertiary tabular-nums max-[640px]:hidden">
           {t('{n} 在跑', { n: running })}
-        </span>
-      )}
-      {machines.length > 1 && (
-        <span className="text-content-tertiary tabular-nums max-[640px]:hidden">
-          +{machines.length - 1}
         </span>
       )}
     </Button>
@@ -138,7 +130,6 @@ function MachineScreen({
   onExpand?: () => void;
 }) {
   const { t } = useI18n();
-  const online = machine.online === true;
   if (computer !== null && teamId !== undefined && desktopControlOnline(machine, computer)) {
     return (
       <MachineScreenSurface
@@ -150,11 +141,7 @@ function MachineScreen({
       />
     );
   }
-  if (!online) return <ScreenPlaceholder online={false} label={t('电脑离线')} />;
-  if (desktopControlOnline(machine, computer)) {
-    return <ScreenPlaceholder online label={t('桌面控制已上线，屏幕显示在这里')} />;
-  }
-  return <ScreenPlaceholder online label={t('屏幕随桌面控制一起上线，到时显示在这里')} />;
+  return null;
 }
 
 function MachineCard({
@@ -358,10 +345,19 @@ function MachineCard({
           </span>
           <span className="flex items-center gap-1.5 text-meta text-content-tertiary">
             <OnlineDot online={online} />
-            {runningLabel(machine, t)}
+            {machineStateLabel(machine, t)}
           </span>
         </span>
       </div>
+      {online && !screenLive && (
+        <p
+          data-testid="machine-screen-hint"
+          className="m-0 flex items-center gap-2 px-3.5 pb-1 text-meta text-content-tertiary"
+        >
+          <MonitorSmartphone aria-hidden="true" className="size-3.5 flex-none" />
+          {t('未开启桌面控制，开启后这里显示屏幕')}
+        </p>
+      )}
       <CapabilityRow
         icon={<MonitorSmartphone aria-hidden="true" className="size-4" />}
         label={t('桌面控制')}

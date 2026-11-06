@@ -12,6 +12,7 @@ import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { recordOutsideLocation } from '../settings/settings-href.js';
+import { fleetStatus } from './fleet-status.js';
 import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
@@ -93,16 +94,9 @@ export function AppSidebar({
     [todos, live, todosQ.data, fixture.todos],
   );
   const fixtureMachines = fixture.resources?.machines;
-  const machinesOnline = live
-    ? (machinesQ.data ?? []).filter((m) => m.online).length
-    : fixtureMachines != null
-      ? fixtureMachines.filter((m) => m.online === true).length
-      : fixture.chief != null
-        ? 1
-        : 0;
-  const machinesOffline = live
-    ? (machinesQ.data ?? []).filter((m) => !m.online).length
-    : (fixtureMachines ?? []).filter((m) => m.online === false).length;
+  const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
+  const machinesOnline =
+    live || fixtureMachines != null ? fleet.online : fixture.chief != null ? 1 : 0;
   const { pathname, search: locationSearch } = location;
   useEffect(
     () => recordOutsideLocation(`${pathname}${locationSearch}`),
@@ -112,7 +106,8 @@ export function AppSidebar({
   const sidebarProps = {
     attention: needsYouCount(resolvedTodos),
     machinesOnline,
-    machinesOffline,
+    machinesOffline: fleet.offline,
+    offlineMachineNames: fleet.offlineNames,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     usageNav: fixture.usageNav === true,
