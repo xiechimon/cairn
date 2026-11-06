@@ -84,38 +84,22 @@ test('active row = sidebar-active fill, no ring', async ({ page }) => {
   expect(m.ring).toBe('none');
 });
 
-test('project rows: tile letters follow --project-ink-N in order, open-task counts', async ({
-  page,
-}) => {
+test('project rows carry a neutral glyph, no colored tile and no count', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(3);
-  const probe = await rows.evaluateAll((els) => {
-    const root = getComputedStyle(document.documentElement);
-    return els.map((el, i) => {
-      const tile = el.querySelector('.project-avatar')!;
-      const probeEl = document.createElement('span');
-      probeEl.style.color = root.getPropertyValue(`--project-ink-${(i % 6) + 1}`);
-      document.body.append(probeEl);
-      const want = getComputedStyle(probeEl).color;
-      probeEl.remove();
-      return {
-        tile: getComputedStyle(tile).color,
-        want,
-        initial: tile.textContent,
-        count: el.querySelector('[data-slot="sidebar-project-count"]')?.textContent ?? null,
-      };
-    });
-  });
-  for (const row of probe) expect(row.tile).toBe(row.want);
-  expect(probe.map((r) => r.initial)).toEqual(['R', 'R', 'R']);
-  expect(probe.map((r) => r.count)).toEqual(['1', null, null]);
-
-  await page.getByTestId('project-group').getByRole('link', { name: '新建项目' }).click();
-  await expect(page).toHaveURL(/\/app\/project\/new\?scenario=board-repos/);
+  const probe = await rows.evaluateAll((els) =>
+    els.map((el) => ({
+      glyphColor: getComputedStyle(el.querySelector('[data-slot="project-glyph"]')!).color,
+      tile: el.querySelector('.project-avatar') !== null,
+      count: el.querySelector('[data-slot="sidebar-project-count"]') !== null,
+    })),
+  );
+  expect(new Set(probe.map((r) => r.glyphColor)).size).toBe(1);
+  expect(probe.some((r) => r.tile || r.count)).toBe(false);
 });
 
-test('long project names truncate and keep the waiting count visible', async ({ page }) => {
+test('long project names truncate to one 32px line', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
@@ -123,19 +107,15 @@ test('long project names truncate and keep the waiting count visible', async ({ 
     .evaluate((row) => {
       const label = row.querySelector('span.truncate') as HTMLElement;
       label.textContent = '一个非常非常非常长的项目名字用来压测侧栏截断行为-with-latin-tail';
-      const count = row.querySelector('[data-slot="sidebar-project-count"]')!;
       const r = row.getBoundingClientRect();
-      const c = count.getBoundingClientRect();
       return {
         overflow: label.scrollWidth > label.clientWidth,
         ellipsis: getComputedStyle(label).textOverflow,
-        countInside: c.right <= r.right && c.width > 0,
         rowHeight: r.height,
       };
     });
   expect(m.overflow).toBe(true);
   expect(m.ellipsis).toBe('ellipsis');
-  expect(m.countInside).toBe(true);
   expect(m.rowHeight).toBe(32);
 });
 
