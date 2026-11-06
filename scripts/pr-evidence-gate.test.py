@@ -457,7 +457,7 @@ class EvidenceCardTests(unittest.TestCase):
             with self.subTest(requirement=requirement):
                 result, output = self.verdict(self.card(requirement=requirement))
                 self.assertEqual(result, 1, output)
-                self.assertIn('FAIL api-card: Requirement needs', output)
+                self.assertIn('FAIL api-card: Requirement has no', output)
 
     def test_plan_decision_with_a_quote_is_an_internal_requirement(self):
         requirement = '### Requirement\n\nD110, plan 30\n\n> composer drafts survive close and sync across devices\n\n'
@@ -513,6 +513,45 @@ class EvidenceCardTests(unittest.TestCase):
     def test_without_a_changed_file_list_nothing_extra_is_enforced(self):
         result, output = self.verdict('Checks passed.', changed=None)
         self.assertEqual(result, 0, output)
+
+    def test_formatting_around_an_empty_label_does_not_count_as_content(self):
+        for empty in ['**Live:**', '__Live:__', '- **Live:**', '`Live:`', '**Live:** **', 'Live: *', 'Live: ``']:
+            with self.subTest(empty=empty):
+                lines = f'```text\n{empty}\nMocked: none.\nNot covered: x.\n```\n'
+                result, output = self.verdict('Checks passed.\n' + lines, changed=['scripts/x.mjs'])
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL coverage-lines: missing Live:', output)
+
+    def test_formatted_labels_with_content_pass(self):
+        proof = 'Checks passed.\n\n**Live:** the stack.\n\n__Mocked:__ none.\n\n- **Not covered:** `x`.\n'
+        result, output = self.verdict(proof, changed=['scripts/x.mjs'])
+        self.assertEqual(result, 0, output)
+
+    def test_short_and_wrapped_quotes_count(self):
+        link = '[#3104](https://github.com/xiechimon/cairn/issues/3104)\n\n'
+        for quote in ['> Return 404.\n', '> must survive closing the app\n> and reopening it on any device\n', '>Done\n']:
+            with self.subTest(quote=quote):
+                result, output = self.verdict(self.card(requirement='### Requirement\n\n' + link + quote + '\n'))
+                self.assertEqual(result, 0, output)
+
+    def test_empty_quote_is_not_a_quote_and_the_message_says_which_part_is_missing(self):
+        link = '[#3104](https://github.com/xiechimon/cairn/issues/3104)\n\n'
+        for quote in ['>\n', '> **\n> \n', '> `` *\n']:
+            with self.subTest(quote=quote):
+                result, output = self.verdict(self.card(requirement='### Requirement\n\n' + link + quote + '\n'))
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL api-card: Requirement has no quoted excerpt', output)
+                self.assertNotIn('has no internal link', output)
+        result, output = self.verdict(self.card(requirement='### Requirement\n\n> Return 404.\n\n'))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL api-card: Requirement has no internal link', output)
+        self.assertNotIn('no quoted excerpt', output)
+
+    def test_http_status_must_be_in_the_response_column(self):
+        requests = self.requests.replace('`404`', 'not found').replace('`200 {"content":"a"}`', 'ok').replace('/drafts/x', '/drafts/404')
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL api-card: Requests table has no row with an HTTP status code in the Response column', output)
 
     def test_workflow_passes_the_changed_files_to_the_gate(self):
         workflow = Path('.github/workflows/pr-evidence.yml').read_text()

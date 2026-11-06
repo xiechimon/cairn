@@ -79,7 +79,8 @@ this repository) always needs the screenshot. Requests holds an embedded
 screenshot of the real call, and a table with a Before row and at least one
 row naming an HTTP status code. Every PR that changes more than docs must
 also carry non-empty `Live:`, `Mocked:` and `Not covered:` lines (`Not
-verified:` was merged into `Not covered:`). The gate checks the card's shape;
+verified:` was merged into `Not covered:`; a label with only markup after it
+counts as empty). The gate checks the card's shape;
 whether it matches the requirement stays a reviewer judgment.
 
 Usage:
@@ -137,7 +138,8 @@ HTTP_STATUS = re.compile(r'(?<![\w.])[1-5]\d\d(?![\w.])')
 INTERNAL_LINK = re.compile(r'https://(?:github\.com|raw\.githubusercontent\.com)/xiechimon/cairn(?:/|$)')
 INTERNAL_REF = re.compile(r'https://github\.com/xiechimon/cairn/(?:issues|pull|blob)/|\bD\d{1,4}\b')
 THIRD_PARTY_LINE = re.compile(r'^[ \t]*(?:[-*]\s+)?(?:\*\*)?Third-party:', re.M | re.I)
-QUOTE_LINE = re.compile(r'^[ \t]*>[ \t]*(\S.{19,})$', re.M)
+QUOTE_LINE = re.compile(r'^[ \t]*>[ \t]?(.*)$', re.M)
+MARKUP = re.compile(r'[*_`~\s]+')
 
 
 
@@ -328,6 +330,10 @@ def card_section(text, title):
     return None
 
 
+def has_content(text):
+    return bool(MARKUP.sub('', text))
+
+
 def table_rows(section):
     rows = []
     for line in section.splitlines():
@@ -338,7 +344,7 @@ def table_rows(section):
         if all(re.fullmatch(r':?-+:?', cell) for cell in cells):
             continue
         rows.append(cells)
-    return rows[1:]
+    return (rows[0], rows[1:]) if rows else ([], [])
 
 
 def embedded_images(section):
@@ -361,18 +367,24 @@ def card_problems(body):
         if third_party:
             if not shots:
                 problems.append('third-party Requirement needs an embedded screenshot of the official doc')
-        elif not shots and not (INTERNAL_REF.search(requirement) and QUOTE_LINE.search(requirement)):
-            problems.append('Requirement needs an internal link (issue, PR or plan decision Dxxx) plus a quoted excerpt, or an embedded screenshot of the doc')
+        elif not shots:
+            if not INTERNAL_REF.search(requirement):
+                problems.append('Requirement has no internal link (issue, PR or plan decision Dxxx); add one, or screenshot the doc')
+            if not has_content(' '.join(QUOTE_LINE.findall(requirement))):
+                problems.append('Requirement has no quoted excerpt: quote the requirement under the link with > lines, or screenshot the doc')
     if requests is None:
         problems.append("missing '### Requests' section: screenshot the real call and add the Requests table")
     else:
         if not embedded_images(requests):
             problems.append('Requests section has no embedded screenshot of the running product or API tool')
-        rows = table_rows(requests)
+        header, rows = table_rows(requests)
         if not any(row and re.sub(r'[*`_ ]', '', row[0]).lower().startswith('before') for row in rows):
             problems.append('Requests table has no Before row: one 404 or the old response is enough')
-        if not any(HTTP_STATUS.search(' '.join(row)) for row in rows):
-            problems.append('Requests table has no row with an HTTP status code')
+        response = next((i for i, cell in enumerate(header) if 'response' in cell.lower()), None)
+        if response is None:
+            problems.append("Requests table has no 'Response' column")
+        elif not any(len(row) > response and HTTP_STATUS.search(row[response]) for row in rows):
+            problems.append('Requests table has no row with an HTTP status code in the Response column')
     return problems
 
 
@@ -380,8 +392,8 @@ def coverage_problems(body):
     text = visible_markdown(body, blank_fences=False)
     problems = []
     for label in COVERAGE_LABELS:
-        pattern = rf'^[ \t]*(?:[-*+]\s+)?(?:\*\*)?{label}:(?:\*\*)?[ \t]*\S'
-        if not re.search(pattern, text, re.M):
+        pattern = re.compile(rf'^[ \t]*(?:[-*+][ \t]+)?[*_`]{{0,2}}{label}:[*_`]{{0,2}}(?P<rest>.*)$', re.M)
+        if not any(has_content(match['rest']) for match in pattern.finditer(text)):
             problems.append(f'missing {label}:')
     if 'missing Not covered:' in problems and re.search(r'^[ \t]*(?:[-*+]\s+)?(?:\*\*)?Not verified:', text, re.M):
         problems.append('Not verified: was merged into Not covered: (name what ran live, what was mocked, and what no check reached)')
