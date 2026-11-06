@@ -1,9 +1,18 @@
 import { copyFileSync, existsSync, renameSync } from 'node:fs';
 import type { Context } from '@earendil-works/chord/context';
 import type { Models } from '@earendil-works/pi-ai/models';
-import type { Extension, Harness, HarnessSettings } from '@earendil-works/pi-durable';
+import {
+  AssistantEntry,
+  type EntryId,
+  type EntryRecord,
+  type Extension,
+  type Harness,
+  type HarnessSettings,
+  ToolResultEntry,
+  UserEntry,
+} from '@earendil-works/pi-durable';
 import { parseWatermark } from '../watermark.js';
-import { activeConversation, newestEntryId } from './conversations.js';
+import { activeConversation, type Conversation, newestEntryId } from './conversations.js';
 import { openCoordinatorHarness } from './harness.js';
 import { type SeedRow, seedCoordinator } from './seed.js';
 import { settleStaleSubmissions } from './stale-runs.js';
@@ -53,6 +62,27 @@ function backupBeforeUpgrade(path: string, from: string): void {
   if (existsSync(path) && !existsSync(target)) copyFileSync(path, target);
 }
 
+function isContentEntry(entry: EntryRecord): boolean {
+  if (UserEntry.is(entry) || ToolResultEntry.is(entry)) return true;
+  if (!AssistantEntry.is(entry)) return false;
+  const message = entry.model?.[0];
+  return !(message?.role === 'assistant' && message.stopReason === 'aborted');
+}
+
+async function hasContentBeyond(
+  root: Conversation,
+  after: number,
+  context: Context,
+): Promise<boolean> {
+  const page = await root.entries(
+    { minEntryId: (after + 1) as EntryId, order: 'ascending' },
+    500,
+    undefined,
+    context,
+  );
+  return page.items.some(isContentEntry);
+}
+
 export async function openReconciledHarness(
   storagePath: string,
   models: Models,
@@ -72,7 +102,6 @@ export async function openReconciledHarness(
     facts.conversationId === null || rootNewest === undefined
       ? root
       : await activeConversation(harness, facts.conversationId, context);
-  const newest = recorded === undefined ? undefined : await newestEntryId(recorded, context);
   const watermark = parseWatermark(facts.lastMirroredEntryId);
   let outcome: ReconcileOutcome = 'unchanged';
   let reseed: ReconcileOutcome | null = null;
@@ -86,9 +115,8 @@ export async function openReconciledHarness(
     reseed = 'reseeded-missing-conversation';
   } else if (
     watermark?.kind === 'mirrored' &&
-    newest !== undefined &&
-    newest > watermark.entryId &&
-    !facts.hasClaimedStep
+    !facts.hasClaimedStep &&
+    (await hasContentBeyond(recorded, watermark.entryId, context))
   ) {
     reseed = 'reseeded-ahead';
   }

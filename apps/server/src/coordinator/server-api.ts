@@ -3,6 +3,7 @@ import {
   chiefThread,
   coordinatorConversation,
   coordinatorEntry,
+  steerPending,
   step,
   stopPending,
 } from '../db/schema.js';
@@ -58,7 +59,18 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       heartbeatStep(deps, null, stepId);
     },
     stop: async (stepId) => fetchStop(deps, { id: null }, stepId).discard,
-    steer: async (stepId) => fetchSteer(deps, { id: null }, stepId).content,
+    steer: async (stepId) => {
+      const owned = stepRow(stepId);
+      const pending = deps.db
+        .select()
+        .from(steerPending)
+        .where(eq(steerPending.conversationId, owned.buildId))
+        .get();
+      const { content } = fetchSteer(deps, { id: null }, stepId);
+      return content === null || pending === undefined
+        ? null
+        : { content, key: String(pending.createdAt) };
+    },
     ackSteer: async (stepId) => {
       const owned = stepRow(stepId);
       const thread = deps.db

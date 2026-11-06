@@ -55,7 +55,7 @@ describe('Coordinator rewind', () => {
 
     await rewindTo(w, 'second question');
     expect(w.s.db.select().from(coordinatorConversation).get()?.lastMirroredEntryId).toMatch(
-      /^rewind:\d+$/,
+      /^rewind:\d+:/,
     );
     coordinator.wake(w.threadId);
     await coordinator.idle();
@@ -115,7 +115,7 @@ describe('Coordinator rewind', () => {
 
     expect(seen).toHaveLength(3);
     const next = JSON.stringify(seen[2]?.messages);
-    expect(next).toContain('first question');
+    expect(next.split('first question')).toHaveLength(2);
     expect(next).not.toContain('beta answer');
     expect(next).not.toContain('second question');
     expect(w.s.db.select().from(coordinatorConversation).get()?.lastMirroredEntryId).toMatch(

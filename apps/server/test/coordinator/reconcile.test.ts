@@ -1,7 +1,7 @@
 import { fauxAssistantMessage, fauxToolCall } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { chiefMessage, step } from '../../src/db/schema.js';
+import { chiefMessage, coordinatorConversation, step } from '../../src/db/schema.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -117,5 +117,33 @@ describe('Coordinator reconcile at open', () => {
     expect(calls).toBe(2);
     expect(questionRows(w)).toHaveLength(1);
     expect(JSON.stringify(w.s.db.select().from(chiefMessage).all())).toContain('resumed answer');
+  });
+
+  it('re-seeds a newly claimed step when the store is ahead of the restored database', async () => {
+    const w = await world('before the restore');
+    const { faux } = stub('ok');
+    const first = boot(w, faux);
+    first.wake(w.threadId);
+    await first.idle();
+    await first.close();
+    w.s.db.update(coordinatorConversation).set({ lastMirroredEntryId: '1' }).run();
+    await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      content: 'after the restore',
+    });
+
+    const outcomes: string[] = [];
+    const second = boot(w, faux, {
+      logger: {
+        info: (obj: { outcome?: string }) => {
+          if (obj.outcome !== undefined) outcomes.push(obj.outcome);
+        },
+        warn: () => {},
+        error: () => {},
+      },
+    });
+    second.wake(w.threadId);
+    await second.idle();
+
+    expect(outcomes).toEqual(['reseeded-ahead']);
   });
 });

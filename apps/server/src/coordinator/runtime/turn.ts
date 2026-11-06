@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { ClaimedStep, MachineDoneBody, ModelUsage } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
@@ -12,12 +11,6 @@ import type { ConversationGate, StepGate } from './tools.js';
 import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
-const STEER_REQUEST_HASH_CHARS = 16;
-
-function steerRequestId(stepId: string, content: string): string {
-  const digest = createHash('sha256').update(content).digest('hex');
-  return `steer-${stepId}-${digest.slice(0, STEER_REQUEST_HASH_CHARS)}`;
-}
 
 export interface TurnDeps {
   harness: Harness;
@@ -136,15 +129,15 @@ export async function runCoordinatorTurn(
       steering = true;
       void api
         .steer(stepId)
-        .then(async (content) => {
-          if (content === null) return;
+        .then(async (steer) => {
+          if (steer === null) return;
           await root.submit(
             {
               type: 'input',
-              content,
+              content: steer.content,
               whenBusy: 'steer',
               whenIdle: 'reject',
-              requestId: steerRequestId(stepId, content),
+              requestId: `steer-${stepId}-${steer.key}`,
             },
             context,
           );

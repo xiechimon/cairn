@@ -914,7 +914,7 @@ function markStoreRewind(db: Db, threadId: string, anchorId: string, doomedIds: 
     .where(inArray(coordinatorEntry.chiefMessageId, [anchorId, ...doomedIds]))
     .run();
   db.update(coordinatorConversation)
-    .set({ lastMirroredEntryId: rewindWatermark(before), updatedAt: nowMs() })
+    .set({ lastMirroredEntryId: rewindWatermark(before, anchorId), updatedAt: nowMs() })
     .where(eq(coordinatorConversation.threadId, threadId))
     .run();
 }
