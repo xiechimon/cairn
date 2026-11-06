@@ -21,7 +21,7 @@ for (const width of [1440, 375]) {
       const meta = await row.getByTestId('account-meta').boundingBox();
       expect(status?.x ?? 0).toBeGreaterThanOrEqual((meta?.x ?? 0) + 40);
       expect(status?.y ?? 0).toBeLessThan((row0?.y ?? 0) + (row0?.height ?? 0));
-      expect((row0?.height ?? 0)).toBeLessThanOrEqual(64);
+      expect((row0?.height ?? 0)).toBeLessThanOrEqual(84);
     }
   });
 }
@@ -80,5 +80,28 @@ for (const width of [1440, 375]) {
       await expect(first.getByTestId('quota-account').filter({ hasText: full }).first()).toBeVisible();
     }
     await expect(first.getByTestId('quota-account').first()).toContainText('优先级 1');
+  });
+}
+
+for (const width of [1440, 375]) {
+  test(`account meta at ${width}px uses the free width and wraps instead of ellipsizing`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(URL);
+    const metas = page.getByTestId('account-meta');
+    await expect(metas.first()).toBeVisible();
+    const overflow = await metas.evaluateAll((els) =>
+      els.map((el) => ({
+        clipped: el.scrollWidth - el.clientWidth,
+        ellipsis: getComputedStyle(el).textOverflow,
+        wrapped: el.getBoundingClientRect().height > 20,
+      })),
+    );
+    for (const meta of overflow) {
+      expect(meta.ellipsis).toBe('clip');
+      expect(meta.clipped).toBeLessThanOrEqual(0);
+    }
+    if (width === 1440) expect(overflow.every((meta) => !meta.wrapped)).toBe(true);
   });
 }

@@ -314,12 +314,12 @@ export function AccountRow({
               }}
             />
           )}
-          <span data-testid="account-meta" className="truncate text-meta text-content-tertiary">
+          <span data-testid="account-meta" className="text-meta break-words text-content-tertiary">
             {meta.join(' · ')}
           </span>
         </span>
       </span>
-      <span className="flex flex-none items-center justify-end gap-1 @xl:w-64">
+      <span className="flex flex-none items-center justify-end gap-1">
         <span
           data-testid="account-status"
           className="flex min-w-0 items-center gap-1.5 text-meta text-content-secondary"
