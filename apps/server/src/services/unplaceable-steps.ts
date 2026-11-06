@@ -26,7 +26,7 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     const projector = projectors.get(todoRow.teamId) ?? stepQueueProjector(deps.db, todoRow.teamId);
     projectors.set(todoRow.teamId, projector);
     const homeMachineId =
-      agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt)?.machineId ?? null;
+      agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt, stepRow.id)?.machineId ?? null;
     const queue = projector.project({
       id: stepRow.id,
       createdAt: stepRow.createdAt,

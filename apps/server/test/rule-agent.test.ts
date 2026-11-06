@@ -149,18 +149,19 @@ describe('D71 a step with no assigned agent runs from the routing rule', () => {
     expect(agentForStep(w.s.db, todoRow, 'build')).toBeNull();
   });
 
-  test('rules on: a review step whose meta names the review rule runs from that rule', async () => {
+  test('rules on: a review step whose meta names the review rule runs on Codex', async () => {
     const w = await world();
     const reviewId = rule(w, 'review');
     const todoRow = await startWithoutAgent(w);
     const prompt = `${JSON.stringify({ kind: 'review', agentId: reviewId })}\nreview body`;
     expect(agentForStep(w.s.db, todoRow, 'review', prompt)).toMatchObject({
       id: reviewId,
-      modelId: 'review-model',
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
     });
   });
 
-  test('rules on: the review rule replaces an existing reviewer agent model', async () => {
+  test('rules on: the review rule replaces an existing reviewer agent model with Codex', async () => {
     const w = await world();
     rule(w, 'review');
     w.s.db
@@ -175,7 +176,10 @@ describe('D71 a step with no assigned agent runs from the routing rule', () => {
       .run();
     const todoRow = await startWithoutAgent(w);
     const prompt = `${JSON.stringify({ kind: 'review', agentId: 'reviewer' })}\nreview body`;
-    expect(agentForStep(w.s.db, todoRow, 'review', prompt)?.modelId).toBe('review-model');
+    expect(agentForStep(w.s.db, todoRow, 'review', prompt)).toMatchObject({
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
+    });
   });
 
   test('seeding adds a review rule from the code reviewer', async () => {

@@ -81,7 +81,7 @@ export function resolveStepCredentials(
   const assignedAgent = agentId
     ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
     : undefined;
-  const route = routeForStep(deps.db, todoRow, stepRow.kind);
+  const route = routeForStep(deps.db, todoRow, stepRow.kind, stepRow.id);
   const policy = policyForStep(deps.db, todoRow, stepRow.kind);
   const base = assignedAgent ?? (route === null ? null : ruleAgent(route, policy));
   const agentRow = base === null ? null : applyRoute(base, route, null, policy);
@@ -120,7 +120,7 @@ export function resolveStepCredentials(
       deps,
       todoRow.teamId,
       stepRow.fallback?.model?.provider ??
-        agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt)?.provider,
+        agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt, stepRow.id)?.provider,
     ),
   };
 }

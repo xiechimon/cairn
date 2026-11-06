@@ -253,7 +253,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     )
     .all();
   for (const row of workers) {
-    const agentRow = agentForStep(deps.db, row.todo, row.step.kind, row.step.prompt);
+    const agentRow = agentForStep(deps.db, row.todo, row.step.kind, row.step.prompt, row.step.id);
     if (agentRow) consider(row.step, agentRow, row.todo);
   }
   const chiefs = deps.db
@@ -324,7 +324,9 @@ export function recoverClaudeRateLimitFailure(
     const todoRow = linked
       ? deps.db.select().from(todo).where(eq(todo.id, linked.todoId)).get()
       : undefined;
-    agentPick = todoRow ? agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt) : null;
+    agentPick = todoRow
+      ? agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt, stepRow.id)
+      : null;
   }
   const claude = agentPick !== null && usesClaudeCode(agentPick, stepRow);
   const teamId = stepTeamId(deps, stepRow);

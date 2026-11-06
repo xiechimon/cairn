@@ -59,7 +59,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .all();
   const workerQueue = workerRows.map((r) => ({
     ...r,
-    home: agentForStep(db, r.todoRow, r.kind, r.prompt)?.machineId ?? null,
+    home: agentForStep(db, r.todoRow, r.kind, r.prompt, r.id)?.machineId ?? null,
   }));
   const chiefRows = db
     .select({
@@ -122,7 +122,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
         ? null
         : applyRoute(
             base,
-            routeForStep(db, row.todoRow, row.kind),
+            routeForStep(db, row.todoRow, row.kind, row.id),
             row.todoRow.routeOverride,
             policyForStep(db, row.todoRow, row.kind),
           );

@@ -561,6 +561,27 @@ export const workPolicy = sqliteTable(
   (t) => [uniqueIndex('work_policy_team_use_unique').on(t.teamId, t.use)],
 );
 
+export const stepRoute = sqliteTable(
+  'step_route',
+  {
+    stepId: text('stepId').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    kind: text('kind').$type<StepKind>().notNull(),
+    difficulty: text('difficulty').$type<'easy' | 'standard' | 'hard'>().notNull(),
+    harness: text('harness').$type<'claude-code' | 'pi'>(),
+    provider: text('provider'),
+    modelId: text('modelId'),
+    machineId: text('machineId'),
+    reason: text('reason').notNull(),
+    rejected:
+      json<{ modelId: string; machineId: string | null; why: string }[]>('rejected').notNull(),
+    decidedAt: epochMs('decidedAt').notNull(),
+  },
+  (t) => [index('step_route_team_decided_idx').on(t.teamId, t.decidedAt)],
+);
+
 export const featureFlag = sqliteTable(
   'feature_flag',
   {

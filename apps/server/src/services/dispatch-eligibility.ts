@@ -99,9 +99,10 @@ export function agentForStep(
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
   prompt: string | null = null,
+  stepId: string | null = null,
 ): typeof agent.$inferSelect | null {
   const agentId = agentIdForStep(todoRow, kind, prompt);
-  const route = routeForStep(db, todoRow, kind);
+  const route = routeForStep(db, todoRow, kind, stepId);
   const agentRow =
     agentId === null ? undefined : db.select().from(agent).where(eq(agent.id, agentId)).get();
   const policy = policyForStep(db, todoRow, kind);

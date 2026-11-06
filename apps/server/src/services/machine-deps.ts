@@ -55,8 +55,9 @@ export function agentForStep(
   todoRow: typeof todo.$inferSelect,
   kind: StepRecord['kind'],
   prompt: string | null = null,
+  stepId: string | null = null,
 ) {
-  return agentForStepEligibility(deps.db, todoRow, kind, prompt);
+  return agentForStepEligibility(deps.db, todoRow, kind, prompt, stepId);
 }
 
 export function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {

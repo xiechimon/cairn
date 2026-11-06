@@ -186,7 +186,7 @@ async function executeWorkerMemoryToolCall(
     {
       teamId: todoRow.teamId,
       agentId: memoryOwnerOf(deps.db, todoRow.teamId, agentId, row.kind),
-      sourceAgentId: agentForStep(deps.db, todoRow, row.kind, row.prompt)?.id ?? agentId,
+      sourceAgentId: agentForStep(deps.db, todoRow, row.kind, row.prompt, row.id)?.id ?? agentId,
       teamScoped: memoryOpsAreTeamScoped(row.kind),
       todoId: todoRow.id,
       projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
@@ -201,13 +201,13 @@ async function executeWorkerMemoryToolCall(
 async function executeWorkerSkillTool(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
-  stepRow: { kind: StepKind; prompt: string | null },
+  stepRow: { id: string; kind: StepKind; prompt: string | null },
   agentId: string,
   name: 'create_skill' | 'update_skill',
   params: Record<string, unknown>,
 ): Promise<string> {
   const agentRow =
-    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt) ??
+    agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt, stepRow.id) ??
     deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   if (!agentRow) throw new NotFoundError(`agent ${agentId}`);
   const want = name === 'create_skill' ? AGENT_TOOL_SKILL_CREATE : AGENT_TOOL_SKILL_UPDATE;

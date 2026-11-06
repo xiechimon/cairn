@@ -150,7 +150,9 @@ function recordSkillInjectionCheck(
     const todoRow = buildRow
       ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
       : undefined;
-    const agentRow = todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : null;
+    const agentRow = todoRow
+      ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt, stepRow.id)
+      : null;
     if (agentRow == null) return;
     skillsAllowlist = agentRow.skillsAllowlist ?? null;
     defaultSkill = agentRow.defaultSkill;
@@ -693,7 +695,10 @@ function workerStepContext(
   if (!buildRow) return null;
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) return null;
-  return { todoRow, agentRow: agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) };
+  return {
+    todoRow,
+    agentRow: agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt, stepRow.id),
+  };
 }
 
 function requeueStep(

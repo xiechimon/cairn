@@ -1018,7 +1018,8 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
           const projected = projector.project({
             id: r.id,
             createdAt: r.createdAt,
-            homeMachineId: agentForStep(deps.db, todoRow, r.kind, r.prompt)?.machineId ?? null,
+            homeMachineId:
+              agentForStep(deps.db, todoRow, r.kind, r.prompt, r.id)?.machineId ?? null,
             holdReason: r.holdReason,
             holdUntil: r.holdUntil,
           });

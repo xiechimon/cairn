@@ -83,6 +83,7 @@ import {
 } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
+import { recordStepRoute } from './step-route.js';
 import { listProjectTagVocab } from './tags.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
@@ -523,7 +524,13 @@ async function tryClaim(
         continue;
       }
     }
-    const agentRow = agentForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.prompt);
+    const agentRow = agentForStep(
+      deps,
+      cand.todoRow,
+      cand.stepRow.kind,
+      cand.stepRow.prompt,
+      cand.stepRow.id,
+    );
     if (agentRow === null) {
       failStepWithEvents(
         deps,
@@ -629,6 +636,7 @@ async function tryClaim(
           .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
           .run();
         if (res.changes === 0) return false;
+        if (routed) recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, model);
         if (skillInjection.hits.length > 0) {
           tx.insert(skillAudit)
             .values(

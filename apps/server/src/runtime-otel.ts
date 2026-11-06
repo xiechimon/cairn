@@ -27,6 +27,7 @@ import { eq } from 'drizzle-orm';
 import type { Db } from './db/client.js';
 import { build, step, todo } from './db/schema.js';
 import { parseChiefTrigger } from './services/chief.js';
+import { storedStepRoute } from './services/step-route.js';
 
 const SCOPE = 'cairn.server';
 const COORDINATOR_TURN_SPAN = 'coordinator turn';
@@ -77,6 +78,7 @@ export function emitRuntimeStepSpan(
           stepId: row.id,
           kind: row.kind,
           checkpointCommit: row.checkpointCommit,
+          route: storedStepRoute(db, row.id),
         }),
         ...(isTurn
           ? {

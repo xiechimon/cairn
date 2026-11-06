@@ -30,7 +30,9 @@ export async function stepToken(
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
   const agentRow =
-    stepRow && todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : null;
+    stepRow && todoRow
+      ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt, stepRow.id)
+      : null;
   const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   let git: GitCredentials | null = null;
   if (projectRow?.repoKind === 'hosted' && todoRow) {

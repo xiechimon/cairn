@@ -36,6 +36,7 @@ import {
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { modelsAreIndependent } from './merge-gate/model-identity.js';
+import { routedRule } from './step-route.js';
 
 type AgentRow = typeof agent.$inferSelect;
 type RoutingRuleRow = typeof routingRule.$inferSelect;
@@ -65,20 +66,21 @@ export function chiefRemoteTools(): readonly RemoteToolDef[] {
 
 export function routeForStep(
   db: Db,
-  todoRow: Pick<typeof todo.$inferSelect, 'teamId'>,
+  todoRow: Pick<typeof todo.$inferSelect, 'teamId'> &
+    Partial<Pick<typeof todo.$inferSelect, 'title' | 'spec'>>,
   kind: StepKind,
+  stepId: string | null = null,
 ): RoutingRuleRow | null {
   if (!routingRulesOn) return null;
   const use =
     isSessionStepKind(kind) || kind === 'merge' ? 'session' : kind === 'review' ? 'review' : null;
   if (use === null) return null;
-  return (
-    db
-      .select()
-      .from(routingRule)
-      .where(and(eq(routingRule.teamId, todoRow.teamId), eq(routingRule.use, use)))
-      .get() ?? null
-  );
+  const rule = db
+    .select()
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, todoRow.teamId), eq(routingRule.use, use)))
+    .get();
+  return rule === undefined ? null : routedRule(db, rule, todoRow, kind, stepId);
 }
 
 function policyUse(kind: StepKind): 'session' | 'review' | null {
