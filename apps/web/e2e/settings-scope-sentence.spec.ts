@@ -60,3 +60,64 @@ test('an offline machine says when it was last online', async ({ page }) => {
   const row = settings(page).getByTestId('machine-item').filter({ hasText: 'old-laptop' });
   await expect(row.getByTestId('machine-last-seen')).toHaveText('最后在线 12 分钟前');
 });
+
+test('pausing a machine and resuming it restores its runtime set', async ({ page }) => {
+  const patches: unknown[] = [];
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
+  );
+  await page.route('**/api/teams/team-1/members', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/teams/team-1/machines', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'm-1',
+          name: 'alpha',
+          teamId: 'team-1',
+          online: true,
+          latestCliVersion: null,
+          kind: 'remote',
+          enabledRuntimes: ['pi'],
+        },
+      ],
+    }),
+  );
+  await page.route('**/api/machines/m-1', (route, request) => {
+    if (request.method() !== 'PATCH') return route.fallback();
+    patches.push(request.postDataJSON());
+    return route.fulfill({ json: {} });
+  });
+  await page.goto('/app/settings/machines');
+  const toggle = settings(page).getByTestId('machine-accept-toggle');
+  await toggle.click();
+  await expect.poll(() => patches.length).toBe(1);
+  expect(patches[0]).toEqual({ enabledRuntimes: [] });
+  await page.route('**/api/teams/team-1/machines', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'm-1',
+          name: 'alpha',
+          teamId: 'team-1',
+          online: true,
+          latestCliVersion: null,
+          kind: 'remote',
+          enabledRuntimes: [],
+        },
+      ],
+    }),
+  );
+  await page.reload();
+  await settings(page).getByTestId('machine-accept-toggle').click();
+  await expect.poll(() => patches.length).toBe(2);
+  expect(patches[1]).toEqual({ enabledRuntimes: ['pi'] });
+});

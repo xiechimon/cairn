@@ -23,7 +23,19 @@ import { toastError } from '../components/ui/toaster.js';
 import type { FixtureSet, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { type ChiefState, MachineDetailPane, useHomeAgents } from './machine-detail-pane.js';
+
+const PAUSED_RUNTIMES_KEY = 'cairn-machine-paused-runtimes';
+
+function rememberedRuntimes(key: string): MachineRuntime[] {
+  try {
+    const parsed: unknown = JSON.parse(safeLocalStorage()?.getItem(key) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter(isMachineRuntime) : [];
+  } catch {
+    return [];
+  }
+}
 
 export type RowSection = 'runtime' | 'capabilities';
 
@@ -93,11 +105,15 @@ export function MachineRowView({
   const pickedTarget = others.find((m) => m.id === evacuateTarget);
   const enabled = (machine.enabledRuntimes ?? []).some(isMachineRuntime);
   const setAccepting = (next: boolean) => {
+    const memoryKey = `${PAUSED_RUNTIMES_KEY}:${machineId}`;
+    const current = (machine.enabledRuntimes ?? []).filter(isMachineRuntime);
+    if (!next) safeSetItem(memoryKey, JSON.stringify(current));
+    const remembered = next ? rememberedRuntimes(memoryKey) : [];
     const ready = MACHINE_RUNTIMES.filter(
       (runtime) =>
         !(machine.providers ?? []).some((p) => p.runtime === runtime && p.login === 'logged-out'),
     );
-    const enabledRuntimes = next ? (ready.length > 0 ? ready : [...MACHINE_RUNTIMES]) : [];
+    const enabledRuntimes = next ? (remembered.length > 0 ? remembered : ready) : [];
     mutations.patchMachine.mutate(
       { id: machineId, body: { enabledRuntimes } },
       { onError: (error) => toastError(t('保存失败，请重试。'), error) },
