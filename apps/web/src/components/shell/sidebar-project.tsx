@@ -88,6 +88,8 @@ export interface SidebarThreadRowProps {
   tone: StoneTone;
   open?: boolean;
   snoozed?: boolean;
+  meta?: ReactNode;
+  showMenu?: boolean;
   onClick?: () => void;
   menu?: ReactNode;
 }
@@ -97,6 +99,8 @@ export function SidebarThreadRow({
   tone,
   open = false,
   snoozed = false,
+  meta,
+  showMenu = true,
   onClick,
   menu,
 }: SidebarThreadRowProps) {
@@ -122,13 +126,23 @@ export function SidebarThreadRow({
         <span className="min-w-0 truncate">{title}</span>
         {snoozed && <AlarmClockOff className="size-3 flex-none text-content-tertiary" />}
       </Button>
-      <span className="hidden flex-none group-focus-within/thread:inline-flex group-hover/thread:inline-flex">
-        {menu ?? (
-          <Button variant="ghost" size="icon-xs" aria-label="Thread menu" className="size-5.5">
-            <Ellipsis />
-          </Button>
-        )}
-      </span>
+      {meta != null && (
+        <span
+          data-slot="sidebar-thread-meta"
+          className="flex-none pr-1.5 text-caption text-content-secondary tabular-nums"
+        >
+          {meta}
+        </span>
+      )}
+      {showMenu && (
+        <span className="hidden flex-none group-focus-within/thread:inline-flex group-hover/thread:inline-flex">
+          {menu ?? (
+            <Button variant="ghost" size="icon-xs" aria-label="Thread menu" className="size-5.5">
+              <Ellipsis />
+            </Button>
+          )}
+        </span>
+      )}
     </div>
   );
 }
