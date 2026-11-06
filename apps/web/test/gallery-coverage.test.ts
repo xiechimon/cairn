@@ -12,6 +12,10 @@ const NOT_IN_GALLERY: Record<string, string> = {
   'chat/agent-rows.tsx':
     'Gap: rendered only by src/chief/chief-message-rows.tsx and src/detail/transcript.tsx; no specimen yet.',
   'ui/trace.tsx': 'Gap: rendered only through chat/agent-rows.tsx; no specimen yet.',
+  'conversation-skeleton.tsx':
+    'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
+  'query-state.tsx':
+    'Gap: wraps live queries on settings, panels and the team page; the gallery has no live queries, so no specimen yet.',
   'qr-code.tsx':
     'Gap: rendered only in the pairing dialog of src/routes/remote-access-page.tsx, which needs a live pairing code; no specimen yet.',
   'queued-capsules.tsx':

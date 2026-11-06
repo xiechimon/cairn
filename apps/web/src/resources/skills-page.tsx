@@ -8,6 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -73,16 +74,23 @@ export function SkillsPage() {
       }
       fixture={fixture}
     >
-      {skills.length === 0 ? (
-        <EmptyState
-          testId="resource-empty"
-          className="mt-6"
-          icon={Puzzle}
-          title={t(SKILL_PAGE_COPY.empty)}
-          description={t(SKILL_PAGE_COPY.directoryHint, { dir: SKILLS_DIR_DEFAULT })}
-          action={{ label: t('新建技能'), onClick: openCreate }}
-        />
-      ) : (
+      <QueryBoundary
+        query={live ? skillsQ : undefined}
+        isEmpty={skills.length === 0}
+        loadingLabel={t('正在加载技能')}
+        errorTitle={t('技能没能加载')}
+        className="mt-6"
+        empty={
+          <EmptyState
+            testId="resource-empty"
+            className="mt-6"
+            icon={Puzzle}
+            title={t(SKILL_PAGE_COPY.empty)}
+            description={t(SKILL_PAGE_COPY.directoryHint, { dir: SKILLS_DIR_DEFAULT })}
+            action={{ label: t('新建技能'), onClick: openCreate }}
+          />
+        }
+      >
         <>
           <div className={RES_SEARCH_ROW_CLS}>
             <InputGroup className="flex-1">
@@ -139,7 +147,7 @@ export function SkillsPage() {
             ))}
           </ResourceList>
         </>
-      )}
+      </QueryBoundary>
       <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </PageShell>

@@ -5,6 +5,7 @@ import { useApiKeys, useApiMutations, useTodos } from '../api/hooks.js';
 import { mapApiKeys, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -52,16 +53,23 @@ export function ApiKeysPage() {
       selected="none"
       title={t('API 密钥')}
     >
-      {keys.length === 0 ? (
-        <EmptyState
-          testId="keys-empty"
-          className="mt-6"
-          icon={Key}
-          title={t('尚无 API 密钥。')}
-          description={t('API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。')}
-          action={{ label: t('新建密钥'), onClick: live ? () => setCreateOpen(true) : undefined }}
-        />
-      ) : (
+      <QueryBoundary
+        query={live ? keysQ : undefined}
+        isEmpty={keys.length === 0}
+        loadingLabel={t('正在加载 API 密钥')}
+        errorTitle={t('API 密钥没能加载')}
+        className="mt-6"
+        empty={
+          <EmptyState
+            testId="keys-empty"
+            className="mt-6"
+            icon={Key}
+            title={t('尚无 API 密钥。')}
+            description={t('API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。')}
+            action={{ label: t('新建密钥'), onClick: live ? () => setCreateOpen(true) : undefined }}
+          />
+        }
+      >
         <>
           {live && (
             <div className="mt-6 flex justify-end">
@@ -117,7 +125,7 @@ export function ApiKeysPage() {
             </SettingsCard>
           )}
         </>
-      )}
+      </QueryBoundary>
       <ApiKeyCreateDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
