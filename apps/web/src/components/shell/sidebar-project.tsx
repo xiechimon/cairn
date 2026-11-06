@@ -124,7 +124,7 @@ export function SidebarThreadRow({
       data-state={state}
       data-open={open ? '' : undefined}
       className={cn(
-        'group/thread relative flex h-8 items-center rounded-(--radius-control)',
+        'group/thread relative flex h-7 items-center rounded-(--radius-control)',
         open && 'bg-sidebar-hover text-foreground',
         lifted && 'bg-card shadow-(--e1)',
         !open && !lifted && 'hover:bg-sidebar-hover',
@@ -136,7 +136,7 @@ export function SidebarThreadRow({
         aria-current={open ? 'true' : undefined}
         title={tooltip}
         className={cn(
-          'h-8 min-w-0 flex-1 justify-start gap-2 px-2 text-ui font-normal hover:bg-transparent dark:hover:bg-transparent',
+          'h-7 min-w-0 flex-1 justify-start gap-2 px-2 text-ui font-normal hover:bg-transparent dark:hover:bg-transparent',
           snoozed || state === 'done' ? 'text-content-tertiary' : 'text-content-secondary',
           (open || state === 'needs-you' || state === 'running') && 'text-foreground',
         )}

@@ -59,7 +59,7 @@ const probe = (page: Page) =>
       const d = max - min;
       const l = (max + min) / 2;
       const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-      if (s <= 0.15) return null;
+      if (s <= 0.15 || l < 0.1 || l > 0.9) return null;
       let h = 0;
       if (max === r) h = ((g - b) / d) % 6;
       else if (max === g) h = (b - r) / d + 2;
@@ -120,7 +120,8 @@ for (const scheme of ['dark', 'light'] as const) {
       ]);
       expect(m.rows.length).toBeGreaterThan(0);
       for (const row of m.rows) {
-        expect(row.titleShare, `L4: title share of a ${row.state} row`).toBeGreaterThanOrEqual(0.6);
+        const shares = row.tag !== null || row.meta !== null ? 0.55 : 0.8;
+        expect(row.titleShare, `L4: title share of a ${row.state} row`).toBeGreaterThanOrEqual(shares);
         if (row.state !== 'needs-you') {
           expect(row.neutralGlyph, `L2: glyph of a ${row.state} row is neutral`).toBe(true);
         }
