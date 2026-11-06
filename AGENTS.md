@@ -59,13 +59,21 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 - Run `pnpm prepush` before pushing. It runs fast checks only; tests run in CI. A push is unverified until CI reports on that head. Run the exact command of any CI step your diff changes.
 - Verify mechanism changes on compiled output, runtime logs or snapshots; use `.claude/skills/verify-cairn/SKILL.md` for acceptance guidance.
 - Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate, and that review on the PR head satisfies the other-vendor review. Fix confirmed findings, and record unfixed findings with reasons in Risk.
-- Protected paths require Codex cloud code review on the PR head. Canonical security surfaces also require the exact-head Codex security approval defined under Safety; ordinary code review alone is insufficient. Docs-only changes outside protected or security paths skip code review.
+- Protected paths require Codex cloud code review on the PR head. Canonical security surfaces are covered by that review: no separate security approval is required while the 2026-11-06 ruling holds. Docs-only changes outside protected paths skip code review.
 - After three review rounds, rethink the approach or hand the PR to ian.
 - Review PRs with `docs/pr-review.md`; read diffs without switching branches in a shared worktree.
 - Decisions are recorded in the owner's plan decision table, not as ADRs; rules that must hold are enforced by checks (tests, gates, `packages/shared/merge-gate-paths.json`).
 - Small changes need no issue or overlap lookup. Reuse an existing issue or PR when it already covers the request.
 - Write PR bodies per `.claude/skills/pr-cairn/SKILL.md`: Proof first, then What, with Review and Risk collapsed; visible prose is capped at 600 characters.
 - Commit format: `<scope>(<ticket>): <subject>`, in English. Put `closes #N` in the commit message for the closing segment, never only in the PR body; do not close a parent ticket from an intermediate segment.
+
+## Harness profile (spec 30)
+
+- It is off by default and stays testable that way: a team with no `harness_profile` row serves nothing, and a test proves it. Never gate it on `flag()`, whose absent value is on for the owner.
+- A profile holds no secret value: server names, transports, commands, URLs and environment-variable names only. A strict schema rejects anything else, and a new field needs a reason it cannot carry a credential.
+- A renderer that does not understand a field, or a harness version whose schema is unverified, stops the apply and names the field. Silent loss counts as a defect.
+- Apply never overwrites content it does not manage, never resolves a conflict by recency, and reads the file back after writing.
+- Any machine-level manifest or apply path touches `apps/server/src/routes-machine.ts` or `apps/server/src/services/machine*.ts`, which are owner-routed.
 
 ## Review guidelines
 
