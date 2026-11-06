@@ -15,6 +15,16 @@ afterAll(() => {
   for (const root of roots.splice(0)) releaseTestTempDir(root);
 });
 
+function fixtureEnv(root: string): NodeJS.ProcessEnv {
+  const {
+    CAIRN_TEST_RUN_ID: _runId,
+    CAIRN_TEST_TEMP_STRICT: _strict,
+    CAIRN_TEST_TEMP_REPORT: _report,
+    ...inherited
+  } = process.env;
+  return { ...inherited, CAIRN_TEST_TEMP_ROOT: root };
+}
+
 function runFixture(withSetup: boolean) {
   const root = makeTestTempDir('tmpdir-cleanup-fixture-');
   roots.push(root);
@@ -39,7 +49,7 @@ function runFixture(withSetup: boolean) {
     {
       cwd: REPO,
       encoding: 'utf8',
-      env: { ...process.env, CAIRN_TEST_TEMP_ROOT: root },
+      env: fixtureEnv(root),
     },
   );
   return { status: result.status, survivor: existsSync(readFileSync(allocated, 'utf8')) };
