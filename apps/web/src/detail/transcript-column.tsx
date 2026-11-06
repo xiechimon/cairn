@@ -79,7 +79,12 @@ function TranscriptColumnInner({
   }, [anchor, threadKey, scrollToEnd]);
   return (
     <MessageScroller className={ROOT_CLS}>
-      <FadeScrollerViewport ref={viewportRef} data-testid="transcript-col" className={VIEWPORT_CLS}>
+      <FadeScrollerViewport
+        ref={viewportRef}
+        reserveEnd={false}
+        data-testid="transcript-col"
+        className={VIEWPORT_CLS}
+      >
         <MessageScrollerContent className={CONTENT_CLS}>
           {spec != null && <SpecBlock spec={spec} />}
           <Transcript

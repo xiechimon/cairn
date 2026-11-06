@@ -30,6 +30,7 @@ import { useSendKey } from '../api/use-send-key.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
+import { isTranscriptSettled } from '../detail/scroll-anchor.js';
 import type { DocBlock, PlanVersion, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -326,10 +327,14 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     },
     wire,
     buildLegDone: hasDoneBuildLeg(steps),
-    transcriptSettled:
-      !live ||
-      (!todoQ.isPending &&
-        (buildId === null || (!buildQ.isPending && !stepsQ.isPending && !messagesQ.isPending))),
+    transcriptSettled: isTranscriptSettled({
+      live,
+      todoPending: todoQ.isPending,
+      buildId,
+      buildPending: buildQ.isPending,
+      stepsPending: stepsQ.isPending,
+      messagesPending: messagesQ.isPending,
+    }),
     started,
     locked: !open,
     running,

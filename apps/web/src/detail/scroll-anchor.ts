@@ -10,3 +10,19 @@ export function openingAnchor(
   if (running) return 'end';
   return transcript.some((item) => item.kind === 'user') ? 'last-user' : 'end';
 }
+
+interface TranscriptQueryState {
+  live: boolean;
+  todoPending: boolean;
+  buildId: string | null;
+  buildPending: boolean;
+  stepsPending: boolean;
+  messagesPending: boolean;
+}
+
+export function isTranscriptSettled(state: TranscriptQueryState): boolean {
+  if (!state.live) return true;
+  if (state.todoPending) return false;
+  if (state.buildId === null) return true;
+  return !state.buildPending && !state.stepsPending && !state.messagesPending;
+}
