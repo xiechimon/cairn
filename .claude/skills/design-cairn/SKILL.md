@@ -12,6 +12,7 @@ Read `apps/web/DESIGN-RULES.md` first (rules with ids), then `apps/web/DESIGN.md
 | Coordinator chat | Claude.ai |
 | Thread list and sidebar | t3code and Amp |
 | Settings | Amp and t3code |
+| Thread progress, review and diff | t3code and Amp |
 | First run and connection state | Amp |
 
 ## Draft first
