@@ -1,10 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
 import { afterEach, describe, expect, it } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import { createConversationGate } from '../../src/coordinator/runtime/tools.js';
@@ -19,12 +18,12 @@ import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 const ctx = BACKGROUND_CONTEXT;
 const dirs: string[] = [];
 afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) releaseTestTempDir(d);
 });
 
 describe('volatile turn context', () => {
   it('reaches only the request of its own turn and is never stored', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'coord-volatile-'));
+    const dir = makeTestTempDir('coord-volatile-');
     dirs.push(dir);
     const requests: string[] = [];
     const faux = fauxProvider({

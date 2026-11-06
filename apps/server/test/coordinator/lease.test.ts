@@ -1,17 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { acquireLease, LEASE_STALE_MS, LeaseHeldError } from '../../src/coordinator/lease.js';
 import { openDb } from '../../src/db/client.js';
 
 const dirs: string[] = [];
 afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) releaseTestTempDir(d);
 });
 
 function twoHandles() {
-  const dir = mkdtempSync(join(tmpdir(), 'coord-lease-'));
+  const dir = makeTestTempDir('coord-lease-');
   dirs.push(dir);
   const path = join(dir, 'server.db');
   return { a: openDb(path), b: openDb(path) };

@@ -1,8 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { afterEach, beforeEach, expect } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { type Coordinator, startCoordinator } from '../../src/coordinator/index.js';
 import { agent as agentTable, routingRule, step } from '../../src/db/schema.js';
 import {
@@ -19,7 +17,7 @@ const closers: (() => Promise<void> | void)[] = [];
 
 afterEach(async () => {
   for (const close of closers.splice(0)) await close();
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) releaseTestTempDir(d);
   setCoordinatorInServer(false);
   setCoordinatorServerContextEnabled(false);
   setCoordinatorWake(() => {});
@@ -88,7 +86,7 @@ export async function world(content = 'hello'): Promise<World> {
   expect(sent.status).toBe(201);
   const { thread } = (await sent.json()) as { thread: { id: string } };
   const stepRow = s.db.select().from(step).get();
-  const storageDir = mkdtempSync(join(tmpdir(), 'coord-runner-'));
+  const storageDir = makeTestTempDir('coord-runner-');
   dirs.push(storageDir);
   return { s, teamId, threadId: thread.id, stepId: stepRow?.id ?? '', storageDir };
 }
