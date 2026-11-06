@@ -3,7 +3,6 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 } from '@cairn/shared';
-import { cn } from 'cn';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type ReactNode,
@@ -22,10 +21,9 @@ import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
-import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
+import { useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
-import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -39,14 +37,12 @@ import {
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
-import { Textarea } from '../components/ui/textarea.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem, Phase } from '../fixtures/records.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ArrowDown,
-  ArrowUp,
   BarChart3,
   ChevronDown,
   ChiefFolder,
@@ -54,18 +50,13 @@ import {
   ChiefUserPlus,
   Grid2x2,
   Minus,
-  Plus,
   RuntimeClaudeCode,
   RuntimePi,
 } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
-import { ComposerAttachments } from '../overlay/composer-attachments.js';
-import { useComposerWire } from '../overlay/composer-wire.js';
-import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
-import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
-import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { AnswerComposer } from './answer-composer.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import {
@@ -74,6 +65,12 @@ import {
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
 import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
+import { serverDraftBinding } from './composer-binding.js';
+import {
+  ComposerSurface,
+  type ComposerSurfaceHandle,
+  PROJECT_CHIP_CLS,
+} from './composer-surface.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
@@ -82,27 +79,11 @@ import type { ChiefEarlier } from './use-chief-surface.js';
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
-export const TOOL_BTN_CLS =
-  "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
-
-export const PROJECT_CHIP_CLS =
-  "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) [&_svg:not([class*='size-'])]:size-auto";
-
-const SEND_BTN_CLS =
-  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent';
-const SEND_ON_CLS =
-  'bg-foreground text-background hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90';
-const STOP_CLS =
-  'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
-
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
 const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5';
-const HOME_COMPOSER_CLS =
-  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
 
-const ATTACHED_COMPOSER_CLS = 'mt-0';
-const FREE_COMPOSER_CLS = 'rounded-t-(--radius-composer)';
+const THREAD_COMPOSER = 'thread';
 
 const EXAMPLE_ICONS = {
   'user-plus': ChiefUserPlus,
@@ -219,14 +200,8 @@ export function ChiefConversation({
         : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
-  const answerKey = useAnswerKey(answerHere);
-  const answering =
-    answerKey === null
-      ? null
-      : (questionDockState.primary() ?? { last: false, enabled: false, advance: () => {} });
-  const answerDraft = answerKey === null ? null : questionDockState.answerText(answerKey);
-  const shownPlaceholder =
-    answering !== null ? t('输入你自己的回答，或留空使用选中的选项') : composerPlaceholder;
+  const answerKey = useAnswerKey();
+  const answerActive = answerHere && answerKey !== null;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -329,116 +304,48 @@ export function ChiefConversation({
     initial: initialDraft,
   });
   const stopTurnRef = useRef<(() => void) | undefined>(undefined);
-  const wire = useComposerWire({
-    editable: onSend != null,
-    draft: answerDraft ?? (onSend != null ? liveDraft : (chief.draft ?? '')),
-    readDraft: answerKey === null ? undefined : () => questionDockState.answerText(answerKey),
-    onDraftChange:
-      answerKey !== null
-        ? (value: string) => questionDockState.setAnswerText(answerKey, value)
-        : onSend != null
-          ? setLiveDraft
-          : undefined,
-    onSend:
-      onSend == null
-        ? undefined
-        : (text: string) => {
-            followSentRef.current = true;
-            userKeyAtSendRef.current = latestUserKeyRef.current;
-            const sent = onSend(text, chipProjectId);
-            Promise.resolve(sent).catch(() => {
-              followSentRef.current = false;
-            });
-            return sent;
-          },
-    onAttachment,
-    mentionGroups,
-    ...(chipVisible ? { onPickProject: (p: { id: string }) => pickProject(p.id) } : {}),
-    slash: {
-      reviewAvailable: false,
-      stopAvailable: targetPlaceholder === null && chief.running === true && onStop != null,
-      onStop: () => stopTurnRef.current?.(),
-    },
-    growCap: 120,
-  });
-  const {
-    handlePaste,
-    handleCaretMoved,
-    handleCompositionEnd,
-    handleBlur,
-    fileInputRef,
-    openFilePicker,
-    attaching,
-    pendingAttachments,
-    onPickFiles,
-    closeInline,
-    inlineOpen,
-    inlineCaret,
-    inlineQuery,
-    inlineRows,
-    inlineHighlight,
-    setInlineHighlight,
-    inlineListboxId,
-    inlineListboxRef,
-    acceptInlineRow,
-    slashOpen,
-    slashQuery,
-    slashCaret,
-    slashSections,
-    slashHighlight,
-    setSlashHighlight,
-    slashListboxId,
-    slashListboxRef,
-    closeSlash,
-    acceptSlashRow,
-    helpOpen,
-    closeHelp,
-    helpRows,
-    helpSkillCount,
-  } = wire;
+  const surfaceRef = useRef<ComposerSurfaceHandle | null>(null);
+  const answerSurfaceRef = useRef<ComposerSurfaceHandle | null>(null);
+  const activeComposer = answerActive ? answerKey : THREAD_COMPOSER;
+  const focusedComposerRef = useRef<string | null>(null);
+  const leaveComposer = useCallback(() => {
+    focusedComposerRef.current = null;
+  }, []);
+  const shownComposerRef = useRef(activeComposer);
+  useLayoutEffect(() => {
+    const previous = shownComposerRef.current;
+    shownComposerRef.current = activeComposer;
+    if (previous === activeComposer || focusedComposerRef.current !== previous) return;
+    const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
+    incoming.current?.focus({ preventScroll: true });
+  }, [activeComposer]);
+  const composerBinding = serverDraftBinding(
+    onSend != null ? liveDraft : (chief.draft ?? ''),
+    onSend != null ? setLiveDraft : undefined,
+  );
+  const sendFromComposer =
+    onSend == null
+      ? undefined
+      : (text: string) => {
+          followSentRef.current = true;
+          userKeyAtSendRef.current = latestUserKeyRef.current;
+          const sent = onSend(text, chipProjectId);
+          Promise.resolve(sent).catch(() => {
+            followSentRef.current = false;
+          });
+          return sent;
+        };
   useEffect(() => {
     if (open) return;
     setRewindConfirm(null);
-    closeInline();
-    closeSlash();
-    closeHelp();
-  }, [open, closeInline, closeSlash, closeHelp]);
-  const { textareaRef } = wire;
+  }, [open]);
   const prefillKey = prefill?.key;
   const prefillText = prefill?.text;
   useEffect(() => {
     if (prefillKey == null || prefillText == null) return;
     setLiveDraft(prefillText);
-    textareaRef.current?.focus({ preventScroll: true });
-  }, [prefillKey, prefillText, textareaRef]);
-  const prevOpenRef = useRef(open);
-  useEffect(() => {
-    const wasOpen = prevOpenRef.current;
-    prevOpenRef.current = open;
-    if (!open || wasOpen) return;
-    let frames = 0;
-    const tryFocus = () => {
-      const node = textareaRef.current;
-      if (node == null) return;
-      const shell = node.closest('[hidden], [data-starting-style]');
-      if (shell == null) {
-        node.focus({ preventScroll: true });
-        return;
-      }
-      if (frames < 12) {
-        frames += 1;
-        requestAnimationFrame(tryFocus);
-      }
-    };
-    requestAnimationFrame(tryFocus);
-  }, [open, textareaRef]);
-  const attachComposer = useCallback(
-    (node: HTMLTextAreaElement | null) => {
-      textareaRef.current = node;
-      composerRef?.(node);
-    },
-    [textareaRef, composerRef],
-  );
+    surfaceRef.current?.focus({ preventScroll: true });
+  }, [prefillKey, prefillText]);
   const home = variant !== 'drawer';
   const ownHeader = variant !== 'global';
   const glances = useMemo(
@@ -457,17 +364,7 @@ export function ChiefConversation({
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
-  const uploadingAnswer = answerKey !== null && wire.attaching;
-  useEffect(() => {
-    questionDockState.setUploading(uploadingAnswer);
-    return () => questionDockState.setUploading(false);
-  }, [uploadingAnswer]);
-  const stopMode =
-    targetPlaceholder === null &&
-    chief.running === true &&
-    wire.draft === '' &&
-    wire.tokens.length === 0 &&
-    onStop != null;
+  const canStop = targetPlaceholder === null && chief.running === true && onStop != null;
   const liveTurn =
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
@@ -484,7 +381,7 @@ export function ChiefConversation({
             () => {
               followSentRef.current = false;
               setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
-              textareaRef.current?.focus({ preventScroll: true });
+              surfaceRef.current?.focus({ preventScroll: true });
             },
             () => {},
           );
@@ -533,6 +430,54 @@ export function ChiefConversation({
       : [],
   );
   const outstandingReports = outstandingReportIds(chief.stream ?? []);
+  const capsules = (
+    <QueuedCapsules
+      messages={queuedCapsules}
+      onSendNow={onSteer ? (id) => onSteer(id) : undefined}
+      onRemove={withdraw}
+      removeLabel={t('撤回')}
+    />
+  );
+  const tools = (
+    <>
+      {composerTools}
+      {chipVisible && (
+        <ProjectMenu
+          title="发给哪个项目"
+          projects={projectOptions}
+          value={pickedProject?.id ?? null}
+          withAuto
+          side="top"
+          onPick={pickProject}
+          trigger={
+            <Button
+              variant="ghost"
+              data-testid="chief-project-chip"
+              data-set={pickedProject != null ? '' : undefined}
+              aria-label={t('发给哪个项目：{name}', {
+                name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
+              })}
+              className={PROJECT_CHIP_CLS}
+            />
+          }
+        >
+          {pickedProject != null ? (
+            <ProjectAvatar
+              name={pickedProject.name}
+              tone={projectOptions.indexOf(pickedProject)}
+              icon={projectMark(pickedProject.id).icon}
+              color={projectMark(pickedProject.id).color}
+              bare
+            />
+          ) : (
+            <CircleDashed className="size-4 flex-none" />
+          )}
+          <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
+          <ChevronDown width={12} height={12} />
+        </ProjectMenu>
+      )}
+    </>
+  );
   const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
@@ -765,230 +710,60 @@ export function ChiefConversation({
                 {composerError}
               </p>
             )}
-            <div
-              data-invalid={composerError != null ? '' : undefined}
-              className={`chief-composer ${questionAttached ? ATTACHED_COMPOSER_CLS : `${FREE_COMPOSER_CLS} ${home ? 'mt-2' : 'mt-2.5'}`} ${home ? HOME_COMPOSER_CLS : 'mx-4 mb-2.5 shrink-0'} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
-              style={home ? { viewTransitionName: 'chief-composer' } : undefined}
-            >
-              <QueuedCapsules
-                messages={queuedCapsules}
-                onSendNow={onSteer ? (id) => onSteer(id) : undefined}
-                onRemove={withdraw}
-                removeLabel={t('撤回')}
+            <ComposerSurface
+              key="thread"
+              handleRef={surfaceRef}
+              binding={composerBinding}
+              editable={onSend != null}
+              onSend={sendFromComposer}
+              onAttachment={onAttachment}
+              mentionGroups={mentionGroups}
+              onPickProject={chipVisible ? (p) => pickProject(p.id) : undefined}
+              slash={{
+                reviewAvailable: false,
+                stopAvailable: canStop,
+                onStop: () => stopTurnRef.current?.(),
+              }}
+              active={!answerActive}
+              attached={questionAttached}
+              onFocusEnter={() => {
+                focusedComposerRef.current = THREAD_COMPOSER;
+              }}
+              onFocusLeave={leaveComposer}
+              placeholder={composerPlaceholder}
+              invalid={composerError != null}
+              home={home}
+              open={open}
+              composerRef={answerActive ? undefined : composerRef}
+              above={answerActive ? null : capsules}
+              tools={answerActive ? null : tools}
+              canStop={canStop}
+              onStop={stopTurn}
+              running={chief.running === true}
+              turnElapsed={turnElapsed}
+            />
+            {answerKey !== null && (
+              <AnswerComposer
+                key={answerKey}
+                answerKey={answerKey}
+                handleRef={answerSurfaceRef}
+                active={answerActive}
+                attached={questionAttached}
+                onFocusEnter={() => {
+                  focusedComposerRef.current = answerKey;
+                }}
+                onFocusLeave={leaveComposer}
+                invalid={composerError != null}
+                home={home}
+                open={open}
+                onAttachment={onAttachment}
+                composerRef={answerActive ? composerRef : undefined}
+                above={answerActive ? capsules : null}
+                tools={answerActive ? tools : null}
+                running={chief.running === true}
+                turnElapsed={turnElapsed}
               />
-              <ComposerAttachments
-                tokens={wire.tokens}
-                pending={pendingAttachments}
-                onRemove={wire.removeToken}
-              />
-              <div className="relative">
-                <Textarea
-                  ref={attachComposer}
-                  data-testid="chief-composer-input"
-                  data-compose-target=""
-                  aria-invalid={composerError != null ? true : undefined}
-                  className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
-                  readOnly={onSend == null}
-                  value={wire.draft}
-                  onChange={wire.handleChange}
-                  onKeyDown={(event) => {
-                    if (
-                      answering !== null &&
-                      event.key === 'Enter' &&
-                      !event.shiftKey &&
-                      !event.nativeEvent.isComposing &&
-                      !wire.slashOpen &&
-                      !wire.inlineOpen
-                    ) {
-                      event.preventDefault();
-                      if (wire.attaching) return;
-                      answering.advance();
-                      return;
-                    }
-                    wire.handleKeyDown(event);
-                  }}
-                  onPaste={handlePaste}
-                  onKeyUp={handleCaretMoved}
-                  onClick={handleCaretMoved}
-                  onSelect={handleCaretMoved}
-                  onCompositionEnd={handleCompositionEnd}
-                  onBlur={handleBlur}
-                  placeholder={shownPlaceholder}
-                  {...(inlineOpen
-                    ? {
-                        role: 'combobox',
-                        'aria-expanded': true,
-                        'aria-controls': inlineListboxId,
-                        'aria-autocomplete': 'list' as const,
-                      }
-                    : slashOpen
-                      ? {
-                          role: 'combobox',
-                          'aria-expanded': true,
-                          'aria-controls': slashListboxId,
-                          'aria-autocomplete': 'list' as const,
-                        }
-                      : {})}
-                  {...(inlineOpen && inlineHighlight != null
-                    ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
-                    : slashOpen && slashHighlight != null
-                      ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
-                      : {})}
-                />
-                {wire.draft === '' && (
-                  <span
-                    aria-hidden
-                    data-testid="chief-composer-placeholder"
-                    className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 pt-0.5 font-sans text-card-title tabular-nums text-(--text-tertiary)"
-                  >
-                    {shownPlaceholder}
-                  </span>
-                )}
-                <MentionHighlight
-                  text={wire.draft}
-                  registry={wire.mentionRegistry}
-                  textareaRef={wire.textareaRef}
-                />
-                <MentionInline
-                  open={inlineOpen}
-                  rows={inlineRows}
-                  caret={inlineCaret}
-                  query={inlineQuery}
-                  highlight={inlineHighlight}
-                  onHover={setInlineHighlight}
-                  onPick={acceptInlineRow}
-                  listboxRef={inlineListboxRef}
-                  listboxId={inlineListboxId}
-                />
-                <SlashMenu
-                  open={slashOpen}
-                  sections={slashSections.map((s) => ({
-                    title: s.section === 'builtin' ? t('命令') : t('技能'),
-                    rows: s.rows,
-                  }))}
-                  caret={slashCaret}
-                  query={slashQuery}
-                  highlight={slashHighlight}
-                  onHover={setSlashHighlight}
-                  onPick={(row) => acceptSlashRow(row, 'enter')}
-                  listboxRef={slashListboxRef}
-                  listboxId={slashListboxId}
-                />
-              </div>
-              {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                style={{ display: 'none' }}
-                onChange={onPickFiles}
-                accept="text/*,image/*,application/json,application/pdf,application/xml"
-              />
-              <div className="-ml-1 flex items-center gap-0.5">
-                <IconTooltip
-                  label={t('添加附件')}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
-                      disabled={attaching || onAttachment == null}
-                      onClick={openFilePicker}
-                    />
-                  }
-                >
-                  <Plus width={16} height={16} />
-                </IconTooltip>
-                {composerTools}
-                {chipVisible && (
-                  <ProjectMenu
-                    title="发给哪个项目"
-                    projects={projectOptions}
-                    value={pickedProject?.id ?? null}
-                    withAuto
-                    side="top"
-                    onPick={pickProject}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        data-testid="chief-project-chip"
-                        data-set={pickedProject != null ? '' : undefined}
-                        aria-label={t('发给哪个项目：{name}', {
-                          name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
-                        })}
-                        className={PROJECT_CHIP_CLS}
-                      />
-                    }
-                  >
-                    {pickedProject != null ? (
-                      <ProjectAvatar
-                        name={pickedProject.name}
-                        tone={projectOptions.indexOf(pickedProject)}
-                        icon={projectMark(pickedProject.id).icon}
-                        color={projectMark(pickedProject.id).color}
-                        bare
-                      />
-                    ) : (
-                      <CircleDashed className="size-4 flex-none" />
-                    )}
-                    <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
-                    <ChevronDown width={12} height={12} />
-                  </ProjectMenu>
-                )}
-                {chief.running === true && turnElapsed != null && (
-                  <span
-                    className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
-                    data-testid="chief-composer-working"
-                  >
-                    {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
-                  </span>
-                )}
-                {answering !== null ? (
-                  <Button
-                    data-testid="chief-question-primary"
-                    className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
-                    disabled={!answering.enabled}
-                    onClick={answering.advance}
-                  >
-                    {answering.last ? t('提交回答') : t('下一步')}
-                    <ShortcutHint keys={['mod', 'enter']} className="pointer-coarse:hidden ml-1" />
-                  </Button>
-                ) : stopMode ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t('停止 Coordinator 这次回复')}
-                    className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
-                    onClick={stopTurn}
-                  >
-                    <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t('发送')}
-                    className={cn(
-                      SEND_BTN_CLS,
-                      (wire.draft !== '' ||
-                        wire.tokens.length > 0 ||
-                        pendingAttachments.length > 0) &&
-                        SEND_ON_CLS,
-                      turnElapsed != null && 'ml-2',
-                    )}
-                    onClick={wire.send}
-                  >
-                    <ArrowUp width={16} height={16} />
-                  </Button>
-                )}
-              </div>
-              <SlashHelp
-                open={helpOpen}
-                onClose={closeHelp}
-                commands={helpRows}
-                skillCount={helpSkillCount}
-              />
-            </div>
+            )}
           </>
         )}
       </div>

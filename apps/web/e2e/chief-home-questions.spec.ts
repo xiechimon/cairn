@@ -752,6 +752,7 @@ test('answer drafts per request and the thread draft stay separate through every
   };
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
+  const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
   const option = (n: number) =>
     page.getByTestId('chief-question-dock').getByTestId(`chief-question-option-0-${n}`);
   const toThread = async () => {
@@ -774,6 +775,18 @@ test('answer drafts per request and the thread draft stay separate through every
     composer: string;
     extra?: () => Promise<void>;
   }[] = [
+    {
+      name: 'slash and mention in the answer are plain text with no menu',
+      run: async () => {
+        await focusComposer();
+        await page.keyboard.type('/re @ag');
+      },
+      composer: '/re @ag',
+      extra: async () => {
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+        await expect(composer).not.toHaveAttribute('aria-expanded');
+      },
+    },
     { name: 'type the answer for A', run: () => composer.fill('ansA'), composer: 'ansA' },
     { name: 'target the thread: its own draft is empty', run: toThread, composer: '' },
     { name: 'type into the thread', run: () => composer.fill('noteX'), composer: 'noteX' },
@@ -825,7 +838,7 @@ test('answer drafts per request and the thread draft stay separate through every
     {
       name: 'start a slow upload on B',
       run: async () => {
-        await page.locator('input[type="file"]').first().setInputFiles({
+        await activeComposer.locator('input[type="file"]').setInputFiles({
           name: 'notes.log',
           mimeType: 'text/plain',
           buffer: Buffer.from('boom'),
@@ -948,7 +961,7 @@ test('answer drafts per request and the thread draft stay separate through every
     {
       name: 'Enter with an upload in flight sends nothing until the upload finishes',
       run: async () => {
-        await page.locator('input[type="file"]').first().setInputFiles({
+        await activeComposer.locator('input[type="file"]').setInputFiles({
           name: 'notes.log',
           mimeType: 'text/plain',
           buffer: Buffer.from('boom'),
@@ -984,6 +997,56 @@ test('answer drafts per request and the thread draft stay separate through every
             [{ header: 'Merge · #2271', choices: ['Send it to ian'] }],
             [{ header: 'Model · #74', choices: [expect.stringMatching(/attachment:t1\/att-1\.log\)\nfinalA$/)] }],
           ]);
+      },
+    },
+    {
+      name: 'an upload in the thread composer finishes there when a question arrives mid-upload',
+      run: async () => {
+        await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
+        await composer.fill('threadDraft');
+        await activeComposer.locator('input[type="file"]').setInputFiles({
+          name: 'late.log',
+          mimeType: 'text/plain',
+          buffer: Buffer.from('late'),
+        });
+        await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
+        const late = question('ask-0000000c', 'Late · #9', 'One more thing?', [
+          { label: 'Yes' },
+          { label: 'No' },
+        ]);
+        state.messages = [...state.messages, { ...late, createdAt: 40 }];
+        await page.evaluate(
+          ([u, message]) =>
+            window.__es.find((es) => es.url.includes(u as string))?.emit({ type: 'message', message }),
+          [`/api/conversations/${THREAD.id}/stream`, late] as const,
+        );
+        await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+        await expect(composer).toHaveValue('');
+        await expect(async () => {
+          await releaseUploads();
+          await expect(page.getByTestId('home-c').getByTestId('attachment-pending')).toHaveCount(0, {
+            timeout: 500,
+          });
+        }).toPass();
+      },
+      composer: '',
+      extra: async () => {
+        await expect(activeComposer.getByTestId('composer-attachments')).toHaveCount(0);
+      },
+    },
+    {
+      name: 'the answer draft stayed empty and the thread draft holds the late upload',
+      run: async () => {
+        await option(0).click();
+        await page.getByTestId('chief-question-primary').click();
+        await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
+      },
+      composer: 'threadDraft',
+      extra: async () => {
+        await expect
+          .poll(() => answered.at(-1)?.body.answers)
+          .toEqual([{ header: 'Late · #9', choices: ['Yes'] }]);
+        await expect(activeComposer.getByTestId('composer-attachments')).toContainText('late.log');
       },
     },
   ];

@@ -71,6 +71,7 @@ export interface ComposerWireOptions {
     onStop?: () => void;
   };
   growCap?: number;
+  active?: boolean;
   onPickProject?: (project: { id: string; label: string }) => void;
 }
 
@@ -138,6 +139,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     mentionFiles,
     slash: slashOptions,
     growCap,
+    active = true,
     onPickProject,
   } = options;
   const { t } = useI18n();
@@ -416,7 +418,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   }, [draft]);
 
   useLayoutEffect(() => {
-    if (growCap == null) return;
+    if (growCap == null || !active) return;
     const ta = textareaRef.current;
     if (ta == null) return;
     const grow = () => {
@@ -433,7 +435,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     });
     observer.observe(ta);
     return () => observer.disconnect();
-  }, [draft, growCap]);
+  }, [draft, growCap, active]);
 
   const applyTextInsert = (
     produce: (

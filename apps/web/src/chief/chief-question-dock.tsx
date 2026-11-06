@@ -104,7 +104,7 @@ export function useQuestionDockVisible(): boolean {
   return useShownQuestions().length > 0;
 }
 
-export function useAnswerKey(bound: boolean): string | null {
+export function useAnswerKey(): string | null {
   const pending = useShownQuestions();
   const shown = pending[clampQuestionIndex(questionDockState.focus(), pending.length)];
   useSyncExternalStore(
@@ -112,7 +112,7 @@ export function useAnswerKey(bound: boolean): string | null {
     () => (shown === undefined ? -1 : stepOf(shown)),
     () => -1,
   );
-  if (!bound || shown === undefined) return null;
+  if (shown === undefined) return null;
   return answerKeyOf(draftKeyOf(shown), stepOf(shown));
 }
 
