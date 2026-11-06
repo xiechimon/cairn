@@ -8,10 +8,12 @@ const ROOT = resolve(import.meta.dirname, '..');
 const sources = JSON.parse(
   readFileSync(resolve(ROOT, 'apps/web/pr-screens/route-sources.json'), 'utf8'),
 );
+const slugsOf = (file) => [
+  ...new Set(pageNames(readFileSync(resolve(ROOT, file), 'utf8')).map(slugOf)),
+];
 const slugs = [
-  ...new Set(
-    pageNames(readFileSync(resolve(ROOT, 'apps/web/e2e/audit-pages.ts'), 'utf8')).map(slugOf),
-  ),
+  ...slugsOf('apps/web/e2e/audit-pages.ts'),
+  ...slugsOf('apps/web/pr-screens/state-pages.ts'),
 ];
 
 test('every audited page has a route-sources entry and every entry names an audited page', () => {
@@ -47,11 +49,11 @@ test('a change inside a directory shared by several pages selects those pages', 
   assert.equal(result.all, false);
 });
 
-test('provider files select the providers page by prefix', () => {
+test('provider files select the providers page and its loading and error states by prefix', () => {
   assert.deepEqual(
     selectPages({ changed: ['apps/web/src/resources/provider-model-list.tsx'], sources, slugs })
       .pages,
-    ['providers'],
+    ['providers', 'settings-loading', 'settings-error'],
   );
 });
 
@@ -89,4 +91,14 @@ test('tests, docs and the gallery select nothing', () => {
     slugs,
   });
   assert.deepEqual(result, { all: false, pages: [] });
+});
+
+test('a change to the home surface selects the first-run state page, and a state page names itself live', () => {
+  const result = selectPages({
+    changed: ['apps/web/src/board/first-run-checklist.tsx'],
+    sources,
+    slugs,
+  });
+  assert.ok(result.pages.includes('first-run-home'));
+  assert.ok(result.pages.includes('failed-thread'));
 });
