@@ -119,3 +119,27 @@ for (const surface of PRESS_SURFACES) {
     expect(dimmed).toEqual([]);
   });
 }
+
+test('a pressed control under a coarse pointer has no transition', async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 1000, height: 900 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  await page.goto('/app?scenario=home-c');
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+  const control = page.getByTestId('machines-button');
+  await expect(control).toBeVisible();
+  const box = await control.boundingBox();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  const pressed = await control.evaluate((el) => ({
+    active: el.matches(':active'),
+    duration: getComputedStyle(el).transitionDuration,
+  }));
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await context.close();
+  expect(pressed).toEqual({ active: true, duration: '0s' });
+});

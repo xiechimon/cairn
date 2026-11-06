@@ -10,6 +10,14 @@
   }
 }
 
+@media (pointer: coarse) {
+  button:active,
+  [role="button"]:active,
+  a:active {
+    transition-duration: 0s;
+  }
+}
+
 .theme-suppress,
 .theme-suppress *,
 .theme-suppress *::before,
