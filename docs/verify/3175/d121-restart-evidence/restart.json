@@ -1,0 +1,132 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/builds/d121-control-build/plans",
+    "status": 200,
+    "body": null,
+    "response": [
+      {
+        "id": "d121-control-plan",
+        "buildId": "d121-control-build",
+        "version": 1,
+        "createdAt": 1793981876685,
+        "content": "Kind: fix\n## Verification\n- `pnpm test` passes\n",
+        "autoApproveAt": 1793982476685,
+        "autoApprovePausedAt": null
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/builds/d121-pause-build/plans/d121-pause-plan/pause-auto-approve",
+    "status": 200,
+    "body": {},
+    "response": {
+      "id": "d121-pause-plan",
+      "buildId": "d121-pause-build",
+      "version": 1,
+      "createdAt": 1793981876685,
+      "content": "Kind: fix\n## Verification\n- `pnpm test` passes\n",
+      "autoApproveAt": null,
+      "autoApprovePausedAt": 1793981876890
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/projects/d121-disable-project/merge-policy",
+    "status": 200,
+    "body": {
+      "planAutoApproveEnabled": false
+    },
+    "response": {
+      "planAutoApproveEnabled": false,
+      "mergePolicy": "autonomous",
+      "localChecks": [],
+      "requireUpToDate": false
+    }
+  },
+  {
+    "action": "Stop owned server process",
+    "pid": 22,
+    "cwd": "[local verification checkout path redacted]"
+  },
+  {
+    "method": "GET",
+    "path": "/api/builds/d121-control-build/plans",
+    "status": 200,
+    "body": null,
+    "response": [
+      {
+        "id": "d121-control-plan",
+        "buildId": "d121-control-build",
+        "version": 1,
+        "createdAt": 1793981876685,
+        "content": "Kind: fix\n## Verification\n- `pnpm test` passes\n",
+        "autoApproveAt": 1793982476685,
+        "autoApprovePausedAt": null
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/builds/d121-pause-build/plans",
+    "status": 200,
+    "body": null,
+    "response": [
+      {
+        "id": "d121-pause-plan",
+        "buildId": "d121-pause-build",
+        "version": 1,
+        "createdAt": 1793981876685,
+        "content": "Kind: fix\n## Verification\n- `pnpm test` passes\n",
+        "autoApproveAt": null,
+        "autoApprovePausedAt": 1793981876890
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/projects/d121-disable-project/merge-policy",
+    "status": 200,
+    "body": null,
+    "response": {
+      "planAutoApproveEnabled": false,
+      "mergePolicy": "autonomous",
+      "localChecks": [],
+      "requireUpToDate": false
+    }
+  },
+  {
+    "rowsBeforeDueSweep": [
+      {
+        "id": "d121-control",
+        "phase": "confirm"
+      },
+      {
+        "id": "d121-disable",
+        "phase": "confirm"
+      },
+      {
+        "id": "d121-pause",
+        "phase": "confirm"
+      }
+    ]
+  },
+  {
+    "rowsAfterRealSchedulerTick": [
+      {
+        "id": "d121-control",
+        "phase": "building"
+      },
+      {
+        "id": "d121-disable",
+        "phase": "confirm"
+      },
+      {
+        "id": "d121-pause",
+        "phase": "confirm"
+      }
+    ],
+    "result": "PASS: restart preserves deadline, per-plan pause, project disable; due control starts"
+  }
+]

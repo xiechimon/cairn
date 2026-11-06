@@ -1,0 +1,62 @@
+$ curl -s -X GET 'http://127.0.0.1:18992/api/builds/d121-review-build/merge-permission'
+HTTP 404
+{"error":"Not found"}
+
+$ curl -s -X POST 'http://127.0.0.1:18992/api/builds/d121-pause-build/plans/d121-pause-plan/pause-auto-approve' -H 'content-type: application/json' -d '{}'
+HTTP 404
+{"error":"Not found"}
+
+$ curl -s -X GET 'http://127.0.0.1:18991/api/builds/d121-review-build/merge-permission'
+HTTP 200
+{"permitted":false,"missingTools":["合并分支","推送分支"],"prUrl":"https://github.com/example/demo/pull/42"}
+
+$ curl -s -X POST 'http://127.0.0.1:18991/api/builds/d121-review-build/merge' -H 'content-type: application/json' -d '{}'
+HTTP 403
+{"error":"Agent Verification builder 未获「合并分支」「推送分支」授权（Agent 详情页权限 tab），无法发起合并"}
+rows before: [{"phase":"review"}]
+rows after:  [{"phase":"review"}]
+
+$ curl -s -X PATCH 'http://127.0.0.1:18991/api/todos/d121-review' -H 'content-type: application/json' -d '{"phase":"done"}'
+HTTP 200
+{"id":"d121-review","teamId":"JTRLn3yOcB0NHTrTrozWJ","projectId":"d121-project","title":"D121 review","spec":"","phase":"done","phaseAt":1793981410660,"archivedAt":null,"snoozedUntil":null,"snoozeMode":null,"seqNum":1,"orderIndex":0,"tagIds":[],"assignment":{"plan":{"agentId":"d121-agent"},"build":{"agentId":"d121-agent"}},"agent":{"id":"d121-agent","displayName":"Verification builder"},"latestBuildId":"d121-review-build","lastRunAt":null,"hasChanges":true,"hasPlan":true,"buildHistory":[{"buildId":"d121-review-build","createdAt":1793981408764}],"sourceTodo":null,"blockedBy":null,"v":2,"createdBy":"P6qUBXjIJxte79BDqMv8n","ownerId":"P6qUBXjIJxte79BDqMv8n","sourceBuildId":null,"sourceKind":null,"sourceRef":null,"output":"code","verified":false,"quotaWait":null}
+rows before: [{"phase":"review"}]
+rows after:  [{"phase":"done"}]
+
+$ curl -s -X GET 'http://127.0.0.1:18991/api/builds/d121-review-build'
+HTTP 200
+{"id":"d121-review-build","todoId":"d121-review","withPlan":true,"prevPhase":null,"triggerSource":"user","planDocId":null,"errorMessage":null,"prUrl":"https://github.com/example/demo/pull/42","prNumber":42,"diffHash":null,"reportAttachmentId":null,"createdAt":1793981408764}
+rows before: [{"prUrl":"https://github.com/example/demo/pull/42","mergeSteps":0}]
+rows after:  [{"prUrl":"https://github.com/example/demo/pull/42","mergeSteps":0}]
+
+$ curl -s -X GET 'http://127.0.0.1:18991/api/builds/d121-pause-build/plans'
+HTTP 200
+[{"id":"d121-pause-plan","buildId":"d121-pause-build","version":1,"createdAt":1793981408764,"content":"Kind: fix\n## Verification\n- `pnpm test` passes\n","autoApproveAt":1793982008764,"autoApprovePausedAt":null}]
+
+$ curl -s -X POST 'http://127.0.0.1:18991/api/builds/d121-pause-build/plans/d121-pause-plan/pause-auto-approve' -H 'content-type: application/json' -d '{}'
+HTTP 200
+{"id":"d121-pause-plan","buildId":"d121-pause-build","version":1,"createdAt":1793981408764,"content":"Kind: fix\n## Verification\n- `pnpm test` passes\n","autoApproveAt":null,"autoApprovePausedAt":1793981410683}
+rows before: [{"autoApprovePausedAt":null}]
+rows after:  [{"autoApprovePausedAt":1793981410683}]
+
+$ curl -s -X POST 'http://127.0.0.1:18991/api/builds/d121-pause-build/plans/d121-pause-plan/pause-auto-approve' -H 'content-type: application/json' -d '{}'
+HTTP 200
+{"id":"d121-pause-plan","buildId":"d121-pause-build","version":1,"createdAt":1793981408764,"content":"Kind: fix\n## Verification\n- `pnpm test` passes\n","autoApproveAt":null,"autoApprovePausedAt":1793981410683}
+rows before: [{"autoApprovePausedAt":1793981410683}]
+rows after:  [{"autoApprovePausedAt":1793981410683}]
+
+$ curl -s -X PATCH 'http://127.0.0.1:18991/api/projects/d121-project/merge-policy' -H 'content-type: application/json' -d '{"planAutoApproveEnabled":false}'
+HTTP 200
+{"planAutoApproveEnabled":false,"mergePolicy":"autonomous","localChecks":[],"requireUpToDate":false}
+rows before: [{"enabled":null}]
+rows after:  [{"enabled":0}]
+
+$ curl -s -X GET 'http://127.0.0.1:18991/api/builds/d121-disable-build/plans'
+HTTP 200
+[{"id":"d121-disable-plan","buildId":"d121-disable-build","version":1,"createdAt":1793981408764,"content":"Kind: fix\n## Verification\n- `pnpm test` passes\n","autoApproveAt":null,"autoApprovePausedAt":null}]
+
+$ curl -s -X POST 'http://127.0.0.1:18991/api/builds/d121-pause-build/steps' -H 'content-type: application/json' -d '{"action":"confirm"}'
+HTTP 202
+{"delegated":true}
+rows before: [{"phase":"confirm"}]
+rows after:  [{"phase":"building"}]
+
