@@ -1,7 +1,7 @@
 import { PERSONA_PROFILES, type PersonaRole } from '@cairn/shared';
 import { and, asc, eq, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, machine as machineTable, provider as providerTable, team } from '../db/schema.js';
+import { agent, machine as machineTable, provider as providerTable } from '../db/schema.js';
 import { newRecordId } from '../lib/ids.js';
 import { mergedCatalogModels } from './model-liveness.js';
 
@@ -94,13 +94,6 @@ export function ensurePersonasSeeded(db: Db, teamId: string): number {
     inserted += 1;
   }
   return inserted;
-}
-
-export function backfillPersonas(db: Db): void {
-  const rows = db.select({ id: team.id }).from(team).all();
-  for (const row of rows) {
-    ensurePersonasSeeded(db, row.id);
-  }
 }
 
 export function personaAgent(
