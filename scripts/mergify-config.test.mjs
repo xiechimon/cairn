@@ -115,3 +115,9 @@ test('a PR the coordinator holds never enters the queue', () => {
     assert.match(queue, /- -label = coordinator-hold\n/, name);
   }
 });
+
+test('the review-gate bot may run dequeue, and writers keep the default', () => {
+  assert.match(config, /commands_restrictions:\n {2}dequeue:\n {4}conditions:\n/);
+  assert.match(config, / {10}- sender = github-actions\[bot\]\n/);
+  assert.match(config, / {10}- sender-permission >= write\n/);
+});
