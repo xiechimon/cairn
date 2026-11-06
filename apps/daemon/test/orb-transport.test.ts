@@ -5,7 +5,6 @@ import {
   linkSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -15,7 +14,6 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createConnection } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { expect, test, vi } from 'vitest';
@@ -34,6 +32,7 @@ import {
 } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
 import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 test.each(['symlink', 'directory', 'file'] as const)(
   'refuses a pre-planted outbox %s without replacing it or touching its target',
@@ -252,7 +251,7 @@ function fixture(
     runtimeDirectoryTimeoutMs?: number;
   } = {},
 ) {
-  const root = mkdtempSync(join(tmpdir(), 'orb-transport-'));
+  const root = testTempDir('orb-transport-');
   const { checkout, distSource, runner: distRunner } = createOrbCheckout(root);
   for (const name of ['run', 'dist', 'seed']) mkdirSync(join(root, name));
   const commands: string[][] = [];

@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MachineDoneBody } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -15,9 +13,10 @@ import { StepStops } from '../src/step-stops.js';
 import { boot, CLAIMED, defer, FakeMachineApi, fakeBackend } from './machine-loop-harness.js';
 import { FakeOrbProvider, type FakeOrbRunner } from './orb-fake.js';
 import { orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixture(runner: FakeOrbRunner, api = new FakeMachineApi(), timeoutMs = 1_000) {
-  const paths = statePaths(mkdtempSync(join(tmpdir(), 'orb-watchdog-')));
+  const paths = statePaths(testTempDir('orb-watchdog-'));
   ensureStateDirs(paths);
   const provider = new FakeOrbProvider({ runner });
   const stop = vi.spyOn(provider, 'stop');

@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { prepareOrbSeed } from '../src/orb/seed.js';
+import { testTempDir } from './test-temp-dir.js';
 
 test('mounts a private bare snapshot with committed objects and no host working files or config', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-safe-seed-'));
+  const root = testTempDir('orb-safe-seed-');
   const repo = join(root, 'host');
   execFileSync('git', ['init', '-b', 'main', repo]);
   writeFileSync(join(repo, 'tracked.txt'), 'committed');
@@ -76,7 +76,7 @@ test('mounts a private bare snapshot with committed objects and no host working 
 }, 30_000);
 
 test('rejects a non-Git host directory before any bind can be constructed', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-reject-seed-'));
+  const root = testTempDir('orb-reject-seed-');
   const source = join(root, 'private');
   mkdirSync(source);
   writeFileSync(join(source, 'machine.json'), 'machine-secret-sentinel');
