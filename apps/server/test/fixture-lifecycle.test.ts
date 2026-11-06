@@ -80,7 +80,7 @@ test('startup failure cleans owned dirs', () => {
       });
       expect(result.status, `${result.stderr}${result.stdout}`).toBe(0);
       const leftover = readdirSync(tmpdir()).filter((name) =>
-        name.includes(`cairn-test-${runId}-`),
+        name.includes(`ct-${runId.slice(0, 8)}-`),
       );
       expect(leftover).toEqual([]);
     } finally {
@@ -116,11 +116,11 @@ test('leaks without dispose', () => {
       const owned = JSON.parse(readFileSync(ownedPath, 'utf8')) as string[];
       expect(owned.length).toBe(4);
       for (const dir of owned) {
-        expect(dir.includes(`cairn-test-${runId}-`)).toBe(true);
+        expect(dir.includes(`ct-${runId.slice(0, 8)}-`)).toBe(true);
         expect(existsSync(dir)).toBe(false);
       }
       const leftover = readdirSync(tmpdir()).filter((name) =>
-        name.includes(`cairn-test-${runId}-`),
+        name.includes(`ct-${runId.slice(0, 8)}-`),
       );
       expect(leftover).toEqual([]);
     } finally {
