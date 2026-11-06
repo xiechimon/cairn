@@ -477,11 +477,29 @@ test('with a machine listed the panel still shows its card and the screen placeh
   );
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(2);
   const card = panel.locator('[data-slot="list-card"]').nth(1);
-  await expect(card.getByTestId('machine-screen')).toContainText(/桌面控制已上线|正在连接屏幕|屏幕/);
+  await expect(card.getByTestId('machine-screen')).toBeVisible();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeEnabled();
   await expect(card.getByRole('switch', { name: '浏览器' })).toBeDisabled();
+});
+
+test('an offline Coordinator machine reads offline in the chip and the card, with no running count', async ({
+  page,
+}) => {
+  const panel = await open(
+    page,
+    { computers: [], commands: [] },
+    [{ id: 'm1', name: 'omarchy', online: false, runningSteps: 3 }],
+  );
+  const chip = page.getByTestId('machines-button');
+  await expect(chip).toContainText('omarchy');
+  await expect(chip).toContainText('离线');
+  await expect(chip).not.toContainText('在跑');
+  const card = panel.locator('[data-slot="list-card"]').nth(0);
+  await expect(card).toContainText('离线');
+  await expect(card.getByTestId('machine-screen')).toHaveCount(0);
+  await expect(card.getByTestId('machine-screen-hint')).toHaveCount(0);
 });
 
 test('the live screen enlarges and becomes interactive after desktop control is on', async ({
@@ -523,7 +541,8 @@ test('without a computer row the machine keeps the waiting placeholder and disab
     [{ id: 'm1', name: 'omarchy', online: true, runningSteps: 0 }],
   );
   const card = panel.locator('[data-slot="list-card"]').nth(0);
-  await expect(card.getByTestId('machine-screen')).toContainText('屏幕随桌面控制一起上线');
+  await expect(card.getByTestId('machine-screen')).toHaveCount(0);
+  await expect(card.getByTestId('machine-screen-hint')).toBeVisible();
   await expect(card.getByRole('switch', { name: '桌面控制' })).toBeDisabled();
   await expect(card.getByText('已安装')).toHaveCount(0);
   await expect(card.getByText('未安装')).toHaveCount(0);
