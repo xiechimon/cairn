@@ -9,6 +9,7 @@ import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
+import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
@@ -285,12 +286,22 @@ export function ProvidersPage() {
           onSelect={(id) => setParams({ item: id })}
           onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
           empty={
-            <EmptyState
-              testId="providers-empty"
-              icon={Cpu}
-              title={t('尚未添加服务商。')}
-              description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
-            />
+            <QueryBoundary
+              query={live ? mergeQueries(providersQ, sourcesQ) : undefined}
+              isEmpty
+              loadingLabel={t('正在加载模型服务')}
+              errorTitle={t('模型服务没能加载')}
+              empty={
+                <EmptyState
+                  testId="providers-empty"
+                  icon={Cpu}
+                  title={t('尚未添加服务商。')}
+                  description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
+                />
+              }
+            >
+              {null}
+            </QueryBoundary>
           }
         >
           {selected?.editor}

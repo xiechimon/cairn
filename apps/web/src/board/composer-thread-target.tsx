@@ -2,7 +2,7 @@ import { type RefObject, useMemo, useRef, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useSendKey } from '../api/use-send-key.js';
-import { PROJECT_CHIP_CLS, TOOL_BTN_CLS } from '../chief/chief-conversation.js';
+import { PROJECT_CHIP_CLS, TOOL_BTN_CLS } from '../chief/composer-surface.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { THREAD_REPLY_HINT, type ThreadReplyDelivery } from '../components/thread/thread-reply.js';
 import { Button } from '../components/ui/button.js';
