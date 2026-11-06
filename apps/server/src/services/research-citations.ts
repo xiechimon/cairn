@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
-import { infoReportMessageSchema, quoteIssueLines, RESEARCH_DATA_NOTE } from '@cairn/shared';
-import { and, asc, eq, isNotNull, isNull, lt, notExists, notInArray, or, sql } from 'drizzle-orm';
+import {
+  classifyStepFailure,
+  infoReportMessageSchema,
+  quoteIssueLines,
+  RESEARCH_DATA_NOTE,
+} from '@cairn/shared';
+import { and, asc, eq, isNotNull, isNull, notExists, notInArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
@@ -8,14 +13,19 @@ import { agent, build, chief, message, todo, tokenUsage } from '../db/schema.js'
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, startBuilds } from './builds.js';
 import { modelsAreIndependent } from './merge-gate/model-identity.js';
+import {
+  CITATION_CHECK_SOURCE_KIND,
+  CITATION_PARKED_MARK,
+  failureNeedsHuman,
+} from './needs-you.js';
 import { runnableResearchAgentIds } from './research-dispatch.js';
 import { routeForStep } from './routing-rules.js';
 import { createTodo } from './todos.js';
 
-const CHECK_SOURCE_KIND = 'research-citation-check';
 const TIER_MARKER_KIND = 'research-tier';
 const CHECKS_PER_TICK = 5;
 const CITATION_RETRY_MS = 60_000;
+export const CITATION_MAX_ATTEMPTS = 3;
 const RETRYABLE_CHECKER_PHASES = ['done', 'failed'] as const;
 
 const claimSchema = z
@@ -112,7 +122,7 @@ function checkerTodo(db: Db, source: SourceReport) {
     .where(
       and(
         eq(todo.teamId, source.teamId),
-        eq(todo.sourceKind, CHECK_SOURCE_KIND),
+        eq(todo.sourceKind, CITATION_CHECK_SOURCE_KIND),
         eq(todo.sourceRef, source.sourceRef),
         isNull(todo.archivedAt),
       ),
@@ -128,17 +138,57 @@ function independent(models: readonly string[], others: readonly string[]): bool
   );
 }
 
+interface CitationAttemptState {
+  attempts: number;
+  parked: boolean;
+  createdAt: number | null;
+}
+
+function citationAttemptId(source: Pick<SourceReport, 'buildId' | 'attachmentId'>): string {
+  return `research-citation-attempt-${source.buildId}:${source.attachmentId}`;
+}
+
+function citationAttemptState(
+  db: Db,
+  source: Pick<SourceReport, 'buildId' | 'attachmentId'>,
+): CitationAttemptState {
+  const row = db
+    .select()
+    .from(message)
+    .where(eq(message.id, citationAttemptId(source)))
+    .get();
+  if (!row) return { attempts: 0, parked: false, createdAt: null };
+  try {
+    const value: unknown = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+    const record = typeof value === 'object' && value !== null ? value : {};
+    return {
+      attempts: 'attempts' in record && typeof record.attempts === 'number' ? record.attempts : 0,
+      parked: 'parked' in record && record.parked === true,
+      createdAt: row.createdAt,
+    };
+  } catch {
+    return { attempts: 0, parked: false, createdAt: row.createdAt };
+  }
+}
+
 function recordCitationAttempt(
   db: Db,
   source: Pick<SourceReport, 'buildId' | 'attachmentId'>,
-  kind: 'research-citation-requested' | 'research-citation-blocked',
+  kind: 'research-citation-requested' | 'research-citation-blocked' | 'research-citation-parked',
   reason: string,
+  patch: { attempts?: number; parked?: boolean; touch?: boolean } = {},
 ): void {
-  const content = JSON.stringify({ kind, reason });
-  const createdAt = nowMs();
+  const state = citationAttemptState(db, source);
+  const content = JSON.stringify({
+    kind,
+    reason,
+    attempts: patch.attempts ?? state.attempts,
+    parked: patch.parked ?? state.parked,
+  });
+  const createdAt = patch.touch === false ? (state.createdAt ?? 0) : nowMs();
   db.insert(message)
     .values({
-      id: `research-citation-attempt-${source.buildId}:${source.attachmentId}`,
+      id: citationAttemptId(source),
       conversationId: source.buildId,
       role: 'system',
       content,
@@ -146,6 +196,39 @@ function recordCitationAttempt(
     })
     .onConflictDoUpdate({ target: message.id, set: { content, createdAt } })
     .run();
+}
+
+function parkCitationCheck(
+  deps: BuildDeps,
+  source: SourceReport,
+  existing: typeof todo.$inferSelect | undefined,
+  reason: string,
+): { todoId: string; buildId: string } | null {
+  recordCitationAttempt(deps.db, source, 'research-citation-parked', reason, {
+    parked: true,
+    touch: false,
+  });
+  if (!existing?.latestBuildId) return null;
+  if (existing.phase === 'failed') {
+    const latest = deps.db.select().from(build).where(eq(build.id, existing.latestBuildId)).get();
+    const previous = latest?.errorMessage ?? '';
+    if (!previous.startsWith(CITATION_PARKED_MARK))
+      deps.db
+        .update(build)
+        .set({ errorMessage: `${CITATION_PARKED_MARK}: ${reason} Last error: ${previous}` })
+        .where(eq(build.id, existing.latestBuildId))
+        .run();
+  }
+  return { todoId: existing.id, buildId: existing.latestBuildId };
+}
+
+function terminalCheckerFailure(db: Db, existing: typeof todo.$inferSelect): string | null {
+  if (existing.phase !== 'failed' || !existing.latestBuildId) return null;
+  const latest = db.select().from(build).where(eq(build.id, existing.latestBuildId)).get();
+  const error = latest?.errorMessage ?? '';
+  if (classifyStepFailure(error) === 'model_unavailable' || failureNeedsHuman(error))
+    return 'The citation checker cannot run: its model or credentials are unavailable.';
+  return null;
 }
 
 function blocked(deps: BuildDeps, source: SourceReport, reason: string): null {
@@ -169,6 +252,17 @@ export function openCitationCheck(
       checkedResearchReport(deps.db, buildId) !== null)
   )
     return { todoId: existing.id, buildId: existing.latestBuildId };
+  const state = citationAttemptState(deps.db, source);
+  if (state.parked) return parkCitationCheck(deps, source, existing, 'Already parked.');
+  const terminal = existing ? terminalCheckerFailure(deps.db, existing) : null;
+  if (terminal) return parkCitationCheck(deps, source, existing, terminal);
+  if (state.attempts >= CITATION_MAX_ATTEMPTS)
+    return parkCitationCheck(
+      deps,
+      source,
+      existing,
+      `Citation check stopped after ${state.attempts} attempts.`,
+    );
   if (source.models.length === 0 || citedUrls(source.content).size === 0) {
     return blocked(deps, source, 'Source report needs observed model usage and cited URLs.');
   }
@@ -221,7 +315,7 @@ export function openCitationCheck(
       output: 'info',
       createdBy: deps.user.id,
       ownerId: deps.user.id,
-      sourceKind: CHECK_SOURCE_KIND,
+      sourceKind: CITATION_CHECK_SOURCE_KIND,
       sourceRef: source.sourceRef,
     });
   const [started] = startBuilds(deps, {
@@ -231,7 +325,15 @@ export function openCitationCheck(
     withPlan: false,
     triggerSource: 'chief',
   });
-  return started ? { todoId: row.id, buildId: started.id } : null;
+  if (!started) return null;
+  recordCitationAttempt(
+    deps.db,
+    source,
+    'research-citation-requested',
+    'Starting an independent citation check.',
+    { attempts: state.attempts + 1, touch: false },
+  );
+  return { todoId: row.id, buildId: started.id };
 }
 
 export function checkedResearchReport(db: Db, buildId: string): CheckedResearchReport | null {
@@ -304,6 +406,10 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
   const report = alias(message, 'research_report');
   const attempt = alias(message, 'citation_attempt');
   const checker = alias(todo, 'citation_checker');
+  const attemptField = (key: 'parked' | 'attempts') =>
+    sql`CASE WHEN json_valid(${attempt.content}) THEN
+      CASE WHEN json_valid(json_extract(${attempt.content}, '$')) THEN
+        json_extract(json_extract(${attempt.content}, '$'), ${`$.${key}`}) END END`;
   const tier = sql<number>`CASE WHEN json_valid(${tierMarker.content}) THEN
     CASE WHEN json_valid(json_extract(${tierMarker.content}, '$')) THEN
       json_extract(json_extract(${tierMarker.content}, '$'), '$.tier') END END`;
@@ -314,7 +420,7 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
     .where(
       and(
         eq(checker.teamId, todo.teamId),
-        eq(checker.sourceKind, CHECK_SOURCE_KIND),
+        eq(checker.sourceKind, CITATION_CHECK_SOURCE_KIND),
         isNull(checker.archivedAt),
         isNotNull(checker.latestBuildId),
         notInArray(checker.phase, [...RETRYABLE_CHECKER_PHASES]),
@@ -340,7 +446,11 @@ export function planResearchCitationChecks(deps: BuildDeps): void {
         isNull(todo.archivedAt),
         isNotNull(build.reportAttachmentId),
         or(sql`${todo.sourceKind} IN ('research-intake', 'research-stuck')`, eq(tier, 2)),
-        or(isNull(attempt.createdAt), lt(attempt.createdAt, nowMs() - CITATION_RETRY_MS)),
+        sql`coalesce(${attemptField('parked')}, 0) != 1`,
+        or(
+          isNull(attempt.createdAt),
+          sql`${attempt.createdAt} < ${nowMs()} - ${CITATION_RETRY_MS} * (1 << min(coalesce(${attemptField('attempts')}, 0), 6))`,
+        ),
         notExists(existingChecker),
       ),
     )
