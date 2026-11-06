@@ -2,13 +2,18 @@ import { randomBytes } from 'node:crypto';
 import {
   chatAttributes,
   executeToolAttributes,
+  langfuseEnvironmentAttributes,
+  otelEnvironment,
+  otelResourceAttributes,
   type ProviderModelRef,
   redactSecrets,
   type TokenCounts,
 } from '@cairn/shared';
 import {
+  createOtlpSender,
   OTLP_SPAN_KIND,
   OTLP_STATUS_ERROR,
+  type OtlpSender,
   type OtlpSpan,
   type OtlpTarget,
   otlpAttributes,
@@ -16,22 +21,29 @@ import {
   otlpTraceparent,
   otlpTracesRequest,
   parseOtlpTarget,
-  postOtlpTraces,
   type StepOtelContext,
   stepOtelContext,
 } from '@cairn/shared/otel';
 
 const SCOPE = 'cairn.daemon';
-const RESOURCE = { 'service.name': 'cairn' } as const;
+
+const sender = createOtlpSender();
 
 export interface DaemonOtel {
-  contextFor(buildId: string, stepId: string): StepOtelContext;
+  contextFor(buildId: string, stepId: string, kind?: string): StepOtelContext;
 }
 
 export function daemonOtelFromEnv(env: NodeJS.ProcessEnv): DaemonOtel | null {
   const target = parseOtlpTarget(env);
   if (target === null) return null;
-  return { contextFor: (buildId, stepId) => stepOtelContext(buildId, stepId, target) };
+  const environment = otelEnvironment(env);
+  return {
+    contextFor: (buildId, stepId, kind) =>
+      stepOtelContext(buildId, stepId, target, {
+        environment,
+        ...(kind !== undefined ? { kind } : {}),
+      }),
+  };
 }
 
 export function claudeTelemetryEnv(ctx: StepOtelContext): Record<string, string> {
@@ -78,6 +90,7 @@ export class PiStepSpanSink {
     private readonly fallback: ProviderModelRef,
     private readonly log?: (msg: string) => void,
     private readonly redact?: <T>(value: T) => T,
+    private readonly out: OtlpSender = sender,
   ) {}
 
   chat(
@@ -101,7 +114,10 @@ export class PiStepSpanSink {
       kind: OTLP_SPAN_KIND.client,
       startTimeUnixNano: otlpNanos(at),
       endTimeUnixNano: otlpNanos(at),
-      attributes: otlpAttributes(chatAttributes(turn, this.fallback)),
+      attributes: otlpAttributes({
+        ...chatAttributes(turn, this.fallback),
+        ...langfuseEnvironmentAttributes(this.ctx.environment),
+      }),
       ...(turn.finishReason === 'error'
         ? { status: { code: OTLP_STATUS_ERROR, message: 'error' } }
         : {}),
@@ -127,14 +143,15 @@ export class PiStepSpanSink {
       kind: OTLP_SPAN_KIND.internal,
       startTimeUnixNano: otlpNanos(start),
       endTimeUnixNano: otlpNanos(end),
-      attributes: otlpAttributes(
-        executeToolAttributes({
+      attributes: otlpAttributes({
+        ...executeToolAttributes({
           name: open.name,
           callId: id,
           arguments: jsonText(open.args),
           result: jsonText(result),
         }),
-      ),
+        ...langfuseEnvironmentAttributes(this.ctx.environment),
+      }),
       ...(isError ? { status: { code: OTLP_STATUS_ERROR, message: 'tool error' } } : {}),
     });
   }
@@ -147,11 +164,18 @@ export class PiStepSpanSink {
     if (this.spans.length === 0) return;
     const target: OtlpTarget = { url: new URL(this.ctx.tracesUrl), headers: this.ctx.headers };
     try {
-      const request = otlpTracesRequest(RESOURCE, SCOPE, this.spans);
+      const request = otlpTracesRequest(
+        otelResourceAttributes(this.ctx.environment),
+        SCOPE,
+        this.spans,
+      );
       const redacted = redactSecrets(this.redact?.(request) ?? request).value as ReturnType<
         typeof otlpTracesRequest
       >;
-      await postOtlpTraces(target, redacted);
+      const accepted = this.out.send(target, redacted, (error) =>
+        this.log?.(`otel push failed: ${error instanceof Error ? error.message : String(error)}`),
+      );
+      if (!accepted) this.log?.('otel push dropped: export queue is full');
     } catch (error) {
       this.log?.(`otel push failed: ${error instanceof Error ? error.message : String(error)}`);
     }

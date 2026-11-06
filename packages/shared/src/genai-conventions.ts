@@ -42,7 +42,70 @@ export const CAIRN_ATTR = {
   stepKind: 'cairn.step_kind',
   checkpointCommit: 'cairn.checkpoint_commit',
   rawStopReason: 'cairn.raw_stop_reason',
+  threadId: 'cairn.thread_id',
+  chiefTrigger: 'cairn.chief_trigger',
 } as const;
+
+export const LANGFUSE_ATTR = {
+  traceName: 'langfuse.trace.name',
+  traceTags: 'langfuse.trace.tags',
+  sessionId: 'langfuse.session.id',
+  genericSessionId: 'session.id',
+  environment: 'langfuse.environment',
+  deploymentEnvironment: 'deployment.environment',
+} as const;
+
+const OTEL_ENVIRONMENT_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+
+export function otelEnvironment(env: { CAIRN_OTEL_ENVIRONMENT?: string }): string | null {
+  const value = env.CAIRN_OTEL_ENVIRONMENT?.trim().toLowerCase();
+  if (value === undefined || !OTEL_ENVIRONMENT_PATTERN.test(value)) return null;
+  return value.startsWith('langfuse') ? null : value;
+}
+
+export function otelResourceAttributes(environment: string | null | undefined): Attributes {
+  return compact({
+    'service.name': 'cairn',
+    [LANGFUSE_ATTR.deploymentEnvironment]: environment,
+  });
+}
+
+export function langfuseEnvironmentAttributes(environment: string | null | undefined): Attributes {
+  return compact({
+    [LANGFUSE_ATTR.environment]: environment,
+    [LANGFUSE_ATTR.deploymentEnvironment]: environment,
+  });
+}
+
+export function langfuseTraceAttributes(trace: {
+  name: string;
+  sessionId: string | null;
+  tags: readonly string[];
+  environment: string | null | undefined;
+}): Attributes {
+  return compact({
+    [LANGFUSE_ATTR.traceName]: trace.name,
+    [LANGFUSE_ATTR.traceTags]: trace.tags,
+    [LANGFUSE_ATTR.sessionId]: trace.sessionId,
+    [LANGFUSE_ATTR.genericSessionId]: trace.sessionId,
+    ...langfuseEnvironmentAttributes(trace.environment),
+  });
+}
+
+export function coordinatorTurnAttributes(turn: {
+  stepId: string;
+  threadId: string;
+  trigger: string;
+}): Attributes {
+  return compact({
+    [GENAI_ATTR.operationName]: GENAI_OPERATION.invokeAgent,
+    [GENAI_ATTR.agentName]: 'coordinator',
+    [CAIRN_ATTR.stepId]: turn.stepId,
+    [CAIRN_ATTR.stepKind]: 'chief',
+    [CAIRN_ATTR.threadId]: turn.threadId,
+    [CAIRN_ATTR.chiefTrigger]: turn.trigger,
+  });
+}
 
 export interface TokenCounts {
   input?: number;
