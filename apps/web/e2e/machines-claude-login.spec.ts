@@ -4,8 +4,9 @@ const PAGE = '/app/settings/machines?scenario=machines-claude-login';
 
 async function open(page: Page, name: string) {
   await page.goto(PAGE);
-  await page.getByTestId('machine-item').filter({ hasText: name }).first().click();
-  await expect(page.getByTestId('machine-detail-name')).toHaveText(name);
+  const row = page.getByTestId('machine-item').filter({ hasText: name }).first();
+  await row.getByTestId('machine-toggle').click();
+  await expect(row).toHaveAttribute('data-expanded', 'true');
 }
 
 test('expiring and expired Claude Code logins warn with the machine name and re-login command as code', async ({

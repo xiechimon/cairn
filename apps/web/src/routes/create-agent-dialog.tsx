@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { MachineName, machineLabel } from '../components/machine-label.js';
 import { CARD_RADIUS_CLS } from '../components/settings-list.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -60,6 +61,7 @@ export function CreateAgentDialog({
   const [modelId, setModelId] = useState<string | null>(null);
   const runtime = provider === 'claude-code' ? 'claude-code' : 'pi';
   const machineCandidates = machines.filter((m) => (m.enabledRuntimes ?? []).includes(runtime));
+  const pickedMachine = machineCandidates.find((m) => m.id === machineId);
   const machineModelOptions =
     provider === 'claude-code'
       ? machineId === null
@@ -152,13 +154,15 @@ export function CreateAgentDialog({
                   className={cn('dlg-agent-machine-select', CONTROL_CLS)}
                 >
                   <SelectValue>
-                    {machineCandidates.find((m) => m.id === machineId)?.name ?? t('选择机器')}
+                    {pickedMachine === undefined
+                      ? t('选择机器')
+                      : machineLabel(pickedMachine, machines)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent aria-label={t('归属机')}>
                   {machineCandidates.map((m) => (
                     <SelectItem key={m.id} className="dlg-agent-machine-row" value={m.id ?? ''}>
-                      {m.name}
+                      <MachineName machine={m} all={machines} />
                       {m.online === false ? `（${t('离线')}）` : ''}
                     </SelectItem>
                   ))}

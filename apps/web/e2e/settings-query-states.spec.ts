@@ -121,23 +121,20 @@ test('providers: a failed team providers fetch does not hide the machine scope e
   await page.goto('/app/settings/providers');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('query-error')).toBeVisible();
-  await settings.getByRole('combobox', { name: '作用于' }).click();
+  await settings.getByRole('combobox', { name: '设置作用于' }).click();
   await page.getByRole('option', { name: /alpha/ }).click();
   await expect(settings.getByTestId('query-error')).toHaveCount(0);
   await expect(settings.getByTestId('provider-instance').first()).toBeVisible();
 });
 
 for (const width of [768, 1024]) {
-  test(`machines: at ${width}px the panel stacks and no row clips its value column`, async ({
+  test(`machines: at ${width}px the expanded row keeps every value column inside it`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/app/settings/machines?scenario=machines-master-detail');
+    await page.goto('/app/settings/machines?scenario=machines-master-detail&machine=md-omarchy');
     const settings = page.getByRole('dialog', { name: '设置' });
     await expect(settings.getByTestId('machine-detail')).toBeVisible();
-    const list = await settings.getByTestId('machine-list').boundingBox();
-    const detail = await settings.getByTestId('machine-detail').boundingBox();
-    expect((detail?.y ?? 0) >= (list?.y ?? 0) + (list?.height ?? 0) - 1).toBe(true);
     const clipped = await settings.getByTestId('machine-detail').evaluate((root) => {
       const rootRight = root.getBoundingClientRect().right;
       return [...root.querySelectorAll('.settings-row')]
@@ -154,12 +151,13 @@ for (const width of [768, 1024]) {
   });
 }
 
-test('machines: at 1440px the list sits beside the detail with a value column per row', async ({
+test('machines: a row spans the whole panel and its detail opens underneath it', async ({
   page,
 }) => {
-  await page.goto('/app/settings/machines?scenario=machines-master-detail');
+  await page.goto('/app/settings/machines?scenario=machines-master-detail&machine=md-omarchy');
   const settings = page.getByRole('dialog', { name: '设置' });
-  const list = await settings.getByTestId('machine-list').boundingBox();
+  const row = await settings.getByTestId('machine-item').first().boundingBox();
   const detail = await settings.getByTestId('machine-detail').boundingBox();
-  expect((detail?.x ?? 0) >= (list?.x ?? 0) + (list?.width ?? 0) - 1).toBe(true);
+  expect((detail?.y ?? 0) >= (row?.y ?? 0)).toBe(true);
+  expect(Math.abs((detail?.width ?? 0) - (row?.width ?? 1))).toBeLessThanOrEqual(1);
 });

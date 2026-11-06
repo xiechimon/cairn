@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useMcpServers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
+import { MachineName, machineLabel } from '../components/machine-label.js';
 import {
   SETTINGS_HINT_CLS,
   SETTINGS_ROW_CLS,
@@ -93,6 +94,7 @@ export function RouteOverrideDialog({
     : (fixture.resources?.machines ?? [])
         .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
         .map((machine) => ({ id: machine.id, name: machine.name }));
+  const pickedMachine = machines.find((machine) => machine.id === machineId);
   const mcpOptions = live
     ? (mcpQ.data ?? []).map((row) => ({ id: row.slug, name: row.label }))
     : (fixture.resources?.mcpServers ?? []).map((row) => ({ id: row.name, name: row.name }));
@@ -173,14 +175,16 @@ export function RouteOverrideDialog({
                 <SelectValue>
                   {machineId === null
                     ? t('不固定')
-                    : (machines.find((machine) => machine.id === machineId)?.name ?? machineId)}
+                    : pickedMachine === undefined
+                      ? machineId
+                      : machineLabel(pickedMachine, machines)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={null}>{t('不固定')}</SelectItem>
                 {machines.map((machine) => (
                   <SelectItem key={machine.id} value={machine.id}>
-                    {machine.name}
+                    <MachineName machine={machine} all={machines} />
                   </SelectItem>
                 ))}
               </SelectContent>

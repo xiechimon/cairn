@@ -17,6 +17,7 @@ import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { EmptyState } from '../components/empty-state.js';
+import { MachineName, machineLabel } from '../components/machine-label.js';
 import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -84,6 +85,7 @@ function RuleEditor({
     (rule.thinkingLevel as ThinkingLevel | null) ?? 'off',
   );
   const [machineId, setMachineId] = useState(rule.machineId);
+  const pickedMachine = machines.find((m) => m.id === machineId);
   const dirty =
     provider !== rule.provider ||
     modelId !== rule.modelId ||
@@ -147,14 +149,16 @@ function RuleEditor({
               <SelectValue>
                 {machineId === null
                   ? t('不固定')
-                  : (machines.find((m) => m.id === machineId)?.name ?? machineId)}
+                  : pickedMachine === undefined
+                    ? undefined
+                    : (machineLabel(pickedMachine, machines) ?? machineId)}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={null}>{t('不固定')}</SelectItem>
               {machines.map((machine) => (
                 <SelectItem key={machine.id} value={machine.id}>
-                  {machine.name}
+                  <MachineName machine={machine} all={machines} />
                 </SelectItem>
               ))}
             </SelectContent>

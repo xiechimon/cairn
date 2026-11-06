@@ -50,18 +50,20 @@ async function stubStack(page: Page) {
   return state;
 }
 
-test('deleting the selected machine drops it from the mounted list and selects the next one', async ({
+test('deleting the open machine drops it from the mounted list and collapses the rows', async ({
   page,
 }) => {
   await stubStack(page);
-  await page.goto('/app/settings/machines');
+  await page.goto('/app/settings/machines?machine=m-1');
   const items = page.getByTestId('machine-item');
   await expect(items).toHaveCount(2);
-  await expect(page.getByTestId('machine-detail-name')).toHaveText('alpha');
+  await expect(items.first()).toHaveAttribute('data-expanded', 'true');
 
-  await page.getByRole('button', { name: '删除', exact: true }).click();
+  await items.first().getByTestId('machine-menu').click();
+  await page.getByTestId('machine-menu-delete').click();
   await page.getByRole('alertdialog', { name: '删除机器' }).getByRole('button', { name: '删除' }).click();
 
   await expect(items).toHaveCount(1);
-  await expect(page.getByTestId('machine-detail-name')).toHaveText('beta');
+  await expect(items.first()).toContainText('beta');
+  await expect(items.first()).toHaveAttribute('data-expanded', 'false');
 });

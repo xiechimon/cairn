@@ -15,7 +15,7 @@ test('chief host tag: a quiet text tag on the host list item (data-orchestration
 
 test('chief mid-turn: running status in the detail of the online remote', async ({ page }) => {
   await page.goto(CHIEF_STATE);
-  await page.locator(ITEM).filter({ hasText: 'mea-wsl' }).click();
+  await page.locator(ITEM).filter({ hasText: 'mea-wsl' }).getByTestId('machine-toggle').click();
   await expect(page.locator(`${PANE} [data-orchestration="running"]`)).toHaveText(
     'Coordinator 回合进行中',
   );
@@ -23,11 +23,11 @@ test('chief mid-turn: running status in the detail of the online remote', async 
 
 test('chief waiting for a machine: waiting status in the detail of the offline remote, next to the offline state', async ({ page }) => {
   await page.goto(CHIEF_STATE);
-  await page.locator(ITEM).filter({ hasText: 'vps-relay' }).click();
+  await page.locator(ITEM).filter({ hasText: 'vps-relay' }).getByTestId('machine-toggle').click();
   await expect(page.locator(`${PANE} [data-orchestration="waiting"]`)).toHaveText(
     'Coordinator 等待机器',
   );
-  await expect(page.locator(`${PANE} [data-on]`)).toHaveAttribute('data-on', 'false');
+  await expect(page.locator(ITEM).filter({ hasText: 'vps-relay' }).getByTestId('machine-item-status')).toHaveText('离线');
 });
 
 test('read state zero controls: the role annotations are plain text, no buttons or menus', async ({ page }) => {
@@ -36,7 +36,6 @@ test('read state zero controls: the role annotations are plain text, no buttons 
   await expect(page.locator(`${SHELL} [data-orchestration] button`)).toHaveCount(0);
   await expect(page.locator(`${SHELL} [data-orchestration] [role="menu"]`)).toHaveCount(0);
   await expect(page.locator(`${SHELL} [data-orchestration][role="button"]`)).toHaveCount(0);
-  await expect(page.locator(`${ITEM} [role="switch"]`)).toHaveCount(0);
 });
 
 test('legacy zero drift: no annotation data (06 canon face) grows no annotation nodes', async ({ page }) => {

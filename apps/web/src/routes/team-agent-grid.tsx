@@ -3,6 +3,7 @@ import { Bot, CircleAlert, CircleDashed, CircleDot, type LucideIcon, Plus } from
 import { Link } from 'react-router';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
+import { machineLabel } from '../components/machine-label.js';
 import { CARD_RADIUS_CLS } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -93,7 +94,7 @@ export function TeamAgentGrid({
             const meta = [
               (agent.model === '' ? t('未配置模型') : agent.model) +
                 (agent.isDefault ? t(' · 默认') : ''),
-              machine?.name,
+              machine === undefined ? undefined : machineLabel(machine, machines ?? []),
             ].filter((part) => part != null && part !== '');
             return (
               <Link
@@ -144,7 +145,7 @@ export function TeamAgentGrid({
             const meta = [
               (agent.model === '' ? t('未配置模型') : agent.model) +
                 (agent.isDefault ? t(' · 默认') : ''),
-              machine?.name,
+              machine === undefined ? undefined : machineLabel(machine, machines ?? []),
             ].filter((part) => part != null && part !== '');
             return (
               <Link

@@ -28,9 +28,11 @@ export function MachineConcurrencySelect({
   value,
   onPick,
   onReset,
+  disabled = false,
 }: {
   machine: MachineRow;
   value: number;
+  disabled?: boolean;
   onPick: (n: number) => Promise<unknown> | undefined;
   onReset: () => Promise<unknown> | undefined;
 }) {
@@ -107,6 +109,7 @@ export function MachineConcurrencySelect({
             variant="outline"
             aria-label={label}
             title={label}
+            disabled={disabled}
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
             data-concurrency-source={source}

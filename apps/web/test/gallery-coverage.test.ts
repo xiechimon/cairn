@@ -11,8 +11,6 @@ const NOT_IN_GALLERY: Record<string, string> = {
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
   'conversation-skeleton.tsx':
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
-  'qr-code.tsx':
-    'Gap: rendered only in the pairing dialog of src/routes/remote-access-page.tsx, which needs a live pairing code; no specimen yet.',
   'queued-capsules.tsx':
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
 };

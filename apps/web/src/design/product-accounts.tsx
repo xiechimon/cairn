@@ -13,6 +13,7 @@ import {
   QuotaSection,
 } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
+import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import {
   type ProviderItem,
@@ -23,6 +24,7 @@ import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsCard } from '../components/settings-list.js';
+import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
 import {
   ACCOUNT_MACHINES,
   ACCOUNT_ROUTING,
@@ -41,6 +43,12 @@ import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
 const TOGGLEABLE: readonly string[] = ['pi', 'claude-code', 'gemini'];
+
+const SCOPE_MACHINES = [
+  { id: 'scope-mac-a1b2', kind: 'local', name: 'studio', online: true },
+  { id: 'scope-mac-c3d4', kind: 'remote', name: 'build-box', online: true },
+  { id: 'scope-mac-e5f6', kind: 'remote', name: 'build-box', online: false },
+] as const;
 
 const settledQuery: QueryLike = {
   isPending: false,
@@ -159,6 +167,8 @@ export function AccountsSection() {
   const { t } = useI18n();
   const { accounts, actionsFor } = useAccounts();
   const [machine, setMachine] = useState<MachineWithProviders | undefined>(PROVIDER_MACHINES[0]);
+  const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
+  const [scopeCheckedAt] = useState(() => Date.now());
   const claude = accounts.filter((a) => a.vendor === 'claude');
   const graph = toRoutingGraph(ACCOUNT_ROUTING, {
     accounts,
@@ -242,6 +252,22 @@ export function AccountsSection() {
       >
         <div className="w-full">
           <ProviderPanelSpecimen />
+        </div>
+      </Specimen>
+      <Specimen
+        id="settings-scope"
+        title="Settings scope sentence"
+        note="Server-side settings pages: one sentence names what the page edits, the menu lists the team and each machine, same-name machines get an id suffix, offline machines are marked; device and personal pages do not show it"
+        stage="sheet"
+        code={`<SettingsScopeSentence machines={machines} scope={scope} onChange={setScope} trailing={<CheckedButton updatedAt={at} fetching={false} />} />`}
+      >
+        <div className="w-full">
+          <SettingsScopeSentence
+            machines={[...SCOPE_MACHINES]}
+            scope={scopeValue}
+            onChange={setScopeValue}
+            trailing={<CheckedButton updatedAt={scopeCheckedAt} fetching={false} />}
+          />
         </div>
       </Specimen>
       <Specimen

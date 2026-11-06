@@ -346,6 +346,30 @@ export const machinesMasterDetail: FixtureSet = {
         kind: 'remote',
         name: 'old-laptop',
         online: false,
+        lastSeenAt: Date.now() - 12 * 60_000,
+        enabledRuntimes: ['pi'],
+        maxConcurrent: 2,
+        runningSteps: 0,
+        concurrencySource: 'estimate',
+        concurrencyRange: { min: 1, max: 4 },
+        capabilities: null,
+      },
+    ],
+  },
+};
+
+export const machinesDuplicateNames: FixtureSet = {
+  ...machinesMasterDetail,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      ...(machinesMasterDetail.resources?.machines ?? []),
+      {
+        id: 'md-build-box-b7q2',
+        kind: 'remote',
+        name: 'build-box',
+        online: false,
+        lastSeenAt: Date.now() - 3 * 60 * 60_000,
         enabledRuntimes: ['pi'],
         maxConcurrent: 2,
         runningSteps: 0,

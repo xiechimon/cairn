@@ -4,7 +4,7 @@ import { mockLive } from './chief-home-mock';
 const FLEET = '/app/resources/providers?scenario=providers-fleet';
 const NOW = Date.now();
 
-const scopeSelect = (page: Page) => page.getByRole('combobox', { name: '作用于' });
+const scopeSelect = (page: Page) => page.getByRole('combobox', { name: '设置作用于' });
 const pickScope = async (page: Page, text: string) => {
   await scopeSelect(page).click();
   await page.getByRole('option').filter({ hasText: text }).first().click();

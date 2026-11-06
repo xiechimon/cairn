@@ -1,0 +1,62 @@
+import { expect, type Page, test } from '@playwright/test';
+
+const DUPLICATES = '/app/settings/machines?scenario=machines-duplicate-names';
+
+const settings = (page: Page) => page.getByRole('dialog', { name: '设置' });
+const scope = (page: Page) => settings(page).getByRole('combobox', { name: '设置作用于' });
+
+test('model services open with a scope sentence and keep the scope in the URL', async ({ page }) => {
+  await page.goto('/app/settings/providers?scenario=providers-fleet');
+  await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
+  await expect(scope(page)).toContainText('团队');
+  await scope(page).click();
+  await page.getByRole('option', { name: /build-box/ }).first().click();
+  await expect(page).toHaveURL(/scope=/);
+  await expect(scope(page)).toContainText('build-box');
+  await expect(settings(page).getByTestId('settings-checked')).toContainText('已检查');
+});
+
+test('subscriptions and routing carry the same sentence and say machines follow the team', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=providers-fleet');
+  await expect(settings(page).getByTestId('settings-scope')).toContainText('设置作用于');
+  await expect(settings(page).getByTestId('settings-scope-note')).toHaveCount(0);
+  await scope(page).click();
+  await page.getByRole('option', { name: /build-box/ }).first().click();
+  await expect(page).toHaveURL(/scope=/);
+  await expect(settings(page).getByTestId('settings-scope-note')).toContainText('沿用团队设置');
+});
+
+test('device and personal pages show no scope sentence', async ({ page }) => {
+  for (const section of ['appearance', 'account']) {
+    await page.goto(`/app/settings/${section}`);
+    await expect(settings(page)).toBeVisible();
+    await expect(settings(page).getByTestId('settings-scope')).toHaveCount(0);
+  }
+});
+
+test('machines with the same name get an id suffix in the rows, the scope menu and the migrate picker', async ({
+  page,
+}) => {
+  await page.goto(DUPLICATES);
+  const rows = settings(page).getByTestId('machine-item');
+  await expect(rows).toHaveCount(4);
+  const twins = rows.filter({ hasText: 'build-box' });
+  await expect(twins).toHaveCount(2);
+  await expect(twins.getByTestId('machine-secondary')).toHaveText(['#dbox', '#b7q2']);
+  await expect(rows.filter({ hasText: 'omarchy' }).getByTestId('machine-secondary')).toHaveCount(0);
+
+  await twins.first().getByTestId('machine-menu').click();
+  await page.getByTestId('machine-menu-evacuate').click();
+  await page.locator('.machine-evacuate-select').click();
+  await expect(page.locator('.machine-evacuate-row', { hasText: 'build-box' })).toContainText(
+    '#b7q2',
+  );
+});
+
+test('an offline machine says when it was last online', async ({ page }) => {
+  await page.goto(DUPLICATES);
+  const row = settings(page).getByTestId('machine-item').filter({ hasText: 'old-laptop' });
+  await expect(row.getByTestId('machine-last-seen')).toHaveText('最后在线 12 分钟前');
+});

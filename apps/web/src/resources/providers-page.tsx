@@ -7,17 +7,12 @@ import { useApiMutations, useMachines, useModelSources, useProviders } from '../
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
+import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { QueryBoundary } from '../components/query-state.js';
+import { SettingsScopeSentence, useSettingsScope } from '../components/settings-scope.js';
 import { Button } from '../components/ui/button.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -38,8 +33,6 @@ import {
   TeamProviderEditor,
 } from './provider-editors.js';
 
-const TEAM_SCOPE = 'team';
-
 interface Entry {
   item: ProviderItem;
   editor: ReactNode;
@@ -47,12 +40,6 @@ interface Entry {
 
 const isMachineRuntime = (value: string): value is MachineRuntime =>
   (MACHINE_RUNTIMES as readonly string[]).includes(value);
-
-function scopeLabel(machine: MachineRow, t: TFunc): string {
-  if (machine.online === false) return `${machine.name} · ${t('离线')}`;
-  if (machine.capabilities?.executor === 'orb') return `${machine.name} · Orb`;
-  return machine.name;
-}
 
 function sourceFor(machine: MachineRow, sources: readonly ModelSource[]): ModelSource | undefined {
   const claude = sources.filter((s) => s.runtime === 'claude-code');
@@ -206,6 +193,14 @@ export function ProvidersPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  const { scope, machine, setScope } = useSettingsScope(machines);
+  const [mountedAt] = useState(() => Date.now());
+  const checkedAt = Math.max(sourcesQ.dataUpdatedAt, providersQ.dataUpdatedAt, mountedAt);
+  const refreshChecks = () => {
+    void sourcesQ.refetch();
+    void providersQ.refetch();
+  };
+
   const setParams = (patch: Record<string, string | null>, replace = false) => {
     const params = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) {
@@ -214,10 +209,6 @@ export function ProvidersPage() {
     }
     setSearchParams(params, { replace });
   };
-
-  const scopeParam = searchParams.get('scope');
-  const machine = machines.find((m) => m.id !== undefined && m.id === scopeParam);
-  const scope = machine?.id ?? TEAM_SCOPE;
 
   const actionsFor = (record: ProviderRecord): ProviderEditActions =>
     live
@@ -264,12 +255,6 @@ export function ProvidersPage() {
   const itemParam = searchParams.get('item');
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
-  const scopeOptions = [
-    { value: TEAM_SCOPE, label: t('团队') },
-    ...machines.flatMap((m) =>
-      m.id === undefined ? [] : [{ value: m.id, label: scopeLabel(m, t) }],
-    ),
-  ];
   return (
     <PageShell
       route={PROVIDERS_HREF}
@@ -278,32 +263,18 @@ export function ProvidersPage() {
       fixture={fixture}
     >
       <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-4 pb-16">
-        <div className="flex items-center gap-2 px-1 text-meta text-content-tertiary">
-          <span id="provider-scope-label">{t('作用于')}</span>
-          <Select
-            value={scope}
-            onValueChange={(next) =>
-              setParams({ scope: next === TEAM_SCOPE ? null : (next as string), item: null })
-            }
-          >
-            <SelectTrigger
-              aria-labelledby="provider-scope-label"
-              size="sm"
-              className="text-ui text-foreground"
-            >
-              <SelectValue>
-                {scopeOptions.find((option) => option.value === scope)?.label}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent aria-label={t('范围')}>
-              {scopeOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <SettingsScopeSentence
+          machines={machines}
+          scope={scope}
+          onChange={(next) => setScope(next, { item: null })}
+          trailing={
+            <CheckedButton
+              updatedAt={checkedAt}
+              fetching={sourcesQ.isFetching || providersQ.isFetching}
+              onRefresh={live ? refreshChecks : undefined}
+            />
+          }
+        />
         <ProviderPanel
           header={
             <div className="flex items-center gap-1">

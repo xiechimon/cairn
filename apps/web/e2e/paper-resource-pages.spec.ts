@@ -46,13 +46,13 @@ for (const [name, url, rows] of [
 }
 
 test('machines: `添加机器` is the plus beside the list heading, no dashed full-width bar', async ({ page }) => {
-  await light(page, '/app/resources/machines?scenario=06');
+  await light(page, '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_');
   const add = page.getByTestId('settings-content').getByRole('button', { name: '添加机器' });
   await expect(add).toBeVisible();
   await expect(page.locator('button.border-dashed')).toHaveCount(0);
-  const local = page.getByTestId('machine-detail');
-  await expect(local).toContainText('在线');
-  await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 79)');
+  const local = page.getByTestId('machine-item').first();
+  await expect(local.getByTestId('machine-item-status')).toHaveText('在线');
+  await expect(local.getByTestId('machine-accept-toggle')).toBeVisible();
 });
 
 for (const [name, url, open, submit] of [

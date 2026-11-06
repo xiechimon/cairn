@@ -51,17 +51,23 @@ test('typing a slash inside another field does not steal focus', async ({ page }
   await expect(name).toBeFocused();
 });
 
-test('machines is master-detail: list on the left, status dot and short status, selection drives the detail', async ({
+test('machines are single-column rows: name, then status, runtime and capability links; switch and menu on the right', async ({
   page,
 }) => {
   await page.goto(MACHINES);
   await expect(items(page)).toHaveCount(3);
-  await expect(items(page).first()).toHaveAttribute('aria-current', 'true');
-  await expect(detail(page).getByTestId('machine-detail-name')).toHaveText('omarchy');
+  await expect(detail(page)).toHaveCount(0);
+  await expect(settings(page).getByTestId('machine-toggle').first()).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
 
   const host = items(page).filter({ hasText: 'omarchy' });
   await expect(host.locator('[data-orchestration="host"]')).toHaveText('Coordinator 主机');
   await expect(host.getByTestId('machine-item-status')).toHaveText('在线');
+  await expect(host.getByTestId('machine-open-runtime')).toContainText('运行时');
+  await expect(host.getByTestId('machine-accept-toggle')).toBeVisible();
+  await expect(host.getByTestId('machine-menu')).toBeVisible();
   await expect(
     items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-item-status'),
   ).toHaveText('离线');
@@ -69,27 +75,32 @@ test('machines is master-detail: list on the left, status dot and short status, 
     items(page).filter({ hasText: 'build-box' }).getByTestId('machine-item-status'),
   ).toHaveText('登录已过期');
   await expect(settings(page).getByTestId('machine-list').locator('svg[fill^="#"]')).toHaveCount(0);
+  await expect(settings(page).getByTestId('settings-checked')).toHaveCount(0);
 
-  await items(page).filter({ hasText: 'old-laptop' }).click();
+  await items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-toggle').click();
   await expect(page).toHaveURL(/machine=md-old-laptop/);
   await expect(items(page).filter({ hasText: 'old-laptop' })).toHaveAttribute(
-    'aria-current',
+    'data-expanded',
     'true',
   );
-  await expect(items(page).first()).not.toHaveAttribute('aria-current', 'true');
-  await expect(detail(page).getByTestId('machine-detail-name')).toHaveText('old-laptop');
+  await expect(items(page).filter({ hasText: 'omarchy' })).toHaveAttribute(
+    'data-expanded',
+    'false',
+  );
+  await expect(detail(page)).toHaveCount(1);
+  await items(page).filter({ hasText: 'old-laptop' }).getByTestId('machine-toggle').click();
+  await expect(detail(page)).toHaveCount(0);
 });
 
-test('detail sections: status, runtimes, capacity, each row a label and description with the control on the right', async ({
+test('expansion sections: runtimes, capacity, each row a label and description with the control on the right', async ({
   page,
 }) => {
   await page.goto(MACHINES);
+  await items(page).filter({ hasText: 'omarchy' }).getByTestId('machine-toggle').click();
   const pane = detail(page);
-  for (const name of ['状态', '运行时', '容量']) {
+  for (const name of ['运行时', '容量']) {
     await expect(pane.getByRole('heading', { name, exact: true })).toBeVisible();
   }
-  await expect(pane.getByTestId('machine-detail-online')).toContainText('在线');
-  await expect(settings(page).getByTestId('machines-checked')).toContainText('已检查');
 
   const row = pane.locator('[data-testid="provider-row"][data-runtime="claude-code"]');
   await expect(row).toContainText('Claude Code');
@@ -106,31 +117,39 @@ test('detail sections: status, runtimes, capacity, each row a label and descript
   expect((control?.x ?? 0) > (label?.x ?? 0) + (label?.width ?? 0)).toBe(true);
 });
 
-test('offline and expired-login machines explain how to bring them back, with the command as code', async ({
+test('the runtime link opens the row and an offline row says when it was last online and freezes its settings', async ({
   page,
 }) => {
   await page.goto(MACHINES);
-  await items(page).filter({ hasText: 'old-laptop' }).click();
+  const old = items(page).filter({ hasText: 'old-laptop' });
+  await expect(old.getByTestId('machine-last-seen')).toContainText('最后在线');
+  await old.getByTestId('machine-open-runtime').click();
+  await expect(old).toHaveAttribute('data-expanded', 'true');
   const pane = detail(page);
-  await expect(pane.getByTestId('machine-detail-online')).toContainText('离线');
+  await expect(pane.getByTestId('machine-offline-hint')).toContainText('重新连接 old-laptop');
+  await expect(old.getByTestId('machine-accept-toggle')).toBeDisabled();
+  await expect(pane.getByTestId('provider-toggle').first()).toBeDisabled();
   await expect(pane.getByTestId('machine-recover')).toContainText('重新启动');
   await expect(pane.getByTestId('machine-recover').locator('code')).toContainText('start');
+});
 
-  await items(page).filter({ hasText: 'build-box' }).click();
-  const warning = pane.getByTestId('claude-login-warning');
+test('expired login explains how to bring the machine back, with the command as code', async ({
+  page,
+}) => {
+  await page.goto(MACHINES);
+  await items(page).filter({ hasText: 'build-box' }).getByTestId('machine-toggle').click();
+  const warning = detail(page).getByTestId('claude-login-warning');
   await expect(warning).toHaveAttribute('data-login', 'expired');
   await expect(warning.locator('code')).toHaveText('claude auth login');
 });
 
-test('at 375px the master-detail stacks and nothing scrolls sideways', async ({ page }) => {
+test('at 375px the rows keep name, status and controls inside the panel and nothing scrolls sideways', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto(MACHINES);
+  await page.goto(`${MACHINES}&machine=md-old-laptop`);
   await expect(items(page)).toHaveCount(3);
-  const list = await settings(page).getByTestId('machine-list').boundingBox();
-  const pane = await detail(page).boundingBox();
-  expect(list).not.toBeNull();
-  expect(pane).not.toBeNull();
-  expect((pane?.y ?? 0) >= (list?.y ?? 0) + (list?.height ?? 0) - 1).toBe(true);
+  await expect(detail(page)).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
@@ -139,6 +158,9 @@ test('at 375px the master-detail stacks and nothing scrolls sideways', async ({ 
     .getByTestId('machines-scroll')
     .evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(inner).toBeLessThanOrEqual(0);
+  const toggle = await items(page).first().getByTestId('machine-accept-toggle').boundingBox();
+  const panel = await settings(page).getByTestId('settings-panel').boundingBox();
+  expect((toggle?.x ?? 0) + (toggle?.width ?? 0) <= (panel?.x ?? 0) + (panel?.width ?? 0)).toBe(true);
 });
 
 test('the old machine detail URL lands on the machine inside settings', async ({ page }) => {
@@ -146,5 +168,8 @@ test('the old machine detail URL lands on the machine inside settings', async ({
   await expect(page).toHaveURL(
     /\/app\/settings\/machines\?scenario=machines-master-detail&machine=md-old-laptop$/,
   );
-  await expect(detail(page).getByTestId('machine-detail-name')).toHaveText('old-laptop');
+  await expect(items(page).filter({ hasText: 'old-laptop' })).toHaveAttribute(
+    'data-expanded',
+    'true',
+  );
 });

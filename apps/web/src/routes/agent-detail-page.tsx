@@ -29,6 +29,7 @@ import {
 import { toModelOptions, toThinkingLevelDisplay } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { machineLabel } from '../components/machine-label.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { ProfileHeader, useEditorFocus } from '../components/profile-card.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -738,7 +739,10 @@ export function AgentDetailPage() {
                     machineFitQ.data.machines.map((m) => (
                       <SettingsRow
                         key={m.machineId}
-                        label={m.name}
+                        label={machineLabel(
+                          { id: m.machineId, name: m.name },
+                          machineFitQ.data.machines.map((x) => ({ id: x.machineId, name: x.name })),
+                        )}
                         hint={machineFitHint(m, t)}
                         hintClassName="agent-perm-hint"
                       >
