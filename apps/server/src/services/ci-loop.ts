@@ -1,7 +1,7 @@
 import { conversationBranch } from '@cairn/shared';
 import { and, desc, eq, inArray, isNotNull, isNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, step, todo } from '../db/schema.js';
+import { build, step, threadPr, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubBranchPull,
@@ -234,6 +234,7 @@ export function createCiPoller(
   run: {
     githubFetch: FetchLike;
     logger?: CiPollLogger;
+    threadPrWakes?: boolean;
     anonReadsPerHour?: number;
     anonIpReadsPerHour?: number;
   },
@@ -329,6 +330,11 @@ export function createCiPoller(
     defaultBranch: string,
     fromReview: boolean,
   ): 'appended' | 'failed' | 'hinted' {
+    if (
+      run.threadPrWakes ||
+      deps.db.select().from(threadPr).where(eq(threadPr.buildId, cand.buildId)).get()
+    )
+      return 'hinted';
     const rounds = countMarkedRounds(deps.db, cand.buildId, CI_MERGE_CONFLICT_PROMPT_HEAD);
     if (rounds >= CI_MERGE_CONFLICT_ROUNDS_MAX) {
       const text = `PR #${pr.prNumber} 与默认分支「${githubText(defaultBranch)}」冲突，已自动解冲突 ${rounds} 轮仍冲突：不再派解冲突步，由人处理（在 GitHub 上解决冲突，或打回重做）。`;
@@ -954,6 +960,11 @@ export function createCiPoller(
       return;
     }
     if (verdict.state === 'red') {
+      if (
+        run.threadPrWakes ||
+        deps.db.select().from(threadPr).where(eq(threadPr.buildId, cand.buildId)).get()
+      )
+        return;
       const rounds = countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD);
       if (rounds >= CI_FIX_ROUNDS_MAX) {
         failWithMessage(cand, todoRow.teamId, deadLoopMessage(rounds));
