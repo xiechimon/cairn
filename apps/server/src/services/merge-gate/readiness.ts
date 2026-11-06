@@ -170,6 +170,55 @@ const runPasses = (r: GateCheckRun) =>
 const isOwnStatus = (s: GateCommitStatus) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT;
 const checkName = (x: GateCheckRun | GateCommitStatus) => ('name' in x ? x.name : x.context);
 
+export function requiredChecksReadiness(
+  head: string | null,
+  input: GateInputs['checks'],
+  block: (code: MergeBlockerCode, ...detail: string[]) => void,
+) {
+  let checks = input;
+  const checkShas =
+    checks === null ? [] : [checks.headSha, checks.statusSha, ...checks.runs.map((r) => r.headSha)];
+  if (checks !== null && !checkShas.every(isFullSha)) {
+    block('required-checks-unreadable', 'check SHA not 40 lowercase hex');
+    checks = null;
+  } else if (checks !== null && head !== null && checkShas.some((s) => s !== head)) {
+    block('required-checks-unreadable', 'checks not read at the PR head');
+    checks = null;
+  } else if (checks !== null && !checks.complete) {
+    block('required-checks-unreadable', 'check list incomplete');
+    checks = null;
+  }
+  const judged = new Set<GateCheckRun | GateCommitStatus>();
+  if (checks === null || checks.required === null) {
+    block('required-checks-unreadable');
+  } else {
+    const required = checks.required;
+    if (required.length === 0) block('required-checks-none');
+    for (const name of required) {
+      if (name.toLowerCase() === MERGE_GATE_STATUS_CONTEXT) {
+        block('self-required');
+        continue;
+      }
+      const run = checks.runs.find((r) => r.name === name);
+      const status = checks.statuses.find((s) => s.context.toLowerCase() === name.toLowerCase());
+      if (run !== undefined) {
+        judged.add(run);
+        if (run.status !== 'completed') block('required-check-pending', quoted(name));
+        else if (!runPasses(run))
+          block('required-check-failed', `${quoted(name)}: ${run.conclusion ?? 'none'}`);
+      } else if (status !== undefined) {
+        judged.add(status);
+        if (status.state === 'pending') block('required-check-pending', quoted(name));
+        else if (status.state !== 'success')
+          block('required-check-failed', `${quoted(name)}: ${status.state}`);
+      } else {
+        block('required-check-missing', quoted(name));
+      }
+    }
+  }
+  return { checks, judged };
+}
+
 export function mergeReadiness(i: GateInputs): MergeReadiness {
   const found = new Map<MergeBlockerCode, string[]>();
   const block = (code: MergeBlockerCode, ...detail: string[]) => {
@@ -214,47 +263,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('base-not-default', `${quoted(pr.baseRef)} → ${quoted(i.repo.defaultBranch)}`);
   }
 
-  let checks = i.checks;
-  const checkShas =
-    checks === null ? [] : [checks.headSha, checks.statusSha, ...checks.runs.map((r) => r.headSha)];
-  if (checks !== null && !checkShas.every(isFullSha)) {
-    block('required-checks-unreadable', 'check SHA not 40 lowercase hex');
-    checks = null;
-  } else if (checks !== null && head !== null && checkShas.some((s) => s !== head)) {
-    block('required-checks-unreadable', 'checks not read at the PR head');
-    checks = null;
-  } else if (checks !== null && !checks.complete) {
-    block('required-checks-unreadable', 'check list incomplete');
-    checks = null;
-  }
-  const judged = new Set<GateCheckRun | GateCommitStatus>();
-  if (checks === null || checks.required === null) {
-    block('required-checks-unreadable');
-  } else {
-    const required = checks.required;
-    if (required.length === 0) block('required-checks-none');
-    for (const name of required) {
-      if (name.toLowerCase() === MERGE_GATE_STATUS_CONTEXT) {
-        block('self-required');
-        continue;
-      }
-      const run = checks.runs.find((r) => r.name === name);
-      const status = checks.statuses.find((s) => s.context.toLowerCase() === name.toLowerCase());
-      if (run !== undefined) {
-        judged.add(run);
-        if (run.status !== 'completed') block('required-check-pending', quoted(name));
-        else if (!runPasses(run))
-          block('required-check-failed', `${quoted(name)}: ${run.conclusion ?? 'none'}`);
-      } else if (status !== undefined) {
-        judged.add(status);
-        if (status.state === 'pending') block('required-check-pending', quoted(name));
-        else if (status.state !== 'success')
-          block('required-check-failed', `${quoted(name)}: ${status.state}`);
-      } else {
-        block('required-check-missing', quoted(name));
-      }
-    }
-  }
+  const { checks, judged } = requiredChecksReadiness(head, i.checks, block);
   if (checks !== null) {
     const evidence = checks.runs.find((r) => r.name === 'pr-evidence');
     if (evidence !== undefined) judged.add(evidence);

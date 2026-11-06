@@ -101,6 +101,22 @@ function githubWorld(baseRef = 'dev', mergeableState = 'clean') {
         head: { ref: conversationBranch('branch-build'), sha: head, repo: { id: 1 } },
         base: { ref: baseRef, repo: { id: 1, default_branch: 'main' } },
       };
+    if (url.endsWith(`/branches/${baseRef}`))
+      body = { protected: true, protection: { required_status_checks: { contexts: ['check'] } } };
+    if (url.includes('/check-runs?')) body = { total_count: 0, check_runs: [] };
+    if (url.includes('/status?'))
+      body = {
+        sha: head,
+        total_count: 1,
+        statuses: [
+          {
+            context: 'check',
+            state: 'success',
+            description: null,
+            updated_at: '2026-11-06T00:00:00Z',
+          },
+        ],
+      };
     if (method === 'PUT') body = { merged: true, sha: 'b'.repeat(40) };
     return {
       ok: true,
@@ -187,6 +203,9 @@ test('a GitHub PR targeting the configured dev branch passes the base check', as
     requestMerge({ ...s.svc, box: s.secretBox, githubFetch: fetch }, 'branch-build'),
   ).resolves.toEqual({ delegated: true });
   expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(1);
+  expect(requests.map((r) => r.url)).toContain(
+    'https://api.github.com/repos/octo/demo/branches/dev',
+  );
 });
 
 test('a GitHub PR targeting main is refused when the configured base is dev', async () => {

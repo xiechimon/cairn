@@ -146,6 +146,7 @@ import { readCompareAt } from './merge-gate/github-facts.js';
 import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
+import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -2402,6 +2403,7 @@ async function mergeThroughGithub(
         .run();
       throw new HttpError(409, 'autonomy-paused: GitHub autonomy marker is open or unreadable');
     }
+    await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
     apiMergeGate(deps, row);
     claimAutonomousMerge(deps.db, row.id);
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
