@@ -3,9 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createCoordinatorModels } from '../src/runtime/models.js';
-import { seedCoordinator } from '../src/runtime/seed.js';
-import { createThreadHarnesses, threadStorePath } from '../src/runtime/thread-harnesses.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
+import { seedCoordinator } from '../../src/coordinator/runtime/seed.js';
+import {
+  createThreadHarnesses,
+  threadStorePath,
+} from '../../src/coordinator/runtime/thread-harnesses.js';
 
 const dirs: string[] = [];
 afterEach(() => {

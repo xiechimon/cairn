@@ -6,7 +6,7 @@ import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { createModels } from '@earendil-works/pi-ai/models';
 import { AssistantEntry } from '@earendil-works/pi-durable';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openCoordinatorHarness } from '../src/runtime/harness.js';
+import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
 
 const dirs: string[] = [];
 afterEach(() => {

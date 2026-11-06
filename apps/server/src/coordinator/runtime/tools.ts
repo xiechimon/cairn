@@ -6,7 +6,7 @@ import {
   type RemoteToolDef,
 } from '@cairn/shared';
 import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
-import type { MachineApi } from '../machine-api.js';
+import type { MachineApi } from './machine-api.js';
 
 export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
 
