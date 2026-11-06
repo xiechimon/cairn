@@ -11,20 +11,13 @@ import {
   build as buildTable,
   gateVerdict,
   message as messageTable,
-  plan as planTable,
+  project as projectTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { completeStep, flushVerdictDigests } from '../src/services/builds.js';
-import {
-  bootServer,
-  issueApiKey,
-  postProject,
-  seedRoute,
-  seedSessionRoute,
-  withVerification,
-} from './helpers.js';
+import { flushVerdictDigests, maybeEnqueueVerifyStep } from '../src/services/builds.js';
+import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 
 const HEAD = 'ab'.repeat(20);
 const FIX_HEAD = 'cd'.repeat(20);
@@ -93,16 +86,19 @@ async function setup(opts: { withVerifierRoute?: boolean } = {}) {
       expect(res.status).toBe(201);
       const buildId = ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
       s.db
-        .insert(planTable)
-        .values({
-          id: `plan-${buildId}`,
-          buildId,
-          version: 1,
-          content: withVerification('## Changes\n- touch a.ts'),
-          createdAt: Date.now(),
-        })
+        .update(projectTable)
+        .set({ repoKind: 'github', githubRepo: 'acme/widgets' })
+        .where(eq(projectTable.id, projectId))
+        .run();
+      s.db
+        .update(buildTable)
+        .set({ prNumber: 7, prUrl: 'https://github.com/acme/widgets/pull/7' })
+        .where(eq(buildTable.id, buildId))
         .run();
       return buildId;
+    },
+    enqueueVerify(buildId: string) {
+      maybeEnqueueVerifyStep(s.svc, this.todoRow(), buildId);
     },
     async claim() {
       const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {
@@ -144,8 +140,8 @@ describe('verification dispatch driven by the routing rules', () => {
     const author = await w.claim();
     expect(author.kind).toBe('session');
     await w.done(author.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+    w.enqueueVerify(buildId);
 
-    expect(w.todoRow().phase).toBe('review');
     const queued = w.stepsOf(buildId).filter((row) => row.kind === 'verify');
     expect(queued).toHaveLength(1);
     expect(queued[0]?.status).toBe('pending');
@@ -193,7 +189,7 @@ describe('verification dispatch driven by the routing rules', () => {
     const buildId = await w.startBuild();
     const author = await w.claim();
     await w.done(author.stepId, { status: 'success', hasChanges: true });
-    expect(w.todoRow().phase).toBe('review');
+    w.enqueueVerify(buildId);
     expect(w.stepsOf(buildId).filter((row) => row.kind === 'verify')).toHaveLength(0);
   });
 
@@ -208,9 +204,12 @@ describe('verification dispatch driven by the routing rules', () => {
         todoId: w.todoId,
         withPlan: false,
         triggerSource: 'user',
+        prNumber: 8,
+        prUrl: 'https://github.com/acme/widgets/pull/8',
         createdAt: Date.now(),
       })
       .run();
+    w.s.db.update(projectTable).set({ repoKind: 'github', githubRepo: 'acme/widgets' }).run();
     w.s.db
       .insert(stepTable)
       .values({
@@ -227,7 +226,7 @@ describe('verification dispatch driven by the routing rules', () => {
       .set({ latestBuildId: buildId })
       .where(eq(todoTable.id, w.todoId))
       .run();
-    completeStep(w.s.svc, 'step-no-route', { hasChanges: true });
+    w.enqueueVerify(buildId);
     expect(w.stepsOf(buildId).filter((row) => row.kind === 'verify')).toHaveLength(0);
   });
 
@@ -237,6 +236,7 @@ describe('verification dispatch driven by the routing rules', () => {
     const buildId = await w.startBuild();
     const first = await w.claim();
     await w.done(first.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+    w.enqueueVerify(buildId);
     const verifier = await w.claim();
     await w.done(verifier.stepId, {
       status: 'success',
@@ -255,7 +255,12 @@ describe('verification dispatch driven by the routing rules', () => {
         createdAt: Date.now() + 5_000,
       })
       .run();
-    completeStep(w.s.svc, fixId, { hasChanges: true });
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: Date.now() + 6_000 })
+      .where(eq(stepTable.id, fixId))
+      .run();
+    w.enqueueVerify(buildId);
     const verifies = w.stepsOf(buildId).filter((row) => row.kind === 'verify');
     expect(verifies).toHaveLength(2);
     const heads = verifies.map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha);

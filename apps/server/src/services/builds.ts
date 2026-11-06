@@ -149,7 +149,7 @@ import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
-import { profileForStep, routeForStep } from './routing-rules.js';
+import { policyForStep, profileForStep, routeForStep } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import {
   appendShipGateInstruction,
@@ -1160,15 +1160,13 @@ export function maybeEnqueueVerifyStep(
   if (existing !== undefined) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
+  if (githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
   const planRow = latestPlanRow(deps, buildId);
-  const verificationItems = planVerificationItems(planRow?.content ?? '');
-  if (githubPrOf(deps, todoRow, buildRow.prNumber) === null && verificationItems.length === 0)
-    return;
   const prompt = buildVerifyStepPrompt({
     ticketRef: ticketRefOf(todoRow),
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
-    verificationItems,
+    verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
     expectedHeadSha,
   });
@@ -1822,10 +1820,9 @@ export function buildMergePermission(deps: BuildDeps, buildId: string): BuildMer
 }
 
 function missingMergeTools(deps: BuildDeps, todoRow: TodoRow): string[] {
-  const profile = profileForStep(deps.db, todoRow, 'session');
-  return profile === null
-    ? []
-    : [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !profile.tools.includes(tool));
+  const policy = policyForStep(deps.db, todoRow, 'session');
+  if (policy === null || policy.seededFromAgentId === null) return [];
+  return [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !policy.tools.includes(tool));
 }
 
 function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
@@ -2969,7 +2966,6 @@ export function completeStep(
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
       });
-      maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
       return;
     }
     if (todoRow.phase === 'building' || canTransitionPhase(todoRow.phase, 'building')) {

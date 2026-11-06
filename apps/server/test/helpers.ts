@@ -397,7 +397,7 @@ export interface PolicySeed {
 
 export function seedPolicy(s: TestServer, use: PolicyUse, opts: PolicySeed = {}): void {
   const values = {
-    tools: opts.tools ?? (use === 'session' ? ['合并分支', '推送分支'] : []),
+    tools: opts.tools ?? [],
     mcpServers: opts.mcpServers ?? [],
     skillsAllowlist: opts.skillsAllowlist ?? null,
     defaultSkill: opts.defaultSkill ?? null,

@@ -88,6 +88,7 @@ function world() {
       id: 'session-policy',
       teamId: team.id,
       use: 'session',
+      seededFromAgentId: 'legacy-agent',
       tools: [],
       mcpServers: [],
       secrets: [],
