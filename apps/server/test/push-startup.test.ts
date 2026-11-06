@@ -1,14 +1,14 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 vi.setConfig({ testTimeout: 40_000 });
 
 describe('production server Web Push startup', () => {
   test('starts and reuses persisted keys without procfs', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-push-startup-'));
+    const home = makeTestTempDir('cairn-push-startup-');
     const keysPath = join(home, 'server', 'vapid.json');
     try {
       let persisted = '';

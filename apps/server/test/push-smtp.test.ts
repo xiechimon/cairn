@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { smtpAlertFallback } from '../src/services/push-alerts.js';
 
 test('SMTP configuration is absent or rejects unsafe configuration', () => {
@@ -21,7 +21,7 @@ test('SMTP configuration is absent or rejects unsafe configuration', () => {
 });
 
 test('SMTP transport passes secure configuration and encoded mail to a scratch curl executable', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-alert-smtp-'));
+  const dir = makeTestTempDir('cairn-alert-smtp-');
   const capture = join(dir, 'capture.json');
   writeFileSync(
     join(dir, 'curl'),

@@ -1,22 +1,14 @@
 import { spawn, spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
 import { openMemoryDb } from '../../apps/server/src/db/client.js';
 import { seed } from '../../apps/server/src/db/seed.js';
 import { composeChiefSystemPrompt } from '../../apps/server/src/services/chief.js';
 import { TeamStreamHub } from '../../apps/server/src/services/events.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   applyPromptSet,
   CHIEF_CONVENTIONS_HEADER,
@@ -226,7 +218,7 @@ let skillsDir: string | undefined;
 function productionPrompt(): string {
   const db = openMemoryDb();
   const { user, team } = seed(db);
-  skillsDir = skillsDir ?? mkdtempSync(join(tmpdir(), 'cairn-ps-skills-'));
+  skillsDir = skillsDir ?? makeTestTempDir('cairn-ps-skills-');
   return composeChiefSystemPrompt({ db, hub: new TeamStreamHub(), user, skillsDir }, team.id);
 }
 
@@ -308,7 +300,7 @@ describe('resumeCompatibilityError unit', () => {
 
 describe('prompt-set resume provenance', () => {
   test('legacy rows without provenance: exit 2, zero relay requests, results.jsonl byte-identical', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-legacy-'));
+    const home = makeTestTempDir('cairn-ps-legacy-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -330,7 +322,7 @@ describe('prompt-set resume provenance', () => {
   }, 120_000);
 
   test('rows written with another model or harness_sha: exit 2 before any relay request', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-model-'));
+    const home = makeTestTempDir('cairn-ps-model-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -373,7 +365,7 @@ describe('prompt-set resume provenance', () => {
   }, 180_000);
 
   test('rows written with --prompt-set current, rerun with --prompt-set cut into the same variant: exit 2 with a message naming a fresh --variant', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-switch-'));
+    const home = makeTestTempDir('cairn-ps-switch-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -393,7 +385,7 @@ describe('prompt-set resume provenance', () => {
   }, 180_000);
 
   test('mixed-arm rows in one variant dir: exit 2', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-mixed-'));
+    const home = makeTestTempDir('cairn-ps-mixed-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -436,7 +428,7 @@ describe('prompt-set resume provenance', () => {
   }, 180_000);
 
   test('--approve-harness on a new harness does not make old rows reusable', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-approve-'));
+    const home = makeTestTempDir('cairn-ps-approve-');
     const relay = await startRecordingRelay();
     try {
       const oldSha = 'd'.repeat(64);
@@ -466,7 +458,7 @@ describe('prompt-set resume provenance', () => {
   }, 120_000);
 
   test('compatible resume with --reps 3 over 2 completed reps runs exactly rep 2', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-resume-'));
+    const home = makeTestTempDir('cairn-ps-resume-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -503,7 +495,7 @@ describe('prompt-set resume provenance', () => {
     expect(applyPromptSet(prod, 'current')).toBe(prod);
     expect(prod).toContain(CHIEF_CONVENTIONS_HEADER);
 
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-length-'));
+    const home = makeTestTempDir('cairn-ps-length-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -556,7 +548,7 @@ describe('prompt-set resume provenance', () => {
   }, 240_000);
 
   test('learn cases receive the selected prompt set', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-learn-'));
+    const home = makeTestTempDir('cairn-ps-learn-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [LEARN_CASE]);
@@ -597,7 +589,7 @@ describe('prompt-set resume provenance', () => {
   }, 240_000);
 
   test('changing --arm rejects resume before relay requests', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-arm-'));
+    const home = makeTestTempDir('cairn-ps-arm-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [LEARN_CASE]);
@@ -620,7 +612,7 @@ describe('prompt-set resume provenance', () => {
   }, 240_000);
 
   test('changing --context-window rejects resume before relay requests', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-window-'));
+    const home = makeTestTempDir('cairn-ps-window-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -646,7 +638,7 @@ describe('prompt-set resume provenance', () => {
   }, 240_000);
 
   test('editing flow cases or roster rejects resume before relay requests', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-flow-'));
+    const home = makeTestTempDir('cairn-ps-flow-');
     const relay = await startRecordingRelay();
     try {
       writeFlow(home, [HOLD_CASE]);
@@ -669,7 +661,7 @@ describe('prompt-set resume provenance', () => {
 
 describe('prompt-set CLI surface', () => {
   test('rejects an unknown prompt set before work starts', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-ps-cli-'));
+    const home = makeTestTempDir('cairn-ps-cli-');
     try {
       writeFlow(home, [HOLD_CASE]);
       const result = spawnSync(

@@ -1,7 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WEB_FETCH_TOOL_NAME, WEB_SEARCH_TOOL_NAME } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -12,6 +11,7 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { agent as agentTable, build as buildTable } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   AGENT_ID,
   api,
@@ -85,7 +85,7 @@ beforeAll(async () => {
   const exaUrl = await startFakeExa();
   savedBaseUrl = process.env[EXA_BASE_URL_ENV];
   process.env[EXA_BASE_URL_ENV] = exaUrl;
-  home = mkdtempSync(join(tmpdir(), 'cairn-web-search-home-'));
+  home = makeTestTempDir('cairn-web-search-home-');
   const reportsDir = join(home, 'reports');
   stub = await startStubLlm([
     {
