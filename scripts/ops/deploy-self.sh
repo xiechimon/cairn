@@ -213,14 +213,10 @@ host_tools_alarm() {
   touch "$STATE/alarms/$reason" || true
 }
 
-claimed_steps() {
-  sqlite3 -readonly "$DB" "select count(*) from step where status = 'claimed'"
-}
-
-stale_claimed_steps() {
+step_counts() {
   local cutoff=$(( ($(date +%s) - STEP_STALE_SECONDS) * 1000 ))
-  sqlite3 -readonly "$DB" \
-    "select count(*) from step where status = 'claimed' and (lastHeartbeatAt is null or lastHeartbeatAt < $cutoff)"
+  sqlite3 -readonly -separator ' ' "$DB" \
+    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed'"
 }
 
 step_wait_alarm() {
@@ -240,8 +236,13 @@ step_wait_alarm() {
 
 assert_idle() {
   [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
-  local running stale now since waited
-  running="$(claimed_steps)"
+  local running stale now since waited counts
+  counts="$(step_counts)" || busy "cannot read the step counts"
+  if ! [[ "$counts" =~ ^([0-9]+)\ ([0-9]+)$ ]]; then
+    busy "cannot read the step counts"
+  fi
+  running="${BASH_REMATCH[1]}"
+  stale="${BASH_REMATCH[2]}"
   if [ "$running" = 0 ]; then
     rm -f "$STATE/steps-waiting-since"
     return 0
@@ -251,7 +252,6 @@ assert_idle() {
   since="$(cat "$STATE/steps-waiting-since")"
   waited=$((now - since))
   [ "$waited" -ge "$STEP_WAIT_SECONDS" ] || busy "$running step running for ${waited}s"
-  stale="$(stale_claimed_steps)"
   [ "$stale" = "$running" ] || busy "$running step running for ${waited}s"
   step_wait_alarm "$running" "$waited"
 }
