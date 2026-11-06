@@ -123,6 +123,7 @@ lines and says which.
 Put one glance card under Proof so a reviewer sees the change without reading the diff:
 
 - Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base "$(git merge-base origin/main HEAD)" --head HEAD`, heading included. When the PR changes `apps/server/drizzle/**` since its merge base, the `pr-evidence` gate reds it if its `### Schema changes` rows differ from the script's output from that merge base to the PR head.
+- After any push that changes the schema, do not hand-edit the table: run `node scripts/pr-schema-sync.mjs <pr-number>`, which prints a body file with `### Schema changes` rewritten from the PR head, then apply it with `gh pr edit <pr-number> --body-file <that file>` in a separate call.
 - API changes (`apps/server/src/routes*.ts`): the evidence card below; the gate enforces it.
 - Cross-component flows: a Mermaid `sequenceDiagram`.
 - `scripts/ops/**`: the command and its run output.
@@ -155,6 +156,16 @@ links using the pushed asset commit's full SHA:
 Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
+
+## Snapshot baselines
+
+When the diff adds or modifies any `*-snapshots/*.png` baseline, the workflow passes the list to the gate as `--changed-baselines`, and `baseline-evidence` reds the PR until the body shows every one of them. Per baseline, give either a table row naming the file with two embedded images, old baseline then new render, or a `<file>: <verdict>` line saying what changed and whether it is intended (a ```` ```text ```` fence keeps long lists out of the cap). Name the file exactly, with or without `.png`. Do not accept a baseline you have not looked at; if no one read it, the verdict says so.
+
+```markdown
+| Baseline | Old baseline | New render |
+| --- | --- | --- |
+| `pr-card-dark-linux.png` | ![old](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<n>/pr-card-dark-old.png) | ![new](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<n>/pr-card-dark-new.png) |
+```
 
 ## UI reference comparison
 
@@ -226,5 +237,6 @@ Do not run a local `codex exec` or `claude -p` review before pushing. Codex clou
 | image links embedded + HTTP 200 | pr-evidence (required check) |
 | a diff touching `apps/server/src/routes*.ts` carries `### Requirement` (internal link plus quote, or a doc screenshot; third-party needs the screenshot) and `### Requests` (a call screenshot, a Before row, a row with an HTTP status) | pr-evidence (required check, `--changed-files`) |
 | a diff changing more than docs has non-empty `Live:`, `Mocked:` and `Not covered:` lines | pr-evidence (required check, `--changed-files`) |
+| every added or modified `*-snapshots/*.png` baseline has an old / new image pair row or a `<file>: <verdict>` line (`baseline-evidence`) | pr-evidence (required check, `--changed-baselines`) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |
