@@ -14,7 +14,7 @@ const RECENT_KEY = 'cairn.dirBrowser.recent';
 const RECENT_MAX = 6;
 
 const LIST_ROW_CLS =
-  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) hover:text-foreground data-selected:bg-(--menu-hover) dark:hover:bg-(--menu-hover) active:not-aria-[haspopup]:translate-y-0';
+  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:bg-(--menu-hover) hover:text-foreground data-selected:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
 const LIST_GROUP_CLS = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
 

@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, team } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
+import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { githubRepoOfProject } from './git.js';
 import { type GithubTokenDeps, teamGithubToken } from './github-connection.js';
 import type { GateReadCache } from './merge-gate/github-facts.js';
@@ -13,7 +14,7 @@ export async function brakeRequest(
   path: string,
   payload?: Record<string, unknown>,
 ): Promise<Awaited<ReturnType<FetchLike>>> {
-  const response = await fetchImpl(`https://api.github.com/repos/${repo}/${path}`, {
+  const response = await fetchImpl(`${githubApiBaseUrl()}/repos/${repo}/${path}`, {
     method: payload === undefined ? 'GET' : 'POST',
     headers: {
       authorization: `Bearer ${token}`,

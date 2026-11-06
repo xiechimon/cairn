@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const allocations = new Map();
+const removal = { recursive: true, force: true, maxRetries: 5, retryDelay: 50 };
 
 export function testTempPrefix(runId) {
   return `ct-${runId.slice(0, 8)}-`;
@@ -20,7 +21,7 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
   const owned = new Set();
   const release = (path) => {
     if (!owned.has(path)) return false;
-    rmSync(path, { recursive: true, force: true });
+    rmSync(path, removal);
     owned.delete(path);
     allocations.delete(path);
     return true;
@@ -41,7 +42,7 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
           );
         }
       } catch (error) {
-        rmSync(path, { recursive: true, force: true });
+        rmSync(path, removal);
         throw error;
       }
       owned.add(path);
@@ -84,7 +85,7 @@ process.once('exit', () => {
           );
         }
       }
-      rmSync(path, { recursive: true, force: true });
+      rmSync(path, removal);
     } catch (error) {
       console.error(error);
       process.exitCode = 1;
