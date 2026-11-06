@@ -5,15 +5,15 @@ import { ASK_REQUEST_ID_PATTERN, CHIEF_REMOTE_TOOLS, CHIEF_ROUTER_TOOLS } from '
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openCoordinatorHarness } from '../src/runtime/harness.js';
-import { createCoordinatorModels } from '../src/runtime/models.js';
+import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import {
   askRequestId,
   COORDINATOR_TOOL_OUTPUT_MAX_BYTES,
   coordinatorToolsExtension,
   createStepGate,
-} from '../src/runtime/tools.js';
-import { runCoordinatorTurn } from '../src/runtime/turn.js';
+} from '../../src/coordinator/runtime/tools.js';
+import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 
 const ctx = BACKGROUND_CONTEXT;

@@ -1,18 +1,23 @@
 import type { ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
-import type { CoordinatorConfig } from '../config.js';
-import type { MachineApi } from '../machine-api.js';
 import {
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
   type ModelRef,
 } from './compaction.js';
+import type { MachineApi } from './machine-api.js';
 import { createCoordinatorModels } from './models.js';
 import { createThreadHarnesses } from './thread-harnesses.js';
 import { coordinatorToolsExtension, createStepGate } from './tools.js';
 import { runCoordinatorTurn } from './turn.js';
 
-export async function startRuntime(config: CoordinatorConfig, api: MachineApi) {
+export interface RuntimeConfig {
+  storageDir: string;
+  heartbeatMs: number;
+  summaryModelId: string;
+}
+
+export async function startRuntime(config: RuntimeConfig, api: MachineApi) {
   const context = BACKGROUND_CONTEXT;
   const models = createCoordinatorModels();
   const gate = createStepGate();

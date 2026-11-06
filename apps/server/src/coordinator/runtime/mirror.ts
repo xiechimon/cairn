@@ -7,7 +7,7 @@ import {
   type EntryRecord,
   ToolResultEntry,
 } from '@earendil-works/pi-durable';
-import type { MachineApi } from '../machine-api.js';
+import type { MachineApi } from './machine-api.js';
 
 function textBlocks(message: AssistantMessage): string {
   return message.content

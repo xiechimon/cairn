@@ -18,11 +18,11 @@ import {
   splitPreviousSummary,
   summaryBatches,
   transcriptLines,
-} from '../src/runtime/compaction.js';
-import { openCoordinatorHarness } from '../src/runtime/harness.js';
-import { createCoordinatorModels } from '../src/runtime/models.js';
-import { coordinatorToolsExtension, createStepGate } from '../src/runtime/tools.js';
-import { runCoordinatorTurn } from '../src/runtime/turn.js';
+} from '../../src/coordinator/runtime/compaction.js';
+import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
+import { coordinatorToolsExtension, createStepGate } from '../../src/coordinator/runtime/tools.js';
+import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 
 const ctx = BACKGROUND_CONTEXT;

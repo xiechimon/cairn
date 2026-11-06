@@ -5,9 +5,9 @@ import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openCoordinatorHarness } from '../src/runtime/harness.js';
-import { createCoordinatorModels } from '../src/runtime/models.js';
-import { runCoordinatorTurn } from '../src/runtime/turn.js';
+import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
+import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 
 const ctx = BACKGROUND_CONTEXT;
