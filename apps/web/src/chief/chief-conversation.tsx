@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useConnected } from '../api/connection-state.js';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -65,7 +66,11 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
-import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import {
+  ChiefConnectionBanner,
+  ChiefFallbackBanner,
+  ChiefOutageBanner,
+} from './chief-outage-banner.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
@@ -88,7 +93,7 @@ const STOP_CLS =
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
-const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5 pb-4';
+const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5';
 const HOME_COMPOSER_CLS =
   'mx-auto mt-2 mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
 
@@ -429,6 +434,7 @@ export function ChiefConversation({
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
       : undefined;
+  const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
   const turnElapsed =
     turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
@@ -656,7 +662,7 @@ export function ChiefConversation({
         <>
           {intro}
           <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport ref={viewportRef} data-testid="chief-body">
+            <FadeScrollerViewport reserveEnd ref={viewportRef} data-testid="chief-body">
               <MessageScrollerContent
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"
@@ -695,7 +701,9 @@ export function ChiefConversation({
         </>
       )}
 
-      {chief.outage != null ? (
+      {!connected ? (
+        <ChiefConnectionBanner />
+      ) : chief.outage != null ? (
         <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
       ) : (
         chief.fallbackModel != null && (

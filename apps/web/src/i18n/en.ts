@@ -1824,4 +1824,6 @@ export const EN: Record<string, string> = {
   '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
   '第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子':
     'The first PR merged on day one. You can post about it in GitHub Discussions',
+  '连接断开，正在重连…': 'Connection lost, reconnecting…',
+  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };
