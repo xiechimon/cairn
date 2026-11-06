@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstPrCardInfo } from '../src/board/first-pr-card.js';
+import { firstPrBodyCopy, firstPrCardInfo } from '../src/board/first-pr-card.js';
 
 const PROMPT = {
   enabled: true,
@@ -61,5 +61,23 @@ describe('the first-PR card', () => {
     const info = firstPrCardInfo({ ...PROMPT, firstPrAt: 0 }, 1_000);
     expect(info?.daysToFirstPr).toBeNull();
     expect(new URL(info?.href ?? '').searchParams.get('body')).not.toContain('days');
+  });
+});
+
+describe('the first-PR card body', () => {
+  const t = (source: string, vars?: Record<string, string | number>) =>
+    source.replace(/\{(\w+)\}/g, (_, key: string) => String(vars?.[key] ?? ''));
+
+  it('never says the first PR took 0 days', () => {
+    expect(firstPrBodyCopy(0, t)).not.toMatch(/0 天/);
+    expect(firstPrBodyCopy(0, t)).toContain('当天');
+  });
+
+  it('states the day count from one day up', () => {
+    expect(firstPrBodyCopy(4, t)).toContain('4 天');
+  });
+
+  it('omits the duration when the time is unknown', () => {
+    expect(firstPrBodyCopy(null, t)).not.toMatch(/\d/);
   });
 });

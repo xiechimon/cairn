@@ -909,7 +909,7 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
     case 'capacity':
       return '请求被限流，请稍后重试。';
     default:
-      return '运行失败，请查看原始错误排查原因后重试。';
+      return '';
   }
 }
 
@@ -1188,6 +1188,7 @@ export function mapMachines(
     kind: m.kind,
     name: m.name,
     online: m.online,
+    ...(m.lastSeenAt !== undefined ? { lastSeenAt: m.lastSeenAt } : {}),
     enabledRuntimes: m.enabledRuntimes,
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),

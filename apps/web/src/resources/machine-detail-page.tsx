@@ -1,4 +1,4 @@
-import { MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
+import { MACHINE_RUNTIMES, type MachineRuntime, PUBLISHED_PACKAGES } from '@cairn/shared';
 import { Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
@@ -7,6 +7,7 @@ import { mapMachines, mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/map
 import { useLiveData } from '../api/provider.js';
 import { ProviderRow } from '../components/accounts/account-parts.js';
 import { EmptyState } from '../components/empty-state.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -24,6 +25,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
+import { offlineGuidance } from './machine-offline.js';
 import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
 import { OnlineStatus } from './parts.js';
 
@@ -105,6 +107,11 @@ export function MachineDetailPage() {
     }
   };
 
+  const offline =
+    machine === null
+      ? null
+      : offlineGuidance(machine, Date.now(), `${PUBLISHED_PACKAGES.cli.command} start`, t);
+
   if (machine === null) {
     return (
       <PageShell
@@ -129,7 +136,17 @@ export function MachineDetailPage() {
     >
       <div className="flex flex-col gap-6 pt-4">
         <SettingsCard>
-          <SettingsRow label={t('状态')}>
+          <SettingsRow
+            label={t('状态')}
+            hint={
+              offline === null ? undefined : (
+                <span data-testid="machine-offline-guidance" className="flex flex-col gap-0.5">
+                  {offline.lastSeen !== null && <span>{offline.lastSeen}</span>}
+                  <span>{withCodeSpans(offline.recovery)}</span>
+                </span>
+              )
+            }
+          >
             <span data-testid="machine-detail-online">
               <OnlineStatus on={machine.online !== false} />
             </span>
