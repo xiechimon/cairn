@@ -233,24 +233,29 @@ describe('enabled', () => {
     ]);
   });
 
-  test('the tailnet socket serves the app', async () => {
+  test('auth on: the tailnet socket needs the token, and sidecar identity headers never replace it', async () => {
     const home = freshHome();
     installBinary(home);
     const { paths } = await start(home);
-    const status = await new Promise<number>((resolve, reject) => {
-      const req = request({
-        socketPath: paths.socketPath,
-        path: '/api/teams',
-        headers: { authorization: `Bearer ${TOKEN}`, host: 'cairn.tail.ts.net' },
+    const statusOf = (headers: Record<string, string>): Promise<number> =>
+      new Promise<number>((resolve, reject) => {
+        const req = request({
+          socketPath: paths.socketPath,
+          path: '/api/teams',
+          headers: { host: 'cairn.tail.ts.net', ...headers },
+        });
+        req.on('response', (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        });
+        req.on('error', reject);
+        req.end();
       });
-      req.on('response', (res) => {
-        res.resume();
-        resolve(res.statusCode ?? 0);
-      });
-      req.on('error', reject);
-      req.end();
-    });
-    expect(status).toBe(200);
+    const identity = { 'Tailscale-User-Login': 'owner@example.com' };
+    expect(await statusOf({})).toBe(401);
+    expect(await statusOf(identity)).toBe(401);
+    expect(await statusOf({ authorization: 'Bearer wrong' })).toBe(401);
+    expect(await statusOf({ authorization: `Bearer ${TOKEN}`, ...identity })).toBe(200);
   });
 
   test('D116: log upload is off unless opted in, and that reaches the sidecar as args and env', async () => {
