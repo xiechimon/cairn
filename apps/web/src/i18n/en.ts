@@ -961,8 +961,6 @@ export const EN: Record<string, string> = {
   '模型额度已用尽，请等待额度恢复后重试。':
     'Model quota exhausted — wait for it to recover, then retry.',
   '请求被限流，请稍后重试。': 'Rate limited — retry later.',
-  '运行失败，请查看原始错误排查原因后重试。':
-    'Run failed — check the raw error to diagnose the cause, then retry.',
   重试: 'Retry',
   失败: 'Failed',
   默认: 'Default',
@@ -1842,6 +1840,25 @@ export const EN: Record<string, string> = {
   撤销设备: 'Revoke',
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
   '配对失败，请在电脑上重新生成二维码。': 'Pairing failed. Create a new QR code on your computer.',
+  等你审阅: 'Ready for review',
+  '选择 {title}': 'Select {title}',
+  '最后在线 {time}': 'Last seen {time}',
+  '在这台机器上确认它已联网、没有休眠，然后运行 `{command}` 重新启动。上线后这里会自动变回在线。':
+    'On this machine, make sure it is online and awake, then run `{command}` to start it again. It turns online here by itself.',
+  '额度空了，等额度恢复后自动续跑。': 'Out of quota. It resumes by itself when quota returns.',
+  '被限流，等恢复后自动续跑。': 'Rate limited. It resumes by itself when the limit lifts.',
+  '第一支 PR 当天就合并了。可以在 GitHub Discussions 发一条帖子':
+    'The first PR merged on day one. You can post about it in GitHub Discussions',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
+  查看: 'View',
+  '{count} 处 Claude 登录已过期': '{count} Claude logins have expired',
+  '{count} 处 Claude 登录即将过期': '{count} Claude logins are about to expire',
+  '{expired} 处已过期，{expiring} 处即将过期': '{expired} expired, {expiring} about to expire',
+  '到期前重新登录，任务才不会中断。':
+    'Sign in again before they expire so tasks are not interrupted.',
+  '重新登录前，这些机器和订阅不会接新任务。':
+    'Until you sign in again, these machines and subscriptions take no new tasks.',
+  查看机器: 'View machines',
+  查看订阅: 'View subscriptions',
 };
