@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
@@ -11,6 +10,7 @@ import {
   render,
   totals,
 } from './pr-screens-report.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const results = {
   suites: [
@@ -84,19 +84,23 @@ test('the report names counts, changed pages, axe additions and job time', () =>
 });
 
 test('changed pages are copied with base, head and the Playwright diff', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'pr-screens-'));
-  for (const sub of ['base', 'head', 'results/x']) mkdirSync(join(dir, sub), { recursive: true });
-  writeFileSync(join(dir, 'base/a-dark.png'), 'b');
-  writeFileSync(join(dir, 'head/a-dark.png'), 'h');
-  writeFileSync(join(dir, 'results/x/a-dark-diff.png'), 'd');
-  collectDiffImages(
-    join(dir, 'results'),
-    join(dir, 'out'),
-    { changed: ['a-dark.png'], added: [] },
-    join(dir, 'head'),
-    join(dir, 'base'),
-  );
-  assert.equal(readFileSync(join(dir, 'out/a-dark.base.png'), 'utf8'), 'b');
-  assert.equal(readFileSync(join(dir, 'out/a-dark.head.png'), 'utf8'), 'h');
-  assert.equal(readFileSync(join(dir, 'out/a-dark.diff.png'), 'utf8'), 'd');
+  const dir = makeTestTempDir('pr-screens-');
+  try {
+    for (const sub of ['base', 'head', 'results/x']) mkdirSync(join(dir, sub), { recursive: true });
+    writeFileSync(join(dir, 'base/a-dark.png'), 'b');
+    writeFileSync(join(dir, 'head/a-dark.png'), 'h');
+    writeFileSync(join(dir, 'results/x/a-dark-diff.png'), 'd');
+    collectDiffImages(
+      join(dir, 'results'),
+      join(dir, 'out'),
+      { changed: ['a-dark.png'], added: [] },
+      join(dir, 'head'),
+      join(dir, 'base'),
+    );
+    assert.equal(readFileSync(join(dir, 'out/a-dark.base.png'), 'utf8'), 'b');
+    assert.equal(readFileSync(join(dir, 'out/a-dark.head.png'), 'utf8'), 'h');
+    assert.equal(readFileSync(join(dir, 'out/a-dark.diff.png'), 'utf8'), 'd');
+  } finally {
+    releaseTestTempDir(dir);
+  }
 });
