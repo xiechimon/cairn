@@ -1,10 +1,10 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 
 const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
@@ -46,7 +46,7 @@ function seedMessage(
 }
 
 test('per-project Coordinator threads merge into the one global thread per chief', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-coordinator-migration-'));
+  const directory = makeTestTempDir('cairn-coordinator-migration-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {
     migrateUpTo(sqlite, directory, '0084_project_coordinator');
@@ -206,7 +206,7 @@ test('per-project Coordinator threads merge into the one global thread per chief
 });
 
 test('a chief with only per-project threads keeps the newest one as its global thread', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-coordinator-migration-'));
+  const directory = makeTestTempDir('cairn-coordinator-migration-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {
     migrateUpTo(sqlite, directory, '0084_project_coordinator');

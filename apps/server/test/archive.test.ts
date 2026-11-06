@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   conversationBranch,
@@ -11,6 +10,7 @@ import {
 } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   agent,
   autonomousMergeAdmission,
@@ -331,7 +331,7 @@ test('archive stop and acknowledgement survive a fresh server process after Undo
   const { s, machineId } = world();
   await action(s, 'archive');
   await action(s, 'unarchive');
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-archive-restart-'));
+  const directory = makeTestTempDir('cairn-archive-restart-');
   try {
     const path = join(directory, 'db.sqlite');
     s.db.run(sql`VACUUM INTO ${path}`);
