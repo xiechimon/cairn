@@ -181,7 +181,14 @@ The original unrestricted review-head choice also failed P6 after one review wri
   apps/server/src/lib/git.ts
   apps/server/src/services/machine-merge-landing.ts
   apps/server/src/services/machine-finish-step.ts
+  apps/server/src/services/local-merge.ts
+  apps/server/src/services/local-merge-facts.ts
+  apps/server/src/services/merge-gate-run.ts
+  apps/server/src/lib/github.ts
+  packages/shared/src/records/project.ts
   apps/daemon/src/merge-decision.ts
+  apps/daemon/src/local-merge.ts
+  apps/daemon/src/git.ts
 ```
 
 sync-commit: cbfbd566acd375fd924b00ba02e8075435fbe9df
