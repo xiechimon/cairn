@@ -8,6 +8,7 @@ import { openDbWithHandle } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
+import { routeForStep } from '../src/services/routing-rules.js';
 import { bootServer, subscriptionClaudeReport } from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
@@ -183,6 +184,42 @@ function legacyWorld(): LegacyWorld {
   return { dbPath, sqlite };
 }
 
+function customRoleWorld(): LegacyWorld {
+  const world = legacyWorld();
+  world.sqlite.exec("DELETE FROM agent_memory WHERE agentId = 'agent-reviewer'");
+  world.sqlite.exec("DELETE FROM agent WHERE id = 'agent-reviewer'");
+  world.sqlite.exec("DELETE FROM routing_rule WHERE use = 'session'");
+  insertAgent(world.sqlite, {
+    id: 'agent-custom-reviewer',
+    name: 'Custom reviewer',
+    provider: 'relay-186',
+    modelId: 'glm-5.3',
+  });
+  insertAgent(world.sqlite, {
+    id: 'agent-planner',
+    name: 'Planner',
+    provider: 'claude-code',
+    modelId: 'claude-opus-5-5',
+  });
+  insertAgent(world.sqlite, {
+    id: 'agent-verifier',
+    name: 'Verifier',
+    provider: 'claude-code',
+    modelId: 'claude-sonnet-5-5',
+    persona: 'verifier',
+  });
+  world.sqlite.prepare("UPDATE todo SET assignment = ? WHERE id = 'todo-flight'").run(
+    JSON.stringify({
+      plan: { agentId: 'agent-planner' },
+      build: { agentId: IMPLEMENTER_AGENT },
+      review: { agentId: 'agent-custom-reviewer' },
+      verify: { agentId: 'agent-verifier' },
+    }),
+  );
+  migrateAll(world.sqlite);
+  return world;
+}
+
 function migratedWorld(): LegacyWorld {
   const world = legacyWorld();
   migrateAll(world.sqlite);
@@ -295,6 +332,69 @@ describe('removing the agent table from a seeded legacy install', () => {
       { independent: 1 },
     ]);
     expect(rows(sqlite, "SELECT id FROM agent_memory WHERE id = 'mem-chief'")).toHaveLength(1);
+  });
+
+  test('every role assignment lands on an equivalent rule and review requests resolve', () => {
+    const world = customRoleWorld();
+    const rules = rows(
+      world.sqlite,
+      "SELECT use, provider, modelId, machineId, seededFromAgentId FROM routing_rule WHERE use IN ('session', 'review') ORDER BY use",
+    );
+    expect(rules).toEqual([
+      {
+        use: 'review',
+        provider: 'relay-186',
+        modelId: 'glm-5.3',
+        machineId: 'm-box',
+        seededFromAgentId: 'agent-custom-reviewer',
+      },
+      {
+        use: 'session',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: 'm-box',
+        seededFromAgentId: IMPLEMENTER_AGENT,
+      },
+    ]);
+    world.sqlite.close();
+    const opened = openDbWithHandle(world.dbPath);
+    const todoRow = opened.db
+      .select()
+      .from(schema.todo)
+      .where(eq(schema.todo.id, 'todo-flight'))
+      .get();
+    if (todoRow === undefined) throw new Error('fixture todo missing');
+    expect(routeForStep(opened.db, todoRow, 'review')?.modelId).toBe('glm-5.3');
+    expect(routeForStep(opened.db, todoRow, 'verify')?.modelId).toBe('claude-sonnet-5-5');
+    expect(routeForStep(opened.db, todoRow, 'plan')?.modelId).toBe('claude-sonnet-5-5');
+    opened.close();
+  });
+
+  test('a team whose only plan and verify agents differ from the builder gets a session rule from them', () => {
+    const world = legacyWorld();
+    world.sqlite.exec("DELETE FROM routing_rule WHERE use = 'session'");
+    world.sqlite.exec('UPDATE todo SET assignment = NULL');
+    insertAgent(world.sqlite, {
+      id: 'agent-planner',
+      name: 'Planner',
+      provider: 'claude-code',
+      modelId: 'claude-opus-5-5',
+    });
+    world.sqlite.exec(
+      "DELETE FROM agent WHERE id = 'agent-impl'; DELETE FROM agent_memory WHERE agentId = 'agent-impl'",
+    );
+    world.sqlite
+      .prepare("UPDATE todo SET assignment = ? WHERE id = 'todo-flight'")
+      .run(JSON.stringify({ plan: { agentId: 'agent-planner' }, build: null }));
+    migrateAll(world.sqlite);
+    expect(
+      rows(
+        world.sqlite,
+        "SELECT provider, modelId, seededFromAgentId FROM routing_rule WHERE use = 'session'",
+      ),
+    ).toEqual([
+      { provider: 'claude-code', modelId: 'claude-opus-5-5', seededFromAgentId: 'agent-planner' },
+    ]);
   });
 
   test('a second boot changes nothing', () => {
