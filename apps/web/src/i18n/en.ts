@@ -176,6 +176,25 @@ export const EN: Record<string, string> = {
   还没有完成的工作: 'Nothing finished yet',
   '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
   新建项目: 'New project',
+  开始使用: 'Get started',
+  '先接上这三样，Coordinator 才能回答': 'Connect these three so the Coordinator can answer',
+  '接入一个模型服务商，Coordinator 才有模型可用。':
+    'Connect a provider so the Coordinator has a model.',
+  去添加: 'Add',
+  连接一台机器: 'Connect a machine',
+  '机器在线，任务才有地方运行。': 'With a machine online, tasks have somewhere to run.',
+  去连接: 'Connect',
+  '设置 Coordinator': 'Set up the Coordinator',
+  '给 Coordinator 选一个 Agent，它才能回答。':
+    'Pick an Agent for the Coordinator so it can answer.',
+  去设置: 'Set up',
+  模型服务已添加: 'Model provider added',
+  有机器在线: 'A machine is online',
+  'Coordinator 可以回答': 'The Coordinator can answer',
+  'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
+  '按首页清单把模型服务、机器和 Coordinator 接上，再发一次。':
+    'Finish the checklist on the home page (provider, machine, Coordinator), then send again.',
+
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   需要你: 'Needs you',
   在跑: 'Running',

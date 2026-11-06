@@ -27,6 +27,7 @@ import type {
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import { FirstRunChecklist } from './first-run-checklist.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
@@ -443,6 +444,7 @@ export function HomeC({
         {banner != null && (
           <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
         )}
+        <FirstRunChecklist onOpenCoordinatorSettings={() => surface.setChiefView('settings')} />
         <ChiefScrollProvider>
           <ChiefConversation
             variant="global"
@@ -464,6 +466,7 @@ export function HomeC({
             onStop={surface.onStop}
             earlier={surface.earlier}
             onSettings={() => surface.setChiefView('settings')}
+            showBindGate={!live}
             hero={hero}
             lead={lead}
             prefill={prefill}
