@@ -192,6 +192,8 @@
   --text-on-accent: #1a1404;
   --overlay-scrim: rgb(0 0 0 / 0.6);
   --text-on-veil: #ffffff;
+  --qr-light: #ffffff;
+  --qr-dark: #000000;
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
   --spot-text-on-tint: #f2cf86;
@@ -291,6 +293,8 @@
   --text-on-accent: #ffffff;
   --overlay-scrim: rgb(0 0 0 / 0.6);
   --text-on-veil: #ffffff;
+  --qr-light: #ffffff;
+  --qr-dark: #000000;
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
   --spot-text-on-tint: #6e4900;
