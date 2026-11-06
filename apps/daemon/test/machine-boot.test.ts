@@ -54,11 +54,13 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
       executor: 'host',
+      codexLogin: { state: 'absent' },
     });
     expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
       mcpServers: ['figma'],
       skills: ['verify-cairn'],
       executor: 'host',
+      codexLogin: { state: 'absent' },
     });
     await handle.stop();
     await handle.done;
