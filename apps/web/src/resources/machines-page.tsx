@@ -8,7 +8,7 @@ import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
-import { QueryGate } from '../components/query-gate.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { SettingsPanel } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { TEAM_NAME } from '../fixtures/fixtures.js';
@@ -120,7 +120,7 @@ export function MachinesPage() {
           waiting: machine.chiefWaiting === true,
         };
   const teamsQ = useTeams(live);
-  const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
+  const teamName = live ? (teamsQ.data?.[0]?.name ?? t('团队')) : TEAM_NAME;
   const [addOpen, setAddOpen] = useState(false);
   const [mountedAt] = useState(() => Date.now());
   const checkedAgo = useCheckedAgo(
@@ -136,6 +136,16 @@ export function MachinesPage() {
     return `?${next.toString()}`;
   };
 
+  const noMachines = (
+    <EmptyState
+      testId="resource-empty"
+      className="mt-6"
+      icon={Monitor}
+      title={t('尚无机器。')}
+      description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+      action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
+    />
+  );
   return (
     <PageShell
       route={MACHINES_HREF}
@@ -148,16 +158,16 @@ export function MachinesPage() {
         data-testid="machines-scroll"
         className="flex w-full min-w-0 flex-col gap-3 px-4 py-4 md:px-6"
       >
-        <QueryGate query={machinesQ} live={live}>
-          {machines.length === 0 || selected === undefined ? (
-            <EmptyState
-              testId="resource-empty"
-              className="mt-6"
-              icon={Monitor}
-              title={t('尚无机器。')}
-              description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
-              action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
-            />
+        <QueryBoundary
+          query={live ? machinesQ : undefined}
+          isEmpty={machines.length === 0}
+          loadingLabel={t('正在加载机器')}
+          errorTitle={t('机器没能加载')}
+          className="mt-6"
+          empty={noMachines}
+        >
+          {selected === undefined ? (
+            noMachines
           ) : (
             <>
               <SettingsPanel
@@ -234,7 +244,7 @@ export function MachinesPage() {
               </SettingsPanel>
             </>
           )}
-        </QueryGate>
+        </QueryBoundary>
       </div>
       <CreateMachineDialog
         open={addOpen}

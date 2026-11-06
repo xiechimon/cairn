@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { stubEmptyApiKeys } from './helpers.js';
+import { stubLiveApiKeys } from './helpers.js';
 
 const light = async (page: Page, url: string) => {
   await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
@@ -11,7 +11,7 @@ for (const [name, url] of [
   ['api-keys', '/app/api-keys'],
 ] as const) {
   test(`${name} empty state: bare ink-3 icon, no tile`, async ({ page }) => {
-    if (name === 'api-keys') await stubEmptyApiKeys(page);
+    if (name === 'api-keys') await stubLiveApiKeys(page);
     await light(page, url);
     const empty = page.locator('.empty-state');
     await expect(empty).toBeVisible();

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { stubLiveApiKeys } from './helpers.js';
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
@@ -58,20 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await setTheme(page, theme);
-    await page.route('**/api/**', (route, request) =>
-      request.method() === 'GET'
-        ? route.fulfill({ status: 500, json: { error: 'stub' } })
-        : route.fallback(),
-    );
-    await page.route('**/api/teams', (route) =>
-      route.fulfill({
-        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-      }),
-    );
-    await page.route('**/api/user/me', (route) =>
-      route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
-    );
-    await page.route('**/api/teams/team-1/api-keys', (route) => route.fulfill({ json: [] }));
+    await stubLiveApiKeys(page);
     await page.goto('/app/api-keys');
     const empty = page.getByTestId('keys-empty');
     await expect(empty).toBeVisible();

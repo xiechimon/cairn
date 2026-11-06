@@ -127,19 +127,18 @@ export async function openChiefWindow(page: Page): Promise<void> {
   await page.keyboard.press('ControlOrMeta+j');
 }
 
-export async function stubEmptyApiKeys(page: Page): Promise<void> {
-  await page.route('**/api/**', (route, request) =>
-    request.method() === 'GET'
-      ? route.fulfill({ status: 500, json: { error: 'Unrelated API surface' } })
-      : route.fallback(),
-  );
-  await page.route('**/api/teams', (route) =>
-    route.fulfill({
-      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-    }),
-  );
-  await page.route('**/api/user/me', (route) =>
-    route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null } }),
-  );
-  await page.route('**/api/teams/team-1/api-keys', (route) => route.fulfill({ json: [] }));
+export async function stubLiveApiKeys(page: Page, keys: unknown[] = []) {
+  await page.route('**/api/**', (route, request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/stream')) return route.abort();
+    if (request.method() !== 'GET') return route.fallback();
+    if (path === '/api/teams')
+      return route.fulfill({
+        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+      });
+    if (path === '/api/user/me')
+      return route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } });
+    if (path === '/api/teams/team-1/api-keys') return route.fulfill({ json: keys });
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
 }

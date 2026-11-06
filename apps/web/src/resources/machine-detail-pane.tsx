@@ -13,7 +13,7 @@ import { useApiMutations, useMembers, useModelSources } from '../api/hooks.js';
 import { mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
-import { QueryGate } from '../components/query-gate.js';
+import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_ROW_CLS,
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -35,6 +35,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
 import { CONCURRENCY_SOURCE_LABEL, MachineConcurrencySelect } from './machine-concurrency.js';
+import { offlineGuidance } from './machine-offline.js';
 import { OnlineStatus } from './parts.js';
 
 export interface ChiefState {
@@ -222,6 +223,14 @@ export function MachineDetailPane({
     mutations.patchMachine.isError &&
     mutations.patchMachine.variables?.body.maxConcurrent !== undefined;
 
+  const offline = online
+    ? null
+    : offlineGuidance(
+        { online: false, lastSeenAt: machine.lastSeenAt },
+        Date.now(),
+        `${PUBLISHED_PACKAGES.cli.command} start`,
+        t,
+      );
   const notice = claudeLoginNotice(machine.claudeLogin, Date.now());
   const loginWarning = notice === null ? null : formatClaudeLoginWarning(notice, machine.name, t);
 
@@ -323,17 +332,16 @@ export function MachineDetailPane({
               <OnlineStatus on={online} />
             </span>
           </SettingsRow>
-          {!online && (
+          {offline !== null && (
             <div
               data-testid="machine-recover"
               className="flex flex-col gap-1 settings-flat-block px-4 py-3 text-meta text-content-secondary"
             >
+              {offline.lastSeen !== null && (
+                <span className="text-content-tertiary">{offline.lastSeen}</span>
+              )}
               <span>
-                {t('在这台机器上运行')}{' '}
-                <InlineCode>{PUBLISHED_PACKAGES.cli.command} start</InlineCode>
-              </span>
-              <span className="text-content-tertiary">
-                {t('它会重新连上服务器，连上后这里会变为在线。')}
+                <TextWithCode text={offline.recovery} />
               </span>
             </div>
           )}
@@ -454,7 +462,13 @@ export function MachineDetailPane({
       )}
 
       <SettingsSection title={t('归属的 Agent')}>
-        <QueryGate query={membersQ} live={live}>
+        <QueryBoundary
+          query={live ? membersQ : undefined}
+          isEmpty={live && membersQ.data === undefined}
+          loadingLabel={t('正在加载团队')}
+          errorTitle={t('团队没能加载')}
+          empty={null}
+        >
           <TeamAgentGrid
             rows
             agents={homeAgents}
@@ -462,7 +476,7 @@ export function MachineDetailPane({
             onCreate={() => setCreateOpen(true)}
             search={search}
           />
-        </QueryGate>
+        </QueryBoundary>
       </SettingsSection>
 
       <SettingsSection title={t('管理')}>

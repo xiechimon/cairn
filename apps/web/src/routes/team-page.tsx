@@ -13,7 +13,7 @@ import {
 import { mapMachines, mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
-import { QueryGate } from '../components/query-gate.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { Button, buttonVariants } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -48,8 +48,8 @@ export function TeamPage() {
   const membersQ = useMembers(teamId, live);
   const teamsQ = useTeams(live);
   const todosQ = useTodos(teamId, live);
-  const team = live && membersQ.data ? mapTeam(membersQ.data) : (fixture.team ?? TEAM_R7);
-  const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
+  const team = live ? mapTeam(membersQ.data ?? []) : (fixture.team ?? TEAM_R7);
+  const teamName = live ? (teamsQ.data?.[0]?.name ?? t('团队')) : TEAM_NAME;
   const chiefQ = useChief(teamId, live);
   const chiefAgentId = live
     ? (chiefQ.data?.chief.agent?.agentId ?? null)
@@ -112,7 +112,13 @@ export function TeamPage() {
         </>
       }
     >
-      <QueryGate query={membersQ} live={live}>
+      <QueryBoundary
+        query={live ? membersQ : undefined}
+        isEmpty={live && membersQ.data === undefined}
+        loadingLabel={t('正在加载团队')}
+        errorTitle={t('团队没能加载')}
+        empty={null}
+      >
         {layout === 'grid' ? (
           <>
             {team.agents.length > 0 && (
@@ -130,7 +136,7 @@ export function TeamPage() {
         ) : (
           <TeamChart agents={team.agents} chiefAgentId={chiefAgentId} />
         )}
-      </QueryGate>
+      </QueryBoundary>
       <CreateAgentDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}

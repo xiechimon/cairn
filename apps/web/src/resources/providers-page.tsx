@@ -9,7 +9,7 @@ import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
-import { QueryGate } from '../components/query-gate.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import {
   Select,
@@ -304,40 +304,48 @@ export function ProvidersPage() {
             </SelectContent>
           </Select>
         </div>
-        <QueryGate query={machine === undefined ? providersQ : sourcesQ} live={live}>
-          <ProviderPanel
-            header={
-              <div className="flex items-center gap-1">
-                <h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>
-                {machine === undefined && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('添加服务商')}
-                    title={t('添加服务商')}
-                    data-testid="resource-new"
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    <Plus aria-hidden strokeWidth={1.75} />
-                  </Button>
-                )}
-              </div>
-            }
-            items={entries.map((e) => e.item)}
-            selectedId={selected?.item.id ?? null}
-            onSelect={(id) => setParams({ item: id })}
-            empty={
-              <EmptyState
-                testId="providers-empty"
-                icon={Cpu}
-                title={t('尚未添加服务商。')}
-                description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
-              />
-            }
-          >
-            {selected?.editor}
-          </ProviderPanel>
-        </QueryGate>
+        <ProviderPanel
+          header={
+            <div className="flex items-center gap-1">
+              <h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>
+              {machine === undefined && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('添加服务商')}
+                  title={t('添加服务商')}
+                  data-testid="resource-new"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus aria-hidden strokeWidth={1.75} />
+                </Button>
+              )}
+            </div>
+          }
+          items={entries.map((e) => e.item)}
+          selectedId={selected?.item.id ?? null}
+          onSelect={(id) => setParams({ item: id })}
+          empty={
+            <QueryBoundary
+              query={live ? (machine === undefined ? providersQ : sourcesQ) : undefined}
+              isEmpty
+              loadingLabel={t('正在加载模型服务')}
+              errorTitle={t('模型服务没能加载')}
+              empty={
+                <EmptyState
+                  testId="providers-empty"
+                  icon={Cpu}
+                  title={t('尚未添加服务商。')}
+                  description={t('添加 API key、订阅或自定义端点后，它们的模型会出现在这里。')}
+                />
+              }
+            >
+              {null}
+            </QueryBoundary>
+          }
+        >
+          {selected?.editor}
+        </ProviderPanel>
       </div>
       <CreateProviderDialog
         open={createOpen}

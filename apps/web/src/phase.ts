@@ -48,7 +48,7 @@ export const ACCENT_INK = 'text-(--card-button)';
 export const RUNNING_INK = 'text-running-text';
 const QUIET_INK = 'text-content-tertiary';
 
-const PLAN_INK = 'text-(--chip-plan-fg)';
+const PLAN_INK = 'text-content-secondary';
 
 export const PHASE_STATUS: Record<Phase, { glyph: GlyphKind; ink: string }> = {
   todo: { glyph: 'todo', ink: QUIET_INK },

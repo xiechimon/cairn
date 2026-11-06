@@ -26,6 +26,7 @@ import {
   renewComputerControl,
 } from './computer-control.js';
 import { findMachineByToken } from './machines.js';
+import { assertDeviceActive, deviceStreams } from './paired-devices.js';
 
 const MAX_CHANNELS = 128;
 const MAX_COMPUTER_CHANNELS = 8;
@@ -62,6 +63,7 @@ interface Channel {
   machineStream?: Duplex;
   openedAt: number;
   streams: Duplex[];
+  unbindDevice: () => void;
 }
 
 const gateways = new WeakMap<ScreenDependencies['machineHub'], ComputerScreenGateway>();
@@ -129,8 +131,15 @@ export class ComputerScreenGateway {
     }
   }
 
-  open(teamId: string, userId: string, computerId: string, input: OpenComputerScreen) {
+  open(
+    teamId: string,
+    userId: string,
+    computerId: string,
+    input: OpenComputerScreen,
+    deviceId: string | null = null,
+  ) {
     if (this.closed) throw new HttpError(503, 'computer screen gateway is closed');
+    assertDeviceActive(deviceId);
     const parsed = openComputerScreenSchema.safeParse(input);
     if (!parsed.success) throw new HttpError(400, 'invalid screen request');
     const { kind, leaseId } = parsed.data;
@@ -169,8 +178,10 @@ export class ComputerScreenGateway {
       machineUsed: false,
       openedAt: now,
       streams: [],
+      unbindDevice: () => {},
     };
     this.channels.set(request.id, channel);
+    channel.unbindDevice = deviceStreams.bind(deviceId, () => this.revoke(channel));
     if (!this.deps.machineHub.pushComputerScreen(row.machineId, request)) {
       this.revoke(channel);
       throw new HttpError(409, 'the computer is not connected');
@@ -417,6 +428,7 @@ export class ComputerScreenGateway {
 
   private revoke(channel: Channel): void {
     if (!this.channels.delete(channel.request.id)) return;
+    channel.unbindDevice();
     for (const stream of channel.streams) stream.destroy();
     channel.viewer?.terminate();
     channel.machine?.terminate();

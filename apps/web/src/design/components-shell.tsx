@@ -24,8 +24,8 @@ import { PhoneTabBar } from '../components/shell/phone-tab-bar.js';
 import { ArchivedProjectCard, ProjectCard } from '../components/shell/project-card.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
+  SidebarGroupHeader,
   SidebarProjectRow,
-  SidebarThreadList,
   SidebarThreadRow,
 } from '../components/shell/sidebar-project.js';
 import { GoalLine } from '../components/stream/goal-line.js';
@@ -49,7 +49,7 @@ export function SidebarSection() {
         title="Sidebar"
         note="Click a project"
         stage="canvas"
-        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarProjectRow name="cairn" tone={0} waiting={2} active />\n<SidebarThreadList><SidebarThreadRow title="Snooze until needed" tone="waiting" open /></SidebarThreadList>`}
+        code={`<SidebarNavRow icon={<Plus />} label="New" shortcut="C" />\n<SidebarGroupHeader label="Needs you" count={1} accent />\n<SidebarThreadRow title="Snooze until needed" state="needs-you" open />\n<SidebarProjectRow name="cairn" active />`}
       >
         <div className="flex w-62 flex-col gap-0.5 py-1">
           <SidebarNavRow icon={<Plus className="size-4" />} label="New" shortcut="C" />
@@ -74,45 +74,26 @@ export function SidebarSection() {
               <Plus />
             </Button>
           </div>
+          <SidebarGroupHeader label="Needs you" count={1} accent />
+          <SidebarThreadRow title="Connect a Claude subscription" state="needs-you" />
+          <SidebarThreadRow title="Failed deploy to staging" state="failed" tag="Failed" />
+          <SidebarGroupHeader label="In progress" count={2} />
+          <SidebarThreadRow
+            title="Snooze until needed and an unreasonably long title that truncates"
+            state="running"
+            elapsed="12m"
+          />
+          <SidebarThreadRow title="Fold finished turns" state="idle" hoverTime="3h" />
           <SidebarProjectRow
             name="cairn"
-            tone={0}
             icon="mountain"
-            color="moss"
-            waiting={2}
             active={active === 'cairn'}
             onClick={() => setActive('cairn')}
           />
-          {active === 'cairn' && (
-            <SidebarThreadList>
-              <SidebarThreadRow
-                title="Connect a Claude subscription"
-                tone="waiting"
-                onClick={() => undefined}
-              />
-              <SidebarThreadRow
-                title="Snooze until needed and an unreasonably long title that truncates"
-                tone="working"
-                open
-              />
-              <SidebarThreadRow title="Fold finished turns" tone="review" />
-              <SidebarThreadRow title="Automation badge and popover" tone="idle" snoozed />
-            </SidebarThreadList>
-          )}
           <SidebarProjectRow
             name="api-latency"
-            tone={2}
-            icon="server"
-            color="slate"
             active={active === 'api'}
             onClick={() => setActive('api')}
-          />
-          <SidebarProjectRow
-            name="docs-site"
-            tone={3}
-            waiting={1}
-            active={active === 'docs'}
-            onClick={() => setActive('docs')}
           />
         </div>
       </Specimen>
@@ -210,7 +191,7 @@ export function ProjectsSection() {
                 label: 'Coordinator',
                 icon: <SpiralMark busy={false} className="size-5" />,
               },
-              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-5" /> },
+              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-4.5" /> },
             ]}
           />
         </div>

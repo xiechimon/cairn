@@ -28,7 +28,7 @@ import {
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { VENDORS } from '../components/accounts/account-parts.js';
-import { QueryGate } from '../components/query-gate.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import {
@@ -230,9 +230,18 @@ export function ModelRoutingPage() {
           {tab === 'accounts' ? (
             <SubscriptionAccounts
               gate={(forVendor, section) => (
-                <QueryGate query={forVendor === 'claude' ? subscriptionsQ : providersQ} live={live}>
+                <QueryBoundary
+                  query={live ? (forVendor === 'claude' ? subscriptionsQ : providersQ) : undefined}
+                  isEmpty={
+                    live &&
+                    (forVendor === 'claude' ? subscriptionsQ.data : providersQ.data) === undefined
+                  }
+                  loadingLabel={t('正在加载账户')}
+                  errorTitle={t('账户没能加载')}
+                  empty={null}
+                >
                   {section}
-                </QueryGate>
+                </QueryBoundary>
               )}
               accounts={accounts}
               stepsByAccount={stepsByAccount}
@@ -285,7 +294,13 @@ export function ModelRoutingPage() {
               }}
             />
           ) : (
-            <QueryGate query={routingQ} live={live}>
+            <QueryBoundary
+              query={live ? routingQ : undefined}
+              isEmpty={live && routingQ.data === undefined}
+              loadingLabel={t('正在加载工作路由')}
+              errorTitle={t('工作路由没能加载')}
+              empty={null}
+            >
               <div className="flex flex-col gap-8 pb-16">
                 <SettingsSection title={t('Claude 用量')}>
                   <SettingsCard>
@@ -335,7 +350,7 @@ export function ModelRoutingPage() {
                   </div>
                 </SettingsSection>
               </div>
-            </QueryGate>
+            </QueryBoundary>
           )}
         </div>
       </SettingsPanel>

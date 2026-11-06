@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { stubLiveApiKeys } from './helpers.js';
 
 test('feedback route is gone — old URL redirects to the home', async ({ page }) => {
   await page.goto('/app/feedback');
@@ -90,20 +91,7 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
 });
 
 test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {
-  await page.route('**/api/**', (route, request) =>
-    request.method() === 'GET'
-      ? route.fulfill({ status: 500, json: { error: 'stub' } })
-      : route.fallback(),
-  );
-  await page.route('**/api/teams', (route) =>
-    route.fulfill({
-      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-    }),
-  );
-  await page.route('**/api/user/me', (route) =>
-    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
-  );
-  await page.route('**/api/teams/team-1/api-keys', (route) => route.fulfill({ json: [] }));
+  await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
 
   const keysEmpty = page.getByTestId('keys-empty');

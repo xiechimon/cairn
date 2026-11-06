@@ -31,7 +31,7 @@ const MONO_MARK_CLS = '[&_path]:fill-current';
 
 const TONE_DOT: Record<ProviderTone, string> = {
   ok: 'bg-running',
-  warn: 'bg-(--chip-confirm-fg)',
+  warn: 'bg-(--waiting-ink)',
   off: 'bg-content-dim',
 };
 

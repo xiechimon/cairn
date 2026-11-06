@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
-import { QueryGate } from '../components/query-gate.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -46,8 +46,13 @@ export function SecretsPage() {
       actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
-      <QueryGate query={secretsQ} live={live}>
-        {secrets.length === 0 ? (
+      <QueryBoundary
+        query={live ? secretsQ : undefined}
+        isEmpty={secrets.length === 0}
+        loadingLabel={t('正在加载密钥')}
+        errorTitle={t('密钥没能加载')}
+        className="mt-6"
+        empty={
           <EmptyState
             testId="resource-empty"
             className="mt-6"
@@ -62,26 +67,26 @@ export function SecretsPage() {
               text: t('也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。'),
             }}
           />
-        ) : (
-          <ResourceList>
-            {secrets.map((secret) => (
-              <ResourceRow key={secret.id}>
-                <RowText>
-                  <RowTitle className="font-mono">{secret.name}</RowTitle>
-                  <RowDesc>
-                    {[
-                      projectName(secret.projectId) === null
-                        ? t('全团队')
-                        : t('仅 {name}', { name: projectName(secret.projectId) ?? '' }),
-                      ...(secret.description != null ? [secret.description] : []),
-                    ].join(' · ')}
-                  </RowDesc>
-                </RowText>
-              </ResourceRow>
-            ))}
-          </ResourceList>
-        )}
-      </QueryGate>
+        }
+      >
+        <ResourceList>
+          {secrets.map((secret) => (
+            <ResourceRow key={secret.id}>
+              <RowText>
+                <RowTitle className="font-mono">{secret.name}</RowTitle>
+                <RowDesc>
+                  {[
+                    projectName(secret.projectId) === null
+                      ? t('全团队')
+                      : t('仅 {name}', { name: projectName(secret.projectId) ?? '' }),
+                    ...(secret.description != null ? [secret.description] : []),
+                  ].join(' · ')}
+                </RowDesc>
+              </RowText>
+            </ResourceRow>
+          ))}
+        </ResourceList>
+      </QueryBoundary>
       <CreateSecretDialog
         key={searchParams.get('project') ?? ''}
         projects={projects}

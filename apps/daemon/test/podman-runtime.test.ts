@@ -1,7 +1,8 @@
-import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PodmanOrbRuntime } from '../src/orb/podman.js';
@@ -52,17 +53,31 @@ function fixture(options: { command?: readonly string[] } = {}) {
   return { podman, runtime };
 }
 
-async function relayFixture(directoryName = 'cairn-orb-egress', socketName = 'egress.sock') {
-  const root = makeTestTempDir('egr-');
+const UNIX_SOCKET_PATH_LIMIT = 104;
+
+function homeRelayRoot(home: string): string | null {
+  const root = join(home, `.cp-${randomBytes(3).toString('hex')}`);
+  const socketPath = join(root, 'cairn-orb-egress', 'egress.sock');
+  return Buffer.byteLength(socketPath) < UNIX_SOCKET_PATH_LIMIT ? root : null;
+}
+
+async function relayFixture(
+  directoryName = 'cairn-orb-egress',
+  socketName = 'egress.sock',
+  underHome = false,
+) {
+  const root = underHome ? homeRelayRoot(homedir()) : makeTestTempDir('egr-');
+  if (root === null) throw new Error('home directory is too long for a unix socket path');
   const directory = join(root, directoryName);
-  mkdirSync(directory, { mode: 0o700 });
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
   const socketPath = join(directory, socketName);
   const server = createServer((socket) => socket.destroy());
   await new Promise<void>((resolve) => server.listen(socketPath, resolve));
   chmodSync(socketPath, 0o600);
   onTestFinished(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    releaseTestTempDir(root);
+    if (underHome) rmSync(root, { recursive: true, force: true });
+    else releaseTestTempDir(root);
   });
   return { root, directory, socketPath };
 }
@@ -163,9 +178,18 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     ]);
   });
 
-  test('never widens the sandbox', async () => {
+  test('a home directory too long for a unix socket yields no relay root', () => {
+    expect(
+      homeRelayRoot('/home/a-user-with-an-unusually-long-home-directory-name/and/more/depth'),
+    ).toBeNull();
+    const short = homeRelayRoot('/home/ian');
+    expect(short).not.toBeNull();
+    expect(short?.startsWith('/home/ian/')).toBe(true);
+  });
+
+  async function expectSandboxNotWidened(underHome: boolean) {
     const { podman, runtime } = fixture();
-    const relay = await relayFixture();
+    const relay = await relayFixture('cairn-orb-egress', 'egress.sock', underHome);
     await runtime.spawn(
       spec({
         egress: { socketPath: relay.socketPath },
@@ -187,7 +211,16 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     expect(joined).not.toContain('unconfined');
     expect(joined).not.toContain('--read-only');
     expect(joined).not.toMatch(/docker\.sock|podman\.sock|containerd\.sock/);
-    expect(joined).not.toContain(homedir());
+    const home = homedir();
+    const mountSources = argv.flatMap((arg, index) =>
+      argv[index - 1] === '-v' ? [arg.split(':')[0] ?? ''] : [],
+    );
+    expect(mountSources.length).toBeGreaterThan(0);
+    for (const source of mountSources) {
+      expect(source === home || home.startsWith(source.endsWith(sep) ? source : source + sep)).toBe(
+        false,
+      );
+    }
     expect(argv.slice(argv.indexOf('--network'), argv.indexOf('--network') + 2)).toEqual([
       '--network',
       'none',
@@ -198,7 +231,14 @@ describe('PodmanOrbRuntime.spawn argv', () => {
       '--cap-drop=SETPCAP',
       '--cap-drop=SYS_CHROOT',
     ]);
-  });
+  }
+
+  test('never widens the sandbox with the default temp root', () => expectSandboxNotWidened(false));
+
+  test.skipIf(homeRelayRoot(homedir()) === null)(
+    'never widens the sandbox with a relay socket under the home directory (skipped when the home directory is too long for a unix socket path)',
+    () => expectSandboxNotWidened(true),
+  );
 
   test('egress socket adds one mount and one variable, none adds nothing', async () => {
     const none = fixture();

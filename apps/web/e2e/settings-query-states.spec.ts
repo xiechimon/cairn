@@ -39,7 +39,7 @@ for (const pane of PANES) {
     await page.goto(`/app/settings/${pane.section}`);
     const settings = page.getByRole('dialog', { name: '设置' });
     await expect(settings.getByTestId('query-error')).toBeVisible();
-    await expect(settings.getByTestId('query-error')).toContainText('无法加载');
+    await expect(settings.getByTestId('query-error')).toContainText('没能加载');
     await expect(settings.locator(pane.empty)).toHaveCount(0);
     await expect(settings.getByTestId('query-loading')).toHaveCount(0);
 

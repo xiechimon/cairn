@@ -1,29 +1,17 @@
 import {
   type PatchProjectBody,
-  PROJECT_COLORS,
   PROJECT_ICONS,
   type ProjectColor,
   type ProjectIcon,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { Ban, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { useI18n } from '../i18n/provider.js';
-import { PROJECT_COLOR_SWATCH } from './project-avatar.js';
 import { PROJECT_ICON_COMPONENTS } from './project-icon-map.js';
-
-const COLOR_LABEL: Record<ProjectColor, string> = {
-  moss: '苔绿',
-  amber: '琥珀',
-  slate: '石板',
-  plum: '梅紫',
-  teal: '青碧',
-  rose: '玫红',
-  gray: '灰色',
-};
 
 const FOCUS = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
 
@@ -97,7 +85,7 @@ export function ProjectIconPicker({
                   FOCUS,
                 )}
               >
-                <Icon className="size-4" strokeWidth={1.75} />
+                <Icon className="size-4" />
               </Button>
             );
           })}
@@ -107,41 +95,6 @@ export function ProjectIconPicker({
             </p>
           )}
         </fieldset>
-        <fieldset className="m-0 flex min-w-0 items-center justify-between border-0 border-t border-border px-2.5 py-2.5">
-          <legend className="sr-only">{t('颜色')}</legend>
-          <Button
-            variant="ghost"
-            type="button"
-            aria-label={t('无颜色')}
-            aria-pressed={color == null}
-            data-color="none"
-            onClick={() => onChange({ color: null })}
-            className={cn(
-              'grid size-5 h-5 min-w-0 cursor-pointer p-0 place-items-center rounded-full text-content-tertiary ring-1 ring-border ring-inset',
-              color == null && 'ring-2 ring-offset-2 ring-offset-popover ring-foreground',
-              FOCUS,
-            )}
-          >
-            <Ban className="size-3" strokeWidth={1.75} />
-          </Button>
-          {PROJECT_COLORS.map((name) => (
-            <Button
-              variant="ghost"
-              key={name}
-              type="button"
-              aria-label={t(COLOR_LABEL[name])}
-              aria-pressed={color === name}
-              data-color={name}
-              onClick={() => onChange({ color: name })}
-              className={cn(
-                'size-5 h-5 min-w-0 cursor-pointer rounded-full p-0',
-                PROJECT_COLOR_SWATCH[name],
-                color === name && 'ring-2 ring-offset-2 ring-offset-popover ring-foreground',
-                FOCUS,
-              )}
-            />
-          ))}
-        </fieldset>
         <div className="border-t border-border p-0.5">
           <Button
             variant="ghost"
@@ -149,7 +102,7 @@ export function ProjectIconPicker({
             onClick={() => onChange({ icon: null, color: null })}
             className="h-8 w-full justify-start px-2.5 text-ui font-normal text-content-secondary hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)"
           >
-            {t('重置图标和颜色')}
+            {t('重置图标')}
           </Button>
         </div>
       </PopoverContent>

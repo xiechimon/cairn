@@ -7,7 +7,7 @@ const settings = (page: Page) => page.getByRole('dialog', { name: '设置' });
 const navItem = (page: Page, id: string) =>
   settings(page).locator(`[data-settings-section="${id}"]`);
 
-test('sidebar footer: settings and activity icons, no user chip, offline pill only when a machine is offline', async ({
+test('sidebar footer: settings and activity icons, no user chip, quiet machine line, red dot only when a machine is offline', async ({
   page,
 }) => {
   await page.goto(`/app?${FLEET}`);
@@ -16,12 +16,14 @@ test('sidebar footer: settings and activity icons, no user chip, offline pill on
   await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
   await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="sidebar-user"]')).toHaveCount(0);
-  await expect(footer.getByTestId('sidebar-attention')).toHaveText('4 台在线 · 1 台离线（old-laptop）');
+  await expect(footer.getByTestId('sidebar-attention').getByText('4 在线 · 1 离线')).toBeVisible();
+  await expect(footer.getByTestId('sidebar-attention')).toHaveAttribute('title', '4 台在线 · 1 台离线（old-laptop）');
+  await expect(footer.getByTestId('sidebar-attention')).toHaveAttribute('data-fleet', 'offline');
 
   await page.goto('/app?scenario=10');
-  await expect(page.getByTestId('sidebar-footer').getByTestId('sidebar-attention')).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByTestId('sidebar-footer').locator('[data-testid="sidebar-attention"][data-fleet="offline"]'),
+  ).toHaveCount(0);
 });
 
 test('the settings icon opens the window on Account; Escape returns to the page it came from', async ({

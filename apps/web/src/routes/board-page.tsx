@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -15,7 +15,9 @@ import { mapMachines, mapSchedules, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { BackupBanner } from '../board/backup-banner.js';
+import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
+import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
 import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { ProjectHome, type ProjectHomeProject } from '../board/project-home.js';
@@ -139,19 +141,52 @@ export function BoardPage() {
 
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
+  const loginWarnings = useClaudeLoginWarnings(machines, now);
+  const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
+    ...(backupWarning != null
+      ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
+      : []),
+    ...(loginWarnings.length > 0
+      ? [
+          {
+            kind: 'login' as const,
+            node: <ClaudeLoginBanner key="login" warnings={loginWarnings} />,
+          },
+        ]
+      : []),
+    ...(quotaInfos != null
+      ? [{ kind: 'quota' as const, node: <QuotaBanner key="quota" infos={quotaInfos} /> }]
+      : []),
+    ...(notifyBanner.visible
+      ? [
+          {
+            kind: 'notify' as const,
+            node: <NotificationBanner key="notify" onEnable={notifyBanner.enable} />,
+          },
+        ]
+      : []),
+    ...(firstPrCard != null
+      ? [
+          {
+            kind: 'first-pr' as const,
+            node: (
+              <FirstPrCard
+                key="first-pr"
+                info={firstPrCard}
+                onDismiss={() =>
+                  mutations.patchTeam.mutate({ firstPrReportPrompt: { dismissed: true } })
+                }
+              />
+            ),
+          },
+        ]
+      : []),
+  ];
+  const picked = pickHomeBanners(bannerCandidates);
   const homeBanner =
-    backupWarning != null ? (
-      <BackupBanner notice={backupWarning} />
-    ) : firstPrCard != null ? (
-      <FirstPrCard
-        info={firstPrCard}
-        onDismiss={() => mutations.patchTeam.mutate({ firstPrReportPrompt: { dismissed: true } })}
-      />
-    ) : quotaInfos != null ? (
-      <QuotaBanner infos={quotaInfos} />
-    ) : notifyBanner.visible ? (
-      <NotificationBanner onEnable={notifyBanner.enable} />
-    ) : undefined;
+    picked.length === 0 ? undefined : (
+      <div className="flex flex-col gap-2">{picked.map((entry) => entry.node)}</div>
+    );
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
@@ -226,6 +261,9 @@ export function BoardPage() {
               machines={machines}
               coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
               schedules={schedules}
+              machinesQuery={live ? machinesQ : undefined}
+              todosQuery={live ? todosQ : undefined}
+              schedulesQuery={live ? schedulesQ : undefined}
             />
           )}
           <ChiefQuestionPanel />
@@ -250,6 +288,7 @@ export function BoardPage() {
         onQuery={search.setQuery}
         onClose={() => search.setOpen(false)}
         server={live ? searchResults.data : undefined}
+        serverQuery={live ? searchResults : undefined}
       />
     </div>
   );

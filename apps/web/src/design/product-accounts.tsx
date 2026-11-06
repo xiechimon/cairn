@@ -1,4 +1,4 @@
-import { Layers, Palette, Server, User } from 'lucide-react';
+import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import {
@@ -13,12 +13,13 @@ import {
   QuotaSection,
 } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
+import { EmptyState } from '../components/empty-state.js';
 import {
   type ProviderItem,
   ProviderModelRow,
   ProviderPanel,
 } from '../components/providers/provider-panel.js';
-import { QueryError, QueryLoading } from '../components/query-gate.js';
+import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsCard } from '../components/settings-list.js';
@@ -40,6 +41,19 @@ import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
 const TOGGLEABLE: readonly string[] = ['pi', 'claude-code', 'gemini'];
+
+const settledQuery: QueryLike = {
+  isPending: false,
+  isError: false,
+  isFetching: false,
+  refetch: () => undefined,
+};
+
+const QUERY_PHASES = [
+  { phase: 'loading', query: { ...settledQuery, isPending: true, isFetching: true } },
+  { phase: 'error', query: { ...settledQuery, isError: true } },
+  { phase: 'empty', query: settledQuery },
+] as const;
 
 function useAccounts() {
   const [accounts, setAccounts] = useState<SubscriptionAccount[]>(() => [
@@ -172,7 +186,7 @@ export function AccountsSection() {
       <Specimen
         id="account-row"
         title="Account row"
-        note="ok, cooling, expired; the number matches the bar segment; ⋯ opens Rename R, Verify V, Remove D"
+        note="ok, cooling, expired; the meta line shows plan, priority and recent use; ⋯ opens Rename R, Verify V, Remove D"
         stage="sheet"
         code={`<AccountRow account={account} index={0} now={now} actions={{ onRename, onVerify, onRemove }} />`}
       >
@@ -240,15 +254,33 @@ export function AccountsSection() {
         <SettingsNavSpecimen />
       </Specimen>
       <Specimen
-        id="query-states"
-        title="List loading and error states"
-        note="a list pane shows a quiet skeleton while loading and an inline error with Retry when the fetch fails; the empty state appears only after a successful fetch"
+        id="query-boundary"
+        title="Query boundary"
+        note="a live list pane: a quiet skeleton while the first fetch runs, an error with Retry when it fails, and the empty state only after a successful fetch"
         stage="sheet"
-        code={`<QueryGate query={listQuery} live={live}>{list}</QueryGate>`}
+        code={`<QueryBoundary query={live ? listQuery : undefined} isEmpty={rows.length === 0} empty={<EmptyState />} loadingLabel={label} errorTitle={title}>{list}</QueryBoundary>`}
       >
-        <div className="flex w-full flex-col gap-2">
-          <QueryLoading rows={2} />
-          <QueryError onRetry={() => undefined} />
+        <div className="flex w-full flex-col gap-6">
+          {QUERY_PHASES.map(({ phase, query }) => (
+            <QueryBoundary
+              key={phase}
+              query={query}
+              isEmpty
+              loadingLabel={t('正在加载机器')}
+              errorTitle={t('机器没能加载')}
+              skeletonRows={2}
+              empty={
+                <EmptyState
+                  testId="resource-empty"
+                  icon={Monitor}
+                  title={t('尚无机器。')}
+                  description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+                />
+              }
+            >
+              {null}
+            </QueryBoundary>
+          ))}
         </div>
       </Specimen>
       <Specimen

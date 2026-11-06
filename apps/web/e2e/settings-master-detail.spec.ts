@@ -113,7 +113,7 @@ test('offline and expired-login machines explain how to bring them back, with th
   await items(page).filter({ hasText: 'old-laptop' }).click();
   const pane = detail(page);
   await expect(pane.getByTestId('machine-detail-online')).toContainText('离线');
-  await expect(pane.getByTestId('machine-recover')).toContainText('在这台机器上运行');
+  await expect(pane.getByTestId('machine-recover')).toContainText('重新启动');
   await expect(pane.getByTestId('machine-recover').locator('code')).toContainText('start');
 
   await items(page).filter({ hasText: 'build-box' }).click();
