@@ -123,3 +123,10 @@ apps/web/.design-sync/node_modules
 
 apps/web/e2e/*-snapshots/*-darwin.png
 apps/web/e2e/*-snapshots/*-win32.png
+
+# PR screenshot job artefacts
+pr-screens-out/
+pr-screens-head/
+pr-screens-base/
+pr-screens-results/
+pr-screens-report/
