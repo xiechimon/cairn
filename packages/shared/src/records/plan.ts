@@ -21,6 +21,8 @@ export type PlanRecord = z.infer<typeof planRecordSchema>;
 
 export const planRowSchema = planRecordSchema.extend({
   content: z.string(),
+  autoApproveAt: epochMs.nullable().optional(),
+  autoApprovePausedAt: epochMs.nullable().optional(),
 });
 export type PlanRow = z.infer<typeof planRowSchema>;
 
