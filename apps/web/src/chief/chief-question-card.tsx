@@ -19,10 +19,10 @@ import {
 } from 'react';
 import { STATUS_WORDS } from '../board/status-words.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
+import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { ShortcutHint } from '../components/ui/kbd.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
