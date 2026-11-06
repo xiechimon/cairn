@@ -20,10 +20,10 @@ export function QrCode({ text, label }: { text: string; label: string }) {
       aria-label={label}
       viewBox={`${-QUIET_ZONE_MODULES} ${-QUIET_ZONE_MODULES} ${span} ${span}`}
       shapeRendering="crispEdges"
-      className="size-56 max-w-full rounded-md bg-white"
+      className="size-56 max-w-full rounded-md bg-(--qr-light)"
       data-testid="pair-qr"
     >
-      <path d={encoded.path} fill="black" />
+      <path d={encoded.path} className="fill-(--qr-dark)" />
     </svg>
   );
 }
