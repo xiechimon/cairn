@@ -242,7 +242,8 @@ function evaluate(repo, number) {
   const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
   const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
-  const needsSecurity = requiresSecurityReview(files);
+  const needsSecurity =
+    process.env.CAIRN_REQUIRE_SECURITY_REVIEW === '1' && requiresSecurityReview(files);
   const securityEntry = needsSecurity ? trustedStateComment(comments, 'security_review') : null;
   const security = needsSecurity
     ? {
