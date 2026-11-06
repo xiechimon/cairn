@@ -714,7 +714,7 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} bound={answerHere && !threadOverride} />
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
         {composerReplacement ?? (
           <>
             {composerError != null && (

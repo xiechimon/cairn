@@ -49,6 +49,7 @@ export interface ChiefQuestionCardProps {
   draftKey?: string;
   pager?: QuestionPager;
   bound?: boolean;
+  ownFooter?: boolean;
 }
 
 export interface QuestionPager {
@@ -185,6 +186,7 @@ export function ChiefQuestionCard({
   draftKey,
   pager,
   bound = false,
+  ownFooter = false,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
@@ -544,7 +546,7 @@ export function ChiefQuestionCard({
               </div>
             )}
           </div>
-          {!bound && (
+          {(!bound || ownFooter) && (
             <div className="flex flex-none flex-wrap items-center gap-2 px-3.5 py-1.5">
               {hintText !== '' && (
                 <span data-testid="chief-question-hint" className={HINT_CLS}>
