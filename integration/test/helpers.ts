@@ -96,7 +96,6 @@ export async function bootRealServer(opts: {
       skillSourcesPath,
       webDir: opts.webDir ?? null,
       authToken: null,
-      tailscaleUsers: [],
       mcpConfigPath,
     });
     const scheduler = opts.scheduler
