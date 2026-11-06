@@ -9116,6 +9116,18 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       ],
       "type": "string",
     },
+    "lastSeenAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "latestCliVersion": {
       "type": [
         "string",

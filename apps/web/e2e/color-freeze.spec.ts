@@ -22,7 +22,7 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     input: '#6b726c',
     ring: '#9cc78b',
     'text-secondary': '#b4bab3',
-    'text-tertiary': '#959c96',
+    'text-tertiary': '#a3aaa4',
     'card-button': '#ebb550',
     'focus-ring': '#9cc78b',
     'spot-text-on-tint': '#f2cf86',
