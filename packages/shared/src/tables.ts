@@ -108,4 +108,5 @@ export const INTERNAL_ONLY_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'data_migration',
 ] as const;
