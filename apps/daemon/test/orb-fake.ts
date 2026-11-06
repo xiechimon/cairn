@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, expect } from 'vitest';
@@ -12,6 +11,7 @@ import {
 import { RelayMachineApi } from '../src/orb/relay.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
 import { orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const assertions: unknown[] = [];
 const workers = new Set<Promise<void>>();
@@ -44,7 +44,7 @@ export function rejectGuestExec(argv: readonly string[]): void {
 export class FakeOrbProvider extends NspawnOrbProvider {
   private readonly worker: FakeOrbRunner;
   constructor(options: { runner: FakeOrbRunner }) {
-    const root = mkdtempSync(join(tmpdir(), 'orb-fake-'));
+    const root = testTempDir('orb-fake-');
     const { distSource, runner: distRunner } = createOrbCheckout(root);
     for (const name of ['run', 'dist', 'seed']) mkdirSync(join(root, name));
     const running = new Set<string>();

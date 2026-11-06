@@ -1,8 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
+import { testTempDir } from './test-temp-dir.js';
 
 const root = resolve(import.meta.dirname, '../../..');
 const dirs: string[] = [];
@@ -17,7 +17,7 @@ test.each([
   ['future', true, '2026-11-01T11:59:00Z', 1, 'incomplete'],
   ['invalid', true, 'invalid', 1, 'incomplete'],
 ])('check reports %s smoke record', (_name, ok, at, status, label) => {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-smoke-'));
+  const dir = testTempDir('cairn-smoke-');
   dirs.push(dir);
   const file = join(dir, 'smoke.json');
   writeFileSync(file, JSON.stringify({ ok, at, model: 'claude-sonnet-4-6' }));
@@ -31,7 +31,7 @@ test.each([
 });
 
 test('missing and malformed records are incomplete', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-smoke-'));
+  const dir = testTempDir('cairn-smoke-');
   dirs.push(dir);
   const file = join(dir, 'smoke.json');
   for (const body of [undefined, '{', '{}', '{"ok":true,"at":"2026-10-31T12:00:00Z"}']) {

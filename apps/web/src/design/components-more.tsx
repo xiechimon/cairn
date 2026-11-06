@@ -1,3 +1,4 @@
+import { pairingLink } from '@cairn/shared';
 import { useId, useState } from 'react';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -7,6 +8,7 @@ import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProfileHeader } from '../components/profile-card.js';
+import { QrCode } from '../components/qr-code.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -218,9 +220,29 @@ export function IdentitySection() {
           <Settings />
         </IconTooltip>
       </Specimen>
+      <Specimen
+        id="pairing-qr"
+        title="Pairing QR code"
+        note="the code in the pairing dialog, encoding a fixed pairing link; the quiet zone and colors stay the same in both themes so phones can scan it"
+      >
+        <Cell label="Full size, 224px">
+          <QrCode text={PAIRING_LINK} label="Pairing QR code" />
+        </Cell>
+        <Cell label="In a 160px container, it shrinks to fit">
+          <div className="w-40 max-w-full">
+            <QrCode text={PAIRING_LINK} label="Pairing QR code" />
+          </div>
+        </Cell>
+      </Specimen>
     </Section>
   );
 }
+
+const PAIRING_LINK = pairingLink({
+  origin: 'https://studio.example.ts.net',
+  code: 'K7M2-QP9X',
+  environmentId: 'env-4f9c1a',
+});
 
 const LIVE_STEPS: { id: string; step: TraceStep }[] = [
   {
