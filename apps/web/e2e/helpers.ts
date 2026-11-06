@@ -51,6 +51,16 @@ export async function settleTransitions(page: Page): Promise<void> {
   if (!settled) throw new Error('CSS transitions still running after 20 rounds');
 }
 
+export async function verticalGap(page: Page, upper: Locator, lower: Locator): Promise<number> {
+  await settleTransitions(page);
+  const lowerHandle = await lower.elementHandle();
+  if (lowerHandle == null) throw new Error('verticalGap: lower element is missing');
+  return upper.evaluate((top, bottom) => {
+    const a = top.getBoundingClientRect();
+    return bottom.getBoundingClientRect().top - a.bottom;
+  }, lowerHandle);
+}
+
 export async function pressAndExpect(
   page: Page,
   key: string,

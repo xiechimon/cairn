@@ -230,6 +230,7 @@ See "Page patterns · Settings list" below.
 ### Live run
 - There is no separate live block: the open group is the live row. A 7px pulse dot (`live-pulse` in `app.css`, still under reduced motion) sits under the last line while the agent works; a quiet live row hides its label when a running group above already speaks.
 - The elapsed time lives in the composer next to the stop button ("Working · 1:12"), not in the transcript.
+- **End space under the Coordinator conversation**: the scroller reserves `--chat-end-space` (160px) below the last message, so the newest reply sits about 165px above the composer top, measured on Claude.ai (118px to its dock plus the dock's own padding and disclaimer); Claude.ai draws no fade there. `FadeScrollerViewport` requires an explicit `reserveEnd`; the thread transcript keeps its own `--chat-extra-space`.
 - When the turn ends the pulse disappears and the group turns past tense.
 
 ### Stone language components
