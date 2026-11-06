@@ -10,3 +10,5 @@ export const testTempRunId: string;
 export const makeTestTempDir: TestTempRun['allocate'];
 export const releaseTestTempDir: TestTempRun['release'];
 export const cleanupTestTempDirs: TestTempRun['cleanup'];
+export function testTempRoot(): string;
+export function testTempPrefix(runId: string): string;

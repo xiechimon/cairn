@@ -5,6 +5,14 @@ import { join } from 'node:path';
 
 const allocations = new Map();
 
+export function testTempPrefix(runId) {
+  return `ct-${runId.slice(0, 8)}-`;
+}
+
+export function testTempRoot() {
+  return process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir();
+}
+
 export function createTestTempRun({ runId = randomUUID() } = {}) {
   if (typeof runId !== 'string' || !/^[a-f0-9-]{36}$/.test(runId)) {
     throw new TypeError('runId must be a UUID');
@@ -24,9 +32,7 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
       if (typeof prefix !== 'string' || !/^[a-zA-Z0-9_-]*$/.test(prefix)) {
         throw new TypeError('prefix must contain only letters, digits, underscores or hyphens');
       }
-      const path = mkdtempSync(
-        join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `cairn-test-${runId}-${prefix}`),
-      );
+      const path = mkdtempSync(join(testTempRoot(), `${testTempPrefix(runId)}${prefix}`));
       try {
         if (process.env.CAIRN_TEST_TEMP_STRICT === '1' && process.env.CAIRN_TEST_TEMP_REPORT) {
           appendFileSync(
