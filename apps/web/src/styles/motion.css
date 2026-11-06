@@ -10,20 +10,6 @@
   }
 }
 
-button:active,
-[role="button"]:active,
-a:active {
-  opacity: 0.85;
-}
-
-@media (pointer: coarse) {
-  button:active,
-  [role="button"]:active,
-  a:active {
-    transition-duration: 0s;
-  }
-}
-
 .theme-suppress,
 .theme-suppress *,
 .theme-suppress *::before,
@@ -31,11 +17,6 @@ a:active {
   /* biome-ignore lint/complexity/noImportantStyles: must outrank every
      component transition for the single frame the flip paints in. */
   transition: none !important;
-}
-
-.sidebar-team-collapse:active,
-.rail-toggle:active {
-  opacity: 1;
 }
 
 .scroll-fade {
