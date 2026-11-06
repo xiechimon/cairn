@@ -17,6 +17,7 @@ import {
   build,
   chief,
   machine as machineTable,
+  project as projectTable,
   routingRule,
   step,
   team as teamTable,
@@ -24,7 +25,11 @@ import {
   workPolicy,
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
-import { buildRunsSession, startBuilds } from '../src/services/builds.js';
+import {
+  buildRunsSession,
+  maybeEnqueueIndependentReview,
+  startBuilds,
+} from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
 import { agentForStep, unassignedStepReason } from '../src/services/dispatch-eligibility.js';
 import { runRoutingMigration } from '../src/services/routing-migration.js';
@@ -213,7 +218,7 @@ describe('runRoutingMigration on a seeded legacy install', () => {
     expect(report.policies).toBe(2);
   });
 
-  test('a code reviewer from the session vendor seeds no review rule or policy', () => {
+  test('a code reviewer from the session vendor seeds no review rule but keeps the read-only review policy', () => {
     w.s.db
       .update(agentTable)
       .set({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' })
@@ -229,12 +234,8 @@ describe('runRoutingMigration on a seeded legacy install', () => {
         .map((r) => r.use),
     ).toEqual(['session']);
     expect(
-      w.s.db
-        .select()
-        .from(workPolicy)
-        .all()
-        .map((p) => p.use),
-    ).toEqual(['session']);
+      w.s.db.select().from(workPolicy).where(eq(workPolicy.use, 'review')).get(),
+    ).toMatchObject({ tools: [], secrets: [] });
   });
 
   test('reports the secrets of the other agents without granting them', () => {
@@ -435,7 +436,7 @@ describe('a team with no agents', () => {
     expect(w.s.db.select().from(routingRule).all()).toHaveLength(1);
     expect(runRoutingMigration(w.s.db).defaultRules).toBe(0);
     expect(w.s.db.select().from(routingRule).all()).toHaveLength(1);
-    expect(w.s.db.select().from(workPolicy).all()).toHaveLength(1);
+    expect(w.s.db.select().from(workPolicy).all()).toHaveLength(2);
   });
 
   test('agents without a model fall back to the default rule', async () => {
@@ -498,5 +499,100 @@ describe('persona seeding is gone from boot', () => {
     const source = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
     expect(source).not.toContain('backfillPersonas');
     expect(source).toContain('runRoutingMigration');
+  });
+});
+
+describe('the legacy reviewer after the upgrade', () => {
+  const HEAD = 'a'.repeat(40);
+
+  async function finishedLegacyBuild(reviewer: { provider: string; modelId: string }) {
+    const w = await legacyWorld();
+    seedLegacyAgents(w);
+    w.s.db.update(agentTable).set(reviewer).where(eq(agentTable.id, 'reviewer')).run();
+    w.s.db
+      .update(projectTable)
+      .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    legacyTodo(w, 'inflight');
+    const buildId = startLegacyBuild(w, 'inflight', false);
+    w.s.db
+      .update(step)
+      .set({ status: 'done', checkpointCommit: HEAD, finishedAt: 5 })
+      .where(eq(step.buildId, buildId))
+      .run();
+    w.s.db.update(build).set({ prNumber: 7 }).where(eq(build.id, buildId)).run();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, 'inflight')).run();
+    runRoutingMigration(w.s.db);
+    setRoutingRulesEnabled(true);
+    const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, 'inflight')).get()!;
+    return { w, buildId, row };
+  }
+
+  test('a reviewer from the author vendor is not scheduled', async () => {
+    const { w, buildId, row } = await finishedLegacyBuild({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+    maybeEnqueueIndependentReview(deps(w), row, buildId);
+    expect(
+      w.s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((r) => r.kind === 'review'),
+    ).toEqual([]);
+  });
+
+  test('a reviewer from another vendor runs with the read-only review policy', async () => {
+    const { w, buildId, row } = await finishedLegacyBuild({
+      provider: 'openai',
+      modelId: 'gpt-6.1-sol',
+    });
+    maybeEnqueueIndependentReview(deps(w), row, buildId);
+    const reviews = w.s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, buildId))
+      .all()
+      .filter((r) => r.kind === 'review');
+    expect(reviews).toHaveLength(1);
+    const effective = agentForStep(w.s.db, row, 'review', reviews[0]!.prompt);
+    expect(effective?.id).toBe('reviewer');
+    expect(effective?.tools).toEqual([]);
+    expect(effective?.secrets).toEqual([]);
+  });
+
+  test('the review policy holds even when no review rule is seeded', async () => {
+    const { w, row } = await finishedLegacyBuild({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+    expect(w.s.db.select().from(routingRule).where(eq(routingRule.use, 'review')).all()).toEqual(
+      [],
+    );
+    const reviewer = agentForStep(
+      w.s.db,
+      row,
+      'review',
+      `${JSON.stringify({ kind: 'review', agentId: 'reviewer' })}\nreview body`,
+    );
+    expect(reviewer?.tools).not.toContain(AGENT_TOOL_MERGE);
+    expect(reviewer?.tools).not.toContain(AGENT_TOOL_PUSH);
+    expect(reviewer?.secrets).toEqual([]);
+  });
+
+  test('a team with no code reviewer still gets an empty review policy', async () => {
+    const w = await legacyWorld();
+    runRoutingMigration(w.s.db);
+    expect(
+      w.s.db.select().from(workPolicy).where(eq(workPolicy.use, 'review')).get(),
+    ).toMatchObject({
+      tools: [],
+      secrets: [],
+      mcpServers: [],
+    });
+    expect(runRoutingMigration(w.s.db).policies).toBe(0);
   });
 });

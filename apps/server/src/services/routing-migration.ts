@@ -5,6 +5,7 @@ import { agent, routingRule, team, workPolicy } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   adoptAgentMemories,
+  seedReviewPolicies,
   seedReviewRules,
   seedRoutingRules,
   seedWorkPolicies,
@@ -115,7 +116,7 @@ export function runRoutingMigration(db: Db): RoutingMigrationReport {
   const sessionRules = seedRoutingRules(db);
   const defaultRules = seedDefaultSessionRules(db);
   const reviewRules = seedReviewRules(db);
-  const policies = seedWorkPolicies(db);
+  const policies = seedWorkPolicies(db) + seedReviewPolicies(db);
   const memoriesAdopted = adoptAgentMemories(db);
   return {
     sessionRules,

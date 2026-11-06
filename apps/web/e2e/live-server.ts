@@ -68,6 +68,7 @@ async function reapGroup(pgid: number): Promise<void> {
 export async function bootLiveServer(
   token: string | null,
   tailscaleUsers?: string,
+  extraEnv: Record<string, string> = {},
 ): Promise<LiveServer> {
   const home = mkdtempSync(join(tmpdir(), 'cairn-e2e-home-'));
   const port = await freePort();
@@ -83,6 +84,7 @@ export async function bootLiveServer(
       [ENV_VARS.webDir]: process.env.E2E_DIST_DIR ?? resolve(import.meta.dirname, '..', 'dist'),
       [ENV_VARS.token]: token ?? '',
       CAIRN_TAILSCALE_USERS: tailscaleUsers ?? '',
+      ...extraEnv,
     },
     stdio: ['pipe', 'ignore', 'inherit'],
   });

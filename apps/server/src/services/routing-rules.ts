@@ -338,6 +338,47 @@ export function seedWorkPolicies(db: Db): number {
   return inserted;
 }
 
+export function seedReviewPolicies(db: Db): number {
+  let inserted = 0;
+  for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
+    const exists =
+      db
+        .select({ id: workPolicy.id })
+        .from(workPolicy)
+        .where(and(eq(workPolicy.teamId, teamId), eq(workPolicy.use, 'review')))
+        .get() !== undefined;
+    if (exists) continue;
+    const reviewer = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.teamId, teamId), eq(agent.persona, 'code_reviewer')))
+      .get();
+    if (reviewer !== undefined) {
+      inserted += seedPolicy(db, teamId, 'review', reviewer);
+      continue;
+    }
+    const now = nowMs();
+    inserted += db
+      .insert(workPolicy)
+      .values({
+        id: newRecordId(),
+        teamId,
+        use: 'review',
+        tools: [],
+        mcpServers: [],
+        skillsAllowlist: null,
+        defaultSkill: null,
+        secrets: [],
+        seededFromAgentId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .run().changes;
+  }
+  return inserted;
+}
+
 export function seedReviewRules(db: Db): number {
   let inserted = 0;
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {

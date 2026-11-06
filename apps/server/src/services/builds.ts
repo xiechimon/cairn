@@ -142,8 +142,10 @@ import { requireIntakeAssignment } from './intake-assignment.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
+import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
+import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
@@ -1198,6 +1200,43 @@ export function maybeEnqueueVerifyStep(
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
 
+function authorModelOf(deps: BuildDeps, todoRow: TodoRow, buildId: string): string | null {
+  const authorStep = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.status, 'done')))
+    .all()
+    .filter((row) => isBuildStepKind(row.kind))
+    .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt))
+    .at(-1);
+  if (authorStep === undefined) return null;
+  const authorAgent = agentForStep(deps.db, todoRow, authorStep.kind, authorStep.prompt);
+  return authorAgent === null ? null : effectiveModel(authorAgent, authorStep).modelId;
+}
+
+function firstIndependentReviewer(
+  deps: BuildDeps,
+  todoRow: TodoRow,
+  buildId: string,
+  candidates: readonly string[],
+): string | null {
+  const authorModel = authorModelOf(deps, todoRow, buildId);
+  if (authorModel === null) return null;
+  return (
+    candidates.find((agentId) => {
+      const probe = buildReviewStepPrompt({
+        agentId,
+        gate: 'review',
+        planText: '',
+        changes: [],
+        checkout: false,
+      });
+      const reviewerModel = agentForStep(deps.db, todoRow, 'review', probe)?.modelId;
+      return reviewerModel != null && modelsAreIndependent(authorModel, reviewerModel);
+    }) ?? null
+  );
+}
+
 export function maybeEnqueueIndependentReview(
   deps: BuildDeps,
   todoRow: TodoRow,
@@ -1228,8 +1267,14 @@ export function maybeEnqueueIndependentReview(
     .from(agent)
     .where(and(eq(agent.teamId, todoRow.teamId), eq(agent.persona, 'code_reviewer')))
     .get();
-  const agentId =
-    slotted ?? personaReviewer?.id ?? routeForStep(deps.db, todoRow, 'review')?.id ?? null;
+  const candidates = [
+    slotted,
+    personaReviewer?.id ?? null,
+    routeForStep(deps.db, todoRow, 'review')?.id ?? null,
+  ].filter((id): id is string => id !== null);
+  const agentId = routingRulesEnabled()
+    ? firstIndependentReviewer(deps, todoRow, buildId, candidates)
+    : (candidates[0] ?? null);
   if (agentId === null) return;
   const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
   const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
