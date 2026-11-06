@@ -10,6 +10,8 @@ import {
 import { join } from 'node:path';
 
 const SEVERITY = ['critical', 'serious', 'moderate', 'minor'];
+const INLINE_LIMIT = 8;
+const IMAGE_WIDTH = 320;
 
 function listFiles(dir, suffix) {
   return existsSync(dir)
@@ -93,11 +95,18 @@ export function render({
   baseErrors,
   durations,
   runUrl,
+  assetBase,
+  selection,
 }) {
   const lines = ['### PR screenshots and accessibility (non-blocking)', ''];
   const duration = Object.entries(durations ?? {})
     .map(([name, seconds]) => `${name} ${Math.round(seconds)}s`)
     .join(', ');
+  if (selection)
+    lines.push(
+      `Audited ${selection.count} of ${selection.total} pages${selection.all ? ' (a shared surface changed)' : ' (only the routes this diff touches)'}; baseline is the merge base on main.`,
+      '',
+    );
   lines.push(
     `Pages: ${classes.changed.length} changed, ${classes.added.length} new, ${classes.removed.length} removed, ${classes.unchanged} unchanged.${duration ? ` Job time: ${duration}.` : ''}`,
     '',
@@ -109,6 +118,23 @@ export function render({
       lines.push(`| ${name.replace(/\.png$/, '')} | new on this head |`);
     for (const name of classes.removed)
       lines.push(`| ${name.replace(/\.png$/, '')} | not on this head |`);
+    lines.push('');
+  }
+  if (assetBase && classes.changed.length > 0) {
+    const image = (stem, kind) =>
+      `<img src="${assetBase}/${stem}.${kind}.png" width="${IMAGE_WIDTH}" alt="${stem} ${kind}">`;
+    lines.push('| Page | main | This head | Diff |', '|---|---|---|---|');
+    for (const name of classes.changed.slice(0, INLINE_LIMIT)) {
+      const stem = name.replace(/\.png$/, '');
+      lines.push(
+        `| ${stem} | ${image(stem, 'base')} | ${image(stem, 'head')} | ${image(stem, 'diff')} |`,
+      );
+    }
+    if (classes.changed.length > INLINE_LIMIT)
+      lines.push(
+        '',
+        `${classes.changed.length - INLINE_LIMIT} more changed pages are in the artifact.`,
+      );
     lines.push('');
   }
   const level = (counts) => SEVERITY.map((s) => `${counts[s]} ${s}`).join(', ');
@@ -158,6 +184,7 @@ function main(argv) {
   const baseDir = option('--base');
   const resultsDir = option('--results');
   const outDir = option('--out');
+  const selection = argv.includes('--selection') ? JSON.parse(option('--selection')) : undefined;
   const durations = argv.includes('--durations') ? JSON.parse(option('--durations')) : {};
   const results = JSON.parse(readFileSync(join(resultsDir, 'results.json'), 'utf8'));
   const classes = classify(
@@ -176,6 +203,8 @@ function main(argv) {
     baseErrors: listFiles(baseDir, '.error.txt'),
     durations,
     runUrl: process.env.RUN_URL,
+    assetBase: process.env.ASSET_BASE,
+    selection,
   });
   collectDiffImages(resultsDir, outDir, classes, headDir, baseDir);
   writeFileSync(join(outDir, 'report.md'), markdown);

@@ -9,6 +9,8 @@ const OUT = process.env.PR_SCREENS_OUT ?? 'pr-screens-out';
 const FROZEN_AT = new Date('2026-10-31T14:00:00+08:00');
 const WCAG_22_AA = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
+const ONLY = process.env.PR_SCREENS_PAGES ? new Set(process.env.PR_SCREENS_PAGES.split(',')) : undefined;
+
 const slugOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 mkdirSync(OUT, { recursive: true });
@@ -17,6 +19,7 @@ test.describe.configure({ mode: 'parallel' });
 
 for (const theme of ['light', 'dark'] as const) {
   for (const p of PAGES) {
+    if (ONLY && !ONLY.has(slugOf(p.name))) continue;
     const key = `${slugOf(p.name)}-${theme}`;
     test(`capture: ${p.name} (${theme})`, async ({ page }) => {
       test.setTimeout(60_000);

@@ -1,15 +1,19 @@
 name: pr-screens
 
-# Non-blocking report for PRs that touch apps/web (D117): every audited page is
-# screenshotted on the merge base and on the PR head by the same runner image,
-# the two sets are diffed with Playwright's snapshot comparison, and axe
-# (WCAG 2.2 AA, D118 Q7) runs on every page. Nothing here is a required check,
+# Non-blocking report for PRs that touch apps/web (D117): the audited pages this
+# diff can reach (scripts/pr-screens-select.mjs; a shared surface selects all)
+# are screenshotted on the merge base on main and on the PR head by the same
+# runner image, the two sets are diffed with Playwright's snapshot comparison,
+# and axe (WCAG 2.2 AA, D118 Q7) runs on the same pages. Changed pages show
+# inline in a sticky PR comment; the images live on pr-assets/screens-<pr> and
+# the branch is deleted when the PR closes. Nothing here is a required check,
 # and every step that inspects the product is allowed to fail.
 #
 # Third-party actions are pinned to full commit SHAs with trailing version
 # comments (#1076); keep the version comment, Dependabot parses it.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     paths:
       - 'apps/web/**'
       - 'packages/**'
@@ -22,8 +26,40 @@ permissions:
   contents: read
 
 jobs:
+  select:
+    if: ${{ github.event.action != 'closed' && !(github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pages: ${{ steps.select.outputs.pages }}
+      count: ${{ steps.select.outputs.count }}
+      selection: ${{ steps.select.outputs.selection }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Select the audited pages this diff can reach
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          merge_base="$(git merge-base "$BASE_SHA" HEAD)"
+          result="$(node scripts/pr-screens-select.mjs --base "$merge_base" --head HEAD)"
+          echo "$result"
+          echo "pages=$(jq -r .pages <<< "$result")" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq -r .count <<< "$result")" >> "$GITHUB_OUTPUT"
+          echo "selection=$(jq -c '{all, count, total}' <<< "$result")" >> "$GITHUB_OUTPUT"
+
   capture:
-    if: ${{ !(github.event.pull_request.draft && github.event.pull_request.user.login == 'mergify[bot]' && startsWith(github.head_ref, 'mergify/merge-queue/')) }}
+    needs: select
+    if: ${{ needs.select.outputs.count != '0' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -67,6 +103,7 @@ jobs:
         continue-on-error: true
         env:
           PR_SCREENS_OUT: pr-screens-out
+          PR_SCREENS_PAGES: ${{ needs.select.outputs.pages }}
         run: pnpm exec playwright test -c playwright.pr-screens.config.ts
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -77,12 +114,12 @@ jobs:
           retention-days: 7
 
   compare:
-    needs: capture
+    needs: [select, capture]
     if: ${{ !cancelled() && needs.capture.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write
       actions: read
       pull-requests: write
     steps:
@@ -126,11 +163,43 @@ jobs:
             --jq '[.jobs[] | select(.name | startswith("capture")) | {key: (.name | capture("\\((?<side>[a-z]+)\\)").side), value: ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601))}] | from_entries' > "$RUNNER_TEMP/durations.json"
           echo "json=$(jq -c . "$RUNNER_TEMP/durations.json")" >> "$GITHUB_OUTPUT"
 
+      - name: Build the report images
+        run: node scripts/pr-screens-report.mjs --head apps/web/pr-screens-head --base apps/web/pr-screens-base --results apps/web/pr-screens-results --out apps/web/pr-screens-report --selection '${{ needs.select.outputs.selection }}' --durations '${{ steps.durations.outputs.json }}' > /dev/null
+
+      - name: Publish the changed pages for the comment
+        id: assets
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          branch="pr-assets/screens-$PR_NUMBER"
+          remote="https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          assets="$RUNNER_TEMP/assets"
+          if git ls-remote --exit-code --heads "$remote" "$branch" > /dev/null; then
+            git clone --quiet --depth 1 --branch "$branch" "$remote" "$assets"
+          else
+            git init -q "$assets"
+            git -C "$assets" checkout -q --orphan "$branch"
+            git -C "$assets" remote add origin "$remote"
+          fi
+          mkdir -p "$assets/$HEAD_SHA"
+          cp apps/web/pr-screens-report/*.png "$assets/$HEAD_SHA/"
+          git -C "$assets" config user.name 'github-actions[bot]'
+          git -C "$assets" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "$assets" add "$HEAD_SHA"
+          git -C "$assets" commit -q -m "pr-screens: pages changed on $HEAD_SHA (#$PR_NUMBER)"
+          git -C "$assets" push -q origin "HEAD:refs/heads/$branch"
+          echo "base=https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$(git -C "$assets" rev-parse HEAD)/$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
       - name: Build the report
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ASSET_BASE: ${{ steps.assets.outputs.base }}
         run: |
-          node scripts/pr-screens-report.mjs --head apps/web/pr-screens-head --base apps/web/pr-screens-base --results apps/web/pr-screens-results --out apps/web/pr-screens-report --durations '${{ steps.durations.outputs.json }}' | tee "$GITHUB_STEP_SUMMARY"
+          node scripts/pr-screens-report.mjs --head apps/web/pr-screens-head --base apps/web/pr-screens-base --results apps/web/pr-screens-results --out apps/web/pr-screens-report --selection '${{ needs.select.outputs.selection }}' --durations '${{ steps.durations.outputs.json }}' | tee "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -155,3 +224,16 @@ jobs:
           else
             gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$body"
           fi
+
+  cleanup:
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Delete the screenshot branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/pr-assets/screens-$PR_NUMBER" || echo "no screenshot branch for #$PR_NUMBER"

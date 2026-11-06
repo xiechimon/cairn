@@ -83,6 +83,31 @@ test('the report names counts, changed pages, axe additions and job time', () =>
   assert.match(text, /\| a-dark \| label \| critical \| 1 \|/);
 });
 
+test('changed pages render inline as images from the asset base, capped, with the selection line', () => {
+  const changed = Array.from({ length: 10 }, (_, i) => `p${i}-dark.png`);
+  const text = render({
+    classes: { changed, added: [], removed: [], unchanged: 0 },
+    axeDiff: { added: [], fixed: [] },
+    baseTotals: totals(new Map()),
+    headTotals: totals(new Map()),
+    headErrors: [],
+    baseErrors: [],
+    assetBase: 'https://raw.githubusercontent.com/o/r/abc/screens',
+    selection: { all: false, count: 10, total: 44 },
+  });
+  assert.match(
+    text,
+    /Audited 10 of 44 pages \(only the routes this diff touches\); baseline is the merge base on main\./,
+  );
+  assert.match(
+    text,
+    /<img src="https:\/\/raw\.githubusercontent\.com\/o\/r\/abc\/screens\/p0-dark\.base\.png" width="320"/,
+  );
+  assert.match(text, /p7-dark\.diff\.png/);
+  assert.doesNotMatch(text, /p8-dark\.diff\.png/);
+  assert.match(text, /2 more changed pages are in the artifact\./);
+});
+
 test('changed pages are copied with base, head and the Playwright diff', () => {
   const dir = makeTestTempDir('pr-screens-');
   try {
