@@ -71,11 +71,12 @@ for (const theme of ['light', 'dark'] as const) {
   test.describe(theme, () => {
     test.use({ colorScheme: theme });
 
-    test('the Coordinator Send button stays readable while pressed', async ({ page }) => {
+    test('the Coordinator answer button stays readable while pressed', async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app?scenario=chief-question');
       await page.getByTestId('home-c').locator('.chief-composer textarea, .chief-composer [contenteditable]').first().fill('hello');
-      await expectReadable(page, page.getByTestId('home-c').getByRole('button', { name: '发送' }), 'chief send');
+      await page.getByTestId('chief-question-option-0-0').click();
+      await expectReadable(page, page.getByTestId('chief-question-primary'), 'chief answer');
     });
 
     test('the thread composer Send button stays readable while pressed', async ({ page }) => {

@@ -1341,7 +1341,6 @@ export const EN: Record<string, string> = {
   提交回答: 'Submit answers',
   输入你的回答: 'Type your answer',
   '（推荐）': '(Recommended)',
-  用我自己的话回答: 'Answer in my own words',
   '{n} / {total}': '{n} of {total}',
   '已选 {n} 项': '{n} selected',
   未选: 'None selected',
