@@ -33,3 +33,84 @@ No source documents a mid-run model switch. Cairn pins a step to the decision re
 - At claim the decision is written once to `step_route` (step id, harness, provider, model, machine, difficulty, reason, rejected candidates). Any later read for that step reuses the stored row, so a step never changes model in flight, and the step's OTel span carries the same fields as `cairn.route.*` for Langfuse.
 - Difficulty comes from an explicit `difficulty:easy|standard|hard` marker in the todo, else spec length (under 300 characters easy, 3000 or more hard). It is crude and recorded on every decision so the thresholds can be tuned from traces.
 - `ROUTING_USES` / `resolveRouting` stay as the read-only settings view; `ROUTE_USES` rows are what dispatch uses, now through the router.
+
+## Live evidence
+
+Run on a verify-cairn scratch stack (server port 8791, fresh `CAIRN_HOME`) at commit f3d78323e plus the journal newline fix. One machine was set to report Claude Code and a valid Codex login; the `routing_rule` rows match the live shape (`session` pinned to `claude-code` / `claude-sonnet-5-5`). Each todo was started with `POST /api/projects/:id/builds` and claimed with `POST /api/machine/tasks/claim`; the `step_route` row is read back from SQLite. Not exercised: real model execution.
+
+```text
+
+### routing_rule rows (live-DB shape: only a session default pinned to Sonnet)
+[
+  {
+    "use": "session",
+    "provider": "claude-code",
+    "modelId": "claude-sonnet-5-5",
+    "thinkingLevel": "low"
+  },
+  {
+    "use": "review",
+    "provider": "claude-code",
+    "modelId": "claude-sonnet-5-5",
+    "thinkingLevel": "low"
+  }
+]
+
+### request: POST /api/projects/CTkdBuWyBm2Yw0jzbwtxy/todos {title:"Rename one label", spec:"rename the export button label"...} then POST /builds -> 201
+
+
+### response: POST /api/machine/tasks/claim -> 200
+{
+  "step": {
+    "id": "X2athYCKaogcCdzBhFBbj",
+    "kind": "session"
+  },
+  "agent": {
+    "provider": "claude-code",
+    "modelId": "claude-haiku-5-5",
+    "thinkingLevel": "low"
+  }
+}
+
+### step_route row for Rename one label
+{
+  "stepId": "X2athYCKaogcCdzBhFBbj",
+  "kind": "session",
+  "difficulty": "easy",
+  "harness": "claude-code",
+  "provider": "claude-code",
+  "modelId": "claude-haiku-5-5",
+  "machineId": "BfRcUspNMyY3BLj4QWGWj",
+  "reason": "easy: claude-haiku-5-5 ranked first",
+  "rejected": "[{\"modelId\":\"claude-haiku-5-5\",\"machineId\":\"bEwt5-CifTwWHnfOqgOMk\",\"why\":\"harness-missing\"}]"
+}
+
+### request: POST /api/projects/CTkdBuWyBm2Yw0jzbwtxy/todos {title:"Queue migration", spec:"difficulty:hard Move the scheduler queue to the new store an"...} then POST /builds -> 201
+
+
+### response: POST /api/machine/tasks/claim -> 200
+{
+  "step": {
+    "id": "o74FVOtjSgnsuF5sQjhV-",
+    "kind": "session"
+  },
+  "agent": {
+    "provider": "openai-codex",
+    "modelId": "gpt-6.1-sol",
+    "thinkingLevel": "low"
+  }
+}
+
+### step_route row for Queue migration
+{
+  "stepId": "o74FVOtjSgnsuF5sQjhV-",
+  "kind": "session",
+  "difficulty": "hard",
+  "harness": "pi",
+  "provider": "openai-codex",
+  "modelId": "gpt-6.1-sol",
+  "machineId": "BfRcUspNMyY3BLj4QWGWj",
+  "reason": "hard: gpt-6.1-sol ranked first",
+  "rejected": "[]"
+}
+```
