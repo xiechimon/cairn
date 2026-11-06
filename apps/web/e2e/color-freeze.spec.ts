@@ -31,12 +31,6 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     'running-bar': '#6fa35c',
     'running-track': '#2e3430',
     'accent-hover': '#33290f',
-    'project-tile-1': '#6f9c5f',
-    'project-tile-2': '#b98a57',
-    'project-tile-3': '#6f93bb',
-    'project-tile-4': '#9a7cad',
-    'project-tile-5': '#5fa3a0',
-    'project-tile-6': '#b77f8a',
   },
   light: {
     canvas: '#e6e7e1',
@@ -68,12 +62,6 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     'running-bar': '#55833f',
     'running-track': '#e1e3dc',
     'accent-hover': '#f7ecd2',
-    'project-tile-1': '#3f6c35',
-    'project-tile-2': '#9a6b3a',
-    'project-tile-3': '#5379a0',
-    'project-tile-4': '#7a5b8e',
-    'project-tile-5': '#3d7c7a',
-    'project-tile-6': '#8a5560',
   },
 };
 

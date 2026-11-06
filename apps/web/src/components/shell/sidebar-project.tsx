@@ -201,7 +201,7 @@ export function SidebarGroupHeader({
         <ChevronDown
           aria-hidden
           className={cn(
-            'size-3 text-content-dim transition-transform duration-150',
+            'size-3.5 text-content-dim transition-transform duration-150',
             !expanded && '-rotate-90',
           )}
           strokeWidth={1.75}

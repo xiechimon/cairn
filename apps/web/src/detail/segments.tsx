@@ -13,7 +13,7 @@ const CODE_SKIN: Record<string, string> = {
     'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code leading-3',
   'doc-code': 'mx-0.5 rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-code',
 };
-const CODE_LINK_SKIN = 'bg-(--chip-plan-bg) text-(--chip-plan-fg)';
+const CODE_LINK_SKIN = 'bg-secondary text-content-secondary';
 
 interface SegmentsProps {
   segments: DocSegment[];

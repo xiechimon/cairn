@@ -56,10 +56,10 @@ const TONES: { tone: StatusTone; label: string }[] = [
 ];
 
 const TAGS = [
-  { id: 't1', name: 'frontend', color: 'var(--project-tile-1)' },
-  { id: 't2', name: 'infra', color: 'var(--project-tile-3)' },
-  { id: 't3', name: 'research', color: 'var(--project-tile-5)' },
-  { id: 't4', name: 'a very long tag name that truncates', color: 'var(--project-tile-6)' },
+  { id: 't1', name: 'frontend', color: 'var(--text-tertiary)' },
+  { id: 't2', name: 'infra', color: 'var(--text-secondary)' },
+  { id: 't3', name: 'research', color: 'var(--text-dim)' },
+  { id: 't4', name: 'a very long tag name that truncates', color: 'var(--text-tertiary)' },
 ];
 
 const MODELS = [

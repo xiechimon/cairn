@@ -41,14 +41,30 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 |---|---|---|
 | V1 | Colors, sizes, radii and shadows come from tokens. No hex, no arbitrary pixel values (`text-[13px]`, `ml-[10.5px]`). | G `ui-drift-gate`, `ui-debt-gate` |
 | V2 | Fonts are Source Serif 4, Instrument Sans and JetBrains Mono only. No Inter, system-ui default, Space Grotesk or another font that models converge on. | M computed `font-family` of every text node is in the set (CJK fallbacks allowed) |
-| V3 | No AI-default styling: no purple or blue-violet gradients, glow, gradient text, frosted blur panels, decorative blobs, emoji as icons or labels (a celebration emoji in a status line), or the same radius and shadow stamped on every block. | M no `linear-gradient` or `blur(` in new CSS except `bubble-gradient`; no emoji in `t()` strings |
+| V3 | No AI-default styling: no purple or blue-violet gradients, glow, gradient text, frosted blur panels, decorative blobs, emoji as icons or labels (a celebration emoji in a status line), or the same radius and shadow stamped on every block. There is no exception: the user bubble is a flat tint. | M no `linear-gradient` or `blur(` in new CSS; no emoji in `t()` strings |
 | V4 | Not everything is a card. A list is rows in one divided `ListCard`; no card inside a card; one card corner per page (`--radius-card`). | M nested `[data-slot=card]` count is 0 |
-| V5 | Three hues carry meaning: ochre means waiting on you, lichen means working, slate means ready for review. Everything else is the ink ladder. Status is icon, color and text, never color alone. Lists and sidebar rows are the exception and follow L1 and L2: one accent only, because a column of three saturated glyphs read as noise next to Amp and t3code (2026-11-06 owner review of #3144). | G `ui-drift-gate`; H |
+| V5 | Three roles carry colour. Ochre, the one accent, means waiting on you. Green is a 6px dot for running or online and nothing else. Rust is failure and destructive actions only. Everything else is the ink ladder (slate and per-project hues are retired). Status is icon, color and text, never color alone. Lists and sidebar rows are the exception and follow L1 and L2: one accent only. | G `ui-drift-gate`, `test/anti-slop-foundations.test.ts`; H |
 | V6 | One primary action per screen, and it is the `primary` Button. Card actions are text links. | H |
 | V7 | Elevation is `--e1`, `--e2` or `--e3` only; no second ring and no raw `box-shadow`. | G `ui-drift-gate` |
 | V8 | Spacing is on the 4px grid. | G `ui-debt-gate`; M computed margins and paddings are multiples of 4 |
-| V9 | Icons are lucide at stroke 1.75 from the project icon set; never invent an icon name, check that the import exists. | G `test/icon-stroke.test.ts`, `pnpm typecheck` |
+| V9 | Icons are lucide from the project icon set; never invent an icon name, check that the import exists. Stroke and size are V14. | G `pnpm typecheck` |
 | V10 | Pages compose existing pieces (`EmptyState`, `SettingsHeader`, `SettingsCard`, `FormStack`, `DialogShell`, `SegmentedTabs`, `ThreadRow`, `SidePanel`) before building their own. | G `ui-page-style-gate`, `ui-drift-gate` |
+
+Anti-slop rules (audit `docs/research/ui-ux-audit-2026-11-06.md`, section on AI slop; batch 1 landed the foundations). Baselines come from `apps/web/.audit-slop.mjs` on the seeded verify stack (2 projects; the 7-project stack adds 5 projects), measured at `5f672eab9` (before) and on this change (after). Where a rule is marked M and a `G` gate is named, the gate already fails; the other M rows await the CI look-and-feel job and run non-blocking first (section 5).
+
+| Id | Rule | Check | Baseline: before, after (measured) |
+|---|---|---|---|
+| V11 | Identity carries no colour. No element is 1 to 2 characters, 14 to 44px square and tinted (a letter tile), and an avatar has no hue. A project shows its chosen icon or a neutral folder glyph. | M; G `test/anti-slop-foundations.test.ts` | letter tiles per screen 2 to 9 (home 7-project: 7), 16 of 27 screens; after: 0 |
+| V12 | At most 2 non-neutral hue families per screen (avatar `<img>` decoded and counted; provider brand marks and user content excluded). | M | home 7-project 6, team page 7, project settings 6; after: home 2, project settings 3 (ochre, green and one rust text), team page not re-measured |
+| V13 | Type budget. Font sizes come from the token steps, at most 6 per screen; at most 3 font weights per screen (ratchet first, then tighten); at most 9 size and weight pairs. | M | 4 weights on 19 of 27 screens, 16px on 1 screen, up to 11 pairs; after: unchanged, 4 weights is the open item |
+| V14 | Icon uniformity. Every lucide svg computes `stroke-width` 1.75px (`svg.lucide` in `app.css` pins it, so a component default of 2 cannot leak) and a size of 14, 16 or 18px (empty-state art and brand marks excluded). | M; G `test/icon-stroke.test.ts` (source scan) | stroke off 1.75: 5 of 15 icons on home, 16 of 27 on the machines pane, 131 of 456 overall; after: 0 of 22 on home, 0 of 34 on the machines pane |
+| V15 | Badge budget. At most 3 tinted short-text elements per screen (keycaps excluded); a tint is for "needs you" counts, and status is a dot plus text. | M | 3 to 12 per screen (home 7-project 8, activity 13, search 12); after: home 1, activity 1, search 5 including 4 keycaps (batch 2 owns the rest) |
+| V16 | No texture or gradient on surfaces. An element wider than 24px has `background-image: none` (progress bars and shimmer text excepted) and no `feTurbulence` data URI. | M; G `test/anti-slop-foundations.test.ts` | home 4, thread 4 to 7 gradient layers; after: 0 on every main screen |
+| V17 | A speaker is not repeated. For consecutive messages from one speaker, avatar images number at most the speaker changes plus 1. | M | home 14 avatars for 1 speaker (owned by #3165) |
+| V18 | Like rows fold. Three or more sibling rows with the same status text sit under one section heading. | M | team page `未设归属机` x6 (batch 2) |
+| V19 | A placeholder is not content. No text node consists only of `—`, `·` or `-` (extends C2 to trailing `—` and `· —`). | M | activity 7, machine settings 3, thread 1 (batch 2) |
+| T3 | No text node contains a backtick; code renders as `<code>`. | M | machine settings 1 (batch 2) |
+| V20 | An object list is rows in one card, not a grid of identical cards; a card grid is for true parallel choices only. | H | team page against t3code providers (batch 2) |
 
 ## 3b. Lists and sidebars
 
