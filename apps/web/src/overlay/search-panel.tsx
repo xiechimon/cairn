@@ -11,7 +11,7 @@ import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { Kbd } from '../components/ui/kbd.js';
+import { ShortcutHint } from '../components/ui/kbd.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -555,7 +555,7 @@ export function SearchPanel({
                       <Activity width={15} height={15} />
                       {t('在活动里查看全部 {n} 条', { n: viewAllCount })}
                       <span className={ROW_END}>
-                        <Kbd>⌘↵</Kbd>
+                        <ShortcutHint keys={['mod', 'enter']} />
                       </span>
                     </Button>
                   </>
@@ -572,17 +572,16 @@ export function SearchPanel({
         )}
         <div className="flex h-9 flex-none items-center gap-4 border-t border-border px-3.5 text-caption text-content-tertiary">
           <span className="flex items-center gap-1.5">
-            <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd>
+            <ShortcutHint keys={['up', 'down']} />
             {t('移动')}
           </span>
           <span className="flex items-center gap-1.5">
-            <Kbd>↵</Kbd>
+            <ShortcutHint keys={['enter']} />
             {t('打开')}
           </span>
           {activeContext != null && (
             <span className="flex items-center gap-1.5">
-              <Kbd>⌫</Kbd>
+              <ShortcutHint keys={['backspace']} />
               {t('移除上下文')}
             </span>
           )}
@@ -597,7 +596,7 @@ export function SearchPanel({
               <CircleHelp data-icon="inline-start" />
               {t('语法')}
             </Button>
-            <Kbd>Esc</Kbd>
+            <ShortcutHint keys={['Esc']} />
             {t('关闭')}
           </span>
         </div>

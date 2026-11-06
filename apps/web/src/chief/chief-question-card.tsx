@@ -22,7 +22,7 @@ import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { Kbd } from '../components/ui/kbd.js';
+import { ShortcutHint } from '../components/ui/kbd.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -94,8 +94,6 @@ function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
 }
 
 type Question = ChiefQuestionItem['questions'][number];
-
-const MOD_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
 function digitsReachCard(target: HTMLElement): boolean {
   if (target.isContentEditable) return false;
@@ -463,9 +461,7 @@ export function ChiefQuestionCard({
           </Button>
           <Button className={DIALOG_PRIMARY_BUTTON} disabled={!primaryEnabled} onClick={advance}>
             {last ? t('提交回答') : t('下一步')}
-            <Kbd className="pointer-coarse:hidden bg-primary-foreground/15 text-primary-foreground">
-              {MOD_KEY} ↵
-            </Kbd>
+            <ShortcutHint keys={['mod', 'enter']} className="pointer-coarse:hidden ml-1" />
           </Button>
         </div>
       </div>

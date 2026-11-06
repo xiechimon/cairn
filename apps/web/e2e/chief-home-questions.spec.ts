@@ -371,7 +371,10 @@ test('the primary button shows its shortcut and Ctrl+Enter or Cmd+Enter submits 
   });
   await page.goto('/app');
   const dock = page.getByTestId('chief-question-dock');
-  await expect(dock.getByRole('button', { name: /提交回答/ }).locator('kbd')).toBeVisible();
+  const keys = dock.getByRole('button', { name: /提交回答/ }).locator('[data-slot="kbd"]');
+  await expect(keys).toHaveCount(2);
+  await expect(keys.last().locator('svg')).toBeVisible();
+  await expect(keys.last()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await dock.getByTestId('chief-question-option-0-1').click();
   await dock.getByTestId('chief-question-option-0-1').press('Control+Enter');
   await expect.poll(() => answered.length).toBe(1);
