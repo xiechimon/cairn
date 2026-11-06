@@ -360,6 +360,7 @@ describe('subscription authorization boundaries', () => {
           endpoint,
           p256dh: 'original-key',
           auth: 'original-auth',
+          pairedDeviceId: null,
           createdAt: 1,
         };
         s.db.insert(pushSubscription).values(original).run();
