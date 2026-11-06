@@ -60,3 +60,49 @@ for (const path of [
     await expectNoConclusion(page);
   });
 }
+
+test('results panel shows loaded todos while the schedules query is still pending', async ({ page }) => {
+  await page.route('**/api/**', (route, request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/stream')) return route.abort();
+    if (request.method() !== 'GET') return route.fallback();
+    if (path === '/api/teams')
+      return route.fulfill({
+        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+      });
+    if (path === '/api/user/me')
+      return route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } });
+    if (path === '/api/todos')
+      return route.fulfill({
+        json: [
+          {
+            id: 'todo-1',
+            teamId: 'team-1',
+            projectId: 'proj-a',
+            title: 'ship the loaded result',
+            spec: 'ship the loaded result',
+            phase: 'done',
+            phaseAt: 1,
+            seqNum: 1,
+            orderIndex: 0,
+            tagIds: [],
+            assignment: null,
+            agent: null,
+            latestBuildId: null,
+            lastRunAt: 0,
+            hasChanges: false,
+            hasPlan: false,
+            buildHistory: [],
+            sourceTodo: null,
+            v: 1,
+          },
+        ],
+      });
+    if (path === '/api/schedules') return new Promise(() => undefined);
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
+  await page.goto('/app');
+  await page.getByRole('button', { name: '成果' }).first().click();
+  await expect(page.getByText('ship the loaded result')).toBeVisible();
+  await expect(page.getByTestId('query-loading')).toHaveCount(0);
+});

@@ -2,7 +2,7 @@ import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
-import { QueryBoundary, type QueryLike } from '../components/query-state.js';
+import { mergeQueries, QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
@@ -31,7 +31,8 @@ interface WorkPanelProps {
   now: number;
   onClose: () => void;
   onOpenThread: (id: string) => void;
-  query?: QueryLike;
+  todosQuery?: QueryLike;
+  schedulesQuery?: QueryLike;
 }
 
 export function WorkPanel({
@@ -41,7 +42,8 @@ export function WorkPanel({
   now,
   onClose,
   onOpenThread,
-  query,
+  todosQuery,
+  schedulesQuery,
 }: WorkPanelProps) {
   const { t } = useI18n();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
@@ -141,8 +143,14 @@ export function WorkPanel({
       </SidePanelHead>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-4">
         <QueryBoundary
-          query={query}
-          isEmpty={todos.length === 0 && schedules.length === 0}
+          query={
+            pane === 'tasks' && todosQuery !== undefined && schedulesQuery !== undefined
+              ? mergeQueries(todosQuery, schedulesQuery)
+              : todosQuery
+          }
+          isEmpty={
+            pane === 'tasks' ? todos.length === 0 && schedules.length === 0 : made.length === 0
+          }
           loadingLabel={pane === 'tasks' ? t('正在加载任务') : t('正在加载成果')}
           errorTitle={pane === 'tasks' ? t('任务没能加载') : t('成果没能加载')}
           empty={pane === 'tasks' ? tasksView : madeView}

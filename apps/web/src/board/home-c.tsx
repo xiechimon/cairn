@@ -104,7 +104,8 @@ interface HomeCProps {
   schedules?: readonly ScheduleRecord[];
   coordinatorMachineId?: string | null;
   machinesQuery?: QueryLike;
-  workQuery?: QueryLike;
+  todosQuery?: QueryLike;
+  schedulesQuery?: QueryLike;
 }
 
 function projectHomeSearch(params: URLSearchParams): string {
@@ -124,7 +125,8 @@ export function HomeC({
   schedules = [],
   coordinatorMachineId = null,
   machinesQuery,
-  workQuery,
+  todosQuery,
+  schedulesQuery,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -416,7 +418,8 @@ export function HomeC({
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}
-          query={workQuery}
+          todosQuery={todosQuery}
+          schedulesQuery={schedulesQuery}
         />
       )
     );

@@ -28,7 +28,6 @@ import { useCloseThread } from '../board/thread-link.js';
 import { BoardQuestionBar, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
-import { mergeQueries } from '../components/query-state.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
@@ -228,7 +227,8 @@ export function BoardPage() {
               coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
               schedules={schedules}
               machinesQuery={live ? machinesQ : undefined}
-              workQuery={live ? mergeQueries(todosQ, schedulesQ) : undefined}
+              todosQuery={live ? todosQ : undefined}
+              schedulesQuery={live ? schedulesQ : undefined}
             />
           )}
           <ChiefQuestionPanel />
