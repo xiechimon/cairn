@@ -189,6 +189,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The azure apt mirror intermittently throttles to ~17 kB/s, stalling `--with-deps` font downloads for 10+ minutes.
+      - name: Use the primary Ubuntu mirror with bounded apt retries
+        run: |
+          sudo sed -i 's#azure.archive.ubuntu.com#archive.ubuntu.com#g' /etc/apt/apt-mirrors.txt
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-bounded > /dev/null
+
       # The integration vitest suites launch real Chromium; a missing executable fails browserType.launch.
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps
@@ -217,6 +223,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The azure apt mirror intermittently throttles to ~17 kB/s, stalling `--with-deps` font downloads for 10+ minutes.
+      - name: Use the primary Ubuntu mirror with bounded apt retries
+        run: |
+          sudo sed -i 's#azure.archive.ubuntu.com#archive.ubuntu.com#g' /etc/apt/apt-mirrors.txt
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-bounded > /dev/null
 
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps
@@ -264,6 +276,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # The azure apt mirror intermittently throttles to ~17 kB/s, stalling `--with-deps` font downloads for 10+ minutes.
+      - name: Use the primary Ubuntu mirror with bounded apt retries
+        run: |
+          sudo sed -i 's#azure.archive.ubuntu.com#archive.ubuntu.com#g' /etc/apt/apt-mirrors.txt
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-bounded > /dev/null
 
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps

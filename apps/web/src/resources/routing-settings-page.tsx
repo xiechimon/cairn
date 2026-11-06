@@ -294,7 +294,7 @@ export function RoutingSettingsPage() {
             hint={
               settings.enabled
                 ? t('CAIRN_ROUTING_RULES 已开启；调度走规则与策略。')
-                : t('CAIRN_ROUTING_RULES 仍关闭；可先编辑，切流在 PR9。')
+                : t('CAIRN_ROUTING_RULES=0 已关闭规则路由；调度仍走 Agent。')
             }
           >
             <span data-testid="routing-rules-enabled" className="text-ui text-content-secondary">
@@ -309,7 +309,7 @@ export function RoutingSettingsPage() {
             icon={Route}
             title={t('还没有路由规则。')}
             description={t(
-              '从现有 Agent 生成 session / review 规则与工作策略，或等 CAIRN_ROUTING_RULES 开启后由服务器种子写入。',
+              '从现有 Agent 生成 session / review 规则与工作策略，或重启服务器由启动迁移写入。',
             )}
             action={
               live

@@ -154,6 +154,7 @@ export async function startStack({
   };
   const server = start(join(checkout, 'apps/server'), 'src/index.ts', [], {
     CAIRN_HOME: join(root, 'server-home'),
+    CAIRN_ROUTING_RULES: '0',
     HOST: '127.0.0.1',
     PORT: String(port),
   });

@@ -1,0 +1,18 @@
+#!/bin/bash
+# Run a whole-repo check in one of up to six machine-wide slots (omarchy load rule, 2026-11-04).
+# Usable slots = clamp(floor(MemAvailable GiB / 3), 1, 6); measured 2026-11-06: full typecheck 2.6 GiB, lint 0.7 GiB, targeted vitest 1.1 GiB peak, read at call time.
+set -u
+[ $# -gt 0 ] || { echo "usage: cairn-heavy <command...>" >&2; exit 2; }
+slots=(/tmp/cairn-heavy-check.lock /tmp/cairn-heavy-check-2.lock /tmp/cairn-heavy-check-3.lock /tmp/cairn-heavy-check-4.lock /tmp/cairn-heavy-check-5.lock /tmp/cairn-heavy-check-6.lock)
+mem_kib=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+usable=$(( mem_kib / 3145728 ))
+(( usable < 1 )) && usable=1
+(( usable > 6 )) && usable=6
+for (( n = 0; n < usable; n++ )); do
+  exec {fd}>"${slots[$n]}"
+  if flock -n "$fd"; then "$@"; rc=$?; exit $rc; fi
+  exec {fd}>&-
+done
+i=$(( RANDOM % usable )); exec {fd}>"${slots[$i]}"
+flock -w 3600 "$fd" || { echo "cairn-heavy: timed out waiting for a slot" >&2; exit 75; }
+"$@"

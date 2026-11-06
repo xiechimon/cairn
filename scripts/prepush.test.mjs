@@ -520,6 +520,7 @@ test('code changes keep suites in CI and out of local plans', () => {
       assert.ok(!plan.some((step) => step.includes('e2e:affected')));
       assert.deepEqual(prepushPlan(paths, 'ci', forceFull), [
         ['node', 'scripts/english-only-gate.mjs'],
+        ['node', 'scripts/journal-newline-gate.mjs'],
         ['node', 'scripts/ui-debt-gate.mjs'],
         ['node', 'scripts/ui-drift-gate.mjs'],
         ['node', 'scripts/ui-page-style-gate.mjs'],

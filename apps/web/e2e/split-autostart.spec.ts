@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ENV_VARS } from '@cairn/shared';
 import { bootLiveServer, type LiveServer } from './live-server';
 
 interface Stage {
@@ -17,7 +18,7 @@ interface TodoWire {
 let server: LiveServer;
 
 test.beforeAll(async () => {
-  server = await bootLiveServer(null);
+  server = await bootLiveServer(null, { [ENV_VARS.routingRules]: '0' });
 });
 
 test.afterAll(async () => {

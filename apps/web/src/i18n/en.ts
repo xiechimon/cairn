@@ -1602,13 +1602,13 @@ export const EN: Record<string, string> = {
   路由规则开关: 'Routing rules switch',
   'CAIRN_ROUTING_RULES 已开启；调度走规则与策略。':
     'CAIRN_ROUTING_RULES is on; dispatch uses rules and policies.',
-  'CAIRN_ROUTING_RULES 仍关闭；可先编辑，切流在 PR9。':
-    'CAIRN_ROUTING_RULES is still off; edit now, cutover is PR9.',
+  'CAIRN_ROUTING_RULES=0 已关闭规则路由；调度仍走 Agent。':
+    'CAIRN_ROUTING_RULES=0 turned rules off; dispatch still uses agents.',
   规则已启用: 'Enabled',
   规则未启用: 'Disabled',
   '还没有路由规则。': 'No routing rules yet.',
-  '从现有 Agent 生成 session / review 规则与工作策略，或等 CAIRN_ROUTING_RULES 开启后由服务器种子写入。':
-    'Seed session/review rules and work policies from agents, or wait for server seeding when CAIRN_ROUTING_RULES is on.',
+  '从现有 Agent 生成 session / review 规则与工作策略，或重启服务器由启动迁移写入。':
+    'Seed session/review rules and work policies from agents, or restart the server so the startup migration writes them.',
   '从 Agent 生成': 'Seed from agents',
   '已从 Agent 生成规则与策略': 'Seeded rules and policies from agents',
   '生成失败，请重试。': 'Seeding failed. Try again.',

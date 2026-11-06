@@ -160,7 +160,7 @@ export function RouteOverrideDialog({
         >
           {routingEnabled
             ? t('CAIRN_ROUTING_RULES 已开启；调度走规则与策略。')
-            : t('CAIRN_ROUTING_RULES 仍关闭；可先编辑，切流在 PR9。')}
+            : t('CAIRN_ROUTING_RULES=0 已关闭规则路由；调度仍走 Agent。')}
         </p>
         <SettingsCard>
           <SettingsRow label={t('首选机器')} hint={t('不填则沿用规则或 Agent 的机器')}>

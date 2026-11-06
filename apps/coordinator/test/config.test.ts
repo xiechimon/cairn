@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { envFlagOn, readConfig, readMachineToken } from '../src/config.js';
+import { readConfig, readMachineToken } from '../src/config.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -33,15 +33,13 @@ describe('readMachineToken', () => {
 });
 
 describe('router tools flag', () => {
-  it('follows the same on-values as the server flag', () => {
-    for (const on of ['1', 'true', 'TRUE', 'yes']) expect(envFlagOn(on)).toBe(true);
-    for (const off of [undefined, '', '0', 'false', 'no']) expect(envFlagOn(off)).toBe(false);
-  });
-
-  it('is read from CAIRN_ROUTING_RULES', () => {
+  it('is on unless CAIRN_ROUTING_RULES switches it off', () => {
     const token = tokenFile(0o600);
     const base = { CAIRN_COORDINATOR_TOKEN_FILE: token };
-    expect(readConfig(base).routerTools).toBe(false);
+    expect(readConfig(base).routerTools).toBe(true);
     expect(readConfig({ ...base, CAIRN_ROUTING_RULES: '1' }).routerTools).toBe(true);
+    for (const off of ['0', 'false', 'no', 'off']) {
+      expect(readConfig({ ...base, CAIRN_ROUTING_RULES: off }).routerTools).toBe(false);
+    }
   });
 });
