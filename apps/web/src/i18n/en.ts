@@ -1758,8 +1758,6 @@ export const EN: Record<string, string> = {
   模型服务没能加载: 'Providers did not load',
   正在加载工作路由: 'Loading work routing',
   工作路由没能加载: 'Work routing did not load',
-  正在加载团队: 'Loading the team',
-  团队没能加载: 'The team did not load',
   正在加载命令记录: 'Loading command history',
   命令记录没能加载: 'Command history did not load',
   '正在加载 Coordinator 的电脑': "Loading the Coordinator's computer",
