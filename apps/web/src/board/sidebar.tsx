@@ -27,10 +27,11 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetStatusLine } from './fleet-status.js';
+import { needsYouCount } from './needs-you.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
 import { SidebarThreadGroups } from './sidebar-thread-groups.js';
-import { groupThreads } from './sidebar-threads.js';
+import { groupThreads, visibleTodos } from './sidebar-threads.js';
 import { THREAD_PARAM, threadHref } from './thread-copy.js';
 
 export type SidebarSelected =
@@ -58,7 +59,6 @@ const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
 interface BoardSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
-  attention?: number;
   machinesOnline?: number;
   machinesOffline?: number;
   offlineMachineNames?: string[];
@@ -163,7 +163,6 @@ function AttentionBadge({ count }: { count: number }) {
 export function BoardSidebar({
   collapsed = false,
   onToggle,
-  attention = 0,
   machinesOffline = 0,
   machinesOnline = 0,
   offlineMachineNames = [],
@@ -207,10 +206,15 @@ export function BoardSidebar({
         onToggleArchive={() => onArchiveProject(row.id, !archived)}
       />
     );
-  const threadGroups = useMemo(
-    () => groupThreads(todos ?? [], activeProject),
-    [todos, activeProject],
+  const shownTodos = useMemo(
+    () => visibleTodos(todos ?? [], new Set(archivedRows.map((row) => row.id)), activeProject),
+    [todos, archivedRows, activeProject],
   );
+  const threadGroups = useMemo(
+    () => groupThreads(shownTodos, activeProject),
+    [shownTodos, activeProject],
+  );
+  const attention = needsYouCount(shownTodos);
   const projectNames = useMemo(
     () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
     [projectRows, archivedRows],

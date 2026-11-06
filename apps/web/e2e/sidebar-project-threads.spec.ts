@@ -81,3 +81,32 @@ test('opening and closing a thread keeps the project filter', async ({ page }) =
   await expect(page).toHaveURL(/[?&]project=proj-1/);
   await expect(sidebar).not.toContainText('Other project');
 });
+
+test('threads of an archived project leave the groups and counts until it is selected', async ({
+  page,
+}) => {
+  const now = Date.now();
+  const todos = [
+    { ...TASK, id: 't-live', title: 'Live thread', phase: 'building', phaseAt: now - 5 * MIN },
+    {
+      ...TASK,
+      id: 't-old',
+      projectId: 'proj-old',
+      title: 'Archived project thread',
+      phase: 'confirm',
+      phaseAt: now - 5 * MIN,
+    },
+  ];
+  const projects = [PROJECT, { ...PROJECT, id: 'proj-old', name: 'attic', archivedAt: now }];
+  await mockLive(page, { threads: [THREAD], messages: [], todos, projects });
+  await page.goto('/app');
+  const sidebar = page.locator('aside.board-sidebar');
+  await expect(sidebar).toContainText('Live thread');
+  await expect(sidebar).not.toContainText('Archived project thread');
+  await expect(sidebar.getByTestId('thread-group-needs-you')).toHaveCount(0);
+  await expect(sidebar.getByTestId('attention-badge')).toHaveCount(0);
+  await sidebar.getByTestId('archived-group').getByRole('button').first().click();
+  await sidebar.locator('[data-slot="sidebar-project-row"]', { hasText: 'attic' }).click();
+  await expect(sidebar).toContainText('Archived project thread');
+  await expect(sidebar.getByTestId('attention-badge')).toHaveText('1');
+});

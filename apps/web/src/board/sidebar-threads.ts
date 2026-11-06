@@ -25,6 +25,16 @@ function runningRank(todo: TodoRecord): number {
   return RUNNING_RANK[threadStatus(todo)] ?? 0;
 }
 
+export function visibleTodos(
+  todos: readonly TodoRecord[],
+  archivedProjectIds: ReadonlySet<string>,
+  selectedProjectId: string | null,
+): TodoRecord[] {
+  return todos.filter(
+    (todo) => !archivedProjectIds.has(todo.projectId) || todo.projectId === selectedProjectId,
+  );
+}
+
 export function groupThreads(todos: readonly TodoRecord[], projectId: string | null): ThreadGroups {
   const groups: ThreadGroups = { needsYou: [], running: [], done: [] };
   for (const todo of todos) {

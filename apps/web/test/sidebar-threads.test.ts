@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { PHASE_VALUES } from '../src/fixtures/records.js';
 import { threadStatus } from '../src/board/thread-copy.js';
-import { elapsedSince, groupThreads } from '../src/board/sidebar-threads.js';
+import { elapsedSince, groupThreads, visibleTodos } from '../src/board/sidebar-threads.js';
 import { NOW, todo } from './helpers.js';
 
 const inProject = (seq: number, phase: Parameters<typeof todo>[1], projectId = 'p1') => ({
@@ -106,4 +106,12 @@ test('elapsed time is blank under a minute, then minutes, hours and days', () =>
   expect(elapsedSince(NOW - 3_600_000, NOW)).toEqual({ n: 1, unit: 'h' });
   expect(elapsedSince(NOW - 2 * 86_400_000, NOW)).toEqual({ n: 2, unit: 'd' });
   expect(elapsedSince(NOW + 5000, NOW)).toBeNull();
+});
+
+test('threads of an archived project show only when that project is selected', () => {
+  const rows = [inProject(1, 'building', 'p1'), inProject(2, 'building', 'p2')];
+  const archived = new Set(['p2']);
+  expect(nums(visibleTodos(rows, archived, null))).toEqual([1]);
+  expect(nums(visibleTodos(rows, archived, 'p1'))).toEqual([1]);
+  expect(nums(visibleTodos(rows, archived, 'p2'))).toEqual([1, 2]);
 });
