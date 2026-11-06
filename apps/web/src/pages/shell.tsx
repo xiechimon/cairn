@@ -2,7 +2,6 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
-import { ChiefQuestionEntry, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -92,7 +91,6 @@ export function PageShell({
             >
               {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
               <div className="ml-auto flex flex-none items-center gap-0.5 empty:hidden">
-                <ChiefQuestionEntry />
                 {actions}
               </div>
             </div>
@@ -114,10 +112,7 @@ export function PageShell({
                 {title}
               </h1>
               {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
-              <div className="ml-auto flex flex-none items-center gap-0.5">
-                <ChiefQuestionEntry />
-                {actions}
-              </div>
+              <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
             </header>
           )}
           <div
@@ -132,7 +127,6 @@ export function PageShell({
             )}
           </div>
         </div>
-        <ChiefQuestionPanel />
       </div>
     </div>
   );

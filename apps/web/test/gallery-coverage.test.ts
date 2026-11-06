@@ -13,6 +13,8 @@ const NOT_IN_GALLERY: Record<string, string> = {
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
   'queued-capsules.tsx':
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
+  'shortcut-hint.tsx':
+    'Rendered inside the Question card specimen (the Ctrl and return keycaps) and the search panel.',
 };
 
 function walk(dir: string): string[] {

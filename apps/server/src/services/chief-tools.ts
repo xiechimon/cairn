@@ -512,6 +512,7 @@ export async function executeChiefTool(
     }
     case 'issues':
     case 'pull_requests':
+    case 'github_overlap':
     case 'workflow_runs':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
