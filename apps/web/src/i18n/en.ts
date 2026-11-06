@@ -176,6 +176,11 @@ export const EN: Record<string, string> = {
   还没有完成的工作: 'Nothing finished yet',
   '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
   新建项目: 'New project',
+  已归档: 'Archived',
+  归档: 'Archive',
+  '{name} 的菜单': '{name} menu',
+  '无法归档项目。': 'Could not archive the project.',
+  '无法取消归档项目。': 'Could not unarchive the project.',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   需要你: 'Needs you',
   在跑: 'Running',

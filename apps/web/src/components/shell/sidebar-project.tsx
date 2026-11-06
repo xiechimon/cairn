@@ -14,7 +14,9 @@ export interface SidebarProjectRowProps {
   color?: ProjectColor | null | undefined;
   waiting?: number;
   active?: boolean;
+  muted?: boolean;
   onClick?: () => void;
+  menu?: ReactNode;
 }
 
 export function SidebarProjectRow({
@@ -24,9 +26,11 @@ export function SidebarProjectRow({
   color,
   waiting = 0,
   active = false,
+  muted = false,
   onClick,
+  menu,
 }: SidebarProjectRowProps) {
-  return (
+  const button = (
     <Button
       variant="ghost"
       onClick={onClick}
@@ -37,6 +41,8 @@ export function SidebarProjectRow({
         active
           ? 'font-semibold text-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover'
           : 'text-content-secondary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover',
+        muted && !active && 'text-content-tertiary',
+        menu != null && 'pr-8',
       )}
     >
       <ProjectAvatar
@@ -51,12 +57,21 @@ export function SidebarProjectRow({
       {waiting > 0 && (
         <span
           data-slot="sidebar-project-count"
-          className="ml-auto flex-none text-caption font-normal text-content-tertiary tabular-nums"
+          className="ml-auto flex-none group-focus-within/project:hidden group-hover/project:hidden text-caption font-normal text-content-tertiary tabular-nums"
         >
           {waiting}
         </span>
       )}
     </Button>
+  );
+  if (menu == null) return button;
+  return (
+    <div className="group/project relative">
+      {button}
+      <span className="absolute top-1/2 right-1 hidden -translate-y-1/2 group-focus-within/project:inline-flex group-hover/project:inline-flex has-aria-expanded:inline-flex [@media(hover:none)]:inline-flex">
+        {menu}
+      </span>
+    </div>
   );
 }
 
