@@ -143,12 +143,9 @@ export function RemoteAccessPage() {
       )}
       {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
         devices.length === 0 && (
-          <EmptyState
-            testId="remote-routes-empty"
-            className="mt-6"
-            icon={Smartphone}
-            title={t('还没有配对的设备')}
-          />
+          <p className="m-0 mt-3 text-meta text-content-tertiary" data-testid="remote-routes-empty">
+            {t('还没有配对的设备')}
+          </p>
         )
       ) : routes.length === 0 ? (
         <EmptyState
