@@ -392,40 +392,8 @@ export function decide(
   limitHit = false,
   wait = null,
   rounds = NO_ROUNDS,
-  security = null,
 ) {
   const sha = pr.head.sha;
-  let receiptApproved = false;
-  if (security) {
-    const review = security.state;
-    const threadsClear = securityThreadsClear(threads);
-    receiptApproved =
-      threadsClear &&
-      review?.hasUnresolvedFindings === null &&
-      cleanSecurityReceipt(pr, security.receiptEvidence, threads);
-    const clean =
-      review?.commitSha === sha &&
-      review.status === 'completed' &&
-      threadsClear &&
-      (review.hasUnresolvedFindings === false || receiptApproved);
-    if (!clean) {
-      const reason = !review
-        ? 'No trusted security review state is available.'
-        : review.commitSha !== sha
-          ? 'The security review is bound to another head.'
-          : !threadsClear
-            ? 'Security findings remain unresolved or thread attribution is unknown.'
-            : review.status !== 'completed'
-              ? 'The security review has not completed successfully.'
-              : 'The security review does not explicitly report zero unresolved findings.';
-      return {
-        status: 'completed',
-        conclusion: 'failure',
-        title: `Codex security review required for ${short(sha)}`,
-        summary: `Canonical security surfaces require a trusted Codex security review completed on ${sha} with has_unresolved_findings=false or the narrowly verified D88 null-state receipt proof. ${reason} Request \`@codex security review\`; resolve every security finding regardless of severity or builtin merge-gate settings.`,
-      };
-    }
-  }
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
   if (limitHit && !reviewedHead)
     return {
@@ -477,7 +445,7 @@ export function decide(
       title: `No open P0/P1 Codex findings for ${short(sha)}`,
       summary: `Codex reviewed this head and no unresolved P0 or P1 thread remains.${
         blockedHeads > 0 ? ` Cycles to pass: ${blockedHeads} blocked head(s) before this one.` : ''
-      }${security ? (receiptApproved ? ' Codex security reviewed this exact head: D88 clean receipt verified against commit identity, freshness and unresolved security threads.' : ' Codex security reviewed this exact head with no unresolved findings.') : ''}${carried}`,
+      }${carried}`,
       removeStall: true,
     };
   const round = rounds.others + 1;

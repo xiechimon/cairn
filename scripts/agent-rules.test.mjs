@@ -30,25 +30,10 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
   assert.ok(!agents.includes('codex exec` from Claude'));
 });
 
-test('canonical security guidance requires exact-head clean Codex SECURITY state without a Claude rerun', () => {
+test('the security review is not part of the merge route', () => {
   const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
-  assert.match(agents, /Codex `security_review` state on the exact head/);
-  assert.match(agents, /`status=completed` and `has_unresolved_findings=false`/);
-  assert.match(agents, /plus green CI and `review-gate` SUCCESS/);
-  assert.match(agents, /resolve every security finding regardless of severity/);
-  assert.match(agents, /no later Claude rerun is required/);
-  assert.match(
-    agents,
-    /D88 permits an explicitly null unresolved field only with a trusted fresh clean SECURITY receipt/,
-  );
-  assert.match(
-    agents,
-    /Both approval paths require zero unresolved security-review threads at every severity/,
-  );
-  assert.match(agents, /unknown thread attribution blocks/);
-  assert.match(agents, /Missing fields, malformed values and explicit true stay blocked/);
-  assert.match(agents, /ordinary code review alone is insufficient/);
-  assert.doesNotMatch(agents, /Run `\/security-review`|plus `\/security-review`/);
+  assert.match(agents, /Codex security review is no longer part of the merge route/);
+  assert.doesNotMatch(agents, /Codex `security_review` state on the exact head/);
 });
 
 test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => {
