@@ -100,14 +100,13 @@ export function SubscriptionAccounts(props: SubscriptionAccountsProps) {
         vendor={vendor}
         accounts={props.accounts.filter((a) => a.vendor === vendor)}
         now={props.now}
-        renderRow={(account, index) => {
+        renderRow={(account) => {
           const steps = props.stepsByAccount[account.id];
           const expanded = open === account.id;
           return (
             <div key={account.id} className="flex flex-col">
               <AccountRow
                 account={account}
-                index={index}
                 now={props.now}
                 actions={props.actionsFor(account)}
                 status={props.statusFor?.(account)}

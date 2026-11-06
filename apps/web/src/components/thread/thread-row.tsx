@@ -81,7 +81,7 @@ export function ThreadRow({
           </span>
           {pr != null && (
             <span className="inline-flex flex-none items-center gap-0.5 text-meta text-content-tertiary tabular-nums">
-              <GitPullRequest className="size-3" />#{pr}
+              <GitPullRequest className="size-3.5" />#{pr}
             </span>
           )}
         </span>

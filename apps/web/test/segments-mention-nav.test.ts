@@ -56,7 +56,7 @@ describe('segments mention navigation seam (#741)', () => {
 
     expect(markup).toMatch(/class="[^"]*\bmention-chip\b[^"]*"/);
     expect(markup).toMatch(/class="[^"]*\bmention-chip--agent\b[^"]*"/);
-    expect(markup).toContain('text-(--chip-done-fg)');
+    expect(markup).toContain('text-content-secondary');
     expect(markup).toContain('cursor-pointer');
   });
 });
