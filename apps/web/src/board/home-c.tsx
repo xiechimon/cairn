@@ -14,6 +14,7 @@ import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { EmptyState } from '../components/empty-state.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { TextureSkeleton } from '../components/texture/texture.js';
@@ -354,13 +355,18 @@ export function HomeC({
         open={pane === 'machines' && threadId === null}
         onToggle={() => togglePane('machines')}
       />
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('任务')}
-        aria-pressed={pane === 'tasks' && threadId === null}
-        onClick={() => togglePane('tasks')}
-        className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      <IconTooltip
+        label={t('任务')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-pressed={pane === 'tasks' && threadId === null}
+            onClick={() => togglePane('tasks')}
+            className="relative text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+          />
+        }
       >
         <ListChecks aria-hidden="true" />
         {entries.length > 0 && (
@@ -370,17 +376,22 @@ export function HomeC({
             className="absolute top-1 right-1 size-1.5 rounded-full bg-(--card-button)"
           />
         )}
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('成果')}
-        aria-pressed={pane === 'made' && threadId === null}
-        onClick={() => togglePane('made')}
-        className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      </IconTooltip>
+      <IconTooltip
+        label={t('成果')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-pressed={pane === 'made' && threadId === null}
+            onClick={() => togglePane('made')}
+            className="text-content-tertiary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+          />
+        }
       >
         <PackageCheck aria-hidden="true" />
-      </Button>
+      </IconTooltip>
     </header>
   );
 

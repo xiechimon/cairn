@@ -577,26 +577,36 @@ export function ChiefConversation({
             </h2>
             <div className="ml-auto flex items-center gap-2.5">
               {onSettings != null && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={HEAD_ICON_BTN_CLS}
-                  aria-label={t('Coordinator 设置')}
-                  onClick={onSettings}
+                <IconTooltip
+                  label={t('Coordinator 设置')}
+                  side="bottom"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={HEAD_ICON_BTN_CLS}
+                      onClick={onSettings}
+                    />
+                  }
                 >
                   <ChiefGear />
-                </Button>
+                </IconTooltip>
               )}
               {onClose != null && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={HEAD_ICON_BTN_CLS}
-                  aria-label={t('最小化')}
-                  onClick={onClose}
+                <IconTooltip
+                  label={t('最小化')}
+                  side="bottom"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={HEAD_ICON_BTN_CLS}
+                      onClick={onClose}
+                    />
+                  }
                 >
                   <Minus width={16} height={16} />
-                </Button>
+                </IconTooltip>
               )}
             </div>
           </div>
