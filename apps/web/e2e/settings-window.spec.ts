@@ -16,7 +16,7 @@ test('sidebar footer: settings and activity icons, no user chip, offline pill on
   await expect(footer.getByTestId('sidebar-activity')).toBeVisible();
   await expect(page.getByTestId('sidebar-user-menu')).toHaveCount(0);
   await expect(page.locator('[data-slot="sidebar-user"]')).toHaveCount(0);
-  await expect(footer.getByTestId('sidebar-attention')).toHaveText('1 台机器离线');
+  await expect(footer.getByTestId('sidebar-attention')).toHaveText('4 台在线 · 1 台离线（old-laptop）');
 
   await page.goto('/app?scenario=10');
   await expect(page.getByTestId('sidebar-footer').getByTestId('sidebar-attention')).toHaveCount(
