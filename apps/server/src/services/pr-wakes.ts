@@ -360,15 +360,18 @@ export function createPrWakes(deps: BuildDeps) {
       }
       if (ledger.wakes >= 10 && !notices.some((n) => n.startsWith('Total')))
         notices.push('Total wake cap (10) reached. Auto-fix disabled.');
-      deps.db
-        .update(threadPr)
-        .set({
-          wakeRounds: ledger.wakes,
-          ...(ledger.wakes >= 10 ? { autoFix: false } : {}),
-          updatedAt: now,
-        })
-        .where(eq(threadPr.id, row.id))
-        .run();
+      const disableAutoFix = ledger.wakes >= 10 && currentPr.autoFix;
+      if (ledger.wakes !== currentPr.wakeRounds || disableAutoFix) {
+        deps.db
+          .update(threadPr)
+          .set({
+            wakeRounds: ledger.wakes,
+            ...(disableAutoFix ? { autoFix: false } : {}),
+            updatedAt: now,
+          })
+          .where(eq(threadPr.id, row.id))
+          .run();
+      }
       if (notices.length > 0) {
         ledger.pendingNotice = {
           buildId: row.buildId,
