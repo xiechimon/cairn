@@ -73,7 +73,7 @@ import {
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
-import { ChiefQuestionDock, useQuestionDockVisible } from './chief-question-dock.js';
+import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
@@ -219,7 +219,12 @@ export function ChiefConversation({
         : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
-  const answering = questionAttached && answerHere ? questionDockState.primary() : null;
+  const answerKey = useAnswerKey(answerHere);
+  const answering =
+    answerKey === null
+      ? null
+      : (questionDockState.primary() ?? { last: false, enabled: false, advance: () => {} });
+  const answerDraft = answerKey === null ? null : questionDockState.answerText(answerKey);
   const shownPlaceholder =
     answering !== null ? t('输入你自己的回答，或留空使用选中的选项') : composerPlaceholder;
   const { live, teamId } = useLiveData();
@@ -326,8 +331,13 @@ export function ChiefConversation({
   const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const wire = useComposerWire({
     editable: onSend != null,
-    draft: onSend != null ? liveDraft : (chief.draft ?? ''),
-    onDraftChange: onSend != null ? setLiveDraft : undefined,
+    draft: answerDraft ?? (onSend != null ? liveDraft : (chief.draft ?? '')),
+    onDraftChange:
+      answerKey !== null
+        ? (value: string) => questionDockState.setAnswerText(answerKey, value)
+        : onSend != null
+          ? setLiveDraft
+          : undefined,
     onSend:
       onSend == null
         ? undefined
@@ -736,10 +746,7 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock
-          home={home}
-          {...(answerHere ? { composer: { text: wire.draft, setText: wire.setDraft } } : {})}
-        />
+        <ChiefQuestionDock home={home} bound={answerHere} />
         {composerReplacement ?? (
           <>
             {composerError != null && (

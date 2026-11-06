@@ -75,7 +75,6 @@ for (const theme of ['light', 'dark'] as const) {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app?scenario=chief-question');
       await page.getByTestId('home-c').locator('.chief-composer textarea, .chief-composer [contenteditable]').first().fill('hello');
-      await page.getByTestId('chief-question-option-0-0').click();
       await expectReadable(page, page.getByTestId('chief-question-primary'), 'chief answer');
     });
 

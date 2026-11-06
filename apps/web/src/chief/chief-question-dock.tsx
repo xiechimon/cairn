@@ -1,16 +1,11 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  ChiefQuestionCard,
-  type QuestionComposer,
-  type QuestionPager,
-  recommendedFirst,
-} from './chief-question-card.js';
+import { ChiefQuestionCard, type QuestionPager, recommendedFirst } from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import { clampQuestionIndex } from './question-dock-index.js';
-import { questionDockState } from './question-dock-state.js';
+import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
   emptyQuestionDrafts,
   questionDraftComplete,
@@ -56,12 +51,12 @@ function DockQuestion({
   request,
   numberKeys,
   pager,
-  composer,
+  bound,
 }: {
   request: OriginChiefQuestion;
   numberKeys: boolean;
   pager: QuestionPager | undefined;
-  composer: QuestionComposer | undefined;
+  bound: boolean;
 }) {
   const root = useOptionalChiefRoot();
   const key = draftKeyOf(request);
@@ -86,7 +81,7 @@ function DockQuestion({
         draftKey={key}
         numberKeys={numberKeys}
         {...(pager !== undefined ? { pager } : {})}
-        {...(composer !== undefined ? { composer } : {})}
+        bound={bound}
         onAnswer={(input) =>
           root?.surface.onAnswerQuestion?.({ ...input, threadId: request.conversationId })
         }
@@ -110,19 +105,26 @@ export function useQuestionDockVisible(): boolean {
   return useShownQuestions().length > 0;
 }
 
-export function ChiefQuestionDock({
-  home,
-  composer,
-}: {
-  home: boolean;
-  composer?: QuestionComposer;
-}) {
+export function useAnswerKey(bound: boolean): string | null {
+  const pending = useShownQuestions();
+  const shown = pending[clampQuestionIndex(questionDockState.focus(), pending.length)];
+  useSyncExternalStore(
+    questionDraftStore.subscribe,
+    () => (shown === undefined ? -1 : stepOf(shown)),
+    () => -1,
+  );
+  if (!bound || shown === undefined) return null;
+  return answerKeyOf(draftKeyOf(shown), stepOf(shown));
+}
+
+export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boolean }) {
   const { t } = useI18n();
   const _root = useOptionalChiefRoot();
   const [searchParams] = useSearchParams();
-  const numberKeys = composer !== undefined && searchParams.get(THREAD_PARAM) === null;
+  const numberKeys = bound && searchParams.get(THREAD_PARAM) === null;
   const pending = useShownQuestions();
-  const [index, setIndex] = useState(0);
+  const setIndex = questionDockState.setFocus;
+  const index = questionDockState.focus();
   useSyncExternalStore(
     questionDraftStore.subscribe,
     () => pending.map((request) => `${stepOf(request)}:${stepComplete(request, false)}`).join(','),
@@ -145,7 +147,10 @@ export function ChiefQuestionDock({
           canPrev: step > 0 || previous !== undefined,
           canNext:
             step < lastStep
-              ? stepComplete(shown, (composer?.text.trim() ?? '') !== '')
+              ? stepComplete(
+                  shown,
+                  questionDockState.answerText(answerKeyOf(draftKeyOf(shown), step)).trim() !== '',
+                )
               : next !== undefined,
           onPrev: () => {
             if (step > 0) {
@@ -178,7 +183,7 @@ export function ChiefQuestionDock({
         request={shown}
         numberKeys={numberKeys}
         pager={pager}
-        composer={composer}
+        bound={bound}
       />
     </section>
   );

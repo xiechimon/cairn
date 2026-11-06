@@ -28,17 +28,14 @@ import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { questionDockState } from './question-dock-state.js';
+import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
   applyQuestionPick,
   emptyQuestionDrafts,
   type QuestionDraft,
   questionDraftComplete,
   questionDraftStore,
-  replaceQuestionDraft,
 } from './question-drafts.js';
-
-let mountedComposerCards = 0;
 
 export type ChiefQuestionItem = Extract<ChiefStreamItem, { kind: 'question' }>;
 
@@ -49,12 +46,7 @@ export interface ChiefQuestionCardProps {
   numberKeys?: boolean;
   draftKey?: string;
   pager?: QuestionPager;
-  composer?: QuestionComposer;
-}
-
-export interface QuestionComposer {
-  text: string;
-  setText: (value: string) => void;
+  bound?: boolean;
 }
 
 export interface QuestionPager {
@@ -184,13 +176,6 @@ function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draft
       if (draftKey !== undefined) persist(drafts, next);
       else setLocalStep(next);
     },
-    commit: (nextDrafts: QuestionDraft[], nextStep: number) => {
-      if (draftKey !== undefined) persist(nextDrafts, nextStep);
-      else {
-        setLocalDrafts(nextDrafts);
-        setLocalStep(nextStep);
-      }
-    },
   };
 }
 
@@ -201,11 +186,11 @@ export function ChiefQuestionCard({
   numberKeys = false,
   draftKey,
   pager,
-  composer,
+  bound = false,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
-  const { drafts, step, submitting, setDrafts, setStep, commit } = useQuestionDrafts(
+  const { drafts, step, submitting, setDrafts, setStep } = useQuestionDrafts(
     item,
     questions,
     draftKey,
@@ -242,42 +227,42 @@ export function ChiefQuestionCard({
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
       e.preventDefault();
-      if (question.multiSelect !== true) composer?.setText('');
+      if (bound && question.multiSelect !== true) setTextAt(step, '');
       setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [pending, collapsed, numberKeys, step, question]);
+  }, [pending, collapsed, numberKeys, bound, step, question]);
 
-  const withComposerText = (
+  const [localTexts, setLocalTexts] = useState<Record<number, string>>({});
+  const textAt = (index: number): string =>
+    draftKey !== undefined
+      ? questionDockState.answerText(answerKeyOf(draftKey, index))
+      : (localTexts[index] ?? '');
+  const setTextAt = (index: number, text: string) => {
+    if (draftKey !== undefined) questionDockState.setAnswerText(answerKeyOf(draftKey, index), text);
+    else setLocalTexts((prev) => ({ ...prev, [index]: text }));
+  };
+  const withText = (
     stored: QuestionDraft | undefined,
     prompt: Question | undefined,
     text: string,
-  ) => {
+  ): QuestionDraft | undefined => {
     if (stored === undefined || prompt === undefined) return stored;
-    if (stored.kind === 'text') return { kind: 'text' as const, value: text };
-    if (text.trim() === '') return { ...stored, other: false, otherText: '' };
+    if (stored.kind === 'text') return { kind: 'text', value: text };
+    if (text.trim() === '') return stored;
     if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
-    return { kind: 'choices' as const, picked: [], other: true, otherText: text };
+    return { kind: 'choices', picked: [], other: true, otherText: text };
   };
-  const effective = (index: number): QuestionDraft | undefined =>
-    composer !== undefined && index === step
-      ? withComposerText(drafts[index], questions[index], composer.text)
-      : drafts[index];
-  const effectiveDrafts = drafts.map((stored, index) => effective(index) ?? stored);
-  const stepComplete = questionDraftComplete(effective(step), question);
+  const effectiveDrafts = drafts.map(
+    (stored, index) => withText(stored, questions[index], textAt(index)) ?? stored,
+  );
+  const stepComplete = questionDraftComplete(effectiveDrafts[step], question);
   const allComplete =
     pending && questions.every((q, i) => questionDraftComplete(effectiveDrafts[i], q));
 
-  const textOf = (stored: QuestionDraft | undefined): string => {
-    if (stored === undefined) return '';
-    if (stored.kind === 'text') return stored.value;
-    return stored.other ? stored.otherText : '';
-  };
-
   const submit = () => {
     if (!allComplete) return;
-    commit(effectiveDrafts, step);
     onAnswer?.({
       requestId: item.requestId,
       answers: effectiveDrafts.map((d, i) => {
@@ -288,7 +273,6 @@ export function ChiefQuestionCard({
         return { header, choices };
       }),
     });
-    composer?.setText('');
   };
 
   const primaryEnabled = pending && (last ? allComplete : stepComplete);
@@ -301,74 +285,13 @@ export function ChiefQuestionCard({
     setStep((s) => Math.min(lastStep, s + 1));
   };
 
-  const latestRef = useRef({ composer, drafts, step, questions, pending, commit });
-  latestRef.current = { composer, drafts, step, questions, pending, commit };
   useEffect(() => {
-    let counted = false;
-    if (composer !== undefined && pending) {
-      const stored = textOf(drafts[step]);
-      if (stored !== '' || mountedComposerCards > 0) composer.setText(stored);
-      mountedComposerCards += 1;
-      counted = true;
-    }
-    return () => {
-      if (counted) queueMicrotask(() => (mountedComposerCards -= 1));
-      const latest = latestRef.current;
-      if (latest.composer === undefined || !latest.pending) return;
-      const stored = withComposerText(
-        latest.drafts[latest.step],
-        latest.questions[latest.step],
-        latest.composer.text,
-      );
-      if (stored !== undefined)
-        latest.commit(
-          latest.drafts.map((draftAt, index) => (index === latest.step ? stored : draftAt)),
-          latest.step,
-        );
-      latest.composer.setText('');
-    };
-  }, []);
-  const boundComposerRef = useRef(composer);
-  useEffect(() => {
-    const previous = boundComposerRef.current;
-    boundComposerRef.current = composer;
-    if (!pending) return;
-    if (previous !== undefined && composer === undefined) {
-      const stored = withComposerText(drafts[step], questions[step], previous.text);
-      if (stored !== undefined)
-        commit(
-          drafts.map((draftAt, index) => (index === step ? stored : draftAt)),
-          step,
-        );
-      previous.setText('');
-    }
-    if (previous === undefined && composer !== undefined) composer.setText(textOf(drafts[step]));
-  }, [composer === undefined]);
-  const wasSubmittingRef = useRef(submitting);
-  useEffect(() => {
-    const was = wasSubmittingRef.current;
-    wasSubmittingRef.current = submitting;
-    if (was && !submitting && composer !== undefined && composer.text === '')
-      composer.setText(textOf(drafts[step]));
-  }, [submitting]);
-
-  const previousStepRef = useRef(step);
-  useEffect(() => {
-    const previous = previousStepRef.current;
-    previousStepRef.current = step;
-    if (previous === step || composer === undefined) return;
-    const stored = withComposerText(drafts[previous], questions[previous], composer.text);
-    commit(
-      drafts.map((draftAt, index) =>
-        index === previous && stored !== undefined ? stored : draftAt,
-      ),
-      step,
-    );
-    composer.setText(textOf(drafts[step]));
-  }, [step]);
+    if (draftKey !== undefined && item.status !== 'pending')
+      questionDockState.clearAnswers(draftKey);
+  }, [draftKey, item.status]);
 
   useEffect(() => {
-    if (!pending || composer === undefined) {
+    if (!pending || !bound) {
       questionDockState.clearPrimary(item.requestId);
       return;
     }
@@ -378,7 +301,7 @@ export function ChiefQuestionCard({
       enabled: primaryEnabled,
       advance: () => advanceRef.current(),
     });
-  }, [pending, composer === undefined, item.requestId, last, primaryEnabled]);
+  }, [pending, bound, item.requestId, last, primaryEnabled]);
   useEffect(() => () => questionDockState.clearPrimary(item.requestId), [item.requestId]);
 
   const advanceRef = useRef(advance);
@@ -452,7 +375,7 @@ export function ChiefQuestionCard({
         }
       : undefined);
   const pick = (optionIndex: number) => {
-    if (question.multiSelect !== true) composer?.setText('');
+    if (bound && question.multiSelect !== true) setTextAt(step, '');
     setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
   };
 
@@ -554,20 +477,15 @@ export function ChiefQuestionCard({
               {question.question}
             </div>
             {question.options.length === 0 ? (
-              composer !== undefined ? null : (
+              bound ? null : (
                 <div className="flex-none px-3.5 pb-2">
                   <Input
                     data-testid={`chief-question-input-${step}`}
                     className={FORM_CONTROL_CLS}
                     placeholder={t('输入你的回答')}
-                    value={draft?.kind === 'text' ? draft.value : ''}
+                    value={textAt(step)}
                     disabled={!pending}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setDrafts((prev) =>
-                        replaceQuestionDraft(prev, step, { kind: 'text', value }),
-                      );
-                    }}
+                    onChange={(e) => setTextAt(step, e.target.value)}
                   />
                 </div>
               )
@@ -609,7 +527,7 @@ export function ChiefQuestionCard({
               </div>
             )}
           </div>
-          {composer === undefined && (
+          {!bound && (
             <div className="flex flex-none flex-wrap items-center gap-2 px-3.5 py-1.5">
               {hintText !== '' && (
                 <span data-testid="chief-question-hint" className={HINT_CLS}>

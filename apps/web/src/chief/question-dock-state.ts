@@ -32,6 +32,12 @@ const dismissing = new Map<string, ReturnType<typeof setTimeout>>();
 const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
+let focusIndex = 0;
+const answers = new Map<string, string>();
+
+export function answerKeyOf(draftKey: string, step: number): string {
+  return `${draftKey}#${step}`;
+}
 
 function emit(): void {
   version += 1;
@@ -47,6 +53,32 @@ export const questionDockState = {
   },
   snapshot(): number {
     return version;
+  },
+  focus(): number {
+    return focusIndex;
+  },
+  setFocus(next: number): void {
+    if (next === focusIndex) return;
+    focusIndex = next;
+    emit();
+  },
+  answerText(key: string): string {
+    return answers.get(key) ?? '';
+  },
+  setAnswerText(key: string, text: string): void {
+    if ((answers.get(key) ?? '') === text) return;
+    if (text === '') answers.delete(key);
+    else answers.set(key, text);
+    emit();
+  },
+  clearAnswers(draftKey: string): void {
+    let changed = false;
+    for (const key of [...answers.keys()]) {
+      if (!key.startsWith(`${draftKey}#`)) continue;
+      answers.delete(key);
+      changed = true;
+    }
+    if (changed) emit();
   },
   primary(): QuestionPrimary | null {
     return primary;
