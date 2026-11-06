@@ -2,6 +2,7 @@ import {
   OtlpTargetConfigError,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
+  otlpTraceIdOfTurn,
   otlpTraceparent,
   parseOtlpTarget,
   stepOtelContext,
@@ -195,6 +196,59 @@ describe('PiStepSpanSink', () => {
     );
     sink.chat(1000, { provider: 'p', model: 'm', finishReason: 'stop' });
     await expect(sink.flush()).resolves.toBeUndefined();
-    expect(logs.some((l) => l.includes('503'))).toBe(true);
+    await vi.waitFor(() => expect(logs.some((l) => l.includes('503'))).toBe(true));
+  });
+});
+
+describe('Coordinator turn context', () => {
+  test('a chief step gets its own trace and the configured environment', () => {
+    const otel = daemonOtelFromEnv({ ...env, CAIRN_OTEL_ENVIRONMENT: 'Staging' })!;
+    const ctx = otel.contextFor('chief-thread-1', 'step-turn', 'chief');
+    expect(ctx.traceId).toBe(otlpTraceIdOfTurn('step-turn'));
+    expect(ctx.traceId).not.toBe(otlpTraceIdOfBuild('chief-thread-1'));
+    expect(ctx.environment).toBe('staging');
+  });
+
+  test('ignores an environment Langfuse would reject', () => {
+    const otel = daemonOtelFromEnv({ ...env, CAIRN_OTEL_ENVIRONMENT: 'langfuse-x' })!;
+    expect(otel.contextFor('b', 's', 'build').environment).toBeUndefined();
+  });
+
+  test('chat and tool spans of a turn carry the environment and a redacted payload', async () => {
+    const otel = daemonOtelFromEnv({ ...env, CAIRN_OTEL_ENVIRONMENT: 'prod' })!;
+    const ctx = otel.contextFor('chief-thread-1', 'step-turn', 'chief');
+    const sink = new PiStepSpanSink(ctx, { provider: 'anthropic', model: 'claude-opus' });
+    const captured = captureFetch();
+    sink.chat(1000, { finishReason: 'stop', usage: { input: 3, output: 2 } });
+    sink.toolStart('c1', 1100, 'list_todos', { token: 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz' });
+    sink.toolEnd('c1', 1200, 'ok', false);
+    await sink.flush();
+    const request = captured[0]!.body.resourceSpans[0]!;
+    expect(request.resource.attributes).toEqual([
+      { key: 'service.name', value: { stringValue: 'cairn' } },
+      { key: 'deployment.environment', value: { stringValue: 'prod' } },
+    ]);
+    const spans = request.scopeSpans[0]!.spans;
+    expect(spans.map((span) => span.name)).toEqual(['chat claude-opus', 'execute_tool list_todos']);
+    for (const span of spans) {
+      expect(span.traceId).toBe(otlpTraceIdOfTurn('step-turn'));
+      const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+      expect(attrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
+    }
+    expect(JSON.stringify(captured[0]!.body)).not.toContain('abcdefghijklmnopqrstuvwxyz');
+  });
+
+  test('an unreachable collector never delays or fails the sink', async () => {
+    const otel = daemonOtelFromEnv(env)!;
+    const ctx = otel.contextFor('chief-thread-1', 'step-turn', 'chief');
+    const sink = new PiStepSpanSink(ctx, { provider: 'p', model: 'm' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    );
+    sink.chat(1, { finishReason: 'stop' });
+    const started = Date.now();
+    await expect(sink.flush()).resolves.toBeUndefined();
+    expect(Date.now() - started).toBeLessThan(200);
   });
 });

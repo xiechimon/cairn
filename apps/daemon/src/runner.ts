@@ -827,7 +827,9 @@ async function runClaimedStep(
   }
   const askAbort = new AbortController();
   const telemetry =
-    deps.otel != null ? deps.otel.contextFor(claimed.step.buildId, stepId) : undefined;
+    deps.otel != null
+      ? deps.otel.contextFor(claimed.step.buildId, stepId, claimed.step.kind)
+      : undefined;
   let askKeepAlive: (() => void) | null = null;
   const runAskChannel = async (params: Record<string, unknown>): Promise<string> => {
     if (client.askUser === undefined) throw new Error('ask channel unavailable');
