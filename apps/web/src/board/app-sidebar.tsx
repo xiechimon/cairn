@@ -10,8 +10,6 @@ import {
 } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
-import { coordinatorBadgeCount } from '../chief/question-dock-index.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -22,7 +20,6 @@ import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { recordOutsideLocation } from '../settings/settings-href.js';
 import { fleetStatus } from './fleet-status.js';
-import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -54,7 +51,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
-  const chiefRoot = useOptionalChiefRoot();
   const todosQ = useTodos(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
@@ -131,10 +127,6 @@ export function AppSidebar({
     );
   };
   const sidebarProps = {
-    attention: coordinatorBadgeCount(
-      needsYouCount(resolvedTodos),
-      chiefRoot?.pendingQuestions.length ?? 0,
-    ),
     machinesOnline,
     machinesOffline: fleet.offline,
     offlineMachineNames: fleet.offlineNames,
