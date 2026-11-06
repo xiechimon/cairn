@@ -80,6 +80,7 @@ export function* sweepAttachmentBatches(
       { table: 'chief_message', cursor: 'id', content: 'content', json: true },
       { table: 'steer_pending', cursor: 'conversationId', content: 'content', json: false },
       { table: 'plan', cursor: 'id', content: 'content', json: false },
+      { table: 'composer_draft', cursor: 'id', content: 'content', json: false },
     ];
     for (const source of sources) {
       let cursor: string | null = null;

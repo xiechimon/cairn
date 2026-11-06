@@ -91,6 +91,8 @@ const INFERRED_ROUTES = [
   'POST /api/uploads/grant',
   'POST /api/uploads/upload',
   'GET /api/attachments/{id}',
+  'GET /api/teams/{id}/drafts/{scope}',
+  'PUT /api/teams/{id}/drafts/{scope}',
   'POST /api/builds/{id}/stop',
   'POST /api/builds/{id}/branch-sync',
   'GET /api/builds/{id}/branch-sync',

@@ -16,6 +16,7 @@ import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { useServerDraft } from '../overlay/use-server-draft.js';
 import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
@@ -205,6 +206,13 @@ function ThreadBody({
   const { t } = useI18n();
   const mentions = useThreadMentions(todo.projectId);
   const archived = todo.archivedAt != null;
+  const { live, teamId } = useLiveData();
+  const [draft, setDraft] = useServerDraft({
+    teamId,
+    scope: `todo:${todo.id}`,
+    localKey: `cairn.draft.todo:${todo.id}`,
+    enabled: live,
+  });
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
@@ -258,6 +266,8 @@ function ThreadBody({
         workingFor={chat.workingFor}
         editable={chat.send !== undefined}
         readOnly={chat.locked}
+        draft={draft}
+        onDraftChange={setDraft}
         {...(chat.send !== undefined ? { onSend: chat.send } : {})}
         {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
         {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}

@@ -30,15 +30,9 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
-import { backfillPersonas } from './services/personas.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
-import {
-  adoptAgentMemories,
-  seedReviewRules,
-  seedRoutingRules,
-  seedWorkPolicies,
-  setRoutingRulesEnabled,
-} from './services/routing-rules.js';
+import { runRoutingMigration } from './services/routing-migration.js';
+import { setRoutingRulesEnabled } from './services/routing-rules.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -78,7 +72,6 @@ const vapidKeys = loadOrCreateVapidKeys(
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
-backfillPersonas(db);
 setRoutingRulesEnabled(config.routingRules);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext);
 setCoordinatorMachineId(config.coordinatorMachineId);
@@ -86,10 +79,11 @@ setCoordinatorRouteLog((teamId, reason) =>
   logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
 );
 if (config.routingRules) {
-  seedRoutingRules(db);
-  seedReviewRules(db);
-  seedWorkPolicies(db);
-  adoptAgentMemories(db);
+  const { withheldSecrets, ...inserted } = runRoutingMigration(db);
+  logger.info(inserted, 'routing rules migration');
+  for (const row of withheldSecrets) {
+    logger.warn(row, 'routing rules migration: agent secrets not granted to the session policy');
+  }
 }
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);

@@ -16,7 +16,7 @@ test('thread more menu opens the per-todo route override dialog', async ({ page 
     'false',
   );
   await expect(dialog.getByTestId('route-override-flag-hint')).toContainText(
-    'CAIRN_ROUTING_RULES 仍关闭',
+    'CAIRN_ROUTING_RULES=0 已关闭规则路由',
   );
   await expect(dialog.getByTestId('route-override-machine')).toBeVisible();
   await dialog.getByTestId('route-override-machine').click();
