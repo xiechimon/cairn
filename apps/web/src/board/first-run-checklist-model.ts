@@ -1,10 +1,10 @@
 import type { ChiefGetResponse } from '@cairn/shared';
 
-export const FIRST_RUN_STEP_IDS = ['provider', 'machine', 'coordinator'] as const;
+export const FIRST_RUN_STEP_IDS = ['model-source', 'machine', 'coordinator'] as const;
 export type FirstRunStepId = (typeof FIRST_RUN_STEP_IDS)[number];
 
 export interface FirstRunFacts {
-  providerCount: number | undefined;
+  modelSources: number | undefined;
   machinesOnline: number | undefined;
   coordinatorCanAnswer: boolean | undefined;
 }
@@ -14,18 +14,28 @@ export interface FirstRunStep {
   done: boolean;
 }
 
+export function modelSourceCount(
+  providers: readonly { id: string }[] | undefined,
+  connections: readonly { id: string; available?: boolean | undefined }[] | undefined,
+): number | undefined {
+  if (providers === undefined || connections === undefined) return undefined;
+  return (
+    providers.length + connections.filter((connection) => connection.available !== false).length
+  );
+}
+
 export function coordinatorCanAnswer(chief: ChiefGetResponse | undefined): boolean | undefined {
   if (chief === undefined) return undefined;
   return chief.agentActor != null && Boolean(chief.agentActor.modelId);
 }
 
 export function firstRunSteps(facts: FirstRunFacts): FirstRunStep[] | null {
-  const { providerCount, machinesOnline, coordinatorCanAnswer: canAnswer } = facts;
-  if (providerCount === undefined || machinesOnline === undefined || canAnswer === undefined) {
+  const { modelSources, machinesOnline, coordinatorCanAnswer: canAnswer } = facts;
+  if (modelSources === undefined || machinesOnline === undefined || canAnswer === undefined) {
     return null;
   }
   return [
-    { id: 'provider', done: providerCount > 0 },
+    { id: 'model-source', done: modelSources > 0 },
     { id: 'machine', done: machinesOnline > 0 },
     { id: 'coordinator', done: canAnswer },
   ];

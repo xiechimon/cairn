@@ -1,16 +1,17 @@
 import { expect, test } from 'vitest';
 import {
   coordinatorCanAnswer,
+  modelSourceCount,
   firstRunComplete,
   firstRunSteps,
 } from '../src/board/first-run-checklist-model.js';
 
-const done = { providerCount: 1, machinesOnline: 1, coordinatorCanAnswer: true };
+const done = { modelSources: 1, machinesOnline: 1, coordinatorCanAnswer: true };
 
 test('nothing is configured on a fresh install: all three steps are open', () => {
-  const steps = firstRunSteps({ providerCount: 0, machinesOnline: 0, coordinatorCanAnswer: false });
+  const steps = firstRunSteps({ modelSources: 0, machinesOnline: 0, coordinatorCanAnswer: false });
   expect(steps?.map((s) => [s.id, s.done])).toEqual([
-    ['provider', false],
+    ['model-source', false],
     ['machine', false],
     ['coordinator', false],
   ]);
@@ -23,7 +24,7 @@ test('each step reads its own fact', () => {
     false,
     true,
   ]);
-  expect(firstRunSteps({ ...done, providerCount: 0 })?.map((s) => s.done)).toEqual([
+  expect(firstRunSteps({ ...done, modelSources: 0 })?.map((s) => s.done)).toEqual([
     false,
     true,
     true,
@@ -36,7 +37,7 @@ test('the checklist is complete, and so disappears, once every step is done', ()
 
 test('while any fact is still loading the checklist stays hidden instead of flashing', () => {
   expect(firstRunSteps({ ...done, machinesOnline: undefined })).toBeNull();
-  expect(firstRunComplete(firstRunSteps({ ...done, providerCount: undefined }))).toBe(true);
+  expect(firstRunComplete(firstRunSteps({ ...done, modelSources: undefined }))).toBe(true);
 });
 
 test('the Coordinator needs a bound agent with a model to answer', () => {
@@ -45,4 +46,26 @@ test('the Coordinator needs a bound agent with a model to answer', () => {
   expect(coordinatorCanAnswer({ ...base, agentActor: null } as never)).toBe(false);
   expect(coordinatorCanAnswer({ ...base, agentActor: { modelId: null } } as never)).toBe(false);
   expect(coordinatorCanAnswer({ ...base, agentActor: { modelId: 'm' } } as never)).toBe(true);
+});
+
+test('a team provider record is a model source', () => {
+  expect(modelSourceCount([{ id: 'p1' }], [])).toBe(1);
+});
+
+test('a machine-local login reported as an available connection is a model source with no provider record', () => {
+  expect(modelSourceCount([], [{ id: 'machine:m1', available: true }])).toBe(1);
+});
+
+test('an unavailable connection (expired login, offline machine) is not a model source', () => {
+  expect(modelSourceCount([], [{ id: 'machine:m1', available: false }])).toBe(0);
+});
+
+test('a connection that does not report availability counts as usable', () => {
+  expect(modelSourceCount([], [{ id: 'c1' }])).toBe(1);
+});
+
+test('nothing configured is zero sources, and still loading is unknown', () => {
+  expect(modelSourceCount([], [])).toBe(0);
+  expect(modelSourceCount(undefined, [])).toBeUndefined();
+  expect(modelSourceCount([], undefined)).toBeUndefined();
 });

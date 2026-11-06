@@ -3,6 +3,7 @@ import { mockLive, PROJECT } from './chief-home-mock';
 
 interface World {
   providers: unknown[];
+  connections?: unknown[];
   machines: { id: string; name: string; online: boolean }[];
   bound: boolean;
   teamPaths: string[];
@@ -18,6 +19,9 @@ async function open(page: Page, world: World) {
       if (path.startsWith('/api/teams/')) world.teamPaths.push(path);
       if (path === '/api/teams/t1/providers') {
         return json({ presets: [], providers: world.providers });
+      }
+      if (path === '/api/teams/t1/model-routing') {
+        return json({ edges: [], connections: world.connections ?? [], quota: [], settings: {} });
       }
       if (path === '/api/teams/t1/machines') return json(world.machines);
       if (path === '/api/teams/t1/chief' && route.request().method() === 'GET') {
@@ -60,10 +64,10 @@ test('a fresh install shows the three steps open, each with a link to where it i
 }) => {
   await open(page, fresh());
   await expect(checklist(page)).toBeVisible();
-  for (const id of ['provider', 'machine', 'coordinator']) {
+  for (const id of ['model-source', 'machine', 'coordinator']) {
     await expect(step(page, id)).toHaveAttribute('data-done', 'false');
   }
-  await expect(step(page, 'provider').getByRole('link', { name: '去添加' })).toHaveAttribute(
+  await expect(step(page, 'model-source').getByRole('link', { name: '去添加' })).toHaveAttribute(
     'href',
     /\/app\/settings\/providers/,
   );
@@ -83,7 +87,7 @@ test('a machine coming online ticks its step without a reload', async ({ page })
     teamPaths: [],
   };
   await open(page, world);
-  await expect(step(page, 'provider')).toHaveAttribute('data-done', 'true');
+  await expect(step(page, 'model-source')).toHaveAttribute('data-done', 'true');
   await expect(step(page, 'machine')).toHaveAttribute('data-done', 'false');
   world.machines = [{ id: 'm1', name: 'omarchy', online: true }];
   await page.evaluate(() => {
@@ -125,4 +129,38 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   await expect(toast).toContainText('Coordinator 还不能回答');
   await expect(toast).toContainText('首页清单');
   await expect(page.locator('[data-sonner-toast]')).not.toContainText('chief agent not bound');
+});
+
+const LOCAL_LOGIN = {
+  id: 'machine:m1',
+  vendor: 'anthropic',
+  kind: 'subscription',
+  models: ['claude-sonnet-5'],
+  available: true,
+};
+
+test('a machine-local Claude Code login completes the model step with no provider record', async ({
+  page,
+}) => {
+  await open(page, {
+    providers: [],
+    connections: [LOCAL_LOGIN],
+    machines: [{ id: 'm1', name: 'omarchy', online: true }],
+    bound: false,
+    teamPaths: [],
+  });
+  await expect(step(page, 'model-source')).toHaveAttribute('data-done', 'true');
+  await expect(step(page, 'machine')).toHaveAttribute('data-done', 'true');
+  await expect(step(page, 'coordinator')).toHaveAttribute('data-done', 'false');
+});
+
+test('an unavailable local login does not complete the model step', async ({ page }) => {
+  await open(page, {
+    providers: [],
+    connections: [{ ...LOCAL_LOGIN, available: false }],
+    machines: [{ id: 'm1', name: 'omarchy', online: true }],
+    bound: false,
+    teamPaths: [],
+  });
+  await expect(step(page, 'model-source')).toHaveAttribute('data-done', 'false');
 });

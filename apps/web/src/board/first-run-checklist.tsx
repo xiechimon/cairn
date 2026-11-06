@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
+import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
@@ -11,12 +12,13 @@ import {
   type FirstRunStepId,
   firstRunComplete,
   firstRunSteps,
+  modelSourceCount,
 } from './first-run-checklist-model.js';
 
 const STEP_COPY: Record<FirstRunStepId, { title: string; hint: string; action: string }> = {
-  provider: {
-    title: '添加模型服务',
-    hint: '接入一个模型服务商，Coordinator 才有模型可用。',
+  'model-source': {
+    title: '接入一个模型来源',
+    hint: '添加模型服务商，或在机器上登录 Claude Code，Coordinator 才有模型可用。',
     action: '去添加',
   },
   machine: {
@@ -32,7 +34,7 @@ const STEP_COPY: Record<FirstRunStepId, { title: string; hint: string; action: s
 };
 
 const STEP_DONE_COPY: Record<FirstRunStepId, string> = {
-  provider: '模型服务已添加',
+  'model-source': '有可用的模型来源',
   machine: '有机器在线',
   coordinator: 'Coordinator 可以回答',
 };
@@ -45,10 +47,14 @@ export function FirstRunChecklist({
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const providersQ = useProviders(teamId, live);
+  const routingQ = useModelRouting(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const chiefQ = useChief(teamId, live);
   const steps = firstRunSteps({
-    providerCount: providersQ.data?.providers.length,
+    modelSources: modelSourceCount(
+      providersQ.data?.providers,
+      routingQ.data === undefined ? undefined : (routingQ.data.connections ?? []),
+    ),
     machinesOnline: machinesQ.data?.filter((machine) => machine.online).length,
     coordinatorCanAnswer: coordinatorCanAnswer(chiefQ.data),
   });
@@ -73,7 +79,7 @@ export function FirstRunChecklist({
         size="sm"
         variant={variant}
         className="ml-auto flex-none"
-        render={<Link to={settingsHref(id === 'provider' ? 'providers' : 'machines')} />}
+        render={<Link to={settingsHref(id === 'model-source' ? 'providers' : 'machines')} />}
       >
         {label}
       </Button>

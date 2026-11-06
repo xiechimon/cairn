@@ -180,8 +180,9 @@ export const EN: Record<string, string> = {
   新建项目: 'New project',
   开始使用: 'Get started',
   '先接上这三样，Coordinator 才能回答': 'Connect these three so the Coordinator can answer',
-  '接入一个模型服务商，Coordinator 才有模型可用。':
-    'Connect a provider so the Coordinator has a model.',
+  接入一个模型来源: 'Connect a model source',
+  '添加模型服务商，或在机器上登录 Claude Code，Coordinator 才有模型可用。':
+    'Add a provider, or sign in to Claude Code on a machine, so the Coordinator has a model.',
   去添加: 'Add',
   连接一台机器: 'Connect a machine',
   '机器在线，任务才有地方运行。': 'With a machine online, tasks have somewhere to run.',
@@ -190,7 +191,7 @@ export const EN: Record<string, string> = {
   '给 Coordinator 选一个 Agent，它才能回答。':
     'Pick an Agent for the Coordinator so it can answer.',
   去设置: 'Set up',
-  模型服务已添加: 'Model provider added',
+  有可用的模型来源: 'A model source is available',
   有机器在线: 'A machine is online',
   'Coordinator 可以回答': 'The Coordinator can answer',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
