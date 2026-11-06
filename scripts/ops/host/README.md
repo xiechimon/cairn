@@ -2,9 +2,11 @@
 
 Copies of the scripts that drive the lanes on the omarchy host. `tools/` mirrors `~/.cairn/tools/` and `lanes/` mirrors `~/lanes/`. The first commit that added this directory is the host state as it was measured, with only host-specific values in `tools/backup/db-backup.sh` parameterised (`CAIRN_REPO`, `CAIRN_BACKUP_REMOTE`).
 
-**The host still runs its own copies.** Nothing here is wired to a unit yet. A follow-up will point the units at a checkout and add a deploy-from-main step like `~/.cairn/tools/review-gate/deploy-from-main.sh` (fetch `origin/main`, skip when the tree hash is unchanged, run the copy's tests, then install it and record the deployed tree). Until then a change here does not change host behavior, and a host edit does not appear here.
+**Deploy.** `scripts/ops/deploy-self.sh` installs `tools/**` into `~/.cairn/tools` and `lanes/**` into `~/lanes` from the commit it just deployed, writes the installed SHA to `~/.cairn/tools/.installed-sha`, and keeps a host file that differs from both the previous and the new revision (reported through one `Host tools differ from main` issue). A host edit does not appear here until someone copies it back.
 
-Not copied: `~/.cairn/tools/app-token/package.json`, its lockfile and `node_modules` (the host installs `@octokit/auth-app` there), `review-gate/` (already in `scripts/ops/review-gate/`), `backup/record-backup-status.sh` (identical to `scripts/ops/record-backup-status.sh`), `.bak` files, logs and state. `tools/eval-env.sh` reads the relay settings from the host's pi config and holds no value itself.
+Not copied: `~/.cairn/tools/app-token/package.json`, its lockfile and `node_modules` (the host installs `@octokit/auth-app` there), `agent-desktop/` (a versioned binary of a separate product, not a cairn host script), `review-gate/` (retired; the host unit `cairn-review-gate.service` is disabled and the directory was deleted 2026-11-06, superseded by the Codex gate in `scripts/ops/review-gate/`), `backup/record-backup-status.sh` (identical to `scripts/ops/record-backup-status.sh`), `.bak` files, logs and state. `tools/eval-env.sh` reads the relay settings from the host's pi config and holds no value itself.
+
+Host inventory (measured 2026-11-06): the managed roots are current (`.installed-sha` matches `main`), `~/lanes` mirrors `lanes/**` exactly, and `~/lanes/cairn` plus `~/.cairn/tools/cairn` are product checkouts, not host tools. The only host files outside `tools/**` and `lanes/**` are the exclusions above; the retired `review-gate/` directory and its disabled unit were deleted.
 
 Units are the host's `cairn-<name>.service` user units. "Called by" lists scripts that invoke the script directly; `main-watch.sh` is itself run by `cairn-main-watch.service`.
 
