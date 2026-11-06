@@ -198,6 +198,9 @@ export const EN: Record<string, string> = {
   '按首页清单把模型服务、机器和 Coordinator 接上，再发一次。':
     'Finish the checklist on the home page (provider, machine, Coordinator), then send again.',
 
+  '{n} 分': '{n}m',
+  '{n} 小时': '{n}h',
+  '{n} 天': '{n}d',
   已归档: 'Archived',
   归档: 'Archive',
   '{name} 的菜单': '{name} menu',
