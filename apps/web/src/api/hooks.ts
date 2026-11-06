@@ -55,6 +55,7 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  PrPanelRow,
   RetroProposal,
   ScheduleRecord,
   SearchResponse,
@@ -207,6 +208,23 @@ export const useBuildGate = (buildId: string | null | undefined, enabled: boolea
         `/api/builds/${buildId}/gate`,
       ),
     enabled: enabled && buildId != null,
+  });
+
+export const PR_POLL_MS = 30_000;
+
+export const usePrs = (
+  teamId: string | undefined,
+  threadId: string | undefined,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ['prs', teamId, threadId ?? null],
+    queryFn: () =>
+      api.get<PrPanelRow[]>(
+        threadId !== undefined ? `/api/prs?threadId=${encodeURIComponent(threadId)}` : '/api/prs',
+      ),
+    enabled: enabled && teamId !== undefined,
+    refetchInterval: PR_POLL_MS,
   });
 
 export const useProjectBuilds = (projectId: string | undefined, enabled: boolean) =>

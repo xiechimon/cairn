@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { ChevronDown, ExternalLink, GitPullRequest } from 'lucide-react';
+import { ChevronDown, Clock, ExternalLink, GitPullRequest } from 'lucide-react';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
@@ -11,6 +11,7 @@ export interface PrCardProps {
   onViewDiff?: () => void;
   onResolve?: () => void;
   githubHref?: string;
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -38,7 +39,7 @@ function resultWord(result: PrCardResult, t: TFunc): string {
   return t('待定');
 }
 
-function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
+export function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
   if (pr.state !== 'merged' && isVerdictStale(pr)) return { label: t('需重新审核'), tone: 'warn' };
   switch (pr.state) {
     case 'open':
@@ -49,8 +50,18 @@ function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
       return { label: t('检查运行中'), tone: 'neutral' };
     case 'checks-failed':
       return { label: t('检查未通过'), tone: 'fail' };
+    case 'review-pending':
+      return { label: t('等待审核'), tone: 'neutral' };
     case 'review-block':
       return { label: t('审核未通过'), tone: 'fail' };
+    case 'closed':
+      return { label: t('已关闭'), tone: 'neutral' };
+    case 'draft':
+      return { label: t('草稿'), tone: 'neutral' };
+    case 'behind':
+      return { label: t('落后于 main'), tone: 'warn' };
+    case 'merge-blocked':
+      return { label: t('GitHub 暂不允许合并'), tone: 'warn' };
     case 'review-pass':
       return { label: t('可合并'), tone: 'ok' };
     case 'queued':
@@ -94,6 +105,24 @@ function VerdictLine({ pr }: { pr: PrCardModel }) {
         )}
       >
         {checksSummary(pr, t)}
+        {current}
+      </p>
+    );
+  }
+  if (pr.state === 'closed' || pr.state === 'draft') {
+    return (
+      <p className="m-0 text-meta text-content-secondary">
+        {checksSummary(pr, t)}
+        {current}
+      </p>
+    );
+  }
+  if (pr.state === 'behind' || pr.state === 'merge-blocked') {
+    return (
+      <p className="m-0 text-meta text-(--chip-confirm-fg)">
+        {pr.state === 'behind'
+          ? t('分支落后，更新后才能合并')
+          : t('审核已通过，GitHub 还不允许合并')}
         {current}
       </p>
     );
@@ -159,8 +188,18 @@ function Details({ pr }: { pr: PrCardModel }) {
   const blockers = pr.blockers ?? [];
   return (
     <dl className="m-0 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 pt-2 text-meta">
-      <dt className="text-content-tertiary">{t('分支')}</dt>
-      <dd className="m-0 min-w-0 truncate font-mono text-content-secondary">{pr.branch}</dd>
+      {pr.repo != null && (
+        <>
+          <dt className="text-content-tertiary">{t('仓库')}</dt>
+          <dd className="m-0 min-w-0 truncate font-mono text-content-secondary">{pr.repo}</dd>
+        </>
+      )}
+      {pr.branch != null && (
+        <>
+          <dt className="text-content-tertiary">{t('分支')}</dt>
+          <dd className="m-0 min-w-0 truncate font-mono text-content-secondary">{pr.branch}</dd>
+        </>
+      )}
       <dt className="text-content-tertiary">{t('检查')}</dt>
       <dd className="m-0 text-content-secondary">{checksSummary(pr, t)}</dd>
       {pr.verdict != null && (
@@ -211,10 +250,11 @@ function Details({ pr }: { pr: PrCardModel }) {
   );
 }
 
-function Actions({ pr, onViewDiff, onResolve, githubHref }: PrCardProps) {
+function Actions({ pr, onViewDiff, onResolve, githubHref, readOnly }: PrCardProps) {
   const { t } = useI18n();
   const needsResolve =
-    pr.state === 'conflicts' || pr.state === 'checks-failed' || pr.state === 'review-block';
+    readOnly !== true &&
+    (pr.state === 'conflicts' || pr.state === 'checks-failed' || pr.state === 'review-block');
   return (
     <div className="flex flex-wrap items-center gap-2">
       {needsResolve && (
@@ -222,9 +262,16 @@ function Actions({ pr, onViewDiff, onResolve, githubHref }: PrCardProps) {
           {t('解决')}
         </Button>
       )}
-      <Button size="sm" variant="outline" onClick={onViewDiff} className="h-6.5 px-2.25 text-meta">
-        {t('查看 diff')}
-      </Button>
+      {(readOnly !== true || onViewDiff != null) && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onViewDiff}
+          className="h-6.5 px-2.25 text-meta"
+        >
+          {t('查看 diff')}
+        </Button>
+      )}
       {githubHref != null && (
         <Button
           size="sm"
@@ -273,6 +320,15 @@ export function PrCard(props: PrCardProps) {
           {pill.label}
         </span>
       </div>
+      {pr.readAgoMinutes != null && (
+        <p
+          data-slot="pr-card-late"
+          className="m-0 flex items-center gap-1.5 text-meta text-(--chip-confirm-fg)"
+        >
+          <Clock className="size-3 flex-none" aria-hidden />
+          {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
+        </p>
+      )}
       <VerdictLine pr={pr} />
       <Actions {...props} />
       <Collapsible className="group/details">

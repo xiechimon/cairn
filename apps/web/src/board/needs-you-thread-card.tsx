@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useSendKey } from '../api/use-send-key.js';
 import { ThreadCard, type ThreadCardProps } from '../components/thread/thread-card.js';
@@ -30,9 +30,11 @@ export function NeedsYouThreadCard({ todo, ...card }: NeedsYouThreadCardProps) {
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const sendKey = useSendKey();
+  const pr = usePrs(teamId, undefined, live).data?.find((row) => row.threadId === todo.id);
+  const prLink = pr !== undefined ? { prLink: { number: pr.number, url: pr.url } } : {};
   const [open, setOpen] = useState(false);
   const delivery = todo.latestBuildId != null ? replyDeliveryOf(todo.phase) : null;
-  if (delivery === null) return <ThreadCard {...card} />;
+  if (delivery === null) return <ThreadCard {...card} {...prLink} />;
   const send = async (content: string) => {
     if (!live) {
       if (DEMO_MODE) blockDemoWrite();
@@ -48,6 +50,7 @@ export function NeedsYouThreadCard({ todo, ...card }: NeedsYouThreadCardProps) {
   return (
     <ThreadCard
       {...card}
+      {...prLink}
       primaryLabel={open ? t('收起') : t('回复')}
       onPrimary={() => setOpen(!open)}
       footer={

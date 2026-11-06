@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { StoneTone } from '../stone/tone.js';
 import { Button } from '../ui/button.js';
 import { Checkbox } from '../ui/checkbox.js';
+import { PrLink } from './pr-link.js';
 
 const TONE_LABEL: Record<StoneTone, string> = {
   waiting: 'Waiting on you',
@@ -19,6 +20,7 @@ export interface ThreadRowProps {
   reason: ReactNode;
   tone: StoneTone;
   pr?: number;
+  prLink?: { number: number; url: string };
   age?: string;
   snoozed?: boolean;
   selected?: boolean;
@@ -32,6 +34,7 @@ export function ThreadRow({
   reason,
   tone,
   pr,
+  prLink,
   age,
   snoozed = false,
   selected = false,
@@ -85,6 +88,9 @@ export function ThreadRow({
         <span className="truncate text-meta text-content-tertiary">{reason}</span>
         <span className="sr-only">{TONE_LABEL[tone]}</span>
       </Button>
+      {prLink != null && (
+        <PrLink number={prLink.number} url={prLink.url} className="pt-px text-meta" />
+      )}
       <span
         className={cn(
           'flex-none pt-px text-meta text-content-tertiary tabular-nums',

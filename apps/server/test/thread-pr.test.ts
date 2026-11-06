@@ -242,6 +242,17 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     });
   });
 
+  test('the panel row carries the time of the last read so the UI can say when data is stale', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    await watchFor(s, mock).sweep(1_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row?.updatedAt).toBe(rows(s)[0]?.updatedAt);
+    expect(row?.updatedAt).toBeGreaterThan(0);
+  });
+
   test('mergeable_state values map onto the panel merge states, a draft shows as draft', async () => {
     const s = boot();
     const mock = new GithubMock();

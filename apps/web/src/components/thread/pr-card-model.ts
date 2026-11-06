@@ -5,10 +5,15 @@ export type PrCardState =
   | 'conflicts'
   | 'checks-running'
   | 'checks-failed'
+  | 'review-pending'
   | 'review-block'
   | 'review-pass'
   | 'queued'
   | 'merged'
+  | 'closed'
+  | 'draft'
+  | 'behind'
+  | 'merge-blocked'
   | 'owner-route';
 
 export type PrCardResult = 'pass' | 'block' | 'pending';
@@ -34,7 +39,9 @@ export interface PrCardChecks {
 export interface PrCardModel {
   number: number;
   title: string;
-  branch: string;
+  branch?: string;
+  repo?: string;
+  readAgoMinutes?: number;
   state: PrCardState;
   checks: PrCardChecks;
   verdict: PrCardVerdict | null;
