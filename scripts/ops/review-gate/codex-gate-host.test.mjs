@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
 const gateScript = fileURLToPath(new URL('./codex-gate.mjs', import.meta.url));
 const SHA = 'c'.repeat(40);
 const OTHER = 'd'.repeat(40);
@@ -288,12 +289,12 @@ test('a failed review is retried at most twice per head', () => {
 test('a retry comment posted after the failed state is not repeated', () => {
   const out = run({
     comments: [
-      stateComment(SHA, 'failed'),
+      { ...stateComment(SHA, 'failed'), created_at: minutesAgo(10), updated_at: minutesAgo(10) },
       {
         id: 11,
         body: `<!-- review-gate-retry:${SHA}:1 -->`,
         user: ACTIONS,
-        created_at: '2026-01-01T00:05:00Z',
+        created_at: minutesAgo(5),
       },
     ],
     checkRuns: [],
@@ -302,16 +303,24 @@ test('a retry comment posted after the failed state is not repeated', () => {
   assert.equal(out.body(out.checkWrites[0]).status, 'in_progress');
 });
 
+const requestComment = (sha, createdAt, marker = `<!-- review-gate-request:${sha} -->`) => ({
+  id: 3,
+  body: `${marker}\n@codex review`,
+  user: ACTIONS,
+  created_at: createdAt,
+});
+const limitNotice = (createdAt) => ({
+  id: 2,
+  body: LIMIT_BODY,
+  user: CODEX,
+  created_at: createdAt,
+  updated_at: createdAt,
+});
+
 test('an exhausted allowance fails the check, labels the PR and posts no retry', () => {
-  const limit = {
-    id: 2,
-    body: LIMIT_BODY,
-    user: CODEX,
-    created_at: '2026-01-01T00:10:00Z',
-    updated_at: '2026-01-01T00:10:00Z',
-  };
+  const limit = limitNotice(minutesAgo(5));
   const out = run({
-    comments: [stateComment(OTHER, 'completed'), limit],
+    comments: [stateComment(OTHER, 'completed'), requestComment(SHA, minutesAgo(10)), limit],
     checkRuns: [ownRun()],
   });
   assert.equal(out.commentPosts.length, 0);
@@ -325,11 +334,75 @@ test('an exhausted allowance fails the check, labels the PR and posts no retry',
   const forged = run({
     comments: [
       stateComment(OTHER, 'completed'),
+      requestComment(SHA, minutesAgo(10)),
       { ...limit, user: { login: 'mallory', type: 'User' } },
     ],
     checkRuns: [],
   });
   assert.equal(forged.body(forged.checkWrites[0]).status, 'in_progress');
+});
+
+test('an old limit notice does not block a new head and its review is requested', () => {
+  const out = run({
+    comments: [stateComment(OTHER, 'completed'), limitNotice(minutesAgo(300))],
+    checkRuns: [ownRun({ started_at: minutesAgo(11) })],
+  });
+  const body = out.body(out.checkWrites[0]);
+  assert.equal(body.status, 'in_progress');
+  assert.match(body.output.title, /^Asked Codex to review/);
+  assert.equal(out.commentPosts.length, 1);
+  assert.match(out.body(out.commentPosts[0]).body, new RegExp(`review-gate-request:${SHA}`));
+  assert.equal(out.labelAdds.length, 0);
+});
+
+test('a limit notice newer than this head request blocks the head', () => {
+  const out = run({
+    comments: [
+      stateComment(OTHER, 'completed'),
+      requestComment(SHA, minutesAgo(30)),
+      limitNotice(minutesAgo(29)),
+    ],
+    checkRuns: [ownRun({ started_at: minutesAgo(40) })],
+  });
+  assert.equal(out.body(out.checkWrites[0]).output.title, 'Codex allowance exhausted');
+  assert.equal(out.commentPosts.length, 0);
+});
+
+test('a limited head is retried once two hours after the last request', () => {
+  const comments = [
+    stateComment(OTHER, 'completed'),
+    requestComment(SHA, minutesAgo(130)),
+    limitNotice(minutesAgo(129)),
+  ];
+  const out = run({ comments, checkRuns: [ownRun({ started_at: minutesAgo(140) })] });
+  assert.equal(out.commentPosts.length, 1);
+  assert.match(out.body(out.commentPosts[0]).body, new RegExp(`review-gate-retry:${SHA}:1`));
+  assert.equal(out.body(out.checkWrites[0]).status, 'in_progress');
+
+  const retried = run({
+    comments: [
+      ...comments,
+      requestComment(SHA, minutesAgo(1), `<!-- review-gate-retry:${SHA}:1 -->`),
+    ],
+    checkRuns: [ownRun({ started_at: minutesAgo(140) })],
+  });
+  assert.equal(retried.commentPosts.length, 0);
+  assert.equal(retried.body(retried.checkWrites[0]).status, 'in_progress');
+});
+
+test('review-stalled is removed once a limited head passes', () => {
+  const out = run({
+    pr: { ...basePr, labels: [{ name: 'review-stalled' }] },
+    comments: [
+      requestComment(SHA, minutesAgo(200)),
+      limitNotice(minutesAgo(199)),
+      stateComment(SHA, 'completed'),
+    ],
+    checkRuns: [ownRun()],
+  });
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'success');
+  assert.equal(out.labelRemoves.length, 1);
+  assert.match(out.labelRemoves[0].args.join(' '), /labels\/review-stalled/);
 });
 
 test('review-stalled is not added twice and is removed on success', () => {
@@ -409,14 +482,14 @@ test('no request before ten minutes, without a check run, or after one was made'
   const fresh = run({ checkRuns: [ownRun({ started_at: new Date().toISOString() })] });
   const noCheck = run({ checkRuns: [] });
   const asked = run({
-    checkRuns: [ownRun()],
+    checkRuns: [ownRun({ started_at: minutesAgo(15) })],
     comments: [
       {
         id: 9,
         body: `<!-- review-gate-request:${SHA} -->\n@codex review`,
         user: ACTIONS,
-        created_at: '2026-01-01T00:20:00Z',
-        updated_at: '2026-01-01T00:20:00Z',
+        created_at: minutesAgo(5),
+        updated_at: minutesAgo(5),
       },
     ],
   });

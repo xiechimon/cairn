@@ -10,6 +10,8 @@ export const QUEUED_LABEL = 'queued';
 export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;
+export const WAIT_DEADLINE_MS = 30 * 60 * 1000;
+export const LIMIT_RETRY_AFTER_MS = 2 * 60 * 60 * 1000;
 export const USAGE_DASHBOARD = 'https://chatgpt.com/codex/cloud/settings/usage';
 
 const gatePaths = JSON.parse(
@@ -72,25 +74,53 @@ export function trustedStateComment(comments, kind = 'code_review') {
     });
   return trusted.reduce(
     (latest, entry) =>
-      !latest || Date.parse(entry.comment.updated_at) >= Date.parse(latest.comment.updated_at)
+      !latest || commentOrder(entry.comment, latest.comment, 'updated_at', 'updated_at') >= 0
         ? entry
         : latest,
     null,
   );
 }
 
-export function usageLimitHit(comments, stateEntry) {
+const idOf = (comment) => (Number.isFinite(Number(comment.id)) ? Number(comment.id) : 0);
+
+export function commentOrder(a, b, field = 'created_at', otherField = 'created_at') {
+  return Date.parse(a[field]) - Date.parse(b[otherField]) || idOf(a) - idOf(b);
+}
+
+export function lastGateRequest(comments, sha) {
+  const prefixes = [`<!-- review-gate-request:${sha} -->`, `<!-- review-gate-retry:${sha}:`];
+  const gateComments = comments.filter(
+    (comment) =>
+      comment.user?.login === ACTIONS_LOGIN &&
+      prefixes.some((prefix) => comment.body?.startsWith(prefix)),
+  );
+  return gateComments.reduce(
+    (latest, comment) => (!latest || commentOrder(comment, latest) > 0 ? comment : latest),
+    null,
+  );
+}
+
+export function limitAnchor(comments, stateEntry, sha) {
+  const anchors = [
+    lastGateRequest(comments, sha),
+    stateEntry?.state?.commitSha === sha ? stateEntry.comment : null,
+  ].filter(Boolean);
+  return anchors.reduce(
+    (latest, comment) => (!latest || commentOrder(comment, latest) > 0 ? comment : latest),
+    null,
+  );
+}
+
+export function usageLimitHit(comments, stateEntry, sha) {
   const newest = comments
     .filter((comment) => isCodexAuthor(comment.user?.login, comment.user?.type))
     .reduce(
-      (latest, comment) =>
-        !latest || Date.parse(comment.created_at) >= Date.parse(latest.created_at)
-          ? comment
-          : latest,
+      (latest, comment) => (!latest || commentOrder(comment, latest) >= 0 ? comment : latest),
       null,
     );
   if (!newest || !LIMIT_RE.test(newest.body ?? '')) return false;
-  return !stateEntry || Date.parse(newest.created_at) > Date.parse(stateEntry.comment.updated_at);
+  const anchor = limitAnchor(comments, stateEntry, sha);
+  return anchor !== null && commentOrder(newest, anchor) > 0;
 }
 
 export function badgeOf(body) {
@@ -395,14 +425,23 @@ export function decide(
 ) {
   const sha = pr.head.sha;
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
-  if (limitHit && !reviewedHead)
+  if (limitHit && !reviewedHead) {
+    if (wait && wait.sinceRequestMs >= LIMIT_RETRY_AFTER_MS)
+      return {
+        status: 'in_progress',
+        title: `Codex allowance exhausted; asked again for ${short(sha)}`,
+        summary: `Codex had hit its usage limit for ${short(sha)} ${LIMIT_RETRY_AFTER_MS / 3600000} hours ago, so the gate commented \`@codex review\` again.`,
+        retry: retryMarker(sha, retries.count + 1),
+        addStall: true,
+      };
     return {
       status: 'completed',
       conclusion: 'failure',
       title: 'Codex allowance exhausted',
-      summary: `Codex reached its usage limit and did not review ${short(sha)}. See the [Codex usage dashboard](${USAGE_DASHBOARD}) and comment \`@codex review\` once the window resets.`,
+      summary: `Codex reached its usage limit and did not review ${short(sha)}. See the [Codex usage dashboard](${USAGE_DASHBOARD}) and the gate asks again every ${LIMIT_RETRY_AFTER_MS / 3600000} hours.`,
       addStall: true,
     };
+  }
   if (!state || state.commitSha !== sha || !state.status || state.status === 'running') {
     const unseen = !state || state.commitSha !== sha;
     if (unseen && wait && !wait.requested && wait.waitedMs >= REQUEST_AFTER_MS)
@@ -412,6 +451,22 @@ export function decide(
         summary: `Codex had not started a review of ${short(sha)} after ${REQUEST_AFTER_MS / 60000} minutes, so the gate commented \`@codex review\`.`,
         request: requestMarker(sha),
       };
+    if (wait && wait.idleMs >= WAIT_DEADLINE_MS) {
+      if (retries.count >= MAX_RETRIES)
+        return {
+          status: 'completed',
+          conclusion: 'failure',
+          title: 'Codex did not finish the review',
+          summary: `Codex produced no result for ${short(sha)} after ${MAX_RETRIES} retries. Comment \`@codex review\` to try again.`,
+          addStall: true,
+        };
+      return {
+        status: 'in_progress',
+        title: `Codex review stalled; retry ${retries.count + 1} of ${MAX_RETRIES}`,
+        summary: `Codex produced no result for ${short(sha)} in ${WAIT_DEADLINE_MS / 60000} minutes, so the gate commented \`@codex review\` again.`,
+        retry: retryMarker(sha, retries.count + 1),
+      };
+    }
     return {
       status: 'in_progress',
       title: `Waiting for the Codex review of ${short(sha)}`,
@@ -427,12 +482,13 @@ export function decide(
         summary: `The Codex review failed ${MAX_RETRIES} times for ${short(sha)}. Comment \`@codex review\` to try again.`,
         addStall: true,
       };
-    const k = retries.pending ? retries.count : retries.count + 1;
+    const pending = retries.pending && !(wait && wait.idleMs >= WAIT_DEADLINE_MS);
+    const k = pending ? retries.count : retries.count + 1;
     return {
       status: 'in_progress',
       title: `Codex review failed; retry ${k} of ${MAX_RETRIES}`,
       summary: `Asked Codex to review ${short(sha)} again.`,
-      ...(retries.pending ? {} : { retry: retryMarker(sha, k) }),
+      ...(pending ? {} : { retry: retryMarker(sha, k) }),
     };
   }
   const blocking = blockingThreads(threads);
