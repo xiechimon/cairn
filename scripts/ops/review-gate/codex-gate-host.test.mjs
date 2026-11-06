@@ -77,7 +77,7 @@ const basePr = {
   changed_files: 1,
 };
 
-function run(world, command = 'evaluate') {
+function run(world, command = 'evaluate', extraEnv = {}) {
   const dir = makeTestTempDir('codex-gate-host-');
   const bin = join(dir, 'bin');
   mkdirSync(bin);
@@ -107,6 +107,8 @@ function run(world, command = 'evaluate') {
       ...(command === 'evaluate' ? { PR_NUMBER: '7' } : {}),
       FAKE_WORLD: worldPath,
       FAKE_LOG: log,
+      CAIRN_REQUIRE_SECURITY_REVIEW: '1',
+      ...extraEnv,
     },
   });
   const calls = readFileSync(log, 'utf8')
@@ -511,6 +513,16 @@ test('security paths fail closed with completed code review and no exact clean s
     assert.equal(check.conclusion, 'failure', JSON.stringify(security));
     assert.match(check.output.summary, /security review/i);
   }
+});
+
+test('security review is skipped by default and a clean code review is enough', () => {
+  const out = run(
+    { files: secureFiles, comments: [stateComment(SHA, 'completed', undefined)] },
+    'evaluate',
+    { CAIRN_REQUIRE_SECURITY_REVIEW: '' },
+  );
+  assert.equal(out.result.status, 0, out.result.stderr);
+  assert.equal(out.body(out.checkWrites[0]).conclusion, 'success');
 });
 
 test('security paths pass clean security state but ignore builtin gate settings and P0 threshold', () => {
