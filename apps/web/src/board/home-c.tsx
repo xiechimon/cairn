@@ -29,6 +29,7 @@ import type {
 import { useI18n } from '../i18n/provider.js';
 import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
@@ -166,6 +167,7 @@ export function HomeC({
   }, [questions?.questionsOpen, pane, searchParams, setSearchParams, location.state]);
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData, chiefView, setChiefView } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -430,13 +432,32 @@ export function HomeC({
         ? 'error'
         : 'loading'
       : surface.load;
+  const composerPlaceholder =
+    projectName != null
+      ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+      : t('跟 Coordinator 说点什么，或描述一个新任务…');
+  const handedOver = load === 'ready' && loadingDraft !== '';
+  useEffect(() => {
+    if (!handedOver) return;
+    setPrefill({ text: loadingDraft, key: Date.now() });
+    setLoadingDraft('');
+  }, [handedOver, loadingDraft]);
   if (load !== 'ready') {
     return (
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {paneButtons}
           {load === 'loading' ? (
-            <ConversationSkeleton />
+            <>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <ConversationSkeleton />
+              </div>
+              <LoadingComposer
+                draft={loadingDraft}
+                onDraftChange={setLoadingDraft}
+                placeholder={composerPlaceholder}
+              />
+            </>
           ) : (
             <>
               <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">

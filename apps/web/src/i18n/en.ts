@@ -1845,6 +1845,7 @@ export const EN: Record<string, string> = {
   电脑没能加载: 'Computers did not load',
   '搜索没能完成，下面只是本地匹配的结果。': 'Search did not finish. These are local matches only.',
   正在加载对话: 'Loading the conversation',
+  '加载完成后才能发送。': 'You can send once loading finishes.',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };

@@ -106,3 +106,16 @@ test('results panel shows loaded todos while the schedules query is still pendin
   await expect(page.getByText('ship the loaded result')).toBeVisible();
   await expect(page.getByTestId('query-loading')).toHaveCount(0);
 });
+
+test('home: the composer stays usable while loading and send is disabled with a reason', async ({
+  page,
+}) => {
+  await delayEveryApi(page);
+  await page.goto('/app');
+  const composer = page.getByTestId('loading-composer');
+  await expect(composer).toBeVisible();
+  await expect(composer).toContainText('加载完成后才能发送。');
+  await composer.getByRole('textbox').fill('draft typed while loading');
+  await expect(composer.getByRole('textbox')).toHaveValue('draft typed while loading');
+  await expect(composer.getByRole('button', { name: '发送' })).toHaveAttribute('aria-disabled', 'true');
+});
