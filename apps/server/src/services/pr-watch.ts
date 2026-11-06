@@ -84,7 +84,7 @@ export function createPrWatch(
   const pulls = new Map<string, { etag: string | null; pull: GithubPullPanel }>();
   const checks = new Map<string, { sha: string; etag: string | null; runs: GithubCheckRun[] }>();
   const rates = new Map<string, RateWindow>();
-  const lastReadAt = new Map<string, number>();
+  const teamReadAt = new Map<string, number>();
   const closedSeenAt = new Map<string, number>();
   let sweeping = false;
 
@@ -287,15 +287,21 @@ export function createPrWatch(
       counted = await readChecks(fetchImpl, token, target, key, head, tally);
       if (counted === null) tally.unreadable += 1;
     }
+    const readComplete = finished || head === '' || counted !== null;
     const sameLine = existing !== undefined && existing.head === head;
     const keep: CheckTally = {
       passed: existing?.checksPassed ?? 0,
       failed: existing?.checksFailed ?? 0,
       running: existing?.checksRunning ?? 0,
       total: existing?.checksTotal ?? 0,
+      failedNames:
+        existing !== undefined ? (JSON.parse(existing.checksFailedNames) as string[]) : [],
     };
     const checksNow =
-      counted ?? (sameLine || finished ? keep : { passed: 0, failed: 0, running: 0, total: 0 });
+      counted ??
+      (sameLine || finished
+        ? keep
+        : { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] });
     const mergeState = finished
       ? (existing?.mergeState ?? 'unknown')
       : mergeStateOf(pull.mergeableState);
@@ -326,7 +332,12 @@ export function createPrWatch(
       checksFailed: checksNow.failed,
       checksRunning: checksNow.running,
       checksTotal: checksNow.total,
+      checksFailedNames: JSON.stringify(checksNow.failedNames),
       head,
+      checksReadFor:
+        counted !== null ? head : sameLine || finished ? (existing?.checksReadFor ?? '') : '',
+      headRef: pull.headRef,
+      baseRef: pull.baseRef ?? '',
       verdictResult: verdict?.result ?? null,
       verdictHead: verdict?.head ?? null,
       blockedSince,
@@ -340,6 +351,7 @@ export function createPrWatch(
           threadId: target.threadId,
           buildId: target.buildId,
           ...values,
+          lastReadAt: readComplete ? now : 0,
           createdAt: now,
           updatedAt: now,
         })
@@ -353,10 +365,12 @@ export function createPrWatch(
       if (changed) {
         deps.db
           .update(threadPr)
-          .set({ ...values, updatedAt: now })
+          .set({ ...values, ...(readComplete ? { lastReadAt: now } : {}), updatedAt: now })
           .where(eq(threadPr.id, existing.id))
           .run();
         tally.updated += 1;
+      } else if (readComplete) {
+        deps.db.update(threadPr).set({ lastReadAt: now }).where(eq(threadPr.id, existing.id)).run();
       }
     }
     const row = deps.db.select().from(threadPr).where(eq(threadPr.buildId, target.buildId)).get();
@@ -397,7 +411,7 @@ export function createPrWatch(
             if (token === null) continue;
             const pacing = pacingOf(rates.get(teamId), now);
             tally.pacing = pacing;
-            const last = lastReadAt.get(teamId);
+            const last = teamReadAt.get(teamId);
             if (
               pacing !== 'normal' &&
               last !== undefined &&
@@ -405,7 +419,7 @@ export function createPrWatch(
             ) {
               continue;
             }
-            lastReadAt.set(teamId, now);
+            teamReadAt.set(teamId, now);
             const fetchImpl = observing(teamId, now);
             let targets = targetsOf(teamId);
             if (pacing === 'armed-only') {

@@ -1,7 +1,7 @@
 import { canOrchestrate } from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useChiefThreads } from '../api/hooks.js';
+import { useApiMutations, useChiefThreads, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -68,6 +68,7 @@ export function useThreadActions({
   const mutations = useApiMutations(teamId);
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
+  const pr = usePrs(teamId, todo.id, live).data?.[0];
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<'accept' | 'delete' | 'stop' | 'route-override' | null>(
     null,
@@ -294,6 +295,7 @@ export function useThreadActions({
         }
         mergeLocked={phase === 'failed'}
         infoOutput={chat.infoOutput}
+        {...(pr !== undefined ? { pr: { number: pr.number, url: pr.url } } : {})}
         confirming={mutations.mergeBuild.isPending || mutations.patchTodo.isPending}
         {...(live ? { onConfirm: confirmAccept } : {})}
       />

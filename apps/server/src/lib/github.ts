@@ -1396,6 +1396,7 @@ export interface GithubPullPanel {
   baseSha?: string | null;
   baseRef?: string | null;
   headSha: string | null;
+  headRef: string;
   mergeableState: string | null;
   additions: number;
   deletions: number;
@@ -1428,7 +1429,7 @@ export async function githubPullPanel(
     mergeable_state?: unknown;
     additions?: unknown;
     deletions?: unknown;
-    head?: { sha?: unknown } | null;
+    head?: { sha?: unknown; ref?: unknown } | null;
     base?: { sha?: unknown; ref?: unknown } | null;
   };
   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
@@ -1446,6 +1447,7 @@ export async function githubPullPanel(
       baseSha: optString(raw.base?.sha),
       baseRef: optString(raw.base?.ref),
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      headRef: typeof raw.head?.ref === 'string' ? raw.head.ref : '',
       mergeableState: optString(raw.mergeable_state),
       additions: typeof raw.additions === 'number' ? raw.additions : 0,
       deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,

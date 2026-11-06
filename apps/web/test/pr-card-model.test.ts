@@ -1,6 +1,7 @@
 import type { MergeBlocker, MergeReadiness } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { type PrCardFacts, prCardModel } from '../src/components/thread/pr-card-model.js';
+import { type PrCardFacts, type PrCardModel, isVerdictStale, prCardModel } from '../src/components/thread/pr-card-model.js';
+import { pillOf } from '../src/components/thread/pr-card.js';
 
 const HEAD = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
@@ -115,5 +116,23 @@ describe('prCardModel', () => {
     expect(merged.queuePosition).toBeUndefined();
     expect(merged.blockers).toBeUndefined();
     expect(merged.ownerRoute).toBeUndefined();
+  });
+});
+
+describe('a finished PR is never reported as needing re-review', () => {
+  const verdict = { result: 'pass', judgedHead: 'a1b2c3d' } as const;
+  const stale = { verdict, currentHead: 'f00ba12' };
+
+  test.each(['merged', 'closed'] as const)('%s with an old verdict is not stale', (state) => {
+    expect(isVerdictStale({ ...stale, state })).toBe(false);
+  });
+
+  test.each(['open', 'draft', 'review-pass'] as const)('%s with an old verdict is stale', (state) => {
+    expect(isVerdictStale({ ...stale, state })).toBe(true);
+  });
+
+  test('the pill of a closed PR with an old verdict says closed', () => {
+    const model = { number: 1, title: 't', state: 'closed', checks: { passed: 1, failed: 0, running: 0, total: 1 }, ...stale } as PrCardModel;
+    expect(pillOf(model, (key) => key).label).toBe('已关闭');
   });
 });
