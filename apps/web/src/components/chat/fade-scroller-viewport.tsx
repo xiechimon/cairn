@@ -3,9 +3,11 @@ import { useScrollFade } from '../../hooks/use-scroll-fade.js';
 import { FOCUS_RING_INSET } from '../../lib/focus-ring.js';
 import { MessageScrollerViewport } from '../ui/message-scroller.js';
 
-type Props = React.ComponentProps<typeof MessageScrollerViewport>;
+type Props = React.ComponentProps<typeof MessageScrollerViewport> & {
+  reserveFade: boolean;
+};
 
-export function FadeScrollerViewport({ className, ref, ...props }: Props) {
+export function FadeScrollerViewport({ className, reserveFade, ref, ...props }: Props) {
   const fadeRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(fadeRef);
   const setRefs = useCallback(
@@ -21,7 +23,14 @@ export function FadeScrollerViewport({ className, ref, ...props }: Props) {
   return (
     <MessageScrollerViewport
       ref={setRefs}
-      className={['scroll-fade', FOCUS_RING_INSET, className].filter(Boolean).join(' ')}
+      className={[
+        'scroll-fade',
+        reserveFade && 'pb-(--scroll-fade-size)',
+        FOCUS_RING_INSET,
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       {...props}
     />
   );
