@@ -93,7 +93,8 @@ The `pr-evidence` gate requires this card whenever the diff changes
 - Requests: an embedded screenshot of the real call with request and response
   visible (Swagger, Postman or the app), and a table with one row per
   requirement clause. A new endpoint or behavior change needs a Before row;
-  one 404 or the old response is enough. At least one row names an HTTP status.
+  one 404 or the old response is enough. The Before row comes from the
+  base branch or production, never a reverted copy of your own change. At least one row names an HTTP status.
 - Generate the table, transcript and screenshots instead of copying them by
   hand: `node .claude/skills/verify-cairn/scripts/vp.mjs drive api-evidence-card card -- <spec.json>`
   (`.claude/skills/verify-cairn/features/api-evidence-card.md`).
@@ -112,8 +113,10 @@ Mocked: none. Auth was off (CAIRN_AUTH=off).
 Not covered: attachment tokens, two real browsers, the 30-day expiry.
 ```
 
-`Not verified:` was merged into `Not covered:`. The gate reds a code PR that
-lacks any of the three lines and says which.
+`Not verified:` was merged into `Not covered:`. An optional fourth line, `Rollback:`, says how to undo
+the change and what that costs; use it for migrations, auth and billing. The
+gate does not require it. The gate reds a code PR that lacks any of the three
+lines and says which.
 
 ## Glance card by change type
 
