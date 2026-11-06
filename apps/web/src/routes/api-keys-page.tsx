@@ -75,7 +75,10 @@ export function ApiKeysPage() {
             .map((key) => (
               <Card
                 key={`once-${key.id}`}
-                className={cn('mt-6 gap-2 px-4 py-3 shadow-none ring-border', CARD_RADIUS_CLS)}
+                className={cn(
+                  'mt-6 gap-2 px-4 py-3 shadow-none ring-4 ring-primary',
+                  CARD_RADIUS_CLS,
+                )}
               >
                 <div className="flex items-center gap-3">
                   <code className="min-w-0 flex-1 font-mono text-ui break-all text-foreground">
