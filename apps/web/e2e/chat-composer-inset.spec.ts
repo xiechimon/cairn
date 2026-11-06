@@ -219,6 +219,22 @@ for (const mask of MASK_CASES) {
             fade: node.style.getPropertyValue('--scroll-fade-bottom'),
           }));
         await expect.poll(read).toEqual({ gap: 0, fade: '0px' });
+        await body.evaluate(
+          (node) =>
+            new Promise<void>((resolve) => {
+              let steady = 0;
+              let last = '';
+              const frame = () => {
+                const now = `${node.scrollHeight}:${node.scrollTop}:${node.hasAttribute('data-autoscrolling')}`;
+                steady = now === last ? steady + 1 : 0;
+                last = now;
+                if (steady >= 30) resolve();
+                else requestAnimationFrame(frame);
+              };
+              requestAnimationFrame(frame);
+            }),
+        );
+        await body.evaluate((node) => node.dispatchEvent(new WheelEvent('wheel', { bubbles: true })));
 
         await body.evaluate((node) => {
           const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
