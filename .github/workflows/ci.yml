@@ -42,14 +42,14 @@ jobs:
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
-    needs: [changes, check-core, vitest-light, vitest-integration]
+    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar-test, tsnet-sidecar-build]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate check parts
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
-          for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}" "${{ needs.vitest-integration.result }}"; do
+          for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}" "${{ needs.vitest-integration.result }}" "${{ needs.tsnet-sidecar-test.result }}" "${{ needs.tsnet-sidecar-build.result }}"; do
             if [ "$result" = "success" ]; then
               continue
             fi
@@ -307,6 +307,82 @@ jobs:
           esac
           [ "$idle" = "skipped" ]
           [ "$ran" = "success" ] || { [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$ran" = "skipped" ]; }
+
+  tsnet-sidecar-test:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/tsnet-sidecar
+    env:
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/tsnet-sidecar/go.mod
+          cache-dependency-path: apps/tsnet-sidecar/go.sum
+
+      - name: Verify module files are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Format
+        run: test -z "$(gofmt -l .)"
+
+      - name: Test
+        run: go test ./...
+
+  tsnet-sidecar-build:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.has-code != 'false'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    defaults:
+      run:
+        working-directory: apps/tsnet-sidecar
+    env:
+      CGO_ENABLED: '0'
+      GOOS: ${{ matrix.target.goos }}
+      GOARCH: ${{ matrix.target.goarch }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/tsnet-sidecar/go.mod
+          cache-dependency-path: apps/tsnet-sidecar/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: |
+          out="$RUNNER_TEMP/tsnet-sidecar-${GOOS}-${GOARCH}"
+          [ "$GOOS" = windows ] && out="$out.exe"
+          go build -trimpath -ldflags '-s -w' -o "$out" .
+          size=$(stat -c %s "$out")
+          echo "tsnet-sidecar ${GOOS}/${GOARCH}: ${size} bytes"
+          [ "$size" -le 41943040 ] || { echo "::error::binary exceeds 40 MiB"; exit 1; }
+          echo "BINARY_PATH=$out" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tsnet-sidecar-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
+          path: ${{ env.BINARY_PATH }}
+          retention-days: 7
+          if-no-files-found: error
 
   pack-smoke:
     needs: changes
