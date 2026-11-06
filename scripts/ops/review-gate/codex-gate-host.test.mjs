@@ -201,6 +201,18 @@ test('an unresolved P1 thread fails the check with its URL', () => {
   assert.match(body.output.summary, /discussion_rP1/);
 });
 
+test('a failing gate on a queued PR posts one extra comment for the dequeue', () => {
+  const world = {
+    comments: [stateComment(SHA, 'completed')],
+    threads: [thread('P1')],
+    checkRuns: [ownRun()],
+  };
+  const plain = run(world);
+  const queued = run({ ...world, pr: { ...basePr, labels: [{ name: 'queued' }] } });
+  assert.equal(queued.body(queued.checkWrites[0]).conclusion, 'failure');
+  assert.equal(queued.commentPosts.length, plain.commentPosts.length + 1);
+});
+
 test('a forged state comment from another author is ignored', () => {
   const forged = { ...stateComment(SHA, 'completed'), user: { login: 'mallory', type: 'User' } };
   const out = run({ comments: [forged], checkRuns: [] });
