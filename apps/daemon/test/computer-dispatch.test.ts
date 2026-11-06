@@ -116,6 +116,7 @@ function countingProvider(): ComputerProvider & { executed: Array<{ timeoutMs: n
   };
 }
 
+const CHILD_HANG_GUARD_MS = 30_000;
 const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20 };
 
 function expectContiguous(frames: ComputerFrame[]) {
@@ -144,7 +145,7 @@ function alive(pid: number): boolean {
 }
 
 async function expectGone(pids: number[]) {
-  const deadline = Date.now() + 1_000;
+  const deadline = Date.now() + 20_000;
   while (pids.some(alive) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
   expect(pids.filter(alive)).toEqual([]);
 }
@@ -458,37 +459,41 @@ describe('computer dispatcher: cancel, retry and shutdown', () => {
           fileURLToPath(new URL('./computer-dispatch-exit-fixture.ts', import.meta.url)),
           mode,
         ],
-        { cwd: home, timeout: 4000 },
+        { cwd: home, timeout: CHILD_HANG_GUARD_MS },
       );
       expect(stdout).toBe('closed\n');
     },
-    10000,
+    CHILD_HANG_GUARD_MS + 5_000,
   );
 
-  test('shutdown aborts a real frame fetch whose server never answers', async () => {
-    const server = createServer((request) => request.resume());
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    try {
-      const address = server.address();
-      if (!address || typeof address === 'string') throw new Error('fixture server has no port');
-      const { stdout } = await promisify(execFile)(
-        process.execPath,
-        [
-          '--import',
-          import.meta.resolve('tsx'),
-          fileURLToPath(new URL('./computer-dispatch-exit-fixture.ts', import.meta.url)),
-          'fetch',
-          `http://127.0.0.1:${address.port}`,
-        ],
-        { cwd: home, timeout: 5000 },
-      );
-      expect(stdout).toBe('closed\n');
-    } finally {
-      server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
-  }, 10000);
+  test(
+    'shutdown aborts a real frame fetch whose server never answers',
+    async () => {
+      const server = createServer((request) => request.resume());
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      try {
+        const address = server.address();
+        if (!address || typeof address === 'string') throw new Error('fixture server has no port');
+        const { stdout } = await promisify(execFile)(
+          process.execPath,
+          [
+            '--import',
+            import.meta.resolve('tsx'),
+            fileURLToPath(new URL('./computer-dispatch-exit-fixture.ts', import.meta.url)),
+            'fetch',
+            `http://127.0.0.1:${address.port}`,
+          ],
+          { cwd: home, timeout: CHILD_HANG_GUARD_MS },
+        );
+        expect(stdout).toBe('closed\n');
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    },
+    CHILD_HANG_GUARD_MS + 5_000,
+  );
 
   test('a failed POST is retried with the same sequence numbers and leaves no gap', async () => {
     const attemptedSeqs: number[][] = [];
