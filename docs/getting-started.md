@@ -51,5 +51,5 @@ The watch-mode dev stack, one process each: `pnpm dev:web`, `pnpm dev:server`, `
 ## Next steps
 
 - Every server and daemon environment variable: [configuration.md](./configuration.md).
-- Private access from your phone over Tailscale: [deploy/tailscale-mobile.md](./deploy/tailscale-mobile.md).
+- Private access from your phone over Tailscale: [deploy/tailscale-mobile.md](./deploy/tailscale-mobile.md). Embedded tsnet with automatic route choice is planned.
 - Engineering canon: [spec/](./spec/), starting with [spec/19-test-layering-and-blast-radius.md](./spec/19-test-layering-and-blast-radius.md).
