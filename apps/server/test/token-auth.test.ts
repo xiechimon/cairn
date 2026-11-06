@@ -12,10 +12,8 @@ import {
   insecureBindWarning,
   loadConfig,
   logTokenAuthStartup,
-  tailscaleBindWarning,
   tokenAuthStartupLines,
   warnInsecureBind,
-  warnTailscaleBind,
 } from '../src/config.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
@@ -76,91 +74,6 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
       { name: 'query-token-probe' },
     );
     expect(post.status).toBe(401);
-  });
-});
-
-describe('#1762 Tailscale Serve identity authentication', () => {
-  function identityRequest(s: TestServer, login: string, remoteAddress: string): Promise<Response> {
-    return Promise.resolve(
-      s.app.request(
-        '/api/user/me',
-        {
-          headers: {
-            'Tailscale-User-Login': login,
-            'x-forwarded-for': '127.0.0.1',
-          },
-        },
-        { incoming: { socket: { remoteAddress } } },
-      ),
-    );
-  }
-
-  test.each(['127.0.0.1', '::1', '::ffff:127.0.0.1'])(
-    'loopback peer %s + allowed login -> /api/user/me 200 without token',
-    async (remoteAddress) => {
-      const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
-      const res = await identityRequest(s, 'xiechimon@github', remoteAddress);
-      expect(res.status).toBe(200);
-      expect((await res.json()) as { id?: string }).toEqual(s.user);
-    },
-  );
-
-  test('loopback + unknown login -> 401', async () => {
-    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
-    const res = await identityRequest(s, 'stranger@github', '127.0.0.1');
-    expect(res.status).toBe(401);
-  });
-
-  test('non-loopback peer + forged identity and forwarding headers -> 401, and a valid token still passes', async () => {
-    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
-    const res = await identityRequest(s, 'xiechimon@github', '100.64.0.2');
-    expect(res.status).toBe(401);
-    const withToken = await Promise.resolve(
-      s.app.request(
-        '/api/user/me',
-        {
-          headers: {
-            'Tailscale-User-Login': 'xiechimon@github',
-            'x-forwarded-for': '127.0.0.1',
-            authorization: `Bearer ${TOKEN}`,
-          },
-        },
-        { incoming: { socket: { remoteAddress: '100.64.0.2' } } },
-      ),
-    );
-    expect(withToken.status).toBe(200);
-  });
-
-  test('loopback + allowed login stays 200 when a stale bearer is also sent', async () => {
-    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
-    const res = await Promise.resolve(
-      s.app.request(
-        '/api/user/me',
-        {
-          headers: {
-            'Tailscale-User-Login': 'xiechimon@github',
-            authorization: 'Bearer stale-bad-token',
-          },
-        },
-        { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
-      ),
-    );
-    expect(res.status).toBe(200);
-  });
-
-  test('missing peer information rejects identity and preserves token fallback', async () => {
-    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
-    const headers = { 'Tailscale-User-Login': 'xiechimon@github' };
-    expect((await reqWith(s, 'GET', '/api/user/me', headers)).status).toBe(401);
-    expect((await reqWith(s, 'GET', '/api/user/me', { ...headers, ...authHeaders })).status).toBe(
-      200,
-    );
-  });
-
-  test('no identity header -> token behavior unchanged', async () => {
-    const s = bootServer({ authToken: TOKEN, tailscaleUsers: ['xiechimon@github'] });
-    expect((await req(s.app, 'GET', '/api/user/me')).status).toBe(401);
-    expect((await reqWith(s, 'GET', '/api/user/me', authHeaders)).status).toBe(200);
   });
 });
 
@@ -411,7 +324,7 @@ describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
     vi.unstubAllEnvs();
   });
 
-  test('file missing -> authToken null (auth off, same as today)', () => {
+  test('file missing -> authToken null until ensureAccessToken generates one', () => {
     const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
     tmpDirs.push(home);
     vi.stubEnv(ENV_VARS.home, home);
@@ -432,8 +345,8 @@ describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
 });
 
 describe('#1708 startup lines (token location + one-time login link)', () => {
-  test('auth off -> zero lines (no behavior change)', () => {
-    expect(tokenAuthStartupLines(loadConfig({ authToken: null }))).toEqual([]);
+  test('CAIRN_AUTH=off (no token) -> zero lines', () => {
+    expect(tokenAuthStartupLines(loadConfig({ authToken: null, authOff: true }))).toEqual([]);
   });
 
   test('env source -> names the env var, the `cairn token` command, and the login link', () => {
@@ -451,7 +364,7 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
     vi.stubEnv(ENV_VARS.token, TOKEN);
     const text = tokenAuthStartupLines(loadConfig({ requireToken: false })).join('\n');
     vi.unstubAllEnvs();
-    expect(text).toContain(`http://localhost:8787/app#token=${TOKEN}`);
+    expect(text).toContain(`http://127.0.0.1:8787/app#token=${TOKEN}`);
   });
 
   test('container mode (requireToken on) -> names the token source but never the value or the login link', () => {
@@ -489,10 +402,10 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
     expect(lines.join('\n')).toContain(join(home, ACCESS_TOKEN_FILE_NAME));
   });
 
-  test('link host: default bind and any-interface -> localhost; ::1 bracketed; explicit host verbatim', () => {
+  test('link host: default bind -> 127.0.0.1; any-interface -> localhost; ::1 bracketed; explicit host verbatim', () => {
     vi.stubEnv(ENV_VARS.token, TOKEN);
-    expect(tokenAuthStartupLines(loadConfig({ host: null })).join('\n')).toContain(
-      'http://localhost:8787/app#token=',
+    expect(tokenAuthStartupLines(loadConfig()).join('\n')).toContain(
+      'http://127.0.0.1:8787/app#token=',
     );
     expect(tokenAuthStartupLines(loadConfig({ host: '0.0.0.0' })).join('\n')).toContain(
       'http://localhost:8787/app#token=',
@@ -524,60 +437,11 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
   });
 });
 
-describe('#1762 Tailscale identity bind warning', () => {
-  test('allowlist + non-loopback or default bind -> WARN; loopback or no allowlist -> no WARN', () => {
-    expect(
-      tailscaleBindWarning(loadConfig({ host: '0.0.0.0', tailscaleUsers: ['xiechimon@github'] })),
-    ).toMatch(/CAIRN_TAILSCALE_USERS/);
-    expect(
-      tailscaleBindWarning(loadConfig({ host: null, tailscaleUsers: ['xiechimon@github'] })),
-    ).toMatch(/127\.0\.0\.1/);
-    expect(
-      tailscaleBindWarning(loadConfig({ host: '127.0.0.1', tailscaleUsers: ['xiechimon@github'] })),
-    ).toBeNull();
-    expect(
-      tailscaleBindWarning(loadConfig({ host: '::1', tailscaleUsers: ['xiechimon@github'] })),
-    ).toBeNull();
-    expect(
-      tailscaleBindWarning(loadConfig({ host: 'localhost', tailscaleUsers: ['xiechimon@github'] })),
-    ).toBeNull();
-    expect(
-      tailscaleBindWarning(
-        loadConfig({ host: '192.168.1.10', tailscaleUsers: ['xiechimon@github'] }),
-      ),
-    ).toMatch(/Identity headers from non-loopback peers are ignored/);
-    expect(tailscaleBindWarning(loadConfig({ host: '0.0.0.0', tailscaleUsers: [] }))).toBeNull();
-  });
-
-  test('entry wiring emits one warning for an unsafe identity bind', () => {
-    const calls: string[] = [];
-    warnTailscaleBind(
-      { warn: (msg: string) => calls.push(msg) },
-      loadConfig({ host: null, tailscaleUsers: ['xiechimon@github'] }),
-    );
-    warnTailscaleBind(
-      { warn: (msg: string) => calls.push(msg) },
-      loadConfig({ host: '127.0.0.1', tailscaleUsers: ['xiechimon@github'] }),
-    );
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatch(/CAIRN_TAILSCALE_USERS/);
-  });
-
-  test('CAIRN_TAILSCALE_USERS maps to a trimmed allowlist without empty entries', () => {
-    vi.stubEnv('CAIRN_TAILSCALE_USERS', ' xiechimon@github, ,other@github,');
-    expect(loadConfig().tailscaleUsers).toEqual(['xiechimon@github', 'other@github']);
-    vi.stubEnv('CAIRN_TAILSCALE_USERS', '');
-    expect(loadConfig().tailscaleUsers).toEqual([]);
-    vi.unstubAllEnvs();
-  });
-});
-
-describe('the 0.0.0.0 bare-bind WARN (failure modes 9/10)', () => {
-  test('an explicit 0.0.0.0 + auth off -> the WARN copy; default bind / loopback / auth on -> no WARN', () => {
+describe('the bare-bind WARN (failure modes 9/10)', () => {
+  test('an explicit 0.0.0.0 + no token -> the WARN copy; loopback / token set -> no WARN', () => {
     const warn = insecureBindWarning(loadConfig({ host: '0.0.0.0', authToken: null }));
     expect(warn).toMatch(/0\.0\.0\.0/);
     expect(warn).toMatch(/CAIRN_TOKEN/);
-    expect(insecureBindWarning(loadConfig({ host: null, authToken: null }))).toBeNull();
     expect(insecureBindWarning(loadConfig({ host: '127.0.0.1', authToken: null }))).toBeNull();
     expect(insecureBindWarning(loadConfig({ host: '0.0.0.0', authToken: TOKEN }))).toBeNull();
   });
@@ -592,12 +456,12 @@ describe('the 0.0.0.0 bare-bind WARN (failure modes 9/10)', () => {
     warnInsecureBind(stubLogger, loadConfig({ host: '0.0.0.0', authToken: null }));
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatch(/0\.0\.0\.0/);
-    warnInsecureBind(stubLogger, loadConfig({ host: null, authToken: null }));
+    warnInsecureBind(stubLogger, loadConfig({ host: '127.0.0.1', authToken: null }));
     warnInsecureBind(stubLogger, loadConfig({ host: '0.0.0.0', authToken: TOKEN }));
     expect(calls).toHaveLength(1);
   });
 
-  test('env mapping: CAIRN_TOKEN -> authToken (empty string = off); HOST -> host', () => {
+  test('env mapping: CAIRN_TOKEN -> authToken (empty string = unset); HOST -> host, default loopback', () => {
     const home = mkdtempSync(join(tmpdir(), 'cairn-token-env-'));
     tmpDirs.push(home);
     vi.stubEnv(ENV_VARS.home, home);
@@ -610,7 +474,7 @@ describe('the 0.0.0.0 bare-bind WARN (failure modes 9/10)', () => {
     vi.unstubAllEnvs();
     vi.stubEnv(ENV_VARS.home, home);
     expect(loadConfig().authToken).toBeNull();
-    expect(loadConfig().host).toBeNull();
+    expect(loadConfig().host).toBe('127.0.0.1');
     vi.unstubAllEnvs();
   });
 });

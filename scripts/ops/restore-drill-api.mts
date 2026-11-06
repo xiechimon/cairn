@@ -29,7 +29,6 @@ const app = createApp({
   oauthStates: new Map(),
   oauthClient: null,
   authToken: null,
-  tailscaleUsers: [],
   reposDir: join(dataDir, 'repos'),
   attachmentsDir: join(dataDir, 'attachments'),
   skillsDir: join(home, 'skills'),

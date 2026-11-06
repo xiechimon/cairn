@@ -54,7 +54,6 @@ export function bootServer(
     oauthClient?: AppContext['oauthClient'];
     oauthFetch?: AppContext['oauthFetch'];
     authToken?: string | null;
-    tailscaleUsers?: string[];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
@@ -130,7 +129,6 @@ export function bootServer(
       skillSourcesPath,
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
       authToken: opts.authToken ?? null,
-      tailscaleUsers: opts.tailscaleUsers ?? [],
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
     };
     const app = createApp(appContext, opts.logger);
