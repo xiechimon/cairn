@@ -15,6 +15,7 @@ import {
   gateState,
   gateVerdict,
   message,
+  plan as planTable,
   project,
   pushDelivery,
   pushDigestItem,
@@ -479,6 +480,88 @@ describe('in-product merge gate', () => {
     const verified = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
     expect(verified?.blockers.map((b) => b.code)).not.toContain('verify-missing');
   });
+
+  test.each([
+    { shape: 'no plan', plan: null, queued: true },
+    { shape: 'plan without verification items', plan: 'no-items', queued: true },
+    { shape: 'plan with verification items', plan: 'items', queued: true },
+  ] as const)(
+    'readiness shape: $shape on a GitHub PR build queues one verify step and clears verify-missing on a passing verdict',
+    async ({ plan: planShape, queued }) => {
+      const { s, buildId, stepId } = await world();
+      if (planShape !== null) {
+        s.db
+          .insert(planTable)
+          .values({
+            id: 'plan-shape',
+            buildId,
+            version: 1,
+            content:
+              planShape === 'items'
+                ? 'Kind: fix\n## Changes\n- a.ts\n\n## Verification\n- `pnpm test` passes\n'
+                : '## Context\nNo checklist here.\n',
+            createdAt: 1,
+          })
+          .run();
+      }
+      completeStep(s.svc, stepId, { hasChanges: true });
+      s.db.update(step).set({ status: 'done', finishedAt: 2 }).where(eq(step.id, stepId)).run();
+      s.db.update(todo).set({ phase: 'review' }).where(eq(todo.id, 'todo-1794')).run();
+      const todoRow = s.db.select().from(todo).where(eq(todo.id, 'todo-1794')).get()!;
+      maybeEnqueueVerifyStep(s.svc, todoRow, buildId);
+      const verifies = s.db
+        .select()
+        .from(step)
+        .where(eq(step.buildId, buildId))
+        .all()
+        .filter((row) => row.kind === 'verify');
+      expect(verifies.length > 0).toBe(queued);
+      const before = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(before?.blockers.map((b) => b.code)).toContain('verify-missing');
+      const verify = verifies[0];
+      if (verify === undefined) return;
+      s.db.update(step).set({ status: 'done', finishedAt: 3 }).where(eq(step.id, verify.id)).run();
+      const digest = computePatchDigest(
+        compareFilesFromResponse({
+          files: [
+            {
+              filename: 'apps/server/src/services/merge-gate/readiness.ts',
+              status: 'modified',
+              sha: '1'.repeat(40),
+              additions: 4,
+              deletions: 1,
+              patch: '@@ protected\n+gate\n',
+            },
+            {
+              filename: 'docs/verify/1794/shot.png',
+              status: 'added',
+              sha: '2'.repeat(40),
+              additions: 0,
+              deletions: 0,
+            },
+          ],
+        }) ?? [],
+        { expectedFileCount: 2 },
+      ).patchDigest;
+      s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: verify.id,
+          buildId,
+          kind: 'verify',
+          perspective: null,
+          outcome: 'pass',
+          patchDigest: digest,
+          headSha: HEAD,
+          expectedHeadSha: HEAD,
+          createdAt: 4,
+        })
+        .run();
+      const after = await evaluateMergeGate(s.svc, buildId, { port: scriptedPort([]) });
+      expect(after?.blockers.map((b) => b.code)).not.toContain('verify-missing');
+      expect(after?.blockers.map((b) => b.code)).not.toContain('no-verifier');
+    },
+  );
 
   test('D71 reviewer identity is the model the review step actually ran: a same-vendor fallback is not independent', async () => {
     const { s, buildId, stepId } = await world();

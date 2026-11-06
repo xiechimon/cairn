@@ -14,6 +14,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { openDbWithHandle } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { listMemoryEntries } from '../src/services/memory.js';
+import { modelsAreIndependent } from '../src/services/merge-gate/model-identity.js';
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
 import {
   coordinatorProfile,
@@ -418,6 +419,233 @@ describe('migration 0112 keeps every legacy step profile', () => {
   test('every intentional difference is justified', () => {
     for (const reason of Object.values(INTENTIONAL_DIFFERENCES)) {
       expect(reason.length).toBeGreaterThan(20);
+    }
+  });
+});
+
+function installWith(prepare: (sqlite: Database.Database) => void): string {
+  const dir = makeTestTempDir('migration-0112-matrix-');
+  dirs.push(dir);
+  const dbPath = join(dir, 'server.db');
+  const sqlite = new Database(dbPath);
+  sqlite.pragma('foreign_keys = ON');
+  migrateUpTo(sqlite, dir, '0109_overconfident_omega_red');
+  sqlite.exec("INSERT INTO user (id, displayName) VALUES ('u1', 'Owner')");
+  sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('t1', 'Team', 1)");
+  sqlite.exec("INSERT INTO project (id, name, teamId) VALUES ('p1', 'Proj', 't1')");
+  prepare(sqlite);
+  migrateAll(sqlite);
+  sqlite.close();
+  return dbPath;
+}
+
+const COORDINATOR_AGENT: Config = {
+  provider: 'openai-codex',
+  modelId: 'gpt-6-luna',
+  thinkingLevel: 'low',
+  tools: [AGENT_TOOL_PUSH],
+  mcpServers: ['coordinator-mcp'],
+  skillsAllowlist: ['coord-skill'],
+  defaultSkill: 'coord-skill',
+  secrets: [],
+  fallbackModels: null,
+};
+
+describe('coordinator binding', () => {
+  test.each(['absent', 'present'] as const)('existing coordinator rule %s', (existing) => {
+    const dbPath = installWith((sqlite) => {
+      insertAgent(sqlite, 'agent-chief', 'Chief', COORDINATOR_AGENT, null);
+      sqlite
+        .prepare(
+          "INSERT INTO chief (id, userId, teamId, createdAt, agentId) VALUES ('chief-u1-t1', 'u1', 't1', 1, 'agent-chief')",
+        )
+        .run();
+      if (existing === 'present') {
+        sqlite
+          .prepare(
+            `INSERT INTO routing_rule (id, teamId, use, provider, modelId, thinkingLevel, createdAt, updatedAt)
+             VALUES ('rule-coord', 't1', 'coordinator', 'claude-code', 'claude-opus-5-5', 'high', 1, 1)`,
+          )
+          .run();
+      }
+    });
+    const opened = openDbWithHandle(dbPath);
+    try {
+      seedDefaultRouting(opened.db);
+      const profile = coordinatorProfile(opened.db, 't1');
+      const expectedModel =
+        existing === 'present'
+          ? { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: 'high' }
+          : { provider: 'openai-codex', modelId: 'gpt-6-luna', thinkingLevel: 'low' };
+      expect(profile).toMatchObject({
+        ...expectedModel,
+        mcpServers: COORDINATOR_AGENT.mcpServers,
+      });
+    } finally {
+      opened.close();
+    }
+  });
+});
+
+describe('research and eval roles', () => {
+  const AUTHOR: Config = {
+    ...ROLE_AGENT,
+    provider: 'claude-code',
+    modelId: 'claude-sonnet-5-5',
+  };
+  const CHECKER: Config = {
+    ...ROLE_AGENT,
+    provider: 'openai-codex',
+    modelId: 'gpt-6-luna',
+    thinkingLevel: 'low',
+    fallbackModels: null,
+  };
+  const cells = (['assigned', 'unassigned'] as const).flatMap((assignment) =>
+    (['custom', 'persona', 'eval-harbor'] as const).map((naming) => ({ assignment, naming })),
+  );
+  test.each(cells)('citation checker $assignment $naming', ({ assignment, naming }) => {
+    const dbPath = installWith((sqlite) => {
+      insertAgent(sqlite, 'agent-aaa-decoy', 'eval-harbor', AUTHOR, null);
+      insertAgent(sqlite, 'agent-author', 'Author', AUTHOR, null);
+      insertAgent(
+        sqlite,
+        'agent-zzz-checker',
+        naming === 'eval-harbor' ? 'eval-harbor' : 'Citation checker',
+        CHECKER,
+        naming === 'persona' ? 'test_engineer' : null,
+      );
+      const todo = sqlite.prepare(
+        `INSERT INTO todo (id, teamId, projectId, title, phase, phaseAt, seqNum, assignment, sourceKind)
+         VALUES (?, 't1', 'p1', ?, 'queued', 1, ?, ?, ?)`,
+      );
+      todo.run(
+        'todo-author',
+        'Author task',
+        1,
+        JSON.stringify({ plan: null, build: { agentId: 'agent-author' } }),
+        null,
+      );
+      todo.run(
+        'todo-citation',
+        'Check citations',
+        2,
+        assignment === 'assigned'
+          ? JSON.stringify({ plan: null, build: { agentId: 'agent-zzz-checker' } })
+          : null,
+        'research-citation-check',
+      );
+    });
+    const opened = openDbWithHandle(dbPath);
+    try {
+      seedDefaultRouting(opened.db);
+      const citation = opened.db
+        .select()
+        .from(schema.todo)
+        .where(eq(schema.todo.id, 'todo-citation'))
+        .get();
+      const author = opened.db
+        .select()
+        .from(schema.todo)
+        .where(eq(schema.todo.id, 'todo-author'))
+        .get();
+      if (citation === undefined || author === undefined) throw new Error('fixture todo missing');
+      const checking = profileForStep(opened.db, citation, 'build');
+      const authoring = profileForStep(opened.db, author, 'build');
+      expect(authoring).toMatchObject({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+      expect(checking).not.toBeNull();
+      if (checking === null || authoring === null) return;
+      const ruleExists =
+        opened.db
+          .select()
+          .from(schema.routingRule)
+          .where(eq(schema.routingRule.use, 'citation_check'))
+          .get() !== undefined;
+      if (assignment === 'unassigned' && naming === 'persona') {
+        expect(ruleExists, 'no independent persona-less checker: the runtime guard blocks').toBe(
+          false,
+        );
+        return;
+      }
+      expect(
+        modelsAreIndependent(authoring.modelId ?? '', checking.modelId ?? ''),
+        'the checker model is independent of the author model',
+      ).toBe(true);
+      if (assignment === 'assigned') {
+        expect(checking).toMatchObject({
+          provider: CHECKER.provider,
+          modelId: CHECKER.modelId,
+          thinkingLevel: CHECKER.thinkingLevel,
+        });
+      }
+    } finally {
+      opened.close();
+    }
+  });
+});
+
+const LEGACY_AGENT_COLUMNS_COVERAGE: Record<string, string> = {
+  'agent.*': 'every agent field: role cells (model, MCP, tools, skills, secrets, fallbacks)',
+  'todo.assignment.plan': 'plan role cells',
+  'todo.assignment.build': 'implement role cells, author and citation-checker cells',
+  'todo.assignment.review': 'review role cells',
+  'todo.assignment.verify': 'verify role cells',
+  'chief.agentId': 'coordinator cells',
+  'routing_rule.seededFromAgentId': 'rule-and-policy and rule-only routing cells',
+  'routing_rule.adoptedAgentIds':
+    'dropped with the column; adopted memory copies are covered by the memory visibility check',
+  'work_policy.seededFromAgentId': 'rule-and-policy and rule-only routing cells',
+  'agent_memory.agentId': 'memory visibility for every role cell',
+  'memory_candidate.agentId': 'rekeyed to the session rule owner; see the candidate test',
+};
+
+describe('legacy agent columns', () => {
+  test('every agent-bearing column of the 0109 schema is listed with its coverage', () => {
+    const dir = makeTestTempDir('migration-0112-matrix-');
+    dirs.push(dir);
+    const sqlite = new Database(join(dir, 'server.db'));
+    migrateUpTo(sqlite, dir, '0109_overconfident_omega_red');
+    const tables = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+      name: string;
+    }[];
+    const found: string[] = [];
+    for (const { name } of tables) {
+      const columns = sqlite.prepare(`SELECT name FROM pragma_table_info('${name}')`).all() as {
+        name: string;
+      }[];
+      for (const column of columns) {
+        if (/agentId|assignment|adoptedAgentIds/i.test(column.name))
+          found.push(`${name}.${column.name}`);
+      }
+    }
+    sqlite.close();
+    const listed = Object.keys(LEGACY_AGENT_COLUMNS_COVERAGE)
+      .filter((key) => !key.startsWith('agent.') && !key.startsWith('todo.assignment.'))
+      .concat('todo.assignment');
+    expect(found.sort()).toEqual([...new Set(listed)].sort());
+  });
+
+  test('pending memory candidates follow the build owner', () => {
+    const dbPath = installWith((sqlite) => {
+      insertAgent(sqlite, 'agent-role', 'Role', ROLE_AGENT, 'implementer');
+      sqlite
+        .prepare(
+          `INSERT INTO memory_candidate (id, agentId, teamId, projectId, title, content, status, buildIds, evidence, conflictIds, createdAt, updatedAt)
+           VALUES ('cand-1', 'agent-role', 't1', 'p1', 'cand', 'candidate fact', 'pending', '[]', '[]', '[]', 1, 1)`,
+        )
+        .run();
+    });
+    const opened = openDbWithHandle(dbPath);
+    try {
+      seedDefaultRouting(opened.db);
+      const owner = memoryOwnerOf(opened.db, 't1', 'build');
+      const row = opened.db
+        .select()
+        .from(schema.memoryCandidate)
+        .where(eq(schema.memoryCandidate.id, 'cand-1'))
+        .get();
+      expect(row?.agentId).toBe(owner);
+    } finally {
+      opened.close();
     }
   });
 });
