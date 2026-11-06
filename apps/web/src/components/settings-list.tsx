@@ -78,7 +78,7 @@ export function SettingsHeader({
 
 const SettingsFlatContext = createContext(false);
 
-export const SETTINGS_VALUE_COL_CLS = 'md:w-56 md:flex-none justify-end';
+export const SETTINGS_VALUE_COL_CLS = '@xl:w-56 @xl:flex-none justify-end';
 
 const SETTINGS_FLAT_CLS =
   'rounded-none bg-transparent shadow-none ring-0 border-t border-border [&_.settings-row]:px-0 [&_.settings-flat-block]:px-0';
@@ -108,7 +108,7 @@ export function SettingsPanel({
       <div
         data-testid="settings-panel"
         className={cn(
-          'flex min-w-0 flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border',
+          '@container flex min-w-0 flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border',
           className,
         )}
       >

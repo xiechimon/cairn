@@ -28,6 +28,7 @@ export interface SubscriptionAccountsProps {
   onAdd: (vendor: AccountVendor) => void;
   vendor?: AccountVendor;
   onVendorChange?: (vendor: AccountVendor) => void;
+  gate?: (vendor: AccountVendor, section: ReactNode) => ReactNode;
 }
 
 function EmptyLine({ children }: { children: ReactNode }) {
@@ -95,38 +96,41 @@ export function SubscriptionAccounts(props: SubscriptionAccountsProps) {
         }}
         onAdd={() => props.onAdd(vendor)}
       />
-      <VendorSection
-        key={vendor}
-        vendor={vendor}
-        accounts={props.accounts.filter((a) => a.vendor === vendor)}
-        now={props.now}
-        renderRow={(account, index) => {
-          const steps = props.stepsByAccount[account.id];
-          const expanded = open === account.id;
-          return (
-            <div key={account.id} className="flex flex-col">
-              <AccountRow
-                account={account}
-                index={index}
-                now={props.now}
-                actions={props.actionsFor(account)}
-                status={props.statusFor?.(account)}
-                expanded={expanded}
-                onToggleExpanded={
-                  steps === undefined ? undefined : () => setOpen(expanded ? null : account.id)
-                }
-              />
-              {expanded && steps !== undefined && (
-                <AccountDetail
-                  steps={steps}
-                  sticky={props.stickiness.filter((s) => s.subscriptionId === account.id)}
+      {(props.gate ?? ((_vendor, section) => section))(
+        vendor,
+        <VendorSection
+          key={vendor}
+          vendor={vendor}
+          accounts={props.accounts.filter((a) => a.vendor === vendor)}
+          now={props.now}
+          renderRow={(account, index) => {
+            const steps = props.stepsByAccount[account.id];
+            const expanded = open === account.id;
+            return (
+              <div key={account.id} className="flex flex-col">
+                <AccountRow
+                  account={account}
+                  index={index}
                   now={props.now}
+                  actions={props.actionsFor(account)}
+                  status={props.statusFor?.(account)}
+                  expanded={expanded}
+                  onToggleExpanded={
+                    steps === undefined ? undefined : () => setOpen(expanded ? null : account.id)
+                  }
                 />
-              )}
-            </div>
-          );
-        }}
-      />
+                {expanded && steps !== undefined && (
+                  <AccountDetail
+                    steps={steps}
+                    sticky={props.stickiness.filter((s) => s.subscriptionId === account.id)}
+                    now={props.now}
+                  />
+                )}
+              </div>
+            );
+          }}
+        />,
+      )}
     </div>
   );
 }

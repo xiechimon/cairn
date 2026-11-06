@@ -62,3 +62,103 @@ test('machines: a slow list fetch shows a skeleton, not the empty state', async 
   await expect(settings.getByTestId('resource-empty')).toHaveCount(0);
   await expect(settings.getByTestId('resource-empty')).toBeVisible();
 });
+
+test('routing: a failed Claude subscriptions fetch still lets the Codex tab show its own accounts', async ({
+  page,
+}) => {
+  const state = { fail: true, ok: [] as unknown };
+  await stub(page, 'claude-subscriptions', state);
+  await page.route('**/api/teams/team-1/providers', (route) =>
+    route.fulfill({
+      json: {
+        providers: [
+          {
+            id: 'p-codex',
+            kind: 'preset',
+            providerId: 'openai-codex',
+            label: 'Codex main',
+            baseUrl: 'https://example.invalid',
+            api: 'openai-responses',
+            models: [],
+            createdAt: 0,
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/app/settings/routing');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('query-error')).toBeVisible();
+  await expect(settings.getByRole('tab', { name: /Codex/ })).toBeVisible();
+  await settings.getByRole('tab', { name: /Codex/ }).click();
+  await expect(settings.getByTestId('query-error')).toHaveCount(0);
+  await expect(settings.getByTestId('account-row')).toContainText('Codex main');
+});
+
+test('providers: a failed team providers fetch does not hide the machine scope editors', async ({
+  page,
+}) => {
+  const state = { fail: true, ok: { providers: [] } as unknown };
+  await stub(page, 'providers', state);
+  await page.route('**/api/teams/team-1/machines', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'm-1',
+          name: 'alpha',
+          teamId: 'team-1',
+          online: true,
+          latestCliVersion: null,
+          kind: 'remote',
+          enabledRuntimes: ['pi'],
+        },
+      ],
+    }),
+  );
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('query-error')).toBeVisible();
+  await settings.getByRole('tab', { name: /alpha/ }).click();
+  await expect(settings.getByTestId('query-error')).toHaveCount(0);
+  await expect(settings.getByTestId('provider-instance').first()).toBeVisible();
+});
+
+for (const width of [768, 1024]) {
+  test(`machines: at ${width}px the panel stacks and no row clips its value column`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/app/settings/machines?scenario=machines-master-detail');
+    const settings = page.getByRole('dialog', { name: '设置' });
+    await expect(settings.getByTestId('machine-detail')).toBeVisible();
+    const list = await settings.getByTestId('machine-list').boundingBox();
+    const detail = await settings.getByTestId('machine-detail').boundingBox();
+    expect((detail?.y ?? 0) >= (list?.y ?? 0) + (list?.height ?? 0) - 1).toBe(true);
+    const clipped = await settings.getByTestId('machine-detail').evaluate((root) => {
+      const rootRight = root.getBoundingClientRect().right;
+      return [...root.querySelectorAll('.settings-row')]
+        .filter((row) => {
+          const box = row.getBoundingClientRect();
+          return (
+            box.right > rootRight + 1 ||
+            [...row.children].some((child) => child.getBoundingClientRect().right > box.right + 1)
+          );
+        })
+        .map((row) => row.textContent?.slice(0, 30));
+    });
+    expect(clipped).toEqual([]);
+  });
+}
+
+test('machines: at 1440px the list sits beside the detail with a value column per row', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/machines?scenario=machines-master-detail');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const list = await settings.getByTestId('machine-list').boundingBox();
+  const detail = await settings.getByTestId('machine-detail').boundingBox();
+  expect((detail?.x ?? 0) >= (list?.x ?? 0) + (list?.width ?? 0) - 1).toBe(true);
+});

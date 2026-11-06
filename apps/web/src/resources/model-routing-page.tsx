@@ -190,73 +190,78 @@ export function ModelRoutingPage() {
         setSearchParams(params, { replace: true });
       }}
     >
-      <QueryGate query={tab === 'accounts' ? subscriptionsQ : routingQ} live={live}>
-        <SettingsPanel>
-          <div className="p-4">
-            {tab === 'accounts' ? (
-              <SubscriptionAccounts
-                accounts={accounts}
-                stepsByAccount={stepsByAccount}
-                stickiness={stickiness}
-                now={now}
-                vendor={vendor}
-                onVendorChange={(next) => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set('vendor', next);
-                  setSearchParams(params, { replace: true });
-                }}
-                onAdd={(vendor) => {
-                  if (vendor === 'claude') {
-                    createSubscription.reset();
-                    setAdding(true);
-                    return;
-                  }
-                  const params = new URLSearchParams({ add: VENDOR_PRESETS[vendor] });
-                  const scenario = searchParams.get('scenario');
-                  if (scenario !== null) params.set('scenario', scenario);
-                  navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
-                }}
-                statusFor={(account) =>
-                  verifying === account.id ? (
-                    <span role="status" className="text-meta text-content-tertiary">
-                      {t('验证中…')}
-                    </span>
-                  ) : null
+      <SettingsPanel>
+        <div className="p-4">
+          {tab === 'accounts' ? (
+            <SubscriptionAccounts
+              gate={(forVendor, section) => (
+                <QueryGate query={forVendor === 'claude' ? subscriptionsQ : providersQ} live={live}>
+                  {section}
+                </QueryGate>
+              )}
+              accounts={accounts}
+              stepsByAccount={stepsByAccount}
+              stickiness={stickiness}
+              now={now}
+              vendor={vendor}
+              onVendorChange={(next) => {
+                const params = new URLSearchParams(searchParams);
+                params.set('vendor', next);
+                setSearchParams(params, { replace: true });
+              }}
+              onAdd={(vendor) => {
+                if (vendor === 'claude') {
+                  createSubscription.reset();
+                  setAdding(true);
+                  return;
                 }
-                actionsFor={(account) => {
-                  const onRemove = () => setRemoving(account);
-                  if (account.vendor !== 'claude') {
-                    return {
-                      onRemove,
-                      ...(live
-                        ? {
-                            onRename: (label: string) =>
-                              mutations.patchProvider.mutate(
-                                { id: account.id, body: { label } },
-                                {
-                                  onError: (error) => toastError(t('重命名失败，请重试。'), error),
-                                },
-                              ),
-                          }
-                        : {}),
-                    };
-                  }
+                const params = new URLSearchParams({ add: VENDOR_PRESETS[vendor] });
+                const scenario = searchParams.get('scenario');
+                if (scenario !== null) params.set('scenario', scenario);
+                navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
+              }}
+              statusFor={(account) =>
+                verifying === account.id ? (
+                  <span role="status" className="text-meta text-content-tertiary">
+                    {t('验证中…')}
+                  </span>
+                ) : null
+              }
+              actionsFor={(account) => {
+                const onRemove = () => setRemoving(account);
+                if (account.vendor !== 'claude') {
                   return {
                     onRemove,
-                    onVerify: () => void verify(account),
-                    ...(accountApiIds.includes(account.id)
+                    ...(live
                       ? {
                           onRename: (label: string) =>
-                            renameSubscription.mutate(
-                              { id: account.id, label },
-                              { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
+                            mutations.patchProvider.mutate(
+                              { id: account.id, body: { label } },
+                              {
+                                onError: (error) => toastError(t('重命名失败，请重试。'), error),
+                              },
                             ),
                         }
                       : {}),
                   };
-                }}
-              />
-            ) : (
+                }
+                return {
+                  onRemove,
+                  onVerify: () => void verify(account),
+                  ...(accountApiIds.includes(account.id)
+                    ? {
+                        onRename: (label: string) =>
+                          renameSubscription.mutate(
+                            { id: account.id, label },
+                            { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
+                          ),
+                      }
+                    : {}),
+                };
+              }}
+            />
+          ) : (
+            <QueryGate query={routingQ} live={live}>
               <div className="flex flex-col gap-8 pb-16">
                 <SettingsSection title={t('Claude 用量')}>
                   <SettingsCard>
@@ -306,10 +311,10 @@ export function ModelRoutingPage() {
                   </div>
                 </SettingsSection>
               </div>
-            )}
-          </div>
-        </SettingsPanel>
-      </QueryGate>
+            </QueryGate>
+          )}
+        </div>
+      </SettingsPanel>
       {adding && (
         <AddClaudeSubscriptionDialog
           onClose={() => {

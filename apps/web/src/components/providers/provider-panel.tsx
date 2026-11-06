@@ -121,34 +121,36 @@ export function ProviderPanel({
 }) {
   const { t } = useI18n();
   return (
-    <SettingsCard className="overflow-hidden md:grid md:grid-cols-[17rem_minmax(0,1fr)]">
-      <div
-        data-testid="provider-list"
-        className="flex flex-col divide-y divide-border border-b border-border md:border-r md:border-b-0"
-      >
-        {items.map((item) => (
-          <ProviderInstanceRow
-            key={item.id}
-            item={item}
-            selected={item.id === selectedId}
-            onSelect={() => onSelect(item.id)}
-          />
-        ))}
-        {onAdd !== undefined && (
-          <Button
-            variant="ghost"
-            onClick={onAdd}
-            className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover"
-          >
-            <Plus aria-hidden className="size-4" />
-            {t('添加服务商')}
-          </Button>
-        )}
-      </div>
-      <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
-        <SettingsFlat>{items.length === 0 ? empty : children}</SettingsFlat>
-      </div>
-    </SettingsCard>
+    <div className="@container">
+      <SettingsCard className="overflow-hidden @3xl:grid @3xl:grid-cols-[17rem_minmax(0,1fr)]">
+        <div
+          data-testid="provider-list"
+          className="flex flex-col divide-y divide-border border-b border-border @3xl:border-r @3xl:border-b-0"
+        >
+          {items.map((item) => (
+            <ProviderInstanceRow
+              key={item.id}
+              item={item}
+              selected={item.id === selectedId}
+              onSelect={() => onSelect(item.id)}
+            />
+          ))}
+          {onAdd !== undefined && (
+            <Button
+              variant="ghost"
+              onClick={onAdd}
+              className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover"
+            >
+              <Plus aria-hidden className="size-4" />
+              {t('添加服务商')}
+            </Button>
+          )}
+        </div>
+        <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
+          <SettingsFlat>{items.length === 0 ? empty : children}</SettingsFlat>
+        </div>
+      </SettingsCard>
+    </div>
   );
 }
 

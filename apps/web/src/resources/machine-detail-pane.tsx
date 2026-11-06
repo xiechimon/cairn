@@ -13,6 +13,7 @@ import { useApiMutations, useMembers, useModelSources } from '../api/hooks.js';
 import { mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
+import { QueryGate } from '../components/query-gate.js';
 import {
   SETTINGS_ROW_CLS,
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -453,13 +454,15 @@ export function MachineDetailPane({
       )}
 
       <SettingsSection title={t('归属的 Agent')}>
-        <TeamAgentGrid
-          rows
-          agents={homeAgents}
-          machines={machines}
-          onCreate={() => setCreateOpen(true)}
-          search={search}
-        />
+        <QueryGate query={membersQ} live={live}>
+          <TeamAgentGrid
+            rows
+            agents={homeAgents}
+            machines={machines}
+            onCreate={() => setCreateOpen(true)}
+            search={search}
+          />
+        </QueryGate>
       </SettingsSection>
 
       <SettingsSection title={t('管理')}>

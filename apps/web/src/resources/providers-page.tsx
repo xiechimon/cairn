@@ -280,7 +280,7 @@ export function ProvidersPage() {
             ]}
           />
         </div>
-        <QueryGate query={providersQ} live={live}>
+        <QueryGate query={machine === undefined ? providersQ : sourcesQ} live={live}>
           <ProviderPanel
             items={entries.map((e) => e.item)}
             selectedId={selected?.item.id ?? null}

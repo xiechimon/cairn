@@ -204,11 +204,11 @@ export function MachinesPage() {
                   </>
                 }
               >
-                <div className="flex min-w-0 flex-col md:flex-row">
+                <div className="flex min-w-0 flex-col @3xl:flex-row">
                   <nav
                     data-testid="machine-list"
                     aria-label={t('已接入的机器')}
-                    className="flex w-full flex-none flex-col border-b border-border md:w-64 md:border-r md:border-b-0"
+                    className="flex w-full flex-none flex-col border-b border-border @3xl:w-64 @3xl:border-r @3xl:border-b-0"
                   >
                     {machines.map((machine) => (
                       <MachineItem

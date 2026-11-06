@@ -114,7 +114,7 @@ export function TeamAgentGrid({
                 {face !== null && (
                   <span
                     className={cn(
-                      'flex flex-none items-center justify-end gap-1 text-meta md:w-56',
+                      'flex flex-none items-center justify-end gap-1 text-meta @xl:w-56',
                       face.cls,
                     )}
                     data-testid="team-card-status"
