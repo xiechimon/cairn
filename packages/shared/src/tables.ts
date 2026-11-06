@@ -58,6 +58,7 @@ export const DB_TABLES = [
   'feature_flag',
   'client_message',
   'harness_profile',
+  'composer_draft',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -102,4 +103,5 @@ export const INTERNAL_ONLY_TABLES = [
   'feature_flag',
   'client_message',
   'harness_profile',
+  'composer_draft',
 ] as const;

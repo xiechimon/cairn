@@ -35,6 +35,10 @@ export class DraftSync {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private saving: Promise<void> | null = null;
   private disposed = false;
+  private version = 0;
+  private readSeq = 0;
+  private drain = false;
+  private keepalive = false;
   private readonly metaKey: string;
   private readonly debounceMs: number;
 
@@ -51,6 +55,7 @@ export class DraftSync {
 
   edit(text: string): void {
     if (this.disposed || text === this.text) return;
+    this.version += 1;
     this.text = text;
     this.writeLocal();
     this.setMeta({ at: this.meta.at, dirty: true });
@@ -64,13 +69,19 @@ export class DraftSync {
       await this.flush();
       return;
     }
+    const startedAt = this.version;
+    this.readSeq += 1;
+    const seq = this.readSeq;
     let remote: Awaited<ReturnType<DraftTransport['load']>>;
     try {
       remote = await this.options.transport.load();
     } catch {
       return;
     }
-    if (this.disposed || this.meta.dirty || remote.updatedAt === this.meta.at) return;
+    if (this.disposed || seq !== this.readSeq || startedAt !== this.version || this.meta.dirty) {
+      return;
+    }
+    if (remote.updatedAt === this.meta.at) return;
     this.text = remote.content;
     this.writeLocal();
     this.setMeta({ at: remote.updatedAt, dirty: false });
@@ -79,24 +90,17 @@ export class DraftSync {
 
   flush(options: { keepalive?: boolean } = {}): Promise<void> {
     this.cancelTimer();
-    if (this.saving !== null) return this.saving;
+    if (this.saving !== null) {
+      this.drain = true;
+      this.keepalive ||= options.keepalive === true;
+      return this.saving;
+    }
     if (!this.meta.dirty) return Promise.resolve();
-    const sent = this.text;
-    const saving = this.options.transport
-      .save(sent, options)
-      .then(
-        (saved) => {
-          const changedMeanwhile = this.text !== sent;
-          this.setMeta({ at: saved.updatedAt, dirty: changedMeanwhile });
-          if (!changedMeanwhile || this.disposed) return;
-          if (this.text === '') void this.flush();
-          else this.schedule();
-        },
-        () => {},
-      )
-      .finally(() => {
-        this.saving = null;
-      });
+    this.drain = false;
+    this.keepalive = options.keepalive === true;
+    const saving = this.saveLoop().finally(() => {
+      this.saving = null;
+    });
     this.saving = saving;
     return saving;
   }
@@ -106,6 +110,27 @@ export class DraftSync {
     void this.flush({ keepalive: true });
     this.disposed = true;
     this.cancelTimer();
+  }
+
+  private async saveLoop(): Promise<void> {
+    while (this.meta.dirty) {
+      const sent = this.text;
+      this.version += 1;
+      let saved: Awaited<ReturnType<DraftTransport['save']>>;
+      try {
+        saved = await this.options.transport.save(sent, { keepalive: this.keepalive });
+      } catch {
+        return;
+      }
+      this.version += 1;
+      const changedMeanwhile = this.text !== sent;
+      this.setMeta({ at: saved.updatedAt, dirty: changedMeanwhile });
+      if (!changedMeanwhile) return;
+      if (!this.drain && this.text !== '') {
+        if (!this.disposed) this.schedule();
+        return;
+      }
+    }
   }
 
   private schedule(): void {

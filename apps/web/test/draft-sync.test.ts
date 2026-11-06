@@ -188,3 +188,139 @@ describe('DraftSync', () => {
     expect(save).toHaveBeenCalledWith('closing the tab', { keepalive: true });
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+function gatedTransport() {
+  const saves: { content: string; keepalive: boolean; done: (at: number | null) => void }[] = [];
+  const loads: { done: (snapshot: DraftSnapshot) => void }[] = [];
+  const transport: DraftTransport = {
+    load() {
+      const d = deferred<DraftSnapshot>();
+      loads.push({ done: d.resolve });
+      return d.promise;
+    },
+    save(content, options) {
+      const d = deferred<DraftSnapshot>();
+      saves.push({
+        content,
+        keepalive: options?.keepalive === true,
+        done: (at) => d.resolve({ content, updatedAt: at }),
+      });
+      return d.promise;
+    },
+  };
+  return { transport, saves, loads };
+}
+
+async function settle() {
+  await vi.advanceTimersByTimeAsync(0);
+}
+
+describe('DraftSync async ordering', () => {
+  it('send during an in-flight save: the clearing write is sent right after it', async () => {
+    const gate = gatedTransport();
+    const sync = new DraftSync({
+      transport: gate.transport,
+      storage: memoryStorage(),
+      localKey: KEY,
+      onRemote: () => {},
+    });
+    sync.edit('about to send');
+    void sync.flush();
+    sync.edit('');
+    await settle();
+    expect(gate.saves.map((s) => s.content)).toEqual(['about to send']);
+    gate.saves[0]?.done(1);
+    await settle();
+    expect(gate.saves.map((s) => s.content)).toEqual(['about to send', '']);
+    gate.saves[1]?.done(null);
+    await settle();
+    await vi.advanceTimersByTimeAsync(DRAFT_SAVE_DEBOUNCE_MS * 4);
+    expect(gate.saves).toHaveLength(2);
+  });
+
+  it('dispose during an in-flight save: newer edits are still saved, with keepalive', async () => {
+    const gate = gatedTransport();
+    const sync = new DraftSync({
+      transport: gate.transport,
+      storage: memoryStorage(),
+      localKey: KEY,
+      onRemote: () => {},
+    });
+    sync.edit('first');
+    void sync.flush();
+    sync.edit('first and more');
+    sync.dispose();
+    gate.saves[0]?.done(1);
+    await settle();
+    expect(gate.saves.map((s) => [s.content, s.keepalive])).toEqual([
+      ['first', false],
+      ['first and more', true],
+    ]);
+  });
+
+  it('a slow read started while clean cannot overwrite an edit that was already saved', async () => {
+    const gate = gatedTransport();
+    const onRemote = vi.fn<(text: string) => void>();
+    const sync = new DraftSync({
+      transport: gate.transport,
+      storage: memoryStorage(),
+      localKey: KEY,
+      onRemote,
+    });
+    const reading = sync.refresh();
+    sync.edit('typed');
+    await vi.advanceTimersByTimeAsync(DRAFT_SAVE_DEBOUNCE_MS);
+    gate.saves[0]?.done(7);
+    await settle();
+    gate.loads[0]?.done({ content: 'stale remote', updatedAt: 3 });
+    await reading;
+    expect(sync.current()).toBe('typed');
+    expect(onRemote).not.toHaveBeenCalled();
+  });
+
+  it('of two overlapping reads only the latest one is applied', async () => {
+    const gate = gatedTransport();
+    const onRemote = vi.fn<(text: string) => void>();
+    const sync = new DraftSync({
+      transport: gate.transport,
+      storage: memoryStorage(),
+      localKey: KEY,
+      onRemote,
+    });
+    const first = sync.refresh();
+    const second = sync.refresh();
+    gate.loads[1]?.done({ content: 'newer', updatedAt: 5 });
+    await second;
+    gate.loads[0]?.done({ content: 'older', updatedAt: 4 });
+    await first;
+    expect(sync.current()).toBe('newer');
+    expect(onRemote).toHaveBeenCalledTimes(1);
+  });
+
+  it('two devices: a send on A during B save does not resurrect the draft on A', async () => {
+    const gate = gatedTransport();
+    const a = new DraftSync({
+      transport: gate.transport,
+      storage: memoryStorage(),
+      localKey: KEY,
+      onRemote: () => {},
+    });
+    a.edit('draft');
+    void a.flush();
+    a.edit('');
+    gate.saves[0]?.done(2);
+    await settle();
+    gate.saves[1]?.done(null);
+    await settle();
+    expect(gate.saves.map((s) => s.content)).toEqual(['draft', '']);
+    expect(a.current()).toBe('');
+  });
+});
