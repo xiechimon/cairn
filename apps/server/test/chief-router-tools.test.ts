@@ -74,7 +74,7 @@ function expectRejected(promise: Promise<unknown>, status: number, message: RegE
 
 describe('router tool vocabulary', () => {
   test('the router tools are a separate five from the base vocabulary', () => {
-    expect(CHIEF_REMOTE_TOOLS).toHaveLength(46);
+    expect(CHIEF_REMOTE_TOOLS).toHaveLength(47);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) {
       expect(CHIEF_REMOTE_TOOLS.map((t) => t.name)).not.toContain(name);
@@ -97,7 +97,7 @@ describe('router tool vocabulary', () => {
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
     ]);
-    expect(Object.keys(chiefToolDefHashes())).toHaveLength(51);
+    expect(Object.keys(chiefToolDefHashes())).toHaveLength(52);
   });
 });
 
