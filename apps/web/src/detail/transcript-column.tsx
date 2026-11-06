@@ -60,7 +60,7 @@ function TranscriptColumnInner({
   return (
     <MessageScroller className={ROOT_CLS}>
       <FadeScrollerViewport
-        reserveFade={false}
+        reserveEnd={false}
         data-testid="transcript-col"
         className={VIEWPORT_CLS}
       >

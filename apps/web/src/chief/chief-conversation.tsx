@@ -646,7 +646,7 @@ export function ChiefConversation({
         <>
           {intro}
           <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport reserveFade ref={viewportRef} data-testid="chief-body">
+            <FadeScrollerViewport reserveEnd ref={viewportRef} data-testid="chief-body">
               <MessageScrollerContent
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"

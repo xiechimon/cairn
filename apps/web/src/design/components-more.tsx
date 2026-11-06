@@ -298,7 +298,7 @@ export function StreamSection() {
         <div className="relative flex h-80 flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border">
           <MessageScrollerProvider autoScroll scrollEdgeThreshold={40} defaultScrollPosition="end">
             <MessageScroller className="h-auto min-h-0 flex-1">
-              <FadeScrollerViewport reserveFade={false}>
+              <FadeScrollerViewport reserveEnd={false}>
                 <MessageScrollerContent className="block gap-0 px-5 pt-4 pb-5">
                   <TraceSteps steps={steps} />
                   <div className="mt-2">
