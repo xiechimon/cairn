@@ -153,6 +153,22 @@ Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
 
+## UI reference comparison
+
+A PR that changes `apps/web/src` adds a reference table under Proof, one row per state that has a reference shot (D120):
+
+```markdown
+| State | Reference | Ours | Verdict |
+| --- | --- | --- | --- |
+| Empty composer | ![Claude.ai](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<n>/empty-compare.png) | (right half of the same image) | Matches the single composer; model chip still sits left of the mode label |
+```
+
+- Make one side-by-side image per state (`magick montage`, see `.claude/skills/verify-cairn/SKILL.md`, "UI reference comparison") from `docs/design/references/<surface>/` and a live capture; store it like the other screenshots.
+- The verdict is one sentence, and says what is still worse than the reference. Fixture-only pairs say `fixture`.
+- Name the surface, the reference product, and the `apps/web/DESIGN-RULES.md` ids checked, in a line under the table. The `Not covered:` line lists states with no shot.
+- A PR with no reference for its surface says so and links the owner's decision; do not substitute another product.
+- Sentences in the verdict column are table text and stay outside the 600-character cap.
+
 ## Review
 
 Do not run a local `codex exec` or `claude -p` review before pushing. Codex cloud code review (`chatgpt-codex-connector[bot]`) reviews every push through the review gate. Never write `@codex` in a PR body: Codex reads it as a task request, answers that the repository has no environment, and skips the automatic review. Fix confirmed findings and record skipped ones with reasons under Review.
