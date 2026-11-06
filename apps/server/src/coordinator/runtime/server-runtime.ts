@@ -8,12 +8,20 @@ import {
   type ModelRef,
 } from './compaction.js';
 import type { MachineApi } from './machine-api.js';
-import { createCoordinatorModels } from './models.js';
+import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
 import { threadStorePath } from './thread-harnesses.js';
-import { coordinatorToolsExtension, createConversationGate } from './tools.js';
+import {
+  type ConversationGate,
+  coordinatorToolsExtension,
+  createConversationGate,
+} from './tools.js';
 import { runCoordinatorTurn } from './turn.js';
-import { createVolatileContext, volatileContextExtension } from './volatile.js';
+import {
+  createVolatileContext,
+  type VolatileContext,
+  volatileContextExtension,
+} from './volatile.js';
 
 export interface ServerRuntimeConfig {
   storageDir: string;
@@ -38,82 +46,98 @@ export interface ServerTurn {
   summary: ProviderBinding;
 }
 
+interface ThreadState {
+  harness: Promise<Harness>;
+  models: CoordinatorModels;
+  gate: ConversationGate;
+  volatile: VolatileContext;
+  summary: { ref: ModelRef | null };
+}
+
 export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi) {
   const context = BACKGROUND_CONTEXT;
-  const models = createCoordinatorModels(config.fixedProviders);
-  const gate = createConversationGate();
-  const volatile = createVolatileContext();
-  let summaryRef: ModelRef | null = null;
   let shuttingDown = false;
-  const extensions = [
-    coordinatorToolsExtension(api, gate, {
-      routerTools: config.routerTools,
-      shuttingDown: () => shuttingDown,
-    }),
-    volatileContextExtension(volatile),
-    coordinatorCompactionExtension(() => summaryRef),
-  ];
-  const settings = () => ({
+  const settings = (models: CoordinatorModels) => () => ({
     compaction: coordinatorCompactionSettings(
       models.models
         .getModels()
         .map((m) => ({ provider: m.provider, id: m.id, contextWindow: m.contextWindow })),
     ),
   });
-  const open = new Map<string, Promise<Harness>>();
+  const open = new Map<string, ThreadState>();
   const busy = new Map<string, number>();
   const lastUsed = new Map<string, number>();
 
-  const openThread = (threadId: string): Promise<Harness> => {
+  const stateOf = (threadId: string): ThreadState => {
     const existing = open.get(threadId);
     if (existing !== undefined) return existing;
-    const opening = openReconciledHarness(
+    const models = createCoordinatorModels(config.fixedProviders);
+    const gate = createConversationGate();
+    const volatile = createVolatileContext();
+    const summary: ThreadState['summary'] = { ref: null };
+    const extensions = [
+      coordinatorToolsExtension(api, gate, {
+        routerTools: config.routerTools,
+        shuttingDown: () => shuttingDown,
+      }),
+      volatileContextExtension(volatile),
+      coordinatorCompactionExtension(() => summary.ref),
+    ];
+    const harness = openReconciledHarness(
       threadStorePath(config.storageDir, threadId),
       models.models,
       context,
-      { extensions, settings },
+      { extensions, settings: settings(models) },
       config.factsFor(threadId),
     ).then((result) => {
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
     });
-    open.set(threadId, opening);
-    opening.catch(() => open.delete(threadId));
-    return opening;
+    const state = { harness, models, gate, volatile, summary };
+    open.set(threadId, state);
+    harness.catch(() => open.delete(threadId));
+    return state;
   };
 
+  const openThread = (threadId: string): Promise<Harness> => stateOf(threadId).harness;
+
   const closeThread = async (threadId: string): Promise<void> => {
-    const opening = open.get(threadId);
-    if (opening === undefined) return;
+    const state = open.get(threadId);
+    if (state === undefined) return;
     open.delete(threadId);
     lastUsed.delete(threadId);
-    const harness = await opening.catch(() => null);
+    const harness = await state.harness.catch(() => null);
     await harness?.close(context);
   };
 
   return {
     openThread,
+    closeThread,
     isOpen: (threadId: string) => open.has(threadId),
     runTurn: async (turn: ServerTurn): Promise<MachineDoneBody> => {
       const { claimed } = turn;
       const threadId = claimed.chief?.threadId ?? '';
-      models.useProvider(turn.router.config, turn.router.resolveKey);
-      models.useProvider(turn.summary.config, turn.summary.resolveKey);
-      summaryRef = { provider: turn.summary.config.providerId, modelId: turn.summary.modelId };
+      const state = stateOf(threadId);
+      state.models.useProvider(turn.router.config, turn.router.resolveKey);
+      state.models.useProvider(turn.summary.config, turn.summary.resolveKey);
+      state.summary.ref = {
+        provider: turn.summary.config.providerId,
+        modelId: turn.summary.modelId,
+      };
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
       try {
-        const harness = await openThread(threadId);
+        const harness = await state.harness;
         return await runCoordinatorTurn(
           {
             harness,
-            models,
+            models: state.models,
             api,
             context,
             heartbeatMs: config.heartbeatMs,
             ...(config.stopPollMs === undefined ? {} : { stopPollMs: config.stopPollMs }),
             now: Date.now,
-            conversationGate: gate,
-            volatile,
+            conversationGate: state.gate,
+            volatile: state.volatile,
             volatileText: turn.volatileText,
           },
           claimed,

@@ -103,6 +103,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const leases = new Map<string, Lease>();
   const draining = new Map<string, Promise<void>>();
   const dirty = new Set<string>();
+  const freshClaims = new Set<string>();
 
   const threadTeam = (threadId: string): string | null =>
     db
@@ -136,7 +137,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       conversationId: row?.conversationId ?? null,
       lastMirroredEntryId: row?.lastMirroredEntryId ?? null,
       piVersion: row?.piVersion ?? null,
-      hasClaimedStep: live.some((r) => r.status === 'claimed' && r.machineId === null),
+      hasClaimedStep: live.some(
+        (r) => r.status === 'claimed' && r.machineId === null && !freshClaims.has(r.id),
+      ),
       isLive: (requestId) => live.some((r) => r.id === requestId),
       seed: () => {
         const teamId = threadTeam(threadId);
@@ -253,6 +256,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     if (teamId === null || !serverTakesTurn(db, teamId, head)) return null;
     if (hasEarlierLiveChiefStep(db, head)) return null;
     if (!claimPendingChiefStep(db, head, null)) return null;
+    freshClaims.add(head.id);
     publishStepStatus(machine, head.id);
     return db.select().from(step).where(eq(step.id, head.id)).get() ?? null;
   };
@@ -326,6 +330,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (!closing && current?.status === 'claimed') {
         await api.done(row.id, { status: 'failed', errorMessage: scrubbed });
       }
+    } finally {
+      freshClaims.delete(row.id);
     }
   };
 
@@ -343,6 +349,14 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     }
   };
 
+  const releaseLeaseIfUnused = (threadId: string): void => {
+    const lease = leases.get(threadId);
+    if (lease === undefined || runtime.isOpen(threadId) || draining.has(threadId)) return;
+    if (!liveSteps(threadId).every((r) => r.machineId !== null)) return;
+    lease.release();
+    leases.delete(threadId);
+  };
+
   const wake = (threadId: string): void => {
     if (closing) return;
     dirty.add(threadId);
@@ -353,11 +367,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       })
       .finally(() => {
         draining.delete(threadId);
-        const lease = leases.get(threadId);
-        if (lease !== undefined && liveSteps(threadId).every((r) => r.machineId !== null)) {
-          lease.release();
-          leases.delete(threadId);
-        }
+        releaseLeaseIfUnused(threadId);
       });
     draining.set(threadId, running);
   };
@@ -379,12 +389,20 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (!lease.heartbeat()) {
         logger.warn({ threadId }, 'coordinator lease lost');
         leases.delete(threadId);
+        void runtime.closeThread(threadId).catch((error: unknown) => {
+          logger.error({ threadId, error: String(error) }, 'coordinator close after lease loss');
+        });
       }
     }
     for (const threadId of liveThreads()) wake(threadId);
-    void runtime.closeIdle(options.idleCloseMs ?? IDLE_CLOSE_MS).catch((error: unknown) => {
-      logger.error({ error: String(error) }, 'coordinator idle close failed');
-    });
+    void runtime
+      .closeIdle(options.idleCloseMs ?? IDLE_CLOSE_MS)
+      .then((closed) => {
+        for (const threadId of closed) releaseLeaseIfUnused(threadId);
+      })
+      .catch((error: unknown) => {
+        logger.error({ error: String(error) }, 'coordinator idle close failed');
+      });
   };
 
   const timer = setInterval(tick, options.tickMs ?? TICK_MS);

@@ -1,7 +1,16 @@
 import { copyFileSync, existsSync, renameSync } from 'node:fs';
 import type { Context } from '@earendil-works/chord/context';
 import type { Models } from '@earendil-works/pi-ai/models';
-import type { Extension, Harness, HarnessSettings } from '@earendil-works/pi-durable';
+import {
+  AssistantEntry,
+  type EntryId,
+  type EntryRecord,
+  type Extension,
+  type Harness,
+  type HarnessSettings,
+  ToolResultEntry,
+  UserEntry,
+} from '@earendil-works/pi-durable';
 import { openCoordinatorHarness } from './harness.js';
 import { type SeedRow, seedCoordinator } from './seed.js';
 import { settleStaleSubmissions } from './stale-runs.js';
@@ -49,6 +58,27 @@ function backupBeforeUpgrade(path: string, from: string): void {
   if (existsSync(path) && !existsSync(target)) copyFileSync(path, target);
 }
 
+function isContentEntry(entry: EntryRecord): boolean {
+  if (UserEntry.is(entry) || ToolResultEntry.is(entry)) return true;
+  if (!AssistantEntry.is(entry)) return false;
+  const message = entry.model?.[0];
+  return !(message?.role === 'assistant' && message.stopReason === 'aborted');
+}
+
+async function hasContentBeyond(
+  root: Awaited<ReturnType<Harness['root']>>,
+  after: number,
+  context: Context,
+): Promise<boolean> {
+  const page = await root.entries(
+    { minEntryId: (after + 1) as EntryId, order: 'ascending' },
+    500,
+    undefined,
+    context,
+  );
+  return page.items.some(isContentEntry);
+}
+
 async function newestEntryId(harness: Harness, context: Context): Promise<number | undefined> {
   const root = await harness.root(context);
   const newest = (await root.entries({}, 1, undefined, context)).items[0]?.id;
@@ -80,8 +110,8 @@ export async function openReconciledHarness(
     reseed = 'reseeded-missing-conversation';
   } else if (
     facts.lastMirroredEntryId !== null &&
-    newest > Number(facts.lastMirroredEntryId) &&
-    !facts.hasClaimedStep
+    !facts.hasClaimedStep &&
+    (await hasContentBeyond(root, Number(facts.lastMirroredEntryId), context))
   ) {
     reseed = 'reseeded-ahead';
   }
