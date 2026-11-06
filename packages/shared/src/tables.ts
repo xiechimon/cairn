@@ -61,6 +61,9 @@ export const DB_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -108,4 +111,7 @@ export const INTERNAL_ONLY_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
 ] as const;
