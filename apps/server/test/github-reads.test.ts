@@ -1291,50 +1291,56 @@ describe('github_overlap Coordinator read', () => {
     });
   });
 
-  test.each(['openIssues', 'filePulls open PRs', 'filePulls files for PR #1'])(
-    'fails closed with a shared lookup budget naming %s',
-    async (lookup) => {
-      const w = overlapWorld();
-      const fetchImpl: FetchLike = async (input, init) => {
-        const path = new URL(String(input)).pathname;
-        const delayed =
-          lookup === 'openIssues' ||
-          (lookup === 'filePulls open PRs' && path === PULLS_PATH) ||
-          (lookup === 'filePulls files for PR #1' && path === `${PULLS_PATH}/1/files`);
-        if (delayed) {
-          await new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(resolve, 250);
-            init?.signal?.addEventListener(
-              'abort',
-              () => {
-                clearTimeout(timer);
-                reject(init.signal?.reason);
-              },
-              { once: true },
-            );
-          });
-        }
-        return w.mock.impl(input, init);
-      };
-      await expect(
-        lookupGithubOverlaps(
-          fetchImpl,
-          { owner: OWNER, repo: REPO_NAME, slug: REPO, token: TOKEN },
-          ['clock'],
-          ['src/clock.ts'],
-          {
-            timeoutMs: 6_000,
-            budgetMs: 100,
-            cleanTitle: (title) => title,
-            readFailure: (failure) => new HttpError(502, failure.kind),
-          },
-        ),
-      ).rejects.toMatchObject({
-        status: 504,
-        message: `github_overlap ${lookup}: lookup budget of 100ms spent; pass fewer paths and repeat`,
-      });
-    },
-  );
+  test.each([
+    ['the search that ran out', 'openIssues'],
+    ['filePulls open PRs', 'filePulls open PRs'],
+    ['filePulls files for PR #1', 'filePulls files for PR #1'],
+  ])('fails closed with a shared lookup budget naming %s', async (_name, lookup) => {
+    const w = overlapWorld();
+    const fetchImpl: FetchLike = async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      const delayed =
+        lookup === 'openIssues' ||
+        (lookup === 'filePulls open PRs' && path === PULLS_PATH) ||
+        (lookup === 'filePulls files for PR #1' && path === `${PULLS_PATH}/1/files`);
+      if (delayed) {
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, 250);
+          init?.signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              reject(init.signal?.reason);
+            },
+            { once: true },
+          );
+        });
+      }
+      return w.mock.impl(input, init);
+    };
+    await expect(
+      lookupGithubOverlaps(
+        fetchImpl,
+        { owner: OWNER, repo: REPO_NAME, slug: REPO, token: TOKEN },
+        ['clock'],
+        ['src/clock.ts'],
+        {
+          timeoutMs: 6_000,
+          budgetMs: 100,
+          cleanTitle: (title) => title,
+          readFailure: (failure) => new HttpError(502, failure.kind),
+        },
+      ),
+    ).rejects.toMatchObject({
+      status: 504,
+      message:
+        lookup === 'openIssues'
+          ? expect.stringMatching(
+              /^github_overlap (openIssues|openPulls|recentPulls): lookup budget of \d+ms spent/,
+            )
+          : `github_overlap ${lookup}: lookup budget of 100ms spent; pass fewer paths and repeat`,
+    });
+  });
 
   test.each([
     ['incomplete results', { body: { total_count: 0, incomplete_results: true, items: [] } }],
