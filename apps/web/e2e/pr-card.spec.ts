@@ -76,9 +76,11 @@ test('the card keeps inside a 420px column', async ({ page }) => {
   }
 });
 
-test('failing checks read as one muted line with the names, the dot is the only color', async ({ page }) => {
+test('failing check names live in the expanded area as one muted line, the dot is the only color', async ({ page }) => {
   await openGallery(page, 'light');
   const card = cardOf(page, 'Checks failed');
+  await expect(card.locator('[data-slot="pr-card-failures"]')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Details' }).click();
   await expect(card.locator('[data-slot="pr-card-failures"]')).toHaveText('2 failed: typecheck, web e2e (3)');
   await expect(card.locator('[data-slot="pr-checks"]')).toHaveAttribute('data-ci', 'failed');
   await expect(card.getByRole('button', { name: 'Open on GitHub' })).toHaveCount(0);

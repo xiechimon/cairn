@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.js';
 import { isVerdictStale, type PrCardModel, type PrCardResult } from './pr-card-model.js';
+import { PrLink } from './pr-link.js';
 import { PrRowMenu } from './pr-row-menu.js';
 
 export interface PrCardProps {
@@ -89,11 +90,7 @@ function stateIcon(pr: PrCardModel) {
         ? GitPullRequestClosed
         : GitPullRequest;
   return (
-    <Icon
-      aria-hidden
-      strokeWidth={1.75}
-      className="mt-0.75 size-3.5 flex-none text-content-tertiary"
-    />
+    <Icon aria-hidden strokeWidth={1.75} className="size-3.5 flex-none text-content-tertiary" />
   );
 }
 
@@ -146,11 +143,36 @@ function Details({ pr }: { pr: PrCardModel }) {
   const lenses = pr.verdict?.lenses ?? [];
   const blockers = pr.blockers ?? [];
   const verdict = verdictText(pr, t);
+  const failures = failedLine(pr, t);
+  const hasBranch = pr.branch !== undefined && pr.branch !== '';
   return (
     <div
       data-slot="pr-card-details"
-      className="flex flex-col gap-1 pt-1 pl-5.5 text-meta text-content-tertiary"
+      className="flex flex-col gap-1 pt-1.5 pl-5.5 text-meta text-content-tertiary"
     >
+      <p data-slot="pr-card-title" className="m-0 break-words text-ui text-foreground">
+        {pr.title}
+      </p>
+      {(hasBranch || pr.additions !== undefined) && (
+        <p className="m-0 flex min-w-0 flex-wrap items-center gap-x-1.5 tabular-nums">
+          {hasBranch && (
+            <span className="min-w-0 truncate font-mono">
+              {pr.branch}
+              {pr.base !== undefined && pr.base !== '' ? ` → ${pr.base}` : ''}
+            </span>
+          )}
+          {pr.additions !== undefined && pr.deletions !== undefined && (
+            <span>
+              +{pr.additions} −{pr.deletions}
+            </span>
+          )}
+        </p>
+      )}
+      {failures !== null && (
+        <p data-slot="pr-card-failures" className="m-0 break-words">
+          {failures}
+        </p>
+      )}
       {verdict !== null && <p className="m-0">{verdict}</p>}
       {lenses.length > 0 && (
         <p className="m-0">
@@ -162,18 +184,12 @@ function Details({ pr }: { pr: PrCardModel }) {
           {blocker}
         </p>
       ))}
-      <p className="m-0">
-        {t('评审 head')} <Sha value={pr.currentHead} />
-      </p>
+      {verdict === null && (
+        <p className="m-0">
+          {t('评审 head')} <Sha value={pr.currentHead} />
+        </p>
+      )}
     </div>
-  );
-}
-
-function hasDetails(pr: PrCardModel): boolean {
-  return (
-    verdictText(pr, (key) => key) !== null ||
-    (pr.verdict?.lenses?.length ?? 0) > 0 ||
-    (pr.blockers?.length ?? 0) > 0
   );
 }
 
@@ -181,86 +197,49 @@ export function PrCard(props: PrCardProps) {
   const { pr, className, githubHref, onViewDiff, onResolve, readOnly } = props;
   const { t } = useI18n();
   const pill = pillOf(pr, t);
-  const failures = failedLine(pr, t);
   const needsResolve =
     readOnly !== true &&
     (pr.state === 'conflicts' || pr.state === 'checks-failed' || pr.state === 'review-block');
-  const expandable = hasDetails(pr);
   return (
     <article
       data-slot="pr-card"
       data-state={pr.state}
       data-stale={isVerdictStale(pr) ? '' : undefined}
-      className={cn(
-        '@container/pr min-w-0 rounded-(--radius-control) py-1.75 pr-1 pl-2',
-        className,
-      )}
+      className={cn('@container/pr min-w-0 rounded-(--radius-control) py-1.5 pr-1 pl-2', className)}
     >
       <Collapsible className="group/details">
-        <div className="flex items-start gap-2.5">
+        <div data-slot="pr-card-row" className="flex items-center gap-2">
           {stateIcon(pr)}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <h3 className="m-0 truncate text-ui font-normal text-foreground">{pr.title}</h3>
-            <p className="m-0 flex min-w-0 flex-wrap items-center gap-x-1.5 text-meta text-content-tertiary">
-              <span className="flex-none tabular-nums">#{pr.number}</span>
-              <span aria-hidden>·</span>
-              <span data-slot="pr-card-state" className="min-w-0 truncate">
-                {pill.label}
-              </span>
-              {pr.additions !== undefined && pr.deletions !== undefined && (
-                <>
-                  <span aria-hidden className="hidden @min-[22rem]/pr:inline">
-                    ·
-                  </span>
-                  <span
-                    data-slot="pr-card-diff"
-                    className="flex w-full flex-none items-center gap-1.5 tabular-nums @min-[22rem]/pr:w-auto"
-                  >
-                    <span>+{pr.additions}</span>
-                    <span>−{pr.deletions}</span>
-                  </span>
-                </>
-              )}
-              {pr.branch !== undefined && pr.branch !== '' && (
-                <span
-                  data-slot="pr-card-branch"
-                  className="hidden min-w-0 items-center gap-1.5 @min-[34rem]/pr:flex"
-                >
-                  <span aria-hidden>·</span>
-                  <span className="min-w-0 truncate font-mono">
-                    {pr.branch}
-                    {pr.base !== undefined && pr.base !== '' ? ` → ${pr.base}` : ''}
-                  </span>
-                </span>
-              )}
-            </p>
-            {failures !== null && (
-              <p
-                data-slot="pr-card-failures"
-                className="m-0 truncate text-meta text-content-tertiary"
-              >
-                {failures}
-              </p>
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-meta text-content-secondary">
+            {githubHref != null ? (
+              <PrLink number={pr.number} url={githubHref} />
+            ) : (
+              <span className="flex-none font-medium tabular-nums">PR #{pr.number}</span>
             )}
-            {pr.readAgoMinutes != null && (
-              <p
-                data-slot="pr-card-late"
-                className="m-0 flex items-center gap-1.5 text-meta text-content-tertiary"
+            <span aria-hidden className="flex-none text-content-tertiary">
+              ·
+            </span>
+            <span data-slot="pr-card-state" className="min-w-0 truncate">
+              {pill.label}
+            </span>
+            <CheckCount pr={pr} />
+            {pr.additions !== undefined && pr.deletions !== undefined && (
+              <span
+                data-slot="pr-card-diff"
+                className="hidden flex-none items-center gap-1.5 text-content-tertiary tabular-nums @min-[24rem]/pr:flex"
               >
-                <Clock className="size-3.5 flex-none" aria-hidden />
-                {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
-              </p>
+                <span aria-hidden>·</span>
+                <span>+{pr.additions}</span>
+                <span>−{pr.deletions}</span>
+              </span>
             )}
           </div>
-          <CheckCount pr={pr} />
-          {expandable && (
-            <CollapsibleTrigger
-              aria-label={t('详情')}
-              className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <ChevronDown className="size-3.5 transition-transform group-data-[open]/details:rotate-180" />
-            </CollapsibleTrigger>
-          )}
+          <CollapsibleTrigger
+            aria-label={t('详情')}
+            className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <ChevronDown className="size-3.5 transition-transform group-data-[open]/details:rotate-180" />
+          </CollapsibleTrigger>
           {githubHref != null && (
             <PrRowMenu
               number={pr.number}
@@ -270,11 +249,18 @@ export function PrCard(props: PrCardProps) {
             />
           )}
         </div>
-        {expandable && (
-          <CollapsibleContent>
-            <Details pr={pr} />
-          </CollapsibleContent>
+        {pr.readAgoMinutes != null && (
+          <p
+            data-slot="pr-card-late"
+            className="m-0 flex items-center gap-1.5 pt-0.5 pl-5.5 text-meta text-content-tertiary"
+          >
+            <Clock className="size-3.5 flex-none" aria-hidden />
+            {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
+          </p>
         )}
+        <CollapsibleContent>
+          <Details pr={pr} />
+        </CollapsibleContent>
       </Collapsible>
     </article>
   );

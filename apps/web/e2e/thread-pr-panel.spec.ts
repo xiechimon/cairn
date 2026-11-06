@@ -94,13 +94,23 @@ for (const theme of ['light', 'dark'] as const) {
     test(`thread header and panel show ${c.name} (${theme})`, async ({ page }) => {
       await setup(page, { rows: [prRow(c.row)] }, theme);
       await page.goto('/app?thread=todo-1');
-      const link = status(page).getByRole('link', { name: /PR #42/ });
-      await expect(link).toHaveAttribute('href', 'https://github.com/xiechimon/cairn/pull/42');
+      await expect(status(page).getByRole('link')).toHaveCount(0);
       await expect(status(page)).not.toContainText(c.pill);
       const card = panel(page).locator('[data-slot="pr-card"]');
+      const link = card.getByRole('link', { name: /PR #42/ });
+      await expect(link).toHaveAttribute('href', 'https://github.com/xiechimon/cairn/pull/42');
+      await expect(card.locator('[data-slot="pr-card-row"]')).toHaveCount(1);
+      const rowHeight = await card.locator('[data-slot="pr-card-row"]').evaluate((el) => el.getBoundingClientRect().height);
+      expect(rowHeight).toBeLessThanOrEqual(36);
       await expect(card).toHaveAttribute('data-state', c.cardState);
       await expect(card.locator('[data-slot="pr-card-state"]')).toHaveText(c.pill);
       await evidencePanelShot(page, `thread-pr-${c.name}-${theme}.png`, page.locator('.side-panel'));
+      await card.getByRole('button', { name: 'Details' }).click();
+      await expect(card.locator('[data-slot="pr-card-title"]')).toContainText('the thread-owned PR panel');
+      if (c.name === 'ci-failed') {
+        await expect(card.locator('[data-slot="pr-card-failures"]')).toHaveText('2 failed: lint, e2e (1)');
+      }
+      await evidencePanelShot(page, `thread-pr-${c.name}-${theme}-expanded.png`, page.locator('.side-panel'));
       await card.getByRole('button', { name: /Menu for PR/ }).click();
       await expect(page.getByRole('menuitem', { name: 'Resolve' })).toHaveCount(0);
       await expect(page.getByRole('menuitem', { name: 'Open on GitHub' })).toHaveAttribute('href', /pull\/42$/);
@@ -268,6 +278,7 @@ test('a closed PR with an old verdict reads Closed, not Needs re-review', async 
   await page.goto('/app?thread=todo-1');
   await expect(panel(page).locator('[data-slot="pr-card-state"]')).toHaveText('Closed');
   await expect(status(page)).not.toContainText('Closed');
+  await expect(status(page).getByRole('link')).toHaveCount(0);
   await expect(panel(page).locator('[data-slot="pr-card"]')).not.toHaveAttribute('data-stale', '');
 });
 
@@ -281,18 +292,21 @@ test('a row whose CI was never read says so instead of showing nothing', async (
 });
 
 for (const c of CASES) {
-  test(`at 375px the meta line of ${c.name} drops the branch and never ends on a separator`, async ({ page }) => {
+  test(`at 375px the ${c.name} status is one line and never ends on a separator`, async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await setup(page, { rows: [prRow(c.row)] });
     await page.goto('/app?thread=todo-1');
-    const meta = panel(page).locator('[data-slot="pr-card"] p').first();
-    await expect(panel(page).locator('[data-slot="pr-card-branch"]')).toBeHidden();
-    const text = (await meta.innerText()).trim();
+    const row = panel(page).locator('[data-slot="pr-card-row"]');
+    const text = (await row.innerText()).trim();
+    expect(text).toContain('PR #42');
     expect(text).not.toMatch(/[·.…]$/);
-    expect(text).toContain('+120');
-    expect(text).toContain('−14');
-    const overflow = await meta.evaluate((el) => el.scrollWidth - el.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
+    const box = await row.evaluate((el) => ({
+      height: el.getBoundingClientRect().height,
+      overflow: el.scrollWidth - el.clientWidth,
+    }));
+    expect(box.height).toBeLessThanOrEqual(36);
+    expect(box.overflow).toBeLessThanOrEqual(0);
+    await page.waitForTimeout(600);
     await evidencePanelShot(page, `thread-pr-${c.name}-375.png`, page.locator('.side-panel'));
   });
 }

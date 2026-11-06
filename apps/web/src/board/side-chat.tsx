@@ -1,4 +1,3 @@
-import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { FileDiff, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -9,7 +8,6 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
-import { PrLink } from '../components/thread/pr-link.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -38,12 +36,10 @@ function StatusLine({
   todo,
   machineName,
   now,
-  pr,
 }: {
   todo: TodoRecord;
   machineName: string | null;
   now: number;
-  pr: PrPanelRow | undefined;
 }) {
   const { t } = useI18n();
   const meta = [machineName, relativeTime(todo.phaseAt, now, t)].filter((part) => part != null);
@@ -56,12 +52,6 @@ function StatusLine({
         {todo.quotaWait != null ? t('等额度') : t(threadCopy(todo).state)}
       </span>
       <span aria-hidden="true">·</span>
-      {pr !== undefined && (
-        <>
-          <PrLink number={pr.number} url={pr.url} />
-          <span aria-hidden="true">·</span>
-        </>
-      )}
       <span className="min-w-0 truncate">{meta.join(' · ')}</span>
     </p>
   );
@@ -414,7 +404,7 @@ function ReadyThread({
             }
           : {})}
       >
-        <StatusLine todo={todo} machineName={chat.machineName} now={now} pr={prRows[0]} />
+        <StatusLine todo={todo} machineName={chat.machineName} now={now} />
       </Head>
       <ThreadPrPanel
         status={prs.status}
