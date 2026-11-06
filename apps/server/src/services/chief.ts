@@ -19,6 +19,7 @@ import {
   CHIEF_DIGEST_GROUP_LABELS,
   CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_WATCH_REASON_DISPATCH,
+  COORDINATOR_NOT_READY,
   chiefDigestContentSchema,
   chiefDigestThreadId,
   chiefIdFormat,
@@ -453,10 +454,15 @@ function requireCoordinatorRule(deps: ChiefDeps, teamId: string): RouteProfile {
     throw new HttpError(
       409,
       'no coordinator routing rule (set one in routing settings: PATCH /api/teams/:id/routing-rules/coordinator)',
+      COORDINATOR_NOT_READY,
     );
   }
   if (!profile.modelId)
-    throw new HttpError(409, 'coordinator routing rule has no model configured');
+    throw new HttpError(
+      409,
+      'coordinator routing rule has no model configured',
+      COORDINATOR_NOT_READY,
+    );
   return profile;
 }
 

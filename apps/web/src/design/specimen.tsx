@@ -1,5 +1,6 @@
 import { cn } from 'cn';
-import type { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronRight } from '../icons/index.js';
 
 export const DISPLAY_STYLE: CSSProperties = {
@@ -8,6 +9,17 @@ export const DISPLAY_STYLE: CSSProperties = {
   lineHeight: 1.05,
   letterSpacing: '-0.02em',
 };
+
+export interface IsolatedSpecimen {
+  id: string;
+  target: HTMLElement | null;
+}
+
+export const OnlySpecimen = createContext<IsolatedSpecimen | null>(null);
+
+export function useOnlySpecimen(): IsolatedSpecimen | null {
+  return useContext(OnlySpecimen);
+}
 
 export function Section({
   id,
@@ -41,6 +53,7 @@ export function GroupTitle({ id, title, lede }: { id: string; title: string; led
 }
 
 export function Specimen({
+  id,
   title,
   note,
   code,
@@ -48,6 +61,7 @@ export function Specimen({
   className,
   children,
 }: {
+  id: string;
   title: string;
   note?: string;
   code?: string;
@@ -55,8 +69,13 @@ export function Specimen({
   className?: string;
   children: ReactNode;
 }) {
-  return (
-    <figure className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
+  const only = useOnlySpecimen();
+  if (only != null && (only.id !== id || only.target == null)) return null;
+  const figure = (
+    <figure
+      data-specimen={id}
+      className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)"
+    >
       <figcaption className="flex items-baseline gap-3 border-b border-border px-5 py-3">
         <span className="flex-none text-ui font-semibold whitespace-nowrap text-foreground">
           {title}
@@ -71,7 +90,7 @@ export function Specimen({
           className,
         )}
       >
-        {children}
+        <OnlySpecimen.Provider value={null}>{children}</OnlySpecimen.Provider>
       </div>
       {code != null && (
         <details className="group border-t border-border">
@@ -90,6 +109,7 @@ export function Specimen({
       )}
     </figure>
   );
+  return only?.target == null ? figure : createPortal(figure, only.target);
 }
 
 export function Cell({ label, children }: { label: string; children: ReactNode }) {

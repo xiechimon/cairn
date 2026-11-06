@@ -33,6 +33,7 @@ const BOARD = [
   'focus-ring-clip',
   'chief-home-',
   'chief-project-pick',
+  'first-run-',
   'task-panel',
   'thread-route-override',
   'route-override-capabilities',

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink } from '../icons/index.js';
 import type { GalleryTheme } from './design-doc.js';
-import { Section } from './specimen.js';
+import { Section, useOnlySpecimen } from './specimen.js';
 
 const FRAME_W = 1200;
 const FRAME_H = 760;
@@ -129,6 +129,7 @@ function Screen({
 }
 
 export function ScreensSection({ theme }: { theme: GalleryTheme }) {
+  if (useOnlySpecimen() != null) return null;
   return (
     <Section
       id="screens"

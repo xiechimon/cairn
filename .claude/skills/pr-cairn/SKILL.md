@@ -123,6 +123,7 @@ lines and says which.
 Put one glance card under Proof so a reviewer sees the change without reading the diff:
 
 - Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base "$(git merge-base origin/main HEAD)" --head HEAD`, heading included. When the PR changes `apps/server/drizzle/**` since its merge base, the `pr-evidence` gate reds it if its `### Schema changes` rows differ from the script's output from that merge base to the PR head.
+- After any push that changes the schema, do not hand-edit the table: run `node scripts/pr-schema-sync.mjs <pr-number>`, which prints a body file with `### Schema changes` rewritten from the PR head, then apply it with `gh pr edit <pr-number> --body-file <that file>` in a separate call.
 - API changes (`apps/server/src/routes*.ts`): the evidence card below; the gate enforces it.
 - Cross-component flows: a Mermaid `sequenceDiagram`.
 - `scripts/ops/**`: the command and its run output.

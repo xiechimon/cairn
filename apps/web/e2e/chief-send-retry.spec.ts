@@ -111,6 +111,10 @@ async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
         outage: null,
       });
     if (path === '/api/conversations/chief-home/messages') return json({ messages });
+    if (path === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);
+    if (path === '/api/teams/t1/providers') {
+      return json({ presets: [], providers: [{ id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' }] });
+    }
     return json([]);
   });
   return { posts, ledger };

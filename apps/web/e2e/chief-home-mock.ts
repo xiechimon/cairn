@@ -69,6 +69,9 @@ export const PROJECT = {
   localPath: null,
 };
 
+export const READY_MACHINE = { id: 'm-ready', name: 'omarchy', online: true };
+export const READY_PROVIDER = { id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' };
+
 export const toolRow = (id: string, name: string, args: unknown, at: number) => ({
   id,
   role: 'assistant',
@@ -192,7 +195,8 @@ export async function mockLive(
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
-    if (p === '/api/teams/t1/machines') return json(state.machines ?? []);
+    if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);
+    if (p === '/api/teams/t1/providers') return json({ presets: [], providers: [READY_PROVIDER] });
     if (p === '/api/server/backup') return json(state.backup ?? { state: 'none' });
     if (p === '/api/flags') return json({ flags: [] });
     if (p === '/api/teams/t1/members' || p === '/api/skills') return json([]);
