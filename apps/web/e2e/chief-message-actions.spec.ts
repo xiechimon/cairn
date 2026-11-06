@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
+import { settleTransitions } from './helpers';
 
 const MINUTE = 60_000;
 const FLAT = /^(none|(rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, )?)+)$/;
@@ -106,11 +107,12 @@ test('keyboard focus on an action button is an outline, not a glow', async ({ pa
   for (let n = 0; n < 40 && !(await copy.evaluate((node) => node === document.activeElement)); n++)
     await page.keyboard.press('Shift+Tab');
   await expect(copy).toBeFocused();
+  await settleTransitions(page);
   const face = await copy.evaluate((node) => {
     const style = getComputedStyle(node);
     return { shadow: style.boxShadow, outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
   });
   expect(face.shadow).toMatch(FLAT);
   expect(face.outlineStyle).toBe('solid');
-  expect(face.outlineWidth).toBe('1px');
+  expect(face.outlineWidth).toBe('2px');
 });
