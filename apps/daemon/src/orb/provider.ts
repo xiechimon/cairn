@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, readlinkSync } from 'node:fs';
 import { constants } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import type { Duplex } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
@@ -45,8 +46,15 @@ export type OrbCommandRunner = (
   options?: OrbExecOptions,
 ) => Promise<OrbExecResult>;
 
+export interface OrbRelayStreamRequest {
+  token: string;
+  signal: AbortSignal;
+  onFailure: (error: Error) => void;
+}
+
 export interface OrbProvider {
   readonly kind: 'host' | 'orb';
+  openRelayStream?(handle: OrbHandle, request: OrbRelayStreamRequest): Promise<Duplex>;
   ensure(input: { conversationId: string; projectId: string }): Promise<OrbHandle>;
   prepare(handle: OrbHandle, seed?: string): Promise<string>;
   start(handle: OrbHandle, options?: { signal?: AbortSignal }): Promise<void>;
