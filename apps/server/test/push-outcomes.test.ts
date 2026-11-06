@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import { pushDelivery, pushDigestItem, pushSubscription } from '../src/db/schema.js';
 import { queuePushDigest, sendPushToUser, sweepPushDigest } from '../src/services/push.js';
@@ -304,7 +304,7 @@ test.each([true, false])(
 test.each(['pending', 'sending'] as const)(
   '%s messages survive closing and reopening the database',
   async (status) => {
-    const directory = mkdtempSync(join(tmpdir(), 'push-restart-'));
+    const directory = makeTestTempDir('push-restart-');
     const path = join(directory, 'test.db');
     const first = openDbWithHandle(path);
     first.db
@@ -420,7 +420,7 @@ test('recovery skips an alert completed by its active sender while another fallb
 });
 
 test('recovery claims fallback across separate database handles before dispatch', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'push-claim-'));
+  const directory = makeTestTempDir('push-claim-');
   const path = join(directory, 'test.db');
   const first = openDbWithHandle(path);
   const second = openDbWithHandle(path);

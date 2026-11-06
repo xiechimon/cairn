@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { wilsonInterval } from '../eval/chief-dispatch/baseline-record.mts';
 import {
   buildComparisonMarkdown,
@@ -89,7 +90,7 @@ function writeArm(
 }
 
 function tempFlow(name: string): string {
-  const home = mkdtempSync(join(tmpdir(), `cairn-compare-${name}-`));
+  const home = makeTestTempDir(`cairn-compare-${name}-`);
   homes.push(home);
   return home;
 }

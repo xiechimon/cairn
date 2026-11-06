@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { type BoundaryExecution, executeBounded } from '../eval/routing/boundary.mts';
 import {
   type ChangedFile,
@@ -76,7 +76,7 @@ let workspace: string;
 let sentinel: string;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'routing-boundary-'));
+  root = makeTestTempDir('routing-boundary-');
   workspace = join(root, 'workspace');
   mkdirSync(join(workspace, 'lib'), { recursive: true });
   mkdirSync(join(workspace, 'vendor'));

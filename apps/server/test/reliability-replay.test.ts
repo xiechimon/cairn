@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { redactSecrets } from '@cairn/shared';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   type BuildReplayRequest,
   buildReplayReport,
@@ -28,7 +28,7 @@ const SAMPLE_TASKS = JSON.parse(
 ) as SampleTasksFile;
 
 function writeJson(content: unknown): { dir: string; path: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-rel-replay-'));
+  const dir = makeTestTempDir('cairn-rel-replay-');
   const path = join(dir, 'replay.json');
   writeFileSync(path, JSON.stringify(content));
   return { dir, path };

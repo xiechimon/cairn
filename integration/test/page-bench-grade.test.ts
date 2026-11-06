@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   aggregateGrades,
   gradeRun,
@@ -63,7 +63,7 @@ function sha256Hex(body: string | Buffer): string {
 }
 
 function artifactHome(): string {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-page-bench-grade-'));
+  const home = makeTestTempDir('cairn-page-bench-grade-');
   scratch.push(home);
   mkdirSync(join(home, 'shots'));
   return home;

@@ -1,7 +1,6 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   type FailureReplayCandidate,
@@ -12,6 +11,7 @@ import {
 } from '@cairn/shared';
 import { otlpTraceIdOfBuild } from '@cairn/shared/otel';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   confirmCandidatesByTraceIds,
   draftAssertionsFromFeedback,
@@ -144,7 +144,7 @@ test('a clean successful pack yields no candidates', () => {
 });
 
 test('unconfirmed candidates never enter the eval bank', () => {
-  const bank = mkdtempSync(join(tmpdir(), 'cairn-fr-bank-'));
+  const bank = makeTestTempDir('cairn-fr-bank-');
   dirs.push(bank);
   const pending: FailureReplayCandidate = failureReplayCandidateSchema.parse({
     id: failureReplayCandidateId('build-plan', 'plan-rejection'),
@@ -164,7 +164,7 @@ test('unconfirmed candidates never enter the eval bank', () => {
 });
 
 test('confirmed candidates materialize into the eval bank as bank cases', () => {
-  const bank = mkdtempSync(join(tmpdir(), 'cairn-fr-bank-'));
+  const bank = makeTestTempDir('cairn-fr-bank-');
   dirs.push(bank);
   const confirmed: FailureReplayCandidate = failureReplayCandidateSchema.parse({
     id: failureReplayCandidateId('build-review', 'review-blocking'),
@@ -193,7 +193,7 @@ test('confirmed candidates materialize into the eval bank as bank cases', () => 
 });
 
 test('enqueue posts TRACE items to the Langfuse annotation queue and never touches the bank', async () => {
-  const bank = mkdtempSync(join(tmpdir(), 'cairn-fr-bank-'));
+  const bank = makeTestTempDir('cairn-fr-bank-');
   dirs.push(bank);
   const received: { method: string; url: string; body: unknown; auth: string | undefined }[] = [];
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -290,7 +290,7 @@ test('confirmCandidatesByTraceIds treats missing confirmation as not confirmed',
 });
 
 test('intake promotes only COMPLETED queue items into the bank', async () => {
-  const bank = mkdtempSync(join(tmpdir(), 'cairn-fr-bank-'));
+  const bank = makeTestTempDir('cairn-fr-bank-');
   dirs.push(bank);
   const pendingPlan = failureReplayCandidateSchema.parse({
     id: failureReplayCandidateId('build-plan', 'plan-rejection'),
