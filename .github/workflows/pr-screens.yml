@@ -33,6 +33,7 @@ jobs:
     outputs:
       pages: ${{ steps.select.outputs.pages }}
       count: ${{ steps.select.outputs.count }}
+      live: ${{ steps.select.outputs.live }}
       selection: ${{ steps.select.outputs.selection }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -55,6 +56,7 @@ jobs:
           echo "$result"
           echo "pages=$(jq -r .pages <<< "$result")" >> "$GITHUB_OUTPUT"
           echo "count=$(jq -r .count <<< "$result")" >> "$GITHUB_OUTPUT"
+          echo "live=$(jq -r .live <<< "$result")" >> "$GITHUB_OUTPUT"
           echo "selection=$(jq -c '{all, count, total}' <<< "$result")" >> "$GITHUB_OUTPUT"
 
   capture:
@@ -92,7 +94,7 @@ jobs:
             mkdir -p "$tree/apps/web/pr-screens" "$tree/apps/web/e2e"
             cp apps/web/pr-screens/* "$tree/apps/web/pr-screens/"
             cp apps/web/e2e/audit-pages.ts apps/web/e2e/helpers.ts "$tree/apps/web/e2e/"
-            cp apps/web/playwright.pr-screens.config.ts "$tree/apps/web/"
+            cp apps/web/playwright.pr-screens.config.ts apps/web/playwright.pr-screens-live.config.ts "$tree/apps/web/"
           fi
           echo "tree=$tree" >> "$GITHUB_OUTPUT"
 
@@ -116,6 +118,21 @@ jobs:
           PR_SCREENS_OUT: pr-screens-out
           PR_SCREENS_PAGES: ${{ needs.select.outputs.pages }}
         run: pnpm exec playwright test -c playwright.pr-screens.config.ts
+
+      - name: Screenshot the selected key states on a seeded server
+        if: ${{ needs.select.outputs.live != '0' }}
+        working-directory: ${{ steps.tree.outputs.tree }}/apps/web
+        continue-on-error: true
+        env:
+          PR_SCREENS_OUT: pr-screens-out
+          PR_SCREENS_PAGES: ${{ needs.select.outputs.pages }}
+        run: pnpm exec playwright test -c playwright.pr-screens-live.config.ts
+
+      - name: Trip every look-and-feel rule once on a violating change
+        if: ${{ matrix.side == 'head' }}
+        working-directory: ${{ steps.tree.outputs.tree }}/apps/web
+        continue-on-error: true
+        run: pnpm exec playwright test -c playwright.pr-screens-trip.config.ts
 
       - name: Record the lockfile this side was built from
         working-directory: ${{ steps.tree.outputs.tree }}
@@ -253,4 +270,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/pr-assets/screens-$PR_NUMBER" || echo "no screenshot branch for #$PR_NUMBER"
+        run: |
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/pr-assets/screens-$PR_NUMBER" || echo "no screenshot branch for #$PR_NUMBER"

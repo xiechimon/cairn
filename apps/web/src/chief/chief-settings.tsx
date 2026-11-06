@@ -139,7 +139,7 @@ export function ChiefSettings({
                 variant="ghost"
                 className={cn(
                   SETTINGS_ROW_CLS,
-                  "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 border-b border-border text-left text-ui font-normal text-foreground hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent [&_svg:first-child]:text-content-tertiary [&_svg:not([class*='size-'])]:size-auto",
+                  "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 border-b border-border text-left text-ui font-normal text-foreground hover:bg-transparent dark:hover:bg-transparent [&_svg:first-child]:text-content-tertiary [&_svg:not([class*='size-'])]:size-auto",
                 )}
                 onClick={() => setAgentOpen(true)}
               >

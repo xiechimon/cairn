@@ -42,6 +42,7 @@ type ProjectRow = typeof project.$inferSelect;
 export function projectMergeConfigOf(row: ProjectRow): ProjectMergeConfig {
   const raw = row.autonomy as (typeof row.autonomy & Partial<ProjectMergeConfig>) | null;
   return projectMergeConfigSchema.parse({
+    planAutoApproveEnabled: raw?.planAutoApproveEnabled,
     mergePolicy: raw?.mergePolicy,
     localChecks: raw?.localChecks,
     requireUpToDate: raw?.requireUpToDate,
