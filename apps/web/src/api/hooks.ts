@@ -895,6 +895,13 @@ export function useApiMutations(teamId: string | undefined) {
     pickLocalFolder: useMutation({
       mutationFn: () => api.post<FsPickResult>('/api/fs/pick'),
     }),
+    setProjectArchived: useMutation({
+      mutationFn: (input: { id: string; archived: boolean }) =>
+        api.post<ProjectRecord>(
+          `/api/projects/${input.id}/${input.archived ? 'archive' : 'unarchive'}`,
+        ),
+      onSuccess: invalidateAll,
+    }),
     deleteProject: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/projects/${id}`),
       onSuccess: invalidateAll,

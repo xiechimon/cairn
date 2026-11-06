@@ -1,11 +1,18 @@
 import { PanelLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { useLocation } from 'react-router';
-import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
+import { useLocation, useNavigate } from 'react-router';
+import {
+  useApiMutations,
+  useMachines,
+  useProjects,
+  useSearchResults,
+  useTodos,
+} from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useTypeToCompose } from '../overlay/hotkeys.js';
@@ -47,6 +54,8 @@ export function AppSidebar({
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const machinesQ = useMachines(teamId, live);
+  const mutations = useApiMutations(teamId);
+  const navigate = useNavigate();
   const projectsQ = useProjects(teamId, live);
   const projects: SidebarProject[] | undefined = useMemo(() => {
     if (live) {
@@ -55,6 +64,7 @@ export function AppSidebar({
         name: p.name,
         icon: p.icon,
         color: p.color,
+        archivedAt: p.archivedAt,
       }));
     }
     if (fixture.projectNames == null) return undefined;
@@ -103,6 +113,20 @@ export function AppSidebar({
     [pathname, locationSearch],
   );
   useTypeToCompose();
+  const archiveProject = (id: string, archived: boolean) => {
+    mutations.setProjectArchived.mutate(
+      { id, archived },
+      {
+        onSuccess: () => {
+          if (archived && new URLSearchParams(locationSearch).get('project') === id) {
+            navigate({ pathname: '/app' });
+          }
+        },
+        onError: (error) =>
+          toastError(t(archived ? '无法归档项目。' : '无法取消归档项目。'), error),
+      },
+    );
+  };
   const sidebarProps = {
     attention: needsYouCount(resolvedTodos),
     machinesOnline,
@@ -113,6 +137,7 @@ export function AppSidebar({
     usageNav: fixture.usageNav === true,
     selected,
     projects,
+    onArchiveProject: live ? archiveProject : undefined,
   };
   return (
     <>

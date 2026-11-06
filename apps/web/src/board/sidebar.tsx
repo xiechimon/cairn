@@ -28,7 +28,9 @@ import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetStatusLine } from './fleet-status.js';
 import { needsYouThreads } from './needs-you.js';
+import { splitProjectsByArchive } from './project-archive.js';
 import { ProjectAvatar } from './project-avatar.js';
+import { SidebarProjectMenu } from './sidebar-project-menu.js';
 
 export type SidebarSelected =
   | 'board'
@@ -47,6 +49,7 @@ export interface SidebarProject {
   name: string;
   icon?: ProjectIcon | null | undefined;
   color?: ProjectColor | null | undefined;
+  archivedAt?: number | null | undefined;
 }
 
 const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
@@ -63,6 +66,7 @@ interface BoardSidebarProps {
   selected?: SidebarSelected;
   projects?: SidebarProject[];
   todos?: TodoRecord[];
+  onArchiveProject?: (id: string, archived: boolean) => void;
 }
 
 export const GROUP_STORAGE_KEYS = {
@@ -167,6 +171,7 @@ export function BoardSidebar({
   selected = 'board',
   projects,
   todos,
+  onArchiveProject,
 }: BoardSidebarProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -181,11 +186,23 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
-  const projectRows = useMemo(
-    () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
+  const { active: projectRows, archived: archivedRows } = useMemo(
+    () => splitProjectsByArchive((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
     [projects],
   );
-  const activeProject = projectRows.some((row) => row.id === projectParam) ? projectParam : null;
+  const activeProject = [...projectRows, ...archivedRows].some((row) => row.id === projectParam)
+    ? projectParam
+    : null;
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const archivedExpanded = archivedOpen || archivedRows.some((row) => row.id === activeProject);
+  const projectMenu = (row: SidebarProject, archived: boolean) =>
+    onArchiveProject === undefined ? undefined : (
+      <SidebarProjectMenu
+        name={row.name}
+        archived={archived}
+        onToggleArchive={() => onArchiveProject(row.id, !archived)}
+      />
+    );
   const waitingByProject = useMemo(() => {
     const counts = new Map<string, number>();
     for (const todo of needsYouThreads(todos ?? [])) {
@@ -411,8 +428,43 @@ export function BoardSidebar({
               waiting={waitingByProject.get(row.id) ?? 0}
               active={activeProject === row.id}
               onClick={() => navigate(projectHref(row.id))}
+              menu={projectMenu(row, false)}
             />
           ))}
+        {archivedRows.length > 0 && (
+          <div data-testid="archived-group" className="mt-2 flex flex-col gap-px">
+            <Button
+              variant="ghost"
+              className={`sidebar-group group h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 ${FOCUS} ${
+                archivedExpanded ? '' : 'sidebar-group--collapsed'
+              }`}
+              aria-expanded={archivedExpanded}
+              onClick={() => setArchivedOpen((prev) => !prev)}
+            >
+              {t('已归档')}
+              <span className="tabular-nums">{archivedRows.length}</span>
+              <ChevronDown
+                aria-hidden
+                className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+                strokeWidth={STROKE}
+              />
+            </Button>
+            {archivedExpanded &&
+              archivedRows.map((row, i) => (
+                <SidebarProjectRow
+                  key={row.id}
+                  name={row.name}
+                  tone={projectRows.length + i}
+                  icon={row.icon}
+                  color={row.color}
+                  muted
+                  active={activeProject === row.id}
+                  onClick={() => navigate(projectHref(row.id))}
+                  menu={projectMenu(row, true)}
+                />
+              ))}
+          </div>
+        )}
       </nav>
 
       <div data-testid="sidebar-footer" className="flex flex-none flex-col gap-1 pt-2">
