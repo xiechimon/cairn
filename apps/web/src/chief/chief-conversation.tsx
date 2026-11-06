@@ -93,8 +93,8 @@ const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-
 const HOME_COMPOSER_CLS =
   'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
 
-const ATTACHED_COMPOSER_CLS = 'mt-0 rounded-(--radius-composer) rounded-t-none';
-const FREE_COMPOSER_CLS = 'rounded-(--radius-composer)';
+const ATTACHED_COMPOSER_CLS = 'mt-0';
+const FREE_COMPOSER_CLS = 'rounded-t-(--radius-composer)';
 
 const EXAMPLE_ICONS = {
   'user-plus': ChiefUserPlus,
@@ -726,7 +726,7 @@ export function ChiefConversation({
             )}
             <div
               data-invalid={composerError != null ? '' : undefined}
-              className={`chief-composer ${questionAttached ? ATTACHED_COMPOSER_CLS : `${FREE_COMPOSER_CLS} ${home ? 'mt-2' : 'mt-2.5'}`} ${home ? HOME_COMPOSER_CLS : 'mx-4 mb-2.5 shrink-0'} data-invalid:ring-1 data-invalid:ring-destructive border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+              className={`chief-composer ${questionAttached ? ATTACHED_COMPOSER_CLS : `${FREE_COMPOSER_CLS} ${home ? 'mt-2' : 'mt-2.5'}`} ${home ? HOME_COMPOSER_CLS : 'mx-4 mb-2.5 shrink-0'} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
               style={home ? { viewTransitionName: 'chief-composer' } : undefined}
             >
               <QueuedCapsules
