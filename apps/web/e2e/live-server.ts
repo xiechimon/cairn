@@ -67,7 +67,6 @@ async function reapGroup(pgid: number): Promise<void> {
  *  the group; the tether reaps it when the spawner dies without disposing. */
 export async function bootLiveServer(
   token: string | null,
-  tailscaleUsers?: string,
   extraEnv: Record<string, string> = {},
 ): Promise<LiveServer> {
   const home = mkdtempSync(join(tmpdir(), 'cairn-e2e-home-'));
@@ -83,7 +82,7 @@ export async function bootLiveServer(
       [ENV_VARS.home]: home,
       [ENV_VARS.webDir]: process.env.E2E_DIST_DIR ?? resolve(import.meta.dirname, '..', 'dist'),
       [ENV_VARS.token]: token ?? '',
-      CAIRN_TAILSCALE_USERS: tailscaleUsers ?? '',
+      [ENV_VARS.auth]: token === null ? 'off' : '',
       ...extraEnv,
     },
     stdio: ['pipe', 'ignore', 'inherit'],

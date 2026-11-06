@@ -18,7 +18,7 @@ interface TodoWire {
 let server: LiveServer;
 
 test.beforeAll(async () => {
-  server = await bootLiveServer(null, undefined, { [ENV_VARS.routingRules]: '0' });
+  server = await bootLiveServer(null, { [ENV_VARS.routingRules]: '0' });
 });
 
 test.afterAll(async () => {

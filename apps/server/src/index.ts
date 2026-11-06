@@ -6,14 +6,15 @@ import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
 import {
   attachmentsDirOf,
+  authStartupRefusal,
   backupStatusPathOf,
   deployRecordPathOf,
+  ensureAccessToken,
   loadConfig,
   logTokenAuthStartup,
-  missingRequiredTokenError,
   reposDirOf,
+  warnIgnoredTailscaleUsers,
   warnInsecureBind,
-  warnTailscaleBind,
 } from './config.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
@@ -44,7 +45,7 @@ import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { startupMessage } from './startup-log.js';
 
-const config = loadConfig();
+const loadedConfig = loadConfig();
 const logger = pino({
   level: process.env.LOG_LEVEL ?? 'info',
   // pino-pretty cannot load its transport worker from a single-file bundle.
@@ -53,11 +54,12 @@ const logger = pino({
     : { transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } }),
 });
 
-const refusal = missingRequiredTokenError(config);
+const refusal = authStartupRefusal(loadedConfig);
 if (refusal !== null) {
   logger.fatal(refusal);
   process.exit(1);
 }
+const config = ensureAccessToken(loadedConfig);
 
 const { db, close } = openDbWithHandle(config.dbPath, { legacyExportDir: config.homeDir });
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
@@ -126,7 +128,6 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
-    tailscaleUsers: config.tailscaleUsers,
     mcpConfigPath: config.mcpConfigPath,
     intakeAgentAllowlist: config.intakeAgentAllowlist,
     logger,
@@ -135,7 +136,7 @@ const app = createApp(
 );
 
 warnInsecureBind(logger, config);
-warnTailscaleBind(logger, config);
+warnIgnoredTailscaleUsers(logger);
 logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(
@@ -179,11 +180,11 @@ const server = serve(
   {
     fetch: app.fetch,
     port: config.port,
-    ...(config.host !== null ? { hostname: config.host } : {}),
+    hostname: config.host,
   },
   (info) => {
     logger.info(
-      { port: info.port, dataDir: config.dataDir, teamId: seeded.team.id },
+      { host: info.address, port: info.port, dataDir: config.dataDir, teamId: seeded.team.id },
       startupMessage(),
     );
   },

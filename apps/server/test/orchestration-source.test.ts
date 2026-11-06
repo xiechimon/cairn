@@ -1,9 +1,8 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rm } from 'node:fs/promises';
 import { orchestrationSourceRef, parseOrchestrationSourceRef } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   agent as agentTable,
   build as buildTable,
@@ -34,7 +33,7 @@ let ghFetch: FetchLike;
 let throttleHome: string;
 
 beforeAll(async () => {
-  throttleHome = await mkdtemp(join(tmpdir(), 'orchestration-source-'));
+  throttleHome = makeTestTempDir('orchestration-source-');
   vi.stubEnv('CAIRN_HOME', throttleHome);
   vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '0');
 });

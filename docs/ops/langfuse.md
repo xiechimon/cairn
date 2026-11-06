@@ -168,6 +168,12 @@ The trailing `/v1/traces` on `CAIRN_OTEL_ENDPOINT` is optional. `CAIRN_OTEL_HEAD
 
 Tree structure: one build is one trace with the root span `invoke_agent`; each step is one child span; under a step, every model turn is a `chat` and every tool call is an `execute_tool`. The trace id is a hash of the buildId, and the span id is a hash of the buildId, stepId, and turn index, so re-pushing the same pack yields exactly the same ids — Langfuse merges by id and the count does not change. Field names are centralized in `apps/server/src/genai-conventions.ts`; renaming a convention only changes that one place. Before pushing, the whole request goes through `redactSecrets`; the masked count is in the `redacted=` of the output.
 
+## Coordinator turns and filtering
+
+Each Coordinator turn is its own trace. The server exports the `chief` step as the root span `coordinator turn`; the daemon adds `chat <model>` and `execute_tool <name>` children with the same redaction as build steps. The trace id is a hash of the step id, so a turn never mixes with a build trace. Attributes follow the [Langfuse OpenTelemetry mapping](https://langfuse.com/integrations/native/opentelemetry): `langfuse.trace.name`, `langfuse.session.id` and `session.id` (the Coordinator thread id, so a thread's turns group as one session), `langfuse.trace.tags` (`cairn`, `coordinator`) and `langfuse.environment`. Build traces carry the same attributes with the todo id as the session and tags `cairn`, `build`. The turn prompt is never exported.
+
+Set `CAIRN_OTEL_ENVIRONMENT` (lowercase letters, digits, `_` and `-`, at most 40 characters, not starting with `langfuse`) to add `deployment.environment` to the resource and `langfuse.environment` to each span; an invalid or unset value adds nothing. `service.name` stays `cairn`. Export is off unless `CAIRN_OTEL_ENDPOINT` is set. It never blocks a turn: posts go through a bounded sender (4 in flight, 64 queued, 5 s timeout) that drops on overflow.
+
 ## Claude Code runtime tool traces (#2269)
 
 Configure `CAIRN_OTEL_ENDPOINT` and `CAIRN_OTEL_HEADERS` on the daemon to export

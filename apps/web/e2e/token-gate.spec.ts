@@ -10,7 +10,7 @@ declare global {
 }
 
 const GATE_TOKEN = 'cairn-e2e-gate-token-0123456789abcdef';
-const TAILSCALE_LOGIN = 'xiechimon@github';
+const FORGED_TAILSCALE_LOGIN = 'xiechimon@github';
 
 async function recordEventSourceUrls(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -31,16 +31,14 @@ async function streamUrls(page: Page): Promise<string[]> {
 
 let authed: LiveServer;
 let openServer: LiveServer;
-let tailscaleServer: LiveServer;
 
 test.beforeAll(async () => {
   authed = await bootLiveServer(GATE_TOKEN);
   openServer = await bootLiveServer(null);
-  tailscaleServer = await bootLiveServer(GATE_TOKEN, TAILSCALE_LOGIN);
 });
 
 test.afterAll(async () => {
-  await Promise.all([authed, openServer, tailscaleServer].map((server) => server?.dispose()));
+  await Promise.all([authed, openServer].map((server) => server?.dispose()));
 });
 
 test('auth on: first visit lands the gate page; wrong token stays without persisting; right token enters the UI and SSE carries ?token=', async ({
@@ -157,19 +155,15 @@ test('#1048 gate page guide: the en face keeps the same facts undistorted (comma
   expect(await help.innerText()).not.toMatch(new RegExp(`${ENV_VARS.token}\\s*=`));
 });
 
-test('#1762 Tailscale Serve identity: the app opens without the token prompt or a stored token', async ({
+test('#2057 a Tailscale-User-Login header from loopback does not skip the gate', async ({
   page,
 }) => {
-  await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': TAILSCALE_LOGIN });
-  const firstLoad = page.waitForResponse(
-    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
-  );
-  await page.goto(`${tailscaleServer.base}/app`);
+  await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': FORGED_TAILSCALE_LOGIN });
+  const firstLoad = page.waitForResponse((res) => res.url().endsWith('/api/teams'));
+  await page.goto(`${authed.base}/app`);
 
-  await expect(page.locator('.board-sidebar')).toBeVisible();
-  await expect(page.locator('.token-gate')).toHaveCount(0);
-  expect((await firstLoad).request().headers().authorization).toBeUndefined();
-  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
+  expect((await firstLoad).status()).toBe(401);
+  await expect(page.locator('.token-gate')).toBeVisible();
 });
 
 test('#1708 login link: /app#token=<valid> signs in and strips the fragment', async ({ page }) => {
