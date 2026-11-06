@@ -1,8 +1,9 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { ACCESS_TOKEN_FILE_NAME, parseAccessTokenFile } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 60_000 });
@@ -34,8 +35,11 @@ interface Booted {
   exited: Promise<number | null>;
 }
 
-async function boot(env: Record<string, string | undefined>): Promise<Booted> {
-  const home = tempDir();
+async function boot(
+  env: Record<string, string | undefined>,
+  existingHome?: string,
+): Promise<Booted> {
+  const home = existingHome ?? tempDir();
   const webDir = tempDir();
   writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>cairn</title>');
   const port = await new Promise<number>((done, fail) => {
@@ -56,6 +60,8 @@ async function boot(env: Record<string, string | undefined>): Promise<Booted> {
       CAIRN_WEB_DIR: webDir,
       CAIRN_TOKEN: undefined,
       CAIRN_REQUIRE_TOKEN: undefined,
+      CAIRN_AUTH: undefined,
+      CAIRN_TAILSCALE_USERS: undefined,
       HOST: '127.0.0.1',
       PORT: String(port),
       ...env,
@@ -115,12 +121,149 @@ describe('container mode: CAIRN_REQUIRE_TOKEN', () => {
     expect(booted.output()).not.toContain(TOKEN);
   });
 
-  test('flag off and no token: default behaviour unchanged, server starts', async () => {
+  test('flag off and no token on loopback: the server generates a token instead of serving open', async () => {
     const booted = await boot({});
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
-    expect((await fetch(`${base}/api/user/me`)).status).toBe(200);
+    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
     expect(booted.output()).not.toMatch(CJK);
+  });
+});
+
+function storedToken(home: string): string {
+  const parsed = parseAccessTokenFile(readFileSync(join(home, ACCESS_TOKEN_FILE_NAME), 'utf8'));
+  if (parsed === null) throw new Error('token file has no token');
+  return parsed;
+}
+
+function lanAddress(): string | null {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const entry of addresses ?? []) {
+      if (entry.family === 'IPv4' && !entry.internal) return entry.address;
+    }
+  }
+  return null;
+}
+
+describe('#2057 safe bare-server defaults on a real process', () => {
+  test('fresh home, HOST/CAIRN_TOKEN/CAIRN_REQUIRE_TOKEN/CAIRN_AUTH all absent: loopback socket, 0600 token, guarded API', async () => {
+    const booted = await boot({ HOST: undefined });
+    await untilOnline(booted);
+    const base = `http://127.0.0.1:${booted.port}`;
+    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
+    const tokenPath = join(booted.home, ACCESS_TOKEN_FILE_NAME);
+    expect(statSync(tokenPath).mode & 0o777).toBe(0o600);
+    const token = storedToken(booted.home);
+    expect(
+      (await fetch(`${base}/api/user/me`, { headers: { authorization: `Bearer ${token}` } }))
+        .status,
+    ).toBe(200);
+    expect(booted.output()).toContain('"host":"127.0.0.1"');
+    expect(booted.output()).toContain(`#token=${token}`);
+    const lan = lanAddress();
+    if (lan !== null) {
+      await expect(
+        fetch(`http://${lan}:${booted.port}/api/user/me`, { signal: AbortSignal.timeout(3_000) }),
+      ).rejects.toThrow();
+    }
+  });
+
+  test('a restart on the same home keeps the stored token', async () => {
+    const first = await boot({ HOST: undefined });
+    await untilOnline(first);
+    const token = storedToken(first.home);
+    first.child.kill('SIGKILL');
+    await first.exited;
+    const second = await boot({ HOST: undefined }, first.home);
+    await untilOnline(second);
+    expect(storedToken(second.home)).toBe(token);
+    expect(
+      (
+        await fetch(`http://127.0.0.1:${second.port}/api/user/me`, {
+          headers: { authorization: `Bearer ${token}` },
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  test('HOST=0.0.0.0 without a token exits 1, names CAIRN_TOKEN, opens no port, writes no token', async () => {
+    const booted = await boot({ HOST: '0.0.0.0' });
+    expect(await booted.exited).toBe(1);
+    expect(booted.output()).toMatch(/CAIRN_TOKEN/);
+    expect(booted.output()).not.toContain('cairn-server online');
+    expect(existsSync(join(booted.home, ACCESS_TOKEN_FILE_NAME))).toBe(false);
+    expect(existsSync(join(booted.home, 'server'))).toBe(false);
+  });
+
+  test('HOST=0.0.0.0 with CAIRN_AUTH=off exits 1 and names CAIRN_AUTH', async () => {
+    const booted = await boot({ HOST: '0.0.0.0', CAIRN_AUTH: 'off' });
+    expect(await booted.exited).toBe(1);
+    expect(booted.output()).toMatch(/CAIRN_AUTH=off/);
+    expect(booted.output()).not.toContain('cairn-server online');
+  });
+
+  test('HOST=0.0.0.0 with CAIRN_AUTH=off and a token still exits 1', async () => {
+    const booted = await boot({ HOST: '0.0.0.0', CAIRN_AUTH: 'off', CAIRN_TOKEN: TOKEN });
+    expect(await booted.exited).toBe(1);
+  });
+
+  test('HOST=0.0.0.0 with a token starts and requires it', async () => {
+    const booted = await boot({ HOST: '0.0.0.0', CAIRN_TOKEN: TOKEN });
+    await untilOnline(booted);
+    const base = `http://127.0.0.1:${booted.port}`;
+    expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
+    expect(
+      (await fetch(`${base}/api/user/me`, { headers: { authorization: `Bearer ${TOKEN}` } }))
+        .status,
+    ).toBe(200);
+  });
+
+  test('CAIRN_AUTH=off on loopback serves open, warns, and writes no token', async () => {
+    const booted = await boot({ CAIRN_AUTH: 'off' });
+    await untilOnline(booted);
+    expect((await fetch(`http://127.0.0.1:${booted.port}/api/user/me`)).status).toBe(200);
+    expect(booted.output()).toMatch(/CAIRN_AUTH=off/);
+    expect(existsSync(join(booted.home, ACCESS_TOKEN_FILE_NAME))).toBe(false);
+  });
+
+  test('a forged Tailscale-User-Login from loopback grants nothing and the allowlist is reported ignored', async () => {
+    const booted = await boot({ CAIRN_TAILSCALE_USERS: 'owner@example.com' });
+    await untilOnline(booted);
+    const base = `http://127.0.0.1:${booted.port}`;
+    const res = await fetch(`${base}/api/user/me`, {
+      headers: { 'tailscale-user-login': 'owner@example.com' },
+    });
+    expect(res.status).toBe(401);
+    expect(booted.output()).toMatch(/CAIRN_TAILSCALE_USERS/);
+  });
+
+  test('the generated token still opens the SSE stream via ?token= and the exempt surfaces stay reachable', async () => {
+    const booted = await boot({});
+    await untilOnline(booted);
+    const base = `http://127.0.0.1:${booted.port}`;
+    const token = storedToken(booted.home);
+    const teams = (await (
+      await fetch(`${base}/api/teams`, { headers: { authorization: `Bearer ${token}` } })
+    ).json()) as { id: string }[];
+    const teamId = teams[0]?.id;
+    expect(teamId).toBeTruthy();
+    const controller = new AbortController();
+    const stream = await fetch(`${base}/api/teams/${teamId}/stream?token=${token}`, {
+      signal: controller.signal,
+    });
+    expect(stream.status).toBe(200);
+    controller.abort();
+    expect((await fetch(`${base}/api/teams/${teamId}/stream?token=wrong`)).status).toBe(401);
+    const callback = await fetch(`${base}/api/oauth/callback?code=x&state=bogus`, {
+      redirect: 'manual',
+    });
+    expect(callback.status).toBe(302);
+    const enroll = await fetch(`${base}/api/machine/enroll/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'exempt-probe' }),
+    });
+    expect(enroll.status).toBe(200);
   });
 });
 

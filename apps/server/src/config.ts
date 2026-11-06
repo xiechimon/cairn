@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,7 @@ import {
   CLAIM_POLL_INTERVAL_MS,
   CLAUDE_CONFIG_FILE_NAME,
   ENV_VARS,
+  formatAccessTokenFile,
   parseAccessTokenFile,
   SKILLS_DIR_DEFAULT,
   TEAM_STREAM_PING_INTERVAL_MS,
@@ -51,9 +53,9 @@ export const serverConfigSchema = z.object({
   webDir: z.string().nullable(),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
-  tailscaleUsers: z.array(z.string()),
   requireToken: z.boolean(),
-  host: z.string().nullable(),
+  authOff: z.boolean(),
+  host: z.string().min(1),
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
   intakeAgentAllowlist: z.array(z.string()),
@@ -91,7 +93,20 @@ function envFlag(name: string): boolean {
   return raw === '1' || lower === 'true' || lower === 'yes';
 }
 
-const ANY_INTERFACE_HOSTS = new Set(['0.0.0.0', '::', '::0']);
+const DEFAULT_HOST = '127.0.0.1';
+const LOOPBACK_BIND_HOSTS = new Set(['::1', '::ffff:127.0.0.1', 'localhost']);
+const LOOPBACK_IPV4 = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+export function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_BIND_HOSTS.has(host) || LOOPBACK_IPV4.test(host);
+}
+
+function envAuthOff(): boolean {
+  const raw = envStr(ENV_VARS.auth);
+  if (raw === null) return false;
+  if (raw.toLowerCase() === 'off') return true;
+  throw new Error(`${ENV_VARS.auth} accepts only "off" (got "${raw}") — unset it to keep auth on`);
+}
 
 function defaultWebDir(): string | null {
   const here = resolve(fileURLToPath(import.meta.url), '../..');
@@ -124,15 +139,16 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       `oauth client half-configured: set both ${ENV_VARS.githubOauthClientId} and ${ENV_VARS.githubOauthClientSecret}, or neither`,
     );
   }
-  const envToken = envStr(ENV_VARS.token);
+  const authOff = envAuthOff();
+  const envToken = authOff ? null : envStr(ENV_VARS.token);
   let fileToken: string | null = null;
-  if (envToken === null) {
+  if (!authOff && envToken === null) {
     const tokenPath = accessTokenFilePath(home);
     if (existsSync(tokenPath)) {
       const parsed = parseAccessTokenFile(readFileSync(tokenPath, 'utf8'));
       if (parsed === null) {
         throw new Error(
-          `token file ${tokenPath} has no usable ${ENV_VARS.token} line — fix or delete it (deleting turns auth off)`,
+          `token file ${tokenPath} has no usable ${ENV_VARS.token} line — fix it or delete it to have a new token generated`,
         );
       }
       fileToken = parsed;
@@ -157,12 +173,9 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
         ? { clientId: oauthId, clientSecret: oauthSecret }
         : null,
     authToken: envToken ?? fileToken,
-    tailscaleUsers: (process.env[ENV_VARS.tailscaleUsers] ?? '')
-      .split(',')
-      .map((login) => login.trim())
-      .filter((login) => login !== ''),
     requireToken: envFlag(ENV_VARS.requireToken),
-    host: envStr('HOST'),
+    authOff,
+    host: envStr('HOST') ?? DEFAULT_HOST,
     mcpConfigPath: resolve(
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
@@ -190,21 +203,66 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
 
 export function insecureBindWarning(config: ServerConfig): string | null {
   if (config.authToken !== null) return null;
-  if (config.host === null || !ANY_INTERFACE_HOSTS.has(config.host)) return null;
-  return `bound to ${config.host} (reachable on every interface) with ${ENV_VARS.token} unset — the API is open to all interfaces; set ${ENV_VARS.token}=<token> to require Bearer auth, or HOST=127.0.0.1 to keep it local`;
+  if (!isLoopbackHost(config.host)) {
+    return `bound to ${config.host} (reachable beyond this machine) with ${ENV_VARS.token} unset — the API is open to every network peer; set ${ENV_VARS.token}=<token> to require Bearer auth, or HOST=127.0.0.1 to keep it local`;
+  }
+  if (config.authOff) {
+    return `${ENV_VARS.auth}=off — token auth is disabled, so every process on this machine and every web page open in a local browser can call the API; unset ${ENV_VARS.auth} to require the generated token`;
+  }
+  return null;
 }
 
-const LOOPBACK_BIND_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
+export function ignoredTailscaleUsersWarning(env: NodeJS.ProcessEnv = process.env): string | null {
+  const raw = env[ENV_VARS.tailscaleUsers];
+  if (raw === undefined || raw.trim() === '') return null;
+  return `${ENV_VARS.tailscaleUsers} is ignored — the Tailscale-User-Login header no longer grants access; sign in with ${ENV_VARS.token} (run \`${BRAND.cliCommandName} token\` on this machine to print it)`;
+}
 
-export function tailscaleBindWarning(config: ServerConfig): string | null {
-  if (config.tailscaleUsers.length === 0) return null;
-  if (config.host !== null && LOOPBACK_BIND_HOSTS.has(config.host)) return null;
-  return `${ENV_VARS.tailscaleUsers} is set but HOST=${config.host ?? 'all interfaces'} is not loopback-only; set HOST=127.0.0.1 and proxy tailscale serve to http://127.0.0.1:${config.port}. Identity headers from non-loopback peers are ignored`;
+export function authOffRefusal(config: ServerConfig): string | null {
+  if (!config.authOff) return null;
+  if (!isLoopbackHost(config.host)) {
+    return `${ENV_VARS.auth}=off is accepted only on a loopback bind but HOST=${config.host} — refusing to start; unset ${ENV_VARS.auth} and set ${ENV_VARS.token}=<long random string> (for example openssl rand -hex 32), or set HOST=127.0.0.1`;
+  }
+  if (config.requireToken) {
+    return `${ENV_VARS.auth}=off contradicts ${ENV_VARS.requireToken} — refusing to start; unset one of them`;
+  }
+  return null;
 }
 
 export function missingRequiredTokenError(config: ServerConfig): string | null {
-  if (!config.requireToken || config.authToken !== null) return null;
-  return `${ENV_VARS.requireToken} is on but ${ENV_VARS.token} is unset or empty — refusing to start; set ${ENV_VARS.token}=<long random string> (for example openssl rand -hex 32) and restart`;
+  if (config.authToken !== null || config.authOff) return null;
+  if (config.requireToken) {
+    return `${ENV_VARS.requireToken} is on but ${ENV_VARS.token} is unset or empty — refusing to start; set ${ENV_VARS.token}=<long random string> (for example openssl rand -hex 32) and restart`;
+  }
+  if (!isLoopbackHost(config.host)) {
+    return `HOST=${config.host} is not loopback and no access token is configured — refusing to start; set ${ENV_VARS.token}=<long random string> (for example openssl rand -hex 32) or run \`${BRAND.cliCommandName} token --rotate\` to write ${accessTokenFilePath(config.homeDir)}, then restart`;
+  }
+  return null;
+}
+
+export function authStartupRefusal(config: ServerConfig): string | null {
+  return authOffRefusal(config) ?? missingRequiredTokenError(config);
+}
+
+export function ensureAccessToken(config: ServerConfig): ServerConfig {
+  if (config.authToken !== null || config.authOff || config.requireToken) return config;
+  if (!isLoopbackHost(config.host)) return config;
+  const tokenPath = accessTokenFilePath(config.homeDir);
+  const generated = randomBytes(32).toString('hex');
+  mkdirSync(config.homeDir, { recursive: true });
+  try {
+    writeFileSync(tokenPath, formatAccessTokenFile(generated), { mode: 0o600, flag: 'wx' });
+    return { ...config, authToken: generated };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+  }
+  const stored = parseAccessTokenFile(readFileSync(tokenPath, 'utf8'));
+  if (stored === null) {
+    throw new Error(
+      `token file ${tokenPath} has no usable ${ENV_VARS.token} line — fix it or delete it to have a new token generated`,
+    );
+  }
+  return { ...config, authToken: stored };
 }
 
 export function tokenAuthStartupLines(config: ServerConfig): string[] {
@@ -221,11 +279,7 @@ export function tokenAuthStartupLines(config: ServerConfig): string[] {
   }
   const host = config.host;
   const display =
-    host === null || host === '0.0.0.0' || host === '::'
-      ? 'localhost'
-      : host.includes(':')
-        ? `[${host}]`
-        : host;
+    host === '0.0.0.0' || host === '::' ? 'localhost' : host.includes(':') ? `[${host}]` : host;
   return [
     `token auth enabled — token source: ${source}; manage it with \`${BRAND.cliCommandName} token\` (\`${BRAND.cliCommandName} token --rotate\` writes a new one; restart the server to apply)`,
     `one-time login link: http://${display}:${config.port}/app#token=${config.authToken}`,
@@ -244,8 +298,8 @@ export function warnInsecureBind(logger: { warn(msg: string): void }, config: Se
   if (message !== null) logger.warn(message);
 }
 
-export function warnTailscaleBind(logger: { warn(msg: string): void }, config: ServerConfig): void {
-  const message = tailscaleBindWarning(config);
+export function warnIgnoredTailscaleUsers(logger: { warn(msg: string): void }): void {
+  const message = ignoredTailscaleUsersWarning();
   if (message !== null) logger.warn(message);
 }
 
