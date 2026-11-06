@@ -22,7 +22,7 @@ import {
 import { createDaemonLogger } from './log.js';
 import { pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
-import { orbReleaseFromEntry } from './orb/protocol.js';
+import { ORB_RELAY_TOKEN_ENV, orbReleaseFromEntry } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
 import { orbAgentHome, runOrbWorker } from './orb/worker.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
@@ -256,9 +256,21 @@ export function buildProgram(): Command {
 
   program
     .command('orb-step', { hidden: true })
-    .requiredOption('--socket <path>', 'Per-step relay socket')
-    .action(async (opts: { socket: string }) => {
+    .option('--socket <path>', 'Per-step relay socket')
+    .option('--stdio', 'Carry the relay over stdin and stdout (remote sandbox orbs)')
+    .action(async (opts: { socket?: string; stdio?: boolean }) => {
       if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
+      if (opts.stdio) {
+        const token = process.env[ORB_RELAY_TOKEN_ENV];
+        delete process.env[ORB_RELAY_TOKEN_ENV];
+        if (!token) throw new Error(`Orb stdio worker requires ${ORB_RELAY_TOKEN_ENV}`);
+        await runOrbWorker({
+          stdio: { input: process.stdin, output: process.stdout, token },
+        });
+        process.stdin.destroy();
+        return;
+      }
+      if (!opts.socket) throw new Error('Orb worker requires --socket or --stdio');
       await runOrbWorker({ socketPath: opts.socket });
     });
 

@@ -111,7 +111,8 @@
             "paths": {
               "cron-parser": "缝纪律（01 §3/§7.3）：cron-parser 只许 Scheduler 缝实现消费（02 §9.2 词表的自建调度循环内）。",
               "simple-git": "缝纪律（01 §3/S10、§7.3）：GitOps 缝 = spawn 系统 git 自建薄 wrapper，simple-git 明文不引入。",
-              "isomorphic-git": "缝纪律（01 §3/S10、§7.3）：GitOps 缝 = spawn 系统 git 自建薄 wrapper，isomorphic-git 明文不引入（无 http-backend/worktree 面）。"
+              "isomorphic-git": "缝纪律（01 §3/S10、§7.3）：GitOps 缝 = spawn 系统 git 自建薄 wrapper，isomorphic-git 明文不引入（无 http-backend/worktree 面）。",
+              "e2b": "Seam discipline (D101): the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
             }
           }
         }
@@ -138,6 +139,16 @@
         "apps/server/src/services/schedules.ts",
         "apps/server/src/services/scheduler.ts"
       ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/daemon/src/orb/e2b-client.ts"],
       "linter": {
         "rules": {
           "style": {
