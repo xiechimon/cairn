@@ -1,8 +1,8 @@
-import { chromium } from '/home/ian/Code/AgentProjects/cairn/.claude/worktrees/ui-click-flash/node_modules/@playwright/test/index.mjs';
+import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 const base = process.env.BASE ?? 'http://127.0.0.1:5274';
 const tag = process.env.TAG;
-const out = `/tmp/flash/ev-${tag}`;
+const out = process.env.OUT ?? `press-${tag}`;
 fs.mkdirSync(out, { recursive: true });
 const b = await chromium.launch();
 const p = await (await b.newContext({ viewport: { width: 1440, height: 732 } })).newPage();
