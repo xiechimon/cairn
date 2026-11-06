@@ -16,14 +16,17 @@ import {
   warnIgnoredTailscaleUsers,
   warnInsecureBind,
 } from './config.js';
+import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
+  setCoordinatorInServer,
   setCoordinatorMachineId,
   setCoordinatorServerContextEnabled,
+  setCoordinatorWake,
 } from './services/coordinator-context.js';
 import { setCoordinatorRouteLog } from './services/coordinator-route.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -74,7 +77,8 @@ const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
 setRoutingRulesEnabled(config.routingRules);
-setCoordinatorServerContextEnabled(config.coordinatorServerContext);
+setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
+setCoordinatorInServer(config.coordinatorInServer);
 setCoordinatorMachineId(config.coordinatorMachineId);
 setCoordinatorRouteLog((teamId, reason) =>
   logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
@@ -183,6 +187,30 @@ const scheduler = createScheduler(
   }),
   schedulingRunOf(config, { githubFetch, logger }),
 );
+const coordinator = config.coordinatorInServer
+  ? startCoordinator({
+      machine: {
+        db,
+        hub,
+        machineHub,
+        box: secretBox,
+        user: seeded.user,
+        vapidKeys,
+        reposDir,
+        attachmentsDir,
+        skillsDir: config.skillsDir,
+        mcpConfigPath: config.mcpConfigPath,
+        intakeAgentAllowlist: config.intakeAgentAllowlist,
+        convHub,
+        githubFetch,
+        oauthClient: config.githubOauth,
+      },
+      storageDir: coordinatorStoreDir(config.dataDir),
+      logger,
+      routerTools: config.routingRules,
+    })
+  : null;
+if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));
 scheduler.start();
 
 const server = serve(
@@ -214,11 +242,16 @@ const tsnetStarting = startTsnetRemote({
   return started;
 });
 
+const COORDINATOR_CLOSE_MS = 5_000;
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   scheduler.stop();
+  await Promise.race([
+    coordinator?.close(),
+    new Promise((resolve) => setTimeout(resolve, COORDINATOR_CLOSE_MS)),
+  ]);
   killInFlightPick();
   computerScreens.close();
   server.close();

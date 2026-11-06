@@ -55,7 +55,7 @@ describe('coordinator tools', () => {
       const tool = tools.find((t) => t.name === def.name);
       expect({ name: def.name, replay: tool?.replay }).toEqual({
         name: def.name,
-        replay: def.replaySafe === true ? 'safe' : 'unsafe',
+        replay: def.replaySafe === true || def.name === 'ask_user' ? 'safe' : 'unsafe',
       });
     }
     for (const dispatching of ['run_builds', 'create_todo', 'set_secret', 'delete_todos']) {

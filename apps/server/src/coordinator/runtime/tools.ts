@@ -8,6 +8,13 @@ import {
 import { defineExtension, defineTool, type ToolRegistration } from '@earendil-works/pi-durable';
 import type { MachineApi } from './machine-api.js';
 
+export class ShutdownInterrupt extends Error {
+  constructor() {
+    super('Coordinator is shutting down');
+    this.name = 'ShutdownInterrupt';
+  }
+}
+
 export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
 
 export type ToolChannel = Pick<MachineApi, 'relayTool' | 'askUser'>;
@@ -22,6 +29,7 @@ async function askThroughChannel(
   callId: string,
   args: Record<string, unknown>,
   signal: AbortSignal | undefined,
+  shuttingDown: () => boolean,
 ): Promise<string> {
   const requestId = askRequestId(stepId, callId);
   try {
@@ -32,8 +40,11 @@ async function askThroughChannel(
         ? { provenance: args.provenance as MachineAskBody['provenance'] }
         : {}),
     };
-    return JSON.stringify(await channel.askUser(stepId, body, signal));
+    const settled = await channel.askUser(stepId, body, signal);
+    if (shuttingDown()) throw new ShutdownInterrupt();
+    return JSON.stringify(settled);
   } catch (error) {
+    if (shuttingDown()) throw new ShutdownInterrupt();
     const message = error instanceof Error ? error.message : String(error);
     return JSON.stringify({
       status: 'cancelled',
@@ -44,17 +55,48 @@ async function askThroughChannel(
   }
 }
 
-export interface StepGate {
+export interface StepResolver {
+  stepFor(conversationId: string): Promise<string>;
+}
+
+export interface StepGate extends StepResolver {
   current(): Promise<string>;
   set(stepId: string | null): void;
+}
+
+export interface ConversationGate extends StepResolver {
+  set(conversationId: string, stepId: string | null): void;
+}
+
+export function createConversationGate(): ConversationGate {
+  const steps = new Map<string, string>();
+  return {
+    stepFor: async (conversationId) => {
+      const stepId = steps.get(conversationId);
+      if (stepId === undefined) {
+        throw new Error(
+          `Coordinator tool call for conversation ${conversationId} has no live step`,
+        );
+      }
+      return stepId;
+    },
+    set: (conversationId, stepId) => {
+      if (stepId === null) steps.delete(conversationId);
+      else steps.set(conversationId, stepId);
+    },
+  };
 }
 
 export function createStepGate(): StepGate {
   let stepId: string | null = null;
   let waiters: ((id: string) => void)[] = [];
+  const current = () =>
+    stepId !== null
+      ? Promise.resolve(stepId)
+      : new Promise<string>((resolve) => waiters.push(resolve));
   return {
-    current: () =>
-      stepId !== null ? Promise.resolve(stepId) : new Promise((resolve) => waiters.push(resolve)),
+    current,
+    stepFor: current,
     set: (next) => {
       stepId = next;
       if (next === null) return;
@@ -70,16 +112,17 @@ const EMPTY_PARAMETERS = { type: 'object', properties: {} };
 export function coordinatorTool(
   def: RemoteToolDef,
   channel: ToolChannel,
-  gate: StepGate,
+  gate: StepResolver,
+  shuttingDown: () => boolean = () => false,
 ): ToolRegistration {
   return defineTool({
     name: def.name,
     description: def.description,
     parameters: (def.parameters ?? EMPTY_PARAMETERS) as object,
-    replay: def.replaySafe === true ? 'safe' : 'unsafe',
+    replay: def.replaySafe === true || def.name === 'ask_user' ? 'safe' : 'unsafe',
     outputLimits: { maxBytes: COORDINATOR_TOOL_OUTPUT_MAX_BYTES, retain: 'head' },
     execute: async (args, api, context) => {
-      const stepId = await gate.current();
+      const stepId = await gate.stepFor(String(api.conversationId));
       const params = args as Record<string, unknown>;
       if (def.name === 'ask_user') {
         const text = await askThroughChannel(
@@ -88,6 +131,7 @@ export function coordinatorTool(
           api.callId,
           params,
           context.abortSignal,
+          shuttingDown,
         );
         return { output: [{ type: 'text', text }] };
       }
@@ -95,6 +139,7 @@ export function coordinatorTool(
         const text = await channel.relayTool(stepId, def.name, params);
         return { output: [{ type: 'text', text }] };
       } catch (error) {
+        if (error instanceof ShutdownInterrupt) throw error;
         const message = error instanceof Error ? error.message : String(error);
         return { output: [{ type: 'text', text: message }], isError: true };
       }
@@ -104,8 +149,8 @@ export function coordinatorTool(
 
 export function coordinatorToolsExtension(
   channel: ToolChannel,
-  gate: StepGate,
-  options: { routerTools?: boolean } = {},
+  gate: StepResolver,
+  options: { routerTools?: boolean; shuttingDown?: () => boolean } = {},
 ) {
   const defs =
     options.routerTools === true
@@ -113,6 +158,6 @@ export function coordinatorToolsExtension(
       : CHIEF_REMOTE_TOOLS;
   return defineExtension({
     name: 'cairn-coordinator-tools',
-    tools: defs.map((def) => coordinatorTool(def, channel, gate)),
+    tools: defs.map((def) => coordinatorTool(def, channel, gate, options.shuttingDown)),
   });
 }

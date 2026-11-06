@@ -14,6 +14,7 @@ import {
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
 import {
   type CoordinatorRouteFallback,
+  coordinatorRoute,
   setCoordinatorRouteLog,
 } from '../src/services/coordinator-route.js';
 import { resolveChiefStepCredentials } from '../src/services/credentials.js';
@@ -327,5 +328,40 @@ describe('the coordinator route (D70 C5)', () => {
     addAnthropicKey(w);
     expect((await claim(w)).agent).toMatchObject({ provider: 'stub-gw', modelId: 'stub-model' });
     expect(fallbacks).toEqual([[w.teamId, 'paid-claude-not-allowed']]);
+  });
+  test('a keyed non-Anthropic provider is the route without allow-paid', async () => {
+    const w = await world();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'vani',
+          label: 'Vani',
+          baseUrl: 'https://vani.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'vani-key',
+          models: [{ id: 'deepseek/deepseek-v4.1-flash', name: 'flash' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-vani',
+        teamId: w.teamId,
+        use: 'coordinator',
+        provider: 'vani',
+        modelId: 'deepseek/deepseek-v4.1-flash',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    expect(coordinatorRoute(w.s.db, w.teamId)).toMatchObject({
+      provider: 'vani',
+      modelId: 'deepseek/deepseek-v4.1-flash',
+    });
+    expect(fallbacks).toEqual([]);
   });
 });

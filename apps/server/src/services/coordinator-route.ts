@@ -95,7 +95,7 @@ export function coordinatorRoute(db: Db, teamId: string) {
   const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
   if (rule === undefined) return fallback(teamId, 'no-api-key-provider');
   const keyed = db
-    .select({ id: provider.id })
+    .select({ id: provider.id, api: provider.api })
     .from(provider)
     .where(
       and(
@@ -106,6 +106,7 @@ export function coordinatorRoute(db: Db, teamId: string) {
     )
     .get();
   if (keyed === undefined) return fallback(teamId, 'rule-provider-has-no-key');
+  if (keyed.api !== 'anthropic-messages') return rule;
   const usage = db
     .select({ claudeUsage: team.claudeUsage })
     .from(team)
