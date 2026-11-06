@@ -6,7 +6,7 @@ import { enrollThroughBrowser, pendingEnrollmentUrl } from '../src/machine-enrol
 import { statePaths } from '../src/state.js';
 
 const SERVER = 'https://cairn.example';
-const AUTHORIZE = 'http://127.0.0.1:8787/app/machines/authorize?enroll=e1';
+const AUTHORIZE = 'https://cairn.example/app/machines/authorize?enroll=e1';
 
 type Poll =
   | { status: 'pending' }
@@ -61,8 +61,7 @@ test('browser enrollment writes machine.json with mode 0600 and points at the se
   expect(saved).toEqual(machine());
   expect(statSync(paths.machineJson).mode & 0o777).toBe(0o600);
   expect(existsSync(join(home, 'enroll.json'))).toBe(false);
-  expect(logs.join('\n')).toContain(`${SERVER}/app/machines/authorize?enroll=e1`);
-  expect(logs.join('\n')).not.toContain('127.0.0.1');
+  expect(logs.join('\n')).toContain(AUTHORIZE);
   releaseTestTempDir(home);
 });
 

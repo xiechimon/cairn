@@ -155,6 +155,16 @@ async function jsonBody(c: Context): Promise<unknown> {
   return c.req.json().catch(() => null);
 }
 
+function enrollOrigin(c: Context): string {
+  const configured = process.env.CAIRN_WEB_ORIGIN?.trim();
+  if (configured !== undefined && configured !== '') {
+    try {
+      return new URL(configured).origin;
+    } catch {}
+  }
+  return originOf(c);
+}
+
 function originOf(c: Context): string {
   return forwardedOrigin({
     url: c.req.url,
@@ -252,7 +262,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     });
     return c.json({
       enrollId,
-      url: `${originOf(c)}/app/machines/authorize?enroll=${enrollId}`,
+      url: `${enrollOrigin(c)}/app/machines/authorize?enroll=${enrollId}`,
     });
   });
 
