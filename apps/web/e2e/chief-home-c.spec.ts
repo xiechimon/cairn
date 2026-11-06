@@ -87,7 +87,7 @@ test('the sidebar lists project names only, and the project chat filters the dec
   await expect(needsYou(page)).toContainText('Connect a Claude subscription token');
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
-  await expect(composer(page)).toHaveAttribute('placeholder', /in cairn/);
+  await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Type your own answer/);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 

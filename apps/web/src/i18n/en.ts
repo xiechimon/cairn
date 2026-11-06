@@ -1333,6 +1333,9 @@ export const EN: Record<string, string> = {
   等待你的回复: 'Waiting for your reply',
   取消提问: 'Dismiss question',
   已取消提问: 'Question dismissed',
+  问题: 'Question',
+  '输入你自己的回答，或留空使用选中的选项':
+    'Type your own answer, or leave blank to use the selected option',
   展开提问: 'Expand question',
   收起提问: 'Collapse question',
   提交回答: 'Submit answers',

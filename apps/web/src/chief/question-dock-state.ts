@@ -3,6 +3,13 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 
 type Listener = () => void;
 
+export type QuestionPrimary = {
+  requestId: string;
+  last: boolean;
+  enabled: boolean;
+  advance: () => void;
+};
+
 const DISMISS_UNDO_MS = 5000;
 
 const COLLAPSED_KEY = 'cairn-question-collapsed';
@@ -24,6 +31,7 @@ function saveCollapsed(): void {
 const dismissing = new Map<string, ReturnType<typeof setTimeout>>();
 const listeners = new Set<Listener>();
 let version = 0;
+let primary: QuestionPrimary | null = null;
 
 function emit(): void {
   version += 1;
@@ -39,6 +47,22 @@ export const questionDockState = {
   },
   snapshot(): number {
     return version;
+  },
+  primary(): QuestionPrimary | null {
+    return primary;
+  },
+  setPrimary(next: QuestionPrimary): void {
+    const same =
+      primary?.requestId === next.requestId &&
+      primary.last === next.last &&
+      primary.enabled === next.enabled;
+    primary = next;
+    if (!same) emit();
+  },
+  clearPrimary(requestId: string): void {
+    if (primary?.requestId !== requestId) return;
+    primary = null;
+    emit();
   },
   isCollapsed(requestId: string): boolean {
     return collapsed.has(requestId);

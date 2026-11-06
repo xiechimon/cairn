@@ -66,9 +66,10 @@ test('two pending decisions are answered one at a time above the composer; the r
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('（推荐）');
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Verified');
   await expect(card.getByTestId('chief-question-option-0-1')).toContainText('wokey');
-  await expect(card.getByTestId('chief-question-other-0')).toContainText('用我自己的话回答');
+  await expect(card.getByTestId('chief-question-other-0')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答，或留空使用选中的选项');
   await card.getByTestId('chief-question-option-0-0').click();
-  await card.getByRole('button', { name: '提交回答' }).click();
+  await page.getByTestId('chief-question-primary').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({
     requestId: 'ask-0000000a',
@@ -78,7 +79,7 @@ test('two pending decisions are answered one at a time above the composer; the r
   await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
 });
 
-test('own words: the free-text row takes a typed answer', async ({ page }) => {
+test('own words: the composer text is the answer', async ({ page }) => {
   const answered: unknown[] = [];
   await mockLive(
     page,
@@ -99,9 +100,9 @@ test('own words: the free-text row takes a typed answer', async ({ page }) => {
   );
   await page.goto('/app');
   const card = page.getByTestId('chief-question-dock').getByTestId('chief-question-card');
-  await card.getByTestId('chief-question-other-0').click();
-  await card.getByTestId('chief-question-input-0').fill('Use the metered key this once');
-  await card.getByRole('button', { name: '提交回答' }).click();
+  await expect(card).toBeVisible();
+  await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
+  await page.getByTestId('chief-question-primary').click();
   await expect
     .poll(() => answered)
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);

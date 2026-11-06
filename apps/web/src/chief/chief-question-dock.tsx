@@ -2,7 +2,12 @@ import { useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChiefQuestionCard, type QuestionPager, recommendedFirst } from './chief-question-card.js';
+import {
+  ChiefQuestionCard,
+  type QuestionComposer,
+  type QuestionPager,
+  recommendedFirst,
+} from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import { clampQuestionIndex } from './question-dock-index.js';
 import { questionDockState } from './question-dock-state.js';
@@ -39,7 +44,8 @@ function setStepOf(request: OriginChiefQuestion, step: number): void {
   questionDraftStore.set(key, { ...record, step });
 }
 
-function stepComplete(request: OriginChiefQuestion): boolean {
+function stepComplete(request: OriginChiefQuestion, typed: boolean): boolean {
+  if (typed) return true;
   const record = questionDraftStore.get(draftKeyOf(request));
   const questions = request.item.questions.map(recommendedFirst);
   const step = record?.step ?? 0;
@@ -50,10 +56,12 @@ function DockQuestion({
   request,
   numberKeys,
   pager,
+  composer,
 }: {
   request: OriginChiefQuestion;
   numberKeys: boolean;
   pager: QuestionPager | undefined;
+  composer: QuestionComposer | undefined;
 }) {
   const root = useOptionalChiefRoot();
   const key = draftKeyOf(request);
@@ -78,6 +86,7 @@ function DockQuestion({
         draftKey={key}
         numberKeys={numberKeys}
         {...(pager !== undefined ? { pager } : {})}
+        {...(composer !== undefined ? { composer } : {})}
         onAnswer={(input) =>
           root?.surface.onAnswerQuestion?.({ ...input, threadId: request.conversationId })
         }
@@ -101,7 +110,13 @@ export function useQuestionDockVisible(): boolean {
   return useShownQuestions().length > 0;
 }
 
-export function ChiefQuestionDock({ home }: { home: boolean }) {
+export function ChiefQuestionDock({
+  home,
+  composer,
+}: {
+  home: boolean;
+  composer?: QuestionComposer;
+}) {
   const { t } = useI18n();
   const _root = useOptionalChiefRoot();
   const [searchParams] = useSearchParams();
@@ -110,7 +125,7 @@ export function ChiefQuestionDock({ home }: { home: boolean }) {
   const [index, setIndex] = useState(0);
   useSyncExternalStore(
     questionDraftStore.subscribe,
-    () => pending.map((request) => `${stepOf(request)}:${stepComplete(request)}`).join(','),
+    () => pending.map((request) => `${stepOf(request)}:${stepComplete(request, false)}`).join(','),
     () => '',
   );
   const at = clampQuestionIndex(index, pending.length);
@@ -128,7 +143,10 @@ export function ChiefQuestionDock({ home }: { home: boolean }) {
       ? {
           label: t('{n} / {total}', { n: position, total }),
           canPrev: step > 0 || previous !== undefined,
-          canNext: step < lastStep ? stepComplete(shown) : next !== undefined,
+          canNext:
+            step < lastStep
+              ? stepComplete(shown, (composer?.text.trim() ?? '') !== '')
+              : next !== undefined,
           onPrev: () => {
             if (step > 0) {
               setStepOf(shown, step - 1);
@@ -160,6 +178,7 @@ export function ChiefQuestionDock({ home }: { home: boolean }) {
         request={shown}
         numberKeys={numberKeys}
         pager={pager}
+        composer={composer}
       />
     </section>
   );

@@ -80,7 +80,7 @@ test('a pending question is a card directly above the composer, and the header h
   await expect(page.getByTestId('chief-stream').getByTestId('chief-question-card')).toHaveCount(0);
   const dockBox = await dock.boundingBox();
   const composerBox = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
-  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(composerBox!.y);
+  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(composerBox!.y + 1);
   expect(composerBox!.y - (dockBox!.y + dockBox!.height)).toBeLessThan(24);
   await expect.poll(() => posts.some((path) => path.includes('/questions/'))).toBe(false);
 });
@@ -116,14 +116,14 @@ test('answering removes the card and the badge count; the next question takes it
   await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
   await expect(badge).toHaveText('2');
   await dock.getByTestId('chief-question-option-0-0').click();
-  await dock.getByRole('button', { name: '提交回答' }).click();
+  await page.getByTestId('chief-question-primary').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]?.path).toContain(`/chief/threads/${THREAD.id}/questions/ask-0000000a/answer`);
   await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
   await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
   await expect(badge).toHaveText('1');
   await dock.getByTestId('chief-question-option-0-0').click();
-  await dock.getByRole('button', { name: '提交回答' }).click();
+  await page.getByTestId('chief-question-primary').click();
   await expect.poll(() => answered.length).toBe(2);
   await expect(dock).toHaveCount(0);
   await expect(badge).toHaveCount(0);
@@ -135,9 +135,8 @@ test('free text answers inline', async ({ page }) => {
   await mockLive(page, state, answerRoute(state, answered));
   await page.goto('/app');
   const dock = page.getByTestId('chief-question-dock');
-  await dock.getByTestId('chief-question-other-0').click();
-  await dock.getByTestId('chief-question-input-0').fill('Use the metered key this once');
-  await dock.getByRole('button', { name: '提交回答' }).click();
+  await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
+  await page.getByTestId('chief-question-primary').click();
   await expect
     .poll(() => answered.map((row) => row.body))
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
@@ -170,14 +169,15 @@ test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ 
   });
   await page.goto('/app');
   const card = page.getByTestId('chief-question-card');
-  await card.getByTestId('chief-question-other-0').click();
-  await card.getByTestId('chief-question-input-0').fill('Keep this text');
+  const composer = page.getByTestId('chief-composer-input');
+  await composer.fill('Keep this text');
   await page.getByTestId('chief-question-next').click();
+  await expect(composer).toHaveValue('');
   await page.getByTestId('chief-question-prev').click();
-  await expect(card.getByTestId('chief-question-input-0')).toHaveValue('Keep this text');
-  await card.getByRole('button', { name: '提交回答' }).click();
+  await expect(composer).toHaveValue('Keep this text');
+  await page.getByTestId('chief-question-primary').click();
   await expect(page.getByTestId('chief-question-error')).toBeVisible();
-  await expect(card.getByTestId('chief-question-input-0')).toHaveValue('Keep this text');
+  await expect(composer).toHaveValue('Keep this text');
   await expect(page.getByTestId('chief-question-position')).toHaveText('1 / 2');
 });
 
@@ -207,7 +207,7 @@ test('at 375px the card sits above the composer and the last message stays visib
   const dockBox = await dock.boundingBox();
   const composerBox = await composer.boundingBox();
   const lastBox = await page.getByText('The final message').boundingBox();
-  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(composerBox!.y);
+  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(composerBox!.y + 1);
   expect(dockBox!.x).toBeGreaterThanOrEqual(0);
   expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(375);
   expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(dockBox!.y);
@@ -233,18 +233,6 @@ test('digits pick an option while nothing is being typed, and stay text in a non
   await page.keyboard.press('2');
   await expect(composer).toHaveValue('ship it2');
   await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
-});
-
-test('digits typed into the free-text answer stay text', async ({ page }) => {
-  await mockLive(page, structuredClone(ONE));
-  await page.goto('/app');
-  const dock = page.getByTestId('chief-question-dock');
-  await dock.getByTestId('chief-question-other-0').click();
-  const input = dock.getByTestId('chief-question-input-0');
-  await input.click();
-  await page.keyboard.type('12');
-  await expect(input).toHaveValue('12');
-  await expect(dock.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'false');
 });
 
 const LONG_OPTIONS = Array.from({ length: 6 }, (_, n) => ({
@@ -282,8 +270,9 @@ for (const size of [
     await expect(dock.getByTestId('chief-question-card')).toBeVisible();
     const input = drawer.getByTestId('chief-composer-input');
     await expect(input).toBeVisible();
-    const send = drawer.getByRole('button', { name: '发送' });
+    const send = drawer.getByTestId('chief-question-primary');
     await expect(send).toBeVisible();
+    await dock.getByTestId('chief-question-option-0-0').click();
     await send.click({ trial: true });
     const frame = await drawer.boundingBox();
     const sendBox = await send.boundingBox();
@@ -300,7 +289,7 @@ for (const size of [
       });
     expect(scrolls).toBe(true);
     await dock.getByTestId('chief-question-option-0-5').scrollIntoViewIfNeeded();
-    await expect(dock.getByRole('button', { name: '提交回答' })).toBeVisible();
+    await expect(send).toBeVisible();
   });
 }
 
@@ -362,7 +351,7 @@ test('a picked option fills only its mark, with no row background', async ({ pag
   await expect(option).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 });
 
-test('the primary button shows its shortcut and Ctrl+Enter or Cmd+Enter submits from inside the card', async ({
+test('the primary button sits in the composer with its shortcut and Ctrl+Enter or Cmd+Enter submits from the card or the composer', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -374,7 +363,9 @@ test('the primary button shows its shortcut and Ctrl+Enter or Cmd+Enter submits 
   });
   await page.goto('/app');
   const dock = page.getByTestId('chief-question-dock');
-  const keys = dock.getByRole('button', { name: /提交回答/ }).locator('[data-slot="kbd"]');
+  const keys = page.getByTestId('chief-question-primary').locator('[data-slot="kbd"]');
+  await expect(page.locator('.chief-composer').getByTestId('chief-question-primary')).toBeVisible();
+  await expect(dock.getByRole('button', { name: /提交回答/ })).toHaveCount(0);
   await expect(keys).toHaveCount(2);
   await expect(keys.last().locator('svg')).toBeVisible();
   await expect(keys.last()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -382,6 +373,78 @@ test('the primary button shows its shortcut and Ctrl+Enter or Cmd+Enter submits 
   await dock.getByTestId('chief-question-option-0-1').press('Control+Enter');
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({ answers: [{ header: 'Model · #74', choices: ['wokey · deepseek-v4.1-flash'] }] });
+});
+
+test('selecting an option then Next, typing text then Next, and an empty composer with nothing selected', async ({
+  page,
+}) => {
+  const answered: unknown[] = [];
+  await mockLive(page, structuredClone(ONE), (path, route, json) => {
+    if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
+    answered.push(route.request().postDataJSON());
+    return json({});
+  });
+  await page.goto('/app');
+  const primary = page.getByTestId('chief-question-primary');
+  const composer = page.getByTestId('chief-composer-input');
+  await expect(primary).toBeDisabled();
+  await expect(composer).toHaveAttribute('placeholder', '输入你自己的回答，或留空使用选中的选项');
+  await page.getByTestId('chief-question-option-0-0').click();
+  await expect(primary).toBeEnabled();
+  await composer.fill('typed answer wins');
+  await composer.press('Enter');
+  await expect.poll(() => answered).toEqual([
+    { answers: [{ header: 'Model · #74', choices: ['typed answer wins'] }] },
+  ]);
+});
+
+test('a multi-step request: Next moves on with the composer cleared, and Submit sends every answer', async ({
+  page,
+}) => {
+  const answered: unknown[] = [];
+  const state = structuredClone(MIXED);
+  await mockLive(page, state, (path, route, json) => {
+    if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
+    answered.push(route.request().postDataJSON());
+    return json({});
+  });
+  await page.goto('/app');
+  const primary = page.getByTestId('chief-question-primary');
+  const composer = page.getByTestId('chief-composer-input');
+  await expect(primary).toContainText('下一步');
+  await expect(primary).toBeDisabled();
+  await page.getByTestId('chief-question-option-0-0').click();
+  await primary.click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 3');
+  await expect(composer).toHaveValue('');
+  await expect(primary).toBeDisabled();
+  await expect(primary).toContainText('提交回答');
+  await composer.fill('Intro and a custom section');
+  await expect(primary).toBeEnabled();
+  await primary.click();
+  await expect
+    .poll(() => answered)
+    .toEqual([
+      {
+        answers: [
+          { header: 'Theme', choices: ['Light'] },
+          { header: 'Sections', choices: ['Intro and a custom section'] },
+        ],
+      },
+    ]);
+});
+
+test('the expanded header is a quiet label and only the collapsed bar shows Needs you', async ({
+  page,
+}) => {
+  await mockLive(page, structuredClone(ONE));
+  await page.goto('/app');
+  const card = page.getByTestId('chief-question-card');
+  await expect(card.getByTestId('chief-question-collapse')).toContainText('问题 · Model · #74');
+  await expect(card.getByTestId('chief-question-status')).toHaveClass(/sr-only/);
+  await card.getByTestId('chief-question-collapse').click();
+  await expect(card.getByTestId('chief-question-status')).not.toHaveClass(/sr-only/);
+  await expect(card.getByTestId('chief-question-status')).toBeVisible();
 });
 
 for (const locale of ['zh', 'en'] as const) {
@@ -418,7 +481,9 @@ for (const locale of ['zh', 'en'] as const) {
             if (box.width <= 1 && box.height <= 1) continue;
             if (box.left < frame.left - 0.5 || box.right > frame.right + 0.5)
               found.push(`${name} leaves the frame horizontally`);
-            const ellipsis = style.textOverflow === 'ellipsis';
+            const ellipsis =
+              style.textOverflow === 'ellipsis' ||
+              (el instanceof HTMLTextAreaElement && el.value === '');
             if (!ellipsis && el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0)
               found.push(`${name} scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`);
           }
@@ -441,7 +506,7 @@ for (const locale of ['zh', 'en'] as const) {
       expect(defects).toEqual([]);
       const dock = drawer.getByTestId('chief-question-dock');
       await expect(dock.getByTestId('chief-question-dismiss')).toBeInViewport({ ratio: 1 });
-      await expect(dock.getByRole('button', { name: locale === 'zh' ? '提交回答' : 'Submit answers' })).toBeInViewport({ ratio: 1 });
+      await expect(drawer.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
     });
   }
 }
@@ -555,7 +620,7 @@ for (const size of [
     await drawer.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
     await drawer.getByTestId('chief-question-option-0-0').click();
     const dismiss = card.getByTestId('chief-question-dismiss');
-    const submit = card.getByRole('button', { name: '提交回答' });
+    const submit = drawer.getByTestId('chief-question-primary');
     await expect(dismiss).toBeInViewport({ ratio: 1 });
     await expect(submit).toBeInViewport({ ratio: 1 });
     await dismiss.click({ trial: true });

@@ -47,6 +47,12 @@ export interface ChiefQuestionCardProps {
   numberKeys?: boolean;
   draftKey?: string;
   pager?: QuestionPager;
+  composer?: QuestionComposer;
+}
+
+export interface QuestionComposer {
+  text: string;
+  setText: (value: string) => void;
 }
 
 export interface QuestionPager {
@@ -83,13 +89,23 @@ const QUESTION_STATUS: Record<
   cancelled: { icon: Ban, ink: 'text-content-tertiary', label: '已取消' },
 };
 
-function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
+function QuestionStatus({
+  status,
+  quiet = false,
+}: {
+  status: ChiefQuestionItem['status'];
+  quiet?: boolean;
+}) {
   const { t } = useI18n();
   const { icon: Icon, ink, label } = QUESTION_STATUS[status];
   return (
     <span
       data-testid="chief-question-status"
-      className={`flex min-w-0 shrink-0 items-center gap-1 text-meta whitespace-nowrap ${ink}`}
+      className={
+        quiet
+          ? 'sr-only'
+          : `flex min-w-0 shrink-0 items-center gap-1 text-meta whitespace-nowrap ${ink}`
+      }
     >
       <Icon aria-hidden strokeWidth={1.75} className="size-3.25" />
       <span className="@max-md:sr-only">{t(label)}</span>
@@ -166,6 +182,13 @@ function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draft
       if (draftKey !== undefined) persist(drafts, next);
       else setLocalStep(next);
     },
+    commit: (nextDrafts: QuestionDraft[], nextStep: number) => {
+      if (draftKey !== undefined) persist(nextDrafts, nextStep);
+      else {
+        setLocalDrafts(nextDrafts);
+        setLocalStep(nextStep);
+      }
+    },
   };
 }
 
@@ -176,10 +199,11 @@ export function ChiefQuestionCard({
   numberKeys = false,
   draftKey,
   pager,
+  composer,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
-  const { drafts, step, submitting, setDrafts, setStep } = useQuestionDrafts(
+  const { drafts, step, submitting, setDrafts, setStep, commit } = useQuestionDrafts(
     item,
     questions,
     draftKey,
@@ -207,7 +231,7 @@ export function ChiefQuestionCard({
       question.options.length === 0
     )
       return;
-    const max = question.options.length + 1;
+    const max = question.options.length;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (cardRef.current?.checkVisibility() !== true) return;
@@ -216,23 +240,45 @@ export function ChiefQuestionCard({
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
       e.preventDefault();
+      if (question.multiSelect !== true) composer?.setText('');
       setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
   }, [pending, collapsed, numberKeys, step, question]);
 
-  const stepComplete = useMemo(() => questionDraftComplete(draft, question), [draft, question]);
-  const allComplete = useMemo(
-    () => pending && questions.every((q, i) => questionDraftComplete(drafts[i], q)),
-    [pending, drafts, questions],
-  );
+  const withComposerText = (
+    stored: QuestionDraft | undefined,
+    prompt: Question | undefined,
+    text: string,
+  ) => {
+    if (stored === undefined || prompt === undefined) return stored;
+    if (stored.kind === 'text') return { kind: 'text' as const, value: text };
+    if (text.trim() === '') return { ...stored, other: false, otherText: '' };
+    if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
+    return { kind: 'choices' as const, picked: [], other: true, otherText: text };
+  };
+  const effective = (index: number): QuestionDraft | undefined =>
+    composer !== undefined && index === step
+      ? withComposerText(drafts[index], questions[index], composer.text)
+      : drafts[index];
+  const effectiveDrafts = drafts.map((stored, index) => effective(index) ?? stored);
+  const stepComplete = questionDraftComplete(effective(step), question);
+  const allComplete =
+    pending && questions.every((q, i) => questionDraftComplete(effectiveDrafts[i], q));
+
+  const textOf = (stored: QuestionDraft | undefined): string => {
+    if (stored === undefined) return '';
+    if (stored.kind === 'text') return stored.value;
+    return stored.other ? stored.otherText : '';
+  };
 
   const submit = () => {
     if (!allComplete) return;
+    commit(effectiveDrafts, step);
     onAnswer?.({
       requestId: item.requestId,
-      answers: drafts.map((d, i) => {
+      answers: effectiveDrafts.map((d, i) => {
         const header = questions[i]?.header ?? '';
         if (d.kind === 'text') return { header, text: d.value.trim() };
         const choices = [...d.picked];
@@ -240,14 +286,74 @@ export function ChiefQuestionCard({
         return { header, choices };
       }),
     });
+    composer?.setText('');
   };
 
   const primaryEnabled = pending && (last ? allComplete : stepComplete);
   const advance = () => {
     if (!primaryEnabled) return;
-    if (last) submit();
-    else setStep((s) => Math.min(lastStep, s + 1));
+    if (last) {
+      submit();
+      return;
+    }
+    setStep((s) => Math.min(lastStep, s + 1));
   };
+
+  const latestRef = useRef({ composer, drafts, step, questions, pending, commit });
+  latestRef.current = { composer, drafts, step, questions, pending, commit };
+  useEffect(() => {
+    if (composer !== undefined && pending && composer.text === '') {
+      composer.setText(textOf(drafts[step]));
+    }
+    return () => {
+      const latest = latestRef.current;
+      if (latest.composer === undefined || !latest.pending) return;
+      const stored = withComposerText(
+        latest.drafts[latest.step],
+        latest.questions[latest.step],
+        latest.composer.text,
+      );
+      if (stored !== undefined)
+        latest.commit(
+          latest.drafts.map((draftAt, index) => (index === latest.step ? stored : draftAt)),
+          latest.step,
+        );
+      latest.composer.setText('');
+    };
+  }, []);
+  const wasSubmittingRef = useRef(submitting);
+  useEffect(() => {
+    const was = wasSubmittingRef.current;
+    wasSubmittingRef.current = submitting;
+    if (was && !submitting && composer !== undefined && composer.text === '')
+      composer.setText(textOf(drafts[step]));
+  }, [submitting]);
+
+  const previousStepRef = useRef(step);
+  useEffect(() => {
+    const previous = previousStepRef.current;
+    previousStepRef.current = step;
+    if (previous === step || composer === undefined) return;
+    const stored = withComposerText(drafts[previous], questions[previous], composer.text);
+    commit(
+      drafts.map((draftAt, index) =>
+        index === previous && stored !== undefined ? stored : draftAt,
+      ),
+      step,
+    );
+    composer.setText(textOf(drafts[step]));
+  }, [step]);
+
+  useEffect(() => {
+    if (!pending || composer === undefined) return;
+    questionDockState.setPrimary({
+      requestId: item.requestId,
+      last,
+      enabled: primaryEnabled,
+      advance: () => advanceRef.current(),
+    });
+  }, [pending, composer === undefined, item.requestId, last, primaryEnabled]);
+  useEffect(() => () => questionDockState.clearPrimary(item.requestId), [item.requestId]);
 
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
@@ -299,7 +405,6 @@ export function ChiefQuestionCard({
   }
 
   const pickedCount = draft?.kind === 'choices' ? draft.picked.length : 0;
-  const otherSelected = draft?.kind === 'choices' && draft.other;
   const multi = question.multiSelect === true;
   const hintText =
     question.options.length === 0
@@ -320,8 +425,10 @@ export function ChiefQuestionCard({
           onNext: () => setStep((s) => Math.min(lastStep, s + 1)),
         }
       : undefined);
-  const pick = (optionIndex: number) =>
+  const pick = (optionIndex: number) => {
+    if (question.multiSelect !== true) composer?.setText('');
     setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
+  };
 
   return (
     <div
@@ -332,7 +439,7 @@ export function ChiefQuestionCard({
       className={ATTACHED_CARD_CLS}
     >
       <div className="flex flex-none items-center gap-1 px-3.5 pt-2 pb-1">
-        <QuestionStatus status={item.status} />
+        <QuestionStatus status={item.status} quiet={!collapsed} />
         <Button
           variant="ghost"
           data-testid="chief-question-collapse"
@@ -341,7 +448,9 @@ export function ChiefQuestionCard({
           className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent"
           onClick={toggleCollapsed}
         >
-          <span className="max-w-1/2 truncate">{question.header}</span>
+          <span className={collapsed ? 'max-w-1/2 truncate' : 'truncate'}>
+            {collapsed ? question.header : `${t('问题')} · ${question.header}`}
+          </span>
           {collapsed && (
             <>
               <span aria-hidden className="h-3 w-px flex-none bg-border" />
@@ -419,21 +528,25 @@ export function ChiefQuestionCard({
               {question.question}
             </div>
             {question.options.length === 0 ? (
-              <div className="flex-none px-3.5 pb-2">
-                <Input
-                  data-testid={`chief-question-input-${step}`}
-                  className={FORM_CONTROL_CLS}
-                  placeholder={t('输入你的回答')}
-                  value={draft?.kind === 'text' ? draft.value : ''}
-                  disabled={!pending}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
-                  }}
-                />
-              </div>
+              composer !== undefined ? null : (
+                <div className="flex-none px-3.5 pb-2">
+                  <Input
+                    data-testid={`chief-question-input-${step}`}
+                    className={FORM_CONTROL_CLS}
+                    placeholder={t('输入你的回答')}
+                    value={draft?.kind === 'text' ? draft.value : ''}
+                    disabled={!pending}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setDrafts((prev) =>
+                        replaceQuestionDraft(prev, step, { kind: 'text', value }),
+                      );
+                    }}
+                  />
+                </div>
+              )
             ) : (
-              <div className="flex flex-none flex-col px-1.5">
+              <div className="flex flex-none flex-col px-1.5 pb-1.5">
                 {question.options.map((option, oi) => {
                   const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
                   return (
@@ -467,65 +580,29 @@ export function ChiefQuestionCard({
                     </Button>
                   );
                 })}
-                <div className="flex flex-col">
-                  <Button
-                    variant="ghost"
-                    data-testid={`chief-question-other-${step}`}
-                    disabled={!pending}
-                    aria-pressed={otherSelected}
-                    className={OPTION_ROW_CLS}
-                    onClick={() => pick(question.options.length)}
-                  >
-                    <ChoiceMark multi={multi} selected={otherSelected} />
-                    <span className="min-w-0 flex-1 text-ui text-foreground">
-                      {t('用我自己的话回答')}
-                    </span>
-                    {question.options.length < 9 && <Keycap>{question.options.length + 1}</Keycap>}
-                  </Button>
-                  {otherSelected && (
-                    <div className="pt-1 pr-2 pb-1.5 pl-8.5">
-                      <Input
-                        data-testid={`chief-question-input-${step}`}
-                        className={FORM_CONTROL_CLS}
-                        placeholder={t('输入你的回答')}
-                        value={draft?.kind === 'choices' ? draft.otherText : ''}
-                        disabled={!pending}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setDrafts((prev) => {
-                            const current = prev[step];
-                            if (current?.kind !== 'choices') return prev;
-                            return replaceQuestionDraft(prev, step, {
-                              ...current,
-                              otherText: value,
-                            });
-                          });
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
-          <div className="flex flex-none flex-wrap items-center gap-2 px-3.5 py-1.5">
-            {hintText !== '' && (
-              <span data-testid="chief-question-hint" className={HINT_CLS}>
-                {hintText}
-              </span>
-            )}
-            <Button
-              className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
-              disabled={!primaryEnabled}
-              onClick={advance}
-            >
-              {last ? t('提交回答') : t('下一步')}
-              <ShortcutHint
-                keys={['mod', 'enter']}
-                className="@max-md:hidden pointer-coarse:hidden ml-1"
-              />
-            </Button>
-          </div>
+          {composer === undefined && (
+            <div className="flex flex-none flex-wrap items-center gap-2 px-3.5 py-1.5">
+              {hintText !== '' && (
+                <span data-testid="chief-question-hint" className={HINT_CLS}>
+                  {hintText}
+                </span>
+              )}
+              <Button
+                className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
+                disabled={!primaryEnabled}
+                onClick={advance}
+              >
+                {last ? t('提交回答') : t('下一步')}
+                <ShortcutHint
+                  keys={['mod', 'enter']}
+                  className="@max-md:hidden pointer-coarse:hidden ml-1"
+                />
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>

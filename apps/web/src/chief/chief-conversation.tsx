@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
@@ -24,6 +25,7 @@ import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
+import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -74,6 +76,7 @@ import {
 import { ChiefQuestionDock, useQuestionDockVisible } from './chief-question-dock.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
+import { questionDockState } from './question-dock-state.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
@@ -212,6 +215,10 @@ export function ChiefConversation({
       : chief.running === true
         ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
         : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const answering = questionAttached ? questionDockState.primary() : null;
+  const shownPlaceholder =
+    answering !== null ? t('输入你自己的回答，或留空使用选中的选项') : composerPlaceholder;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -726,7 +733,7 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} />
+        <ChiefQuestionDock home={home} composer={{ text: wire.draft, setText: wire.setDraft }} />
         {composerReplacement ?? (
           <>
             {composerError != null && (
@@ -765,14 +772,28 @@ export function ChiefConversation({
                   readOnly={onSend == null}
                   value={wire.draft}
                   onChange={wire.handleChange}
-                  onKeyDown={wire.handleKeyDown}
+                  onKeyDown={(event) => {
+                    if (
+                      answering !== null &&
+                      event.key === 'Enter' &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing &&
+                      !wire.slashOpen &&
+                      !wire.inlineOpen
+                    ) {
+                      event.preventDefault();
+                      answering.advance();
+                      return;
+                    }
+                    wire.handleKeyDown(event);
+                  }}
                   onPaste={handlePaste}
                   onKeyUp={handleCaretMoved}
                   onClick={handleCaretMoved}
                   onSelect={handleCaretMoved}
                   onCompositionEnd={handleCompositionEnd}
                   onBlur={handleBlur}
-                  placeholder={composerPlaceholder}
+                  placeholder={shownPlaceholder}
                   {...(inlineOpen
                     ? {
                         role: 'combobox',
@@ -800,7 +821,7 @@ export function ChiefConversation({
                     data-testid="chief-composer-placeholder"
                     className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 pt-0.5 font-sans text-card-title tabular-nums text-(--text-tertiary)"
                   >
-                    {composerPlaceholder}
+                    {shownPlaceholder}
                   </span>
                 )}
                 <MentionHighlight
@@ -902,7 +923,17 @@ export function ChiefConversation({
                     {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
                   </span>
                 )}
-                {stopMode ? (
+                {answering !== null ? (
+                  <Button
+                    data-testid="chief-question-primary"
+                    className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
+                    disabled={!answering.enabled}
+                    onClick={answering.advance}
+                  >
+                    {answering.last ? t('提交回答') : t('下一步')}
+                    <ShortcutHint keys={['mod', 'enter']} className="pointer-coarse:hidden ml-1" />
+                  </Button>
+                ) : stopMode ? (
                   <Button
                     variant="ghost"
                     size="icon"
