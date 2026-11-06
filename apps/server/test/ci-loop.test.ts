@@ -1,5 +1,10 @@
 import { rm } from 'node:fs/promises';
-import { conversationBranch, type Phase, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
+import {
+  conversationBranch,
+  type Phase,
+  parseVerifyPromptMeta,
+  RESEARCH_STUCK_SOURCE_KIND,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -904,6 +909,56 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(w.todoRow().phase).toBe('review');
     expect(w.fixRoundSteps()).toHaveLength(0);
     expect(w.todoRow().hasChanges).toBe(true);
+  });
+
+  test('green queues one verify step bound to the delivered head; a CI fix round is verified again on its own head', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    seedSessionRoute(w.s);
+    const delivered = 'ab'.repeat(20);
+    const fixed = headOf(w.prNumber);
+    w.s.db
+      .update(stepTable)
+      .set({ checkpointCommit: delivered })
+      .where(eq(stepTable.buildId, w.buildId))
+      .run();
+    await w.poller.sweep();
+    const verifies = () => w.allSteps().filter((row) => row.kind === 'verify');
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(1);
+    expect(parseVerifyPromptMeta(verifies()[0]?.prompt ?? null)?.expectedHeadSha).toBe(delivered);
+
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: w.base + 1 })
+      .where(eq(stepTable.id, verifies()[0]?.id ?? ''))
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-ci-fix-after-verify',
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: fixed,
+        finishedAt: w.base + 3_000,
+        createdAt: w.base + 2_000,
+      })
+      .run();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
+    const restarted = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.fetch },
+    );
+    await restarted.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(2);
+    expect(verifies().map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha)).toEqual(
+      expect.arrayContaining([delivered, fixed]),
+    );
+    await w.poller.sweep();
+    expect(verifies()).toHaveLength(2);
   });
 
   test('after green the candidate leaves the grind-green set: another sweep no longer reads checks (moves to the #1403 reconcile surface)', async () => {

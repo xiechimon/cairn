@@ -51,9 +51,9 @@ const getJson = async (url) => {
   if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
   return res.json();
 };
-const postJson = async (url, body) => {
+const postJson = async (url, body, method = 'POST') => {
   const res = await fetch(url, {
-    method: 'POST',
+    method,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(8000),
@@ -90,11 +90,10 @@ await postJson(`${API}/api/teams/${teamId}/providers`, {
   compat: { supportsDeveloperRole: false },
   models: [{ id: 'stub-model', name: 'stub-model' }],
 }).catch(() => {});
-const agent = await postJson(`${API}/api/teams/${teamId}/agents`, {
-  displayName: 'detail-pane-probe',
+const agent = await postJson(`${API}/api/teams/${teamId}/routing-rules/session`, {
   provider: 'stub-gw',
   modelId: 'stub-model',
-});
+}, 'PATCH');
 const agentId = agent.id ?? agent.agentId ?? agent.record?.id;
 const project = await postJson(`${API}/api/projects`, { name: '详情 pane 探针', teamId });
 const projectId = project.id ?? project.record?.id;
@@ -158,7 +157,6 @@ try {
 
   await postJson(`${API}/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: { agentId }, build: { agentId } },
     withPlan: true,
   }).catch(() => {});
   const afterBuild = await getJson(`${API}/api/todos/${todoId}`);

@@ -28,6 +28,7 @@ import {
   hasMessageRow,
   lastPushedCheckpoint,
   maybeEnqueueIndependentReview,
+  maybeEnqueueVerifyStep,
   roundStart,
   stopUnclaimedGateSteps,
   toBuildRecord,
@@ -989,6 +990,23 @@ export function createCiPoller(
     }
     setTodoPhase(deps, cand.todoId, 'review');
     maybeEnqueueIndependentReview(deps, todoRow, cand.buildId);
+    const lastVerifyAt = deps.db
+      .select({ at: step.createdAt })
+      .from(step)
+      .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
+      .orderBy(desc(step.createdAt))
+      .get()?.at;
+    maybeEnqueueVerifyStep(deps, todoRow, cand.buildId, {
+      reverify:
+        lastVerifyAt !== undefined &&
+        hasMessageRow(
+          deps,
+          cand.buildId,
+          'system',
+          CI_MERGE_CONFLICT_VERIFY_NOTE,
+          lastVerifyAt + 1,
+        ),
+    });
     tally.advanced += 1;
   }
 

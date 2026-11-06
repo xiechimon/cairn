@@ -19,6 +19,7 @@ import { systemGitOps } from '../src/lib/git.js';
 import { MERGE_NOT_LANDED_NOTE } from '../src/services/machines.js';
 import {
   bootServer,
+  dropQueuedVerify,
   issueApiKey,
   seedSessionRoute,
   startLegacyBuild,
@@ -312,6 +313,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
       hasChanges: true,
       commit: convSha,
     });
+    dropQueuedVerify(w.s, buildId);
     const todoNow = () => w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
     expect(todoNow().phase).toBe('review');
 
@@ -354,6 +356,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
     const buildStep = await w.claim();
     const convSha = await fakePushConvBranch(w.repoDir, `cairn/conv-${buildId}`);
     await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-1', commit: convSha });
+    dropQueuedVerify(w.s, buildId);
     await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     const mergeStep = await w.claim();
     await fakePushConvBranch(w.repoDir, 'main');
@@ -388,6 +391,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
       hasChanges: true,
       commit: convSha,
     });
+    dropQueuedVerify(w.s, buildId);
     const mainBefore = await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main');
     expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
       202,
@@ -464,6 +468,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
       hasChanges: true,
       commit: convSha,
     });
+    dropQueuedVerify(w.s, buildId);
     expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
       202,
     );

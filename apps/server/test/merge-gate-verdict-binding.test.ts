@@ -22,6 +22,7 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import {
   bootServer,
+  dropQueuedVerify,
   issueApiKey,
   postProject,
   seedRoute,
@@ -260,6 +261,7 @@ async function reachReviewGate(w: World): Promise<string> {
   const claimed = await w.claim();
   expect(claimed.kind).toBe('session');
   await w.done(claimed.stepId, { status: 'success', hasChanges: true, commit: HEAD });
+  dropQueuedVerify(w.s, buildId);
   return buildId;
 }
 

@@ -16,6 +16,7 @@ import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
 import {
   bootServer,
+  dropQueuedVerify,
   issueApiKey,
   postProject,
   seedRoute,
@@ -250,6 +251,7 @@ async function driveToDeadlock(
     hasChanges: true,
     ...(commit !== null ? { commit } : {}),
   });
+  dropQueuedVerify(w.s, buildId);
   expect(w.todoRow().phase).toBe('review');
   const reviewRes = await w.startReview(buildId);
   expect(reviewRes.status).toBe(202);

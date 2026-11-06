@@ -13,7 +13,7 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
-import { ROUTING_SETTINGS_HREF } from '../resources/routing-settings-page.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/routing-settings-page.js';
 import { ChiefQuestionEntry } from './chief-question-panel.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
@@ -122,7 +122,7 @@ export function ChiefSettings({
                   SETTINGS_ROW_CLS,
                   "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 border-b border-border text-left text-ui font-normal text-foreground hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent [&_svg:first-child]:text-content-tertiary [&_svg:not([class*='size-'])]:size-auto",
                 )}
-                onClick={() => navigate(ROUTING_SETTINGS_HREF)}
+                onClick={() => navigate(COORDINATOR_ROUTING_HREF)}
               >
                 {boundAgent != null ? (
                   boundAgent.avatarUrl != null ? (

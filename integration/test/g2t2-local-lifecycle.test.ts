@@ -24,12 +24,12 @@ import { enqueueLocalMerge } from '../../apps/server/src/services/local-merge.js
 import { localGateFacts } from '../../apps/server/src/services/local-merge-facts.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
   type RealServer,
   seedWorld,
+  startLegacyBuild,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -162,13 +162,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
     projectId = world.projectId;
     todoId = world.todoId;
 
-    const started = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(started.status).toBe(201);
-    buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
+    buildId = startLegacyBuild(server, todoId, { withPlan: true });
 
     await waitFor(() => server.todoPhase(todoId) === 'confirm', 120_000);
 
@@ -225,13 +219,7 @@ describe('G2-T2 local form full lifecycle (spec 12: mirror clone + push back to 
         mergePolicy: 'human',
       },
     );
-    const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
-      todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(started.status).toBe(201);
-    const dirtyBuildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
+    const dirtyBuildId = startLegacyBuild(server, world.todoId, { withPlan: true });
 
     await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
     await api(server.url, 'POST', `/api/builds/${dirtyBuildId}/steps`, { action: 'confirm' });

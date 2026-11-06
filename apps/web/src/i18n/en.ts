@@ -1528,6 +1528,10 @@ export const EN: Record<string, string> = {
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
   '还没有路由规则。': 'No routing rules yet.',
+  '先创建 Coordinator 规则，它才能回答你的消息。':
+    'Create the Coordinator rule first so it can answer your messages.',
+  '这条路由还没有规则，选好运行时与模型后创建。':
+    'This route has no rule yet; pick a runtime and model, then create it.',
   不填则沿用规则的机器: 'Leave empty to keep the rule machine',
   '跟随 coordinator 路由规则，在路由设置里调整。':
     'Follows the coordinator routing rules; adjust them in routing settings.',
@@ -1536,8 +1540,6 @@ export const EN: Record<string, string> = {
   '把固定在这台机器上的路由规则一起迁到另一台机器。':
     'Move the routing rules pinned to this machine to another machine.',
   引文检查: 'Citation check',
-  '重启服务器会写入默认的 session 规则与工作策略。':
-    'Restarting the server writes the default session rule and work policy.',
   'Agent 已由路由规则取代': 'Agents are replaced by routing rules',
   '模型、机器和权限现在由工作路由规则与工作策略决定。':
     'Models, machines and permissions are now set by work routing rules and work policies.',

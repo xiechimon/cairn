@@ -22,6 +22,7 @@ import {
   build as buildTable,
   machine as machineTable,
   routingRule,
+  step as stepTable,
   todo as todoTable,
   workPolicy,
 } from '../src/db/schema.js';
@@ -455,6 +456,19 @@ export function startLegacyBuild(
   enqueueStep(s.svc, id, opts.withPlan ? 'plan' : 'build', todoRow.teamId, opts.prompt);
   setTodoPhase(s.svc, todoId, 'queued', { latestBuildId: id, lastRunAt: createdAt });
   return id;
+}
+
+export function dropQueuedVerify(s: TestServer, buildId: string): void {
+  s.db
+    .delete(stepTable)
+    .where(
+      and(
+        eq(stepTable.buildId, buildId),
+        eq(stepTable.kind, 'verify'),
+        eq(stepTable.status, 'pending'),
+      ),
+    )
+    .run();
 }
 
 export function machineIdByName(s: TestServer, name: string): string {

@@ -307,7 +307,11 @@ describe('removing the agent table from a seeded legacy install', () => {
     };
     world.sqlite.close();
     const opened = openDbWithHandle(world.dbPath);
-    expect(seedDefaultRouting(opened.db)).toEqual({ sessionRules: 0, policies: 0 });
+    expect(seedDefaultRouting(opened.db)).toEqual({
+      sessionRules: 0,
+      coordinatorRules: 0,
+      policies: 0,
+    });
     opened.close();
     const again = new Database(world.dbPath);
     expect({

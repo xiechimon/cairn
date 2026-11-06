@@ -22,6 +22,8 @@ import {
   buildReviewStepPrompt,
   buildReworkNewBranchNote,
   buildReworkReuseNote,
+  buildTaskPromptText,
+  buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
   checkPlanContract,
   conversationBranch,
@@ -47,6 +49,7 @@ import {
   SESSION_REWORK_BRIEF,
   STOP_MESSAGE,
   type TodoOutputKind,
+  VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
   withRetryLessons,
@@ -1123,6 +1126,48 @@ export function startBuilds(
 function ticketRefOf(todoRow: { sourceRef: string | null; seqNum: number }): string {
   const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   return String(linked?.issueNumber ?? todoRow.seqNum);
+}
+
+export function maybeEnqueueVerifyStep(
+  deps: BuildDeps,
+  todoRow: typeof todo.$inferSelect,
+  buildId: string,
+  opts: { reverify?: boolean } = {},
+): void {
+  if (routeForStep(deps.db, todoRow, 'verify') === null) return;
+  const expectedHeadSha = dispatchHeadSha(deps, buildId);
+  if (expectedHeadSha === null) return;
+  if (blockingWorkerQuestions(deps.db, buildId).length > 0) return;
+  const existing = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'verify'),
+        opts.reverify === true
+          ? inArray(step.status, ['pending', 'claimed', 'waiting_quota'])
+          : or(
+              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+              gte(step.createdAt, roundStart(deps, buildId)),
+            ),
+      ),
+    )
+    .get();
+  if (existing !== undefined) return;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (buildRow === undefined) return;
+  const planRow = latestPlanRow(deps, buildId);
+  const prompt = buildVerifyStepPrompt({
+    ticketRef: ticketRefOf(todoRow),
+    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
+    planText: planRow?.content ?? '',
+    verificationItems: planVerificationItems(planRow?.content ?? ''),
+    pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+    expectedHeadSha,
+  });
+  insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
+  enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
 }
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
@@ -2842,6 +2887,7 @@ export function completeStep(
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
       });
+      maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
       return;
     }
     if (todoRow.phase === 'building' || canTransitionPhase(todoRow.phase, 'building')) {
