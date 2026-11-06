@@ -279,6 +279,8 @@ function evaluate(repo, number) {
       body: `${result.block}\nReview-gate: ${result.title}`,
     });
   writeCheck(repo, sha, check, result, stateEntry?.comment.html_url);
+  if (result.conclusion === 'failure' && pr.labels.some((label) => label.name === QUEUED_LABEL))
+    ghWrite('POST', `repos/${repo}/issues/${number}/comments`, { body: '@mergifyio dequeue' });
 
   const stalled = pr.labels.some((label) => label.name === STALL_LABEL);
   if (result.addStall && !stalled)
