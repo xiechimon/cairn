@@ -11,11 +11,13 @@ import {
   type TagRecord,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
+import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { agent, type agentMemory, apiKey, project, type tag } from './db/schema.js';
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
+import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
 import { productionHarnessEvalConfig } from './services/harness-eval-production.js';
 
@@ -132,8 +134,8 @@ export async function jsonBody(c: { req: { json(): Promise<unknown> } }): Promis
   return c.req.json().catch(() => null);
 }
 
-export function requestOrigin(c: { req: { url: string } }): string {
-  return new URL(c.req.url).origin;
+export function requestOrigin(c: Context): string {
+  return tailnetOriginOf(c) ?? new URL(c.req.url).origin;
 }
 
 export function verifyGitBasicAuth(ctx: AppContext, header: string): string | undefined {

@@ -453,6 +453,11 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       requireToken,
       auth,
       tailscaleUsers,
+      tsnet,
+      tsnetBinary,
+      tsnetHostname,
+      tsnetUploadLogs,
+      tsnetControlUrl,
       mcpConfig,
       skillsDir,
       customModelReasoning,
@@ -486,6 +491,11 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
     expect(auth).toBe('CAIRN_AUTH');
     expect(tailscaleUsers).toBe('CAIRN_TAILSCALE_USERS');
+    expect(tsnet).toBe('CAIRN_TSNET');
+    expect(tsnetBinary).toBe('CAIRN_TSNET_BINARY');
+    expect(tsnetHostname).toBe('CAIRN_TSNET_HOSTNAME');
+    expect(tsnetUploadLogs).toBe('CAIRN_TSNET_UPLOAD_LOGS');
+    expect(tsnetControlUrl).toBe('CAIRN_TSNET_CONTROL_URL');
     expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
     expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');

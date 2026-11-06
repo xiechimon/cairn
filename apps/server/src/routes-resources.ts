@@ -26,6 +26,7 @@ import {
   createApiKeyBodySchema,
   jsonBody,
   patchSecretBodySchema,
+  requestOrigin,
   requireTeam,
   svcOf,
 } from './routes-helpers.js';
@@ -433,7 +434,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/providers/oauth/:preset/authorize', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const origin = c.req.header('origin') ?? new URL(c.req.url).origin;
+    const origin = c.req.header('origin') ?? requestOrigin(c);
     try {
       const { authorizationUrl } = startOAuthAuthorize(oauthDeps(), {
         teamId,
@@ -503,7 +504,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/github/oauth/authorize', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const origin = c.req.header('origin') ?? new URL(c.req.url).origin;
+    const origin = c.req.header('origin') ?? requestOrigin(c);
     try {
       const { authorizationUrl } = startGithubConnectionAuthorize(oauthDeps(), {
         teamId,
