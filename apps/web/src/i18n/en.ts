@@ -1834,4 +1834,6 @@ export const EN: Record<string, string> = {
   拉取请求: 'Pull requests',
   'PR 列表加载失败，稍后会自动重试。': 'Could not load the PR list; retrying shortly.',
   '任务开出 PR 后会列在这里。': 'PRs opened by threads are listed here.',
+  '连接断开，正在重连…': 'Connection lost, reconnecting…',
+  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };
