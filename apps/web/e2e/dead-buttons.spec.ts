@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { stubLiveApiKeys } from './helpers.js';
 
 test('feedback route is gone — old URL redirects to the home', async ({ page }) => {
   await page.goto('/app/feedback');
@@ -88,6 +89,7 @@ test('composer toolbar drops the `语音输入` button, keeps attachment', async
 });
 
 test('api-keys empty state drops the `查看文档` button, keeps `新建密钥` (#307)', async ({ page }) => {
+  await stubLiveApiKeys(page);
   await page.goto('/app/api-keys');
 
   const keysEmpty = page.getByTestId('keys-empty');

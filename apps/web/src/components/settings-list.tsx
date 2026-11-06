@@ -82,7 +82,7 @@ export function SettingsCard({ className, children }: { className?: string; chil
 
 interface SettingsRowProps {
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   className?: string;
   labelClassName?: string;
   hintClassName?: string;

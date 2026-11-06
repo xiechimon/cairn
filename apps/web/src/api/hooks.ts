@@ -33,6 +33,8 @@ import type {
   NotificationRecord,
   NotificationsResponse,
   OAuthAuthorizeResponse,
+  PairedDevice,
+  PairingCodeResponse,
   PatchAutonomyBody,
   PatchChiefBody,
   PatchMachineBody,
@@ -49,6 +51,7 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  RemoteRoutesResponse,
   RetroProposal,
   ScheduleRecord,
   SearchResponse,
@@ -469,6 +472,39 @@ export const useApiKeys = (teamId: string | undefined, enabled: boolean) =>
     queryFn: () => api.get<ApiKeyRow[]>(`/api/teams/${teamId}/api-keys`),
     enabled: enabled && teamId !== undefined,
   });
+
+const REMOTE_POLL_MS = 10_000;
+const DEVICES_POLL_MS = 3_000;
+
+export const useRemoteRoutes = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['remoteRoutes'],
+    queryFn: () => api.get<RemoteRoutesResponse>('/api/remote/routes'),
+    enabled,
+    refetchInterval: REMOTE_POLL_MS,
+  });
+
+export const useRemoteDevices = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['remoteDevices'],
+    queryFn: () => api.get<PairedDevice[]>('/api/remote/devices'),
+    enabled,
+    retry: false,
+    refetchInterval: DEVICES_POLL_MS,
+  });
+
+export function useRemoteMutations() {
+  const queryClient = useQueryClient();
+  return {
+    createPairingCode: useMutation({
+      mutationFn: () => api.post<PairingCodeResponse>('/api/remote/pairing', {}),
+    }),
+    revokeDevice: useMutation({
+      mutationFn: (id: string) => api.del<void>(`/api/remote/devices/${encodeURIComponent(id)}`),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['remoteDevices'] }),
+    }),
+  };
+}
 
 export const useMcpServers = (teamId: string | undefined, enabled: boolean) =>
   useQuery({

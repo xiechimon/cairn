@@ -274,6 +274,7 @@ export interface MachineRow {
   kind?: 'local' | 'remote';
   name: string;
   online?: boolean;
+  lastSeenAt?: number | null;
   pill?: string;
   enabledRuntimes?: string[];
   chiefHost?: boolean;

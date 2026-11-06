@@ -18,6 +18,7 @@ import type { AppContext } from './context.js';
 import { message, plan as planTable, todo, tokenUsage } from './db/schema.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requestOrigin, requireProject, svcOf } from './routes-helpers.js';
 import {
   createBranchSync,
@@ -46,6 +47,7 @@ import {
 } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { readMergeGateState } from './services/merge-gate-run.js';
+import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { holdSecondRejectionRework } from './services/research-stuck.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
@@ -135,16 +137,23 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         stream.writeSSE({ data: JSON.stringify(payload) }),
       );
       const unsubscribe = ctx.convHub?.subscribe(conversationId, conn) ?? (() => {});
+      const deviceId = pairedDeviceIdOf(c);
       const timer = setInterval(() => {
+        if (deviceId !== null && !pairedDeviceExists(ctx.db, deviceId)) {
+          stream.abort();
+          return;
+        }
         void conn.send({ type: 'ping', seq: conn.nextSeq() });
       }, ctx.pingIntervalMs);
       let release: () => void = () => {};
       const held = new Promise<void>((resolve) => {
         release = resolve;
       });
+      const unbindDevice = deviceStreams.bind(deviceId, () => stream.abort());
       stream.onAbort(() => {
         clearInterval(timer);
         unsubscribe();
+        unbindDevice();
         release();
       });
       await conn.send({ type: 'ping', seq: conn.nextSeq() });

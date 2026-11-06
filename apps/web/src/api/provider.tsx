@@ -22,6 +22,7 @@ export interface LiveData {
   teamId: string | undefined;
   userName: string;
   user: CurrentUser;
+  teamsQuery: { isError: boolean; isFetching: boolean; refetch: () => unknown } | undefined;
 }
 
 const LiveDataContext = createContext<LiveData>({
@@ -29,6 +30,7 @@ const LiveDataContext = createContext<LiveData>({
   teamId: undefined,
   userName: '我',
   user: FIXTURE_USER,
+  teamsQuery: undefined,
 });
 
 export function useLiveData(): LiveData {
@@ -67,8 +69,9 @@ export function LiveDataBridge() {
             avatarUrl: session.data?.avatarUrl ?? null,
           }
         : FIXTURE_USER,
+      teamsQuery: live ? teams : undefined,
     }),
-    [live, teamId, session.data],
+    [live, teamId, session.data, teams],
   );
   const scenarioId =
     live || !SCENARIOS_ENABLED ? null : new URLSearchParams(search).get(SCENARIO_PARAM);

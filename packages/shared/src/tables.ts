@@ -19,6 +19,7 @@ export const DB_TABLES = [
   'provider',
   'secret',
   'api_key',
+  'paired_device',
   'machine',
   'token_usage',
   'chief',
@@ -68,6 +69,7 @@ export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
+  'paired_device',
   'branch_sync',
   'stop_pending',
   'queued_message',

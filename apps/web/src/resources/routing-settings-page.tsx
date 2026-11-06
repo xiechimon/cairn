@@ -17,6 +17,7 @@ import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { EmptyState } from '../components/empty-state.js';
+import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -309,72 +310,81 @@ export function RoutingSettingsPage() {
     );
   return (
     <PageShell route={ROUTING_SETTINGS_HREF} title={t('工作路由')} fixture={fixture}>
-      <div className="flex flex-col gap-6">
-        {empty && (
-          <EmptyState
-            testId="routing-settings-empty"
-            className="mt-2"
-            icon={Route}
-            title={t('还没有路由规则。')}
-            description={t('先创建 Coordinator 规则，它才能回答你的消息。')}
-          />
-        )}
-        {(settings.rules.length > 0 || missingUses.length > 0) && (
-          <div className="flex flex-col gap-4">
-            <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
-              {t('路由规则')}
-            </h2>
-            {settings.rules.map((rule) => (
-              <RuleEditor
-                key={rule.id}
-                use={rule.use}
-                rule={rule}
-                machines={machines}
-                options={modelOptions}
-                live={live}
-                onSave={live ? (body) => saveRule(rule.use, body) : undefined}
-              />
-            ))}
-            {missingUses.map((use) => (
-              <RuleEditor
-                key={`new-${use}`}
-                use={use}
-                rule={null}
-                machines={machines}
-                options={modelOptions}
-                live={live}
-                onSave={live ? (body) => saveRule(use, body) : undefined}
-              />
-            ))}
-          </div>
-        )}
-        {settings.policies.length > 0 && (
-          <div className="flex flex-col gap-4">
-            <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
-              {t('工作策略')}
-            </h2>
-            {settings.policies.map((policy) => (
-              <PolicyEditor
-                key={policy.id}
-                policy={policy}
-                live={live}
-                onSave={
-                  live
-                    ? (body) =>
-                        mutations.patchPolicy.mutate(
-                          { use: policy.use, body },
-                          {
-                            onSuccess: () => toastSuccess(t('规则已保存')),
-                            onError: (error) => toastError(t('保存失败，请重试。'), error),
-                          },
-                        )
-                    : undefined
-                }
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <QueryBoundary
+        query={live ? settingsQ : undefined}
+        isEmpty={live && settingsQ.data === undefined}
+        loadingLabel={t('正在加载工作路由')}
+        errorTitle={t('工作路由没能加载')}
+        className="mt-6"
+        empty={null}
+      >
+        <div className="flex flex-col gap-6">
+          {empty && (
+            <EmptyState
+              testId="routing-settings-empty"
+              className="mt-2"
+              icon={Route}
+              title={t('还没有路由规则。')}
+              description={t('先创建 Coordinator 规则，它才能回答你的消息。')}
+            />
+          )}
+          {(settings.rules.length > 0 || missingUses.length > 0) && (
+            <div className="flex flex-col gap-4">
+              <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
+                {t('路由规则')}
+              </h2>
+              {settings.rules.map((rule) => (
+                <RuleEditor
+                  key={rule.id}
+                  use={rule.use}
+                  rule={rule}
+                  machines={machines}
+                  options={modelOptions}
+                  live={live}
+                  onSave={live ? (body) => saveRule(rule.use, body) : undefined}
+                />
+              ))}
+              {missingUses.map((use) => (
+                <RuleEditor
+                  key={`new-${use}`}
+                  use={use}
+                  rule={null}
+                  machines={machines}
+                  options={modelOptions}
+                  live={live}
+                  onSave={live ? (body) => saveRule(use, body) : undefined}
+                />
+              ))}
+            </div>
+          )}
+          {settings.policies.length > 0 && (
+            <div className="flex flex-col gap-4">
+              <h2 className="m-0 px-1 text-card-title font-medium text-foreground">
+                {t('工作策略')}
+              </h2>
+              {settings.policies.map((policy) => (
+                <PolicyEditor
+                  key={policy.id}
+                  policy={policy}
+                  live={live}
+                  onSave={
+                    live
+                      ? (body) =>
+                          mutations.patchPolicy.mutate(
+                            { use: policy.use, body },
+                            {
+                              onSuccess: () => toastSuccess(t('规则已保存')),
+                              onError: (error) => toastError(t('保存失败，请重试。'), error),
+                            },
+                          )
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </QueryBoundary>
     </PageShell>
   );
 }

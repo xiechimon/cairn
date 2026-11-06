@@ -16,8 +16,10 @@ import { type agentMemory, apiKey, project, type tag } from './db/schema.js';
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
 import { productionHarnessEvalConfig } from './services/harness-eval-production.js';
+import { assertDeviceActive } from './services/paired-devices.js';
 
 export const SESSION_COOKIE = BRAND.sessionCookieName;
 
@@ -90,8 +92,10 @@ export function toMemoryRecord(row: typeof agentMemory.$inferSelect): MemoryReco
   };
 }
 
-export async function jsonBody(c: { req: { json(): Promise<unknown> } }): Promise<unknown> {
-  return c.req.json().catch(() => null);
+export async function jsonBody(c: Context): Promise<unknown> {
+  const body = await c.req.json().catch(() => null);
+  assertDeviceActive(pairedDeviceIdOf(c));
+  return body;
 }
 
 export function requestOrigin(c: Context): string {
