@@ -150,7 +150,7 @@ test('a protected path does not get the owner-route label', (t) => {
 });
 
 test('a protected path loses a stale owner-route label', (t) => {
-  const gh = fakeGh(t, { labels: ['owner-route', 'review-gate'] });
+  const gh = fakeGh(t, { labels: ['owner-route', 'bug'] });
   const result = routeLabelling(repoWith(t, protectedChange), gh);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.equal(gh.writes().length, 1);
@@ -166,7 +166,7 @@ test('a queueable head loses a stale owner-route label', (t) => {
 });
 
 test('a queueable head without the label is not written', (t) => {
-  const gh = fakeGh(t, { labels: ['review-gate'] });
+  const gh = fakeGh(t, { labels: ['bug'] });
   const result = routeLabelling(repoWith(t, queueableChange), gh);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.deepEqual(gh.writes(), []);

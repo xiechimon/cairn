@@ -113,6 +113,7 @@ test('a PR the coordinator holds never enters the queue', () => {
   for (const name of ['default', 'bot']) {
     const [queue] = rules[name].split('    merge_conditions:\n');
     assert.match(queue, /- -label = coordinator-hold\n/, name);
+    assert.doesNotMatch(queue, /needs-decision/, name);
   }
 });
 

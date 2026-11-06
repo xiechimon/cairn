@@ -15,7 +15,7 @@ test('merge instructions require the pr-gate auto-merge verdict', () => {
       guidance
         .split('\n')
         .includes(
-          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (path class does not route to ian), ${tasks} and no \`needs-decision\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
+          `- Both paths require a pr-gate go with \`mergedBy: 'auto-merge'\` (path class does not route to ian), ${tasks} and no \`coordinator-hold\` label. After merging, verify the resulting main commit's author and its \`commit-author\` Actions result.`,
         ),
       file,
     );
@@ -36,27 +36,25 @@ test('the security review is not part of the merge route', () => {
   assert.doesNotMatch(agents, /Codex `security_review` state on the exact head/);
 });
 
-test('AGENTS.md and pr-cairn agree that agents never add needs-decision', () => {
+test('AGENTS.md and pr-cairn agree that coordinator-hold is the only hold label', () => {
   for (const file of ['AGENTS.md', '.claude/skills/pr-cairn/SKILL.md']) {
     const guidance = readFileSync(join(ROOT, file), 'utf8');
-    assert.ok(!guidance.includes('--add-label needs-decision'), file);
-    assert.match(guidance, /[Nn]ever add the `needs-decision` label/, file);
+    assert.ok(!guidance.includes('needs-decision'), file);
     assert.match(guidance, /decide by [^\n]*recommendation[^\n]*say [^\n]*chat/i, file);
     assert.ok(guidance.includes('gh pr merge <n> --disable-auto'), file);
     assert.ok(guidance.includes("mergedBy: 'auto-merge'"), file);
   }
 });
 
-test('active docs never tell agents to add needs-decision', () => {
+test('active docs never mention the retired needs-decision label', () => {
   for (const file of [
     'AGENTS.md',
     '.claude/skills/pr-cairn/SKILL.md',
     'docs/pr-review.md',
-    'docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md',
+    'docs/ops/agent-bot-identity.md',
   ]) {
     const guidance = readFileSync(join(ROOT, file), 'utf8');
-    assert.ok(!guidance.includes('--add-label needs-decision'), file);
-    assert.doesNotMatch(guidance, /(?<![Nn]ever )\badd(?:s|ing)? (?:the )?`needs-decision`/, file);
+    assert.ok(!guidance.includes('needs-decision'), file);
   }
 });
 

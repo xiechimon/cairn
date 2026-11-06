@@ -640,7 +640,7 @@ test('missing state requires an explicit start without creating a fresh state', 
 });
 
 test('paused: every human-wait label on issues or open linked PRs takes priority over failure', async () => {
-  for (const label of ['needs-decision', 'waits-ian', 'ready-for-human']) {
+  for (const label of ['waits-ian', 'ready-for-human']) {
     for (const onPull of [false, true]) {
       const { state, invoke } = harness();
       state.stdout = 'no match';
@@ -658,7 +658,7 @@ test('closed linked PR labels do not pause, while explicit pause does', async ()
   const { state, invoke } = harness();
   state.stdout = 'no match';
   state.issues[0].closedByPullRequestsReferences = connection([
-    { number: 88, state: 'CLOSED', labels: connection([{ name: 'needs-decision' }]) },
+    { number: 88, state: 'CLOSED', labels: connection([{ name: 'waits-ian' }]) },
   ]);
   expectState(await invoke(), 'incomplete', 10);
   expectState(await invoke(['--pause', 'quota wait', '--fail', 'stop']), 'failed', 30, /stop/);
