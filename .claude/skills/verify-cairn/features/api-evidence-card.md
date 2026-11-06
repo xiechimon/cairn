@@ -38,5 +38,5 @@ Outputs in the evidence directory: `calls.txt` (the real transcript), `calls.png
 
 - `calls.png` is a text-viewer capture of the real transcript, not a Swagger or Postman window. Prefer a screenshot of the real product UI or API tool when one exists, and use this capture when the change has no UI.
 - Auth on the isolated stack is off, so a card cannot show per-user isolation; list that under `Not covered:`.
-- The Before row needs a second stack on the base commit. Name it under `Live:`; if only a log line shows the old behavior, say so under `Mocked:`.
+- The Before row needs a second stack on the base branch (or a read-only call to production), never a stack with your change reverted. Name it under `Live:`; if only a log line shows the old behavior, say so under `Mocked:`.
 - Upload the screenshots to `pr-assets/<pr-number>` as `.claude/skills/pr-cairn/SKILL.md` describes; do not run the driver with `VERIFY_EVIDENCE_DIR` inside `docs/verify/`.

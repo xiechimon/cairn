@@ -610,6 +610,18 @@ class EvidenceCardTests(unittest.TestCase):
         self.assertEqual(result, 1, output)
         self.assertIn('no row with an HTTP status code in the Response column', output)
 
+    def test_an_optional_rollback_line_changes_nothing(self):
+        for rollback in ['Rollback: revert the PR; the table is created empty.', '**Rollback:** drop the column.', '']:
+            with self.subTest(rollback=rollback):
+                lines = self.lines.replace('```\n', rollback + '\n```\n') if rollback and self.lines.endswith('```\n') else self.lines
+                result, output = self.verdict(self.card(lines=lines))
+                self.assertEqual(result, 0, output)
+
+    def test_skill_says_where_the_before_row_comes_from(self):
+        skill = Path('.claude/skills/pr-cairn/SKILL.md').read_text()
+        self.assertIn('base branch or production', skill)
+        self.assertIn('never a reverted copy', skill)
+
     def test_workflow_passes_the_changed_files_to_the_gate(self):
         workflow = Path('.github/workflows/pr-evidence.yml').read_text()
         self.assertIn('--changed-files', workflow)
@@ -617,7 +629,7 @@ class EvidenceCardTests(unittest.TestCase):
     def test_template_and_skill_name_the_card(self):
         for path in ['.github/PULL_REQUEST_TEMPLATE.md', '.claude/skills/pr-cairn/SKILL.md']:
             text = Path(path).read_text()
-            for needle in ['### Requirement', '### Requests', 'Live:', 'Mocked:', 'Not covered:']:
+            for needle in ['### Requirement', '### Requests', 'Live:', 'Mocked:', 'Not covered:', 'Rollback:', 'base branch']:
                 with self.subTest(path=path, needle=needle):
                     self.assertIn(needle, text)
             self.assertNotIn('one line naming the test that fails on main', text)
