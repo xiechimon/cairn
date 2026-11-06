@@ -213,6 +213,19 @@ test('a failing gate on a queued PR posts one extra comment for the dequeue', ()
   assert.equal(queued.commentPosts.length, plain.commentPosts.length + 1);
 });
 
+test('a queued PR whose review inputs cannot be loaded is dequeued', () => {
+  const out = run({
+    pr: { ...basePr, labels: [{ name: 'queued' }] },
+    files: [],
+    checkRuns: [ownRun()],
+  });
+  assert.equal(out.body(out.checkWrites[0]).output.title, 'Cannot determine the review inputs');
+  assert.deepEqual(
+    out.commentPosts.map((call) => out.body(call).body),
+    ['@mergifyio dequeue'],
+  );
+});
+
 test('a forged state comment from another author is ignored', () => {
   const forged = { ...stateComment(SHA, 'completed'), user: { login: 'mallory', type: 'User' } };
   const out = run({ comments: [forged], checkRuns: [] });
