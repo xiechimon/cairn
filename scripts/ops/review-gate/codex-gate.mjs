@@ -8,12 +8,9 @@ import {
   HUMAN_LABEL,
   markPreExisting,
   preExistingThreads,
-  receiptCommit,
-  requiresSecurityReview,
   retryStatus,
   reviewRequested,
   STALL_LABEL,
-  securityReceiptComment,
   shouldSkip,
   trustedStateComment,
   usageLimitHit,
@@ -32,17 +29,6 @@ const THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cu
           diffSide
           comments(first: 1) { nodes { author { login __typename } body url pullRequestReview { body } } }
         }
-        pageInfo { hasNextPage endCursor }
-      }
-    }
-  }
-}`;
-
-const FORCE_PUSH_QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
-  repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) {
-      timelineItems(first: 100, after: $cursor, itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT]) {
-        nodes { ... on HeadRefForcePushedEvent { createdAt } }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -103,61 +89,6 @@ function loadThreads(repo, number) {
     }
     if (!page.pageInfo.hasNextPage) return threads;
     cursor = page.pageInfo.endCursor;
-  }
-}
-
-function loadForcePushes(repo, number) {
-  const [owner, name] = repo.split('/');
-  const events = [];
-  let cursor = null;
-  for (;;) {
-    const args = [
-      'api',
-      'graphql',
-      '-f',
-      `query=${FORCE_PUSH_QUERY}`,
-      '-f',
-      `owner=${owner}`,
-      '-f',
-      `name=${name}`,
-      '-F',
-      `number=${number}`,
-    ];
-    if (cursor) args.push('-f', `cursor=${cursor}`);
-    const page = ghJson(args).data.repository.pullRequest.timelineItems;
-    events.push(...page.nodes);
-    if (!page.pageInfo.hasNextPage) return events;
-    if (typeof page.pageInfo.endCursor !== 'string' || page.pageInfo.endCursor === cursor)
-      throw new Error('Incomplete force-push timeline');
-    cursor = page.pageInfo.endCursor;
-  }
-}
-
-function loadReceiptEvidence(repo, pr, comments, state) {
-  if (
-    state?.commitSha !== pr.head.sha ||
-    state.status !== 'completed' ||
-    state.hasUnresolvedFindings !== null
-  )
-    return null;
-  const prefix = receiptCommit(securityReceiptComment(comments));
-  if (!prefix || !pr.head.sha.startsWith(prefix)) return null;
-  try {
-    const commits = listPaged(`repos/${repo}/pulls/${pr.number}/commits`).map(
-      (commit) => commit.sha,
-    );
-    const resolvedSha = ghJson(['api', `repos/${repo}/commits/${prefix}`]).sha;
-    const forcePushes = loadForcePushes(repo, pr.number);
-    const refMatches =
-      prefix.length === 40
-        ? []
-        : ['heads', 'tags'].flatMap((kind) =>
-            listPaged(`repos/${repo}/git/matching-refs/${kind}/${prefix}`).map((ref) => ref.ref),
-          );
-    return { comments, commits, resolvedSha, forcePushes, refMatches };
-  } catch (error) {
-    console.error(`PR #${pr.number}: cannot prove security receipt provenance: ${error.message}`);
-    return null;
   }
 }
 
@@ -232,7 +163,7 @@ function evaluate(repo, number) {
     writeCheck(repo, sha, check, {
       status: 'completed',
       conclusion: 'failure',
-      title: 'Cannot determine the required security review',
+      title: 'Cannot determine the review inputs',
       summary:
         'The PR file list or review inputs could not be verified. Re-evaluate after the complete file list and review threads are available; a previous successful check cannot qualify this head.',
     });
@@ -242,14 +173,6 @@ function evaluate(repo, number) {
   const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
   const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
-  const needsSecurity = requiresSecurityReview(files);
-  const securityEntry = needsSecurity ? trustedStateComment(comments, 'security_review') : null;
-  const security = needsSecurity
-    ? {
-        state: securityEntry?.state ?? null,
-        receiptEvidence: loadReceiptEvidence(repo, pr, comments, securityEntry?.state),
-      }
-    : null;
   const result = decide(
     pr,
     stateEntry?.state ?? null,
@@ -261,7 +184,6 @@ function evaluate(repo, number) {
       requested: reviewRequested(comments, sha),
     },
     blockRounds(comments, sha),
-    security,
   );
   console.log(
     `PR #${number} ${sha.slice(0, 7)}: ${result.status} ${result.conclusion ?? ''} ${result.title}`,
@@ -295,13 +217,7 @@ function sweep(repo) {
   for (const pr of open) {
     try {
       const check = newestOwnCheck(repo, pr.head.sha);
-      if (check?.status === 'completed' && check.conclusion === 'success') {
-        try {
-          if (!requiresSecurityReview(loadFiles(repo, pr))) continue;
-        } catch (error) {
-          console.error(`PR #${pr.number}: ${error.message}; re-evaluating the check`);
-        }
-      }
+      if (check?.status === 'completed' && check.conclusion === 'success') continue;
       ghWrite('POST', `repos/${repo}/actions/workflows/${GATE_WORKFLOW}/dispatches`, {
         ref: 'main',
         inputs: { pr: String(pr.number) },
