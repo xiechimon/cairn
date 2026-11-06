@@ -38,6 +38,8 @@ import {
   replaceQuestionDraft,
 } from './question-drafts.js';
 
+let mountedComposerCards = 0;
+
 export type ChiefQuestionItem = Extract<ChiefStreamItem, { kind: 'question' }>;
 
 export interface ChiefQuestionCardProps {
@@ -302,10 +304,15 @@ export function ChiefQuestionCard({
   const latestRef = useRef({ composer, drafts, step, questions, pending, commit });
   latestRef.current = { composer, drafts, step, questions, pending, commit };
   useEffect(() => {
-    if (composer !== undefined && pending && composer.text === '') {
-      composer.setText(textOf(drafts[step]));
+    let counted = false;
+    if (composer !== undefined && pending) {
+      const stored = textOf(drafts[step]);
+      if (stored !== '' || mountedComposerCards > 0) composer.setText(stored);
+      mountedComposerCards += 1;
+      counted = true;
     }
     return () => {
+      if (counted) queueMicrotask(() => (mountedComposerCards -= 1));
       const latest = latestRef.current;
       if (latest.composer === undefined || !latest.pending) return;
       const stored = withComposerText(
@@ -345,7 +352,10 @@ export function ChiefQuestionCard({
   }, [step]);
 
   useEffect(() => {
-    if (!pending || composer === undefined) return;
+    if (!pending || composer === undefined) {
+      questionDockState.clearPrimary(item.requestId);
+      return;
+    }
     questionDockState.setPrimary({
       requestId: item.requestId,
       last,

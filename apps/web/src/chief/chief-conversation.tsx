@@ -216,7 +216,8 @@ export function ChiefConversation({
         ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
         : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
-  const answering = questionAttached ? questionDockState.primary() : null;
+  const answerHere = targetPlaceholder === null;
+  const answering = questionAttached && answerHere ? questionDockState.primary() : null;
   const shownPlaceholder =
     answering !== null ? t('输入你自己的回答，或留空使用选中的选项') : composerPlaceholder;
   const { live, teamId } = useLiveData();

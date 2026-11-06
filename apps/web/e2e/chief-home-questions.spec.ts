@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, THREAD } from './chief-home-mock';
+import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 function question(requestId: string, header: string, text: string, options: unknown[]) {
   return {
@@ -627,3 +627,52 @@ for (const size of [
     await submit.click({ trial: true });
   });
 }
+
+test('each pending request keeps its own composer draft when moving A, B, A, B', async ({ page }) => {
+  await mockLive(page, structuredClone(TWO));
+  await page.goto('/app');
+  const composer = page.getByTestId('chief-composer-input');
+  await composer.fill('draft for A');
+  await page.getByTestId('chief-question-next').click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+  await expect(composer).toHaveValue('');
+  await composer.fill('draft for B');
+  await page.getByTestId('chief-question-prev').click();
+  await expect(composer).toHaveValue('draft for A');
+  await page.getByTestId('chief-question-next').click();
+  await expect(composer).toHaveValue('draft for B');
+  await page.getByTestId('chief-question-prev').click();
+  await expect(composer).toHaveValue('draft for A');
+});
+
+test('targeting a thread turns the composer back into a normal send and leaves the question pending', async ({
+  page,
+}) => {
+  const answered: string[] = [];
+  const messaged: unknown[] = [];
+  const withTodo = { ...structuredClone(ONE), todos: [{ ...TASK, phase: 'confirm' }] };
+  await mockLive(page, withTodo, (path, route, json) => {
+    if (path.endsWith('/answer') && route.request().method() === 'POST') {
+      answered.push(path);
+      return json({});
+    }
+    if (/^\/api\/todos\/[^/]+\/messages$/.test(path) && route.request().method() === 'POST') {
+      messaged.push(route.request().postDataJSON());
+      return json({ todoId: 'todo-1', conversationId: 'build-1', delivered: 'revision' }, 201);
+    }
+    return undefined;
+  });
+  await page.goto('/app');
+  const composer = page.getByTestId('chief-composer-input');
+  await expect(page.getByTestId('chief-question-primary')).toBeVisible();
+  await page.getByRole('button', { name: '对某个 thread 说' }).click();
+  await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
+  await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '发送' })).toBeVisible();
+  await expect(composer).not.toHaveAttribute('placeholder', '输入你自己的回答，或留空使用选中的选项');
+  await composer.fill('thread note');
+  await composer.press('Enter');
+  await expect.poll(() => messaged.length).toBe(1);
+  expect(answered).toEqual([]);
+  await expect(page.getByTestId('chief-question-card')).toBeVisible();
+});
