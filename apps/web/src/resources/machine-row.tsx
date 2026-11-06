@@ -181,13 +181,13 @@ export function MachineRowView({
     >
       <div className="flex min-w-0 items-center gap-3 px-4 py-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             data-testid="machine-toggle"
             aria-expanded={expanded}
             aria-controls={bodyId}
             onClick={onToggle}
-            className="flex min-w-0 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-ui font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring)"
+            className="h-auto min-w-0 justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground hover:bg-transparent"
           >
             <ChevronRight
               aria-hidden
@@ -208,7 +208,7 @@ export function MachineRowView({
                 {t('Coordinator 主机')}
               </span>
             )}
-          </button>
+          </Button>
           <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 pl-5 text-meta">
             <span aria-hidden className={cn('size-1.5 flex-none rounded-full', status.dot)} />
             <span
@@ -233,27 +233,27 @@ export function MachineRowView({
             <span aria-hidden className="text-content-dim">
               ·
             </span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               data-testid="machine-open-runtime"
               onClick={() => onOpenSection('runtime')}
-              className="cursor-pointer border-0 bg-transparent p-0 text-meta text-content-tertiary outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-(--focus-ring)"
+              className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary hover:bg-transparent hover:text-foreground"
             >
               {t('运行时')} ›
-            </button>
+            </Button>
             {machine.capabilities !== undefined && (
               <>
                 <span aria-hidden className="text-content-dim">
                   ·
                 </span>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   data-testid="machine-open-capabilities"
                   onClick={() => onOpenSection('capabilities')}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-meta text-content-tertiary outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-(--focus-ring)"
+                  className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary hover:bg-transparent hover:text-foreground"
                 >
                   {t('能力')} ›
-                </button>
+                </Button>
               </>
             )}
           </div>
