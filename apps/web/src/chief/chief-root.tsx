@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -10,9 +10,6 @@ export interface ChiefRootApi {
   surface: ChiefSurface;
   openChiefThread: (threadId: string) => void;
   pendingQuestions: OriginChiefQuestion[];
-  questionsOpen: boolean;
-  setQuestionsOpen: (open: boolean) => void;
-  openQuestionOrigin: (conversationId: string) => void;
 }
 
 const ChiefRootContext = createContext<ChiefRootApi | null>(null);
@@ -53,7 +50,6 @@ export function ChiefRoot() {
   const onHome = pathname === '/app';
   const { teamId } = useLiveData();
   const surface = useChiefSurface(fixture, deepLink, onHome);
-  const [questionsOpen, setQuestionsOpenState] = useState(false);
   const pendingQuestions = useMemo(
     () =>
       originChiefQuestions(surface.chiefData.stream ?? [], {
@@ -62,30 +58,6 @@ export function ChiefRoot() {
         title: surface.chiefData.threadTitle,
       }),
     [surface.chiefData.stream, surface.chiefData.threadId, surface.chiefData.threadTitle, teamId],
-  );
-  const setQuestionsOpen = useCallback(
-    (open: boolean) => {
-      if (open) surface.setChiefView('none');
-      setQuestionsOpenState(open);
-    },
-    [surface],
-  );
-  useEffect(() => {
-    if (pendingQuestions.length === 0) setQuestionsOpenState(false);
-  }, [pendingQuestions.length]);
-  useEffect(() => {
-    if (surface.chiefView === 'drawer') setQuestionsOpenState(false);
-  }, [surface.chiefView]);
-  const openQuestionOrigin = useCallback(
-    (conversationId: string) => {
-      if (pathname === '/app') {
-        setQuestionsOpen(false);
-        return;
-      }
-      setLinkThreadId(conversationId);
-      navigate('/app');
-    },
-    [pathname, navigate],
   );
   const onSettings = useCallback(() => {
     if (pathname === '/app') surface.setChiefView('settings');
@@ -96,11 +68,8 @@ export function ChiefRoot() {
       surface,
       openChiefThread: setLinkThreadId,
       pendingQuestions,
-      questionsOpen,
-      setQuestionsOpen,
-      openQuestionOrigin,
     }),
-    [surface, pendingQuestions, questionsOpen, setQuestionsOpen, openQuestionOrigin],
+    [surface, pendingQuestions],
   );
   const ownsConversation = onHome;
   const windowOpen = surface.chiefView === 'drawer' && !ownsConversation;

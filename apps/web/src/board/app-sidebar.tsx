@@ -4,6 +4,8 @@ import { useLocation } from 'react-router';
 import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
+import { coordinatorBadgeCount } from '../chief/question-dock-index.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -44,6 +46,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
+  const chiefRoot = useOptionalChiefRoot();
   const todosQ = useTodos(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const projectsQ = useProjects(teamId, live);
@@ -110,7 +113,10 @@ export function AppSidebar({
   );
   useTypeToCompose();
   const sidebarProps = {
-    attention: needsYouCount(resolvedTodos),
+    attention: coordinatorBadgeCount(
+      needsYouCount(resolvedTodos),
+      chiefRoot?.pendingQuestions.length ?? 0,
+    ),
     machinesOnline,
     machinesOffline,
     todos: resolvedTodos,

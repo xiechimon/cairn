@@ -66,6 +66,7 @@ import { useServerDraft } from '../overlay/use-server-draft.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import { ChiefQuestionDock } from './chief-question-dock.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
@@ -692,217 +693,220 @@ export function ChiefConversation({
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
         )
       )}
-      {composerReplacement ?? (
-        <>
-          {composerError != null && (
-            <p
-              role="alert"
-              data-testid="chief-composer-error"
-              className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex items-center gap-1.5 text-meta text-destructive`}
+      <div data-testid="chief-composer-block" className="flex flex-none flex-col">
+        <ChiefQuestionDock home={home} />
+        {composerReplacement ?? (
+          <>
+            {composerError != null && (
+              <p
+                role="alert"
+                data-testid="chief-composer-error"
+                className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex items-center gap-1.5 text-meta text-destructive`}
+              >
+                <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
+                {composerError}
+              </p>
+            )}
+            <div
+              data-invalid={composerError != null ? '' : undefined}
+              className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+              style={home ? { viewTransitionName: 'chief-composer' } : undefined}
             >
-              <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
-              {composerError}
-            </p>
-          )}
-          <div
-            data-invalid={composerError != null ? '' : undefined}
-            className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
-            style={home ? { viewTransitionName: 'chief-composer' } : undefined}
-          >
-            <QueuedCapsules
-              messages={queuedCapsules}
-              onSendNow={onSteer ? (id) => onSteer(id) : undefined}
-              onRemove={withdraw}
-              removeLabel={t('撤回')}
-            />
-            <ComposerAttachments
-              tokens={wire.tokens}
-              pending={pendingAttachments}
-              onRemove={wire.removeToken}
-            />
-            <div className="relative">
-              <Textarea
-                ref={attachComposer}
-                data-testid="chief-composer-input"
-                data-compose-target=""
-                aria-invalid={composerError != null ? true : undefined}
-                className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
-                readOnly={onSend == null}
-                value={wire.draft}
-                onChange={wire.handleChange}
-                onKeyDown={wire.handleKeyDown}
-                onPaste={handlePaste}
-                onKeyUp={handleCaretMoved}
-                onClick={handleCaretMoved}
-                onSelect={handleCaretMoved}
-                onCompositionEnd={handleCompositionEnd}
-                onBlur={handleBlur}
-                placeholder={
-                  targetPlaceholder ??
-                  (chief.outage != null
-                    ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-                    : chief.running === true
-                      ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-                      : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
-                }
-                {...(inlineOpen
-                  ? {
-                      role: 'combobox',
-                      'aria-expanded': true,
-                      'aria-controls': inlineListboxId,
-                      'aria-autocomplete': 'list' as const,
-                    }
-                  : slashOpen
+              <QueuedCapsules
+                messages={queuedCapsules}
+                onSendNow={onSteer ? (id) => onSteer(id) : undefined}
+                onRemove={withdraw}
+                removeLabel={t('撤回')}
+              />
+              <ComposerAttachments
+                tokens={wire.tokens}
+                pending={pendingAttachments}
+                onRemove={wire.removeToken}
+              />
+              <div className="relative">
+                <Textarea
+                  ref={attachComposer}
+                  data-testid="chief-composer-input"
+                  data-compose-target=""
+                  aria-invalid={composerError != null ? true : undefined}
+                  className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
+                  readOnly={onSend == null}
+                  value={wire.draft}
+                  onChange={wire.handleChange}
+                  onKeyDown={wire.handleKeyDown}
+                  onPaste={handlePaste}
+                  onKeyUp={handleCaretMoved}
+                  onClick={handleCaretMoved}
+                  onSelect={handleCaretMoved}
+                  onCompositionEnd={handleCompositionEnd}
+                  onBlur={handleBlur}
+                  placeholder={
+                    targetPlaceholder ??
+                    (chief.outage != null
+                      ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
+                      : chief.running === true
+                        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+                        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
+                  }
+                  {...(inlineOpen
                     ? {
                         role: 'combobox',
                         'aria-expanded': true,
-                        'aria-controls': slashListboxId,
+                        'aria-controls': inlineListboxId,
                         'aria-autocomplete': 'list' as const,
                       }
-                    : {})}
-                {...(inlineOpen && inlineHighlight != null
-                  ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
-                  : slashOpen && slashHighlight != null
-                    ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
-                    : {})}
+                    : slashOpen
+                      ? {
+                          role: 'combobox',
+                          'aria-expanded': true,
+                          'aria-controls': slashListboxId,
+                          'aria-autocomplete': 'list' as const,
+                        }
+                      : {})}
+                  {...(inlineOpen && inlineHighlight != null
+                    ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
+                    : slashOpen && slashHighlight != null
+                      ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
+                      : {})}
+                />
+                <MentionHighlight
+                  text={wire.draft}
+                  registry={wire.mentionRegistry}
+                  textareaRef={wire.textareaRef}
+                />
+                <MentionInline
+                  open={inlineOpen}
+                  rows={inlineRows}
+                  caret={inlineCaret}
+                  query={inlineQuery}
+                  highlight={inlineHighlight}
+                  onHover={setInlineHighlight}
+                  onPick={acceptInlineRow}
+                  listboxRef={inlineListboxRef}
+                  listboxId={inlineListboxId}
+                />
+                <SlashMenu
+                  open={slashOpen}
+                  sections={slashSections.map((s) => ({
+                    title: s.section === 'builtin' ? t('命令') : t('技能'),
+                    rows: s.rows,
+                  }))}
+                  caret={slashCaret}
+                  query={slashQuery}
+                  highlight={slashHighlight}
+                  onHover={setSlashHighlight}
+                  onPick={(row) => acceptSlashRow(row, 'enter')}
+                  listboxRef={slashListboxRef}
+                  listboxId={slashListboxId}
+                />
+              </div>
+              {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                style={{ display: 'none' }}
+                onChange={onPickFiles}
+                accept="text/*,image/*,application/json,application/pdf,application/xml"
               />
-              <MentionHighlight
-                text={wire.draft}
-                registry={wire.mentionRegistry}
-                textareaRef={wire.textareaRef}
-              />
-              <MentionInline
-                open={inlineOpen}
-                rows={inlineRows}
-                caret={inlineCaret}
-                query={inlineQuery}
-                highlight={inlineHighlight}
-                onHover={setInlineHighlight}
-                onPick={acceptInlineRow}
-                listboxRef={inlineListboxRef}
-                listboxId={inlineListboxId}
-              />
-              <SlashMenu
-                open={slashOpen}
-                sections={slashSections.map((s) => ({
-                  title: s.section === 'builtin' ? t('命令') : t('技能'),
-                  rows: s.rows,
-                }))}
-                caret={slashCaret}
-                query={slashQuery}
-                highlight={slashHighlight}
-                onHover={setSlashHighlight}
-                onPick={(row) => acceptSlashRow(row, 'enter')}
-                listboxRef={slashListboxRef}
-                listboxId={slashListboxId}
-              />
-            </div>
-            {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              style={{ display: 'none' }}
-              onChange={onPickFiles}
-              accept="text/*,image/*,application/json,application/pdf,application/xml"
-            />
-            <div className="-ml-1 flex items-center gap-0.5">
-              <IconTooltip
-                label={t('添加附件')}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
-                    disabled={attaching || onAttachment == null}
-                    onClick={openFilePicker}
-                  />
-                }
-              >
-                <Plus width={16} height={16} />
-              </IconTooltip>
-              {composerTools}
-              {chipVisible && (
-                <ProjectMenu
-                  title="发给哪个项目"
-                  projects={projectOptions}
-                  value={pickedProject?.id ?? null}
-                  withAuto
-                  side="top"
-                  onPick={pickProject}
+              <div className="-ml-1 flex items-center gap-0.5">
+                <IconTooltip
+                  label={t('添加附件')}
                   trigger={
                     <Button
                       variant="ghost"
-                      data-testid="chief-project-chip"
-                      data-set={pickedProject != null ? '' : undefined}
-                      aria-label={t('发给哪个项目：{name}', {
-                        name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
-                      })}
-                      className={PROJECT_CHIP_CLS}
+                      size="icon"
+                      className={`${TOOL_BTN_CLS} disabled:pointer-events-auto`}
+                      disabled={attaching || onAttachment == null}
+                      onClick={openFilePicker}
                     />
                   }
                 >
-                  {pickedProject != null ? (
-                    <ProjectAvatar
-                      name={pickedProject.name}
-                      tone={projectOptions.indexOf(pickedProject)}
-                      icon={projectMark(pickedProject.id).icon}
-                      color={projectMark(pickedProject.id).color}
-                      bare
-                    />
-                  ) : (
-                    <CircleDashed className="size-4 flex-none" />
-                  )}
-                  <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
-                  <ChevronDown width={12} height={12} />
-                </ProjectMenu>
-              )}
-              {chief.running === true && turnElapsed != null && (
-                <span
-                  className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
-                  data-testid="chief-composer-working"
-                >
-                  {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
-                </span>
-              )}
-              {stopMode ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('停止 Coordinator 这次回复')}
-                  className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
-                  onClick={stopTurn}
-                >
-                  <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('发送')}
-                  className={cn(
-                    SEND_BTN_CLS,
-                    (wire.draft !== '' ||
-                      wire.tokens.length > 0 ||
-                      pendingAttachments.length > 0) &&
-                      SEND_ON_CLS,
-                    turnElapsed != null && 'ml-2',
-                  )}
-                  onClick={wire.send}
-                >
-                  <ArrowUp width={16} height={16} />
-                </Button>
-              )}
+                  <Plus width={16} height={16} />
+                </IconTooltip>
+                {composerTools}
+                {chipVisible && (
+                  <ProjectMenu
+                    title="发给哪个项目"
+                    projects={projectOptions}
+                    value={pickedProject?.id ?? null}
+                    withAuto
+                    side="top"
+                    onPick={pickProject}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        data-testid="chief-project-chip"
+                        data-set={pickedProject != null ? '' : undefined}
+                        aria-label={t('发给哪个项目：{name}', {
+                          name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
+                        })}
+                        className={PROJECT_CHIP_CLS}
+                      />
+                    }
+                  >
+                    {pickedProject != null ? (
+                      <ProjectAvatar
+                        name={pickedProject.name}
+                        tone={projectOptions.indexOf(pickedProject)}
+                        icon={projectMark(pickedProject.id).icon}
+                        color={projectMark(pickedProject.id).color}
+                        bare
+                      />
+                    ) : (
+                      <CircleDashed className="size-4 flex-none" />
+                    )}
+                    <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
+                    <ChevronDown width={12} height={12} />
+                  </ProjectMenu>
+                )}
+                {chief.running === true && turnElapsed != null && (
+                  <span
+                    className="ml-auto flex h-7 items-center text-meta tabular-nums text-(--text-tertiary)"
+                    data-testid="chief-composer-working"
+                  >
+                    {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
+                  </span>
+                )}
+                {stopMode ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('停止 Coordinator 这次回复')}
+                    className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
+                    onClick={stopTurn}
+                  >
+                    <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('发送')}
+                    className={cn(
+                      SEND_BTN_CLS,
+                      (wire.draft !== '' ||
+                        wire.tokens.length > 0 ||
+                        pendingAttachments.length > 0) &&
+                        SEND_ON_CLS,
+                      turnElapsed != null && 'ml-2',
+                    )}
+                    onClick={wire.send}
+                  >
+                    <ArrowUp width={16} height={16} />
+                  </Button>
+                )}
+              </div>
+              <SlashHelp
+                open={helpOpen}
+                onClose={closeHelp}
+                commands={helpRows}
+                skillCount={helpSkillCount}
+              />
             </div>
-            <SlashHelp
-              open={helpOpen}
-              onClose={closeHelp}
-              commands={helpRows}
-              skillCount={helpSkillCount}
-            />
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
       <DialogShell
         title={t('恢复到此处')}
         open={rewindConfirm !== null}

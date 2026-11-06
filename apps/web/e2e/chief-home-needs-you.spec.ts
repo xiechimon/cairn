@@ -17,7 +17,7 @@ function question(requestId: string, header: string, text: string, options: unkn
   };
 }
 
-test('two pending decisions are two header questions; the recommended option is first and answering it resumes the thread (#1784)', async ({
+test('two pending decisions are answered one at a time above the composer; the recommended option is first and answering it resumes the thread (#1784)', async ({
   page,
 }) => {
   const answered: { requestId: string; body: unknown }[] = [];
@@ -58,9 +58,8 @@ test('two pending decisions are two header questions; the recommended option is 
   });
   await page.goto('/app');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
-  await page.getByTestId('chief-question-entry').click();
-  const panel = page.getByTestId('chief-question-panel');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+  const panel = page.getByTestId('chief-question-dock');
   const card = panel.getByTestId('chief-question-card');
   await expect(card.getByTestId('chief-question-status')).toHaveText('待你决定');
   await expect(card.getByTestId('chief-question-option-0-0')).toHaveText('1Claude subscription （推荐）');
@@ -73,7 +72,7 @@ test('two pending decisions are two header questions; the recommended option is 
     requestId: 'ask-0000000a',
     body: { answers: [{ header: 'Model · #74', choices: ['Claude subscription'] }] },
   });
-  await expect(page.getByTestId('chief-question-count')).toHaveText('1');
+  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
   await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
 });
 
@@ -97,8 +96,7 @@ test('own words: the free-text row takes a typed answer', async ({ page }) => {
     },
   );
   await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
-  const card = page.getByTestId('chief-question-panel').getByTestId('chief-question-card');
+  const card = page.getByTestId('chief-question-dock').getByTestId('chief-question-card');
   await card.getByTestId('chief-question-other-0').click();
   await card.getByTestId('chief-question-input-0').fill('Use the metered key this once');
   await card.getByRole('button', { name: '提交回答' }).click();
@@ -107,7 +105,7 @@ test('own words: the free-text row takes a typed answer', async ({ page }) => {
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
 });
 
-test('number keys pick only in the open question card', async ({ page }) => {
+test('the question dock steps between pending questions', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -123,13 +121,13 @@ test('number keys pick only in the open question card', async ({ page }) => {
     todos: [],
   });
   await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
-  const panel = page.getByTestId('chief-question-panel');
-  const card = panel.getByTestId('chief-question-card');
-  await expect(card).toHaveCount(1);
-  await page.keyboard.press('2');
-  await expect(card.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
-  await panel.getByTestId('chief-question-pick').nth(1).click();
-  await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
-  await expect(panel.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
+  const dock = page.getByTestId('chief-question-dock');
+  await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
+  await expect(page.getByTestId('chief-question-prev')).toBeDisabled();
+  await page.getByTestId('chief-question-next').click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('2/2');
+  await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
+  await page.getByTestId('chief-question-prev').click();
+  await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
 });

@@ -190,17 +190,6 @@ test('the more menu holds archive and delete, and Escape closes the menu first',
   await expect(page.getByRole('alertdialog')).toContainText('Rerun the relay probe');
 });
 
-test('with a thread open, number keys leave the Coordinator question alone', async ({ page }) => {
-  await page.goto(`${HOME}&thread=home-c-review`);
-  await expect(sideChat(page)).toBeVisible();
-  await page.getByTestId('chief-question-entry').click();
-  const option = page.getByTestId('chief-question-panel').getByTestId('chief-question-option-0-0');
-  await expect(option).toBeVisible();
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('1');
-  await expect(option).toHaveAttribute('aria-pressed', 'false');
-});
-
 test('a plan waiting for approval opens in full from the card and from the transcript', async ({
   page,
 }) => {

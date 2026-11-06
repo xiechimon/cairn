@@ -10,8 +10,6 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
-import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Greeting } from '../components/stream/greeting.js';
@@ -138,7 +136,6 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
-  const questions = useOptionalChiefRoot();
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
@@ -147,15 +144,8 @@ export function HomeC({
     setSearchParams(params, { replace: true, state: location.state });
   };
   const togglePane = (next: WorkPane) => {
-    questions?.setQuestionsOpen(false);
     showPane(pane === next && threadId === null ? null : next);
   };
-  useEffect(() => {
-    if (questions?.questionsOpen !== true || pane === null) return;
-    const params = new URLSearchParams(searchParams);
-    params.delete(PANE_PARAM);
-    setSearchParams(params, { replace: true, state: location.state });
-  }, [questions?.questionsOpen, pane, searchParams, setSearchParams, location.state]);
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const { chiefData, chiefView, setChiefView } = surface;
@@ -347,7 +337,6 @@ export function HomeC({
       <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
         {projectName ?? t('Coordinator')}
       </h1>
-      <ChiefQuestionEntry />
       <MachineChip
         machines={computers}
         open={pane === 'machines' && threadId === null}

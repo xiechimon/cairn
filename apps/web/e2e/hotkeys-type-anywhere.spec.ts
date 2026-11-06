@@ -81,26 +81,14 @@ async function mockPendingQuestion(page: Page) {
   });
 }
 
-test('a pending question card keeps its number keys out of the composer', async ({ page }) => {
-  await mockPendingQuestion(page);
-  await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
-  const option = page.getByTestId('chief-question-panel').getByTestId('chief-question-option-0-0');
-  await expect(option).toBeVisible();
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('1');
-  await expect(option).toHaveAttribute('aria-pressed', 'true');
-  await expect(homeComposer(page)).toHaveValue('');
-});
-
-test('a hidden question card leaves number keys to the composer', async ({ page }) => {
+test('digits still type into the composer while a question is pending', async ({ page }) => {
   await mockPendingQuestion(page);
   await page.goto('/app');
   const composer = homeComposer(page);
-  await expect(page.getByTestId('chief-question-entry')).toBeVisible();
+  await expect(page.getByTestId('chief-question-dock')).toBeVisible();
   await expect(composer).toBeVisible();
-  await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.type('1');
   await expect(composer).toHaveValue('1');
+  await expect(page.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'false');
 });

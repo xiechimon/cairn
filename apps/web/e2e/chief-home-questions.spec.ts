@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, PROJECT, THREAD } from './chief-home-mock';
+import { mockLive, THREAD } from './chief-home-mock';
 
 function question(requestId: string, header: string, text: string, options: unknown[]) {
   return {
@@ -33,79 +33,16 @@ const TWO = {
   todos: [],
 };
 
-test('a pending Coordinator question stays quiet in the header until the user opens it (#2853)', async ({
-  page,
-}) => {
-  const posts: string[] = [];
-  await mockLive(page, structuredClone(TWO), (path, route) => {
-    if (route.request().method() === 'POST') posts.push(path);
-    return undefined;
-  });
-  await page.goto('/app');
-  const entry = page.getByTestId('chief-question-entry');
-  await expect(entry).toBeVisible();
-  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
-  await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
-  await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('home-c').getByTestId('chief-question-card')).toHaveCount(0);
-  await expect(page.locator('.chief-fab')).toHaveCount(0);
-  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
-  await expect.poll(() => posts.some((path) => path.includes('/questions/'))).toBe(false);
-});
-
-test('Later closes the panel without answering or cancelling, and the draft returns (#2853)', async ({
-  page,
-}) => {
-  const posts: { path: string; method: string }[] = [];
-  await mockLive(page, structuredClone(TWO), (path, route) => {
-    posts.push({ path, method: route.request().method() });
-    return undefined;
-  });
-  await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
-  const panel = page.getByTestId('chief-question-panel');
-  await expect(panel).toBeVisible();
-  const card = panel.getByTestId('chief-question-card');
-  await card.getByTestId('chief-question-option-0-0').click();
-  await expect(card.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
-  await panel.getByTestId('chief-question-later').click();
-  await expect(panel).toHaveCount(0);
-  expect(posts.filter((row) => row.path.includes('/questions/'))).toEqual([]);
-  await page.getByTestId('chief-question-entry').click();
-  await expect(panel.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
-});
-
-test('the draft survives leaving home and returning from another page (#2853)', async ({ page }) => {
-  await mockLive(page, structuredClone(TWO));
-  await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
-  await page.getByTestId('chief-question-card').getByTestId('chief-question-other-0').click();
-  await page.getByTestId('chief-question-input-0').fill('Use the metered key this once');
-  await page.getByTestId('chief-question-later').click();
-  await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
-  await page.getByTestId('sidebar-settings').click();
-  await expect(page.getByTestId('settings-content')).toBeVisible();
-  await expect(page.getByTestId('page-topbar').getByTestId('chief-question-count')).toHaveText('2');
-  await page.getByTestId('page-topbar').getByTestId('chief-question-entry').click();
-  const panel = page.getByTestId('chief-question-panel');
-  await expect(panel.getByTestId('chief-question-other-0')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.getByTestId('chief-question-input-0')).toHaveValue(
-    'Use the metered key this once',
-  );
-});
-
-test('submit posts to the originating thread and leaves the other request pending (#2853)', async ({
-  page,
-}) => {
-  const answered: { path: string; body: unknown }[] = [];
-  const state = structuredClone(TWO);
-  await mockLive(page, state, (path, route, json) => {
+function answerRoute(state: typeof TWO, answered: { path: string; body: unknown }[]) {
+  return (
+    path: string,
+    route: { request: () => { method: () => string; postDataJSON: () => unknown } },
+    json: (body: unknown, status?: number) => unknown,
+  ) => {
     const match = /\/chief\/threads\/([^/]+)\/questions\/([^/]+)\/answer$/.exec(path);
     if (match === null || route.request().method() !== 'POST') return undefined;
-    const threadId = match[1] ?? '';
     const requestId = match[2] ?? '';
-    const body = route.request().postDataJSON();
+    const body = route.request().postDataJSON() as { answers: unknown[] };
     answered.push({ path, body });
     state.messages = state.messages.map((row) =>
       row.id === `row-${requestId}`
@@ -114,27 +51,114 @@ test('submit posts to the originating thread and leaves the other request pendin
             content: JSON.stringify({
               ...JSON.parse(row.content as string),
               status: 'answered',
-              answers: (body as { answers: unknown[] }).answers,
+              answers: body.answers,
             }),
           }
         : row,
     );
-    expect(threadId).toBe(THREAD.id);
     return json(JSON.parse(state.messages.find((row) => row.id === `row-${requestId}`)!.content as string));
+  };
+}
+
+const ONE = { ...TWO, messages: TWO.messages.slice(0, 2) };
+const NONE = { ...TWO, messages: TWO.messages.slice(0, 1) };
+
+test('a pending question is a card directly above the composer, and the header has no question pill (D119)', async ({
+  page,
+}) => {
+  const posts: string[] = [];
+  await mockLive(page, structuredClone(ONE), (path, route) => {
+    if (route.request().method() === 'POST') posts.push(path);
+    return undefined;
   });
   await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
-  const panel = page.getByTestId('chief-question-panel');
-  await panel.getByTestId('chief-question-option-0-0').click();
-  await panel.getByRole('button', { name: '提交回答' }).click();
-  await expect.poll(() => answered.length).toBe(1);
-  expect(answered[0]?.path).toContain(`/chief/threads/${THREAD.id}/questions/ask-0000000a/answer`);
-  await expect(page.getByTestId('chief-question-count')).toHaveText('1');
-  await expect(panel).toBeVisible();
-  await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  const dock = page.getByTestId('chief-composer-block').getByTestId('chief-question-dock');
+  await expect(dock.getByTestId('chief-question-card')).toBeVisible();
+  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-count')).toHaveCount(0);
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-card')).toHaveCount(0);
+  const dockBox = await dock.boundingBox();
+  const composerBox = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
+  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(composerBox!.y);
+  expect(composerBox!.y - (dockBox!.y + dockBox!.height)).toBeLessThan(24);
+  await expect.poll(() => posts.some((path) => path.includes('/questions/'))).toBe(false);
 });
 
-test('a failed submit keeps the typed draft (#2853)', async ({ page }) => {
+test('no pending question means no card and no pill', async ({ page }) => {
+  await mockLive(page, structuredClone(NONE));
+  await page.goto('/app');
+  await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toBeVisible();
+  await expect(page.getByTestId('chief-question-dock')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
+  await expect(page.getByTestId('attention-badge')).toHaveCount(0);
+});
+
+test('the header carries no question pill on any page', async ({ page }) => {
+  await mockLive(page, structuredClone(TWO));
+  await page.goto('/app/schedules');
+  await expect(page.getByTestId('page-topbar')).toBeVisible();
+  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
+  await page.goto('/app?chief=settings');
+  await expect(page.getByTestId('chief-settings-topbar')).toBeVisible();
+  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
+});
+
+test('answering removes the card and the badge count; the next question takes its place', async ({
+  page,
+}) => {
+  const answered: { path: string; body: unknown }[] = [];
+  const state = structuredClone(TWO);
+  await mockLive(page, state, answerRoute(state, answered));
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  const badge = page.getByRole('complementary').getByTestId('attention-badge');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+  await expect(badge).toHaveText('2');
+  await dock.getByTestId('chief-question-option-0-0').click();
+  await dock.getByRole('button', { name: '提交回答' }).click();
+  await expect.poll(() => answered.length).toBe(1);
+  expect(answered[0]?.path).toContain(`/chief/threads/${THREAD.id}/questions/ask-0000000a/answer`);
+  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
+  await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(badge).toHaveText('1');
+  await dock.getByTestId('chief-question-option-0-0').click();
+  await dock.getByRole('button', { name: '提交回答' }).click();
+  await expect.poll(() => answered.length).toBe(2);
+  await expect(dock).toHaveCount(0);
+  await expect(badge).toHaveCount(0);
+});
+
+test('free text answers inline', async ({ page }) => {
+  const answered: { path: string; body: unknown }[] = [];
+  const state = structuredClone(ONE);
+  await mockLive(page, state, answerRoute(state, answered));
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await dock.getByTestId('chief-question-other-0').click();
+  await dock.getByTestId('chief-question-input-0').fill('Use the metered key this once');
+  await dock.getByRole('button', { name: '提交回答' }).click();
+  await expect
+    .poll(() => answered.map((row) => row.body))
+    .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
+  await expect(dock).toHaveCount(0);
+});
+
+test('the sidebar Coordinator badge counts pending questions and opens the card from another page', async ({
+  page,
+}) => {
+  await mockLive(page, structuredClone(TWO));
+  await page.goto('/app/schedules');
+  const badge = page.getByRole('complementary').getByTestId('attention-badge');
+  await expect(badge).toHaveText('2');
+  await expect(page.getByTestId('chief-question-dock')).toBeHidden();
+  await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
+  await expect(page).toHaveURL(/\/app(\?|$)/);
+  await expect(page.getByTestId('chief-question-dock').getByTestId('chief-question-card')).toBeVisible();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
+});
+
+test('stepping keeps a typed draft, and a failed submit keeps it too', async ({ page }) => {
   let fail = true;
   await mockLive(page, structuredClone(TWO), (path, route, json) => {
     if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
@@ -145,58 +169,46 @@ test('a failed submit keeps the typed draft (#2853)', async ({ page }) => {
     return json({});
   });
   await page.goto('/app');
-  await page.getByTestId('chief-question-entry').click();
   const card = page.getByTestId('chief-question-card');
   await card.getByTestId('chief-question-other-0').click();
   await card.getByTestId('chief-question-input-0').fill('Keep this text');
+  await page.getByTestId('chief-question-next').click();
+  await page.getByTestId('chief-question-prev').click();
+  await expect(card.getByTestId('chief-question-input-0')).toHaveValue('Keep this text');
   await card.getByRole('button', { name: '提交回答' }).click();
   await expect(page.getByTestId('chief-question-error')).toBeVisible();
   await expect(card.getByTestId('chief-question-input-0')).toHaveValue('Keep this text');
-  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
+  await expect(page.getByTestId('chief-question-position')).toHaveText('1/2');
 });
 
-test('a pending question stays in the header on project home, settings, and not-found (#2853)', async ({
+test('at 375px the card sits above the composer and the last message stays visible', async ({
   page,
 }) => {
-  await mockLive(page, { ...structuredClone(TWO), projects: [PROJECT] });
-  await page.goto('/app?project=proj-1');
-  await expect(page.getByTestId('project-home')).toBeVisible();
-  await expect(page.getByTestId('chief-question-entry')).toBeVisible();
-  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
-  await page.getByTestId('chief-question-entry').click();
-  await expect(page.getByTestId('chief-question-panel')).toBeVisible();
-  await page.getByTestId('chief-question-later').click();
-
-  await page.goto('/app?chief=settings');
-  await expect(page.getByTestId('chief-settings-col')).toBeVisible();
-  await expect(page.getByTestId('chief-settings-topbar').getByTestId('chief-question-count')).toHaveText(
-    '2',
-  );
-
-  await page.goto('/app?project=missing-project');
-  await expect(page.getByTestId('project-not-found')).toBeVisible();
-  await expect(page.getByTestId('chief-question-entry')).toBeVisible();
-  await expect(page.getByTestId('chief-question-count')).toHaveText('2');
-  await page.getByTestId('chief-question-entry').click();
-  await expect(page.getByTestId('chief-question-panel')).toBeVisible();
-});
-
-test('number keys only choose when the question card is visible (#2853)', async ({ page }) => {
-  await mockLive(page, structuredClone(TWO));
+  await page.setViewportSize({ width: 375, height: 667 });
+  const history = Array.from({ length: 14 }, (_, n) => ({
+    id: `hist-${n}`,
+    role: n % 2 === 0 ? 'user' : 'assistant',
+    content: `History message ${n}`,
+    createdAt: 100 + n,
+  }));
+  const state = structuredClone(TWO);
+  state.messages = [
+    ...history,
+    ...state.messages.map((row, n) => ({ ...row, createdAt: 200 + n })),
+    { id: 'tail', role: 'assistant', content: 'The final message', createdAt: 300 },
+  ];
+  await mockLive(page, state);
   await page.goto('/app');
-  const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
-  await expect(page.getByTestId('chief-question-entry')).toBeVisible();
-  await expect(composer).toBeVisible();
-  await expect(page.getByTestId('chief-question-panel')).toHaveCount(0);
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.type('1');
-  await expect(composer).toHaveValue('1');
-  await composer.fill('');
-  await page.getByTestId('chief-question-entry').click();
-  const option = page.getByTestId('chief-question-option-0-0');
-  await expect(option).toBeVisible();
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.press('1');
-  await expect(option).toHaveAttribute('aria-pressed', 'true');
-  await expect(composer).toHaveValue('');
+  const dock = page.getByTestId('chief-question-dock');
+  await expect(dock).toBeVisible();
+  await expect(page.getByText('The final message')).toBeVisible();
+  const composer = page.getByTestId('home-c').locator('.chief-composer');
+  await expect(composer).toBeInViewport({ ratio: 1 });
+  const dockBox = await dock.boundingBox();
+  const composerBox = await composer.boundingBox();
+  const lastBox = await page.getByText('The final message').boundingBox();
+  expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(composerBox!.y);
+  expect(dockBox!.x).toBeGreaterThanOrEqual(0);
+  expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(375);
+  expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(dockBox!.y);
 });
