@@ -158,19 +158,17 @@ function walkTestFiles(dir, out) {
 // .github/workflows/ci.yml).
 function collectTestRefs() {
   const refs = new Map();
-  let fileCount = 0;
   for (const root of TEST_ROOTS) {
     const abs = join(REPO_ROOT, root);
     if (!existsSync(abs)) continue;
     for (const file of walkTestFiles(abs, [])) {
-      fileCount += 1;
       const relPath = relative(REPO_ROOT, file);
       for (const num of refMatches(readFileSync(file, 'utf8'))) {
         addToIndex(refs, num, relPath);
       }
     }
   }
-  return { refs, fileCount };
+  return refs;
 }
 
 function gh(args) {
@@ -289,7 +287,7 @@ if (coverage.unlisted.length > 0) {
 
 const specRefs = collectSpecRefs();
 const { numeric: verifyNumeric, other: verifyOther } = collectVerifyDirs();
-const { refs: testRefs, fileCount: testFileCount } = collectTestRefs();
+const testRefs = collectTestRefs();
 const { repo, tickets } = fetchTickets();
 const ciJobs = collectCiSurface();
 
@@ -482,7 +480,6 @@ for (const row of rows) {
 // Distinct spec files that contributed a reference. Deliberately NOT a count
 // of fetched tickets: that number moves whenever anyone opens any issue, and
 // the doc must only change when a source of the map changes.
-const specFileCount = new Set([...specRefs.values()].flatMap((s) => [...s])).size;
 
 out.push('## 1. Statistics');
 out.push('');
@@ -504,7 +501,6 @@ out.push(`| unresolvable ticket numbers (§3.3) | ${unresolved.length} |`);
 out.push(
   `| evidence directories that are not GitHub ticket numbers (§3.4) | ${verifyOther.size} |`,
 );
-out.push(`| scan surface: spec volumes / test files | ${specFileCount} / ${testFileCount} |`);
 out.push('');
 
 // §2 the map

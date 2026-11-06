@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import {
@@ -10,6 +8,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { agent as agentTable, apiKey as apiKeyTable, githubConnection } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -106,7 +105,7 @@ async function setupWorld(
 }
 
 async function seedUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-g2t2-user-')), 'repo');
+  const dir = join(makeTestTempDir('cairn-g2t2-user-'), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   return dir;
 }

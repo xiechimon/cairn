@@ -1,10 +1,10 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 
 const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
@@ -14,7 +14,7 @@ const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.j
 test.each(['fresh', 'upgrade'])(
   '%s migration adds nullable agent attachment provenance without losing human files',
   (mode) => {
-    const directory = mkdtempSync(join(tmpdir(), 'cairn-agent-attachment-migration-'));
+    const directory = makeTestTempDir('cairn-agent-attachment-migration-');
     const sqlite = new Database(':memory:');
     const db = drizzle(sqlite);
     try {
