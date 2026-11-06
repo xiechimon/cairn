@@ -1,5 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { is } from 'drizzle-orm';
@@ -7,6 +6,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { getTableConfig, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 
@@ -43,7 +43,7 @@ test('Feishu migration follows all main migrations with unique indexes and a com
 test.each(['fresh', 'upgrade'])(
   '%s database applies Feishu migration and preserves main data',
   (mode) => {
-    const directory = mkdtempSync(join(tmpdir(), 'cairn-1974-migration-'));
+    const directory = makeTestTempDir('cairn-1974-migration-');
     const sqlite = new Database(join(directory, 'test.sqlite'));
     sqlite.pragma('foreign_keys = ON');
     const db = drizzle(sqlite);

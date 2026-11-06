@@ -1,9 +1,8 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rm } from 'node:fs/promises';
 import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { agent as agentTable } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import {
@@ -15,7 +14,7 @@ import { bindAllAgents, bootServer, issueApiKey, postProject, type TestServer } 
 
 let throttleHome: string;
 beforeAll(async () => {
-  throttleHome = await mkdtemp(join(tmpdir(), 'github-writeback-'));
+  throttleHome = makeTestTempDir('github-writeback-');
   vi.stubEnv('CAIRN_HOME', throttleHome);
   vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '0');
 });

@@ -1,6 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   FAILURE_WHERE,
@@ -10,6 +9,7 @@ import {
   type TrajectoryPack,
 } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { sampleFailures } from '../src/eval-sample-failures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
@@ -100,7 +100,7 @@ function pack(input: {
 }
 
 function fixtureTree() {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-sample-failures-'));
+  const root = makeTestTempDir('cairn-sample-failures-');
   dirs.push(root);
   writeFlow(
     root,
@@ -365,7 +365,7 @@ test('root command without --flows samples repository-root hillclimb', () => {
   const flow = `_cn91-2143-${process.pid}`;
   const hillclimb = join(repoRoot, '.claude/hillclimb');
   writeFlow(hillclimb, flow, [{ prompt_id: 'root-fail', rep: 0, grade: { ok: 0 } }], ['root-fail']);
-  const outRoot = mkdtempSync(join(tmpdir(), 'cairn-sample-failures-root-'));
+  const outRoot = makeTestTempDir('cairn-sample-failures-root-');
   dirs.push(outRoot);
   const out = join(outRoot, 'out');
   try {
