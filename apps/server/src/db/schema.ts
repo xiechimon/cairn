@@ -25,6 +25,7 @@ import type {
   NotificationType,
   PersonaRole,
   Phase,
+  PrMergeState,
   ProjectColor,
   ProjectIcon,
   ProjectMergeConfig,
@@ -32,6 +33,7 @@ import type {
   ProviderApi,
   ProviderCompat,
   ProviderModel,
+  PrPanelState,
   RequiredCapabilities,
   RouteOverride,
   RouteUse,
@@ -784,6 +786,50 @@ export const harnessProfile = sqliteTable(
     updatedAt: epochMs('updatedAt').notNull(),
   },
   (t) => [uniqueIndex('harness_profile_team_unique').on(t.teamId)],
+);
+
+export const threadPr = sqliteTable(
+  'thread_pr',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    threadId: text('threadId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    buildId: text('buildId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    repo: text('repo').notNull(),
+    number: integer('number').notNull(),
+    title: text('title').notNull().default(''),
+    url: text('url').notNull(),
+    state: text('state').$type<PrPanelState>().notNull().default('open'),
+    mergeState: text('mergeState').$type<PrMergeState>().notNull().default('unknown'),
+    additions: integer('additions').notNull().default(0),
+    deletions: integer('deletions').notNull().default(0),
+    checksPassed: integer('checksPassed').notNull().default(0),
+    checksFailed: integer('checksFailed').notNull().default(0),
+    checksRunning: integer('checksRunning').notNull().default(0),
+    checksTotal: integer('checksTotal').notNull().default(0),
+    head: text('head').notNull().default(''),
+    verdictResult: text('verdictResult').$type<'pass' | 'block'>(),
+    verdictHead: text('verdictHead'),
+    autoFix: bool('autoFix').notNull().default(true),
+    mergeWhenReady: bool('mergeWhenReady').notNull().default(false),
+    autoArchive: bool('autoArchive').notNull().default(true),
+    dismissed: bool('dismissed').notNull().default(false),
+    blockedSince: epochMs('blockedSince'),
+    wakeRounds: integer('wakeRounds').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('thread_pr_build_unique').on(t.buildId),
+    uniqueIndex('thread_pr_team_repo_number_unique').on(t.teamId, t.repo, t.number),
+    index('thread_pr_threadId_idx').on(t.threadId),
+  ],
 );
 
 export const tokenUsage = sqliteTable(

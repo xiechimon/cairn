@@ -1387,6 +1387,67 @@ export async function githubMergePull(
   return { kind: 'unknown', reason: 'status', status: res.status };
 }
 
+export interface GithubPullPanel {
+  state: 'open' | 'closed';
+  merged: boolean;
+  draft: boolean;
+  title: string;
+  htmlUrl: string | null;
+  headSha: string | null;
+  mergeableState: string | null;
+  additions: number;
+  deletions: number;
+}
+
+export interface GithubPullPanelPage {
+  notModified: boolean;
+  etag: string | null;
+  pull: GithubPullPanel | null;
+}
+
+export async function githubPullPanel(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  opts: { etag?: string | null } = {},
+): Promise<GithubPullPanelPage | null> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  const got = await conditionalGetJson(fetchImpl, url, token, opts.etag, FETCH_TIMEOUT_MS);
+  if (got === null) return null;
+  if (got.notModified) return { notModified: true, etag: opts.etag ?? null, pull: null };
+  const raw = got.data as {
+    state?: unknown;
+    merged?: unknown;
+    draft?: unknown;
+    title?: unknown;
+    html_url?: unknown;
+    mergeable_state?: unknown;
+    additions?: unknown;
+    deletions?: unknown;
+    head?: { sha?: unknown } | null;
+  };
+  if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
+    return null;
+  }
+  return {
+    notModified: false,
+    etag: got.etag,
+    pull: {
+      state: raw.state,
+      merged: raw.merged,
+      draft: raw.draft === true,
+      title: typeof raw.title === 'string' ? raw.title : '',
+      htmlUrl: optString(raw.html_url),
+      headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      mergeableState: optString(raw.mergeable_state),
+      additions: typeof raw.additions === 'number' ? raw.additions : 0,
+      deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,
+    },
+  };
+}
+
 export interface GithubCheckRun {
   name: string;
   status: string;
