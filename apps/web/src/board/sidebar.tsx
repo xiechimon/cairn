@@ -475,34 +475,39 @@ export function BoardSidebar({
         )}
       </nav>
 
-      <div data-testid="sidebar-footer" className="flex flex-none flex-col gap-1 pt-2">
-        <div className="flex w-full items-center gap-0.5">
-          <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
-            <Settings className={ICON} strokeWidth={STROKE} />
+      <div
+        data-testid="sidebar-footer"
+        className="flex h-8 flex-none items-center gap-0.5 pt-2 box-content"
+      >
+        <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
+          <Settings className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
+          <Activity className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        {usageNav && (
+          <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
+            <ChartColumn className={ICON} strokeWidth={STROKE} />
           </SidebarFooterIcon>
-          <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
-            <Activity className={ICON} strokeWidth={STROKE} />
-          </SidebarFooterIcon>
-          {usageNav && (
-            <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
-              <ChartColumn className={ICON} strokeWidth={STROKE} />
-            </SidebarFooterIcon>
-          )}
-        </div>
+        )}
         {fleet != null && (
-          <Link
-            data-testid="sidebar-attention"
-            data-fleet={fleet.tone}
-            to={{ pathname: settingsHref('machines'), search: plain }}
-            title={fleet.title}
-            className={`flex min-h-6 w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-caption text-content-tertiary no-underline hover:text-content-secondary ${FOCUS}`}
-          >
-            <span
-              aria-hidden
-              className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-content-tertiary'}`}
-            />
-            <span className="min-w-0 truncate">{fleet.label}</span>
-          </Link>
+          <div className="@container flex min-w-0 flex-1 justify-end">
+            <Link
+              data-testid="sidebar-attention"
+              data-fleet={fleet.tone}
+              to={{ pathname: settingsHref('machines'), search: plain }}
+              title={fleet.title}
+              aria-label={fleet.title}
+              className={`flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 text-caption whitespace-nowrap text-content-tertiary no-underline hover:text-content-secondary ${FOCUS}`}
+            >
+              <span
+                aria-hidden
+                className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-content-tertiary'}`}
+              />
+              <span className="@min-[9rem]:hidden">{fleet.short}</span>
+              <span className="hidden @min-[9rem]:inline">{fleet.label}</span>
+            </Link>
+          </div>
         )}
       </div>
     </aside>

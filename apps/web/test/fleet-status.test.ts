@@ -58,6 +58,7 @@ describe('fleetSummary', () => {
   it('is a short count line with the offline names as the tooltip', () => {
     expect(fleetSummary({ online: 2, offline: 1, offlineNames: ['xmonsMac'] }, t)).toEqual({
       label: '2 在线 · 1 离线',
+      short: '2/3',
       title: '2 台在线 · 1 台离线（xmonsMac）',
       tone: 'offline',
     });
@@ -66,6 +67,7 @@ describe('fleetSummary', () => {
   it('is neutral and nameless when every machine is online', () => {
     expect(fleetSummary({ online: 3, offline: 0, offlineNames: [] }, t)).toEqual({
       label: '3 在线',
+      short: '3/3',
       title: '3 在线',
       tone: 'online',
     });
