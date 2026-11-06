@@ -10,6 +10,7 @@ function stateOfRow(row: PrPanelRow): PrCardState {
   if (row.state === 'closed') return 'closed';
   if (row.state === 'draft') return 'draft';
   if (row.mergeState === 'dirty') return 'conflicts';
+  if (prCiUnread(row)) return 'open';
   if (row.checks.failed > 0) return 'checks-failed';
   if (row.checks.running > 0) return 'checks-running';
   if (row.verdict?.result === 'block') return 'review-block';
@@ -17,6 +18,15 @@ function stateOfRow(row: PrPanelRow): PrCardState {
   if (row.verdict.judgedHead !== row.head) return 'review-pending';
   if (MERGEABLE_STATES.has(row.mergeState)) return 'review-pass';
   return row.mergeState === 'behind' ? 'behind' : 'merge-blocked';
+}
+
+export function prCiUnread(row: PrPanelRow): boolean {
+  return (
+    row.lastReadAt === 0 &&
+    row.checks.total === 0 &&
+    row.state !== 'merged' &&
+    row.state !== 'closed'
+  );
 }
 
 export function prCardModelOfRow(row: PrPanelRow, now: number): PrCardModel {
@@ -32,6 +42,7 @@ export function prCardModelOfRow(row: PrPanelRow, now: number): PrCardModel {
     additions: row.additions,
     deletions: row.deletions,
     state,
+    ciUnread: prCiUnread(row),
     checks: row.checks,
     verdict:
       row.verdict === null

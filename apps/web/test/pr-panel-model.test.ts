@@ -5,6 +5,7 @@ import {
   prByThread,
   prCardModelOfRow,
   prChecksText,
+  prCiUnread,
 } from '../src/components/thread/pr-panel-model.js';
 
 const HEAD = '4f8e2c1d9b0a63e57c1f08a2d4b6e9137a5c80de';
@@ -96,5 +97,24 @@ describe('list helpers', () => {
   test('a PR with no checks shows no count', () => {
     expect(prChecksText({ passed: 0, failed: 0, running: 0, total: 0, failedNames: [] })).toBeNull();
     expect(prChecksText({ passed: 3, failed: 0, running: 0, total: 4, failedNames: [] })).toBe('3/4');
+  });
+});
+
+describe('a row whose checks were never read', () => {
+  const empty = { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] };
+
+  test('is flagged while the PR can still change', () => {
+    expect(prCiUnread(row({ lastReadAt: 0, checks: empty }))).toBe(true);
+    expect(prCardModelOfRow(row({ lastReadAt: 0, checks: empty }), NOW).ciUnread).toBe(true);
+  });
+
+  test('never reads as ready to merge', () => {
+    expect(stateOf({ lastReadAt: 0, checks: empty })).toBe('open');
+  });
+
+  test('is not flagged once read, finished, or when checks exist', () => {
+    expect(prCiUnread(row({ lastReadAt: NOW, checks: empty }))).toBe(false);
+    expect(prCiUnread(row({ lastReadAt: 0, state: 'merged', checks: empty }))).toBe(false);
+    expect(prCiUnread(row({ lastReadAt: 0 }))).toBe(false);
   });
 });

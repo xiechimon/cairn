@@ -2,18 +2,19 @@ import type { PrPanelRow } from '@cairn/shared';
 import { PrCard } from '../components/thread/pr-card.js';
 import { prCardModelOfRow } from '../components/thread/pr-panel-model.js';
 import { Button } from '../components/ui/button.js';
+import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 
 export interface ThreadPrPanelProps {
   status: 'pending' | 'error' | 'success';
   rows: readonly PrPanelRow[];
-  now: number;
   onViewChanges: (() => void) | undefined;
   onRetry: () => void;
 }
 
-export function ThreadPrPanel({ status, rows, now, onViewChanges, onRetry }: ThreadPrPanelProps) {
+export function ThreadPrPanel({ status, rows, onViewChanges, onRetry }: ThreadPrPanelProps) {
   const { t } = useI18n();
+  const now = useMinuteClock();
   if (status === 'pending') return null;
   if (status === 'error') {
     return (

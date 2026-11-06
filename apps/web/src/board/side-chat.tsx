@@ -9,9 +9,7 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { ToneGlyph } from '../components/stone/tone-glyph.js';
-import { pillOf } from '../components/thread/pr-card.js';
 import { PrLink } from '../components/thread/pr-link.js';
-import { prCardModelOfRow } from '../components/thread/pr-panel-model.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -61,9 +59,6 @@ function StatusLine({
       {pr !== undefined && (
         <>
           <PrLink number={pr.number} url={pr.url} />
-          <span data-testid="side-chat-pr-status" className="flex-none">
-            {pillOf(prCardModelOfRow(pr, now), t).label}
-          </span>
           <span aria-hidden="true">·</span>
         </>
       )}
@@ -421,7 +416,6 @@ function ReadyThread({
       <ThreadPrPanel
         status={prs.status}
         rows={prRows}
-        now={now}
         onViewChanges={chat.changes.status !== 'none' ? () => onView('changes') : undefined}
         onRetry={() => void prs.refetch()}
       />

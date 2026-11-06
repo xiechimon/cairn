@@ -38,6 +38,7 @@ for (const theme of THEMES) {
     test('the Resolve menu item shows only for conflicts, failed checks and a blocking review', async ({
       page,
     }) => {
+      test.slow();
       await openGallery(page, theme);
       const withResolve = ['Conflicts', 'Checks failed', 'Review BLOCK'];
       const grid = page.locator('[data-pr-card-case]');
@@ -49,6 +50,7 @@ for (const theme of THEMES) {
           withResolve.includes(label) ? 1 : 0,
         );
         await page.keyboard.press('Escape');
+        await expect(page.getByRole('menu')).toHaveCount(0);
       }
     });
   });

@@ -46,6 +46,7 @@ export interface PrCardModel {
   additions?: number;
   deletions?: number;
   readAgoMinutes?: number;
+  ciUnread?: boolean;
   state: PrCardState;
   checks: PrCardChecks;
   verdict: PrCardVerdict | null;

@@ -82,15 +82,15 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?thread=todo-1');
       const link = status(page).getByRole('link', { name: /PR #42/ });
       await expect(link).toHaveAttribute('href', 'https://github.com/xiechimon/cairn/pull/42');
-      await expect(status(page).getByTestId('side-chat-pr-status')).toHaveText(c.pill);
+      await expect(status(page)).not.toContainText(c.pill);
       const card = panel(page).locator('[data-slot="pr-card"]');
       await expect(card).toHaveAttribute('data-state', c.cardState);
       await expect(card.locator('[data-slot="pr-card-state"]')).toHaveText(c.pill);
+      await evidencePanelShot(page, `thread-pr-${c.name}-${theme}.png`, page.locator('.side-panel'));
       await card.getByRole('button', { name: /Menu for PR/ }).click();
       await expect(page.getByRole('menuitem', { name: 'Resolve' })).toHaveCount(0);
       await expect(page.getByRole('menuitem', { name: 'Open on GitHub' })).toHaveAttribute('href', /pull\/42$/);
       await page.keyboard.press('Escape');
-      await evidencePanelShot(page, `thread-pr-${c.name}-${theme}.png`, page.locator('.side-panel'));
     });
   }
 }
@@ -105,6 +105,16 @@ test('a read older than ten minutes says the data is late, a finished PR does no
   await page.goto('/app?thread=todo-1');
   await expect(panel(page).locator('[data-slot="pr-card"]')).toHaveAttribute('data-state', 'merged');
   await expect(panel(page).locator('[data-slot="pr-card-late"]')).toHaveCount(0);
+});
+
+test('the late-read warning appears on an idle thread once ten minutes have passed', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-06T12:00:00Z') });
+  await setup(page, { rows: [prRow({ lastReadAt: new Date('2026-11-06T11:55:00Z').getTime() })] });
+  await page.goto('/app?thread=todo-1');
+  await expect(panel(page).locator('[data-slot="pr-card"]')).toBeVisible();
+  await expect(panel(page).locator('[data-slot="pr-card-late"]')).toHaveCount(0);
+  await page.clock.fastForward('07:00');
+  await expect(panel(page).locator('[data-slot="pr-card-late"]')).toContainText('Last read 12 min ago');
 });
 
 test('a thread without a PR shows no PR block and no placeholder', async ({ page }) => {
@@ -192,9 +202,36 @@ test('the changes view does not leak into the next thread after closing', async 
 test('a closed PR with an old verdict reads Closed, not Needs re-review', async ({ page }) => {
   await setup(page, { rows: [prRow({ state: 'closed', verdict: { result: 'pass', judgedHead: '9d03b7a1e6c24f58b0a3d7e19c5f2468ab13c0de' } })] });
   await page.goto('/app?thread=todo-1');
-  await expect(status(page).getByTestId('side-chat-pr-status')).toHaveText('Closed');
+  await expect(panel(page).locator('[data-slot="pr-card-state"]')).toHaveText('Closed');
+  await expect(status(page)).not.toContainText('Closed');
   await expect(panel(page).locator('[data-slot="pr-card"]')).not.toHaveAttribute('data-stale', '');
 });
+
+test('a row whose CI was never read says so instead of showing nothing', async ({ page }) => {
+  await setup(page, { rows: [prRow({ lastReadAt: 0, checks: { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] } })] });
+  await page.goto('/app?thread=todo-1');
+  await expect(panel(page).locator('[data-slot="pr-checks"]')).toHaveText('CI not read');
+  await expect(panel(page).locator('[data-slot="pr-card-state"]')).toHaveText('Open');
+  await expect(panel(page).locator('[data-slot="pr-card-late"]')).toHaveCount(0);
+  await evidencePanelShot(page, 'thread-pr-ci-unread-light.png', page.locator('.side-panel'));
+});
+
+for (const c of CASES) {
+  test(`at 375px the meta line of ${c.name} drops the branch and never ends on a separator`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await setup(page, { rows: [prRow(c.row)] });
+    await page.goto('/app?thread=todo-1');
+    const meta = panel(page).locator('[data-slot="pr-card"] p').first();
+    await expect(panel(page).locator('[data-slot="pr-card-branch"]')).toBeHidden();
+    const text = (await meta.innerText()).trim();
+    expect(text).not.toMatch(/[·.…]$/);
+    expect(text).toContain('+120');
+    expect(text).toContain('−14');
+    const overflow = await meta.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await evidencePanelShot(page, `thread-pr-${c.name}-375.png`, page.locator('.side-panel'));
+  });
+}
 
 test('at 375px the panel and header fit without horizontal scroll', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });

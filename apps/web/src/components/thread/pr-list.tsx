@@ -4,7 +4,7 @@ import { GitMerge, GitPullRequest, GitPullRequestClosed } from 'lucide-react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { Button } from '../ui/button.js';
-import { prChecksText } from './pr-panel-model.js';
+import { prChecksText, prCiUnread } from './pr-panel-model.js';
 import { PrRowMenu } from './pr-row-menu.js';
 
 const VISIBLE_ROWS = 5;
@@ -24,10 +24,20 @@ function Glyph({ state }: { state: PrPanelRow['state'] }) {
   );
 }
 
-function CheckCount({ checks }: { checks: PrPanelRow['checks'] }) {
+function CheckCount({ checks, unread }: { checks: PrPanelRow['checks']; unread: boolean }) {
   const { t } = useI18n();
   const text = prChecksText(checks);
-  if (text === null) return null;
+  if (text === null) {
+    return unread ? (
+      <span
+        data-slot="pr-checks"
+        data-ci="unread"
+        className="flex-none text-meta text-content-tertiary"
+      >
+        {t('CI 未读取')}
+      </span>
+    ) : null;
+  }
   const failed = checks.failed > 0;
   const running = checks.running > 0;
   return (
@@ -82,7 +92,7 @@ export function PrList({ rows, onOpenThread, onViewChanges }: PrListProps) {
               <span className="text-(--diff-add-fg) tabular-nums">+{row.additions}</span>
               <span className="text-destructive tabular-nums">−{row.deletions}</span>
               <span className="ml-auto">
-                <CheckCount checks={row.checks} />
+                <CheckCount checks={row.checks} unread={prCiUnread(row)} />
               </span>
             </span>
           </Button>

@@ -1719,6 +1719,7 @@ export const EN: Record<string, string> = {
   还没有审核: 'No review yet',
   'head 已移到': 'Head moved to',
   审核结论已过期: 'verdict is stale',
+  'CI 未读取': 'CI not read',
   '{failed} 个失败：{names}': '{failed} failed: {names}',
   '{failed} 个失败 · {passed}/{total} 通过': '{failed} failed · {passed} of {total} passed',
   '{running} 个运行中 · {passed}/{total} 通过': '{running} running · {passed} of {total} passed',

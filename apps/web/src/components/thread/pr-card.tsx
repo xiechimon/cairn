@@ -100,6 +100,17 @@ function stateIcon(pr: PrCardModel) {
 function CheckCount({ pr }: { pr: PrCardModel }) {
   const { t } = useI18n();
   const { passed, total } = pr.checks;
+  if (total === 0 && pr.ciUnread === true) {
+    return (
+      <span
+        data-slot="pr-checks"
+        data-ci="unread"
+        className="flex-none text-meta text-content-tertiary"
+      >
+        {t('CI 未读取')}
+      </span>
+    );
+  }
   if (total === 0) return null;
   const dot = dotOf(pr);
   return (
@@ -180,29 +191,46 @@ export function PrCard(props: PrCardProps) {
       data-slot="pr-card"
       data-state={pr.state}
       data-stale={isVerdictStale(pr) ? '' : undefined}
-      className={cn('min-w-0 rounded-(--radius-control) py-1.75 pr-1 pl-2', className)}
+      className={cn(
+        '@container/pr min-w-0 rounded-(--radius-control) py-1.75 pr-1 pl-2',
+        className,
+      )}
     >
       <Collapsible className="group/details">
         <div className="flex items-start gap-2.5">
           {stateIcon(pr)}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <h3 className="m-0 truncate text-ui font-normal text-foreground">{pr.title}</h3>
-            <p className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary">
+            <p className="m-0 flex min-w-0 flex-wrap items-center gap-x-1.5 text-meta text-content-tertiary">
               <span className="flex-none tabular-nums">#{pr.number}</span>
               <span aria-hidden>·</span>
-              <span data-slot="pr-card-state" className="flex-none whitespace-nowrap">
+              <span data-slot="pr-card-state" className="min-w-0 truncate">
                 {pill.label}
               </span>
-              {pr.additions !== undefined && (
-                <span className="flex-none text-(--diff-add-fg) tabular-nums">+{pr.additions}</span>
-              )}
-              {pr.deletions !== undefined && (
-                <span className="flex-none text-destructive tabular-nums">−{pr.deletions}</span>
+              {pr.additions !== undefined && pr.deletions !== undefined && (
+                <>
+                  <span aria-hidden className="hidden @min-[22rem]/pr:inline">
+                    ·
+                  </span>
+                  <span
+                    data-slot="pr-card-diff"
+                    className="flex w-full flex-none items-center gap-1.5 tabular-nums @min-[22rem]/pr:w-auto"
+                  >
+                    <span className="text-(--diff-add-fg)">+{pr.additions}</span>
+                    <span className="text-destructive">−{pr.deletions}</span>
+                  </span>
+                </>
               )}
               {pr.branch !== undefined && pr.branch !== '' && (
-                <span className="min-w-0 truncate font-mono before:mr-1.5 before:font-sans before:content-['·']">
-                  {pr.branch}
-                  {pr.base !== undefined && pr.base !== '' ? ` → ${pr.base}` : ''}
+                <span
+                  data-slot="pr-card-branch"
+                  className="hidden min-w-0 items-center gap-1.5 @min-[34rem]/pr:flex"
+                >
+                  <span aria-hidden>·</span>
+                  <span className="min-w-0 truncate font-mono">
+                    {pr.branch}
+                    {pr.base !== undefined && pr.base !== '' ? ` → ${pr.base}` : ''}
+                  </span>
                 </span>
               )}
             </p>
