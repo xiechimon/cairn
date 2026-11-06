@@ -637,6 +637,7 @@ export const pushSubscription = sqliteTable(
     endpoint: text('endpoint').notNull(),
     p256dh: text('p256dh').notNull(),
     auth: text('auth').notNull(),
+    pairedDeviceId: text('pairedDeviceId'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
@@ -747,6 +748,22 @@ export const apiKey = sqliteTable('api_key', {
   masked: text('masked').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const pairedDevice = sqliteTable(
+  'paired_device',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    name: text('name').notNull(),
+    tokenHash: text('tokenHash').notNull(),
+    masked: text('masked').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    lastSeenAt: epochMs('lastSeenAt'),
+  },
+  (t) => [uniqueIndex('paired_device_tokenHash_unique').on(t.tokenHash)],
+);
 
 export const machine = sqliteTable(
   'machine',
