@@ -16,6 +16,31 @@ WHERE a.`id` = (
   LIMIT 1
 )
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'session');--> statement-breakpoint
+INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
+SELECT lower(hex(randomblob(16))), a.`teamId`, 'session', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
+FROM `agent` a
+WHERE a.`id` = (
+  SELECT b.`id` FROM `agent` b
+  WHERE b.`teamId` = a.`teamId` AND b.`provider` IS NOT NULL AND b.`modelId` IS NOT NULL
+    AND b.`id` NOT IN (SELECT `agentId` FROM `chief` WHERE `agentId` IS NOT NULL)
+    AND (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND b.`id` IN (json_extract(t.`assignment`, '$.plan.agentId'), json_extract(t.`assignment`, '$.verify.agentId'))) > 0
+  ORDER BY (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND b.`id` IN (json_extract(t.`assignment`, '$.plan.agentId'), json_extract(t.`assignment`, '$.verify.agentId'))) DESC, b.`id`
+  LIMIT 1
+)
+AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'session');--> statement-breakpoint
+INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
+SELECT lower(hex(randomblob(16))), a.`teamId`, 'review', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
+FROM `agent` a
+WHERE a.`id` = (
+  SELECT b.`id` FROM `agent` b
+  WHERE b.`teamId` = a.`teamId` AND b.`provider` IS NOT NULL AND b.`modelId` IS NOT NULL
+    AND b.`id` NOT IN (SELECT `agentId` FROM `chief` WHERE `agentId` IS NOT NULL)
+    AND (b.`persona` = 'code_reviewer' OR (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = b.`id`) > 0)
+  ORDER BY (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = b.`id`) DESC,
+    coalesce(b.`persona` = 'code_reviewer', 0) DESC, b.`id`
+  LIMIT 1
+)
+AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review');--> statement-breakpoint
 INSERT OR IGNORE INTO `work_policy` (`id`, `teamId`, `use`, `tools`, `mcpServers`, `skillsAllowlist`, `defaultSkill`, `secrets`, `seededFromAgentId`, `createdAt`, `updatedAt`)
 SELECT lower(hex(randomblob(16))), r.`teamId`, 'session', a.`tools`, a.`mcpServers`, a.`skillsAllowlist`, a.`defaultSkill`, a.`secrets`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
 FROM `routing_rule` r JOIN `agent` a ON a.`id` = r.`seededFromAgentId` AND a.`teamId` = r.`teamId`
@@ -50,31 +75,6 @@ WHERE a.`id` = (
 )
 AND EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND t.`sourceKind` = 'research-citation-check')
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'citation_check');--> statement-breakpoint
-INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
-SELECT lower(hex(randomblob(16))), a.`teamId`, 'session', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
-FROM `agent` a
-WHERE a.`id` = (
-  SELECT b.`id` FROM `agent` b
-  WHERE b.`teamId` = a.`teamId` AND b.`provider` IS NOT NULL AND b.`modelId` IS NOT NULL
-    AND b.`id` NOT IN (SELECT `agentId` FROM `chief` WHERE `agentId` IS NOT NULL)
-    AND (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND b.`id` IN (json_extract(t.`assignment`, '$.plan.agentId'), json_extract(t.`assignment`, '$.verify.agentId'))) > 0
-  ORDER BY (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND b.`id` IN (json_extract(t.`assignment`, '$.plan.agentId'), json_extract(t.`assignment`, '$.verify.agentId'))) DESC, b.`id`
-  LIMIT 1
-)
-AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'session');--> statement-breakpoint
-INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
-SELECT lower(hex(randomblob(16))), a.`teamId`, 'review', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
-FROM `agent` a
-WHERE a.`id` = (
-  SELECT b.`id` FROM `agent` b
-  WHERE b.`teamId` = a.`teamId` AND b.`provider` IS NOT NULL AND b.`modelId` IS NOT NULL
-    AND b.`id` NOT IN (SELECT `agentId` FROM `chief` WHERE `agentId` IS NOT NULL)
-    AND (b.`persona` = 'code_reviewer' OR (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = b.`id`) > 0)
-  ORDER BY (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = b.`id`) DESC,
-    coalesce(b.`persona` = 'code_reviewer', 0) DESC, b.`id`
-  LIMIT 1
-)
-AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review');--> statement-breakpoint
 UPDATE `agent_memory` SET `independent` = 1 WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (a.`persona` IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)) OR (a.`persona` = 'verifier' OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.verify.agentId') = a.`id`)));--> statement-breakpoint
 UPDATE `agent_memory` SET `agentId` = (SELECT r.`id` FROM `routing_rule` r WHERE r.`teamId` = `agent_memory`.`teamId` AND r.`use` = 'review')
 WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (a.`persona` IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)))

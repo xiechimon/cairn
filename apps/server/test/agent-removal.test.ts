@@ -431,6 +431,54 @@ describe('removing the agent table from a seeded legacy install', () => {
     ]);
   });
 
+  test.each([
+    ['plan', 'agent-planner', undefined],
+    ['verify', 'agent-verifier', 'verifier'],
+  ] as const)(
+    'a %s-only install keeps the agent tools, mcp servers and secrets in the session policy',
+    (slot, agentId, persona) => {
+      const world = legacyWorld();
+      world.sqlite.exec("DELETE FROM routing_rule WHERE use = 'session'");
+      world.sqlite.exec("DELETE FROM work_policy WHERE use = 'session'");
+      world.sqlite.exec('UPDATE todo SET assignment = NULL');
+      world.sqlite.exec("UPDATE agent SET persona = NULL WHERE id = 'agent-impl'");
+      world.sqlite.exec("DELETE FROM agent_memory WHERE agentId = 'agent-impl'");
+      world.sqlite.exec("DELETE FROM agent WHERE id = 'agent-impl'");
+      insertAgent(world.sqlite, {
+        id: agentId,
+        name: 'Slot agent',
+        provider: 'claude-code',
+        modelId: 'claude-opus-5-5',
+        persona,
+        tools: ['推送分支'],
+        secrets: ['SLOT_KEY'],
+        mcpServers: ['codegraph'],
+      });
+      world.sqlite
+        .prepare("UPDATE todo SET assignment = ? WHERE id = 'todo-flight'")
+        .run(JSON.stringify({ plan: null, build: null, [slot]: { agentId } }));
+      migrateAll(world.sqlite);
+      expect(
+        rows(world.sqlite, "SELECT seededFromAgentId FROM routing_rule WHERE use = 'session'"),
+      ).toEqual([{ seededFromAgentId: agentId }]);
+      expect(
+        rows(
+          world.sqlite,
+          "SELECT tools, secrets, mcpServers FROM work_policy WHERE use = 'session'",
+        ),
+      ).toEqual([{ tools: '["推送分支"]', secrets: '["SLOT_KEY"]', mcpServers: '["codegraph"]' }]);
+      world.sqlite.close();
+      const opened = openDbWithHandle(world.dbPath);
+      seedDefaultRouting(opened.db);
+      opened.close();
+      const again = new Database(world.dbPath);
+      expect(rows(again, "SELECT secrets FROM work_policy WHERE use = 'session'")).toEqual([
+        { secrets: '["SLOT_KEY"]' },
+      ]);
+      again.close();
+    },
+  );
+
   test('a second boot changes nothing', () => {
     const world = migratedWorld();
     const before = {
