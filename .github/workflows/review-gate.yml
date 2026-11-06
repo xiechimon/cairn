@@ -42,3 +42,4 @@ jobs:
           COMMAND: ${{ github.event_name == 'schedule' && 'sweep' || 'evaluate' }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          CAIRN_REQUIRE_SECURITY_REVIEW: ${{ vars.CAIRN_REQUIRE_SECURITY_REVIEW }}
