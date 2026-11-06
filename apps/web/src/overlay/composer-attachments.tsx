@@ -37,7 +37,7 @@ export function ComposerAttachments({
   return (
     <div
       data-testid="composer-attachments"
-      className="flex max-h-24 flex-wrap gap-2 overflow-y-auto pt-1.5 pb-2.5"
+      className="flex max-h-36 flex-wrap gap-2 overflow-y-auto pt-1.5 pb-2.5"
       role="status"
       aria-label={t('附件')}
     >
