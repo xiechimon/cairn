@@ -65,6 +65,7 @@ export function MenuSection() {
       lede="One menu surface for dropdowns, selects and popovers. Rows are 32px with concentric corners. Every row carries one letter on the right; pressing it while the menu is open runs the row. Rows that ask before acting end in an ellipsis; danger rows go red."
     >
       <Specimen
+        id="dropdown-menu"
         title="Dropdown menu"
         note={
           last == null
@@ -181,7 +182,12 @@ export function MenuSection() {
           </KeyedMenuContent>
         </DropdownMenu>
       </Specimen>
-      <Specimen title="Popover" note="For a small panel anchored to its trigger" stage="canvas">
+      <Specimen
+        id="popover"
+        title="Popover"
+        note="For a small panel anchored to its trigger"
+        stage="canvas"
+      >
         <Popover>
           <PopoverTrigger render={<Button variant="outline" />}>Machine status</PopoverTrigger>
           <PopoverContent align="start" className="w-72 gap-3">
@@ -220,6 +226,7 @@ export function DialogSection() {
       lede="Three widths on a light dim backdrop, a 16px title, one scrolling body and a split footer: hint on the left, actions on the right."
     >
       <Specimen
+        id="sizes-2"
         title="Sizes"
         code={`<DialogShell open={open} onClose={close} size="m" title="New schedule"\n  hint="Runs in your time zone"\n  footer={<><Button variant="ghost" className={DIALOG_TEXT_BUTTON}>Cancel</Button><Button className={DIALOG_PRIMARY_BUTTON}>Create</Button></>}>\n  …\n</DialogShell>`}
       >
@@ -232,6 +239,7 @@ export function DialogSection() {
         ))}
       </Specimen>
       <Specimen
+        id="confirm"
         title="Confirm"
         note="Destructive actions confirm first; never delete directly"
         code={`<AlertDialogShell open={open} onClose={close} title="Delete this task?" ariaLabel="Delete task"\n  footer={<AlertDialogActions cancelLabel="Cancel" confirmLabel="Delete" onCancel={close} onConfirm={…} />}>…</AlertDialogShell>`}
@@ -313,6 +321,7 @@ export function ToastSection() {
       lede="Light feedback after an action, bottom left. Failures say what went wrong; anything undoable offers Undo."
     >
       <Specimen
+        id="kinds"
         title="Kinds"
         code={`toastSuccess('Saved')\ntoastError('Could not save', error)\ntoast('Task deleted', { action: { label: 'Undo', onClick } })`}
       >
