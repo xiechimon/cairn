@@ -27,7 +27,7 @@ const MENU_CLS =
   'slash-menu max-h-62 overflow-auto rounded-(--radius-popover) bg-popover p-(--menu-pad) shadow-(--shadow-popover)';
 
 const ROW_CLS =
-  'slash-menu-row flex h-7 w-full cursor-pointer items-center justify-start rounded-(--radius-menu-item) border-0 px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
+  'slash-menu-row flex h-7 w-full cursor-pointer items-center justify-start rounded-(--radius-menu-item) border-0 px-2.5 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground';
 
 const ROW_LIT = ' bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
