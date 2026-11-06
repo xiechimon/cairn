@@ -46,29 +46,6 @@ function readPending(path: string): PendingEnrollment | null {
   }
 }
 
-function originOf(url: string): string | null {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
-
-export function rewriteToServerOrigin(url: string, serverUrl: string): string {
-  const target = originOf(serverUrl);
-  if (target === null) return url;
-  try {
-    const parsed = new URL(url);
-    const server = new URL(serverUrl);
-    parsed.protocol = server.protocol;
-    parsed.hostname = server.hostname;
-    parsed.port = server.port;
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
-
 export type EnrollApi = Pick<MachineClient, 'enrollStart' | 'enrollPoll'>;
 
 function asEnrollApi(client: unknown): EnrollApi {
@@ -100,7 +77,7 @@ export async function enrollThroughBrowser(
     const started = await api.enrollStart({ name });
     pending = {
       enrollId: started.enrollId,
-      url: rewriteToServerOrigin(started.url, serverUrl),
+      url: started.url,
       expiresAt: io.now() + ENROLL_TTL_MS,
       serverUrl,
     };
