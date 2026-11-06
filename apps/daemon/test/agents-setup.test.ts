@@ -19,8 +19,57 @@ const husky = join(repo, 'node_modules/husky/bin.js');
 const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
 const roots: string[] = [];
 
-afterEach(() => {
-  for (const root of roots.splice(0)) releaseTestTempDir(root);
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function killStubTree(pidFile: string): number[] {
+  let pids: number[] = [];
+  try {
+    pids = readFileSync(pidFile, 'utf8').split('\n').filter(Boolean).map(Number);
+  } catch {
+    return pids;
+  }
+  for (const pid of pids) {
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, 'SIGKILL');
+      } catch {}
+    }
+  }
+  return pids;
+}
+
+async function settle(pids: number[]): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (pids.some(alive) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+afterEach(async () => {
+  const errors: unknown[] = [];
+  for (const root of roots.splice(0)) {
+    try {
+      await settle(killStubTree(join(realpathSync(root), 'stub-pids')));
+    } catch (error) {
+      errors.push(error);
+    } finally {
+      try {
+        releaseTestTempDir(root);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  }
+  if (errors.length) throw new AggregateError(errors, 'agents-setup fixture cleanup failed');
 });
 
 function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm', 'git']) {
@@ -31,6 +80,7 @@ function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm',
   const bin = join(root, 'bin');
   const home = join(root, 'home with spaces');
   const log = join(root, 'commands.jsonl');
+  const pids = join(root, 'stub-pids');
   mkdirSync(bin);
   mkdirSync(home);
   const env = {
@@ -44,6 +94,7 @@ function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm',
     GIT_COMMITTER_NAME: 'Setup Test',
     GIT_COMMITTER_EMAIL: 'setup@example.com',
     CAIRN_TEST_LOG: log,
+    CAIRN_TEST_PIDS: pids,
     CAIRN_TEST_HUSKY: husky,
     CAIRN_TEST_GIT: realGit,
     ...overrides,
@@ -66,6 +117,7 @@ function fixture(overrides: NodeJS.ProcessEnv = {}, stubs = ['corepack', 'pnpm',
       String.raw`#!${process.execPath}
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync } from 'node:fs';
+appendFileSync(process.env.CAIRN_TEST_PIDS, process.pid + '\n');
 const command = ${JSON.stringify(name)};
 const args = process.argv.slice(2);
 if (command === 'git' && args[0] !== 'fetch') {

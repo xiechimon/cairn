@@ -6,6 +6,7 @@ import {
 } from '@cairn/shared/github-create-gate';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
+import { githubApiBaseUrl, isGithubApiUrl } from './github-api-base.js';
 
 export type FetchLike = (
   input: string | URL,
@@ -25,7 +26,6 @@ export type FetchLike = (
 
 const FETCH_TIMEOUT_MS = 15_000;
 
-// GitHub rejects API requests without a user-agent.
 const API_HEADERS = {
   accept: 'application/vnd.github+json',
   'x-github-api-version': '2022-11-28',
@@ -175,7 +175,7 @@ export async function githubPull(
   prNumber: number,
   opts: { etag?: string | null; timeoutMs?: number } = {},
 ): Promise<GithubPullPage | null> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}`;
   const got = await conditionalGetJson(
     fetchImpl,
     url,
@@ -243,7 +243,7 @@ export async function githubCompareStatus(
   head: string,
 ): Promise<string | 'missing' | 'invalid' | null> {
   if (!isFullSha(base) || !isFullSha(head)) return 'invalid';
-  const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
   try {
     const res = await fetchImpl(url, {
       headers: {
@@ -331,7 +331,7 @@ export async function githubRepoReachable(
   owner: string,
   repo: string,
 ): Promise<GithubRepoProbe> {
-  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const url = `${githubApiBaseUrl()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
   try {
     const data = (await readJson(fetchImpl, url, {
       ...API_HEADERS,
@@ -453,7 +453,7 @@ export async function githubUserRepos(
   fetchImpl: FetchLike,
   token: string,
 ): Promise<GithubUserRepo[]> {
-  const url = `https://api.github.com/user/repos?per_page=${USER_REPOS_PER_PAGE}&sort=pushed`;
+  const url = `${githubApiBaseUrl()}/user/repos?per_page=${USER_REPOS_PER_PAGE}&sort=pushed`;
   const data = await readJson(fetchImpl, url, {
     ...API_HEADERS,
     authorization: `Bearer ${token}`,
@@ -484,7 +484,7 @@ export async function githubUserRepos(
 }
 
 export async function githubUserLogin(fetchImpl: FetchLike, token: string): Promise<string> {
-  const data = (await readJson(fetchImpl, 'https://api.github.com/user', {
+  const data = (await readJson(fetchImpl, `${githubApiBaseUrl()}/user`, {
     ...API_HEADERS,
     authorization: `Bearer ${token}`,
   })) as { login?: unknown };
@@ -555,7 +555,7 @@ export async function githubRepoIssues(
   opts: { state: 'open' | 'closed' | 'all'; page: number },
 ): Promise<{ issues: GithubIssueSummary[]; hasMore: boolean }> {
   const url =
-    `https://api.github.com/${repoPath(owner, repo)}/issues` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues` +
     `?state=${opts.state}&page=${opts.page}&per_page=${ISSUES_PER_PAGE}`;
   const { data, getHeader } = await readJsonFull(fetchImpl, url, authHeaders(token));
   if (!Array.isArray(data)) {
@@ -577,7 +577,7 @@ export async function githubRepoIssue(
   repo: string,
   issueNumber: number,
 ): Promise<GithubIssueDetail> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
   const data = (await readJson(fetchImpl, url, authHeaders(token))) as Record<string, unknown>;
   const projected = projectIssue(data);
   if (!projected) {
@@ -686,7 +686,7 @@ function listUrl(
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) query.set(key, String(value));
   }
-  return `https://api.github.com/${repoPath(owner, repo)}/${path}?${query}`;
+  return `${githubApiBaseUrl()}/${repoPath(owner, repo)}/${path}?${query}`;
 }
 
 function projectArray<T>(
@@ -804,7 +804,7 @@ export async function githubRepoLabels(
   owner: string,
   repo: string,
 ): Promise<GithubLabel[]> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/labels?per_page=${LABELS_PER_PAGE}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/labels?per_page=${LABELS_PER_PAGE}`;
   const data = await readJson(fetchImpl, url, authHeaders(token));
   if (!Array.isArray(data)) {
     throw new HttpError(502, 'github labels response not an array');
@@ -870,7 +870,7 @@ async function intakeConditionalGet(
 function nextPageUrl(link: string | null): string | null {
   for (const part of (link ?? '').split(',')) {
     const m = /<([^>]+)>\s*;\s*rel="next"/.exec(part);
-    if (m?.[1]?.startsWith('https://api.github.com/')) return m[1];
+    if (m?.[1] !== undefined && isGithubApiUrl(m[1])) return m[1];
   }
   return null;
 }
@@ -891,7 +891,7 @@ export async function githubOpenIssuesWithLabel(
 ): Promise<GithubConditionalRead<GithubLabeledIssuesPage> | null> {
   const url =
     opts.url ??
-    `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues?state=open` +
       `&labels=${encodeURIComponent(label)}&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
   const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
   if (got === null || got.notModified) return got;
@@ -940,7 +940,7 @@ export async function githubOpenIssuesDetail(
 ): Promise<GithubConditionalRead<GithubOpenIssuesDetailPage> | null> {
   const url =
     opts.url ??
-    `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues?state=open` +
       `&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
   const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
   if (got === null || got.notModified) return got;
@@ -992,7 +992,7 @@ export async function githubIssueEvents(
 ): Promise<GithubConditionalRead<GithubIssueEventsPage> | null> {
   const url =
     opts.url ??
-    `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}/events` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/events` +
       `?per_page=${INTAKE_PER_PAGE}`;
   const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
   if (got === null || got.notModified) return got;
@@ -1060,7 +1060,7 @@ export async function githubIssueTimeline(
 ): Promise<GithubLinkedPullsRead | null> {
   const maxPages = opts.maxPages ?? GITHUB_ISSUE_TIMELINE_MAX_PAGES;
   let url =
-    `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}/timeline` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/timeline` +
     `?per_page=${INTAKE_PER_PAGE}`;
   const pulls: GithubLinkedPull[] = [];
   for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
@@ -1118,7 +1118,7 @@ export async function githubIssueClosingPulls(
   repo: string,
   issueNumber: number,
 ): Promise<GithubLinkedPullsRead | null> {
-  const url = 'https://api.github.com/graphql';
+  const url = `${githubApiBaseUrl()}/graphql`;
   const got = await intakeGet(fetchImpl, url, token, null, {
     method: 'POST',
     body: JSON.stringify({
@@ -1192,7 +1192,7 @@ export async function githubCollaboratorPermission(
   login: string,
 ): Promise<GithubRepoPermission | null> {
   const url =
-    `https://api.github.com/${repoPath(owner, repo)}/collaborators/` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/collaborators/` +
     `${encodeURIComponent(login)}/permission`;
   const got = await intakeGet(fetchImpl, url, token, null);
   if (got === null) return null;
@@ -1219,7 +1219,7 @@ export async function githubIssueState(
   issueNumber: number,
   opts: { etag?: string | null } = {},
 ): Promise<GithubConditionalRead<{ state: 'open' | 'closed' }> | null> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
   const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
   if (got === null || got.notModified) return got;
   const state = (got.data.body as { state?: unknown } | null | undefined)?.state;
@@ -1265,7 +1265,7 @@ export async function githubCreateIssue(
   repo: string,
   input: { title: string; body: string; labels?: string[] },
 ): Promise<{ number: number }> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/issues`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues`;
   let data: Record<string, unknown>;
   for (let attempt = 0; ; attempt++) {
     try {
@@ -1301,7 +1301,7 @@ export async function githubUpdateIssueTitle(
   issueNumber: number,
   title: string,
 ): Promise<void> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
 }
 
@@ -1313,7 +1313,7 @@ export async function githubCloseIssue(
   issueNumber: number,
   opts: string | { stateReason: 'completed' },
 ): Promise<void> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, {
     state: 'closed',
     state_reason: typeof opts === 'string' ? 'not_planned' : opts.stateReason,
@@ -1341,7 +1341,7 @@ export async function githubMergePull(
   prNumber: number,
   input: { sha: string; commitTitle: string; commitMessage: string },
 ): Promise<GithubMergeResult> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
   let res: Awaited<ReturnType<FetchLike>>;
   try {
     res = await fetchImpl(url, {
@@ -1413,7 +1413,7 @@ export async function githubPullPanel(
   prNumber: number,
   opts: { etag?: string | null } = {},
 ): Promise<GithubPullPanelPage | null> {
-  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}`;
   const got = await conditionalGetJson(fetchImpl, url, token, opts.etag, FETCH_TIMEOUT_MS);
   if (got === null) return null;
   if (got.notModified) return { notModified: true, etag: opts.etag ?? null, pull: null };
@@ -1473,7 +1473,7 @@ export async function githubCommitCheckRuns(
   opts: { etag?: string | null } = {},
 ): Promise<GithubCheckRunsPage | null> {
   const url =
-    `https://api.github.com/${repoPath(owner, repo)}/commits/${encodeURIComponent(ref)}` +
+    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/commits/${encodeURIComponent(ref)}` +
     `/check-runs?per_page=${CHECK_RUNS_PER_PAGE}`;
   const got = await conditionalGetJson(fetchImpl, url, token, opts.etag, FETCH_TIMEOUT_MS);
   if (got === null) return null;
@@ -1506,7 +1506,7 @@ export async function githubRequiredChecks(
   repo: string,
   branch: string,
 ): Promise<string[] | null> {
-  const base = `https://api.github.com/${repoPath(owner, repo)}`;
+  const base = `${githubApiBaseUrl()}/${repoPath(owner, repo)}`;
   const seg = encodedPath(branch);
   if (seg === null) return null;
   const [branchRead, rulesRead] = await Promise.all([
@@ -1736,7 +1736,7 @@ const gateUrl = (
   path: string,
   query?: Record<string, string | number>,
 ) =>
-  `https://api.github.com/${repoPath(owner, repo)}/${path}` +
+  `${githubApiBaseUrl()}/${repoPath(owner, repo)}/${path}` +
   (query === undefined
     ? ''
     : `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}`);
