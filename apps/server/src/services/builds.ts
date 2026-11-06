@@ -1159,7 +1159,8 @@ export function maybeEnqueueVerifyStep(
   if (buildRow === undefined) return;
   const planRow = latestPlanRow(deps, buildId);
   const verificationItems = planVerificationItems(planRow?.content ?? '');
-  if (verificationItems.length === 0) return;
+  if (githubPrOf(deps, todoRow, buildRow.prNumber) === null && verificationItems.length === 0)
+    return;
   const prompt = buildVerifyStepPrompt({
     ticketRef: ticketRefOf(todoRow),
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
