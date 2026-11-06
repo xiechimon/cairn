@@ -104,6 +104,10 @@
                 "message": "Seam discipline (ACP): ACP SDK and adapters may only be consumed through apps/daemon/src/backend/."
               },
               {
+                "group": ["**/legacy/agent-layer/*"],
+                "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
+              },
+              {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
                 "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
               }
@@ -124,7 +128,10 @@
       "includes": [
         "apps/daemon/src/backend/**",
         "apps/coordinator/src/runtime/**",
-        "apps/coordinator/test/**"
+        "apps/coordinator/test/**",
+        "apps/server/src/db/client.ts",
+        "apps/server/src/legacy/**",
+        "apps/server/test/**"
       ],
       "linter": {
         "rules": {

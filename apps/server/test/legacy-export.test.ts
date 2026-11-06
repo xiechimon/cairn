@@ -148,14 +148,14 @@ function exportFiles(homeDir: string): string[] {
 }
 
 describe('legacy-export migration guardrail (skill + mcp_server table retirement)', () => {
-  test('L1/L5: legacy db two tables with rows -> export content complete on disk, retired tables and the agent table gone', () => {
+  test('L1/L5: legacy db two tables with rows -> export content complete on disk, retired tables gone and the agent table kept for one start', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 2, mcpRows: 1 });
     const home = temp('cairn-legacy-home-');
     const { db, close } = openDbWithHandle(dbPath, { legacyExportDir: home });
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
       expect(tableExists(dbPath, 'mcp_server')).toBe(false);
-      expect(tableExists(dbPath, 'agent')).toBe(false);
+      expect(tableExists(dbPath, 'agent')).toBe(true);
       const files = exportFiles(home);
       expect(files).toHaveLength(1);
       expect(files[0]).toMatch(/^legacy-export-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
@@ -220,7 +220,7 @@ describe('legacy-export migration guardrail (skill + mcp_server table retirement
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
       expect(tableExists(dbPath, 'mcp_server')).toBe(false);
-      expect(tableExists(dbPath, 'agent')).toBe(false);
+      expect(tableExists(dbPath, 'agent')).toBe(true);
     } finally {
       close();
     }

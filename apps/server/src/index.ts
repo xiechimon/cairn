@@ -60,7 +60,21 @@ if (refusal !== null) {
 }
 const config = ensureAccessToken(loadedConfig);
 
-const { db, close } = openDbWithHandle(config.dbPath, { legacyExportDir: config.homeDir });
+const opened = (() => {
+  try {
+    return openDbWithHandle(config.dbPath, {
+      legacyExportDir: config.homeDir,
+      migrationLogger: logger,
+    });
+  } catch (error) {
+    logger.fatal(
+      { err: error },
+      error instanceof Error ? error.message : 'database migration failed',
+    );
+    process.exit(1);
+  }
+})();
+const { db, close } = opened;
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
 const vapidKeys = loadOrCreateVapidKeys(
   config.vapidKeysPath,

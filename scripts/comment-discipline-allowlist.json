@@ -735,42 +735,42 @@
     "reason": "external quirk: vite build empties its outDir before writing, so parallel builds into one dist clobber each other"
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/dispatch-eligibility.ts",
+    "path": "apps/server/src/legacy/agent-layer/dispatch-eligibility.ts",
     "line": "// Verbatim copy of apps/server/src/services/dispatch-eligibility.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/dispatch-eligibility.ts",
+    "path": "apps/server/src/legacy/agent-layer/dispatch-eligibility.ts",
     "line": "// @ts-nocheck",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/routing-migration.ts",
+    "path": "apps/server/src/legacy/agent-layer/routing-migration.ts",
     "line": "// Verbatim copy of apps/server/src/services/routing-migration.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/routing-migration.ts",
+    "path": "apps/server/src/legacy/agent-layer/routing-migration.ts",
     "line": "// @ts-nocheck",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/routing-rules.ts",
+    "path": "apps/server/src/legacy/agent-layer/routing-rules.ts",
     "line": "// Verbatim copy of apps/server/src/services/routing-rules.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/routing-rules.ts",
+    "path": "apps/server/src/legacy/agent-layer/routing-rules.ts",
     "line": "// @ts-nocheck",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/schema.ts",
+    "path": "apps/server/src/legacy/agent-layer/schema.ts",
     "line": "// Verbatim copy of apps/server/src/db/schema.ts from origin/main at df552ef68c64926cd114580a48ad15ddd9cf0ffd, the last commit before the agent layer was removed. Used only as the test oracle for migration 0115; do not edit.",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   },
   {
-    "path": "apps/server/test/fixtures/legacy-oracle/schema.ts",
+    "path": "apps/server/src/legacy/agent-layer/schema.ts",
     "line": "// @ts-nocheck",
     "reason": "Provenance header and type-check opt-out of the verbatim legacy routing oracle copied from origin/main df552ef68; the file is test-only and must stay byte-identical to the source apart from imports."
   }

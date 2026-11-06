@@ -59,6 +59,7 @@ export const DB_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'data_migration',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];

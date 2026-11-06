@@ -24,9 +24,9 @@ import {
   type WorkPolicyRecord,
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
-import { HttpError, notFound } from '../../../src/lib/errors.js';
-import { newRecordId, nowMs } from '../../../src/lib/ids.js';
-import { modelsAreIndependent } from '../../../src/services/merge-gate/model-identity.js';
+import { HttpError, notFound } from '../../lib/errors.js';
+import { newRecordId, nowMs } from '../../lib/ids.js';
+import { modelsAreIndependent } from '../../services/merge-gate/model-identity.js';
 import type { Db } from './db.js';
 import {
   agent,

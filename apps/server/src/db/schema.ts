@@ -566,6 +566,12 @@ export const agentMemory = sqliteTable('agent_memory', {
   updatedAt: epochMs('updatedAt').notNull(),
 });
 
+export const dataMigration = sqliteTable('data_migration', {
+  id: text('id').primaryKey(),
+  doneAt: epochMs('doneAt').notNull(),
+  detail: text('detail').notNull(),
+});
+
 export const memorySaveConflict = sqliteTable('memory_save_conflict', {
   id: text('id').primaryKey(),
   candidateIds: json<string[]>('candidateIds').notNull(),

@@ -1,11 +1,14 @@
 import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import type { Db } from './db.js';
-import { agentForStep } from './dispatch-eligibility.js';
-import { runRoutingMigration } from './routing-migration.js';
-import { memoryOwnerOf, setRoutingRulesEnabled } from './routing-rules.js';
-import * as schema from './schema.js';
+import type { Db } from '../../../src/legacy/agent-layer/db.js';
+import { agentForStep } from '../../../src/legacy/agent-layer/dispatch-eligibility.js';
+import { runRoutingMigration } from '../../../src/legacy/agent-layer/routing-migration.js';
+import {
+  memoryOwnerOf,
+  setRoutingRulesEnabled,
+} from '../../../src/legacy/agent-layer/routing-rules.js';
+import * as schema from '../../../src/legacy/agent-layer/schema.js';
 
 export interface OracleProfile {
   provider: string | null;
@@ -38,6 +41,8 @@ export interface LegacyOracle {
 export function openLegacyOracle(dbPath: string): LegacyOracle {
   const sqlite = new Database(dbPath);
   sqlite.pragma('foreign_keys = ON');
+  sqlite.pragma('synchronous = OFF');
+  sqlite.pragma('journal_mode = MEMORY');
   const db: Db = drizzle(sqlite, { schema });
   runRoutingMigration(db);
   setRoutingRulesEnabled(true);

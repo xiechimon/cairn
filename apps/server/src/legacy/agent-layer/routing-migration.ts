@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { AGENT_TOOL_DEFAULTS } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
-import { newRecordId, nowMs } from '../../../src/lib/ids.js';
+import { newRecordId, nowMs } from '../../lib/ids.js';
 import type { Db } from './db.js';
 import {
   adoptAgentMemories,
