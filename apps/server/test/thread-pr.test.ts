@@ -48,6 +48,7 @@ class GithubMock {
   pulls = new Map<string, PullSpec>();
   checks = new Map<string, RunSpec[]>();
   failing = new Set<string>();
+  failingChecks = false;
   remaining: number | null = null;
   limit = 5000;
   resetAtSeconds: number | null = null;
@@ -106,6 +107,7 @@ class GithubMock {
     }
     const runs = /\/commits\/([0-9a-f]+)\/check-runs/.exec(url);
     if (runs) {
+      if (this.failingChecks) return send(500, { message: 'boom' });
       return send(200, {
         check_runs: (this.checks.get(runs[1] ?? '') ?? []).map((r) => ({
           ...r,
@@ -274,6 +276,54 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
     expect(row?.lastReadAt).toBe(70_000);
     expect(rows(s)[0]?.updatedAt).toBe(1_000);
+  });
+
+  test('repeated unreadable check runs keep the old counts and leave lastReadAt at the last full read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    mock.checks.set(HEAD_A, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failingChecks = true;
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row?.checks).toMatchObject({ passed: 1, total: 1 });
+    expect(row?.lastReadAt).toBe(1_000);
+    mock.failingChecks = false;
+    await watch.sweep(210_000);
+    expect(listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId })[0]?.lastReadAt).toBe(
+      210_000,
+    );
+  });
+
+  test('a new PR whose check runs cannot be read is recorded as never fully read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    mock.failingChecks = true;
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    expect(rows(s)[0]?.lastReadAt).toBe(0);
+    mock.failingChecks = false;
+    await watch.sweep(70_000);
+    expect(rows(s)[0]?.lastReadAt).toBe(70_000);
+  });
+
+  test('a changed pull with unreadable check runs still updates its fields but not lastReadAt', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { title: 'before' });
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failingChecks = true;
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { title: 'after' });
+    await watch.sweep(70_000);
+    expect(rows(s)[0]).toMatchObject({ title: 'after', lastReadAt: 1_000 });
   });
 
   test('a failed poll leaves lastReadAt at the last good read', async () => {

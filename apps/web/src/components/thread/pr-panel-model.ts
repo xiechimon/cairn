@@ -38,7 +38,7 @@ export function prCardModelOfRow(row: PrPanelRow, now: number): PrCardModel {
         ? null
         : { result: row.verdict.result, judgedHead: shortHead(row.verdict.judgedHead) },
     currentHead: shortHead(row.head),
-    ...(!finished && lateMs > PR_READ_LATE_MS
+    ...(!finished && row.lastReadAt > 0 && lateMs > PR_READ_LATE_MS
       ? { readAgoMinutes: Math.floor(lateMs / 60_000) }
       : {}),
   };

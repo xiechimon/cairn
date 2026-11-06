@@ -285,6 +285,7 @@ export function createPrWatch(
       counted = await readChecks(fetchImpl, token, target, key, head, tally);
       if (counted === null) tally.unreadable += 1;
     }
+    const readComplete = finished || head === '' || counted !== null;
     const sameLine = existing !== undefined && existing.head === head;
     const keep: CheckTally = {
       passed: existing?.checksPassed ?? 0,
@@ -346,7 +347,7 @@ export function createPrWatch(
           threadId: target.threadId,
           buildId: target.buildId,
           ...values,
-          lastReadAt: now,
+          lastReadAt: readComplete ? now : 0,
           createdAt: now,
           updatedAt: now,
         })
@@ -359,12 +360,14 @@ export function createPrWatch(
       (field) => existing[field] !== values[field],
     );
     if (!changed) {
-      deps.db.update(threadPr).set({ lastReadAt: now }).where(eq(threadPr.id, existing.id)).run();
+      if (readComplete) {
+        deps.db.update(threadPr).set({ lastReadAt: now }).where(eq(threadPr.id, existing.id)).run();
+      }
       return;
     }
     deps.db
       .update(threadPr)
-      .set({ ...values, lastReadAt: now, updatedAt: now })
+      .set({ ...values, ...(readComplete ? { lastReadAt: now } : {}), updatedAt: now })
       .where(eq(threadPr.id, existing.id))
       .run();
     tally.updated += 1;

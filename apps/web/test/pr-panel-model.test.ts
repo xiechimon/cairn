@@ -76,6 +76,10 @@ describe('a stale read is reported only for a PR that can still change', () => {
     expect(prCardModelOfRow(row({ lastReadAt: NOW - 1_000 }), NOW).readAgoMinutes).toBeUndefined();
   });
 
+  test('a row never fully read carries no absurd age', () => {
+    expect(prCardModelOfRow(row({ lastReadAt: 0 }), NOW).readAgoMinutes).toBeUndefined();
+  });
+
   test('a merged PR never reads as stale', () => {
     const model = prCardModelOfRow(row({ state: 'merged', lastReadAt: NOW - 3_600_000 }), NOW);
     expect(model.readAgoMinutes).toBeUndefined();
