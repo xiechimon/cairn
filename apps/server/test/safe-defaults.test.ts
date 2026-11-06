@@ -1,5 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -8,6 +7,7 @@ import {
   parseAccessTokenFile,
 } from '@cairn/shared';
 import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   authStartupRefusal,
   ensureAccessToken,
@@ -22,7 +22,7 @@ const TOKEN = 'safe-defaults-token-0123456789abcdef';
 const tmpDirs: string[] = [];
 
 function freshHome(): string {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-safe-defaults-'));
+  const home = makeTestTempDir('safe-defaults-');
   tmpDirs.push(home);
   return home;
 }
@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of tmpDirs.splice(0)) releaseTestTempDir(dir);
 });
 
 describe('#2057 default bind', () => {
