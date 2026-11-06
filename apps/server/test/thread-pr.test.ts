@@ -326,6 +326,34 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     expect(rows(s)[0]).toMatchObject({ title: 'after', lastReadAt: 1_000 });
   });
 
+  test('checksReadFor names the head the checks were read for, and a head change with a failed read keeps the old one', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_A });
+    mock.checks.set(HEAD_A, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    expect(listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId })[0]).toMatchObject({
+      head: HEAD_A,
+      checksReadFor: HEAD_A,
+    });
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { head: HEAD_B });
+    mock.failingChecks = true;
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row).toMatchObject({ head: HEAD_B, checksReadFor: HEAD_A });
+    expect(row?.checks.total).toBe(0);
+    mock.failingChecks = false;
+    mock.checks.set(HEAD_B, [{ name: 'unit', status: 'completed', conclusion: 'success' }]);
+    await watch.sweep(210_000);
+    expect(listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId })[0]).toMatchObject({
+      head: HEAD_B,
+      checksReadFor: HEAD_B,
+    });
+  });
+
   test('a failed poll leaves lastReadAt at the last good read', async () => {
     const s = boot();
     const mock = new GithubMock();

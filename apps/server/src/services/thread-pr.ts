@@ -75,6 +75,7 @@ export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
     branch: row.headRef,
     base: row.baseRef,
     head: row.head,
+    checksReadFor: row.checksReadFor,
     verdict:
       row.verdictResult !== null && row.verdictHead !== null
         ? { result: row.verdictResult, judgedHead: row.verdictHead }

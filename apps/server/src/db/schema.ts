@@ -815,6 +815,7 @@ export const threadPr = sqliteTable(
     checksTotal: integer('checksTotal').notNull().default(0),
     checksFailedNames: text('checksFailedNames').notNull().default('[]'),
     head: text('head').notNull().default(''),
+    checksReadFor: text('checksReadFor').notNull().default(''),
     headRef: text('headRef').notNull().default(''),
     baseRef: text('baseRef').notNull().default(''),
     verdictResult: text('verdictResult').$type<'pass' | 'block'>(),

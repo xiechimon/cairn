@@ -22,8 +22,8 @@ function stateOfRow(row: PrPanelRow): PrCardState {
 
 export function prCiUnread(row: PrPanelRow): boolean {
   return (
-    row.lastReadAt === 0 &&
-    row.checks.total === 0 &&
+    row.head !== '' &&
+    row.checksReadFor !== row.head &&
     row.state !== 'merged' &&
     row.state !== 'closed'
   );

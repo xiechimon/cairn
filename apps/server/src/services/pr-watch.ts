@@ -332,6 +332,7 @@ export function createPrWatch(
       checksTotal: checksNow.total,
       checksFailedNames: JSON.stringify(checksNow.failedNames),
       head,
+      checksReadFor: counted !== null ? head : (existing?.checksReadFor ?? ''),
       headRef: pull.headRef,
       baseRef: pull.baseRef,
       verdictResult: verdict?.result ?? null,

@@ -39,6 +39,7 @@ export const prPanelRowSchema = z.object({
     failedNames: z.array(z.string()),
   }),
   head: z.string(),
+  checksReadFor: z.string(),
   verdict: z.object({ result: z.enum(['pass', 'block']), judgedHead: z.string() }).nullable(),
   autoFix: z.boolean(),
   mergeWhenReady: z.boolean(),

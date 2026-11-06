@@ -22,6 +22,7 @@ function prRow(over: Record<string, unknown> = {}) {
     deletions: 14,
     checks: { passed: 9, failed: 0, running: 0, total: 9, failedNames: [] },
     head: HEAD,
+    checksReadFor: HEAD,
     verdict: { result: 'pass', judgedHead: HEAD },
     autoFix: true,
     mergeWhenReady: false,
@@ -208,7 +209,7 @@ test('a closed PR with an old verdict reads Closed, not Needs re-review', async 
 });
 
 test('a row whose CI was never read says so instead of showing nothing', async ({ page }) => {
-  await setup(page, { rows: [prRow({ lastReadAt: 0, checks: { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] } })] });
+  await setup(page, { rows: [prRow({ checksReadFor: '', checks: { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] } })] });
   await page.goto('/app?thread=todo-1');
   await expect(panel(page).locator('[data-slot="pr-checks"]')).toHaveText('CI not read');
   await expect(panel(page).locator('[data-slot="pr-card-state"]')).toHaveText('Open');

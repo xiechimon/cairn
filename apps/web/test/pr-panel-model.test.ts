@@ -35,6 +35,7 @@ function row(over: Partial<PrPanelRow> = {}): PrPanelRow {
     blockedSince: null,
     wakeRounds: 0,
     lastReadAt: NOW,
+    checksReadFor: HEAD,
     ...over,
   };
 }
@@ -100,21 +101,28 @@ describe('list helpers', () => {
   });
 });
 
-describe('a row whose checks were never read', () => {
+describe('a row whose checks were not read for its current head', () => {
+  const OLD = '9d03b7a1e6c24f58b0a3d7e19c5f2468ab13c0de';
   const empty = { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] };
 
-  test('is flagged while the PR can still change', () => {
-    expect(prCiUnread(row({ lastReadAt: 0, checks: empty }))).toBe(true);
-    expect(prCardModelOfRow(row({ lastReadAt: 0, checks: empty }), NOW).ciUnread).toBe(true);
+  test('is flagged when the checks were never read', () => {
+    expect(prCiUnread(row({ checksReadFor: '', lastReadAt: 0, checks: empty }))).toBe(true);
+    expect(prCardModelOfRow(row({ checksReadFor: '', checks: empty }), NOW).ciUnread).toBe(true);
+  });
+
+  test('is flagged after a head change whose checks read failed, however fresh lastReadAt is', () => {
+    const afterPush = row({ head: HEAD, checksReadFor: OLD, lastReadAt: NOW, checks: empty });
+    expect(prCiUnread(afterPush)).toBe(true);
+    expect(prCardModelOfRow(afterPush, NOW).state).toBe('open');
   });
 
   test('never reads as ready to merge', () => {
-    expect(stateOf({ lastReadAt: 0, checks: empty })).toBe('open');
+    expect(stateOf({ checksReadFor: OLD })).toBe('open');
   });
 
-  test('is not flagged once read, finished, or when checks exist', () => {
-    expect(prCiUnread(row({ lastReadAt: NOW, checks: empty }))).toBe(false);
-    expect(prCiUnread(row({ lastReadAt: 0, state: 'merged', checks: empty }))).toBe(false);
-    expect(prCiUnread(row({ lastReadAt: 0 }))).toBe(false);
+  test('is not flagged once read for the head, or when finished', () => {
+    expect(prCiUnread(row())).toBe(false);
+    expect(prCiUnread(row({ checksReadFor: '', state: 'merged', checks: empty }))).toBe(false);
+    expect(prCiUnread(row({ head: '', checksReadFor: '' }))).toBe(false);
   });
 });
