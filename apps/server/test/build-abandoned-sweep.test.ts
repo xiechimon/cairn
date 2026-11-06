@@ -8,7 +8,11 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import {
+  ABANDONED_CLAIM_QUARANTINE_LIMIT,
+  BUILD_ABANDONED_STEP_MS,
+  sweepAbandonedBuildSteps,
+} from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -769,5 +773,52 @@ describe('#1284 verify step sweep (sweepAbandonedBuildSteps adds the verify kind
 
     expect(stepRowOf(w).status).toBe('pending');
     expect(buildRowOf(w).errorMessage).toBeNull();
+  });
+});
+
+describe('#2582 crash-loop quarantine (releaseClaimedStep counts abandoned claims)', () => {
+  test('one abandoned claim releases back to pending and counts it', () => {
+    const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).claimCount).toBe(1);
+    expect(buildRowOf(w).errorMessage).toBeNull();
+    expect(todoRowOf(w).phase).toBe('building');
+  });
+
+  test('the Nth abandoned claim quarantines the step instead of releasing it', () => {
+    const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 300_000 });
+    w.s.db
+      .update(stepTable)
+      .set({ claimCount: ABANDONED_CLAIM_QUARANTINE_LIMIT - 1 })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('failed');
+    expect(buildRowOf(w).errorMessage).toMatch(
+      new RegExp(`crashed ${ABANDONED_CLAIM_QUARANTINE_LIMIT} times`),
+    );
+  });
+
+  test('a claim that made progress before the machine went offline does not count toward quarantine', () => {
+    const w = makeWorld({ status: 'claimed', createdAgo: 300_000, heartbeatAgo: 130_000 });
+    w.s.db
+      .update(stepTable)
+      .set({ claimCount: ABANDONED_CLAIM_QUARANTINE_LIMIT - 1 })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).claimCount).toBe(ABANDONED_CLAIM_QUARANTINE_LIMIT - 1);
+  });
+
+  test('quarantine limit is a small fixed number, not a sweeping timeout', () => {
+    expect(ABANDONED_CLAIM_QUARANTINE_LIMIT).toBe(3);
   });
 });
