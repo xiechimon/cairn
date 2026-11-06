@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { ChevronRight, EllipsisVertical, PenLine, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { ChevronRight, EllipsisVertical, PenLine, ShieldCheck, Trash2 } from 'lucide-react';
 import { type ComponentType, type ReactNode, type SVGProps, useState } from 'react';
 import type {
   AccountStep,
@@ -22,7 +22,6 @@ import { ClaudeMark, GrokMark, OpenAIMark, PiMark } from '../brand-marks.js';
 import { FORM_CONTROL_CLS } from '../form-layout.js';
 import { ListRow } from '../list-card.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../menu-keys.js';
-import { SegmentedTabs } from '../segmented.js';
 import { isLowQuota } from '../settings/quota-row.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
