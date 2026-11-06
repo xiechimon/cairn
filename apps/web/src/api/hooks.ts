@@ -47,7 +47,7 @@ import type {
   PatchScheduleBody,
   PatchTeamBody,
   PatchUserBody,
-  PlanRow,
+  PlanResponse as PlanRow,
   ProjectCommitDetailResponse,
   ProjectFileResponse,
   ProjectFilesResponse,
