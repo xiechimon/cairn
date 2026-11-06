@@ -31,7 +31,7 @@ function row(over: Partial<PrPanelRow> = {}): PrPanelRow {
     dismissed: false,
     blockedSince: null,
     wakeRounds: 0,
-    updatedAt: NOW,
+    lastReadAt: NOW,
     ...over,
   };
 }
@@ -66,16 +66,16 @@ describe('a panel row maps onto one card state', () => {
 
 describe('a stale read is reported only for a PR that can still change', () => {
   test('an open PR read long ago carries the age in minutes', () => {
-    const model = prCardModelOfRow(row({ updatedAt: NOW - PR_READ_LATE_MS - 60_000 }), NOW);
+    const model = prCardModelOfRow(row({ lastReadAt: NOW - PR_READ_LATE_MS - 60_000 }), NOW);
     expect(model.readAgoMinutes).toBe(11);
   });
 
   test('a recent read carries no age', () => {
-    expect(prCardModelOfRow(row({ updatedAt: NOW - 1_000 }), NOW).readAgoMinutes).toBeUndefined();
+    expect(prCardModelOfRow(row({ lastReadAt: NOW - 1_000 }), NOW).readAgoMinutes).toBeUndefined();
   });
 
   test('a merged PR never reads as stale', () => {
-    const model = prCardModelOfRow(row({ state: 'merged', updatedAt: NOW - 3_600_000 }), NOW);
+    const model = prCardModelOfRow(row({ state: 'merged', lastReadAt: NOW - 3_600_000 }), NOW);
     expect(model.readAgoMinutes).toBeUndefined();
   });
 });

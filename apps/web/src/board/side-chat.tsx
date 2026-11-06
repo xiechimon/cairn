@@ -26,7 +26,7 @@ import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { threadCopy, threadTone } from './thread-copy.js';
+import { threadCopy, threadTone, VIEW_PARAM } from './thread-copy.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
 import { ThreadUsageFooter } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
@@ -317,7 +317,7 @@ export function SideChat({
   const todo = chat.todo;
   const [searchParams] = useSearchParams();
   const [chosenView, setView] = useState<ThreadView>(
-    searchParams.get('view') === 'changes' ? 'changes' : 'chat',
+    searchParams.get(VIEW_PARAM) === 'changes' ? 'changes' : 'chat',
   );
   const view = chat.changes.status === 'none' ? 'chat' : chosenView;
   const showsChanges = view === 'changes';

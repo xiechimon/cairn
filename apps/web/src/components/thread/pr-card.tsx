@@ -40,7 +40,7 @@ function resultWord(result: PrCardResult, t: TFunc): string {
 }
 
 export function pillOf(pr: PrCardModel, t: TFunc): { label: string; tone: Tone } {
-  if (pr.state !== 'merged' && isVerdictStale(pr)) return { label: t('需重新审核'), tone: 'warn' };
+  if (isVerdictStale(pr)) return { label: t('需重新审核'), tone: 'warn' };
   switch (pr.state) {
     case 'open':
       return { label: t('已开启'), tone: 'neutral' };
@@ -296,7 +296,7 @@ export function PrCard(props: PrCardProps) {
     <article
       data-slot="pr-card"
       data-state={pr.state}
-      data-stale={pr.state !== 'merged' && isVerdictStale(pr) ? '' : undefined}
+      data-stale={isVerdictStale(pr) ? '' : undefined}
       className={cn(
         'flex min-w-0 flex-col gap-2.5 rounded-xl bg-card px-3.5 py-3 shadow-(--e1)',
         className,

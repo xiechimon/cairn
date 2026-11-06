@@ -15,7 +15,7 @@ import { useI18n } from '../i18n/provider.js';
 import { scheduleSummary } from '../pages/schedule-summary.js';
 import { needsYouThreads } from './needs-you.js';
 import { relativeTime } from './rel-time.js';
-import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { THREAD_PARAM, threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
 
 export type WorkPane = 'tasks' | 'made' | 'machines';
 
@@ -150,7 +150,7 @@ export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }
                       setSearchParams((prev) => {
                         const params = new URLSearchParams(prev);
                         params.set(THREAD_PARAM, pr.threadId);
-                        params.set('view', 'changes');
+                        params.set(VIEW_PARAM, 'changes');
                         return params;
                       })
                     }

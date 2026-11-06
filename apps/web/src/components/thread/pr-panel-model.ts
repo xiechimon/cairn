@@ -22,7 +22,7 @@ function stateOfRow(row: PrPanelRow): PrCardState {
 export function prCardModelOfRow(row: PrPanelRow, now: number): PrCardModel {
   const state = stateOfRow(row);
   const finished = state === 'merged' || state === 'closed';
-  const lateMs = now - row.updatedAt;
+  const lateMs = now - row.lastReadAt;
   return {
     number: row.number,
     title: row.title,

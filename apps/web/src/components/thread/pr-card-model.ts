@@ -82,7 +82,10 @@ export function shortHead(sha: string): string {
   return sha.slice(0, SHORT_HEAD_LENGTH);
 }
 
-export function isVerdictStale(pr: Pick<PrCardModel, 'verdict' | 'currentHead'>): boolean {
+export function isVerdictStale(
+  pr: Pick<PrCardModel, 'verdict' | 'currentHead' | 'state'>,
+): boolean {
+  if (pr.state === 'merged' || pr.state === 'closed') return false;
   return pr.verdict != null && pr.verdict.judgedHead !== pr.currentHead;
 }
 

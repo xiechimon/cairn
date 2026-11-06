@@ -82,7 +82,7 @@ export function createPrWatch(
   const pulls = new Map<string, { etag: string | null; pull: GithubPullPanel }>();
   const checks = new Map<string, { sha: string; etag: string | null; runs: GithubCheckRun[] }>();
   const rates = new Map<string, RateWindow>();
-  const lastReadAt = new Map<string, number>();
+  const teamReadAt = new Map<string, number>();
   const closedSeenAt = new Map<string, number>();
   let sweeping = false;
 
@@ -338,6 +338,7 @@ export function createPrWatch(
           threadId: target.threadId,
           buildId: target.buildId,
           ...values,
+          lastReadAt: now,
           createdAt: now,
           updatedAt: now,
         })
@@ -349,10 +350,13 @@ export function createPrWatch(
     const changed = (Object.keys(values) as (keyof typeof values)[]).some(
       (field) => existing[field] !== values[field],
     );
-    if (!changed) return;
+    if (!changed) {
+      deps.db.update(threadPr).set({ lastReadAt: now }).where(eq(threadPr.id, existing.id)).run();
+      return;
+    }
     deps.db
       .update(threadPr)
-      .set({ ...values, updatedAt: now })
+      .set({ ...values, lastReadAt: now, updatedAt: now })
       .where(eq(threadPr.id, existing.id))
       .run();
     tally.updated += 1;
@@ -381,7 +385,7 @@ export function createPrWatch(
             if (token === null) continue;
             const pacing = pacingOf(rates.get(teamId), now);
             tally.pacing = pacing;
-            const last = lastReadAt.get(teamId);
+            const last = teamReadAt.get(teamId);
             if (
               pacing !== 'normal' &&
               last !== undefined &&
@@ -389,7 +393,7 @@ export function createPrWatch(
             ) {
               continue;
             }
-            lastReadAt.set(teamId, now);
+            teamReadAt.set(teamId, now);
             const fetchImpl = observing(teamId, now);
             let targets = targetsOf(teamId);
             if (pacing === 'armed-only') {

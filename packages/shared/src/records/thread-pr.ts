@@ -38,7 +38,7 @@ export const prPanelRowSchema = z.object({
   dismissed: z.boolean(),
   blockedSince: epochMs.nullable(),
   wakeRounds: count,
-  updatedAt: epochMs,
+  lastReadAt: epochMs,
 });
 export type PrPanelRow = z.infer<typeof prPanelRowSchema>;
 

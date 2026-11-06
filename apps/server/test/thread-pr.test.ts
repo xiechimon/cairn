@@ -242,15 +242,31 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     });
   });
 
-  test('the panel row carries the time of the last read so the UI can say when data is stale', async () => {
+  test('an unchanged PR polled successfully, including on a 304, moves lastReadAt and not updatedAt', async () => {
     const s = boot();
     const mock = new GithubMock();
     const t = seedThread(s);
     mock.pulls.set(`octo/demo#${t.prNumber}`, {});
-    await watchFor(s, mock).sweep(1_000);
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    await watch.sweep(70_000);
+    expect(mock.notModified).toBeGreaterThan(0);
     const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
-    expect(row?.updatedAt).toBe(rows(s)[0]?.updatedAt);
-    expect(row?.updatedAt).toBeGreaterThan(0);
+    expect(row?.lastReadAt).toBe(70_000);
+    expect(rows(s)[0]?.updatedAt).toBe(1_000);
+  });
+
+  test('a failed poll leaves lastReadAt at the last good read', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    mock.failing.add(`octo/demo#${t.prNumber}`);
+    await watch.sweep(70_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row?.lastReadAt).toBe(1_000);
   });
 
   test('mergeable_state values map onto the panel merge states, a draft shows as draft', async () => {

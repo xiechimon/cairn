@@ -822,6 +822,7 @@ export const threadPr = sqliteTable(
     dismissed: bool('dismissed').notNull().default(false),
     blockedSince: epochMs('blockedSince'),
     wakeRounds: integer('wakeRounds').notNull().default(0),
+    lastReadAt: epochMs('lastReadAt').notNull().default(0),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
   },

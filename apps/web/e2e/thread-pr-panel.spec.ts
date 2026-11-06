@@ -27,7 +27,7 @@ function prRow(over: Record<string, unknown> = {}) {
     dismissed: false,
     blockedSince: null,
     wakeRounds: 0,
-    updatedAt: Date.now(),
+    lastReadAt: Date.now(),
     ...over,
   };
 }
@@ -91,12 +91,12 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 test('a read older than ten minutes says the data is late, a finished PR does not', async ({ page }) => {
-  await setup(page, { rows: [prRow({ updatedAt: Date.now() - 47 * 60_000 })] });
+  await setup(page, { rows: [prRow({ lastReadAt: Date.now() - 47 * 60_000 })] });
   await page.goto('/app?thread=todo-1');
   await expect(panel(page).locator('[data-slot="pr-card-late"]')).toContainText('Last read 47 min ago');
   await evidencePanelShot(page, 'thread-pr-stale-light.png', page.locator('.side-panel'));
   await page.unroute('**/api/**');
-  await setup(page, { rows: [prRow({ state: 'merged', updatedAt: Date.now() - 47 * 60_000 })] });
+  await setup(page, { rows: [prRow({ state: 'merged', lastReadAt: Date.now() - 47 * 60_000 })] });
   await page.goto('/app?thread=todo-1');
   await expect(panel(page).locator('[data-slot="pr-card"]')).toHaveAttribute('data-state', 'merged');
   await expect(panel(page).locator('[data-slot="pr-card-late"]')).toHaveCount(0);
@@ -171,6 +171,24 @@ test('the same PR link reaches the needs-you card, the outputs panel and the fin
   await page.goto('/app?thread=todo-1');
   await page.getByRole('button', { name: 'Finish…' }).click();
   await expect(page.getByTestId('accept-dialog-pr').getByRole('link', { name: /PR #42/ })).toHaveAttribute('href', /pull\/42$/);
+});
+
+test('the changes view does not leak into the next thread after closing', async ({ page }) => {
+  await setup(page, { rows: [prRow()] });
+  await page.goto('/app?thread=todo-1&view=changes');
+  await page.getByRole('button', { name: 'Close' }).first().click();
+  await expect(page).not.toHaveURL(/view=changes/);
+  await page.locator('[data-slot="thread-card"]').first().getByRole('button', { name: 'View thread' }).click();
+  await expect(page).toHaveURL(/thread=todo-1/);
+  await expect(page).not.toHaveURL(/view=/);
+  await expect(page.getByTestId('thread-pr-panel')).toBeVisible();
+});
+
+test('a closed PR with an old verdict reads Closed, not Needs re-review', async ({ page }) => {
+  await setup(page, { rows: [prRow({ state: 'closed', verdict: { result: 'pass', judgedHead: 'b'.repeat(40) } })] });
+  await page.goto('/app?thread=todo-1');
+  await expect(status(page).getByTestId('side-chat-pr-status')).toHaveText('Closed');
+  await expect(panel(page).locator('[data-slot="pr-card"]')).not.toHaveAttribute('data-stale', '');
 });
 
 test('at 375px the panel and header fit without horizontal scroll', async ({ page }) => {

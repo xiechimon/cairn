@@ -32,7 +32,7 @@ import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
 import { composeRequest } from './open-composer.js';
-import { THREAD_PARAM, threadCopy, threadStatus, threadTone } from './thread-copy.js';
+import { THREAD_PARAM, threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -143,6 +143,7 @@ export function HomeC({
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
+    params.delete(VIEW_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state: location.state });

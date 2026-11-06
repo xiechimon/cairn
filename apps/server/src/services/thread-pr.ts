@@ -72,7 +72,7 @@ export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
     dismissed: row.dismissed,
     blockedSince: row.blockedSince,
     wakeRounds: row.wakeRounds,
-    updatedAt: row.updatedAt,
+    lastReadAt: row.lastReadAt,
   });
 }
 
