@@ -9,7 +9,7 @@ import {
   Server,
   Settings,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
@@ -28,6 +28,9 @@ import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { needsYouThreads } from './needs-you.js';
 import { ProjectAvatar } from './project-avatar.js';
+import { SidebarProjectThreads } from './sidebar-project-threads.js';
+import { projectThreads } from './sidebar-threads.js';
+import { THREAD_PARAM, threadHref } from './thread-copy.js';
 
 export type SidebarSelected =
   | 'board'
@@ -177,6 +180,7 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
   const projectRows = useMemo(
     () => (projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id)),
     [projects],
@@ -394,16 +398,22 @@ export function BoardSidebar({
         </div>
         {!projectsCollapsed &&
           projectRows.map((row, i) => (
-            <SidebarProjectRow
-              key={row.id}
-              name={row.name}
-              tone={i}
-              icon={row.icon}
-              color={row.color}
-              waiting={waitingByProject.get(row.id) ?? 0}
-              active={activeProject === row.id}
-              onClick={() => navigate(projectHref(row.id))}
-            />
+            <Fragment key={row.id}>
+              <SidebarProjectRow
+                name={row.name}
+                tone={i}
+                icon={row.icon}
+                color={row.color}
+                waiting={waitingByProject.get(row.id) ?? 0}
+                active={activeProject === row.id}
+                onClick={() => navigate(projectHref(row.id))}
+              />
+              <SidebarProjectThreads
+                threads={projectThreads(todos ?? [], row.id)}
+                openThreadId={openThreadId}
+                onOpen={(id) => navigate(threadHref(id, baseParams.toString()))}
+              />
+            </Fragment>
           ))}
       </nav>
 
