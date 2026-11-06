@@ -734,7 +734,8 @@ test('answer drafts per request and the thread draft stay separate through every
   });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
-  const option = (n: number) => page.getByTestId(`chief-question-option-0-${n}`);
+  const option = (n: number) =>
+    page.getByTestId('chief-question-dock').getByTestId(`chief-question-option-0-${n}`);
   const toThread = async () => {
     await page.getByRole('button', { name: '对某个 thread 说' }).click();
     await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
@@ -749,34 +750,145 @@ test('answer drafts per request and the thread draft stay separate through every
     await composer.click();
     await expect(composer).toBeFocused();
   };
-  const steps: { name: string; run: () => Promise<void>; composer: string; extra?: () => Promise<void> }[] = [
+  const steps: {
+    name: string;
+    run: () => Promise<void>;
+    composer: string;
+    extra?: () => Promise<void>;
+  }[] = [
     { name: 'type the answer for A', run: () => composer.fill('ansA'), composer: 'ansA' },
     { name: 'target the thread: its own draft is empty', run: toThread, composer: '' },
     { name: 'type into the thread', run: () => composer.fill('noteX'), composer: 'noteX' },
-    { name: 'digits type into the thread draft', run: async () => { await focusComposer(); await page.keyboard.press('End'); await page.keyboard.type('1'); }, composer: 'noteX1',
-      extra: async () => { await expect(option(0)).toHaveAttribute('aria-pressed', 'false'); } },
-    { name: 'click an option while the thread is targeted', run: () => option(1).click(), composer: 'noteX1',
-      extra: async () => { await expect(option(1)).toHaveAttribute('aria-pressed', 'true'); } },
-    { name: 'switch page to B while the thread is targeted', run: () => page.getByTestId('chief-question-next').click(), composer: 'noteX1' },
-    { name: 'back to A while the thread is targeted', run: () => page.getByTestId('chief-question-prev').click(), composer: 'noteX1' },
-    { name: 'target the Coordinator: A answer is back', run: toCoordinator, composer: 'ansA' },
-    { name: 'switch page to B: empty', run: () => page.getByTestId('chief-question-next').click(), composer: '' },
+    {
+      name: 'digits type into the thread draft',
+      run: async () => {
+        await focusComposer();
+        await page.keyboard.press('End');
+        await page.keyboard.type('1');
+      },
+      composer: 'noteX1',
+      extra: async () => {
+        await expect(option(0)).toHaveAttribute('aria-pressed', 'false');
+      },
+    },
+    {
+      name: 'click an option while the thread is targeted',
+      run: () => option(1).click(),
+      composer: 'noteX1',
+      extra: async () => {
+        await expect(option(1)).toHaveAttribute('aria-pressed', 'true');
+      },
+    },
+    {
+      name: 'switch page to B while the thread is targeted',
+      run: () => page.getByTestId('chief-question-next').click(),
+      composer: 'noteX1',
+    },
+    {
+      name: 'back to A while the thread is targeted',
+      run: () => page.getByTestId('chief-question-prev').click(),
+      composer: 'noteX1',
+    },
+    { name: 'target the Coordinator: the option replaced A custom text', run: toCoordinator, composer: '' },
+    {
+      name: 'typing custom text clears the option',
+      run: () => composer.fill('ansA2'),
+      composer: 'ansA2',
+      extra: async () => {
+        await expect(option(1)).toHaveAttribute('aria-pressed', 'false');
+      },
+    },
+    {
+      name: 'switch page to B: empty',
+      run: () => page.getByTestId('chief-question-next').click(),
+      composer: '',
+    },
     { name: 'type the answer for B', run: () => composer.fill('ansB'), composer: 'ansB' },
-    { name: 'back to A: its answer is intact', run: () => page.getByTestId('chief-question-prev').click(), composer: 'ansA' },
-    { name: 'digit in a non-empty answer types', run: async () => { await focusComposer(); await page.keyboard.press('End'); await page.keyboard.type('2'); }, composer: 'ansA2',
-      extra: async () => { await expect(option(1)).toHaveAttribute('aria-pressed', 'true'); } },
-    { name: 'forward to B: its answer is intact', run: () => page.getByTestId('chief-question-next').click(), composer: 'ansB' },
+    {
+      name: 'back to A: its answer is intact',
+      run: () => page.getByTestId('chief-question-prev').click(),
+      composer: 'ansA2',
+    },
+    {
+      name: 'a digit in a non-empty answer types',
+      run: async () => {
+        await focusComposer();
+        await page.keyboard.press('End');
+        await page.keyboard.type('2');
+      },
+      composer: 'ansA22',
+      extra: async () => {
+        await expect(option(1)).toHaveAttribute('aria-pressed', 'false');
+      },
+    },
+    {
+      name: 'forward to B: its answer is intact',
+      run: () => page.getByTestId('chief-question-next').click(),
+      composer: 'ansB',
+    },
     { name: 'target the thread again: its draft is intact', run: toThread, composer: 'noteX1' },
-    { name: 'Enter sends to the thread, answers untouched', run: () => composer.press('Enter'), composer: '',
+    {
+      name: 'Enter sends to the thread, answers untouched',
+      run: () => composer.press('Enter'),
+      composer: '',
       extra: async () => {
         await expect.poll(() => messaged.map((m) => m.content)).toEqual(['noteX1']);
         expect(answered).toEqual([]);
-      } },
+      },
+    },
     { name: 'target the Coordinator: B answer still there', run: toCoordinator, composer: 'ansB' },
-    { name: 'Enter answers B with the typed text', run: () => composer.press('Enter'), composer: 'ansB',
+    {
+      name: 'custom text then an option: the option is what is shown',
+      run: () => option(0).click(),
+      composer: '',
       extra: async () => {
-        await expect.poll(() => answered.map((row) => row.body.answers)).toEqual([[{ header: 'Merge · #2271', choices: ['ansB'] }]]);
-      } },
+        await expect(option(0)).toHaveAttribute('aria-pressed', 'true');
+      },
+    },
+    {
+      name: 'submit B: the option is what is sent',
+      run: () => composer.press('Enter'),
+      composer: '',
+      extra: async () => {
+        await expect
+          .poll(() => answered.map((row) => row.body.answers))
+          .toEqual([[{ header: 'Merge · #2271', choices: ['Send it to ian'] }]]);
+      },
+    },
+    {
+      name: 'A shows its custom text again after B is answered',
+      run: async () => {
+        await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
+      },
+      composer: 'ansA22',
+    },
+    {
+      name: 'an option then custom text: the text is what is shown',
+      run: async () => {
+        await option(0).click();
+        await composer.fill('finalA');
+      },
+      composer: 'finalA',
+      extra: async () => {
+        await expect(option(0)).toHaveAttribute('aria-pressed', 'false');
+      },
+    },
+    {
+      name: 'Enter twice fast sends exactly one answer, the text',
+      run: async () => {
+        await Promise.all([composer.press('Enter'), composer.press('Enter')]);
+        await page.waitForTimeout(800);
+      },
+      composer: '',
+      extra: async () => {
+        await expect
+          .poll(() => answered.map((row) => row.body.answers))
+          .toEqual([
+            [{ header: 'Merge · #2271', choices: ['Send it to ian'] }],
+            [{ header: 'Model · #74', choices: ['finalA'] }],
+          ]);
+      },
+    },
   ];
   const failed: string[] = [];
   for (const step of steps) {

@@ -11,6 +11,7 @@ import {
   questionDraftComplete,
   questionDraftKey,
   questionDraftStore,
+  questionSubmitStore,
 } from './question-drafts.js';
 import type { OriginChiefQuestion } from './question-origin.js';
 
@@ -33,8 +34,6 @@ function setStepOf(request: OriginChiefQuestion, step: number): void {
   const record = questionDraftStore.get(key) ?? {
     drafts: emptyQuestionDrafts(request.item.questions),
     step: 0,
-    submitting: false,
-    error: null,
   };
   questionDraftStore.set(key, { ...record, step });
 }
@@ -62,7 +61,7 @@ function DockQuestion({
   const key = draftKeyOf(request);
   const error = useSyncExternalStore(
     questionDraftStore.subscribe,
-    () => questionDraftStore.get(key)?.error ?? null,
+    () => questionSubmitStore.get(key).error,
     () => null,
   );
   return (

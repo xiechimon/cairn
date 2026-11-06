@@ -35,6 +35,8 @@ import {
   type QuestionDraft,
   questionDraftComplete,
   questionDraftStore,
+  questionSubmitStore,
+  replaceQuestionDraft,
 } from './question-drafts.js';
 
 export type ChiefQuestionItem = Extract<ChiefStreamItem, { kind: 'question' }>;
@@ -149,14 +151,11 @@ function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draft
   const [localStep, setLocalStep] = useState(0);
   const drafts = stored?.drafts ?? localDrafts;
   const step = stored?.step ?? localStep;
-  const submitting = stored?.submitting === true;
   const persist = (nextDrafts: QuestionDraft[], nextStep: number) => {
     if (draftKey === undefined) return;
     questionDraftStore.set(draftKey, {
       drafts: nextDrafts,
       step: nextStep,
-      submitting,
-      error: null,
     });
   };
   useEffect(() => {
@@ -165,7 +164,6 @@ function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draft
   return {
     drafts,
     step,
-    submitting,
     setDrafts: (update: (prev: QuestionDraft[]) => QuestionDraft[]) => {
       const next = update(drafts);
       if (draftKey !== undefined) persist(next, step);
@@ -190,10 +188,11 @@ export function ChiefQuestionCard({
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
-  const { drafts, step, submitting, setDrafts, setStep } = useQuestionDrafts(
-    item,
-    questions,
-    draftKey,
+  const { drafts, step, setDrafts, setStep } = useQuestionDrafts(item, questions, draftKey);
+  const submitting = useSyncExternalStore(
+    questionDraftStore.subscribe,
+    () => (draftKey === undefined ? false : questionSubmitStore.get(draftKey).submitting),
+    () => false,
   );
   const pending = item.status === 'pending' && onAnswer !== undefined && !submitting;
   const total = questions.length;
@@ -227,7 +226,7 @@ export function ChiefQuestionCard({
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
       e.preventDefault();
-      if (bound && question.multiSelect !== true) setTextAt(step, '');
+      if (question.multiSelect !== true) setTextAt(step, '');
       setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
@@ -250,7 +249,7 @@ export function ChiefQuestionCard({
   ): QuestionDraft | undefined => {
     if (stored === undefined || prompt === undefined) return stored;
     if (stored.kind === 'text') return { kind: 'text', value: text };
-    if (text.trim() === '') return stored;
+    if (!bound || text.trim() === '') return stored;
     if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
     return { kind: 'choices', picked: [], other: true, otherText: text };
   };
@@ -263,6 +262,7 @@ export function ChiefQuestionCard({
 
   const submit = () => {
     if (!allComplete) return;
+    if (draftKey !== undefined && questionSubmitStore.get(draftKey).submitting) return;
     onAnswer?.({
       requestId: item.requestId,
       answers: effectiveDrafts.map((d, i) => {
@@ -284,6 +284,18 @@ export function ChiefQuestionCard({
     }
     setStep((s) => Math.min(lastStep, s + 1));
   };
+
+  const typedText = textAt(step);
+  const typedPicks = draft?.kind === 'choices' ? draft.picked.length : 0;
+  useEffect(() => {
+    if (!bound || !pending || question === undefined || question.multiSelect === true) return;
+    if (typedText.trim() === '' || typedPicks === 0) return;
+    setDrafts((prev) => {
+      const current = prev[step];
+      if (current?.kind !== 'choices') return prev;
+      return replaceQuestionDraft(prev, step, { ...current, picked: [] });
+    });
+  }, [typedText, typedPicks, bound, pending, step]);
 
   useEffect(() => {
     if (draftKey !== undefined && item.status !== 'pending')
@@ -375,7 +387,7 @@ export function ChiefQuestionCard({
         }
       : undefined);
   const pick = (optionIndex: number) => {
-    if (bound && question.multiSelect !== true) setTextAt(step, '');
+    if (question.multiSelect !== true) setTextAt(step, '');
     setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
   };
 
