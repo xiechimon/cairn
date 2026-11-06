@@ -67,6 +67,49 @@ export type CreateProviderBody = z.infer<typeof createProviderBodySchema>;
 export const patchProviderBodySchema = createProviderBodySchema.partial();
 export type PatchProviderBody = z.infer<typeof patchProviderBodySchema>;
 
+export const testProviderBodySchema = z.object({
+  model: z.string().min(1).optional(),
+});
+export type TestProviderBody = z.infer<typeof testProviderBodySchema>;
+
+export const providerTestErrorTypeSchema = z.enum([
+  'no_key',
+  'no_model',
+  'auth',
+  'not_found',
+  'rate_limited',
+  'server',
+  'timeout',
+  'network',
+  'invalid_response',
+  'other',
+]);
+export type ProviderTestErrorType = z.infer<typeof providerTestErrorTypeSchema>;
+
+export const providerTestErrorSchema = z.object({
+  type: providerTestErrorTypeSchema,
+  message: z.string(),
+});
+export type ProviderTestError = z.infer<typeof providerTestErrorSchema>;
+
+export const providerTestResultSchema = z.object({
+  status: z.enum(['ok', 'failed']),
+  listing: z.object({
+    httpStatus: z.number().int().nullable(),
+    modelCount: z.number().int().nullable(),
+    latencyMs: z.number().int().nullable(),
+    error: providerTestErrorSchema.nullable(),
+  }),
+  probe: z.object({
+    requestedModel: z.string().nullable(),
+    echoedModel: z.string().nullable(),
+    httpStatus: z.number().int().nullable(),
+    latencyMs: z.number().int().nullable(),
+    error: providerTestErrorSchema.nullable(),
+  }),
+});
+export type ProviderTestResult = z.infer<typeof providerTestResultSchema>;
+
 export const PROVIDER_PRESET_IDS = [
   'github-copilot',
   'openai-codex',

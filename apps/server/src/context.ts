@@ -45,6 +45,8 @@ export interface AppContext {
   githubFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;
   oauthFetch?: FetchLike;
+  providerTestFetch?: FetchLike;
+  providerTestTimeoutMs?: number;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
   mcpConfigPath: string;

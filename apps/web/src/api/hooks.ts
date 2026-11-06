@@ -55,6 +55,7 @@ import type {
   ProjectTreeResponse,
   ProviderPreset,
   ProviderRecord,
+  ProviderTestResult,
   RetroProposal,
   ScheduleRecord,
   SearchResponse,
@@ -995,6 +996,10 @@ export function useApiMutations(teamId: string | undefined) {
     deleteProvider: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/providers/${id}`),
       onSuccess: invalidateAll,
+    }),
+    testProvider: useMutation({
+      mutationFn: (id: string) =>
+        api.post<ProviderTestResult>(`/api/teams/${teamId}/providers/${id}/test`, {}),
     }),
     patchProvider: useMutation({
       mutationFn: (input: { id: string; body: PatchProviderBody }) =>
