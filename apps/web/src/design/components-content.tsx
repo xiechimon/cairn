@@ -504,6 +504,11 @@ export function TraceSection() {
           <Labeled label="Collapsed: a long first line is cut with an ellipsis">
             <ThinkingRow text={THINKING_LONG} />
           </Labeled>
+          <Labeled label="Collapsed at 320px, a narrow panel">
+            <div className="w-80 max-w-full">
+              <ThinkingRow text={THINKING_LONG} />
+            </div>
+          </Labeled>
           <Labeled label="Open: the title becomes Thinking, the full text follows">
             <ThinkingRow text={THINKING_MULTILINE} defaultOpen />
           </Labeled>
@@ -557,6 +562,21 @@ export function TraceSection() {
                 <TraceTitle>Push fix/lockfile</TraceTitle>
               </TraceLine>
             </Trace>
+          </Cell>
+          <Cell label="Collapsed at 320px: a long title truncates, the description stays">
+            <div className="w-80 max-w-full">
+              <Trace>
+                <TraceLine>
+                  <TraceIcon>
+                    <FileText />
+                  </TraceIcon>
+                  <TraceTitle>
+                    Read apps/server/src/services/merge-gate/model-identity.ts
+                  </TraceTitle>
+                  <TraceDescription>1,204 lines</TraceDescription>
+                </TraceLine>
+              </Trace>
+            </div>
           </Cell>
           <Cell label="Collapsible: open, with the detail panel">
             <Trace>
