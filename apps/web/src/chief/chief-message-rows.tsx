@@ -25,7 +25,6 @@ import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
-import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
@@ -218,8 +217,6 @@ interface ChiefStreamRowProps {
   index: number;
   latest: boolean;
   replyable?: boolean;
-  bound: ChiefContent['bound'];
-  agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
   copiedKey: string | null;
   onCopy: (key: string, text: string) => void;
@@ -271,8 +268,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   index: i,
   latest,
   replyable = false,
-  bound,
-  agent,
   runningTool,
   copiedKey,
   onCopy,
@@ -471,17 +466,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   }
-  const identity =
-    bound && agent ? <ChiefIdentity agent={agent} busy={item.typing === true} /> : null;
   const tools = turnToolSteps(item.tools);
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
       <Message className={MSG_ROW_CLS} data-testid="chief-msg">
-        <MessageContent
-          className={identity != null ? `${MSG_COL_MID_CLS} gap-1.5` : MSG_COL_MID_CLS}
-          data-testid="chief-msg-col"
-        >
-          {identity}
+        <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           {tools.length > 0 && (
             <TraceGroup
               density="compact"
