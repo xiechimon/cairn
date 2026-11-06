@@ -24,7 +24,7 @@ import { relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { threadCopy, threadTone, VIEW_PARAM } from './thread-copy.js';
+import { threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
 import { ThreadUsageFooter } from './thread-usage-footer.js';
 import { type ThreadChat, useThreadChat } from './use-thread-chat.js';
@@ -238,6 +238,9 @@ function ThreadBody({
           onOpenPlan={onOpenPlan}
           spec={todo.spec.trim() !== '' ? todo.spec : undefined}
           autoScroll={chat.transcript.length > 0}
+          running={threadStatus(todo) === 'running'}
+          settled={chat.transcriptSettled}
+          threadKey={todo.id}
         />
       )}
       {chat.sendError != null && (

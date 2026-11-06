@@ -66,7 +66,7 @@ export function ProviderInstanceRow({
         variant="ghost"
         onClick={onSelect}
         className={cn(
-          'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent',
+          'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent',
           item.tone === 'off' && !selected && 'opacity-60',
         )}
       >
@@ -133,7 +133,7 @@ export function ProviderPanel({
           <Button
             variant="ghost"
             onClick={onAdd}
-            className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-sidebar-hover"
+            className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover"
           >
             <Plus aria-hidden className="size-4" />
             {t('添加服务商')}
