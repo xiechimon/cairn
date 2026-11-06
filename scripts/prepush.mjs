@@ -10,6 +10,7 @@ export const prepushModules = [
   'scripts/prepush.mjs',
   'scripts/heavy-slots.mjs',
   'scripts/english-only-gate.mjs',
+  'scripts/journal-newline-gate.mjs',
   'scripts/scrub-git-env.mjs',
 ];
 
@@ -28,6 +29,7 @@ export const selfTests = [
   'scripts/prepush.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/english-only-gate.test.mjs',
+  'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
@@ -106,6 +108,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   }
   const required = [
     language,
+    ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
