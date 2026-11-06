@@ -10,12 +10,20 @@ export interface StatePage {
   name: string;
   url: (state: LiveState) => string;
   world: 'empty' | 'seeded';
-  mock?: (page: Page) => Promise<void>;
+  mock?: (page: Page) => Promise<() => Promise<void>>;
   open?: (page: Page) => Promise<void>;
   ready: (page: Page) => Locator;
 }
 
 const PROVIDERS_API = '**/api/teams/*/providers*';
+const waitForHits = (hits: () => number, wanted: number) => async () => {
+  const deadline = Date.now() + 15_000;
+  while (hits() < wanted) {
+    if (Date.now() > deadline) throw new Error(`providers API was hit ${hits()} of ${wanted} times`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
+
 const pageColumn = (page: Page) => page.getByTestId('page-col');
 
 export const STATE_PAGES: StatePage[] = [
@@ -48,17 +56,28 @@ export const STATE_PAGES: StatePage[] = [
     name: 'settings loading',
     url: () => '/app/resources/providers',
     world: 'seeded',
-    mock: (page) => page.route(PROVIDERS_API, () => new Promise(() => undefined)),
+    mock: async (page) => {
+      let hits = 0;
+      await page.route(PROVIDERS_API, () => {
+        hits += 1;
+        return new Promise(() => undefined);
+      });
+      return waitForHits(() => hits, 1);
+    },
     ready: pageColumn,
   },
   {
     name: 'settings error',
     url: () => '/app/resources/providers',
     world: 'seeded',
-    mock: (page) =>
-      page.route(PROVIDERS_API, (route) =>
-        route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }),
-      ),
-    ready: pageColumn,
+    mock: async (page) => {
+      let hits = 0;
+      await page.route(PROVIDERS_API, (route) => {
+        hits += 1;
+        return route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' });
+      });
+      return waitForHits(() => hits, 2);
+    },
+    ready: (page) => page.getByTestId('page-col').getByText('尚未添加服务商'),
   },
 ];

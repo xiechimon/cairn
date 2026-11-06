@@ -31,9 +31,10 @@ for (const theme of THEMES) {
       test.setTimeout(60_000);
       try {
         await prepare(page, theme);
-        if (p.mock) await p.mock(page);
+        const settled = p.mock ? await p.mock(page) : undefined;
         await page.goto(`http://127.0.0.1:${PORTS[p.world]}${p.url(stateOf(p.world))}`);
         if (p.open) await p.open(page);
+        if (settled) await settled();
         await page.waitForTimeout(600);
         await record(page, key, theme, p.ready(page));
       } catch (error) {
