@@ -27,7 +27,6 @@ import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
-import { BoardQuestionBar, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
@@ -206,12 +205,10 @@ export function BoardPage() {
             />
           ) : projectLookup === 'loading' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <BoardQuestionBar />
               <ProjectsLoading />
             </div>
           ) : projectLookup === 'failed' ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <BoardQuestionBar />
               <ProjectsFailed
                 retrying={teamsQ.isFetching || projectsQ.isFetching}
                 onRetry={() => {
@@ -225,7 +222,6 @@ export function BoardPage() {
             </div>
           ) : projectLookup === 'unknown' && homeProjectId !== null ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <BoardQuestionBar />
               <ProjectNotFound
                 unknownId={homeProjectId}
                 suggestions={suggestProjects(homeProjectId, knownProjects)}
@@ -240,7 +236,6 @@ export function BoardPage() {
             </div>
           ) : homeProject !== null && !projectChat ? (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <BoardQuestionBar />
               <ProjectHome
                 key={homeProject.id}
                 project={homeProject}
@@ -266,7 +261,6 @@ export function BoardPage() {
               schedulesQuery={live ? schedulesQ : undefined}
             />
           )}
-          <ChiefQuestionPanel />
         </div>
         {threadId !== null && (
           <SideChat
