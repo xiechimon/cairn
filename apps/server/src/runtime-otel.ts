@@ -1,9 +1,11 @@
 import {
+  chiefTurnErrorContentSchema,
   coordinatorTurnAttributes,
   GENAI_OPERATION,
   langfuseEnvironmentAttributes,
   langfuseTraceAttributes,
   otelEnvironment,
+  otelErrorMessage,
   otelResourceAttributes,
   runtimeBuildAttributes,
   stepAttributes,
@@ -23,10 +25,11 @@ import {
   otlpTracesRequest,
   parseOtlpTarget,
 } from '@cairn/shared/otel';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from './db/client.js';
-import { build, step, todo } from './db/schema.js';
+import { build, chiefMessage, machine, schedule, step, todo } from './db/schema.js';
 import { parseChiefTrigger } from './services/chief.js';
+import { stepRuntimeFor } from './services/dispatch-eligibility.js';
 
 const SCOPE = 'cairn.server';
 const COORDINATOR_TURN_SPAN = 'coordinator turn';
@@ -48,6 +51,31 @@ function push(target: OtlpTarget, env: NodeJS.ProcessEnv, spans: OtlpSpan[]): vo
   );
 }
 
+function stepFailureReason(db: Db, row: typeof step.$inferSelect): string | undefined {
+  if (row.kind === 'chief') {
+    const recorded = db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, `chief-err-${row.id}`))
+      .get();
+    try {
+      const content =
+        typeof recorded?.content === 'string' ? JSON.parse(recorded.content) : recorded?.content;
+      const parsed = chiefTurnErrorContentSchema.safeParse(content);
+      return parsed.success ? otelErrorMessage(parsed.data.message) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  if (row.scheduleId === null) return undefined;
+  const recorded = db
+    .select()
+    .from(schedule)
+    .where(and(eq(schedule.id, row.scheduleId), eq(schedule.lastRunStepId, row.id)))
+    .get();
+  return otelErrorMessage(recorded?.lastRunError);
+}
+
 export function emitRuntimeStepSpan(
   db: Db,
   stepId: string,
@@ -61,8 +89,22 @@ export function emitRuntimeStepSpan(
   const start = row.claimedAt;
   const end = Math.max(start, row.finishedAt ?? Date.now());
   const isTurn = row.kind === 'chief';
+  const buildRow = isTurn
+    ? undefined
+    : db.select().from(build).where(eq(build.id, row.buildId)).get();
+  const machineRow =
+    !isTurn && row.machineId !== null
+      ? db.select({ name: machine.name }).from(machine).where(eq(machine.id, row.machineId)).get()
+      : undefined;
+  const model = isTurn ? undefined : row.fallback?.model;
+  const errorMessage =
+    row.status === 'failed'
+      ? (stepFailureReason(db, row) ?? otelErrorMessage(buildRow?.errorMessage))
+      : undefined;
   const status =
-    row.status === 'failed' ? { status: { code: OTLP_STATUS_ERROR, message: 'failed' } } : {};
+    row.status === 'failed'
+      ? { status: { code: OTLP_STATUS_ERROR, message: errorMessage ?? 'failed' } }
+      : {};
   push(target, env, [
     {
       traceId: otlpTraceIdOfStep({ kind: row.kind, buildId: row.buildId, stepId: row.id }),
@@ -77,6 +119,18 @@ export function emitRuntimeStepSpan(
           stepId: row.id,
           kind: row.kind,
           checkpointCommit: row.checkpointCommit,
+          errorMessage,
+          ...(isTurn
+            ? {}
+            : {
+                buildId: row.buildId,
+                todoId: buildRow?.todoId,
+                machineId: row.machineId,
+                machineName: machineRow?.name,
+                runtime: model ? stepRuntimeFor(model.provider) : undefined,
+                provider: model?.provider,
+                model: model?.modelId,
+              }),
         }),
         ...(isTurn
           ? {
@@ -110,6 +164,7 @@ export function emitRuntimeBuildSpan(
   const row = db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) return;
   const todoRow = db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  const errorMessage = outcome === 'done' ? undefined : otelErrorMessage(row.errorMessage);
   const start = row.createdAt;
   const end = Math.max(start, Date.now());
   push(target, env, [
@@ -123,6 +178,8 @@ export function emitRuntimeBuildSpan(
       attributes: otlpAttributes({
         ...runtimeBuildAttributes({
           buildId: row.id,
+          todoId: row.todoId,
+          errorMessage,
           baseSha: row.baseSha,
           harnessHash: row.harnessHash,
           agentName: todoRow?.title,
@@ -134,7 +191,9 @@ export function emitRuntimeBuildSpan(
           environment: otelEnvironment(env),
         }),
       }),
-      ...(outcome === 'done' ? {} : { status: { code: OTLP_STATUS_ERROR, message: outcome } }),
+      ...(outcome === 'done'
+        ? {}
+        : { status: { code: OTLP_STATUS_ERROR, message: errorMessage ?? outcome } }),
     },
   ]);
 }
