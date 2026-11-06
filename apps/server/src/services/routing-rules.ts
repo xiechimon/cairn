@@ -35,6 +35,7 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { modelsAreIndependent } from './merge-gate/model-identity.js';
 
 type AgentRow = typeof agent.$inferSelect;
 type RoutingRuleRow = typeof routingRule.$inferSelect;
@@ -337,6 +338,47 @@ export function seedWorkPolicies(db: Db): number {
   return inserted;
 }
 
+export function seedReviewPolicies(db: Db): number {
+  let inserted = 0;
+  for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
+    const exists =
+      db
+        .select({ id: workPolicy.id })
+        .from(workPolicy)
+        .where(and(eq(workPolicy.teamId, teamId), eq(workPolicy.use, 'review')))
+        .get() !== undefined;
+    if (exists) continue;
+    const reviewer = db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.teamId, teamId), eq(agent.persona, 'code_reviewer')))
+      .get();
+    if (reviewer !== undefined) {
+      inserted += seedPolicy(db, teamId, 'review', reviewer);
+      continue;
+    }
+    const now = nowMs();
+    inserted += db
+      .insert(workPolicy)
+      .values({
+        id: newRecordId(),
+        teamId,
+        use: 'review',
+        tools: [],
+        mcpServers: [],
+        skillsAllowlist: null,
+        defaultSkill: null,
+        secrets: [],
+        seededFromAgentId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .run().changes;
+  }
+  return inserted;
+}
+
 export function seedReviewRules(db: Db): number {
   let inserted = 0;
   for (const { id: teamId } of db.select({ id: team.id }).from(team).all()) {
@@ -346,7 +388,12 @@ export function seedReviewRules(db: Db): number {
       .from(agent)
       .where(and(eq(agent.teamId, teamId), eq(agent.persona, 'code_reviewer')))
       .get();
-    if (reviewer !== undefined) inserted += seedRule(db, teamId, 'review', reviewer);
+    if (reviewer === undefined) continue;
+    const sessionModel = sessionRuleOf(db, teamId)?.modelId;
+    if (sessionModel !== undefined && !modelsAreIndependent(sessionModel, reviewer.modelId ?? '')) {
+      continue;
+    }
+    inserted += seedRule(db, teamId, 'review', reviewer);
   }
   return inserted;
 }

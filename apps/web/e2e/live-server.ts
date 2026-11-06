@@ -65,7 +65,10 @@ async function reapGroup(pgid: number): Promise<void> {
  *  corepack's shim in front, and the shim exits on SIGTERM without
  *  forwarding it, which orphaned the whole server tree. dispose() reaps
  *  the group; the tether reaps it when the spawner dies without disposing. */
-export async function bootLiveServer(token: string | null): Promise<LiveServer> {
+export async function bootLiveServer(
+  token: string | null,
+  extraEnv: Record<string, string> = {},
+): Promise<LiveServer> {
   const home = mkdtempSync(join(tmpdir(), 'cairn-e2e-home-'));
   const port = await freePort();
   const child = spawn(process.execPath, ['--import', 'tsx', '--import', TETHER, 'src/index.ts'], {
@@ -80,6 +83,7 @@ export async function bootLiveServer(token: string | null): Promise<LiveServer> 
       [ENV_VARS.webDir]: process.env.E2E_DIST_DIR ?? resolve(import.meta.dirname, '..', 'dist'),
       [ENV_VARS.token]: token ?? '',
       [ENV_VARS.auth]: token === null ? 'off' : '',
+      ...extraEnv,
     },
     stdio: ['pipe', 'ignore', 'inherit'],
   });
