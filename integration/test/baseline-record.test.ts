@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   appendWeeklyRow,
   formatBaselineSection,
@@ -176,7 +176,7 @@ describe('upsertResultsSection', () => {
 
 describe('recordWeekly', () => {
   test('appends a table row and replaces the metrics Results section', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'baseline-record-'));
+    const dir = makeTestTempDir('baseline-record-');
     const resultsPath = join(dir, 'results.jsonl');
     const errorsPath = join(dir, 'errors.jsonl');
     const statePath = join(dir, '_state.json');
@@ -305,7 +305,7 @@ describe('formatBaselineSection', () => {
 
 describe('record provenance', () => {
   test('refuses to publish a run without main harness provenance', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'baseline-provenance-'));
+    const dir = makeTestTempDir('baseline-provenance-');
     const resultsPath = join(dir, 'results.jsonl');
     const errorsPath = join(dir, 'errors.jsonl');
     const statePath = join(dir, '_state.json');

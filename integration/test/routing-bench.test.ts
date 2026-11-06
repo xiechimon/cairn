@@ -1,7 +1,7 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { benchTaskProblems, CAIRN_BENCH_TASKS, seedWorkdir } from '../eval/routing/bench.mts';
 import { runOracle } from '../eval/routing/oracle.mts';
 import { REFERENCE_FILES } from './routing-reference.js';
@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 function workspace(): string {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-routing-fixture-'));
+  const directory = makeTestTempDir('cairn-routing-fixture-');
   directories.push(directory);
   return directory;
 }

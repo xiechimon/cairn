@@ -1,10 +1,10 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { backfillTokenUsageCost } from '../src/services/token-usage-cost.js';
@@ -17,7 +17,7 @@ test('upgrading from 0057 preserves ambiguous legacy zeros instead of guessing t
   const cut = journal.entries.findIndex((entry) => entry.tag === '0058_token_usage_cost_nullable');
   expect(cut).toBeGreaterThan(0);
   expect(journal.entries[cut - 1]?.tag).toBe('0057_github_connection_refresh');
-  const prior = mkdtempSync(join(tmpdir(), 'cairn-1847-migrations-'));
+  const prior = makeTestTempDir('cairn-1847-migrations-');
   const sqlite = new Database(':memory:');
   try {
     mkdirSync(join(prior, 'meta'));

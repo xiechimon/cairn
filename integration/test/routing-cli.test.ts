@@ -1,15 +1,7 @@
-import {
-  cpSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { CAIRN_BENCH_TASKS } from '../eval/routing/bench.mts';
 import type { RoutingRunRow } from '../eval/routing/driver.mts';
 import {
@@ -47,7 +39,7 @@ afterEach(async () => {
 });
 
 function outDir(): string {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-routing-cli-'));
+  const directory = makeTestTempDir('cairn-routing-cli-');
   directories.push(directory);
   return directory;
 }

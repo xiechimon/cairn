@@ -1,6 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rmSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -8,13 +6,14 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { statePaths } from '../../apps/daemon/src/state.js';
 import { step } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { AGENT_ID, api, bootRealServer, daemonLogLines, seedWorld, waitFor } from './helpers.js';
 import { startStubLlm } from './stub-llm.js';
 
 test('message_todo reaches a running daemon and logs the delivered step', async () => {
   const stub = await startStubLlm([{ content: 'Working on the task.', delayMs: 8_000 }]);
   const server = await bootRealServer({ providerBaseUrl: stub.url });
-  const home = mkdtempSync(join(tmpdir(), 'cairn-message-todo-'));
+  const home = makeTestTempDir('cairn-message-todo-');
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

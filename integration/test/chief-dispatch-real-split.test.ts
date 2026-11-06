@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { runHeldOut } from '../eval/chief-dispatch-real/run-heldout.mts';
 import {
   openHeldOutCases,
@@ -61,7 +61,7 @@ describe('chief-dispatch-real split', () => {
   });
 
   test('the held-out file on disk is not valid JSON (it is sealed)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-dispatch-real-split-'));
+    const dir = makeTestTempDir('cairn-dispatch-real-split-');
     dirs.push(dir);
     const box = createEphemeralSecretBox();
     const { heldOut } = splitLabeledCases(SAMPLE);
@@ -75,7 +75,7 @@ describe('chief-dispatch-real split', () => {
   });
 
   test('the runner invokes the evaluator and stdout contains no case prompt text', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-dispatch-real-heldout-'));
+    const dir = makeTestTempDir('cairn-dispatch-real-heldout-');
     dirs.push(dir);
     const box = createEphemeralSecretBox();
     const { visible, heldOut } = splitLabeledCases(SAMPLE);

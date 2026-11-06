@@ -1,17 +1,9 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { attachment } from '../src/db/schema.js';
 import { signAttachmentGrant } from '../src/lib/attachments-token.js';
 import { newRecordId } from '../src/lib/ids.js';
@@ -343,7 +335,7 @@ describe('attachments -- upload side', () => {
 
 describe('attachments -- #2055 signing key and path containment', () => {
   test('forged public-constant grant with traversal key -> 401; nothing written outside', () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-2055-forge-'));
+    const root = makeTestTempDir('cairn-2055-forge-');
     const attachmentsDir = join(root, 'attachments');
     mkdirSync(attachmentsDir);
     const s = bootServer({ attachmentsDir });
@@ -553,7 +545,7 @@ describe('attachments -- #2055 signing key and path containment', () => {
   });
 
   test('teamId directory replaced with symlink outside attachmentsDir is rejected', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-2055-symlink-'));
+    const root = makeTestTempDir('cairn-2055-symlink-');
     const attachmentsDir = join(root, 'attachments');
     const outside = join(root, 'outside');
     mkdirSync(attachmentsDir);
@@ -588,7 +580,7 @@ describe('attachments -- #2055 signing key and path containment', () => {
   });
 
   test('destination file symlink outside attachmentsDir is rejected; outside unchanged', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'cairn-2055-leaf-symlink-'));
+    const root = makeTestTempDir('cairn-2055-leaf-symlink-');
     const attachmentsDir = join(root, 'attachments');
     const outside = join(root, 'outside');
     const outsideTarget = join(outside, 'leaked.md');

@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { redactSecrets, STOP_MESSAGE } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { type Db, openDbWithHandle, openMemoryDb } from '../src/db/client.js';
 import { build, message, project, step, team, todo } from '../src/db/schema.js';
 import {
@@ -327,7 +327,7 @@ test('a failure recorded only on a failed step gets its cause, not active or stu
 });
 
 test('opening the db is read-only: a write through the same handle throws', () => {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-rel-report-'));
+  const home = makeTestTempDir('cairn-rel-report-');
   homes.push(home);
   const dbPath = join(home, 'server.db');
   const opened = openDbWithHandle(dbPath);
@@ -355,7 +355,7 @@ function runCli(home: string, args: string[]) {
 }
 
 function cliFixtureDb(): string {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-rel-cli-'));
+  const home = makeTestTempDir('cairn-rel-cli-');
   homes.push(home);
   const dbPath = join(home, 'server', 'server.db');
   const opened = openDbWithHandle(dbPath);
@@ -397,7 +397,7 @@ test('the CLI reports the checked-in sample when --replay is given, ignoring pro
   timeout: 60_000,
 }, () => {
   const home = cliFixtureDb();
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-rel-cli-replay-'));
+  const dir = makeTestTempDir('cairn-rel-cli-replay-');
   homes.push(dir);
   const replayPath = join(dir, 'replay.json');
   writeFileSync(

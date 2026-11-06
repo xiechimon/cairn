@@ -1,11 +1,11 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { and, eq, like } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, step as stepTable } from '../../apps/server/src/db/schema.js';
 import { setCoordinatorMachineId } from '../../apps/server/src/services/coordinator-context.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
@@ -79,7 +79,7 @@ beforeAll(async () => {
   expect(enrolled.status).toBe(200);
   const { token, machineId } = (await enrolled.json()) as { token: string; machineId: string };
   setCoordinatorMachineId(machineId);
-  home = mkdtempSync(join(tmpdir(), 'cairn-sidecar-home-'));
+  home = makeTestTempDir('cairn-sidecar-home-');
   mkdirSync(join(home, 'coordinator'), { mode: 0o700 });
   writeFileSync(join(home, 'coordinator', 'machine-token'), token, { mode: 0o600 });
   const bound = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {

@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -12,10 +11,10 @@ import {
 } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { harnessRegressionResultSchema } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import type { Case, RosterAgent } from '../eval/chief-dispatch/grade.mts';
 
 const require = createRequire(new URL('../package.json', import.meta.url));
@@ -129,7 +128,7 @@ async function listenRecording(mode: StubMode): Promise<RecordingRelay> {
 }
 
 function flowHome(cases: Case[]): { home: string; out: string; variant: string } {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-write-verify-'));
+  const home = makeTestTempDir('cairn-write-verify-');
   scratch.push(home);
   writeFileSync(
     join(home, 'cases.json'),
