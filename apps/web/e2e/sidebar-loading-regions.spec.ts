@@ -40,7 +40,7 @@ test('home: the tasks, results and computers panels show a skeleton while loadin
   await page.goto('/app');
   for (const name of ['任务', '成果', '电脑']) {
     await page.getByRole('button', { name }).first().click();
-    await expect(page.getByTestId('query-loading')).toBeVisible();
+    await expect(page.getByTestId('query-loading').first()).toBeVisible();
     await expectNoConclusion(page);
   }
 });
