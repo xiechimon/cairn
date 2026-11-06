@@ -98,8 +98,7 @@
   ],
   "first-run-home": [
     "apps/web/src/board/",
-    "apps/web/src/chief/",
-    "apps/web/src/api/"
+    "apps/web/src/chief/"
   ],
   "pending-question": [
     "apps/web/src/chief/",
@@ -118,13 +117,11 @@
   "settings-loading": [
     "apps/web/src/resources/providers-page.tsx",
     "apps/web/src/resources/provider-",
-    "apps/web/src/settings/",
-    "apps/web/src/api/"
+    "apps/web/src/settings/"
   ],
   "settings-error": [
     "apps/web/src/resources/providers-page.tsx",
     "apps/web/src/resources/provider-",
-    "apps/web/src/settings/",
-    "apps/web/src/api/"
+    "apps/web/src/settings/"
   ]
 }

@@ -102,3 +102,9 @@ test('a change to the home surface selects the first-run state page, and a state
   assert.ok(result.pages.includes('first-run-home'));
   assert.ok(result.pages.includes('failed-thread'));
 });
+
+test('a change under api/ is shared and selects every page, state pages included', () => {
+  const result = selectPages({ changed: ['apps/web/src/api/mappers.ts'], sources, slugs });
+  assert.equal(result.all, true);
+  assert.deepEqual(result.pages, slugs);
+});
