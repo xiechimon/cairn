@@ -27,6 +27,8 @@ export interface ProviderItem {
   toggle?: ProviderSwitch;
 }
 
+const MONO_MARK_CLS = '[&_path]:fill-current';
+
 const TONE_DOT: Record<ProviderTone, string> = {
   ok: 'bg-running',
   warn: 'bg-(--chip-confirm-fg)',
@@ -36,7 +38,7 @@ const TONE_DOT: Record<ProviderTone, string> = {
 export function ProviderMarkTile({ Mark }: { Mark: ProviderMark }) {
   return (
     <span className="flex size-8 flex-none items-center justify-center rounded-(--radius-control) bg-background text-content-secondary ring-1 ring-border">
-      <Mark aria-hidden className="size-4" />
+      <Mark aria-hidden className={cn('size-4', MONO_MARK_CLS)} />
     </span>
   );
 }
@@ -70,7 +72,10 @@ export function ProviderInstanceRow({
           item.tone === 'off' && !selected && 'opacity-60',
         )}
       >
-        <item.Mark aria-hidden className="mt-0.5 size-4 flex-none text-content-secondary" />
+        <item.Mark
+          aria-hidden
+          className={cn('mt-0.5 size-4 flex-none text-content-secondary', MONO_MARK_CLS)}
+        />
         <span className="flex min-w-0 flex-col">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-ui font-medium text-foreground">{item.name}</span>

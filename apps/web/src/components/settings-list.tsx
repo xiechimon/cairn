@@ -82,7 +82,8 @@ export function SettingsCard({ className, children }: { className?: string; chil
 
 interface SettingsRowProps {
   label: string;
-  hint?: string;
+  hint?: ReactNode;
+  labelTestId?: string;
   className?: string;
   labelClassName?: string;
   hintClassName?: string;
@@ -109,6 +110,7 @@ export function SettingsSelectTrigger({
 export function SettingsRow({
   label,
   hint,
+  labelTestId,
   className,
   labelClassName,
   hintClassName,
@@ -122,6 +124,7 @@ export function SettingsRow({
       <span className={cn('flex min-w-0 flex-col', withHint && 'max-w-3/5 flex-auto')}>
         <span
           id={labelId}
+          data-testid={labelTestId}
           className={cn('settings-label-text text-ui text-foreground', labelClassName)}
         >
           {label}
@@ -140,6 +143,37 @@ export function SettingsRow({
         </span>
       </SettingsRowLabelContext.Provider>
     </div>
+  );
+}
+
+export function SettingsSection({
+  title,
+  description,
+  action,
+  className,
+  testId,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+  testId?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section data-testid={testId} className={cn('flex flex-col gap-2', className)}>
+      <div className="flex min-h-7 items-center justify-between gap-3 px-1">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
+          {description != null && (
+            <p className="m-0 text-meta text-content-tertiary">{description}</p>
+          )}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 

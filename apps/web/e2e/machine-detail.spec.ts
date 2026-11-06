@@ -1,19 +1,20 @@
 import { expect, test } from '@playwright/test';
 
-const LIST = '/app/resources/machines?scenario=06';
-const DETAIL = '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
+const REMOTE = 'Kd8fG2hJ4mN9pQ1rStUvWx3';
+const LIST = '/app/settings/machines?scenario=06';
+const DETAIL = `${LIST}&machine=${REMOTE}`;
 
-test('list row machine name is a link → detail page', async ({ page }) => {
+test('selecting a machine in the list opens its detail in place', async ({ page }) => {
   await page.goto(LIST);
-  await page.getByRole('link', { name: 'mea-wsl' }).click();
-  await expect(page).toHaveURL(DETAIL);
+  await page.getByTestId('machine-item').filter({ hasText: 'mea-wsl' }).click();
+  await expect(page).toHaveURL(new RegExp(`machine=${REMOTE}`));
   await expect(page.getByTestId('machine-detail-online')).toBeVisible();
+  await expect(page.getByTestId('machine-detail-name')).toHaveText('mea-wsl');
 });
 
-test('detail page fact strip + grid lists only agents bound to this machine', async ({ page }) => {
+test('detail shows only agents bound to this machine', async ({ page }) => {
   await page.goto(DETAIL);
   await expect(page.getByTestId('machine-detail-online')).toContainText('在线');
-
   await expect(page.getByTestId('team-agent-grid')).toBeVisible();
   await expect(page.getByTestId('team-agent-card')).toHaveCount(0);
 });
@@ -55,5 +56,5 @@ test('danger-zone delete opens a confirm layer first, cancel does not delete', a
   await confirm.getByRole('button', { name: '取消' }).click();
   await expect(confirm).toBeHidden();
   expect(deletes).toBe(0);
-  await expect(page).toHaveURL(DETAIL);
+  await expect(page).toHaveURL(new RegExp(`machine=${REMOTE}`));
 });

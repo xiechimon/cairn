@@ -38,14 +38,3 @@ test('agent detail back is an in-SPA navigation, not a document reload', async (
     '[data-route="team"]',
   );
 });
-
-// Paper page shell (PR 6): sidebar destinations (skills) carry no back arrow
-// any more; the second detail face is machine detail → the machines list.
-test('machine detail back is an in-SPA navigation, not a document reload', async ({ page }) => {
-  await expectBackIsSpaNavigation(
-    page,
-    '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
-    '/app/settings/machines',
-    '[data-route="/app/resources/machines"] h1:text-is("机器")',
-  );
-});

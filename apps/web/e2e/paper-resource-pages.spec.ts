@@ -32,7 +32,6 @@ for (const [name, url, rows] of [
   ['skills', '/app/resources/skills?scenario=06', 1],
   ['mcp', '/app/resources/mcp-servers?scenario=07', 1],
   ['secrets', '/app/resources/secrets?scenario=agent-detail-secrets', 2],
-  ['machines', '/app/resources/machines?scenario=06', 2],
 ] as const) {
   test(`${name} list: one settings card of 52px rows, 14px corner`, async ({ page }) => {
     await light(page, url);
@@ -46,12 +45,12 @@ for (const [name, url, rows] of [
   });
 }
 
-test('machines: `添加机器` sits in the top bar, no dashed full-width bar', async ({ page }) => {
+test('machines: `添加机器` is the plus beside the list heading, no dashed full-width bar', async ({ page }) => {
   await light(page, '/app/resources/machines?scenario=06');
-  const add = page.getByTestId('page-topbar').getByRole('button', { name: '添加机器' });
+  const add = page.getByTestId('settings-content').getByRole('button', { name: '添加机器' });
   await expect(add).toBeVisible();
-  await expect(page.locator('[data-testid="page-col"] button.border-dashed')).toHaveCount(0);
-  const local = page.locator('div[data-kind="local"]');
+  await expect(page.locator('button.border-dashed')).toHaveCount(0);
+  const local = page.getByTestId('machine-detail');
   await expect(local).toContainText('在线');
   await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 79)');
 });
@@ -74,7 +73,7 @@ for (const [name, url, open, submit] of [
 ] as const) {
   test(`${name} dialog: FormActions footer, primary is not a full-width bar`, async ({ page }) => {
     await light(page, url);
-    await page.getByTestId('page-topbar').getByRole('button', { name: open, exact: true }).click();
+    await page.getByTestId('page-toolbar').getByRole('button', { name: open, exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     const foot = dialog.getByTestId('dialog-foot');

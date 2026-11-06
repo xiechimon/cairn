@@ -27,7 +27,12 @@ import {
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
-import { SettingsCard, SettingsRow, SettingsSegmented } from '../components/settings-list.js';
+import {
+  SettingsCard,
+  SettingsRow,
+  SettingsSection,
+  SettingsSegmented,
+} from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -58,15 +63,6 @@ function providerAccount(record: ProviderRecord, vendor: AccountVendor): Subscri
     lastUsedAt: null,
     stepsLast24h: null,
   };
-}
-
-function SectionHead({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-1">
-      <h2 className="m-0 text-card-title font-medium text-foreground">{title}</h2>
-      {hint !== undefined && <span className="text-meta text-content-tertiary">{hint}</span>}
-    </div>
-  );
 }
 
 export function ModelRoutingPage() {
@@ -255,10 +251,19 @@ export function ModelRoutingPage() {
         />
       ) : (
         <div className="flex flex-col gap-8 pb-16">
-          <section className="flex flex-col gap-2">
-            <SectionHead title={t('Claude 用量')} />
+          <SettingsSection title={t('Claude 用量')}>
             <SettingsCard>
-              <SettingsRow label={t('付费方式')} className="flex-wrap gap-y-2 py-2.5">
+              <SettingsRow
+                label={t('付费方式')}
+                hint={
+                  <span data-testid="claude-usage-hint">
+                    {claudeUsage === 'subscription-only'
+                      ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
+                      : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
+                  </span>
+                }
+                className="flex-wrap gap-y-2 py-2.5"
+              >
                 <SettingsSegmented
                   label={t('Claude 用量')}
                   value={claudeUsage}
@@ -270,16 +275,12 @@ export function ModelRoutingPage() {
                 />
               </SettingsRow>
             </SettingsCard>
-            <p data-testid="claude-usage-hint" className="m-0 px-1 text-meta text-content-tertiary">
-              {claudeUsage === 'subscription-only'
-                ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
-                : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
-            </p>
-          </section>
-          <section data-testid="routing-section" className="flex flex-col gap-2">
-            <p className="m-0 px-1 text-meta text-content-tertiary">
-              {t('每种用途用哪个模型、走哪个连接')}
-            </p>
+          </SettingsSection>
+          <SettingsSection
+            testId="routing-section"
+            title={t('用途与连接')}
+            description={t('每种用途用哪个模型、走哪个连接')}
+          >
             <div className="overflow-x-auto rounded-(--radius-card) bg-card px-4 py-4 shadow-(--e1)">
               {graph === null ? (
                 <p className="m-0 text-meta text-content-tertiary">{t('正在读取路由…')}</p>
@@ -293,7 +294,7 @@ export function ModelRoutingPage() {
                 </div>
               )}
             </div>
-          </section>
+          </SettingsSection>
         </div>
       )}
       {adding && (

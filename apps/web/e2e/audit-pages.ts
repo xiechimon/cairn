@@ -84,10 +84,14 @@ export const PAGES: AuditPage[] = [
     url: '/app/resources/agents/r3-builder?scenario=agent-detail',
     ready: (p) => p.locator('.agent-skill-select'),
   },
-  { name: 'machines', url: '/app/resources/machines?scenario=06', ready: row },
+  {
+    name: 'machines',
+    url: '/app/settings/machines?scenario=06',
+    ready: (p) => p.getByTestId('machine-item').first(),
+  },
   {
     name: 'machine detail',
-    url: '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
+    url: '/app/settings/machines?scenario=06&machine=Kd8fG2hJ4mN9pQ1rStUvWx3',
     ready: (p) => p.getByTestId('team-agent-grid'),
   },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },

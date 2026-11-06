@@ -1,297 +1,97 @@
-import { claudeLoginNotice, MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
+import { claudeLoginNotice } from '@cairn/shared';
 import { cn } from 'cn';
-import { Monitor, Plus as PlusIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Monitor, Plus, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.js';
+import { useChief, useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
-import { formatClaudeLoginWarning } from '../claude-login-warning.js';
-import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
+import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
-import { Input } from '../components/ui/input.js';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
-import { blockDemoWrite } from '../demo/demo-gate.js';
 import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, Minus, Plus, Restore } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
-import { OnlineStatus, ResourceList, ResourceRow, RowMeta, RowText, RowTitle } from './parts.js';
+import { type ChiefState, MachineDetailPane } from './machine-detail-pane.js';
 
 export const MACHINES_HREF = '/app/resources/machines';
 
-const RUNTIME_LABELS: Record<MachineRuntime, string> = {
-  pi: 'pi',
-  'claude-code': 'Claude Code',
-  gemini: 'Gemini',
-};
+const CHECKED_TICK_MS = 30_000;
 
-const RUNTIME_MARKS: Record<MachineRuntime, typeof PiMark> = {
-  pi: PiMark,
-  'claude-code': ClaudeMark,
-  gemini: GeminiMark,
-};
+type ItemStatus = { label: string; dot: string };
 
-const FALLBACK_RANGE = { min: 1, max: 8 };
-
-export const CONCURRENCY_SOURCE_LABEL = {
-  manual: '手动',
-  measured: '推荐',
-  estimate: '估算',
-} as const;
-
-function BasisRow({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="flex items-baseline justify-between gap-3">
-      <span className="text-content-tertiary">{label}</span>
-      <span className="tabular-nums text-content-secondary">{value}</span>
-    </span>
-  );
+function itemStatus(machine: MachineRow): ItemStatus {
+  if (machine.online === false) {
+    return { label: '离线', dot: 'bg-content-dim' };
+  }
+  const notice = claudeLoginNotice(machine.claudeLogin, Date.now());
+  if (notice?.kind === 'expired') {
+    return { label: '登录已过期', dot: 'bg-(--card-button)' };
+  }
+  if (notice?.kind === 'expiring') {
+    return { label: '登录将过期', dot: 'bg-(--card-button)' };
+  }
+  return { label: '在线', dot: 'bg-running' };
 }
 
-function MachineConcurrencySelect({
+function useCheckedAgo(updatedAt: number): string {
+  const { t } = useI18n();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), CHECKED_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+  return relativeTime(updatedAt, Math.max(now, updatedAt), t);
+}
+
+function MachineItem({
   machine,
-  value,
-  onPick,
-  onReset,
+  href,
+  selected,
+  host,
 }: {
   machine: MachineRow;
-  value: number;
-  onPick: (n: number) => Promise<unknown> | undefined;
-  onReset: () => Promise<unknown> | undefined;
+  href: string;
+  selected: boolean;
+  host: boolean;
 }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const range = machine.concurrencyRange ?? FALLBACK_RANGE;
-  const outOfRange = value < range.min || value > range.max;
-  const [pendingTarget, setPendingTarget] = useState<number | null>(null);
-  const inFlight = useRef(0);
-  const current = pendingTarget ?? value;
-  const track = (target: number | null, req: Promise<unknown> | undefined) => {
-    if (!req) return;
-    inFlight.current += 1;
-    setPendingTarget(target);
-    void req.finally(() => {
-      inFlight.current -= 1;
-      if (inFlight.current === 0) setPendingTarget(null);
-    });
-  };
-  const send = (n: number) => track(n, onPick(n));
-  const [draft, setDraft] = useState(String(current));
-  const [dirty, setDirty] = useState(false);
-  const skipCommit = useRef(false);
-  useEffect(() => {
-    if (!dirty) setDraft(String(current));
-  }, [current, dirty]);
-  const clampTo = (n: number) => Math.min(range.max, Math.max(range.min, n));
-  const settle = (n: number) => {
-    setDraft(String(n));
-    setDirty(false);
-  };
-  const commit = () => {
-    if (!dirty) return;
-    const parsed = Number.parseInt(draft, 10);
-    if (Number.isNaN(parsed)) {
-      settle(current);
-      return;
-    }
-    const next = clampTo(parsed);
-    settle(next);
-    if (next !== current) send(next);
-  };
-  const step = (delta: number) => {
-    const parsed = Number.parseInt(draft, 10);
-    const base = dirty && !Number.isNaN(parsed) ? parsed : current;
-    const next = clampTo(clampTo(base) + delta);
-    settle(next);
-    if (next !== current) send(next);
-  };
-  const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
-  const recommended = machine.recommendedConcurrent;
-  const hardware = machine.capabilities?.hardware;
-  const source = machine.concurrencySource;
-  const estimate = source === 'estimate';
-  const overridden = machine.maxConcurrentOverridden === true;
-  const label =
-    source !== undefined
-      ? t('并发上限 {n}，{source}', { n: value, source: t(CONCURRENCY_SOURCE_LABEL[source]) })
-      : t('并发上限 {n}', { n: value });
+  const status = itemStatus(machine);
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        if (next) {
-          settle(current);
-          skipCommit.current = false;
-        }
-        setOpen(next);
-      }}
+    <Link
+      to={href}
+      replace
+      data-testid="machine-item"
+      data-machine-id={machine.id}
+      data-kind={machine.kind ?? 'remote'}
+      aria-current={selected ? 'true' : undefined}
+      className="flex min-w-0 flex-col gap-0.5 border-b border-border px-3.5 py-2.5 text-inherit no-underline outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-[current=true]:bg-secondary"
     >
-      <PopoverTrigger
-        render={
-          <Button
-            variant="ghost"
-            aria-label={label}
-            title={label}
-            data-machine-id={machine.id}
-            data-testid="machine-concurrency"
-            data-concurrency-source={source}
-            className="h-6 w-10 cursor-pointer justify-between gap-1 rounded-md px-1.5 text-meta font-normal text-content-tertiary hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
-          />
-        }
-      >
-        <span className="tabular-nums">{value}</span>
-        <ChevronDown width={11} height={11} className="flex-none" />
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        side="bottom"
-        sideOffset={8}
-        aria-label={t('并发上限')}
-        className="w-52 p-(--menu-pad)"
-      >
-        <div className="flex items-baseline justify-between px-1">
-          <span className="text-meta text-content-tertiary">{t('并发上限')}</span>
-          <span className="text-ui font-medium tabular-nums text-foreground">{value}</span>
-        </div>
-        {source !== undefined && (
-          <div className="px-1 text-meta text-content-tertiary">
-            {t(CONCURRENCY_SOURCE_LABEL[source])}
-          </div>
-        )}
-        <div className="flex items-center gap-1 px-1 py-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('减少并发上限')}
-            data-testid="machine-concurrency-dec"
-            disabled={current <= range.min && Number.parseInt(draft, 10) <= range.min}
-            className="size-7 cursor-pointer rounded-md text-content-secondary hover:bg-(--surface-hover)"
-            data-concurrency-action="step"
-            onMouseDown={keepFocus}
-            onClick={() => step(-1)}
-          >
-            <Minus width={12} height={12} />
-          </Button>
-          <Input
-            type="number"
-            inputMode="numeric"
-            role="spinbutton"
-            aria-label={t('并发上限')}
-            aria-valuemin={range.min}
-            aria-valuemax={range.max}
-            aria-valuenow={value}
-            aria-describedby={`concurrency-hint-${machine.id}`}
-            min={range.min}
-            max={range.max}
-            data-testid="machine-concurrency-input"
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              setDirty(true);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                commit();
-              } else if (e.key === 'Escape') {
-                skipCommit.current = true;
-                settle(current);
-              }
-            }}
-            onBlur={(e) => {
-              const to = e.relatedTarget as HTMLElement | null;
-              if (skipCommit.current || to?.dataset.concurrencyAction !== undefined) {
-                skipCommit.current = false;
-                return;
-              }
-              commit();
-            }}
-            className="h-7 flex-1 [appearance:textfield] rounded-md px-1 text-center text-ui tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('增加并发上限')}
-            data-testid="machine-concurrency-inc"
-            disabled={current >= range.max && Number.parseInt(draft, 10) >= range.max}
-            className="size-7 cursor-pointer rounded-md text-content-secondary hover:bg-(--surface-hover)"
-            data-concurrency-action="step"
-            onMouseDown={keepFocus}
-            onClick={() => step(1)}
-          >
-            <Plus width={12} height={12} />
-          </Button>
-        </div>
-        <div
-          id={`concurrency-hint-${machine.id}`}
-          data-testid="machine-concurrency-hint"
-          className="px-1 pb-1 text-meta text-content-tertiary"
+      <span className="truncate text-ui font-medium text-foreground">{machine.name}</span>
+      <span className="flex min-w-0 items-center gap-1.5 text-meta">
+        <span aria-hidden className={cn('size-1.5 flex-none rounded-full', status.dot)} />
+        <span
+          data-testid="machine-item-status"
+          className="whitespace-nowrap text-content-secondary"
         >
-          {t(estimate ? '可选 {min}–{max}（默认档位）' : '可选 {min}–{max}（按内存）', range)}
-          {recommended !== undefined && ` · ${t('推荐 {n}', { n: recommended })}`}
-          {outOfRange && (
-            <span data-testid="machine-concurrency-out-of-range" className="block">
-              {t('当前值 {n} 超出可选范围', { n: value })}
+          {t(status.label)}
+        </span>
+        {host && (
+          <>
+            <span aria-hidden className="text-content-dim">
+              ·
             </span>
-          )}
-        </div>
-        {(estimate || hardware?.memoryTotalMb !== undefined) && (
-          <div
-            className="flex flex-col gap-1 px-1 text-meta"
-            data-testid="machine-concurrency-basis"
-          >
-            {estimate ? (
-              <span className="text-content-tertiary">
-                {t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}
-              </span>
-            ) : null}
-            {estimate || hardware === undefined || hardware.memoryTotalMb === undefined ? null : (
-              <>
-                <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
-                <BasisRow
-                  label={t('总内存')}
-                  value={`${(hardware.memoryTotalMb / 1024).toFixed(1)} GiB`}
-                />
-                <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
-              </>
-            )}
-          </div>
+            <span data-orchestration="host" className="truncate text-content-tertiary">
+              {t('Coordinator 主机')}
+            </span>
+          </>
         )}
-        {overridden && (
-          <Button
-            variant="ghost"
-            data-testid="machine-concurrency-reset"
-            data-concurrency-action="reset"
-            onMouseDown={keepFocus}
-            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-meta font-normal text-content-secondary hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
-            onClick={() => {
-              setDirty(false);
-              setOpen(false);
-              track(recommended ?? null, onReset());
-            }}
-          >
-            <Restore width={12} height={12} className="flex-none text-content-tertiary" />
-            {t('恢复推荐')}
-          </Button>
-        )}
-      </PopoverContent>
-    </Popover>
+      </span>
+    </Link>
   );
-}
-
-function capabilityFull(
-  t: ReturnType<typeof useI18n>['t'],
-  caps: { mcpServers: unknown[]; skills: unknown[] } | null,
-): string {
-  return caps === null
-    ? t('能力清单未上报')
-    : t('MCP {n} · 本机技能 {m}', { n: caps.mcpServers.length, m: caps.skills.length });
 }
 
 export function MachinesPage() {
@@ -305,9 +105,7 @@ export function MachinesPage() {
   const orchestration = live ? chiefQ.data?.orchestration : undefined;
   const activityOf = (machineId?: string) =>
     orchestration?.activity.find((a) => a.machineId === machineId);
-  const chiefState = (
-    machine: MachineRow,
-  ): { host: boolean; running: boolean; waiting: boolean } =>
+  const chiefState = (machine: MachineRow): ChiefState =>
     live
       ? {
           host: orchestration?.homeMachineId === machine.id,
@@ -322,209 +120,113 @@ export function MachinesPage() {
   const teamsQ = useTeams(live);
   const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
   const [addOpen, setAddOpen] = useState(false);
-  const mutations = useApiMutations(teamId);
+  const [mountedAt] = useState(() => Date.now());
+  const checkedAgo = useCheckedAgo(
+    live && machinesQ.dataUpdatedAt > 0 ? machinesQ.dataUpdatedAt : mountedAt,
+  );
 
   const rowKey = (machine: MachineRow): string => machine.id ?? machine.name;
-
-  const [capDraft, setCapDraft] = useState<Record<string, number>>({});
-  const capOn = (machine: MachineRow): number =>
-    capDraft[rowKey(machine)] ?? machine.maxConcurrent ?? 1;
-  const capChain = useRef<Record<string, Promise<unknown>>>({});
-  const patchCap = (id: string, maxConcurrent: number | null): Promise<unknown> => {
-    const prev = capChain.current[id] ?? Promise.resolve();
-    const next = prev.then(() =>
-      mutations.patchMachine.mutateAsync({ id, body: { maxConcurrent } }).catch(() => undefined),
-    );
-    capChain.current[id] = next;
-    return next;
+  const wanted = searchParams.get('machine');
+  const selected = machines.find((m) => rowKey(m) === wanted) ?? machines[0];
+  const hrefFor = (machine: MachineRow): string => {
+    const next = new URLSearchParams(searchParams);
+    next.set('machine', rowKey(machine));
+    return `?${next.toString()}`;
   };
-  const pickCap = (machine: MachineRow, n: number): Promise<unknown> | undefined => {
-    if (!live || machine.id == null) {
-      if (blockDemoWrite()) return;
-      setCapDraft((prev) => ({ ...prev, [rowKey(machine)]: n }));
-      return;
-    }
-    return patchCap(machine.id, n);
-  };
-  const resetCap = (machine: MachineRow): Promise<unknown> | undefined => {
-    if (!live || machine.id == null) {
-      if (blockDemoWrite()) return;
-      setCapDraft((prev) => ({
-        ...prev,
-        [rowKey(machine)]: machine.recommendedConcurrent ?? machine.maxConcurrent ?? 1,
-      }));
-      return;
-    }
-    return patchCap(machine.id, null);
-  };
-  const capSaveFailed =
-    mutations.patchMachine.isError &&
-    mutations.patchMachine.variables?.body.maxConcurrent !== undefined;
 
   return (
     <PageShell
       route={MACHINES_HREF}
       title={t('机器')}
       selected={MACHINES_HREF}
-      actions={
-        machines.length > 0 && (
-          <Button className={TOPBAR_PRIMARY_BUTTON} onClick={() => setAddOpen(true)}>
-            <PlusIcon aria-hidden strokeWidth={1.75} className="size-3.5" />
-            {t('添加机器')}
-          </Button>
-        )
-      }
       fixture={fixture}
+      bleed
     >
-      {capSaveFailed && (
-        <p className="mt-0 mb-2 text-meta text-destructive" role="alert">
-          {t('保存失败，请重试。')}
-        </p>
-      )}
-      {machines.length === 0 ? (
-        <EmptyState
-          testId="resource-empty"
-          className="mt-6"
-          icon={Monitor}
-          title={t('尚无机器。')}
-          description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
-          action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
-        />
-      ) : (
-        <ResourceList>
-          {machines.map((machine) => {
-            const chief = chiefState(machine);
-            const notice = claudeLoginNotice(machine.claudeLogin, Date.now());
-            const loginWarning =
-              notice === null ? null : formatClaudeLoginWarning(notice, machine.name, t);
-            return (
-              <ResourceRow
-                key={rowKey(machine)}
-                className="flex-wrap gap-y-2"
-                data-machine-id={machine.id}
-                data-kind={machine.kind ?? 'remote'}
-              >
-                <RowText>
-                  <RowTitle>
-                    <Link to={`${MACHINES_HREF}/${machine.id}?${searchParams.toString()}`}>
-                      {t(machine.name)}
-                    </Link>
-                  </RowTitle>
-                  {machine.online !== undefined && <OnlineStatus on={machine.online !== false} />}
-                </RowText>
-                <span className="ml-auto flex flex-wrap items-center justify-end gap-x-5 gap-y-2">
-                  {machine.kind === 'local' ? (
-                    <span className="flex items-center gap-4">
-                      {MACHINE_RUNTIMES.map((runtime) => {
-                        const on = (machine.enabledRuntimes ?? []).includes(runtime);
-                        const Mark = RUNTIME_MARKS[runtime];
-                        return (
-                          <span
-                            className="flex items-center"
-                            key={runtime}
-                            data-runtime={runtime}
-                            data-enabled={on}
-                            role="img"
-                            aria-label={RUNTIME_LABELS[runtime]}
-                            title={RUNTIME_LABELS[runtime]}
-                          >
-                            <Mark
-                              className={cn('block flex-none', on ? 'opacity-100' : 'opacity-35')}
-                            />
-                          </span>
-                        );
-                      })}
-                    </span>
-                  ) : (
-                    machine.pill != null && <RowMeta>{t(machine.pill)}</RowMeta>
-                  )}
-                  {(chief.host || chief.running || chief.waiting) && (
-                    <span className="flex flex-none items-center gap-3">
-                      {chief.host && (
-                        <span
-                          className="text-meta font-medium whitespace-nowrap text-content-secondary"
-                          data-orchestration="host"
-                        >
-                          {t('Coordinator 主机')}
-                        </span>
-                      )}
-                      {chief.running && (
-                        <span
-                          className="inline-flex items-center gap-1.5 text-meta whitespace-nowrap text-running-text before:block before:size-1.5 before:rounded-full before:bg-running before:content-['']"
-                          data-orchestration="running"
-                        >
-                          {t('Coordinator 回合进行中')}
-                        </span>
-                      )}
-                      {chief.waiting && (
-                        <span
-                          className="inline-flex items-center gap-1.5 text-meta whitespace-nowrap text-content-tertiary before:block before:size-1.5 before:rounded-full before:bg-content-dim before:content-['']"
-                          data-orchestration="waiting"
-                        >
-                          {t('Coordinator 等待机器')}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                  {machine.maxConcurrent !== undefined && (
-                    <span
-                      className="flex flex-none items-center gap-2.5"
-                      data-machine-col="concurrency"
-                    >
-                      {machine.runningSteps !== undefined && (
-                        <span
-                          className="w-16 text-meta whitespace-nowrap tabular-nums text-content-tertiary"
-                          data-machine-running={machine.runningSteps}
-                        >
-                          {t('执行中 {n}/{cap}', {
-                            n: machine.runningSteps,
-                            cap: capOn(machine),
-                          })}
-                        </span>
-                      )}
-                      <MachineConcurrencySelect
-                        machine={machine}
-                        value={capOn(machine)}
-                        onPick={(n) => pickCap(machine, n)}
-                        onReset={() => resetCap(machine)}
-                      />
-                    </span>
-                  )}
-                  {machine.capabilities !== undefined && (
-                    <span
-                      className="w-24 flex-none truncate text-right text-meta whitespace-nowrap text-content-tertiary"
-                      data-machine-capabilities={
-                        machine.capabilities === null ? 'unreported' : 'reported'
-                      }
-                      title={capabilityFull(t, machine.capabilities)}
-                    >
-                      <span className="sr-only">{capabilityFull(t, machine.capabilities)}</span>
-                      <span aria-hidden="true">
-                        {machine.capabilities === null
-                          ? '—'
-                          : t('MCP {n} · 技能 {m}', {
-                              n: machine.capabilities.mcpServers.length,
-                              m: machine.capabilities.skills.length,
-                            })}
-                      </span>
-                    </span>
-                  )}
+      <div
+        data-testid="machines-scroll"
+        className="flex w-full min-w-0 flex-col gap-3 px-4 py-4 md:px-6"
+      >
+        {machines.length === 0 || selected === undefined ? (
+          <EmptyState
+            testId="resource-empty"
+            className="mt-6"
+            icon={Monitor}
+            title={t('尚无机器。')}
+            description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+            action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
+          />
+        ) : (
+          <>
+            <div className="flex min-h-7 items-center justify-between gap-3 px-1">
+              <div className="flex items-center gap-1">
+                <h2 className="m-0 text-card-title font-semibold text-foreground">
+                  {t('已接入的机器')}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('添加机器')}
+                  title={t('添加机器')}
+                  onClick={() => setAddOpen(true)}
+                >
+                  <Plus aria-hidden strokeWidth={1.75} />
+                </Button>
+              </div>
+              {live ? (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  data-testid="machines-checked"
+                  className="gap-1.5 text-content-tertiary"
+                  onClick={() => void machinesQ.refetch()}
+                >
+                  <RefreshCw
+                    aria-hidden
+                    strokeWidth={1.75}
+                    className={cn('size-3', machinesQ.isFetching && 'animate-spin')}
+                  />
+                  {t('已检查 {ago}', { ago: checkedAgo })}
+                </Button>
+              ) : (
+                <span
+                  data-testid="machines-checked"
+                  className="inline-flex items-center gap-1.5 text-meta text-content-tertiary"
+                >
+                  <RefreshCw aria-hidden strokeWidth={1.75} className="size-3" />
+                  {t('已检查 {ago}', { ago: checkedAgo })}
                 </span>
-                {loginWarning !== null && (
-                  <span
-                    className="basis-full text-meta"
-                    data-testid="claude-login-warning"
-                    data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
-                    role="status"
-                  >
-                    {loginWarning}
-                  </span>
-                )}
-              </ResourceRow>
-            );
-          })}
-        </ResourceList>
-      )}
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:gap-2">
+              <nav
+                data-testid="machine-list"
+                aria-label={t('已接入的机器')}
+                className="flex w-full flex-none flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border md:w-64"
+              >
+                {machines.map((machine) => (
+                  <MachineItem
+                    key={rowKey(machine)}
+                    machine={machine}
+                    href={hrefFor(machine)}
+                    selected={machine === selected}
+                    host={chiefState(machine).host}
+                  />
+                ))}
+              </nav>
+              <div className="min-w-0 flex-1">
+                <MachineDetailPane
+                  key={rowKey(selected)}
+                  machine={selected}
+                  machines={machines}
+                  chief={chiefState(selected)}
+                  fixture={fixture}
+                  search={`?${searchParams.toString()}`}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
       <CreateMachineDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}

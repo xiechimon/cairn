@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
-const MACHINE_DETAIL = '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
+const MACHINE_DETAIL = '/app/settings/machines?scenario=06&machine=Kd8fG2hJ4mN9pQ1rStUvWx3';
 
 test('settings row labels name the agent detail selects', async ({ page }) => {
   await page.goto(AGENT_DETAIL);
