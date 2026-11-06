@@ -333,12 +333,12 @@ export function ChiefQuestionCard({
     >
       <div className="flex flex-none items-center gap-1 px-3.5 pt-2 pb-1">
         <QuestionStatus status={item.status} />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           data-testid="chief-question-collapse"
           aria-expanded={!collapsed}
           title={collapsed ? t('展开提问') : t('收起提问')}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left text-caption text-content-tertiary outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent"
           onClick={toggleCollapsed}
         >
           <span className="max-w-1/2 truncate">{question.header}</span>
@@ -348,7 +348,7 @@ export function ChiefQuestionCard({
               <span className="min-w-0 flex-1 truncate text-foreground">{question.question}</span>
             </>
           )}
-        </button>
+        </Button>
         {shownPager !== undefined && (
           <div className="flex flex-none items-center">
             <Button
