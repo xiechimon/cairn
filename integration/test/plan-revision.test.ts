@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import type { RosterAgent } from '../eval/chief-dispatch/grade.mts';
 import type { TurnEvidence } from '../eval/chief-dispatch/stack.mts';
 import {
@@ -575,7 +575,7 @@ describe('plan revision execution', () => {
     const dataset = JSON.parse(readFileSync(join(planFlow, 'cases.json'), 'utf8')) as {
       roster: RosterAgent[];
     };
-    const home = mkdtempSync(join(tmpdir(), 'cairn-plan-rev-missing-'));
+    const home = makeTestTempDir('cairn-plan-rev-missing-');
     homes.push(home);
     writeFileSync(
       join(home, 'cases.json'),
@@ -786,7 +786,7 @@ describe('plan revision runner traces', () => {
     const dataset = JSON.parse(readFileSync(join(planFlow, 'cases.json'), 'utf8')) as {
       roster: RosterAgent[];
     };
-    const home = mkdtempSync(join(tmpdir(), 'cairn-plan-rev-traces-'));
+    const home = makeTestTempDir('cairn-plan-rev-traces-');
     homes.push(home);
     writeFileSync(
       join(home, 'cases.json'),

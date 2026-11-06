@@ -1,10 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import type { Case, RosterAgent } from '../eval/chief-dispatch/grade.mts';
 
 const require = createRequire(new URL('../package.json', import.meta.url));
@@ -39,7 +39,7 @@ test.each([
 ])(
   'eval CLI materializes context $expected from declaration $declared',
   async ({ declared, expected }) => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-context-cli-'));
+    const home = makeTestTempDir('cairn-context-cli-');
     const hold = dataset.cases.find((c) => c.expect.kind === 'hold');
     if (hold === undefined) throw new Error('No hold fixture');
     writeFileSync(
@@ -174,7 +174,7 @@ test.each(['0', '-1', '1.5', 'NaN', 'Infinity', '9007199254740992'])(
 );
 
 test('context-window requests for learn cases are rejected before model execution', () => {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-context-learn-'));
+  const home = makeTestTempDir('cairn-context-learn-');
   try {
     writeFileSync(
       join(home, 'cases.json'),
@@ -209,7 +209,7 @@ test('context-window requests for learn cases are rejected before model executio
 test.each([undefined, 'missing-chief'])(
   'an explicit window rejects a chief model outside the roster: %s',
   (model) => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-context-missing-chief-'));
+    const home = makeTestTempDir('cairn-ctx-nochief-');
     try {
       const roster = dataset.roster.filter((entry) => entry.modelId !== 'glm-5.3');
       writeFileSync(
@@ -250,7 +250,7 @@ test.each([undefined, 'missing-chief'])(
 );
 
 test('configuration failures record the requested window without claiming materialization', () => {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-context-requested-'));
+  const home = makeTestTempDir('cairn-context-requested-');
   try {
     writeFileSync(
       join(home, 'cases.json'),
