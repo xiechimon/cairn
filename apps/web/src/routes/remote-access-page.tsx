@@ -8,27 +8,52 @@ import { EmptyState } from '../components/empty-state.js';
 import { QrCode } from '../components/qr-code.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { pairingOrigin } from '../lib/pairing-origin.js';
+import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { PageShell } from '../pages/shell.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
 export const REMOTE_ACCESS_ROUTE = 'remote-access';
 
+function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
+  if (source === 'page') return t('当前页面地址');
+  return source === 'tailnet' ? t('Tailscale') : t('局域网');
+}
+
+function sourceLabel(
+  candidates: PairingCandidate[],
+  origin: string,
+  t: (key: string) => string,
+): string {
+  const found = candidates.find((candidate) => candidate.origin === origin);
+  return found === undefined ? origin : sourceName(found.source, t);
+}
+
 function PairingDialog({
   pairing,
-  origin,
+  candidates,
   environmentId,
   onClose,
 }: {
   pairing: PairingCodeResponse;
-  origin: string;
+  candidates: PairingCandidate[];
   environmentId: string;
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const [chosen, setChosen] = useState<string>(candidates[0]?.origin ?? '');
+  const origin = candidates.some((candidate) => candidate.origin === chosen)
+    ? chosen
+    : (candidates[0]?.origin ?? '');
   const link = pairingLink({ origin, code: pairing.code, environmentId });
   return (
     <DialogShell
@@ -47,6 +72,20 @@ function PairingDialog({
     >
       <div className="flex flex-col items-center gap-3">
         <QrCode text={link} label={t('配对二维码')} />
+        {candidates.length > 1 && (
+          <Select value={origin} onValueChange={(next) => setChosen(next ?? origin)}>
+            <SelectTrigger className="w-full max-w-72" data-testid="pairing-route-select">
+              <SelectValue>{sourceLabel(candidates, origin, t)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {candidates.map((candidate) => (
+                <SelectItem key={candidate.origin} value={candidate.origin}>
+                  {sourceName(candidate.source, t)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <p className="m-0 max-w-full text-center text-meta break-all text-content-tertiary">
           {t('手机将连接到 {origin}', { origin })}
         </p>
@@ -65,8 +104,9 @@ export function RemoteAccessPage() {
   const mutations = useRemoteMutations();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const routes = routesQ.data?.routes ?? [];
-  const origin = routesQ.data === undefined ? null : pairingOrigin(routes, window.location.origin);
-  const pairingBlocked = live && routesQ.data !== undefined && origin === null;
+  const candidates =
+    routesQ.data === undefined ? [] : pairingCandidates(routes, window.location.origin);
+  const pairingBlocked = live && routesQ.data !== undefined && candidates.length === 0;
   const tailnet = routesQ.data?.tailnet;
   const devices = devicesQ.data ?? [];
   const startPairing = () =>
@@ -84,7 +124,7 @@ export function RemoteAccessPage() {
         live ? (
           <Button
             className={DIALOG_PRIMARY_BUTTON}
-            disabled={mutations.createPairingCode.isPending || origin === null}
+            disabled={mutations.createPairingCode.isPending || candidates.length === 0}
             onClick={startPairing}
             data-testid="pair-new-device"
           >
@@ -148,10 +188,10 @@ export function RemoteAccessPage() {
           ))}
         </ResourceList>
       )}
-      {pairing !== null && routesQ.data !== undefined && origin !== null && (
+      {pairing !== null && routesQ.data !== undefined && candidates.length > 0 && (
         <PairingDialog
           pairing={pairing}
-          origin={origin}
+          candidates={candidates}
           environmentId={routesQ.data.environmentId}
           onClose={() => setPairing(null)}
         />

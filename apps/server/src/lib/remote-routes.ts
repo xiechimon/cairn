@@ -6,6 +6,7 @@ import type { SidecarStatus } from './tsnet-sidecar.js';
 const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '']);
 const IPV4_PATTERN = /^\d{1,3}(\.\d{1,3}){3}$/;
 const LINK_LOCAL_PREFIX = '169.254.';
+const DOCKER_DEFAULT_BRIDGE_PREFIX = '172.17.';
 const DNS_NAME_PATTERN = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i;
 
 export type InterfaceTable = NodeJS.Dict<NetworkInterfaceInfo[]>;
@@ -25,6 +26,7 @@ function lanAddresses(host: string, interfaces: InterfaceTable): string[] {
     for (const entry of entries ?? []) {
       if (entry.family !== 'IPv4' || entry.internal) continue;
       if (entry.address.startsWith(LINK_LOCAL_PREFIX)) continue;
+      if (entry.address.startsWith(DOCKER_DEFAULT_BRIDGE_PREFIX)) continue;
       found.add(entry.address);
     }
   }

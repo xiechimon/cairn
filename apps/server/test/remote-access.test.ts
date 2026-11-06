@@ -163,6 +163,22 @@ describe('F-R1 routes: listeners, interfaces and tailnet', () => {
     return (await res.json()) as RemoteRoutesResponse;
   }
 
+  test('the default Docker bridge range is never advertised as a LAN route', async () => {
+    const body = await routesOf({
+      listenHost: '0.0.0.0',
+      networkInterfaces: () =>
+        ({
+          eth0: [{ address: '172.17.0.2', family: 'IPv4', internal: false }],
+          eth1: [{ address: '172.18.0.2', family: 'IPv4', internal: false }],
+          wlan0: [{ address: '192.168.1.20', family: 'IPv4', internal: false }],
+        }) as unknown as NodeJS.Dict<import('node:os').NetworkInterfaceInfo[]>,
+    });
+    expect(body.routes.map((route) => route.url)).toEqual([
+      'http://172.18.0.2:8787',
+      'http://192.168.1.20:8787',
+    ]);
+  });
+
   test('a loopback bind advertises no LAN address (nothing listens there)', async () => {
     const body = await routesOf({ listenHost: '127.0.0.1', networkInterfaces: () => interfaces });
     expect(body.routes).toEqual([]);
