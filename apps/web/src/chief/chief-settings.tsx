@@ -13,7 +13,6 @@ import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/rec
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
 import { ChiefAgentDialog, type ChiefAgentOption } from './chief-agent-dialog.js';
-import { ChiefQuestionEntry } from './chief-question-panel.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
 
@@ -120,9 +119,6 @@ export function ChiefSettings({
         <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
           {t('Coordinator 设置')}
         </h1>
-        <div className="ml-auto">
-          <ChiefQuestionEntry />
-        </div>
       </header>
       <div className="flex-1 overflow-x-hidden overflow-y-auto px-4">
         <div data-testid="chief-settings-col" className="mx-auto w-192 max-w-full pt-4 pb-6">
