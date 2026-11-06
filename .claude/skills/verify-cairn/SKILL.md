@@ -35,6 +35,18 @@ The implementer templates incorporate the same checklist in `docs/agent-dispatch
 | Observe | screenshots (1440x732, same convention as e2e); HTTP JSON (`GET /api/auth/session`, `/api/todos`, `/api/teams`...); SQLite rows (`<CAIRN_HOME>/server/server.db`, better-sqlite3 read-only); server logs (`cairn-server online` line). |
 | Isolate | three axes: `VERIFY_PORT` (server, default 8791) / `VERIFY_WEB_PORT` (vite, default 5273) / `CAIRN_HOME` (scratch). vite dev does not write `dist/`, no collision with e2e's dist. |
 
+## UI reference comparison
+
+A UI change is verified against the reference shots, not only against its own before picture (D120). Surface to shots: `docs/design/references/README.md`; rules: `apps/web/DESIGN-RULES.md`; brief and coverage table: `.claude/skills/design-cairn/SKILL.md`.
+
+1. List the states from the brief's component x state table. Produce each on the live stack; seed what the stack cannot reach (pending question, offline machine, quota, error, long content) with a fixture or seed data and label it fixture.
+2. Capture each state: `node .claude/skills/verify-cairn/scripts/vp.mjs capture </app/route> --name <state>` writes a 1440x732 dark screenshot into the evidence directory. Light theme and 390px come from the CI screenshot job or a Playwright context with `viewport` and `colorScheme`; the D117 matrix is 1440 and 390, light and dark.
+3. Put the reference beside ours, one image per state: `magick montage <reference> <ours> -tile 2x1 -geometry 1000x+8+8 <state>-compare.png`.
+4. Write one sentence per pair: what matches, what is still worse than the reference. A pair with no sentence does not count.
+5. Run the `M` rules that apply (spacing, tooltips, placeholders, raw errors, fonts) and report the numbers; the CI look-and-feel job runs the same rules next to axe, non-blocking for 2 weeks and then blocking.
+
+The self-review of the pairs is done by the session that built the screen. Evidence limits above still apply: fixture pairs say so, and a real-stack pair is required for the main state.
+
 ## Port and lane discipline (read first)
 
 The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupants are live processes of another lane (often including the user's own dev stack), **must not be killed**. This skill defaults to 8791 + 5273; if launch finds them taken, change ports (env override `VERIFY_PORT` / `VERIFY_WEB_PORT`), never touch anyone else's port. Check occupancy: `lsof -iTCP:8791 -sTCP:LISTEN`.

@@ -384,6 +384,8 @@ Dark adds one more slot, `--top` (an `inset 0 1px 0` top highlight at 5% white),
 
 ## Aesthetic constraints for agents (paste into prompts)
 
+Read `DESIGN-RULES.md` (next to this file) first: it holds the short checkable rules and the anti-patterns. The block below is the token summary to paste into a prompt.
+
 ```text
 Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: direction A, Cairn. Stone paper, dense, calm. Light (.light): canvas #e6e7e1 → sheet #f6f6f2 → card #fdfdfb, ink #1d231f. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow.
