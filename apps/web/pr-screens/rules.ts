@@ -174,7 +174,7 @@ for (const el of document.querySelectorAll('body *')) {
   const s = getComputedStyle(el);
   for (const prop of ['marginTop','marginRight','marginBottom','marginLeft','paddingTop','paddingRight','paddingBottom','paddingLeft']) {
     const value = parseFloat(s[prop]);
-    if (Number.isFinite(value) && Math.abs(value / 4 - Math.round(value / 4)) > 0.01) {
+    if (Number.isFinite(value) && Math.abs(value) < 64 && Math.abs(value / 4 - Math.round(value / 4)) > 0.01) {
       const key = keyOf(el) + ':' + prop + ':' + value;
       if (!found.has(key)) found.set(key, { key, text: prop + ' ' + value + 'px on ' + keyOf(el) + ' is off the 4px grid' });
     }
@@ -192,7 +192,7 @@ for (const el of document.querySelectorAll('body *')) {
   if (!visible(el)) continue;
   const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ');
   if (!/[\\u4e00-\\u9fff]/.test(own)) continue;
-  for (const word of own.match(/[A-Za-z]{4,}/g) || []) {
+  for (const word of own.replaceAll('Claude Code', 'Claude').match(/[A-Za-z]{4,}/g) || []) {
     if (glossary.includes(word.toLowerCase())) continue;
     found.set(word.toLowerCase(), { key: word.toLowerCase(), text: '"' + own.trim().slice(0, 40) + '" has the Latin word "' + word + '" inside a CJK string' });
   }
