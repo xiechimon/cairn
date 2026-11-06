@@ -5,6 +5,7 @@ import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
   AGENT_TOOL_TAG,
+  type RequiredCapabilities,
   type StepKind,
 } from '@cairn/shared';
 import Database from 'better-sqlite3';
@@ -13,6 +14,8 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
+import { capabilityGatePasses } from '../src/services/dispatch-eligibility.js';
+import { OVERFLOW_AFTER_MS, routeTargets, routeVerdict } from '../src/services/machine-routing.js';
 import { listMemoryEntries } from '../src/services/memory.js';
 import { modelsAreIndependent } from '../src/services/merge-gate/model-identity.js';
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
@@ -648,4 +651,189 @@ describe('legacy agent columns', () => {
       opened.close();
     }
   });
+});
+
+type OrbKind = 'capability' | 'name' | 'native';
+
+interface PlacementCell {
+  role: 'implement' | 'review';
+  pinned: boolean;
+  orb: OrbKind;
+  caps: 'null' | 'set';
+  routing: 'off' | 'on';
+}
+
+const OWN_CAPS: RequiredCapabilities = { mcpServers: ['codegraph'] };
+
+function placementInstall(cell: PlacementCell): string {
+  return installWith((sqlite) => {
+    const machine = sqlite.prepare(
+      'INSERT INTO machine (id, teamId, name, online, tokenHash, capabilities) VALUES (?, ?, ?, 1, ?, ?)',
+    );
+    const pinnedName =
+      cell.orb === 'name' ? 'box-orb' : cell.orb === 'capability' ? 'box' : 'laptop';
+    const pinnedCaps =
+      cell.orb === 'capability'
+        ? { mcpServers: ['codegraph'], skills: [], executor: 'orb' }
+        : cell.orb === 'native'
+          ? { mcpServers: ['codegraph'], skills: [], executor: 'host' }
+          : { mcpServers: ['codegraph'], skills: [] };
+    machine.run('m-pinned', 't1', pinnedName, 'h1', JSON.stringify(pinnedCaps));
+    machine.run(
+      'm-other',
+      't1',
+      'other',
+      'h2',
+      JSON.stringify({ mcpServers: ['codegraph'], skills: [], executor: 'host' }),
+    );
+    insertAgent(sqlite, 'agent-role', 'Role', ROLE_AGENT, null);
+    sqlite
+      .prepare('UPDATE agent SET machineId = ?, requiredCapabilities = ? WHERE id = ?')
+      .run(
+        cell.pinned ? 'm-pinned' : null,
+        cell.caps === 'set' ? JSON.stringify(OWN_CAPS) : null,
+        'agent-role',
+      );
+    const slot = cell.role === 'review' ? 'review' : 'build';
+    sqlite
+      .prepare(
+        `INSERT INTO todo (id, teamId, projectId, title, phase, phaseAt, seqNum, assignment)
+         VALUES ('todo-1', 't1', 'p1', 'Task', 'queued', 1, 1, ?)`,
+      )
+      .run(JSON.stringify({ plan: null, build: null, [slot]: { agentId: 'agent-role' } }));
+    if (cell.routing === 'on') {
+      sqlite
+        .prepare(
+          `INSERT INTO routing_rule (id, teamId, use, provider, modelId, machineId, requiredCapabilities, seededFromAgentId, createdAt, updatedAt)
+           VALUES ('rule-existing', 't1', ?, 'relay-9', 'glm-x', ?, ?, 'agent-role', 1, 1)`,
+        )
+        .run(
+          cell.role === 'review' ? 'review' : 'session',
+          cell.pinned ? 'm-pinned' : null,
+          cell.caps === 'set' ? JSON.stringify(OWN_CAPS) : null,
+        );
+    }
+  });
+}
+
+function expectedCaps(cell: PlacementCell): RequiredCapabilities | null {
+  const own = cell.caps === 'set' ? OWN_CAPS : null;
+  if (cell.routing === 'on' && cell.caps === 'set') return own;
+  const inferred = cell.pinned && cell.orb !== 'native';
+  return inferred ? { ...(own ?? {}), executor: 'orb' } : own;
+}
+
+type PinnedState = 'online' | 'offline' | 'busy past overflow';
+
+function claimVerdicts(caps: RequiredCapabilities | null, machineId: string | null) {
+  const other = {
+    capabilities: { mcpServers: ['codegraph'], skills: [], executor: 'host' as const },
+    claudeCodeReport: null,
+  };
+  const states: PinnedState[] = ['online', 'offline', 'busy past overflow'];
+  return Object.fromEntries(
+    states.map((state) => {
+      const verdict = routeVerdict({
+        machineId: 'm-other',
+        targets: routeTargets(null, machineId),
+        unavailable: () => state === 'offline',
+        waitingSince: 0,
+        now: state === 'busy past overflow' ? OVERFLOW_AFTER_MS + 1 : 1,
+      });
+      return [state, verdict.claim && capabilityGatePasses(other, { requiredCapabilities: caps })];
+    }),
+  );
+}
+
+const PLACEMENT_CELLS: PlacementCell[] = (['implement', 'review'] as const).flatMap((role) =>
+  [true, false].flatMap((pinned) =>
+    (['capability', 'name', 'native'] as const).flatMap((orb) =>
+      (['null', 'set'] as const).flatMap((caps) =>
+        (['off', 'on'] as const).flatMap((routing) =>
+          pinned || orb === 'native' ? [{ role, pinned, orb, caps, routing }] : [],
+        ),
+      ),
+    ),
+  ),
+);
+
+describe('executor and placement', () => {
+  test.each(PLACEMENT_CELLS)(
+    '$role pinned=$pinned machine=$orb caps=$caps routing=$routing',
+    (cell) => {
+      const dbPath = placementInstall(cell);
+      const opened = openDbWithHandle(dbPath);
+      try {
+        seedDefaultRouting(opened.db);
+        const todoRow = opened.db
+          .select()
+          .from(schema.todo)
+          .where(eq(schema.todo.id, 'todo-1'))
+          .get();
+        if (todoRow === undefined) throw new Error('fixture todo missing');
+        const profile = profileForStep(
+          opened.db,
+          todoRow,
+          cell.role === 'review' ? 'review' : 'build',
+        );
+        expect(profile).not.toBeNull();
+        if (profile === null) return;
+        const caps = expectedCaps(cell);
+        expect(profile.requiredCapabilities).toEqual(caps);
+        expect(profile.machineId).toBe(cell.pinned ? 'm-pinned' : null);
+        expect(claimVerdicts(profile.requiredCapabilities, profile.machineId)).toEqual(
+          claimVerdicts(caps, cell.pinned ? 'm-pinned' : null),
+        );
+        const nativeOnOrbWork =
+          cell.pinned && cell.orb !== 'native' && cell.routing === 'off'
+            ? claimVerdicts(profile.requiredCapabilities, profile.machineId)
+            : null;
+        if (nativeOnOrbWork !== null) {
+          expect(nativeOnOrbWork['busy past overflow']).toBe(false);
+          expect(nativeOnOrbWork.offline).toBe(false);
+        }
+      } finally {
+        opened.close();
+      }
+    },
+  );
+});
+
+describe('review independence', () => {
+  test.each(['same model', 'other model'] as const)(
+    'review agent on the %s as the session',
+    (relation) => {
+      const dbPath = installWith((sqlite) => {
+        insertAgent(
+          sqlite,
+          'agent-impl',
+          'Implementer',
+          { ...ROLE_AGENT, provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+          'implementer',
+        );
+        insertAgent(
+          sqlite,
+          'agent-reviewer',
+          'Reviewer',
+          relation === 'same model'
+            ? { ...ROLE_AGENT, provider: 'claude-code', modelId: 'claude-sonnet-5-5' }
+            : { ...ROLE_AGENT, provider: 'openai-codex', modelId: 'gpt-6-luna' },
+          'code_reviewer',
+        );
+      });
+      const opened = openDbWithHandle(dbPath);
+      try {
+        seedDefaultRouting(opened.db);
+        const review = opened.db
+          .select()
+          .from(schema.routingRule)
+          .where(eq(schema.routingRule.use, 'review'))
+          .get();
+        if (relation === 'same model') expect(review).toBeUndefined();
+        else expect(review?.modelId).toBe('gpt-6-luna');
+      } finally {
+        opened.close();
+      }
+    },
+  );
 });

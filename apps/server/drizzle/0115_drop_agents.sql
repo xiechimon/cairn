@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS `legacy_todo_assignment_backup` AS SELECT `id` AS `to
 CREATE TABLE IF NOT EXISTS `legacy_chief_agent_backup` AS SELECT `id` AS `chiefId`, `teamId`, `agentId` FROM `chief` WHERE `agentId` IS NOT NULL;--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS `legacy_routing_rule_adoption_backup` AS SELECT `id` AS `ruleId`, `teamId`, `adoptedAgentIds` FROM `routing_rule` WHERE `adoptedAgentIds` IS NOT NULL;--> statement-breakpoint
 INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
-SELECT lower(hex(randomblob(16))), a.`teamId`, 'session', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
+SELECT lower(hex(randomblob(16))), a.`teamId`, 'session', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, CASE WHEN EXISTS (SELECT 1 FROM `machine` m WHERE m.`id` = a.`machineId` AND (json_extract(m.`capabilities`, '$.executor') = 'orb' OR (json_extract(m.`capabilities`, '$.executor') IS NULL AND substr(m.`name`, -4) = '-orb'))) THEN json_set(coalesce(a.`requiredCapabilities`, '{}'), '$.executor', 'orb') ELSE a.`requiredCapabilities` END, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
 FROM `agent` a
 WHERE a.`id` = (
   SELECT b.`id` FROM `agent` b
@@ -17,7 +17,7 @@ WHERE a.`id` = (
 )
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'session');--> statement-breakpoint
 INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
-SELECT lower(hex(randomblob(16))), a.`teamId`, 'session', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
+SELECT lower(hex(randomblob(16))), a.`teamId`, 'session', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, CASE WHEN EXISTS (SELECT 1 FROM `machine` m WHERE m.`id` = a.`machineId` AND (json_extract(m.`capabilities`, '$.executor') = 'orb' OR (json_extract(m.`capabilities`, '$.executor') IS NULL AND substr(m.`name`, -4) = '-orb'))) THEN json_set(coalesce(a.`requiredCapabilities`, '{}'), '$.executor', 'orb') ELSE a.`requiredCapabilities` END, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
 FROM `agent` a
 WHERE a.`id` = (
   SELECT b.`id` FROM `agent` b
@@ -29,12 +29,13 @@ WHERE a.`id` = (
 )
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'session');--> statement-breakpoint
 INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `seededFromAgentId`, `createdAt`, `updatedAt`)
-SELECT lower(hex(randomblob(16))), a.`teamId`, 'review', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
+SELECT lower(hex(randomblob(16))), a.`teamId`, 'review', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, CASE WHEN EXISTS (SELECT 1 FROM `machine` m WHERE m.`id` = a.`machineId` AND (json_extract(m.`capabilities`, '$.executor') = 'orb' OR (json_extract(m.`capabilities`, '$.executor') IS NULL AND substr(m.`name`, -4) = '-orb'))) THEN json_set(coalesce(a.`requiredCapabilities`, '{}'), '$.executor', 'orb') ELSE a.`requiredCapabilities` END, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
 FROM `agent` a
 WHERE a.`id` = (
   SELECT b.`id` FROM `agent` b
   WHERE b.`teamId` = a.`teamId` AND b.`provider` IS NOT NULL AND b.`modelId` IS NOT NULL
     AND b.`id` NOT IN (SELECT `agentId` FROM `chief` WHERE `agentId` IS NOT NULL)
+    AND NOT EXISTS (SELECT 1 FROM `routing_rule` s WHERE s.`teamId` = b.`teamId` AND s.`use` = 'session' AND s.`modelId` = b.`modelId`)
     AND (b.`persona` = 'code_reviewer' OR (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = b.`id`) > 0)
   ORDER BY (SELECT count(*) FROM `todo` t WHERE t.`teamId` = b.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = b.`id`) DESC,
     coalesce(b.`persona` = 'code_reviewer', 0) DESC, b.`id`
@@ -77,6 +78,9 @@ WHERE a.`id` = (
 )
 AND EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND t.`sourceKind` = 'research-citation-check')
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'citation_check');--> statement-breakpoint
+UPDATE `routing_rule` SET `requiredCapabilities` = json_set('{}', '$.executor', 'orb')
+WHERE `use` IN ('session', 'review') AND `requiredCapabilities` IS NULL AND `seededFromAgentId` IS NOT NULL
+AND EXISTS (SELECT 1 FROM `agent` a WHERE a.`id` = `routing_rule`.`seededFromAgentId` AND a.`teamId` = `routing_rule`.`teamId` AND EXISTS (SELECT 1 FROM `machine` m WHERE m.`id` = a.`machineId` AND (json_extract(m.`capabilities`, '$.executor') = 'orb' OR (json_extract(m.`capabilities`, '$.executor') IS NULL AND substr(m.`name`, -4) = '-orb'))));--> statement-breakpoint
 UPDATE `routing_rule` SET `mcpServers` = (SELECT a.`mcpServers` FROM `chief` c JOIN `agent` a ON a.`id` = c.`agentId` WHERE c.`teamId` = `routing_rule`.`teamId` AND a.`mcpServers` IS NOT NULL LIMIT 1)
 WHERE `use` = 'coordinator' AND `mcpServers` IS NULL
 AND EXISTS (SELECT 1 FROM `chief` c JOIN `agent` a ON a.`id` = c.`agentId` WHERE c.`teamId` = `routing_rule`.`teamId` AND a.`mcpServers` IS NOT NULL);--> statement-breakpoint
