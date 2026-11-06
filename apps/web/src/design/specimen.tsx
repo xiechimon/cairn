@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import type { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
 import { ChevronRight } from '../icons/index.js';
 
 export const DISPLAY_STYLE: CSSProperties = {
@@ -8,6 +8,12 @@ export const DISPLAY_STYLE: CSSProperties = {
   lineHeight: 1.05,
   letterSpacing: '-0.02em',
 };
+
+export const OnlySpecimen = createContext<string | null>(null);
+
+export function useOnlySpecimen(): string | null {
+  return useContext(OnlySpecimen);
+}
 
 export function Section({
   id,
@@ -20,6 +26,7 @@ export function Section({
   lede: string;
   children: ReactNode;
 }) {
+  if (useOnlySpecimen() != null) return children;
   return (
     <section id={id} data-gallery-section="" className="scroll-mt-4 pt-16">
       <h2 className="m-0 font-heading text-page font-title text-foreground">{title}</h2>
@@ -30,6 +37,7 @@ export function Section({
 }
 
 export function GroupTitle({ id, title, lede }: { id: string; title: string; lede: string }) {
+  if (useOnlySpecimen() != null) return null;
   return (
     <header id={id} className="scroll-mt-4 border-b border-border pt-24 pb-5">
       <h1 className="m-0 font-semibold text-foreground" style={DISPLAY_STYLE}>
@@ -41,6 +49,7 @@ export function GroupTitle({ id, title, lede }: { id: string; title: string; led
 }
 
 export function Specimen({
+  id,
   title,
   note,
   code,
@@ -48,6 +57,7 @@ export function Specimen({
   className,
   children,
 }: {
+  id: string;
   title: string;
   note?: string;
   code?: string;
@@ -55,8 +65,13 @@ export function Specimen({
   className?: string;
   children: ReactNode;
 }) {
+  const only = useOnlySpecimen();
+  if (only != null && only !== id) return null;
   return (
-    <figure className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)">
+    <figure
+      data-specimen={id}
+      className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)"
+    >
       <figcaption className="flex items-baseline gap-3 border-b border-border px-5 py-3">
         <span className="flex-none text-ui font-semibold whitespace-nowrap text-foreground">
           {title}
@@ -71,7 +86,7 @@ export function Specimen({
           className,
         )}
       >
-        {children}
+        <OnlySpecimen.Provider value={null}>{children}</OnlySpecimen.Provider>
       </div>
       {code != null && (
         <details className="group border-t border-border">

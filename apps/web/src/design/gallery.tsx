@@ -58,7 +58,7 @@ import { ProductPagesSection } from './product-pages.js';
 import { ProductProviders } from './product-providers.js';
 import { ProductThreadReplySection } from './product-thread-reply.js';
 import { ScreensSection } from './screens.js';
-import { GroupTitle } from './specimen.js';
+import { GroupTitle, OnlySpecimen, useOnlySpecimen } from './specimen.js';
 
 const NAV = [
   {
@@ -168,6 +168,116 @@ function useActiveSection(scroller: RefObject<HTMLElement | null>): string {
   return active;
 }
 
+function GallerySections({ theme }: { theme: GalleryTheme }) {
+  const only = useOnlySpecimen();
+  return (
+    <>
+      <div key={theme}>
+        <GroupTitle
+          id="foundations"
+          title="Cairn"
+          lede="The design system behind the workbench: tokens measured live from the app's CSS, the real components, and pages built from them."
+        />
+        {only == null && <FoundationsHero theme={theme} />}
+        <ColorSection />
+        <TypeSection />
+        <ShapeSection />
+        <ElevationSection />
+        <MotionSection />
+        <TextureSection />
+        {only == null && <DocCheckSection theme={theme} />}
+      </div>
+      <GroupTitle
+        id="components"
+        title="Components"
+        lede="Every specimen below renders the component the app ships, from src/components. Click, type and use the keyboard; they all work."
+      />
+      <ButtonSection />
+      <BadgeSection />
+      <TooltipSection />
+      <InputSection />
+      <ChoiceSection />
+      <MenuSection />
+      <DialogSection />
+      <ToastSection />
+      <EmptySection />
+      <SearchSyntaxSection />
+      <SettingsSection />
+      <AvatarSection />
+      <ConversationSection />
+      <TraceSection />
+      <StructureSection />
+      <IdentitySection />
+      <StreamSection />
+      <GroupTitle
+        id="product"
+        title="Product"
+        lede="The app's own components from board, detail, Coordinator, overlay and pages, rendered with sample data in every state they ship."
+      />
+      <ProductProviders>
+        <ProductBoardSection />
+        <ProductDetailSection />
+        <ProductChiefSection />
+        <ProductThreadReplySection />
+        <ProductOverlaysSection />
+        <ProductPagesSection theme={theme} />
+        <ProductAddProviderSection />
+      </ProductProviders>
+      <GroupTitle
+        id="inbox-threads"
+        title="Inbox and threads"
+        lede="The inbox groups, thread cards and rows, and the bars prototype A is built from, as reusable components in src/components. Pages compose only these."
+      />
+      <StoneSection />
+      <ThreadCardSection />
+      <ThreadRowSection />
+      <PermissionSection />
+      <PlanSection />
+      <ThreadUsageSection />
+      <PrBarSection />
+      <PrCardSection />
+      <ScheduledSection />
+      <ScheduleDetailSection />
+      <AutomationSection />
+      <SidebarSection />
+      <ProjectsSection />
+      <CoordinatorStreamSection />
+      <PanelSection />
+      <RoutingSection />
+      <AccountsSection />
+      <GroupTitle
+        id="patterns"
+        title="Patterns"
+        lede="Page prototypes composed from the components above, with working interactions."
+      />
+      <ProvidersPattern />
+      <ScreensSection theme={theme} />
+    </>
+  );
+}
+
+export function GalleryOnly({
+  id,
+  theme,
+  width,
+}: {
+  id: string;
+  theme: GalleryTheme;
+  width: number | null;
+}) {
+  return (
+    <OnlySpecimen.Provider value={id}>
+      <div
+        data-gallery-only={id}
+        className="min-h-full bg-background text-foreground"
+        style={width == null ? undefined : { width }}
+      >
+        <GallerySections theme={theme} />
+      </div>
+    </OnlySpecimen.Provider>
+  );
+}
+
 export function Gallery() {
   const [theme, setTheme] = useState<GalleryTheme>(() =>
     document.documentElement.classList.contains('light') ? 'light' : 'dark',
@@ -248,86 +358,7 @@ export function Gallery() {
           {controls}
         </div>
         <div className="mx-auto max-w-250 px-6 pb-40 md:px-12">
-          <div key={theme}>
-            <GroupTitle
-              id="foundations"
-              title="Cairn"
-              lede="The design system behind the workbench: tokens measured live from the app's CSS, the real components, and pages built from them."
-            />
-            <FoundationsHero theme={theme} />
-            <ColorSection />
-            <TypeSection />
-            <ShapeSection />
-            <ElevationSection />
-            <MotionSection />
-            <TextureSection />
-            <DocCheckSection theme={theme} />
-          </div>
-          <GroupTitle
-            id="components"
-            title="Components"
-            lede="Every specimen below renders the component the app ships, from src/components. Click, type and use the keyboard; they all work."
-          />
-          <ButtonSection />
-          <BadgeSection />
-          <TooltipSection />
-          <InputSection />
-          <ChoiceSection />
-          <MenuSection />
-          <DialogSection />
-          <ToastSection />
-          <EmptySection />
-          <SearchSyntaxSection />
-          <SettingsSection />
-          <AvatarSection />
-          <ConversationSection />
-          <TraceSection />
-          <StructureSection />
-          <IdentitySection />
-          <StreamSection />
-          <GroupTitle
-            id="product"
-            title="Product"
-            lede="The app's own components from board, detail, Coordinator, overlay and pages, rendered with sample data in every state they ship."
-          />
-          <ProductProviders>
-            <ProductBoardSection />
-            <ProductDetailSection />
-            <ProductChiefSection />
-            <ProductThreadReplySection />
-            <ProductOverlaysSection />
-            <ProductPagesSection theme={theme} />
-            <ProductAddProviderSection />
-          </ProductProviders>
-          <GroupTitle
-            id="inbox-threads"
-            title="Inbox and threads"
-            lede="The inbox groups, thread cards and rows, and the bars prototype A is built from, as reusable components in src/components. Pages compose only these."
-          />
-          <StoneSection />
-          <ThreadCardSection />
-          <ThreadRowSection />
-          <PermissionSection />
-          <PlanSection />
-          <ThreadUsageSection />
-          <PrBarSection />
-          <PrCardSection />
-          <ScheduledSection />
-          <ScheduleDetailSection />
-          <AutomationSection />
-          <SidebarSection />
-          <ProjectsSection />
-          <CoordinatorStreamSection />
-          <PanelSection />
-          <RoutingSection />
-          <AccountsSection />
-          <GroupTitle
-            id="patterns"
-            title="Patterns"
-            lede="Page prototypes composed from the components above, with working interactions."
-          />
-          <ProvidersPattern />
-          <ScreensSection theme={theme} />
+          <GallerySections theme={theme} />
         </div>
       </main>
     </div>

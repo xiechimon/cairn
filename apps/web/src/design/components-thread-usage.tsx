@@ -19,7 +19,7 @@ export function ThreadUsageSection() {
       title="Thread usage"
       lede="A quiet footer above the composer opens into totals across every run. Unknown prices and unavailable duration stay blank; models and machines remain readable in the expanded view."
     >
-      <Specimen title="Collapsed thread usage" stage="canvas">
+      <Specimen id="collapsed-thread-usage" title="Collapsed thread usage" stage="canvas">
         <div className="w-full max-w-105">
           <ThreadUsageDisclosure
             summary={SUMMARY}
@@ -28,7 +28,7 @@ export function ThreadUsageSection() {
           />
         </div>
       </Specimen>
-      <Specimen title="Expanded thread usage" stage="canvas">
+      <Specimen id="expanded-thread-usage" title="Expanded thread usage" stage="canvas">
         <div className="w-full max-w-105">
           <ThreadUsageDisclosure
             summary={SUMMARY}
@@ -38,7 +38,7 @@ export function ThreadUsageSection() {
           />
         </div>
       </Specimen>
-      <Specimen title="Unpriced thread usage" stage="canvas">
+      <Specimen id="unpriced-thread-usage" title="Unpriced thread usage" stage="canvas">
         <div className="w-full max-w-105">
           <ThreadUsageDisclosure
             summary={{ ...SUMMARY, cost: '—' }}
@@ -48,7 +48,11 @@ export function ThreadUsageSection() {
           />
         </div>
       </Specimen>
-      <Specimen title="Loading and failed thread usage" stage="canvas">
+      <Specimen
+        id="loading-and-failed-thread-usage"
+        title="Loading and failed thread usage"
+        stage="canvas"
+      >
         <div className="flex w-full max-w-105 flex-col gap-4">
           <ThreadUsageDisclosure
             summary={{ ...SUMMARY, tokens: '—', cached: '—', models: [], machines: [] }}
