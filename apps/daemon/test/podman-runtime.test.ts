@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { PodmanOrbRuntime } from '../src/orb/podman.js';
@@ -163,7 +163,19 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     ]);
   });
 
-  test('never widens the sandbox', async () => {
+  test.each([
+    ['the default temp root', undefined],
+    ['a temp root under the home directory', join(homedir(), '.cache', 'cairn-podman-widen-test')],
+  ])('never widens the sandbox with %s', async (_name, tempRoot) => {
+    if (tempRoot !== undefined) {
+      mkdirSync(tempRoot, { recursive: true });
+      const previous = process.env.CAIRN_TEST_TEMP_ROOT;
+      process.env.CAIRN_TEST_TEMP_ROOT = tempRoot;
+      onTestFinished(() => {
+        if (previous === undefined) delete process.env.CAIRN_TEST_TEMP_ROOT;
+        else process.env.CAIRN_TEST_TEMP_ROOT = previous;
+      });
+    }
     const { podman, runtime } = fixture();
     const relay = await relayFixture();
     await runtime.spawn(
@@ -187,7 +199,16 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     expect(joined).not.toContain('unconfined');
     expect(joined).not.toContain('--read-only');
     expect(joined).not.toMatch(/docker\.sock|podman\.sock|containerd\.sock/);
-    expect(joined).not.toContain(homedir());
+    const home = homedir();
+    const mountSources = argv.flatMap((arg, index) =>
+      argv[index - 1] === '-v' ? [arg.split(':')[0] ?? ''] : [],
+    );
+    expect(mountSources.length).toBeGreaterThan(0);
+    for (const source of mountSources) {
+      expect(source === home || home.startsWith(source.endsWith(sep) ? source : source + sep)).toBe(
+        false,
+      );
+    }
     expect(argv.slice(argv.indexOf('--network'), argv.indexOf('--network') + 2)).toEqual([
       '--network',
       'none',
