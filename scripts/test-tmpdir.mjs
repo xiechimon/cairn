@@ -25,7 +25,7 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
         throw new TypeError('prefix must contain only letters, digits, underscores or hyphens');
       }
       const path = mkdtempSync(
-        join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `cairn-test-${runId}-${prefix}`),
+        join(process.env.CAIRN_TEST_TEMP_ROOT ?? tmpdir(), `ct-${runId.slice(0, 8)}-${prefix}`),
       );
       try {
         if (process.env.CAIRN_TEST_TEMP_STRICT === '1' && process.env.CAIRN_TEST_TEMP_REPORT) {
