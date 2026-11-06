@@ -89,8 +89,8 @@ test('routing: a failed Claude subscriptions fetch still lets the Codex tab show
   await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('query-error')).toBeVisible();
-  await expect(settings.getByRole('tab', { name: /Codex/ })).toBeVisible();
-  await settings.getByRole('tab', { name: /Codex/ }).click();
+  await expect(settings.getByTestId('vendor-list').getByRole('button', { name: /Codex/ })).toBeVisible();
+  await settings.getByTestId('vendor-list').getByRole('button', { name: /Codex/ }).click();
   await expect(settings.getByTestId('query-error')).toHaveCount(0);
   await expect(settings.getByTestId('account-row')).toContainText('Codex main');
 });

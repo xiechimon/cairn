@@ -441,9 +441,7 @@ export function VendorList({
 }) {
   const { t } = useI18n();
   return (
-    <div
-      role="tablist"
-      aria-orientation="vertical"
+    <nav
       aria-label={t('订阅账户')}
       data-testid="vendor-list"
       className="flex w-full flex-none flex-col border-b border-border @3xl:w-64 @3xl:border-r @3xl:border-b-0"
@@ -452,15 +450,14 @@ export function VendorList({
         const { label, short, Mark } = VENDORS[vendor];
         const selected = vendor === value;
         return (
-          <button
+          <Button
             key={vendor}
-            type="button"
-            role="tab"
-            aria-selected={selected}
+            variant="ghost"
+            aria-current={selected ? 'true' : undefined}
             aria-label={`${short} ${counts[vendor]}`}
             data-vendor={vendor}
             onClick={() => onChange(vendor)}
-            className="flex items-center gap-2.5 border-b border-border px-3.5 py-2.5 text-left outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-selected:bg-secondary"
+            className="h-auto w-full justify-start gap-2.5 rounded-none border-0 border-b border-border px-3.5 py-2.5 text-left font-normal whitespace-normal outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-[current=true]:bg-secondary"
           >
             <Mark
               aria-hidden
@@ -474,10 +471,10 @@ export function VendorList({
                 {t('{n} 个账户', { n: counts[vendor] })}
               </span>
             </span>
-          </button>
+          </Button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
