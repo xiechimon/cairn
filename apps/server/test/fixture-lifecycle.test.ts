@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { bootServer } from './helpers.js';
 
 const vitestBin = fileURLToPath(
@@ -48,7 +49,7 @@ describe('bootServer fixture lifecycle', () => {
   });
 
   test('caller-supplied reposDir survives dispose', () => {
-    const caller = mkdtempSync(join(tmpdir(), 'caller-repos-'));
+    const caller = makeTestTempDir('caller-repos-');
     try {
       const s = bootServer({ reposDir: caller });
       s.dispose();

@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { autonomousMergeAdmission, build, project, todo } from '../src/db/schema.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -11,7 +11,7 @@ import { prepareRecoveryBranch } from '../src/services/github-recovery.js';
 import { bootServer, postProject } from './helpers.js';
 
 test('recovery publishes one exact revert commit on a named branch and preserves later changes', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'server-recovery-'));
+  const dir = makeTestTempDir('server-recovery-');
   try {
     const git = (...args: string[]) =>
       execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();

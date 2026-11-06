@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, runGitOk } from '../../daemon/src/git.js';
 import { inspectLocalPatch } from '../../daemon/src/local-merge.js';
 import {
@@ -26,7 +26,7 @@ afterEach(() => {
 const identity = { name: 'server-digest', email: 'server-digest@cairn.local' };
 
 async function seededRepo(): Promise<{ dir: string; base: string; head: string }> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'srv-local-digest-')), 'repo');
+  const dir = join(makeTestTempDir('srv-local-digest-'), 'repo');
   mkdirSync(dir);
   const git = (args: string[]) => runGitOk(args, { cwd: dir, env: commitEnv(identity) });
   await git(['init', '-b', 'main']);

@@ -1,9 +1,9 @@
-import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { chmod, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -12,7 +12,7 @@ let readonlyHome: string;
 let gateDirectory: string;
 
 beforeAll(async () => {
-  readonlyHome = await mkdtemp(join(tmpdir(), 'github-create-route-readonly-'));
+  readonlyHome = makeTestTempDir('github-create-route-readonly-');
   gateDirectory = join(readonlyHome, 'github-create');
   await mkdir(gateDirectory);
   await chmod(gateDirectory, 0o500);

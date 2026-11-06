@@ -1,7 +1,7 @@
-import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { chmod, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HttpError } from '../src/lib/errors.js';
 import { githubCreateIssue } from '../src/lib/github.js';
 
@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 test('parallel creates share slots and an explicit secondary limit retries successfully', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'github-create-server-'));
+  const home = makeTestTempDir('github-create-server-');
   vi.stubEnv('CAIRN_HOME', home);
   vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '30');
   const calls: number[] = [];
@@ -40,7 +40,7 @@ test('parallel creates share slots and an explicit secondary limit retries succe
 });
 
 test('an unwritable gate directory surfaces as HttpError 503 naming the directory, with zero outbound calls', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'github-create-server-readonly-'));
+  const home = makeTestTempDir('github-create-server-readonly-');
   const directory = join(home, 'github-create');
   await mkdir(directory);
   await chmod(directory, 0o500);
