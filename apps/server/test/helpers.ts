@@ -60,6 +60,7 @@ export function bootServer(
     mcpConfigPath?: string;
     backupStatusPath?: string;
     deployRecordPath?: string;
+    remote?: Partial<NonNullable<AppContext['remote']>>;
   } = {},
 ) {
   const db = openMemoryDb();
@@ -97,6 +98,13 @@ export function bootServer(
   const oauthStates: AppContext['oauthStates'] = new Map();
   try {
     const appContext: AppContext = {
+      remote: {
+        environmentId: '0f9d3a52-6c1e-4b7a-9d3e-5a1c2b4d6e80',
+        listenHost: '127.0.0.1',
+        listenPort: 8787,
+        tailnetStatus: () => null,
+        ...opts.remote,
+      },
       db,
       hub,
       machineHub,

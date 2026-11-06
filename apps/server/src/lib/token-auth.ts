@@ -10,12 +10,32 @@ const STREAM_PATH_PATTERNS = [
   /^\/api\/conversations\/[^/]+\/stream$/,
 ];
 
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const OWNER_ONLY_PATTERNS = [
+  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|feishu)(?:\/|$)/,
+  /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection)(?:\/|$)/,
+  /^\/api\/machines\/[^/]+(?:\/|$)/,
+];
+
+export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
+  if (pathname === '/api/remote/pairing' || pathname.startsWith('/api/remote/devices')) return true;
+  if (READ_METHODS.has(method.toUpperCase())) return false;
+  return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
+}
+
+const OPEN_REMOTE_PATHS = new Set(['/api/remote/descriptor', '/api/remote/pair']);
+
+export function isOpenRemotePath(pathname: string): boolean {
+  return OPEN_REMOTE_PATHS.has(pathname);
+}
+
 function isExempt(pathname: string): boolean {
   if (pathname.includes('%')) return false;
   if (!pathname.startsWith('/api/')) return true;
   if (pathname === '/api/machine' || pathname.startsWith('/api/machine/')) return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
+  if (isOpenRemotePath(pathname)) return true;
   return false;
 }
 
@@ -41,21 +61,50 @@ export function isLoopbackPeer(c: Context): boolean {
   return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
 }
 
-export function registerTokenAuth(app: Hono, token: string | null): void {
+export interface TokenAuthOptions {
+  resolveDeviceId?: (provided: string) => string | null;
+}
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    pairedDeviceId: string;
+  }
+}
+
+export function pairedDeviceIdOf(c: Context): string | null {
+  return c.get('pairedDeviceId') ?? null;
+}
+
+export function registerTokenAuth(
+  app: Hono,
+  token: string | null,
+  options: TokenAuthOptions = {},
+): void {
   if (token === null) return;
-  const verify = makeVerifier(token);
+  const verifyOwner = makeVerifier(token);
   app.use('*', async (c, next) => {
+    const verify = (provided: string): boolean => {
+      if (verifyOwner(provided)) return true;
+      const deviceId = options.resolveDeviceId?.(provided) ?? null;
+      if (deviceId === null) return false;
+      c.set('pairedDeviceId', deviceId);
+      return true;
+    };
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
+    const admit = () =>
+      pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, pathname)
+        ? c.json({ error: 'only the owner token can do this' }, 403)
+        : next();
     const authorization = c.req.header('authorization');
     if (authorization !== undefined) {
       const match = /^Bearer\s+(.+)$/i.exec(authorization);
-      if (match !== null && verify(match[1] ?? '')) return next();
+      if (match !== null && verify(match[1] ?? '')) return admit();
     }
     if (STREAM_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) {
       const queryToken = url.searchParams.get('token');
-      if (queryToken !== null && verify(queryToken)) return next();
+      if (queryToken !== null && verify(queryToken)) return admit();
     }
     return c.json({ error: 'Unauthorized' }, 401);
   });
