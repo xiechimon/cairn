@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -99,6 +100,33 @@ describe('staged boot migration', () => {
     after.close();
   });
 
+  test("a database that already applied main's latest migration still receives both stages in order", () => {
+    const dbPath = legacyInstall(true);
+    const prepared = new Database(dbPath);
+    migrate(drizzle(prepared), { migrationsFolder: mainFolder() });
+    prepared.close();
+    expect(tables(dbPath)).toContain('coordinator_conversation');
+    expect(tables(dbPath)).not.toContain('legacy_agent_backup');
+    openDbWithHandle(dbPath).close();
+    expect(tables(dbPath)).toContain('legacy_agent_backup');
+    expect(tables(dbPath)).toContain('agent');
+    openDbWithHandle(dbPath).close();
+    expect(tables(dbPath)).not.toContain('agent');
+    expect(tables(dbPath)).toContain('coordinator_conversation');
+  });
+
+  test("the journal orders both stages after main's latest entry", () => {
+    const journal = JSON.parse(
+      readFileSync(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: { tag: string; when: number }[] };
+    const at = (tag: string) => journal.entries.findIndex((entry) => entry.tag === tag);
+    const mainLatest = journal.entries[at('0117_coordinator_store')];
+    for (const tag of ['0119_agent_layer_backup', '0120_drop_agents']) {
+      expect(at(tag)).toBeGreaterThan(at('0117_coordinator_store'));
+      expect(journal.entries[at(tag)]?.when).toBeGreaterThan(mainLatest?.when ?? Infinity);
+    }
+  });
+
   test('the data step is idempotent through its marker', () => {
     const dbPath = legacyInstall(true);
     const opened = openDbWithHandle(dbPath);
@@ -108,7 +136,7 @@ describe('staged boot migration', () => {
     sqlite.close();
   });
 
-  test('0116 refuses to run before the marker exists', () => {
+  test('0120 refuses to run before the marker exists', () => {
     const dbPath = legacyInstall(true);
     const sqlite = new Database(dbPath);
     migrate(drizzle(sqlite), { migrationsFolder: stageFolder() });
@@ -121,5 +149,11 @@ describe('staged boot migration', () => {
 function stageFolder(): string {
   const dir = makeTestTempDir('migration-boot-stage-');
   dirs.push(dir);
-  return migrationsThrough(dir, '0115_agent_layer_backup');
+  return migrationsThrough(dir, '0119_agent_layer_backup');
+}
+
+function mainFolder(): string {
+  const dir = makeTestTempDir('migration-boot-main-');
+  dirs.push(dir);
+  return migrationsThrough(dir, '0117_coordinator_store');
 }

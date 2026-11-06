@@ -32,7 +32,7 @@ export interface MigrationLogger {
   info(fields: Record<string, unknown>, message: string): void;
 }
 
-const AGENT_LAYER_BACKUP_TAG = '0115_agent_layer_backup';
+const AGENT_LAYER_BACKUP_TAG = '0119_agent_layer_backup';
 
 function agentLayerMarkerExists(sqlite: Database.Database): boolean {
   return (

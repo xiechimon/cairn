@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6a128361-29ee-4b95-9d10-ecf0ec83bb72",
-  "prevId": "40b16d2d-0a7f-4f56-a933-dde03cbd983d",
+  "id": "5769d604-c9e0-4e89-8977-91d4112fe129",
+  "prevId": "d6c5fe29-fdcb-479d-aebb-800f6ac0a77f",
   "tables": {
     "agent": {
       "name": "agent",
@@ -2303,26 +2303,118 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "data_migration": {
-      "name": "data_migration",
+    "coordinator_conversation": {
+      "name": "coordinator_conversation",
       "columns": {
-        "id": {
-          "name": "id",
+        "threadId": {
+          "name": "threadId",
           "type": "text",
           "primaryKey": true,
           "notNull": true,
           "autoincrement": false
         },
-        "doneAt": {
-          "name": "doneAt",
-          "type": "integer",
+        "conversationId": {
+          "name": "conversationId",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "detail": {
-          "name": "detail",
+        "lastMirroredEntryId": {
+          "name": "lastMirroredEntryId",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "piVersion": {
+          "name": "piVersion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "coordinator_entry": {
+      "name": "coordinator_entry",
+      "columns": {
+        "chiefMessageId": {
+          "name": "chiefMessageId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "threadId": {
+          "name": "threadId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conversationId": {
+          "name": "conversationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entryId": {
+          "name": "entryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "coordinator_entry_thread_idx": {
+          "name": "coordinator_entry_thread_idx",
+          "columns": [
+            "threadId",
+            "conversationId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "coordinator_lease": {
+      "name": "coordinator_lease",
+      "columns": {
+        "storeKey": {
+          "name": "storeKey",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "heartbeatAt": {
+          "name": "heartbeatAt",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -6412,6 +6504,37 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "data_migration": {
+      "name": "data_migration",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "doneAt": {
+          "name": "doneAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

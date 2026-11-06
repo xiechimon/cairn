@@ -60,6 +60,9 @@ export const DB_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
   'data_migration',
 ] as const;
 
@@ -108,5 +111,8 @@ export const INTERNAL_ONLY_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
   'data_migration',
 ] as const;
