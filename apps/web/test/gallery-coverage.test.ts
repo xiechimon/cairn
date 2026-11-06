@@ -14,6 +14,8 @@ const NOT_IN_GALLERY: Record<string, string> = {
   'ui/trace.tsx': 'Gap: rendered only through chat/agent-rows.tsx; no specimen yet.',
   'queued-capsules.tsx':
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
+  'shortcut-hint.tsx':
+    'Rendered inside the Question card specimen (the Ctrl and return keycaps) and the search panel.',
 };
 
 function walk(dir: string): string[] {
