@@ -6,7 +6,7 @@ import {
   decide,
   GATE_CHECK,
   HUMAN_LABEL,
-  lastGateRequest,
+  limitAnchor,
   markPreExisting,
   preExistingThreads,
   QUEUED_LABEL,
@@ -181,7 +181,12 @@ function evaluate(repo, number) {
   const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
   const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
-  const lastRequest = lastGateRequest(comments, sha);
+  const anchor = limitAnchor(comments, stateEntry, sha);
+  const lastActivity = Math.max(
+    check ? Date.parse(check.started_at) : 0,
+    anchor ? Date.parse(anchor.created_at) : 0,
+    stateEntry?.state.commitSha === sha ? Date.parse(stateEntry.comment.updated_at) : 0,
+  );
   const result = decide(
     pr,
     stateEntry?.state ?? null,
@@ -191,7 +196,8 @@ function evaluate(repo, number) {
     {
       waitedMs: check ? Date.now() - Date.parse(check.started_at) : 0,
       requested: reviewRequested(comments, sha),
-      sinceRequestMs: lastRequest ? Date.now() - Date.parse(lastRequest.created_at) : 0,
+      sinceRequestMs: anchor ? Date.now() - Date.parse(anchor.created_at) : 0,
+      idleMs: lastActivity > 0 ? Date.now() - lastActivity : 0,
     },
     blockRounds(comments, sha),
   );

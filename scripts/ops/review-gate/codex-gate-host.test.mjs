@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
 const gateScript = fileURLToPath(new URL('./codex-gate.mjs', import.meta.url));
 const SHA = 'c'.repeat(40);
 const OTHER = 'd'.repeat(40);
@@ -288,12 +289,12 @@ test('a failed review is retried at most twice per head', () => {
 test('a retry comment posted after the failed state is not repeated', () => {
   const out = run({
     comments: [
-      stateComment(SHA, 'failed'),
+      { ...stateComment(SHA, 'failed'), created_at: minutesAgo(10), updated_at: minutesAgo(10) },
       {
         id: 11,
         body: `<!-- review-gate-retry:${SHA}:1 -->`,
         user: ACTIONS,
-        created_at: '2026-01-01T00:05:00Z',
+        created_at: minutesAgo(5),
       },
     ],
     checkRuns: [],
@@ -302,7 +303,6 @@ test('a retry comment posted after the failed state is not repeated', () => {
   assert.equal(out.body(out.checkWrites[0]).status, 'in_progress');
 });
 
-const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
 const requestComment = (sha, createdAt, marker = `<!-- review-gate-request:${sha} -->`) => ({
   id: 3,
   body: `${marker}\n@codex review`,
@@ -482,14 +482,14 @@ test('no request before ten minutes, without a check run, or after one was made'
   const fresh = run({ checkRuns: [ownRun({ started_at: new Date().toISOString() })] });
   const noCheck = run({ checkRuns: [] });
   const asked = run({
-    checkRuns: [ownRun()],
+    checkRuns: [ownRun({ started_at: minutesAgo(15) })],
     comments: [
       {
         id: 9,
         body: `<!-- review-gate-request:${SHA} -->\n@codex review`,
         user: ACTIONS,
-        created_at: '2026-01-01T00:20:00Z',
-        updated_at: '2026-01-01T00:20:00Z',
+        created_at: minutesAgo(5),
+        updated_at: minutesAgo(5),
       },
     ],
   });
