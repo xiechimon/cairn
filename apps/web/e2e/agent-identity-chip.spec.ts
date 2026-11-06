@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const SCENARIO = '/app/schedules?scenario=chief-agent-chip';
-const AGENT_HREF = '/app/resources/agents/r3-builder';
 
 function stubDicebear(page: Page) {
   return page.route('**/api.dicebear.com/**', (route) =>
@@ -12,65 +11,20 @@ function stubDicebear(page: Page) {
   );
 }
 
-test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
+test.describe('Coordinator replies carry no identity row (D122)', () => {
   test.beforeEach(async ({ page }) => {
     await stubDicebear(page);
     await page.goto(SCENARIO);
     const drawer = page.locator('.chief-drawer');
     await expect(drawer).toBeVisible();
-
     await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   });
 
-  test('F-E1/E2/E10: avatar+name side by side in a chain, href points at the Agent settings page, geometry canon does not drift', async ({
-    page,
-  }) => {
-
-    const chip = page.getByTestId('chief-stream').getByRole('link', { name: 'r3-builder' });
-    await expect(chip).toHaveCount(1);
-
-    const img = chip.locator('img');
-    await expect(img).toBeVisible();
-    await expect(chip.getByText('r3-builder')).toHaveText('r3-builder');
-
-    await expect(chip).toHaveAttribute('href', `${AGENT_HREF}?scenario=chief-agent-chip`);
-
-    const box = await img.boundingBox();
-    expect(box?.width).toBe(24);
-    expect(box?.height).toBe(24);
-    const fontSize = await chip
-      .getByText('r3-builder')
-      .evaluate((el) => getComputedStyle(el).fontSize);
-    expect(fontSize).toBe('13px');
-  });
-
-  test('F-E9: hover only changes the cursor, invents no background state (reference-site canon)', async ({ page }) => {
-    const chip = page.getByTestId('chief-stream').getByRole('link', { name: 'r3-builder' });
-    const bgBefore = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
-    await chip.hover();
-    const bgAfter = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(bgAfter).toBe(bgBefore);
-    expect(await chip.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
-  });
-
-  test('F-E3: click → SPA navigation into the Agent settings page, detail page resolves the real record', async ({ page }) => {
-    await page.getByTestId('chief-stream').getByRole('link', { name: 'r3-builder' }).click();
-    await page.waitForURL((u) => u.pathname === AGENT_HREF);
-
-    await expect(page.locator('.agent-detail')).toBeVisible();
-    await expect(page.locator('.agent-missing')).toHaveCount(0);
-    await expect(page.locator('.agent-detail')).toContainText('r3-builder');
-
-    await expect(page.locator('.agent-tabs')).toBeVisible();
-  });
-
-  test('F-E4: keyboard reachable — focus lands on the chip, Enter activates navigation', async ({ page }) => {
-    const chip = page.getByTestId('chief-stream').getByRole('link', { name: 'r3-builder' });
-    await chip.focus();
-    const focused = await chip.evaluate((el) => el === document.activeElement);
-    expect(focused).toBe(true);
-    await page.keyboard.press('Enter');
-    await page.waitForURL((u) => u.pathname === AGENT_HREF);
+  test('no avatar or agent-name link sits above a Coordinator reply', async ({ page }) => {
+    const stream = page.getByTestId('chief-stream');
+    await expect(stream.getByTestId('chief-msg-col').first()).toBeVisible();
+    await expect(stream.getByRole('link', { name: 'r3-builder' })).toHaveCount(0);
+    await expect(stream.getByTestId('chief-msg-col').locator('a[href$="/agents/r3-builder"]')).toHaveCount(0);
   });
 });
 
