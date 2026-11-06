@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -12,7 +11,6 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { StepJournal } from '../src/journal.js';
@@ -22,6 +20,7 @@ import { RunStop } from '../src/step-stops.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
 import { orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -30,7 +29,7 @@ afterEach(() => {
 });
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'orb-hardening-'));
+  const root = testTempDir('orb-hardening-');
   roots.push(root);
   const checkout = createOrbCheckout(root);
   const runtimeRoot = join(root, 'run');

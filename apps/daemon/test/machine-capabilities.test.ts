@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { cpus, tmpdir, totalmem } from 'node:os';
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { cpus, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { machineHardwareSchema } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -8,10 +8,11 @@ import {
   probeMachineCapabilities,
   probeMachineHardware,
 } from '../src/machine-capabilities.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const tmpDirs: string[] = [];
 function tmpRoot(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-caps-'));
+  const dir = testTempDir('cairn-caps-');
   tmpDirs.push(dir);
   return dir;
 }

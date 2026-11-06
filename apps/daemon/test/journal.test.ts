@@ -1,12 +1,12 @@
-import { existsSync, mkdtempSync, statSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-journal-'));
+  return testTempDir('cairn-journal-');
 }
 
 function modeBits(path: string): number {
