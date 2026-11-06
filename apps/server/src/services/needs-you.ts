@@ -38,6 +38,7 @@ const MISSING_CREDENTIALS = [
 ] as const;
 
 export function failureNeedsHuman(errorMessage: string): boolean {
+  if (errorMessage.startsWith('PR Auto-fix needs you:')) return true;
   if (isProviderAuthFailure(errorMessage)) return true;
   if (errorMessage.startsWith(CITATION_PARKED_MARK)) return true;
   if (GATE_REJECTION.some((mark) => errorMessage.includes(mark))) return true;
