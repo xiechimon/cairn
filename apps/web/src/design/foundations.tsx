@@ -239,7 +239,11 @@ export function ColorSection() {
       title="Color"
       lede="Four steps of ink on three layers of stone. Ochre means it waits on you, green means it is working. Ratios are measured live against the card."
     >
-      <Specimen title="Ink on the card" note="WCAG 2.x contrast, text needs 4.5, labeled icons 3">
+      <Specimen
+        id="ink-on-the-card"
+        title="Ink on the card"
+        note="WCAG 2.x contrast, text needs 4.5, labeled icons 3"
+      >
         <div className="-my-3 w-full divide-y divide-border">
           {INK.map((ink) => {
             const k = contrast(over(rgba(`var(${ink.cssVar})`), card), card);
@@ -276,7 +280,7 @@ export function ColorSection() {
           })}
         </div>
       </Specimen>
-      <Specimen title="Semantic slots" note="Click a value to copy it">
+      <Specimen id="semantic-slots" title="Semantic slots" note="Click a value to copy it">
         <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {SEMANTIC.map(([name, cssVar]) => (
             <Swatch key={name} name={name} cssVar={cssVar} />
@@ -329,6 +333,7 @@ export function TypeSection() {
       lede="Seven sizes. Source Serif 4 for the greeting and page titles, Instrument Sans for everything else, JetBrains Mono for code and times."
     >
       <Specimen
+        id="scale"
         title="Scale"
         note="Tailwind keys text-page, text-heading, text-card-title, text-ui, text-meta, text-caption"
       >
@@ -361,6 +366,7 @@ export function ShapeSection() {
     >
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <Specimen
+          id="concentric-corners"
           title="Concentric corners"
           note={`${menu}px menu − ${pad}px padding = ${menu - pad}px rows`}
           stage="canvas"
@@ -383,7 +389,7 @@ export function ShapeSection() {
             ))}
           </div>
         </Specimen>
-        <Specimen title="Radius scale">
+        <Specimen id="radius-scale" title="Radius scale">
           <div className="-my-3 w-full divide-y divide-border">
             {RADII.map((r) => {
               const px = computedLength(r.expr);
@@ -415,7 +421,7 @@ export function ElevationSection() {
       title="Elevation"
       lede="Three tokens with the hairline ring built in. Cards sit, menus float, dialogs lift. Never add a second ring or a raw shadow."
     >
-      <Specimen title="Three heights" stage="canvas" className="p-0">
+      <Specimen id="three-heights" title="Three heights" stage="canvas" className="p-0">
         <div className="relative h-72 w-full">
           {ELEVATIONS.map((e) => (
             <div key={e.token} className={cn('absolute p-4', e.cls)} style={e.box}>
@@ -438,7 +444,7 @@ export function MotionSection() {
       title="Motion"
       lede="The stone is quiet. Every transition takes one of these durations and curves; play them together to compare."
     >
-      <Specimen title="Durations and curves">
+      <Specimen id="durations-and-curves" title="Durations and curves">
         <div className="flex w-full flex-col gap-1">
           <div className="mb-3">
             <Button onClick={() => setPlayed((p) => !p)}>{played ? 'Reset' : 'Play all'}</Button>

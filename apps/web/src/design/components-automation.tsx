@@ -64,17 +64,23 @@ export function AutomationSection() {
       lede="The title chip opens the real popover. Pause, resume and delete work on specimen data; finished retained once records have no enable switch."
     >
       <Specimen
+        id="active-automation-chip"
         title="Active automation chip"
         note="Open to inspect cadence, prompt and the enabled switch"
       >
         <AutomationExample initial={ACTIVE} />
       </Specimen>
-      <Specimen title="Paused automation chip" note="The paused icon remains next to the title">
+      <Specimen
+        id="paused-automation-chip"
+        title="Paused automation chip"
+        note="The paused icon remains next to the title"
+      >
         <AutomationExample
           initial={{ ...ACTIVE, id: 'schedule-paused', enabled: false, nextRunAt: null }}
         />
       </Specimen>
       <Specimen
+        id="finished-retained-once-automation"
         title="Finished retained once automation"
         note="No upcoming run and no switch; deleted server records cannot appear"
       >
@@ -91,6 +97,7 @@ export function AutomationSection() {
         />
       </Specimen>
       <Specimen
+        id="automatically-disabled-automation"
         title="Automatically disabled automation"
         note="The reason remains visible when the popover opens"
       >

@@ -48,6 +48,7 @@ export function TextureSection() {
       lede="The Cairn spiral and a slow noise field, drawn as ASCII characters or 4×4 Bayer dots in the project hue. Texture marks arrival, emptiness and agents at work; surfaces you read stay flat. Motion runs only while something runs and stops under reduced motion."
     >
       <Specimen
+        id="spiral-art"
         title="Spiral art"
         note="Sign-in and first run: the logo spiral, enlarged and cropped, under a veil that clears for the headline"
         code={`<SpiralArt filter="ascii" className="h-96">\n  <Headline />\n</SpiralArt>`}
@@ -66,6 +67,7 @@ export function TextureSection() {
         </div>
       </Specimen>
       <Specimen
+        id="spiral-mark"
         title="Spiral mark"
         note="Large empty states swap the line icon for the spiral in dots"
         code={`<EmptyState media={<SpiralMark />} title="No threads yet" … />`}
@@ -82,6 +84,7 @@ export function TextureSection() {
         </div>
       </Specimen>
       <Specimen
+        id="drift-field"
         title="Drift field"
         note="Behind the Coordinator greeting and on a running card; it freezes to one frame when nothing runs"
         code={`<DriftField active={running} />\n<DriftEdge active={card.running} />`}
@@ -120,7 +123,12 @@ export function TextureSection() {
           </div>
         </div>
       </Specimen>
-      <Specimen title="Loading" note="A dot sweep for loading" code={`<TextureSkeleton />`}>
+      <Specimen
+        id="loading"
+        title="Loading"
+        note="A dot sweep for loading"
+        code={`<TextureSkeleton />`}
+      >
         <div className="flex w-full flex-col gap-5">
           <Labeled label="TextureSkeleton">
             <TextureSkeleton />

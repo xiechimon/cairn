@@ -100,6 +100,7 @@ export function ButtonSection() {
       lede="One primary action per screen. The default tier is the primary button; everything else is a quieter tier or a text button."
     >
       <Specimen
+        id="variants"
         title="Variants"
         code={`<Button>New task</Button>\n<Button variant="secondary">Filter</Button>\n<Button variant="ghost">Cancel</Button>\n<Button variant="destructive">Delete</Button>`}
       >
@@ -109,7 +110,7 @@ export function ButtonSection() {
           </Cell>
         ))}
       </Specimen>
-      <Specimen title="Sizes" note="default is 32px tall">
+      <Specimen id="sizes" title="Sizes" note="default is 32px tall">
         {SIZES.map((size) => (
           <Cell key={size} label={size}>
             <Button size={size}>
@@ -127,6 +128,7 @@ export function ButtonSection() {
         ))}
       </Specimen>
       <Specimen
+        id="states"
         title="States"
         note="A disabled primary turns stone with secondary ink; other tiers fade to half strength. A busy button says what it is doing"
         code={`<Button className={DIALOG_PRIMARY_BUTTON} disabled>Create</Button>`}
@@ -170,7 +172,7 @@ export function BadgeSection() {
       title="Badge and chips"
       lede="Badges count and label. Status chips carry the five task states; tag chips carry the user's own colors. Never mix the two color sources."
     >
-      <Specimen title="Badge variants">
+      <Specimen id="badge-variants" title="Badge variants">
         {(['default', 'secondary', 'outline', 'destructive', 'ghost'] as const).map((variant) => (
           <Cell key={variant} label={variant}>
             <Badge variant={variant}>{variant === 'destructive' ? '2 failed' : '12'}</Badge>
@@ -183,6 +185,7 @@ export function BadgeSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="status-chip"
         title="Status chip"
         code={`<StatusChip tone="confirm">Awaiting confirmation</StatusChip>`}
       >
@@ -192,7 +195,7 @@ export function BadgeSection() {
           </Cell>
         ))}
       </Specimen>
-      <Specimen title="Tag chip" note="Truncates past 160px">
+      <Specimen id="tag-chip" title="Tag chip" note="Truncates past 160px">
         {TAGS.map((tag) => (
           <TagChip key={tag.id} tag={tag} />
         ))}
@@ -209,6 +212,7 @@ export function TooltipSection() {
       lede="Icon-only buttons explain themselves on hover and focus. Shortcuts ride inside the tooltip as key caps."
     >
       <Specimen
+        id="hover-or-focus-the-buttons"
         title="Hover or focus the buttons"
         code={`<Tooltip>\n  <TooltipTrigger render={<Button size="icon" variant="ghost" />}>…</TooltipTrigger>\n  <TooltipContent>Search <Kbd>⌘K</Kbd></TooltipContent>\n</Tooltip>`}
       >
@@ -254,7 +258,7 @@ export function InputSection() {
       title="Inputs and forms"
       lede="Labels on top, help below, one narrow column, the primary button on the right. Errors say what is wrong and how to fix it."
     >
-      <Specimen title="Fields">
+      <Specimen id="fields" title="Fields">
         <Cell label="default">
           <Input
             aria-label="Task name"
@@ -287,6 +291,7 @@ export function InputSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="form"
         title="Form"
         note="FormStack, FormField, FormActions"
         code={`<FormStack>\n  <FormField label="Task name" htmlFor="name" help="…"><Input … /></FormField>\n  <FormActions primary={{ label: 'Create' }} secondary={{ label: 'Cancel', onClick }} />\n</FormStack>`}
@@ -350,6 +355,7 @@ export function ChoiceSection() {
       lede="Select for one value from a list, segmented controls for two to four, checkboxes and switches for on or off."
     >
       <Specimen
+        id="select"
         title="Select"
         code={`<Select value={v} onValueChange={…}>\n  <SelectTrigger className={FORM_CONTROL_CLS}><SelectValue /></SelectTrigger>\n  <SelectContent>…</SelectContent>\n</Select>`}
       >
@@ -373,7 +379,11 @@ export function ChoiceSection() {
           </Select>
         </Cell>
       </Specimen>
-      <Specimen title="Checkbox and switch" note="The label is the hit area">
+      <Specimen
+        id="checkbox-and-switch"
+        title="Checkbox and switch"
+        note="The label is the hit area"
+      >
         <div className="flex flex-col gap-3">
           <ChoiceRow
             label="Run all checks"
@@ -431,6 +441,7 @@ export function ChoiceSection() {
         </div>
       </Specimen>
       <Specimen
+        id="segmented"
         title="Segmented"
         note="SegmentedRadio picks a value, SegmentedTabs switches a view"
         code={`<SegmentedRadio label="Frequency" value={v} onChange={set} options={[…]} />\n<SegmentedTabs value={v} onChange={set} options={[…]} slide />`}

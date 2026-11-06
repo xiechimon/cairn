@@ -45,6 +45,7 @@ function ComposerSpecimen() {
   const [sent, setSent] = useState<string[]>([]);
   return (
     <Specimen
+      id="composer"
       title="Composer"
       note={sent.length === 0 ? 'Type / for commands or @ for mentions' : `Sent: ${sent.at(-1)}`}
       stage="canvas"
@@ -206,6 +207,7 @@ function DialogsSpecimen() {
   ] as const;
   return (
     <Specimen
+      id="task-dialogs"
       title="Task dialogs"
       note={last == null ? 'Each button opens the real dialog' : `Last: ${last}`}
       stage="canvas"
@@ -272,7 +274,7 @@ export function ProductDetailSection() {
       title="Thread parts"
       lede="Pieces a thread conversation is built from: the spec, work traces, queued messages, the composer, the plan and changes pane and the finish and stop dialogs. The side chat composes them on the home."
     >
-      <Specimen title="Spec" note="SpecBlock" stage="sheet">
+      <Specimen id="spec" title="Spec" note="SpecBlock" stage="sheet">
         <Cell label="SpecBlock">
           <div className="w-120">
             <SpecBlock
@@ -284,6 +286,7 @@ export function ProductDetailSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="source-line"
         title="Source line"
         note="SourceIssueLine for each source kind"
         stage="sheet"
@@ -322,6 +325,7 @@ export function ProductDetailSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="work-trace"
         title="Work trace"
         note="WorkTrace collapsed and expanded, InjectedSkills"
         stage="sheet"
@@ -350,6 +354,7 @@ export function ProductDetailSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="queued-messages"
         title="Queued messages"
         note={
           last ??
@@ -379,6 +384,7 @@ export function ProductDetailSection() {
       </Specimen>
       <ComposerSpecimen />
       <Specimen
+        id="status-and-inline-segments"
         title="Status and inline segments"
         note="TodoStatus for every phase, Segments with code, links and mentions"
       >
@@ -413,6 +419,7 @@ export function ProductDetailSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="plan-and-changes"
         title="Plan and changes"
         note="DocPane, as the project page hosts it. Switch plan and changes from the pane title or header buttons."
         stage="canvas"

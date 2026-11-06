@@ -158,6 +158,7 @@ export function AccountsSection() {
       lede="Subscription accounts per vendor, pooled the way T3 Code's Usage → Limits does: one card per quota window, one bar segment per account, the number is what is left. They sit on top of the model routing page, above the graph."
     >
       <Specimen
+        id="pooled-window"
         title="Pooled window"
         note="5-hour window over three Claude accounts: one over its limit, one never reported (dashed)"
         stage="sheet"
@@ -168,6 +169,7 @@ export function AccountsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="account-row"
         title="Account row"
         note="ok, cooling, expired; the number matches the bar segment; ⋯ opens Rename R, Verify V, Remove D"
         stage="sheet"
@@ -187,6 +189,7 @@ export function AccountsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="subscription-accounts"
         title="Subscription accounts"
         note="one vendor at a time through SegmentedTabs (icon + count); Add account follows the selected vendor; a Claude row opens to its steps and sticky threads"
         stage="sheet"
@@ -203,6 +206,7 @@ export function AccountsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="routing-from-the-api"
         title="Routing from the API"
         note="toRoutingGraph maps GET /model-routing onto the graph; nightly scan has no connection"
         stage="sheet"
@@ -215,6 +219,7 @@ export function AccountsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="provider-panel"
         title="Provider panel"
         note="Providers page: list of instances (status dot ok, warn, off; optional runtime switch) beside the selected one's editor; model rows show name, id, retired, remove"
         stage="sheet"
@@ -225,6 +230,7 @@ export function AccountsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="settings-nav"
         title="Settings nav"
         note="Settings window: search narrows the list, groups with a heading, current section highlighted, optional count badge"
         stage="sheet"
@@ -233,6 +239,7 @@ export function AccountsSection() {
         <SettingsNavSpecimen />
       </Specimen>
       <Specimen
+        id="providers-on-one-machine"
         title="Providers on one machine"
         note="shown on the machine detail page: signed in, signed out with its login command, unknown"
         stage="sheet"

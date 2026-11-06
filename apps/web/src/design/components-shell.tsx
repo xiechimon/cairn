@@ -45,6 +45,7 @@ export function SidebarSection() {
       lede="The sidebar sits on the canvas: nav rows with key hints, project rows with a waiting count, the open project's nested thread rows on a dashed trail, and the user footer."
     >
       <Specimen
+        id="sidebar"
         title="Sidebar"
         note="Click a project"
         stage="canvas"
@@ -128,6 +129,7 @@ export function ProjectsSection() {
       lede="The Projects page card, the shared list row used by Library, activity and settings lists, and the phone tab bar with an inbox badge."
     >
       <Specimen
+        id="project-cards"
         title="Project cards"
         stage="canvas"
         code={`<ProjectCard name="cairn" tone={0} repo="xiechimon/cairn" created="Oct 2" goal="…" waiting={2} running={2} threads={11} merged={34} />`}
@@ -164,6 +166,7 @@ export function ProjectsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="list-rows"
         title="List rows"
         stage="canvas"
         code={`<ListCard>\n  <ListRow icon={<FileText />} title="plan-b2.md" subtitle="Coordinator · 12 KB" trailing="2h ago" />\n</ListCard>`}
@@ -190,6 +193,7 @@ export function ProjectsSection() {
         </ListCard>
       </Specimen>
       <Specimen
+        id="phone-tab-bar"
         title="Phone tab bar"
         note="62px, badge counts what waits on you"
         stage="canvas"
@@ -212,6 +216,7 @@ export function ProjectsSection() {
         </div>
       </Specimen>
       <Specimen
+        id="settings-danger-zone"
         title="Settings danger zone"
         note="The existing SettingsDangerZone row with the danger outline"
         stage="canvas"
@@ -239,6 +244,7 @@ export function CoordinatorStreamSection() {
       lede="The pieces around the thread cards: the goal line, the greeting, clickable status rows, quiet suggestions, and the archived banner that replaces the composer."
     >
       <Specimen
+        id="stream-header"
         title="Stream header"
         note={chip == null ? 'Click a row or a suggestion' : `Picked: ${chip}`}
         code={`<GoalLine onEdit={edit}>Bring p95 latency under 200 ms.</GoalLine>\n<Greeting since="Since last night">Morning, ian.</Greeting>\n<StreamDigest rows={[{ tone: 'waiting', count: 2, label: 'need you', onSelect }]} />\n<SuggestionChip>Make a plan</SuggestionChip>`}
@@ -266,6 +272,7 @@ export function CoordinatorStreamSection() {
         </div>
       </Specimen>
       <Specimen
+        id="archived-banner"
         title="Archived banner"
         code={`<NoticeBanner tone="waiting" icon={Archive} title="This project is archived." actions={<Button size="sm">Unarchive</Button>} />`}
       >
@@ -327,6 +334,7 @@ export function RoutingSection() {
       lede="Jobs on the left name their model; a curve runs to the connection that serves them, which shows how much of its 5-hour and weekly quota is left. A bar turns ochre at 20% left."
     >
       <Specimen
+        id="routing-nodes-and-quota-bar"
         title="Routing nodes and quota bar"
         stage="canvas"
         code={`<RoutingGraph jobs={[{ id: 'coordinator', name: 'Coordinator', model: 'claude-opus-5-5', tone: 1, connectionId: 'claude' }]} connections={[{ id: 'claude', name: 'Claude subscription', tier: 'Max 20x', quota: { fiveHour: 62, week: 78 } }]} />`}

@@ -60,6 +60,7 @@ export function EmptySection() {
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Specimen
+          id="empty-state"
           title="Empty state"
           code={`<EmptyState icon={Key} title="No API keys yet" description="…" action={{ label: 'Create key' }} />`}
         >
@@ -71,7 +72,11 @@ export function EmptySection() {
             action={{ label: 'Create key' }}
           />
         </Specimen>
-        <Specimen title="Read-only empty state" note="A hint explains why there is no action">
+        <Specimen
+          id="read-only-empty-state"
+          title="Read-only empty state"
+          note="A hint explains why there is no action"
+        >
           <EmptyState
             className="w-full"
             icon={Server}
@@ -81,7 +86,7 @@ export function EmptySection() {
           />
         </Specimen>
       </div>
-      <Specimen title="Skeleton" note="Card-shaped, two per column">
+      <Specimen id="skeleton" title="Skeleton" note="Card-shaped, two per column">
         <div className="flex w-full flex-col gap-3">
           <div className="mb-1">
             <Button
@@ -118,7 +123,11 @@ export function EmptySection() {
         </div>
       </Specimen>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Specimen title="Project not found" note="An unknown project link, with close names">
+        <Specimen
+          id="project-not-found"
+          title="Project not found"
+          note="An unknown project link, with close names"
+        >
           <MemoryRouter>
             <ProjectNotFound
               unknownId="cairn-old"
@@ -130,7 +139,11 @@ export function EmptySection() {
             />
           </MemoryRouter>
         </Specimen>
-        <Specimen title="Project not found, recent" note="Nothing is close, so the latest projects">
+        <Specimen
+          id="project-not-found-recent"
+          title="Project not found, recent"
+          note="Nothing is close, so the latest projects"
+        >
           <MemoryRouter>
             <ProjectNotFound
               unknownId="zzzzzzzz"
@@ -146,7 +159,11 @@ export function EmptySection() {
             />
           </MemoryRouter>
         </Specimen>
-        <Specimen title="Projects failed to load" note="Retry, or leave for the Coordinator">
+        <Specimen
+          id="projects-failed-to-load"
+          title="Projects failed to load"
+          note="Retry, or leave for the Coordinator"
+        >
           <MemoryRouter>
             <ProjectsFailed onRetry={() => undefined} />
           </MemoryRouter>
@@ -165,7 +182,7 @@ export function SettingsSection() {
       title="Settings list"
       lede="A header above one card of equal-height rows. Label left, control right, danger zone in its own card at the end."
     >
-      <Specimen title="Account settings" stage="canvas" className="block">
+      <Specimen id="account-settings" title="Account settings" stage="canvas" className="block">
         <div className="mx-auto flex max-w-160 flex-col gap-4">
           <SettingsHeader
             avatar={<SeededAvatar name="ian" fallback="/avatar-user.png" className="size-14" />}
@@ -220,7 +237,7 @@ export function AvatarSection() {
       title="Avatar"
       lede="Avatars are seeded from the name, so the same person always looks the same. A busy agent's avatar draws its spiral over a faint copy, so the face never changes."
     >
-      <Specimen title="Seeded avatar">
+      <Specimen id="seeded-avatar" title="Seeded avatar">
         {[
           { size: 'size-6', label: '24' },
           { size: 'size-8', label: '32' },
@@ -262,6 +279,7 @@ export function ConversationSection() {
       lede="Message is the row, Bubble is the surface, Marker is a note between turns. Attachments ride in the composer and the stream."
     >
       <Specimen
+        id="turns"
         title="Turns"
         code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
       >
@@ -341,7 +359,7 @@ export function ConversationSection() {
           </Marker>
         </div>
       </Specimen>
-      <Specimen title="Attachments" note="done, uploading and error states">
+      <Specimen id="attachments" title="Attachments" note="done, uploading and error states">
         {files.map((f) => (
           <Attachment key={f.name} state={f.state}>
             <AttachmentMedia>
@@ -413,6 +431,7 @@ export function TraceSection() {
       lede="The agent's narration stays body text. Tool activity folds into one grey summary line ending in a triangle; open it for a hairline card with one 36px row per action: a quiet verb, the target in medium weight, and the result at the end. A row opens to its command and output. Never hand-write tool rows."
     >
       <Specimen
+        id="trace-states"
         title="Trace states"
         note="done, running (present tense, shimmer on the verb), failed (red count and exit code), pending"
         code={`<TraceSteps defaultOpen steps={[{ id, step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } }]} />`}
@@ -433,6 +452,7 @@ export function TraceSection() {
         </div>
       </Specimen>
       <Specimen
+        id="step-kinds"
         title="Step kinds"
         note="think, search, read, say, run (opens to command and output), edit, push, check"
       >
@@ -443,6 +463,7 @@ export function TraceSection() {
         />
       </Specimen>
       <Specimen
+        id="coordinator-turn-tools"
         title="Coordinator turn tools"
         note="the same group at compact density under a Coordinator reply"
       >
@@ -462,7 +483,7 @@ export function SearchSyntaxSection() {
       lede="Typed filters become chips in the field. A value that cannot match is flagged on its chip with a reason, and the footer opens the syntax list."
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <Specimen title="Chips" note="Valid, then flagged with its reason">
+        <Specimen id="chips" title="Chips" note="Valid, then flagged with its reason">
           <div className="flex w-full flex-col gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               {GALLERY_CHIPS.map((chip, index) => (
@@ -477,7 +498,11 @@ export function SearchSyntaxSection() {
             <ChipProblems chips={GALLERY_CHIPS} problems={[null, null, 'bad_cost']} />
           </div>
         </Specimen>
-        <Specimen title="Syntax help" note="Opened from the palette footer or the Activity field">
+        <Specimen
+          id="syntax-help"
+          title="Syntax help"
+          note="Opened from the palette footer or the Activity field"
+        >
           <SyntaxHelp className="w-full" />
         </Specimen>
       </div>
