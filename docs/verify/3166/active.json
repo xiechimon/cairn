@@ -1,0 +1,65 @@
+{
+  "edges": [
+    {
+      "use": "coordinator",
+      "modelId": "claude-opus-5-5",
+      "effort": "high",
+      "connectionId": null,
+      "unavailable": true,
+      "reason": "no-connection"
+    },
+    {
+      "use": "implementation",
+      "modelId": "gpt-6.1-sol",
+      "effort": "high",
+      "connectionId": "machine:j1seMdQSET1AnWBy-0Ls9:codex"
+    },
+    {
+      "use": "review",
+      "modelId": "claude-sonnet-5-5",
+      "effort": "high",
+      "connectionId": null,
+      "unavailable": true,
+      "reason": "no-connection"
+    },
+    {
+      "use": "mechanical",
+      "modelId": "claude-haiku-5-5",
+      "effort": "low",
+      "connectionId": null,
+      "unavailable": true,
+      "reason": "no-connection"
+    },
+    {
+      "use": "eval",
+      "modelId": "claude-sonnet-5-5",
+      "effort": "high",
+      "connectionId": null,
+      "unavailable": true,
+      "reason": "no-connection"
+    },
+    {
+      "use": "nightly-scan",
+      "modelId": "claude-haiku-5-5",
+      "effort": "low",
+      "connectionId": null,
+      "unavailable": true,
+      "reason": "no-connection"
+    }
+  ],
+  "connections": [
+    {
+      "id": "machine:j1seMdQSET1AnWBy-0Ls9:codex",
+      "vendor": "openai",
+      "kind": "subscription",
+      "models": [
+        "gpt-6.1-sol"
+      ],
+      "available": true
+    }
+  ],
+  "quota": [],
+  "settings": {
+    "claudeUsage": "subscription-only"
+  }
+}

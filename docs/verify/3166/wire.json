@@ -1,0 +1,24 @@
+[
+  {
+    "teamId": "WxbJRIPeYmOirT0_6ua0m",
+    "name": "isolated-codex",
+    "capabilities": {
+      "mcpServers": [],
+      "skills": [],
+      "codexLogin": {
+        "state": "ok",
+        "expiresAt": 1793984347602
+      }
+    }
+  },
+  {
+    "capabilities": {
+      "mcpServers": [],
+      "skills": [],
+      "codexLogin": {
+        "state": "ok",
+        "expiresAt": 1793984347602
+      }
+    }
+  }
+]
