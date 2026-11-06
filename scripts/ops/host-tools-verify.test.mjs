@@ -42,6 +42,11 @@ function fixture(files) {
     dir,
     verify: (...args) =>
       spawnSync('bash', [VERIFY, ...args], { env: { ...env, ...roots }, encoding: 'utf8' }),
+    verifyWith: (extra, ...args) =>
+      spawnSync('bash', [VERIFY, ...args], {
+        env: { ...env, ...roots, ...extra },
+        encoding: 'utf8',
+      }),
   };
 }
 
@@ -86,6 +91,35 @@ test('--adopt installs the repo copy and keeps the host edit beside it', () => {
   assert.equal(statSync(host).mode & 0o777, 0o755);
   const kept = result.stdout.match(/kept as (\S+)\)/)[1];
   assert.equal(readFileSync(kept, 'utf8'), '#!/bin/bash\necho edited\n');
+});
+
+test('--adopt twice at the same repo sha keeps both host edits', () => {
+  const f = fixture(seed);
+  const host = join(f.dir, 'tools/a.sh');
+  write(host, '#!/bin/bash\necho first\n', 0o755);
+  const first = f.verify('--adopt', host);
+  write(host, '#!/bin/bash\necho second\n', 0o755);
+  const second = f.verify('--adopt', host);
+  const keptFirst = first.stdout.match(/kept as (\S+)\)/)[1];
+  const keptSecond = second.stdout.match(/kept as (\S+)\)/)[1];
+  assert.notEqual(keptFirst, keptSecond);
+  assert.equal(readFileSync(keptFirst, 'utf8'), '#!/bin/bash\necho first\n');
+  assert.equal(readFileSync(keptSecond, 'utf8'), '#!/bin/bash\necho second\n');
+});
+
+test('--adopt refuses when its backup name already exists and loses nothing', () => {
+  const f = fixture(seed);
+  const host = join(f.dir, 'tools/a.sh');
+  const stamp = { CAIRN_HOST_TOOLS_STAMP: '20261106T000000Z' };
+  write(host, '#!/bin/bash\necho first\n', 0o755);
+  const first = f.verifyWith(stamp, '--adopt', host);
+  const keptFirst = first.stdout.match(/kept as (\S+)\)/)[1];
+  write(host, '#!/bin/bash\necho second\n', 0o755);
+  const second = f.verifyWith(stamp, '--adopt', host);
+  assert.equal(second.status, 1);
+  assert.match(second.stdout, /DIFF +.*tools\/a\.sh/);
+  assert.equal(readFileSync(host, 'utf8'), '#!/bin/bash\necho second\n');
+  assert.equal(readFileSync(keptFirst, 'utf8'), '#!/bin/bash\necho first\n');
 });
 
 test('--adopt leaves files it was not asked about', () => {

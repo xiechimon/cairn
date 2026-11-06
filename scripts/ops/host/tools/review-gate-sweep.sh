@@ -7,7 +7,7 @@ now=$(date +%s)
 gh pr list --repo "$repo" --state open --json number,isDraft,headRefName,headRefOid --jq '.[] | select(.isDraft|not) | select(.headRefName|startswith("mergify/")|not) | "\(.number) \(.headRefOid)"' |
 while read -r n sha; do
   state=$(gh api "repos/$repo/commits/$sha/check-runs?check_name=review-gate" --jq '[.check_runs[]|.status+":"+(.conclusion//"")][0] // "none"')
-  case "$state" in completed:success|completed:failure) continue ;; esac
+  [ "$state" = completed:success ] && continue
   committed=$(gh api "repos/$repo/commits/$sha" --jq '.commit.committer.date')
   age=$(( now - $(date -d "$committed" +%s) ))
   [ "$age" -lt 900 ] && continue

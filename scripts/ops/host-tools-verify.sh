@@ -12,7 +12,7 @@ usage() {
   echo "usage: host-tools-verify.sh [--adopt <host path>...]" >&2
   echo "  Compares the host tools, lane helpers, bin scripts and user units with scripts/ops/host at \$CAIRN_HOST_TOOLS_REF [HEAD] of \$CAIRN_CHECKOUT." >&2
   echo "  Prints ok, DIFF, MISSING or EXTRA per file and exits 1 when any file is not ok." >&2
-  echo "  --adopt moves each named DIFF host file to <file>.drift-<sha> and installs the repo version." >&2
+  echo "  --adopt moves each named DIFF host file to <file>.drift-<sha>-<UTC timestamp> and installs the repo version." >&2
   exit 2
 }
 
@@ -41,10 +41,13 @@ managed="$(mktemp)"
 trap 'rm -f "$managed"' EXIT
 
 adopt_file() {
-  local rel="$1" dest="$2" mode=644
+  local rel="$1" dest="$2" mode=644 backup
+  backup="$dest.drift-$sha-${CAIRN_HOST_TOOLS_STAMP:-$(date -u +%Y%m%dT%H%M%S%NZ)}"
   case "$rel" in *.sh | */host/bin/*) mode=755 ;; esac
   [ ! -x "$dest" ] || mode=755
-  mv "$dest" "$dest.drift-$sha" &&
+  [ ! -e "$backup" ] || { echo "refused: $backup already exists" >&2; return 1; }
+  BACKUP="$backup"
+  mv "$dest" "$backup" &&
     git -C "$CHECKOUT" show "$REF:$rel" >"$dest.tmp.$$" &&
     chmod "$mode" "$dest.tmp.$$" &&
     mv "$dest.tmp.$$" "$dest"
@@ -62,7 +65,7 @@ while IFS= read -r rel; do
   elif [ "$(git hash-object "$dest")" = "$expected" ]; then
     echo "ok      $dest"
   elif [[ " ${adopt[*]-} " == *" $dest "* ]] && adopt_file "$rel" "$dest"; then
-    echo "adopted $dest (host copy kept as $dest.drift-$sha)"
+    echo "adopted $dest (host copy kept as $BACKUP)"
   else
     echo "DIFF    $dest"
     bad=1
