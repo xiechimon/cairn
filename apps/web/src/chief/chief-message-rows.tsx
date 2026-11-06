@@ -1,6 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
-import { relativeTime } from '../board/rel-time.js';
+import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -37,6 +37,7 @@ const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: string }) {
   const { t, locale } = useI18n();
   const now = useMinuteClock();
+  if (createdAt != null && !isUsableTimestamp(createdAt, now)) return null;
   if (createdAt == null) {
     return fallback == null ? null : (
       <span className={STAMP_CLS} data-testid="chief-msg-stamp">

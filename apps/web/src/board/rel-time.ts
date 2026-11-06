@@ -6,6 +6,7 @@ const zhT: TFunc = (source, vars) => translate('zh', {}, source, vars);
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
+const CLOCK_SKEW = 5 * MINUTE;
 const TZ_OFFSET = 8 * HOUR;
 
 function dayIndex(ts: number): number {
@@ -24,4 +25,8 @@ export function relativeTime(ts: number, now: number, t: TFunc = zhT): string {
   }
   if (days === 1) return t('昨天');
   return t('{n} 天前', { n: days });
+}
+
+export function isUsableTimestamp(ts: number | null | undefined, now: number): ts is number {
+  return typeof ts === 'number' && Number.isFinite(ts) && ts > 0 && ts <= now + CLOCK_SKEW;
 }
