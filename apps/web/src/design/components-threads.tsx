@@ -1,3 +1,4 @@
+import type { PrPanelRow } from '@cairn/shared';
 import { GitPullRequest } from 'lucide-react';
 import { useState } from 'react';
 import { ListCard } from '../components/list-card.js';
@@ -8,6 +9,7 @@ import { PlanApproval } from '../components/thread/plan-approval.js';
 import { PrBar } from '../components/thread/pr-bar.js';
 import { PrCard } from '../components/thread/pr-card.js';
 import type { PrCardModel } from '../components/thread/pr-card-model.js';
+import { PrList } from '../components/thread/pr-list.js';
 import { ProposalCard } from '../components/thread/proposal-card.js';
 import { ScheduledTaskRow } from '../components/thread/scheduled-task-row.js';
 import { UsageStrip } from '../components/thread/usage-strip.js';
@@ -355,6 +357,80 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
     },
   },
 ];
+
+const PR_LIST_HEAD = '4f8e2c1d9b0a63e57c1f08a2d4b6e9137a5c80de';
+
+function prListRow(
+  index: number,
+  over: Partial<PrPanelRow> & Pick<PrPanelRow, 'title' | 'checks'>,
+): PrPanelRow {
+  return {
+    buildId: `build-${index}`,
+    threadId: `thread-${index}`,
+    projectId: 'project-1',
+    repo: 'xiechimon/cairn',
+    number: 3190 - index,
+    url: `https://github.com/xiechimon/cairn/pull/${3190 - index}`,
+    state: 'open',
+    mergeState: 'clean',
+    additions: 24 * (index + 1),
+    deletions: 6 * (index + 1),
+    branch: 'cairn/feature',
+    base: 'main',
+    head: PR_LIST_HEAD,
+    checksReadFor: PR_LIST_HEAD,
+    verdict: null,
+    autoFix: true,
+    mergeWhenReady: false,
+    autoArchive: true,
+    dismissed: false,
+    blockedSince: null,
+    wakeRounds: 0,
+    lastReadAt: 0,
+    ...over,
+  };
+}
+
+const PR_LIST_ROWS: PrPanelRow[] = [
+  prListRow(0, {
+    title: 'web(3122): thread-owned PR panel',
+    checks: { passed: 9, failed: 0, running: 0, total: 9, failedNames: [] },
+  }),
+  prListRow(1, {
+    title: 'server(3189): wake thread sessions for PR auto-fixes',
+    checks: { passed: 6, failed: 2, running: 1, total: 9, failedNames: ['lint', 'e2e (1)'] },
+  }),
+  prListRow(2, {
+    title: 'docs(3000): keep live counts in sync',
+    state: 'merged',
+    checks: { passed: 23, failed: 0, running: 0, total: 23, failedNames: [] },
+  }),
+];
+
+export function PrListSection() {
+  return (
+    <Section
+      id="pr-list"
+      title="PR list"
+      lede="Every thread-owned pull request as dense rows: icon, title, repo and number, line counts and a CI dot with its count. The menu holds Open on GitHub, Copy link and View changes."
+    >
+      <Specimen
+        id="pr-list"
+        title="PR list"
+        stage="canvas"
+        code="<PrList rows={rows} onOpenThread={...} onViewChanges={...} />"
+      >
+        <div className="w-full max-w-110">
+          <PrList
+            rows={PR_LIST_ROWS}
+            onOpenThread={() => toastSuccess('Thread opened')}
+            onViewChanges={() => toastSuccess('Changes opened')}
+          />
+        </div>
+      </Specimen>
+    </Section>
+  );
+}
 
 export function PrCardSection() {
   return (

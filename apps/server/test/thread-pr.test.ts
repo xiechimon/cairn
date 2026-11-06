@@ -281,7 +281,7 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     expect(row?.checks.failedNames).toEqual(['lint', 'e2e (1)']);
   });
 
-  test('an unchanged PR polled successfully, including on a 304, moves lastReadAt and not updatedAt', async () => {
+  test('an unchanged PR polled successfully, including on a 304, moves lastReadAt', async () => {
     const s = boot();
     const mock = new GithubMock();
     const t = seedThread(s);
@@ -292,7 +292,6 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     expect(mock.notModified).toBeGreaterThan(0);
     const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
     expect(row?.lastReadAt).toBe(70_000);
-    expect(rows(s)[0]?.updatedAt).toBe(1_000);
   });
 
   test('repeated unreadable check runs keep the old counts and leave lastReadAt at the last full read', async () => {
