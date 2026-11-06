@@ -1,3 +1,4 @@
+import { createECDH, randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import {
@@ -10,9 +11,10 @@ import {
   type RemoteRoutesResponse,
   remoteDescriptorSchema,
 } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { pairedDevice } from '../src/db/schema.js';
+import { pairedDevice, pushSubscription } from '../src/db/schema.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/environment-id.js';
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
 import type { SidecarStatus } from '../src/lib/tsnet-sidecar.js';
@@ -560,5 +562,136 @@ describe('F-T1 tailnet listener carries the same guarantees', () => {
     } finally {
       await listener.close();
     }
+  });
+});
+
+describe('F-R2 revocation reaches live state', () => {
+  const STREAM_END_MS = 2000;
+
+  async function endsAfterRevoke(s: TestServer, path: string): Promise<boolean> {
+    const paired = await pairDevice(s);
+    const res = await call(s, 'GET', path, {
+      headers: { authorization: `Bearer ${paired.token}` },
+    });
+    expect(res.status).toBe(200);
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    await reader.read();
+    await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: ownerHeaders });
+    const drained = (async () => {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) return true;
+      }
+    })();
+    const timeout = new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), STREAM_END_MS);
+    });
+    const ended = await Promise.race([drained, timeout]);
+    await reader.cancel().catch(() => {});
+    return ended;
+  }
+
+  test('the team stream of a revoked device is closed', async () => {
+    const s = bootServer({ authToken: OWNER });
+    expect(await endsAfterRevoke(s, `/api/teams/${s.team.id}/stream`)).toBe(true);
+  });
+
+  test('the conversation stream of a revoked device is closed', async () => {
+    const s = bootServer({ authToken: OWNER });
+    expect(await endsAfterRevoke(s, '/api/conversations/some-conversation/stream')).toBe(true);
+  });
+
+  test('a stream whose device row vanished without the revoke path still ends at the next ping', async () => {
+    const s = bootServer({ authToken: OWNER, pingIntervalMs: 50 });
+    const paired = await pairDevice(s);
+    const res = await call(s, 'GET', `/api/teams/${s.team.id}/stream`, {
+      headers: { authorization: `Bearer ${paired.token}` },
+    });
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    await reader.read();
+    s.db.delete(pairedDevice).where(eq(pairedDevice.id, paired.deviceId)).run();
+    const ended = await Promise.race([
+      (async () => {
+        for (;;) if ((await reader.read()).done) return true;
+      })(),
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), STREAM_END_MS);
+      }),
+    ]);
+    expect(ended).toBe(true);
+    await reader.cancel().catch(() => {});
+  });
+
+  test('the owner stream survives the revocation of a device', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const owner = await call(s, 'GET', `/api/teams/${s.team.id}/stream`, {
+      headers: ownerHeaders,
+    });
+    const reader = (owner.body as ReadableStream<Uint8Array>).getReader();
+    await reader.read();
+    const paired = await pairDevice(s);
+    await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: ownerHeaders });
+    const still = await Promise.race([
+      reader.read().then(() => 'open'),
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve('open'), 300);
+      }),
+    ]);
+    expect(still).toBe('open');
+    await reader.cancel().catch(() => {});
+  });
+
+  test('push subscriptions made by a device are removed with it; the owner keeps theirs', async () => {
+    const s = bootServer({ authToken: OWNER, pushEndpointHosts: new Set(['push.example']) });
+    const subscribe = async (headers: Record<string, string>, endpoint: string) => {
+      const ecdh = createECDH('prime256v1');
+      ecdh.generateKeys();
+      const res = await call(s, 'POST', `/api/teams/${s.team.id}/push/subscriptions`, {
+        headers,
+        body: {
+          endpoint,
+          keys: {
+            p256dh: ecdh.getPublicKey().toString('base64url'),
+            auth: randomBytes(16).toString('base64url'),
+          },
+          origin: 'https://cairn.test',
+        },
+      });
+      expect(res.status).toBe(201);
+    };
+    const first = await pairDevice(s, 'first');
+    const second = await pairDevice(s, 'second');
+    await subscribe({ authorization: `Bearer ${first.token}` }, 'https://push.example/first');
+    await subscribe({ authorization: `Bearer ${second.token}` }, 'https://push.example/second');
+    await subscribe(ownerHeaders, 'https://push.example/owner');
+    await call(s, 'DELETE', `/api/remote/devices/${first.deviceId}`, { headers: ownerHeaders });
+    const left = s.db
+      .select({ endpoint: pushSubscription.endpoint })
+      .from(pushSubscription)
+      .all()
+      .map((row) => row.endpoint)
+      .sort();
+    expect(left).toEqual(['https://push.example/owner', 'https://push.example/second']);
+  });
+
+  test('an endpoint a device re-registers belongs to that device and goes with it', async () => {
+    const s = bootServer({ authToken: OWNER, pushEndpointHosts: new Set(['push.example']) });
+    const ecdh = createECDH('prime256v1');
+    ecdh.generateKeys();
+    const body = {
+      endpoint: 'https://push.example/shared',
+      keys: {
+        p256dh: ecdh.getPublicKey().toString('base64url'),
+        auth: randomBytes(16).toString('base64url'),
+      },
+      origin: 'https://cairn.test',
+    };
+    const path = `/api/teams/${s.team.id}/push/subscriptions`;
+    await call(s, 'POST', path, { headers: ownerHeaders, body });
+    const paired = await pairDevice(s);
+    await call(s, 'POST', path, { headers: { authorization: `Bearer ${paired.token}` }, body });
+    await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, { headers: ownerHeaders });
+    const rows = s.db.select({ endpoint: pushSubscription.endpoint }).from(pushSubscription).all();
+    expect(rows).toHaveLength(0);
   });
 });

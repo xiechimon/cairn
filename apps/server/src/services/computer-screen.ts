@@ -26,6 +26,7 @@ import {
   renewComputerControl,
 } from './computer-control.js';
 import { findMachineByToken } from './machines.js';
+import { deviceStreams } from './paired-devices.js';
 
 const MAX_CHANNELS = 128;
 const MAX_COMPUTER_CHANNELS = 8;
@@ -129,7 +130,13 @@ export class ComputerScreenGateway {
     }
   }
 
-  open(teamId: string, userId: string, computerId: string, input: OpenComputerScreen) {
+  open(
+    teamId: string,
+    userId: string,
+    computerId: string,
+    input: OpenComputerScreen,
+    deviceId: string | null = null,
+  ) {
     if (this.closed) throw new HttpError(503, 'computer screen gateway is closed');
     const parsed = openComputerScreenSchema.safeParse(input);
     if (!parsed.success) throw new HttpError(400, 'invalid screen request');
@@ -171,6 +178,7 @@ export class ComputerScreenGateway {
       streams: [],
     };
     this.channels.set(request.id, channel);
+    deviceStreams.bind(deviceId, () => this.revoke(channel));
     if (!this.deps.machineHub.pushComputerScreen(row.machineId, request)) {
       this.revoke(channel);
       throw new HttpError(409, 'the computer is not connected');

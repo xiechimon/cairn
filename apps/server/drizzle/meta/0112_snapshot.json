@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f74089cf-5735-47d4-ae6b-a248f830b29a",
+  "id": "cb41e9a1-56ae-44f5-afef-4fbb945c491f",
   "prevId": "cb96e6a9-7f83-4608-aa4e-d702d612eed0",
   "tables": {
     "agent": {
@@ -4230,6 +4230,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "pairedDeviceId": {
+          "name": "pairedDeviceId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "createdAt": {

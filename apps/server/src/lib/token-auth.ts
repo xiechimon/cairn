@@ -49,7 +49,13 @@ export function isLoopbackPeer(c: Context): boolean {
 }
 
 export interface TokenAuthOptions {
-  isDeviceToken?: (provided: string) => boolean;
+  resolveDeviceId?: (provided: string) => string | null;
+}
+
+const deviceIdByRequest = new WeakMap<Request, string>();
+
+export function pairedDeviceIdOf(c: Context): string | null {
+  return deviceIdByRequest.get(c.req.raw) ?? null;
 }
 
 export function registerTokenAuth(
@@ -59,9 +65,14 @@ export function registerTokenAuth(
 ): void {
   if (token === null) return;
   const verifyOwner = makeVerifier(token);
-  const verify = (provided: string): boolean =>
-    verifyOwner(provided) || options.isDeviceToken?.(provided) === true;
   app.use('*', async (c, next) => {
+    const verify = (provided: string): boolean => {
+      if (verifyOwner(provided)) return true;
+      const deviceId = options.resolveDeviceId?.(provided) ?? null;
+      if (deviceId === null) return false;
+      deviceIdByRequest.set(c.req.raw, deviceId);
+      return true;
+    };
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();

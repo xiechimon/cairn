@@ -11,7 +11,7 @@ import { registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
 import { countsAsMemberWrite, recordMemberWrite } from './services/autonomy-gates.js';
 import { NotFoundError } from './services/builds.js';
-import { isPairedDeviceToken } from './services/paired-devices.js';
+import { pairedDeviceIdOfToken } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -84,7 +84,7 @@ function registerMemberActivity(app: Hono, ctx: AppContext): void {
 export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   registerTokenAuth(app, ctx.authToken, {
-    isDeviceToken: (provided) => isPairedDeviceToken(ctx.db, provided),
+    resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
   });
   registerMemberActivity(app, ctx);
   registerRoutes(app, ctx);

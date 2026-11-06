@@ -9,6 +9,7 @@ import type { AppContext } from './context.js';
 import { pushDelivery, pushSubscription, todo } from './db/schema.js';
 import { parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
 import { sendMustReachAlert } from './services/push-alerts.js';
 import { clearThreadPresence, recordThreadPresence } from './services/thread-presence.js';
@@ -166,6 +167,7 @@ export function registerPushRoutes(app: Hono, ctx: AppContext): void {
         endpoint: body.endpoint,
         p256dh: body.keys.p256dh,
         auth: body.keys.auth,
+        pairedDeviceId: pairedDeviceIdOf(c),
         createdAt,
       })
       .onConflictDoUpdate({
@@ -175,6 +177,7 @@ export function registerPushRoutes(app: Hono, ctx: AppContext): void {
           teamId: ctx.team.id,
           p256dh: body.keys.p256dh,
           auth: body.keys.auth,
+          pairedDeviceId: pairedDeviceIdOf(c),
           createdAt,
         },
       })

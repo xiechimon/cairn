@@ -3,6 +3,7 @@ import type { Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { computerScreensOf } from './services/computer-screen.js';
 
 export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
@@ -31,7 +32,13 @@ export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
       'screen request',
     );
     return c.json(
-      computerScreensOf(ctx).open(teamId, ctx.user.id, c.req.param('computerId'), body),
+      computerScreensOf(ctx).open(
+        teamId,
+        ctx.user.id,
+        c.req.param('computerId'),
+        body,
+        pairedDeviceIdOf(c),
+      ),
       201,
     );
   });

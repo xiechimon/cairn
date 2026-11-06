@@ -9,7 +9,7 @@ import {
 } from '@cairn/shared';
 import { asc, count, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { pairedDevice } from '../db/schema.js';
+import { pairedDevice, pushSubscription } from '../db/schema.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
@@ -105,23 +105,61 @@ export function listPairedDevices(db: Db, teamId: string): PairedDevice[] {
     .map(toView);
 }
 
+export interface DeviceStreamRegistry {
+  bind(deviceId: string | null, close: () => void): () => void;
+  closeAll(deviceId: string): void;
+}
+
+export function createDeviceStreamRegistry(): DeviceStreamRegistry {
+  const open = new Map<string, Set<() => void>>();
+  return {
+    bind(deviceId, close) {
+      if (deviceId === null) return () => {};
+      const closers = open.get(deviceId) ?? new Set<() => void>();
+      closers.add(close);
+      open.set(deviceId, closers);
+      return () => {
+        closers.delete(close);
+        if (closers.size === 0) open.delete(deviceId);
+      };
+    },
+    closeAll(deviceId) {
+      for (const close of [...(open.get(deviceId) ?? [])]) close();
+      open.delete(deviceId);
+    },
+  };
+}
+
+export const deviceStreams = createDeviceStreamRegistry();
+
+export function pairedDeviceExists(db: Db, id: string): boolean {
+  return (
+    db.select({ id: pairedDevice.id }).from(pairedDevice).where(eq(pairedDevice.id, id)).get() !==
+    undefined
+  );
+}
+
 export function revokePairedDevice(db: Db, teamId: string, id: string): boolean {
   const row = db.select().from(pairedDevice).where(eq(pairedDevice.id, id)).get();
   if (row === undefined || row.teamId !== teamId) return false;
-  db.delete(pairedDevice).where(eq(pairedDevice.id, id)).run();
+  db.transaction((tx) => {
+    tx.delete(pushSubscription).where(eq(pushSubscription.pairedDeviceId, id)).run();
+    tx.delete(pairedDevice).where(eq(pairedDevice.id, id)).run();
+  });
+  deviceStreams.closeAll(id);
   return true;
 }
 
-export function isPairedDeviceToken(db: Db, plaintext: string, now = nowMs()): boolean {
-  if (!plaintext.startsWith(DEVICE_TOKEN_PREFIX)) return false;
+export function pairedDeviceIdOfToken(db: Db, plaintext: string, now = nowMs()): string | null {
+  if (!plaintext.startsWith(DEVICE_TOKEN_PREFIX)) return null;
   const row = db
     .select()
     .from(pairedDevice)
     .where(eq(pairedDevice.tokenHash, hashCredential(plaintext)))
     .get();
-  if (row === undefined) return false;
+  if (row === undefined) return null;
   if (row.lastSeenAt === null || now - row.lastSeenAt >= LAST_SEEN_RESOLUTION_MS) {
     db.update(pairedDevice).set({ lastSeenAt: now }).where(eq(pairedDevice.id, row.id)).run();
   }
-  return true;
+  return row.id;
 }

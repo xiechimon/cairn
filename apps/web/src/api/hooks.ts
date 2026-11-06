@@ -519,6 +519,7 @@ export const useApiKeys = (teamId: string | undefined, enabled: boolean) =>
   });
 
 const REMOTE_POLL_MS = 10_000;
+const DEVICES_POLL_MS = 3_000;
 
 export const useRemoteRoutes = (enabled: boolean) =>
   useQuery({
@@ -534,6 +535,7 @@ export const useRemoteDevices = (enabled: boolean) =>
     queryFn: () => api.get<PairedDevice[]>('/api/remote/devices'),
     enabled,
     retry: false,
+    refetchInterval: DEVICES_POLL_MS,
   });
 
 export function useRemoteMutations() {

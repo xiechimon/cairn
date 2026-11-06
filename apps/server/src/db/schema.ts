@@ -636,6 +636,7 @@ export const pushSubscription = sqliteTable(
     endpoint: text('endpoint').notNull(),
     p256dh: text('p256dh').notNull(),
     auth: text('auth').notNull(),
+    pairedDeviceId: text('pairedDeviceId'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],

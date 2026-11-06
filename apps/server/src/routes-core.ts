@@ -15,7 +15,7 @@ import type { AppContext } from './context.js';
 import { agent, team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
-import { isOpenRemotePath } from './lib/token-auth.js';
+import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
 import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import { readDeployStatus } from './services/deploy-status.js';
@@ -28,6 +28,7 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from './services/notifications.js';
+import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
 import {
   listRoutingSettings,
   seedRoutingSettings,
@@ -194,16 +195,23 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
         stream.writeSSE({ data: JSON.stringify(payload) }),
       );
       const unsubscribe = ctx.hub.subscribe(teamId, conn, ctx.user.id);
+      const deviceId = pairedDeviceIdOf(c);
       const timer = setInterval(() => {
+        if (deviceId !== null && !pairedDeviceExists(ctx.db, deviceId)) {
+          stream.abort();
+          return;
+        }
         void conn.send({ type: 'ping', seq: conn.nextSeq() });
       }, ctx.pingIntervalMs);
       let release: () => void = () => {};
       const held = new Promise<void>((resolve) => {
         release = resolve;
       });
+      const unbindDevice = deviceStreams.bind(deviceId, () => stream.abort());
       stream.onAbort(() => {
         clearInterval(timer);
         unsubscribe();
+        unbindDevice();
         release();
       });
       await conn.send({ type: 'ping', seq: conn.nextSeq() });

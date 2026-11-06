@@ -12,6 +12,7 @@ import WebSocket from 'ws';
 import { chief, computer, computerCall, machine, step } from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
 import { ComputerScreenGateway } from '../src/services/computer-screen.js';
+import { deviceStreams } from '../src/services/paired-devices.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const MACHINE_TOKEN = 'screen-test-machine-token';
@@ -338,6 +339,29 @@ describe('real websocket screen bridge', () => {
     viewer.send(Buffer.from('RFB 003.008\n'));
     expect((await response)[0]).toEqual(Buffer.from('RFB 003.008\n'));
     await expect(connect(base + cap.path, undefined, cap.wsProtocols)).rejects.toThrow(/401/);
+  });
+
+  test('an open screen of a revoked device is cut, and another device keeps its own', async () => {
+    const requests = boot();
+    const base = await listen();
+    const cap = gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'view' }, 'device-a');
+    const other = gateway.open(
+      s.team.id,
+      s.user.id,
+      'computer-screen',
+      { kind: 'view' },
+      'device-b',
+    );
+    const daemon = await connect(
+      `${base}/api/machine/computer-screen/${requests[0]?.id}`,
+      MACHINE_TOKEN,
+    );
+    const viewer = await connect(base + cap.path, undefined, cap.wsProtocols);
+    const closed = once(viewer, 'close');
+    deviceStreams.closeAll('device-a');
+    await closed;
+    expect(daemon.readyState).not.toBe(WebSocket.OPEN);
+    await expect(connect(base + other.path, undefined, other.wsProtocols)).resolves.toBeDefined();
   });
 
   test('the daemon greeting is buffered until the viewer attaches', async () => {

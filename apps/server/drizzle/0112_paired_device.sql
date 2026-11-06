@@ -9,4 +9,5 @@ CREATE TABLE `paired_device` (
 	FOREIGN KEY (`teamId`) REFERENCES `team`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `paired_device_tokenHash_unique` ON `paired_device` (`tokenHash`);
+CREATE UNIQUE INDEX `paired_device_tokenHash_unique` ON `paired_device` (`tokenHash`);--> statement-breakpoint
+ALTER TABLE `push_subscription` ADD `pairedDeviceId` text;
