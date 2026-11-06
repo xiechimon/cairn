@@ -19,6 +19,7 @@ import { RelayMachineServer, RelayPathError } from './relay.js';
 import { cleanOrbOutbox } from './runtime-fs.js';
 
 export const ORB_HEARTBEAT_TIMEOUT_MS = 120_000;
+export const ORB_STREAM_AUTH_TIMEOUT_MS = 60_000;
 
 export async function runOrbStep(
   lifecycle: OrbLifecycle,
@@ -126,6 +127,9 @@ export async function runOrbStep(
           machineName: deps.machineName,
           methods,
         };
+        const remoteSandbox = lifecycle.provider.openRelayStream !== undefined;
+        if (remoteSandbox && claimed.project?.repo?.kind === 'local')
+          throw new Error('Local repositories cannot run in a remote sandbox orb');
         const projectId = claimed.project?.id;
         if (projectId && !isOrbPathId(projectId)) throw new Error('Invalid orb project id');
         const seed =
@@ -217,6 +221,7 @@ export async function runOrbStep(
             socketPath,
             stepId,
             release,
+            ...(remoteSandbox ? { authTimeoutMs: ORB_STREAM_AUTH_TIMEOUT_MS } : {}),
             onStaleRelease: (loaded) => {
               staleRelease = loaded;
             },
@@ -250,7 +255,7 @@ export async function runOrbStep(
                 stopRequest: stop.request ?? undefined,
                 env: {
                   ...input.options.env,
-                  ...(deps.orbProxyUrl
+                  ...(deps.orbProxyUrl && !remoteSandbox
                     ? { HTTP_PROXY: deps.orbProxyUrl, HTTPS_PROXY: deps.orbProxyUrl }
                     : {}),
                 },
@@ -272,25 +277,38 @@ export async function runOrbStep(
               deps.journal.remove(stepId);
             },
           });
-          for (let attempt = 0; ; attempt++) {
-            try {
-              if (outboxDirectory) {
-                try {
-                  mkdirSync(outboxDirectory, { mode: 0o700 });
-                  ownsOutbox = true;
-                } catch (error) {
-                  throw new RelayPathError(
-                    `Orb outbox must be recreated by root: ${String(error)}`,
-                  );
+          if (lifecycle.provider.openRelayStream) {
+            const stream = await lifecycle.provider.openRelayStream(handle, {
+              token: relay.authToken,
+              signal: execController.signal,
+              onFailure: (error) => {
+                exitError = error.message;
+              },
+            });
+            if (stream.destroyed) finishTransport();
+            else stream.once('close', finishTransport);
+            relay.attach(stream);
+          } else {
+            for (let attempt = 0; ; attempt++) {
+              try {
+                if (outboxDirectory) {
+                  try {
+                    mkdirSync(outboxDirectory, { mode: 0o700 });
+                    ownsOutbox = true;
+                  } catch (error) {
+                    throw new RelayPathError(
+                      `Orb outbox must be recreated by root: ${String(error)}`,
+                    );
+                  }
                 }
+                await relay.listen();
+                break;
+              } catch (error) {
+                if (handle.running) await lifecycle.provider.stop(handle);
+                ownsOutbox = false;
+                if (!(error instanceof RelayPathError) || attempt > 0) throw error;
+                await lifecycle.provider.start(handle, { signal: execController.signal });
               }
-              await relay.listen();
-              break;
-            } catch (error) {
-              if (handle.running) await lifecycle.provider.stop(handle);
-              ownsOutbox = false;
-              if (!(error instanceof RelayPathError) || attempt > 0) throw error;
-              await lifecycle.provider.start(handle, { signal: execController.signal });
             }
           }
           input.options.stopRequest = stop.request ?? undefined;
