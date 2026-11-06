@@ -181,6 +181,7 @@ test('updating checks preserves an existing human policy and zero cap', () => {
   if (!row) throw new Error('missing project');
   expect(updateProjectMergeConfig(s.db, row, { localChecks: ['new'] })).toEqual({
     mergePolicy: 'human',
+    planAutoApproveEnabled: true,
     localChecks: ['new'],
     requireUpToDate: false,
   });
