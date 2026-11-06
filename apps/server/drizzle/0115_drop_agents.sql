@@ -78,9 +78,11 @@ WHERE a.`id` = (
 )
 AND EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND t.`sourceKind` = 'research-citation-check')
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'citation_check');--> statement-breakpoint
-UPDATE `routing_rule` SET `requiredCapabilities` = json_set('{}', '$.executor', 'orb')
-WHERE `use` IN ('session', 'review') AND `requiredCapabilities` IS NULL AND `seededFromAgentId` IS NOT NULL
-AND EXISTS (SELECT 1 FROM `agent` a WHERE a.`id` = `routing_rule`.`seededFromAgentId` AND a.`teamId` = `routing_rule`.`teamId` AND EXISTS (SELECT 1 FROM `machine` m WHERE m.`id` = a.`machineId` AND (json_extract(m.`capabilities`, '$.executor') = 'orb' OR (json_extract(m.`capabilities`, '$.executor') IS NULL AND substr(m.`name`, -4) = '-orb'))));--> statement-breakpoint
+UPDATE `routing_rule` SET `requiredCapabilities` = (
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM `machine` m WHERE m.`id` = a.`machineId` AND (json_extract(m.`capabilities`, '$.executor') = 'orb' OR (json_extract(m.`capabilities`, '$.executor') IS NULL AND substr(m.`name`, -4) = '-orb'))) THEN json_set(coalesce(a.`requiredCapabilities`, '{}'), '$.executor', 'orb') ELSE a.`requiredCapabilities` END
+  FROM `agent` a WHERE a.`id` = `routing_rule`.`seededFromAgentId` AND a.`teamId` = `routing_rule`.`teamId`
+)
+WHERE `use` IN ('session', 'review') AND `requiredCapabilities` IS NULL AND `seededFromAgentId` IS NOT NULL;--> statement-breakpoint
 UPDATE `routing_rule` SET `mcpServers` = (SELECT a.`mcpServers` FROM `chief` c JOIN `agent` a ON a.`id` = c.`agentId` WHERE c.`teamId` = `routing_rule`.`teamId` AND a.`mcpServers` IS NOT NULL LIMIT 1)
 WHERE `use` = 'coordinator' AND `mcpServers` IS NULL
 AND EXISTS (SELECT 1 FROM `chief` c JOIN `agent` a ON a.`id` = c.`agentId` WHERE c.`teamId` = `routing_rule`.`teamId` AND a.`mcpServers` IS NOT NULL);--> statement-breakpoint
