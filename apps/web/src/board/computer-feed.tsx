@@ -94,7 +94,7 @@ function CommandEntry({ command, now }: { command: ComputerCommand; now: number 
         {command.status === 'running' ? (
           <Badge
             data-tone="plan"
-            className="ml-auto flex-none gap-1 bg-(--chip-plan-bg) pl-1.5 text-(--chip-plan-fg)"
+            className="ml-auto flex-none gap-1 bg-secondary pl-1.5 text-content-secondary"
           >
             <StatusGlyph kind="working" className="size-3" />
             {t(STATUS_LABEL[command.status])}

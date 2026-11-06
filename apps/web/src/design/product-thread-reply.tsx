@@ -59,6 +59,7 @@ export function ProductThreadReplySection() {
       lede="A needs-you card on the home replies straight to its thread. Reply opens ThreadReply inside the card; the hint says how the thread takes it (plan feedback, a rerun, or a note into the running turn). The Coordinator only gets a note."
     >
       <Specimen
+        id="reply-on-a-needs-you-card"
         title="Reply on a needs-you card"
         note="ThreadCard footer + ThreadReply"
         stage="canvas"

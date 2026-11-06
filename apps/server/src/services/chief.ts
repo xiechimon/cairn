@@ -19,6 +19,7 @@ import {
   CHIEF_DIGEST_GROUP_LABELS,
   CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_WATCH_REASON_DISPATCH,
+  COORDINATOR_NOT_READY,
   chiefDigestContentSchema,
   chiefDigestThreadId,
   chiefIdFormat,
@@ -468,11 +469,11 @@ export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | 
 
 function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
   if (row.agentId === null) {
-    throw new HttpError(409, 'chief agent not bound (请先为 Coordinator 选择一个 Agent。)');
+    throw new HttpError(409, 'chief agent not bound', COORDINATOR_NOT_READY);
   }
   const agentRow = deps.db.select().from(agent).where(eq(agent.id, row.agentId)).get();
   if (!agentRow?.modelId) {
-    throw new HttpError(409, 'chief agent has no model configured');
+    throw new HttpError(409, 'chief agent has no model configured', COORDINATOR_NOT_READY);
   }
   return agentRow;
 }
