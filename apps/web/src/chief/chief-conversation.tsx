@@ -456,6 +456,11 @@ export function ChiefConversation({
   const heroScrollRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   useScrollFade(heroScrollRef, { enabled: heroLayout });
+  const uploadingAnswer = answerKey !== null && wire.attaching;
+  useEffect(() => {
+    questionDockState.setUploading(uploadingAnswer);
+    return () => questionDockState.setUploading(false);
+  }, [uploadingAnswer]);
   const stopMode =
     targetPlaceholder === null &&
     chief.running === true &&
@@ -795,6 +800,7 @@ export function ChiefConversation({
                       !wire.inlineOpen
                     ) {
                       event.preventDefault();
+                      if (wire.attaching) return;
                       answering.advance();
                       return;
                     }

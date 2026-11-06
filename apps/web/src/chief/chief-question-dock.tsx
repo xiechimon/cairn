@@ -145,12 +145,13 @@ export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boole
           label: t('{n} / {total}', { n: position, total }),
           canPrev: step > 0 || previous !== undefined,
           canNext:
-            step < lastStep
+            !(bound && questionDockState.uploading()) &&
+            (step < lastStep
               ? stepComplete(
                   shown,
                   questionDockState.answerText(answerKeyOf(draftKeyOf(shown), step)).trim() !== '',
                 )
-              : next !== undefined,
+              : next !== undefined),
           onPrev: () => {
             if (step > 0) {
               setStepOf(shown, step - 1);

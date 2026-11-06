@@ -275,9 +275,11 @@ export function ChiefQuestionCard({
     });
   };
 
-  const primaryEnabled = pending && (last ? allComplete : stepComplete);
+  const blockedByUpload = bound && questionDockState.uploading();
+  const canAdvance = pending && (last ? allComplete : stepComplete) && !blockedByUpload;
+  const primaryEnabled = canAdvance;
   const advance = () => {
-    if (!primaryEnabled) return;
+    if (!canAdvance || (bound && questionDockState.uploading())) return;
     if (last) {
       submit();
       return;

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Route, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 function question(requestId: string, header: string, text: string, options: unknown[]) {
@@ -732,6 +732,24 @@ test('answer drafts per request and the thread draft stay separate through every
     }
     return answer(path, route, json);
   });
+  const heldUploads: Route[] = [];
+  await page.route('**/api/uploads/grant', (route) => {
+    heldUploads.push(route);
+  });
+  await page.route('**/api/uploads/upload', (route) => {
+    heldUploads.push(route);
+  });
+  const releaseUploads = async () => {
+    let n = 0;
+    for (const route of heldUploads.splice(0)) {
+      n += 1;
+      if (route.request().url().endsWith('/grant'))
+        await route.fulfill({
+          json: { uploadUrl: '/api/uploads', grant: `grant-${n}`, key: `t1/att-${n}.log`, attachmentId: `att-${n}` },
+        });
+      else await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 3 } });
+    }
+  };
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   const option = (n: number) =>
@@ -874,6 +892,31 @@ test('answer drafts per request and the thread draft stay separate through every
       },
     },
     {
+      name: 'Enter with an upload in flight sends nothing until the upload finishes',
+      run: async () => {
+        await page.locator('input[type="file"]').first().setInputFiles({
+          name: 'notes.log',
+          mimeType: 'text/plain',
+          buffer: Buffer.from('boom'),
+        });
+        await expect(page.getByTestId('attachment-pending')).toBeVisible();
+        await composer.press('Enter');
+        await page.waitForTimeout(500);
+      },
+      composer: 'finalA',
+      extra: async () => {
+        expect(answered).toHaveLength(1);
+        await expect(page.getByTestId('chief-question-primary')).toBeDisabled();
+        await expect.poll(() => heldUploads.length).toBeGreaterThan(0);
+        await expect(async () => {
+          await releaseUploads();
+          await expect(page.getByTestId('attachment-pending')).toHaveCount(0, { timeout: 500 });
+        }).toPass();
+        await expect(page.getByTestId('chief-question-primary')).toBeEnabled();
+        expect(answered).toHaveLength(1);
+      },
+    },
+    {
       name: 'Enter twice fast sends exactly one answer, the text',
       run: async () => {
         await Promise.all([composer.press('Enter'), composer.press('Enter')]);
@@ -885,7 +928,7 @@ test('answer drafts per request and the thread draft stay separate through every
           .poll(() => answered.map((row) => row.body.answers))
           .toEqual([
             [{ header: 'Merge · #2271', choices: ['Send it to ian'] }],
-            [{ header: 'Model · #74', choices: ['finalA'] }],
+            [{ header: 'Model · #74', choices: [expect.stringMatching(/attachment:t1\/att-1\.log\)\nfinalA$/)] }],
           ]);
       },
     },

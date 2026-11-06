@@ -33,6 +33,7 @@ const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
 let focusIndex = 0;
+let uploading = false;
 const answers = new Map<string, string>();
 
 export function answerKeyOf(draftKey: string, step: number): string {
@@ -53,6 +54,14 @@ export const questionDockState = {
   },
   snapshot(): number {
     return version;
+  },
+  uploading(): boolean {
+    return uploading;
+  },
+  setUploading(next: boolean): void {
+    if (next === uploading) return;
+    uploading = next;
+    emit();
   },
   focus(): number {
     return focusIndex;
