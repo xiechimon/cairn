@@ -30,7 +30,7 @@ function ShortcutHint({
           <Kbd
             key={key}
             className={cn(
-              'h-4.5 min-w-4.5 rounded-(--cds-radius-sm) border border-current/22 bg-transparent px-[3px] text-current shadow-none!',
+              'h-4.5 min-w-4.5 rounded-(--cds-radius-sm) border border-current/22 bg-transparent px-1 text-current shadow-none!',
               Icon !== null && 'px-0',
               chipClassName,
             )}
