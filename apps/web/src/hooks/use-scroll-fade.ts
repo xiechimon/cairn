@@ -71,8 +71,16 @@ export function useScrollFade(
     sync();
     el.addEventListener('scroll', sync, { passive: true });
     const ro = new ResizeObserver(sync);
-    ro.observe(el);
-    const mo = new MutationObserver(sync);
+    const observeBox = () => {
+      ro.disconnect();
+      ro.observe(el, { box: 'border-box' });
+      for (const child of el.children) ro.observe(child, { box: 'border-box' });
+    };
+    observeBox();
+    const mo = new MutationObserver((records) => {
+      if (records.some((record) => record.target === el)) observeBox();
+      sync();
+    });
     mo.observe(el, { childList: true, subtree: true, characterData: true });
     return () => {
       el.removeEventListener('scroll', sync);
