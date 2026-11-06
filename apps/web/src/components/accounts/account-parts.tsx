@@ -26,7 +26,6 @@ import { isLowQuota } from '../settings/quota-row.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { ToggleSwitch } from '../toggle-switch.js';
-import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../ui/dropdown-menu.js';
 import { Input } from '../ui/input.js';
@@ -82,39 +81,42 @@ function useClock(): (ts: number, now: number) => string {
 const leftPercent = (window: QuotaWindow) =>
   Math.max(0, Math.round((1 - window.utilization) * 100));
 
-function accountChip(
+function recoversIn(ts: number, now: number, t: TFunc): string {
+  const minutes = Math.max(1, Math.round((ts - now) / 60_000));
+  if (minutes < 60) return t('{n} 分钟后恢复', { n: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return t('{n} 小时后恢复', { n: hours });
+  return t('{n} 天后恢复', { n: Math.round(hours / 24) });
+}
+
+function accountStatus(
   account: SubscriptionAccount,
   now: number,
   t: TFunc,
   clock: (ts: number, now: number) => string,
-): { tone: StatusTone; label: string } {
+): { dot: string; label: string } {
   switch (account.state) {
     case 'ok':
-      return { tone: 'done', label: t('可用') };
+      return { dot: 'bg-running', label: t('可用') };
     case 'cooling':
       return {
-        tone: 'idle',
+        dot: 'bg-content-dim',
         label:
           account.cooldownUntil === null
             ? t('冷却中')
             : t('冷却至 {time}', { time: clock(account.cooldownUntil, now) }),
       };
     case 'exhausted':
-      return { tone: 'idle', label: t('额度用尽') };
+      return {
+        dot: 'bg-content-dim',
+        label:
+          account.cooldownUntil !== null && account.cooldownUntil > now
+            ? `${t('额度用尽')} · ${recoversIn(account.cooldownUntil, now, t)}`
+            : t('额度用尽'),
+      };
     case 'expired':
-      return { tone: 'confirm', label: t('已过期') };
+      return { dot: 'bg-(--card-button)', label: t('已过期') };
   }
-}
-
-export function AccountStateChip({ account, now }: { account: SubscriptionAccount; now: number }) {
-  const { t } = useI18n();
-  const clock = useClock();
-  const chip = accountChip(account, now, t, clock);
-  return (
-    <StatusChip tone={chip.tone} className="flex-none">
-      {chip.label}
-    </StatusChip>
-  );
 }
 
 export function PoolWindowCard({
@@ -239,15 +241,6 @@ export function PoolWindowCard({
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <span className="flex min-w-0 flex-col">
-      <span className="truncate text-ui text-foreground tabular-nums">{value}</span>
-      <span className="text-caption text-content-tertiary">{label}</span>
-    </span>
-  );
-}
-
 export interface AccountRowActions {
   onRename?: (label: string) => void;
   onVerify?: () => void;
@@ -272,6 +265,19 @@ export function AccountRow({
   status?: ReactNode;
 }) {
   const { t } = useI18n();
+  const clock = useClock();
+  const state = accountStatus(account, now, t, clock);
+  const usage = [
+    ...(account.lastUsedAt === null
+      ? []
+      : [t('最近使用 {ago}', { ago: relativeTime(account.lastUsedAt, now, t) })]),
+    ...(account.stepsLast24h === null ? [] : [t('24 小时 {n} 步', { n: account.stepsLast24h })]),
+  ];
+  const meta = [
+    ...(account.plan === null ? [] : [account.plan]),
+    t('优先级 {n}', { n: index + 1 }),
+    ...(usage.length === 0 ? [t('还没用过')] : usage),
+  ];
   const [draft, setDraft] = useState<string | null>(null);
   const save = () => {
     const next = draft?.trim() ?? '';
@@ -284,14 +290,14 @@ export function AccountRow({
       data-account-id={account.id}
       data-vendor={account.vendor}
       data-state={account.state}
-      className={cn(SETTINGS_ROW_CLS, 'flex-wrap justify-start gap-x-6 gap-y-2 py-2.5')}
+      className={cn(SETTINGS_ROW_CLS, 'flex-nowrap gap-3')}
     >
-      <span className="flex min-w-0 flex-auto items-center gap-2.5 sm:w-72 sm:flex-none">
-        {onToggleExpanded !== undefined ? (
+      <span className="flex min-w-0 flex-auto items-center gap-2">
+        {onToggleExpanded !== undefined && (
           <Button
             variant="ghost"
             size="icon-xs"
-            className="-ml-1.5 text-content-tertiary"
+            className="-ml-1.5 flex-none text-content-tertiary"
             aria-expanded={expanded}
             aria-label={t('展开 {name}', { name: account.label })}
             onClick={onToggleExpanded}
@@ -300,47 +306,38 @@ export function AccountRow({
               className={cn('transition-transform duration-(--dur-fast)', expanded && 'rotate-90')}
             />
           </Button>
-        ) : (
-          <span aria-hidden className="w-4.5 flex-none" />
         )}
-        <ProjectAvatar name={String(index + 1)} tone={index} />
-        {draft === null ? (
-          <span className="truncate text-ui font-semibold text-foreground">{account.label}</span>
-        ) : (
-          <Input
-            aria-label={t('账户名称')}
-            data-testid="account-rename-input"
-            className={cn(FORM_CONTROL_CLS, 'min-w-0 flex-auto')}
-            autoFocus
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={save}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') save();
-              if (event.key === 'Escape') setDraft(null);
-            }}
-          />
-        )}
-        {account.plan !== null && draft === null && (
-          <Badge variant="outline" className="flex-none">
-            {account.plan}
-          </Badge>
-        )}
+        <span className="flex min-w-0 flex-auto flex-col">
+          {draft === null ? (
+            <span className="truncate text-ui text-foreground">{account.label}</span>
+          ) : (
+            <Input
+              aria-label={t('账户名称')}
+              data-testid="account-rename-input"
+              className={cn(FORM_CONTROL_CLS, 'min-w-0 flex-auto')}
+              autoFocus
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={save}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') save();
+                if (event.key === 'Escape') setDraft(null);
+              }}
+            />
+          )}
+          <span data-testid="account-meta" className="truncate text-meta text-content-tertiary">
+            {meta.join(' · ')}
+          </span>
+        </span>
       </span>
-      <span className="w-40 flex-none">
-        <AccountStateChip account={account} now={now} />
-      </span>
-      <span className="grid grid-cols-2 gap-x-6">
-        <Stat
-          value={account.lastUsedAt === null ? '—' : relativeTime(account.lastUsedAt, now, t)}
-          label={t('最近使用')}
-        />
-        <Stat
-          value={account.stepsLast24h === null ? '—' : String(account.stepsLast24h)}
-          label={t('24 小时步骤')}
-        />
-      </span>
-      <span className="ml-auto flex items-center gap-2">
+      <span className="flex flex-none items-center justify-end gap-1 @xl:w-64">
+        <span
+          data-testid="account-status"
+          className="flex min-w-0 items-center gap-1.5 text-meta text-content-secondary"
+        >
+          <span aria-hidden className={cn('size-1.5 flex-none rounded-full', state.dot)} />
+          <span className="truncate max-sm:max-w-28">{state.label}</span>
+        </span>
         {status}
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -416,14 +413,13 @@ export function VendorSection({
         </SettingsCard>
       ) : (
         <>
-          {windows.length > 0 ? (
-            windows.map((name) => (
-              <PoolWindowCard key={name} name={name} accounts={accounts} now={now} />
-            ))
-          ) : (
-            <p className="m-0 px-1 text-meta text-content-tertiary">{t('还没有额度读数')}</p>
-          )}
+          {windows.map((name) => (
+            <PoolWindowCard key={name} name={name} accounts={accounts} now={now} />
+          ))}
           <SettingsCard>{accounts.map((account, index) => renderRow(account, index))}</SettingsCard>
+          {windows.length === 0 && (
+            <p className="m-0 text-meta text-content-tertiary">{t('还没有额度读数')}</p>
+          )}
         </>
       )}
     </section>
@@ -457,7 +453,7 @@ export function VendorList({
             aria-label={`${short} ${counts[vendor]}`}
             data-vendor={vendor}
             onClick={() => onChange(vendor)}
-            className="h-auto w-full justify-start gap-2.5 rounded-none border-b border-border px-3.5 py-2.5 text-left first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) font-normal whitespace-normal outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-[current=true]:bg-secondary"
+            className="h-auto w-full justify-start gap-2.5 rounded-none border-x-0 border-t-0 border-b border-border px-3.5 py-2.5 text-left first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) font-normal whitespace-normal outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-[current=true]:bg-secondary"
           >
             <Mark
               aria-hidden
