@@ -2,6 +2,7 @@ import {
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
+  otlpTraceIdOfTurn,
 } from '@cairn/shared/otel';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -224,5 +225,124 @@ describe('emitRuntimeBuildSpan', () => {
     const captured = captureFetch();
     emitRuntimeBuildSpan(s.db, buildId, 'done', {});
     expect(captured).toEqual([]);
+  });
+});
+
+describe('Coordinator turn export', () => {
+  function chiefTurn(prompt: string | null) {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const stepId = `step-${Math.random().toString(36).slice(2)}`;
+    s.db
+      .insert(stepTable)
+      .values({
+        id: stepId,
+        buildId: 'chief-thread-9',
+        kind: 'chief',
+        status: 'done',
+        prompt,
+        claimedAt: 1000,
+        finishedAt: 2000,
+        createdAt: 900,
+      })
+      .run();
+    return { s, stepId };
+  }
+
+  function attrsOf(span: { attributes: { key: string; value: unknown }[] }) {
+    return Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+  }
+
+  test('exports the turn as the root of its own trace grouped by thread session', () => {
+    const { s, stepId } = chiefTurn(null);
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, { ...env, CAIRN_OTEL_ENVIRONMENT: 'prod' });
+    expect(captured).toHaveLength(1);
+    const request = captured[0]!.body.resourceSpans[0]!;
+    expect(request.resource.attributes).toEqual([
+      { key: 'service.name', value: { stringValue: 'cairn' } },
+      { key: 'deployment.environment', value: { stringValue: 'prod' } },
+    ]);
+    const span = request.scopeSpans[0]!.spans[0]!;
+    expect(span.traceId).toBe(otlpTraceIdOfTurn(stepId));
+    expect(span.spanId).toBe(otlpStepSpanIdOfBuild('chief-thread-9', stepId));
+    expect(span.parentSpanId).toBeUndefined();
+    expect(span.name).toBe('coordinator turn');
+    const attrs = attrsOf(span);
+    expect(attrs['langfuse.trace.name']).toEqual({ stringValue: 'coordinator turn' });
+    expect(attrs['langfuse.session.id']).toEqual({ stringValue: 'chief-thread-9' });
+    expect(attrs['session.id']).toEqual({ stringValue: 'chief-thread-9' });
+    expect(attrs['langfuse.trace.tags']).toEqual({
+      arrayValue: { values: [{ stringValue: 'cairn' }, { stringValue: 'coordinator' }] },
+    });
+    expect(attrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
+    expect(attrs['deployment.environment']).toEqual({ stringValue: 'prod' });
+    expect(attrs['cairn.thread_id']).toEqual({ stringValue: 'chief-thread-9' });
+    expect(attrs['cairn.chief_trigger']).toEqual({ stringValue: 'user' });
+  });
+
+  test('never exports the turn prompt', () => {
+    const { s, stepId } = chiefTurn('please use token sk-ant-api03-supersecretvalue');
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    expect(JSON.stringify(captured[0]!.body)).not.toContain('supersecretvalue');
+  });
+
+  test('omits environment attributes when CAIRN_OTEL_ENVIRONMENT is unset', () => {
+    const { s, stepId } = chiefTurn(null);
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    const request = captured[0]!.body.resourceSpans[0]!;
+    expect(request.resource.attributes).toEqual([
+      { key: 'service.name', value: { stringValue: 'cairn' } },
+    ]);
+    const attrs = attrsOf(request.scopeSpans[0]!.spans[0]!);
+    expect(attrs['langfuse.environment']).toBeUndefined();
+    expect(attrs['deployment.environment']).toBeUndefined();
+  });
+
+  test('exports nothing when the endpoint is unset', () => {
+    const { s, stepId } = chiefTurn(null);
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, { CAIRN_OTEL_ENVIRONMENT: 'prod' });
+    expect(captured).toEqual([]);
+  });
+
+  test('a collector that never answers neither blocks nor throws', () => {
+    const { s, stepId } = chiefTurn(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    );
+    const started = Date.now();
+    expect(() => emitRuntimeStepSpan(s.db, stepId, env)).not.toThrow();
+    expect(Date.now() - started).toBeLessThan(200);
+  });
+
+  test('a collector that rejects the request does not surface an unhandled error', async () => {
+    const { s, stepId } = chiefTurn(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('connect ECONNREFUSED');
+      }),
+    );
+    expect(() => emitRuntimeStepSpan(s.db, stepId, env)).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  test('build root and steps carry the session and environment', () => {
+    const { s, buildId, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
+    const captured = captureFetch();
+    const withEnv = { ...env, CAIRN_OTEL_ENVIRONMENT: 'prod' };
+    emitRuntimeBuildSpan(s.db, buildId, 'done', withEnv);
+    emitRuntimeStepSpan(s.db, stepId, withEnv);
+    const root = attrsOf(captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
+    expect(root['langfuse.trace.name']).toEqual({ stringValue: 'build' });
+    expect(root['langfuse.session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
+    expect(root['langfuse.environment']).toEqual({ stringValue: 'prod' });
+    const stepAttrs = attrsOf(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
+    expect(stepAttrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
+    expect(stepAttrs['langfuse.trace.name']).toBeUndefined();
   });
 });

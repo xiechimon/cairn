@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
+  createOtlpSender,
   OTLP_SPAN_KIND,
   OTLP_STATUS_ERROR,
   type OtlpTarget,
@@ -9,6 +10,8 @@ import {
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
+  otlpTraceIdOfStep,
+  otlpTraceIdOfTurn,
   otlpTraceparent,
   otlpTracesRequest,
   parseOtlpTarget,
@@ -186,5 +189,60 @@ describe('postOtlpTraces', () => {
     await expect(postOtlpTraces(target as OtlpTarget, { resourceSpans: [] })).rejects.toThrow(
       'HTTP 500',
     );
+  });
+});
+
+describe('turn trace ids', () => {
+  test('chief steps trace per turn, other steps per build', () => {
+    expect(otlpTraceIdOfStep({ kind: 'chief', buildId: 'chief-t', stepId: 's1' })).toBe(
+      otlpTraceIdOfTurn('s1'),
+    );
+    expect(otlpTraceIdOfStep({ kind: 'build', buildId: 'b1', stepId: 's1' })).toBe(
+      otlpTraceIdOfBuild('b1'),
+    );
+    expect(otlpTraceIdOfTurn('s1')).not.toBe(otlpTraceIdOfTurn('s2'));
+  });
+});
+
+describe('createOtlpSender', () => {
+  const target: OtlpTarget = { url: new URL('http://127.0.0.1:1/v1/traces'), headers: {} };
+  const request = otlpTracesRequest({ 'service.name': 'cairn' }, 'test', []);
+
+  test('bounds in-flight and queued exports and drops the overflow without throwing', async () => {
+    const release: (() => void)[] = [];
+    const fetchStub = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release.push(() => resolve(new Response('{}', { status: 200 })));
+        }),
+    );
+    vi.stubGlobal('fetch', fetchStub);
+    const sender = createOtlpSender({ concurrency: 1, queue: 2, timeoutMs: 1000 });
+    const accepted = [1, 2, 3, 4, 5].map(() => sender.send(target, request));
+    expect(accepted).toEqual([true, true, true, false, false]);
+    expect(sender.dropped()).toBe(2);
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    release.shift()?.();
+    await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
+    vi.unstubAllGlobals();
+  });
+
+  test('a collector that never answers is cut off by the timeout and frees its slot', async () => {
+    const fetchStub = vi.fn(
+      (_url: unknown, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    vi.stubGlobal('fetch', fetchStub);
+    const failures: unknown[] = [];
+    const sender = createOtlpSender({ concurrency: 1, queue: 4, timeoutMs: 20 }, (e) =>
+      failures.push(e),
+    );
+    sender.send(target, request);
+    sender.send(target, request);
+    await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(failures).toHaveLength(2));
+    vi.unstubAllGlobals();
   });
 });
