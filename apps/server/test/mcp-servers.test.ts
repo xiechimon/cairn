@@ -1,5 +1,4 @@
-import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type ClaimedStep,
@@ -11,6 +10,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { agentMemory, agent as agentTable, todo } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { listMcpServers, readClaudeMcpServers } from '../src/services/mcp-servers.js';
@@ -42,7 +42,7 @@ async function call(
 }
 
 function configPath(content?: unknown): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-mcp-cfg-'));
+  const dir = makeTestTempDir('cairn-mcp-cfg-');
   const p = join(dir, 'claude.json');
   if (content !== undefined) {
     writeFileSync(p, typeof content === 'string' ? content : JSON.stringify(content), 'utf8');

@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   type AnswersFile,
   buildLabelerTrust,
@@ -281,7 +281,7 @@ test('conflicting repeated labels for the same item identity across weeks are re
 });
 
 test('labeler-trust.json shape uses Wilson lower bound, not the raw point estimate', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'eval-review-score-'));
+  const dir = makeTestTempDir('eval-review-score-');
   temps.push(dir);
   const path = join(dir, 'labeler-trust.json');
   const reader = { model: 'gpt-5', vendor: 'openai' };

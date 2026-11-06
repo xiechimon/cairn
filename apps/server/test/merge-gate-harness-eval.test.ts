@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CHIEF_DISPATCH_BASELINE_DECISION_OK_CI_LOWER,
@@ -11,6 +10,7 @@ import {
 } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { publishEvaluation } from '../../../scripts/harness-eval-worker.mjs';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import type { AppContext } from '../src/context.js';
 import { openDbWithHandle } from '../src/db/client.js';
 import { svcOf } from '../src/routes-helpers.js';
@@ -181,7 +181,7 @@ afterEach(() => {
 });
 
 function openWorld(opts: { now?: { value: number }; attemptTimeoutMs?: number } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-1979-'));
+  const dir = makeTestTempDir('cairn-1979-');
   const opened = openDbWithHandle(join(dir, 'db.sqlite'));
   worlds.push({ close: opened.close, dir });
   const dispatches: HarnessEvalDispatchRequest[] = [];
@@ -514,7 +514,7 @@ describe('merge-gate harness eval routing (#1979)', () => {
   });
 
   test('GitHub facts lifecycle: missing evidence dispatches, validated result-only commit is reread and clears regression', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-1979-lifecycle-'));
+    const dir = makeTestTempDir('cairn-1979-lifecycle-');
     const opened = openDbWithHandle(join(dir, 'db.sqlite'));
     worlds.push({
       close: () => {

@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import { harnessEvalAttempt } from '../src/db/schema.js';
 import {
@@ -32,7 +32,7 @@ function openWorld(opts: {
   attemptTimeoutMs?: number;
   ids?: string[];
 }) {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-1977-'));
+  const dir = makeTestTempDir('cairn-1977-');
   const opened = openDbWithHandle(join(dir, 'db.sqlite'));
   directories.push({ close: opened.close, dir });
   const dispatches: HarnessEvalDispatchRequest[] = [];
@@ -124,7 +124,7 @@ describe('harness eval coordinator', () => {
   });
 
   test('a restart (new coordinator on the same db) sees the in-flight attempt and does not dispatch', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-1977-restart-'));
+    const dir = makeTestTempDir('cairn-1977-restart-');
     const path = join(dir, 'db.sqlite');
     let opened = openDbWithHandle(path);
     const firstDispatches: HarnessEvalDispatchRequest[] = [];
