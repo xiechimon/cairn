@@ -13,11 +13,11 @@ const buttonVariants = cva(
         default:
           'bg-primary text-primary-foreground hover:bg-primary/80 active:bg-primary/65 disabled:bg-secondary disabled:text-content-secondary disabled:opacity-100',
         outline:
-          'border-border bg-card hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground active:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_8%)] dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:active:bg-input/70',
+          'border-border bg-card hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground active:bg-[color-mix(in_oklab,var(--muted),var(--foreground)_8%)] dark:border-input dark:bg-input/30 dark:hover:bg-input/50 dark:active:bg-input/70',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] active:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_10%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] active:bg-[color-mix(in_oklab,var(--secondary),var(--foreground)_10%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:
-          'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground active:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_8%)] dark:hover:bg-muted/50 dark:active:bg-muted',
+          'hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground active:bg-[color-mix(in_oklab,var(--muted),var(--foreground)_8%)] dark:hover:bg-muted/50 dark:active:bg-muted',
         destructive:
           'bg-destructive/10 text-destructive hover:bg-destructive/20 active:bg-destructive/30 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40',
         link: 'text-foreground underline decoration-border underline-offset-4 hover:decoration-current',
