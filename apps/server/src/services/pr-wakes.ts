@@ -26,9 +26,10 @@ import {
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
 import { newRecordId } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
-import { buildCiFixPrompt, buildMergeConflictPrompt } from './ci-loop.js';
+import { buildCiFixPrompt, buildMergeConflictPrompt, verdictOfCheckRuns } from './ci-loop.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
+import { blockingWorkerQuestions } from './worker-question-store.js';
 
 const ledgerSchema = z.object({
   wakes: z.number().int().nonnegative().default(0),
@@ -38,6 +39,7 @@ const ledgerSchema = z.object({
   seen: z.array(z.string()).default([]),
   failure: z.object({ head: z.string(), signature: z.string() }).nullable().default(null),
   repeated: z.boolean().default(false),
+  pendingNotice: z.object({ buildId: z.string(), content: z.string() }).nullable().default(null),
 });
 
 type WakeKind = 'conflict' | 'ci' | 'review';
@@ -49,6 +51,49 @@ interface WakeEvent {
 
 function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
+  for (const row of deps.db.select().from(threadPr).where(eq(threadPr.teamId, teamId)).all()) {
+    deps.db.transaction(() => {
+      const ledgerId = `pr-wakes:${row.teamId}:${row.repo}#${row.number}`;
+      const stored = deps.db.select().from(message).where(eq(message.id, ledgerId)).get();
+      const ledger = ledgerSchema.parse(stored?.content ?? {});
+      const notice = ledger.pendingNotice;
+      if (notice === null || notice.buildId !== row.buildId) return;
+      const current = deps.db.select().from(todo).where(eq(todo.id, row.threadId)).get();
+      const currentBuild = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
+      if (
+        !current ||
+        current.latestBuildId !== row.buildId ||
+        currentBuild?.prNumber !== row.number ||
+        current.archivedAt !== null ||
+        current.phase === 'closed' ||
+        blockingWorkerQuestions(deps.db, row.buildId).length > 0 ||
+        deps.db
+          .select({ id: step.id })
+          .from(step)
+          .where(
+            and(
+              eq(step.buildId, row.buildId),
+              inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+            ),
+          )
+          .get() !== undefined
+      )
+        return;
+      deps.db
+        .update(build)
+        .set({ errorMessage: notice.content })
+        .where(eq(build.id, row.buildId))
+        .run();
+      if (current.phase === 'done' || current.phase === 'todo')
+        setTodoPhase(deps, current.id, 'queued');
+      setTodoPhase(deps, current.id, 'failed');
+      ledger.pendingNotice = null;
+      deps.db.update(message).set({ content: ledger }).where(eq(message.id, ledgerId)).run();
+    });
+  }
 }
 
 export function createPrWakes(deps: BuildDeps) {
@@ -102,7 +147,12 @@ export function createPrWakes(deps: BuildDeps) {
         ['failure', 'timed_out'].includes(r.conclusion ?? '') &&
         !runs?.some((other) => other.name === r.name && other.conclusion === 'success'),
     );
-    if (failures.length > 0 && pull.baseSha) {
+    if (
+      runs !== null &&
+      verdictOfCheckRuns(runs).state === 'red' &&
+      failures.length > 0 &&
+      pull.baseSha
+    ) {
       const base = await githubCommitCheckRuns(fetch, token, owner, repo, pull.baseSha);
       const fixable = failures.filter(
         (failure) =>
@@ -231,6 +281,7 @@ export function createPrWakes(deps: BuildDeps) {
         current.latestBuildId !== row.buildId ||
         current.archivedAt !== null ||
         current.phase === 'closed' ||
+        blockingWorkerQuestions(deps.db, row.buildId).length > 0 ||
         !currentPr?.autoFix ||
         currentPr.dismissed ||
         currentPr.number !== row.number ||
@@ -318,6 +369,12 @@ export function createPrWakes(deps: BuildDeps) {
         })
         .where(eq(threadPr.id, row.id))
         .run();
+      if (notices.length > 0) {
+        ledger.pendingNotice = {
+          buildId: row.buildId,
+          content: `PR Auto-fix needs you: #${row.number} ${notices.join(' ')}`,
+        };
+      }
       deps.db
         .insert(message)
         .values({
@@ -338,12 +395,8 @@ export function createPrWakes(deps: BuildDeps) {
           .onConflictDoNothing()
           .run();
         deps.db.update(build).set({ errorMessage: content }).where(eq(build.id, row.buildId)).run();
-        if (active.length === 0 && events.length === 0) {
-          if (current.phase === 'done' || current.phase === 'todo')
-            setTodoPhase(deps, current.id, 'queued');
-          setTodoPhase(deps, current.id, 'failed');
-        }
       }
     });
+    settlePrWakeNotices(deps, row.teamId);
   };
 }

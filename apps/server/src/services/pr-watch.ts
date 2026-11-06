@@ -12,7 +12,7 @@ import type { BuildDeps } from './builds.js';
 import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
-import { createPrWakes } from './pr-wakes.js';
+import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
 
 export const PR_WATCH_INTERVAL_MS = 60_000;
@@ -392,6 +392,7 @@ export function createPrWatch(
         for (const { id: teamId } of deps.db.select({ id: team.id }).from(team).all()) {
           try {
             tally.pruned += pruneSuperseded(teamId);
+            settlePrWakeNotices(deps, teamId);
             const token = await githubTokenOrNull(deps, teamId);
             if (token === null) continue;
             const pacing = pacingOf(rates.get(teamId), now);

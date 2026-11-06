@@ -8,6 +8,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { openDbWithHandle } from '../src/db/client.js';
 import {
   build as buildTable,
+  message,
   project as projectTable,
   routingRule,
   steerPending,
@@ -23,6 +24,8 @@ import { createPrFeedbackPoller } from '../src/services/pr-feedback.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { readWorkerQuestion } from '../src/services/worker-question-store.js';
+import { askWorkerQuestion } from '../src/services/worker-questions.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
@@ -714,4 +717,180 @@ test('scheduler cannot fall back to legacy fixes when the first PrWatch read fai
     scheduler.stop();
     vi.useRealTimers();
   }
+});
+
+test.each(['claimed', 'done'] as const)(
+  'a parked question blocks every repair kind with a %s session',
+  async (status) => {
+    const f = fixture();
+    setRoutingRulesEnabled(true);
+    f.s.db.update(todoTable).set({ phase: 'building' }).run();
+    f.s.db
+      .insert(stepTable)
+      .values({
+        id: 'parked-session',
+        buildId: f.t.buildId,
+        kind: 'session',
+        status: 'claimed',
+        createdAt: 1,
+      })
+      .run();
+    const session = f.steps()[0]!;
+    await askWorkerQuestion(
+      f.s.svc,
+      session,
+      {
+        requestId: 'parked-question',
+        questions: [
+          {
+            header: 'Choice',
+            question: 'Which approach?',
+            options: [{ label: 'A' }, { label: 'B' }],
+          },
+        ],
+      },
+      { holdMs: 0 },
+    );
+    f.s.db.update(stepTable).set({ status }).run();
+    f.s.db.update(todoTable).set({ phase: 'review' }).run();
+    const before = readWorkerQuestion(f.s.db, f.t.buildId, 'parked-question');
+    f.fail(1);
+    f.comment(1);
+    f.pull.mergeable = 'dirty';
+    await watchFor(f.s, f.mock).sweep();
+    expect(rows(f.s)[0]?.wakeRounds).toBe(0);
+    expect(f.steps()).toHaveLength(1);
+    expect(f.s.db.select().from(steerPending).get()).toBeUndefined();
+    expect(f.s.db.select().from(todoTable).get()).toMatchObject({
+      phase: 'review',
+      awaitingReply: true,
+    });
+    expect(readWorkerQuestion(f.s.db, f.t.buildId, 'parked-question')).toEqual(before);
+    expect(
+      f.s.db
+        .select()
+        .from(message)
+        .all()
+        .filter((m) => m.actor === 'github'),
+    ).toEqual([]);
+  },
+);
+
+test('staggered job failures wait for the whole run and consume one round', async () => {
+  const f = fixture();
+  f.mock.checks.set(
+    f.pull.base,
+    ['unit', 'lint'].map((name) => ({ name, status: 'completed', conclusion: 'success' })),
+  );
+  f.mock.checks.set(HEAD_A, [
+    { id: 1, name: 'unit', status: 'completed', conclusion: 'failure' },
+    { id: 2, name: 'lint', status: 'in_progress', conclusion: null },
+  ]);
+  await watchFor(f.s, f.mock).sweep();
+  expect(f.steps()).toEqual([]);
+  expect(rows(f.s)[0]?.wakeRounds).toBe(0);
+  f.mock.checks.get(HEAD_A)![1] = {
+    id: 2,
+    name: 'lint',
+    status: 'completed',
+    conclusion: 'failure',
+  };
+  await watchFor(f.s, f.mock).sweep();
+  f.settle();
+  await watchFor(f.s, f.mock).sweep();
+  expect(f.steps()).toHaveLength(1);
+  expect(rows(f.s)[0]?.wakeRounds).toBe(1);
+  expect(f.steps()[0]?.prompt).toContain('unit');
+  expect(f.steps()[0]?.prompt).toContain('lint');
+});
+
+test.each(['done', 'building', 'review', 'failed'] as const)(
+  'the tenth wake surfaces its deferred cap after settling to %s even without a GitHub read',
+  async (phase) => {
+    const f = fixture();
+    for (let id = 1; id <= 10; id += 1) {
+      f.pull.head = id.toString(16).padStart(40, '0');
+      f.fail(id, `failure ${id}`);
+      await watchFor(f.s, f.mock).sweep();
+      if (id < 10) f.settle();
+    }
+    expect(rows(f.s)[0]).toMatchObject({ wakeRounds: 10, autoFix: false });
+    expect(f.s.db.select().from(todoTable).get()?.phase).toBe('queued');
+    f.settle();
+    f.s.db.update(todoTable).set({ phase }).run();
+    f.s.db.update(buildTable).set({ errorMessage: null }).run();
+    f.mock.failing.add(`octo/demo#${f.t.prNumber}`);
+    await watchFor(f.s, f.mock).sweep();
+    const item = listNeedsYou(f.s.svc, f.s.team.id).current.find((i) => i.todo.id === f.t.todoId);
+    expect(item).toMatchObject({ reason: 'failed' });
+    expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('Total wake cap (10)');
+    await sweepFailedRetries(f.s.svc);
+    expect(f.steps()).toHaveLength(10);
+  },
+);
+
+test('a question opened during GitHub intake prevents dispatch and budget debit', async () => {
+  const f = fixture();
+  setRoutingRulesEnabled(true);
+  f.s.db
+    .insert(stepTable)
+    .values({
+      id: 'asking-session',
+      buildId: f.t.buildId,
+      kind: 'session',
+      status: 'claimed',
+      createdAt: 1,
+    })
+    .run();
+  f.fail(1);
+  const fetch = f.mock.fetch.getMockImplementation()!;
+  f.mock.fetch.mockImplementationOnce(async (input, init) => {
+    await askWorkerQuestion(
+      f.s.svc,
+      f.steps()[0]!,
+      {
+        requestId: 'arriving-question',
+        questions: [
+          {
+            header: 'Choice',
+            question: 'Which approach?',
+            options: [{ label: 'A' }, { label: 'B' }],
+          },
+        ],
+      },
+      { holdMs: 0 },
+    );
+    return fetch(input, init);
+  });
+  await watchFor(f.s, f.mock).sweep();
+  expect(rows(f.s)[0]?.wakeRounds).toBe(0);
+  expect(f.s.db.select().from(steerPending).get()).toBeUndefined();
+  expect(readWorkerQuestion(f.s.db, f.t.buildId, 'arriving-question')?.status).toBe('pending');
+});
+
+test('a per-kind cap observed during a session survives disabling Auto-fix and settling', async () => {
+  const f = fixture();
+  for (let id = 1; id <= 3; id += 1) {
+    f.fail(id);
+    await watchFor(f.s, f.mock).sweep();
+    f.settle();
+  }
+  f.s.db
+    .insert(stepTable)
+    .values({
+      id: 'ongoing-session',
+      buildId: f.t.buildId,
+      kind: 'session',
+      status: 'claimed',
+      createdAt: 1,
+    })
+    .run();
+  f.fail(4);
+  await watchFor(f.s, f.mock).sweep();
+  expect(f.s.db.select().from(todoTable).get()?.phase).not.toBe('failed');
+  f.s.db.update(threadPrTable).set({ autoFix: false }).run();
+  f.settle();
+  await watchFor(f.s, f.mock).sweep();
+  expect(listNeedsYou(f.s.svc, f.s.team.id).current.map((i) => i.todo.id)).toContain(f.t.todoId);
+  expect(f.s.db.select().from(buildTable).get()?.errorMessage).toContain('CI fix cap (3 per head)');
 });
