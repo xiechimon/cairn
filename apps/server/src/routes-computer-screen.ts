@@ -4,6 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
+import { jsonBody } from './routes-helpers.js';
 import { computerScreensOf } from './services/computer-screen.js';
 
 export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
@@ -26,11 +27,7 @@ export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
   };
   app.post('/api/teams/:teamId/computers/:computerId/screen', async (c) => {
     const teamId = checkedTeam(c);
-    const body = parseWith(
-      openComputerScreenSchema,
-      await c.req.json().catch(() => null),
-      'screen request',
-    );
+    const body = parseWith(openComputerScreenSchema, await jsonBody(c), 'screen request');
     return c.json(
       computerScreensOf(ctx).open(
         teamId,
@@ -53,7 +50,7 @@ export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
     const teamId = checkedTeam(c);
     const { leaseId } = parseWith(
       computerControlLeaseSchema.pick({ leaseId: true }).strict(),
-      await c.req.json().catch(() => null),
+      await jsonBody(c),
       'control lease',
     );
     return c.json(
@@ -64,7 +61,7 @@ export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
     const teamId = checkedTeam(c);
     const { leaseId } = parseWith(
       computerControlLeaseSchema.pick({ leaseId: true }).strict(),
-      await c.req.json().catch(() => null),
+      await jsonBody(c),
       'control lease',
     );
     computerScreensOf(ctx).releaseControl(teamId, ctx.user.id, c.req.param('computerId'), leaseId);

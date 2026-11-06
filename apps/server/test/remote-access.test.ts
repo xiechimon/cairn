@@ -695,3 +695,146 @@ describe('F-R2 revocation reaches live state', () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+describe('F-R3 a request that outlives its device cannot create state', () => {
+  const BODY_DELAY_MS = 50;
+
+  async function revokedBetweenAuthAndBody(
+    s: TestServer,
+    path: string,
+    payload: unknown,
+  ): Promise<Response> {
+    const paired = await pairDevice(s);
+    let feed: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        feed = controller;
+      },
+    });
+    const pending = Promise.resolve(
+      s.app.request(path, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${paired.token}`,
+          'content-type': 'application/json',
+        },
+        body,
+        duplex: 'half',
+      } as RequestInit),
+    );
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, BODY_DELAY_MS);
+    });
+    const revoked = await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, {
+      headers: ownerHeaders,
+    });
+    expect(revoked.status).toBe(204);
+    feed?.enqueue(new TextEncoder().encode(JSON.stringify(payload)));
+    feed?.close();
+    return pending;
+  }
+
+  test('a push subscription is not recreated after the device is revoked', async () => {
+    const s = bootServer({ authToken: OWNER, pushEndpointHosts: new Set(['push.example']) });
+    const ecdh = createECDH('prime256v1');
+    ecdh.generateKeys();
+    const res = await revokedBetweenAuthAndBody(s, `/api/teams/${s.team.id}/push/subscriptions`, {
+      endpoint: 'https://push.example/late',
+      keys: {
+        p256dh: ecdh.getPublicKey().toString('base64url'),
+        auth: randomBytes(16).toString('base64url'),
+      },
+      origin: 'https://cairn.test',
+    });
+    expect(res.status).toBe(401);
+    expect(s.db.select().from(pushSubscription).all()).toHaveLength(0);
+  });
+
+  test('a screen request of a revoked device is refused before it reaches the gateway', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const res = await revokedBetweenAuthAndBody(
+      s,
+      `/api/teams/${s.team.id}/computers/any-computer/screen`,
+      { kind: 'view' },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  test('every JSON route is covered: a project is not created after the device is revoked', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const res = await revokedBetweenAuthAndBody(s, '/api/projects', { name: 'late project' });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('F-C1 credentials and grants are owner-only', () => {
+  const CREDENTIAL_ROUTES: readonly (readonly [string, string, unknown])[] = [
+    ['POST', '/api/teams/{team}/api-keys', { name: 'k', machineAccess: true }],
+    ['DELETE', '/api/teams/{team}/api-keys/any', undefined],
+    ['POST', '/api/teams/{team}/secrets', { name: 'S', value: 'v' }],
+    ['PATCH', '/api/teams/{team}/secrets/any', { value: 'v' }],
+    ['DELETE', '/api/teams/{team}/secrets/any', undefined],
+    ['POST', '/api/teams/{team}/providers', { name: 'p' }],
+    ['PATCH', '/api/teams/{team}/providers/any', { name: 'p' }],
+    ['DELETE', '/api/teams/{team}/providers/any', undefined],
+    ['POST', '/api/teams/{team}/providers/oauth/any/authorize', {}],
+    ['POST', '/api/teams/{team}/github/oauth/authorize', {}],
+    ['DELETE', '/api/teams/{team}/github/connection', undefined],
+    ['POST', '/api/teams/{team}/claude-subscriptions', { name: 'c' }],
+    ['DELETE', '/api/teams/{team}/claude-subscriptions/any', undefined],
+    ['POST', '/api/teams/{team}/claude-subscriptions/any/verify', {}],
+    ['PUT', '/api/teams/{team}/feishu', {}],
+    ['DELETE', '/api/teams/{team}/feishu', undefined],
+    ['PATCH', '/api/machines/any', { name: 'm' }],
+    ['DELETE', '/api/machines/any', undefined],
+    ['POST', '/api/machines/any/revoke', {}],
+    ['POST', '/api/machines/any/evacuate', {}],
+    ['POST', '/api/remote/pairing', {}],
+    ['GET', '/api/remote/devices', undefined],
+    ['DELETE', '/api/remote/devices/any', undefined],
+  ];
+
+  test.each(CREDENTIAL_ROUTES)(
+    '%s %s refuses a device token with 403',
+    async (method, path, body) => {
+      const s = bootServer({ authToken: OWNER });
+      const paired = await pairDevice(s);
+      const target = path.replace('{team}', s.team.id);
+      const res = await call(s, method, target, {
+        headers: { authorization: `Bearer ${paired.token}` },
+        ...(body !== undefined ? { body } : {}),
+      });
+      expect(res.status).toBe(403);
+      const owner = await call(s, method, target, {
+        headers: ownerHeaders,
+        ...(body !== undefined ? { body } : {}),
+      });
+      expect(owner.status).not.toBe(403);
+    },
+  );
+
+  test('a device cannot mint a machine-enrolling key, so it cannot enroll a machine', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const paired = await pairDevice(s);
+    const res = await call(s, 'POST', `/api/teams/${s.team.id}/api-keys`, {
+      headers: { authorization: `Bearer ${paired.token}` },
+      body: { name: 'enroller', machineAccess: true },
+    });
+    expect(res.status).toBe(403);
+    const confirm = await call(s, 'POST', '/api/machine/enroll/confirm', {
+      headers: { authorization: `Bearer ${paired.token}` },
+      body: { enrollId: 'x' },
+    });
+    expect([401, 403]).toContain(confirm.status);
+  });
+
+  test('a device still reads and writes ordinary app state', async () => {
+    const s = bootServer({ authToken: OWNER });
+    const paired = await pairDevice(s);
+    const headers = { authorization: `Bearer ${paired.token}` };
+    expect((await call(s, 'GET', `/api/teams/${s.team.id}/api-keys`, { headers })).status).toBe(
+      200,
+    );
+    expect((await call(s, 'GET', `/api/teams/${s.team.id}/secrets`, { headers })).status).toBe(200);
+  });
+});

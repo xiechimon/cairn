@@ -10,6 +10,7 @@ import {
 import { asc, count, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { pairedDevice, pushSubscription } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
@@ -108,10 +109,15 @@ export function listPairedDevices(db: Db, teamId: string): PairedDevice[] {
 export interface DeviceStreamRegistry {
   bind(deviceId: string | null, close: () => void): () => void;
   closeAll(deviceId: string): void;
+  isRevoked(deviceId: string | null): boolean;
+  size(): number;
 }
+
+const REVOKED_MEMORY = 1000;
 
 export function createDeviceStreamRegistry(): DeviceStreamRegistry {
   const open = new Map<string, Set<() => void>>();
+  const revoked = new Set<string>();
   return {
     bind(deviceId, close) {
       if (deviceId === null) return () => {};
@@ -124,13 +130,24 @@ export function createDeviceStreamRegistry(): DeviceStreamRegistry {
       };
     },
     closeAll(deviceId) {
+      revoked.add(deviceId);
+      if (revoked.size > REVOKED_MEMORY) {
+        const oldest = revoked.values().next().value;
+        if (oldest !== undefined) revoked.delete(oldest);
+      }
       for (const close of [...(open.get(deviceId) ?? [])]) close();
       open.delete(deviceId);
     },
+    isRevoked: (deviceId) => deviceId !== null && revoked.has(deviceId),
+    size: () => [...open.values()].reduce((total, closers) => total + closers.size, 0),
   };
 }
 
 export const deviceStreams = createDeviceStreamRegistry();
+
+export function assertDeviceActive(deviceId: string | null): void {
+  if (deviceStreams.isRevoked(deviceId)) throw new HttpError(401, 'this device was revoked');
+}
 
 export function pairedDeviceExists(db: Db, id: string): boolean {
   return (

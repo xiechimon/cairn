@@ -11,6 +11,7 @@ import { parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
+import { assertDeviceActive } from './services/paired-devices.js';
 import { sendMustReachAlert } from './services/push-alerts.js';
 import { clearThreadPresence, recordThreadPresence } from './services/thread-presence.js';
 
@@ -157,6 +158,7 @@ export function registerPushRoutes(app: Hono, ctx: AppContext): void {
     ) {
       return c.json({ error: 'push endpoint already belongs to another account' }, 409);
     }
+    assertDeviceActive(pairedDeviceIdOf(c));
     const createdAt = nowMs();
     ctx.db
       .insert(pushSubscription)

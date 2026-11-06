@@ -364,6 +364,19 @@ describe('real websocket screen bridge', () => {
     await expect(connect(base + other.path, undefined, other.wsProtocols)).resolves.toBeDefined();
   });
 
+  test('a revoked device cannot open a screen, and a closed channel leaves no binding behind', () => {
+    boot();
+    deviceStreams.closeAll('device-gone');
+    expect(() =>
+      gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'view' }, 'device-gone'),
+    ).toThrow(/revoked/);
+    const before = deviceStreams.size();
+    gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'view' }, 'device-live');
+    expect(deviceStreams.size()).toBe(before + 1);
+    gateway.invalidateComputer('computer-screen');
+    expect(deviceStreams.size()).toBe(before);
+  });
+
   test('the daemon greeting is buffered until the viewer attaches', async () => {
     const requests = boot();
     const base = await listen();
