@@ -1,12 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { prepareFileAttachment } from '../src/attach-file.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const roots: string[] = [];
 function workspace() {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-attach-file-'));
+  const root = testTempDir('cairn-attach-file-');
   roots.push(root);
   const cwd = join(root, 'worktree');
   mkdirSync(cwd);

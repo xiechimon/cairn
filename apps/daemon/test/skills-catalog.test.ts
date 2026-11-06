@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DAEMON_LOG_PREFIXES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
@@ -9,9 +8,10 @@ import {
   SKILLS_CATALOG_BUDGET_BYTES,
 } from '../src/backend/skills.js';
 import { createDaemonLogger, isLogPrefix } from '../src/log.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-skills-${tag}-`));
+  return testTempDir(`cairn-skills-${tag}-`);
 }
 
 function writeSkill(
@@ -45,7 +45,7 @@ function collect(
   const logs: string[] = [];
   const catalog = buildSkillsCatalog({
     skillsDir,
-    cwd: tmpdir(),
+    cwd: testTempDir('daemon-cwd-'),
     ...(allowlist !== undefined ? { allowlist } : {}),
     ...(teamSkillsDir !== undefined ? { teamSkillsDir } : {}),
     ...(budgetBytes !== undefined ? { budgetBytes } : {}),
@@ -62,7 +62,7 @@ function collectInjected(
   const logs: string[] = [];
   const catalog = buildSkillsCatalog({
     skillsDir,
-    cwd: tmpdir(),
+    cwd: testTempDir('daemon-cwd-'),
     injectedSkills,
     ...(opts.allowlist !== undefined ? { allowlist: opts.allowlist } : {}),
     ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
@@ -599,7 +599,7 @@ describe('actually injected name set (#1186: onResolved, not the log line)', () 
     const names: { injected: string[]; omitted: string[]; unrendered: string[] }[] = [];
     const catalog = buildSkillsCatalog({
       skillsDir: root,
-      cwd: tmpdir(),
+      cwd: testTempDir('daemon-cwd-'),
       allowlist: ['keep-me', 'drop-me', 'quiet'],
       budgetBytes: fullBytes - 1,
       onResolved: (got) => names.push(got),

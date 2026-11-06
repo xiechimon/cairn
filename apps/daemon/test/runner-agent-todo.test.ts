@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -22,6 +20,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function logger(): DaemonLogger {
   const push = () => {};
@@ -166,7 +165,7 @@ function backendOf(script: StepEvent[]): AgentBackend {
 }
 
 async function run(script: StepEvent[]) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-todo-'));
+  const home = testTempDir('cairn-runner-todo-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new RecordingClient();
   await runStep(

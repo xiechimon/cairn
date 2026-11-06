@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +18,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { combineTimeoutWithRootCause, RETRY_STORM_MAX, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const RELAY_400 = '400: {"message":"Model does not support this protocol.","type":"server_error"}';
 const TRANSIENT_503 = '503: service unavailable';
@@ -218,7 +217,7 @@ async function runLifecycleCase(
   opts?: { providerId?: string; retryStormMax?: number },
 ) {
   const providerId = opts?.providerId ?? 'gw-lc';
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-lc-'));
+  const home = testTempDir('cairn-runner-lc-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

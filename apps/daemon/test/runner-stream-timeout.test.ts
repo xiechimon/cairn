@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -26,6 +24,7 @@ import {
   streamTimeoutMessage,
 } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -284,7 +283,7 @@ async function run(opts: {
   durationCapMs?: number;
   env?: Record<string, string>;
 }): Promise<MachineDoneBody> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-timeout-'));
+  const home = testTempDir('cairn-runner-timeout-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger } = captureLogger();
   const client = new FakeClient();

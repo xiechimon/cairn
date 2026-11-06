@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -19,6 +17,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -160,7 +159,7 @@ function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: 
 }
 
 async function runNoopCase(script: StepEvent[]) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-noop-'));
+  const home = testTempDir('cairn-runner-noop-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -212,7 +211,7 @@ describe('runner silent no-op gate (#698 hole 1: a zero-event round must not clo
 
 describe('pi prompt() preflight rejection surfaces (#698 hole 2: swallowed error → watchdog false culprit)', () => {
   test('failure mode 6: credential-less preset provider → error event arrives and the stream ends (true-cause wording)', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-pi-noop-'));
+    const home = testTempDir('cairn-pi-noop-');
     const saved = {
       apiKey: process.env.ANTHROPIC_API_KEY,
       authToken: process.env.ANTHROPIC_AUTH_TOKEN,

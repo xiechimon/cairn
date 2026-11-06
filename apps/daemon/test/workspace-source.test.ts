@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { normalizedRepoRef, WorkspaceManager } from '../src/workspace.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 
@@ -59,7 +59,7 @@ async function advanceTruth(): Promise<string> {
 }
 
 async function makeUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-user-')), 'repo');
+  const dir = join(testTempDir('cairn-dual-user-'), 'repo');
   await runGit(['clone', truthDir, dir]);
   return dir;
 }
@@ -76,9 +76,9 @@ function prepareInput(localPath: string | null) {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'cairn-dual-root-'));
-  truthDir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-truth-')), 'truth.git');
-  seedDir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-seed-')), 'seed');
+  root = testTempDir('cairn-dual-root-');
+  truthDir = join(testTempDir('cairn-dual-truth-'), 'truth.git');
+  seedDir = join(testTempDir('cairn-dual-seed-'), 'seed');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedTruth();
@@ -116,7 +116,7 @@ describe('dual execution-source selection (github-shape localPath acceleration s
 
   test('D2 origin mismatch → fall back (against mistaken absorption)', async () => {
     const userRepo = await makeUserRepo();
-    const other = join(mkdtempSync(join(tmpdir(), 'cairn-dual-other-')), 'truth.git');
+    const other = join(testTempDir('cairn-dual-other-'), 'truth.git');
     await runGit(['init', '--bare', other]);
     await runGit(['remote', 'set-url', 'origin', other], { cwd: userRepo });
     const prepared = await ws.prepare(prepareInput(userRepo));

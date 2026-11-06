@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +18,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const probeMock = vi.fn();
 vi.mock('../src/github-probe.js', async (importOriginal) => {
@@ -249,7 +248,7 @@ async function runOnce(opts: RunOpts): Promise<MachineDoneBody> {
   probeMock.mockReset();
   if (opts.probe instanceof Error) probeMock.mockRejectedValue(opts.probe);
   else probeMock.mockResolvedValue(opts.probe);
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-delivery-'));
+  const home = testTempDir('cairn-runner-delivery-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger } = captureLogger();
   const client = new FakeClient();

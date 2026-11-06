@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -16,6 +14,7 @@ import type { DaemonLogger } from '../src/log.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function defer<T = void>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;
@@ -105,7 +104,7 @@ function gatedWorkspace(gate: Promise<void>): WorktreeOps {
 }
 
 function stepDeps(api: FakeMachineApi, extra: { workspace?: WorktreeOps; backend?: AgentBackend }) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-reclaim-'));
+  const home = testTempDir('cairn-reclaim-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const backend = extra.backend ?? gatedBackend(Promise.resolve()).backend;
   return {

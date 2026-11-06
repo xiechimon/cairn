@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { hostname, tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { readClaudeCodeReport } from '../src/claude-code-models.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -10,7 +11,7 @@ afterEach(() => {
 });
 
 function tmpHome(settingsJson?: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-daemon-cc-'));
+  const dir = testTempDir('cairn-daemon-cc-');
   dirs.push(dir);
   if (settingsJson !== undefined) {
     mkdirSync(join(dir, '.claude'), { recursive: true });

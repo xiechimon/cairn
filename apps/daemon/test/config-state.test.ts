@@ -1,13 +1,5 @@
-import {
-  chmodSync,
-  existsSync,
-  lstatSync,
-  mkdtempSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { chmodSync, existsSync, lstatSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   BRAND,
@@ -30,9 +22,10 @@ import {
   statePaths,
   writeDaemonJson,
 } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
+  return testTempDir('cairn-cfg-');
 }
 
 function modeBits(path: string): number {
