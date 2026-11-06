@@ -449,7 +449,9 @@ export function HomeC({
       >
         {paneButtons}
         {banner != null && (
-          <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
+          <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
+            {banner}
+          </div>
         )}
         <ChiefScrollProvider>
           <ChiefConversation

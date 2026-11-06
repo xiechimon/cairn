@@ -1838,4 +1838,8 @@ export const EN: Record<string, string> = {
     'The first PR merged on day one. You can post about it in GitHub Discussions',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
+  '{count} 处 Claude 登录需要处理': '{count} Claude logins need attention',
+  '都已过期。': 'All have expired.',
+  '{expired} 处已过期，其余快到期。': '{expired} expired, the rest expire soon.',
+  查看: 'View',
 };
