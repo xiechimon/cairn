@@ -328,7 +328,6 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
       .set({
         phase: 'review',
         latestBuildId: buildId,
-        assignment: { plan: null, build: { agentId: AGENT_ID } },
         sourceRef: 'github:xiechimon/cairn#1625',
       })
       .where(eq(todoTable.id, world.todoId))

@@ -137,7 +137,6 @@ function mockChiefLiveApi(
       return route.fulfill(json({ messages }));
     }
 
-    if (p === '/api/teams/t1/agents/agent-1') return route.fulfill(json(AGENT));
     if (p === '/api/todos' || p === '/api/projects') return route.fulfill(json([]));
     if (
       p === '/api/teams/t1/members' ||
@@ -206,7 +205,7 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(mention).toHaveCount(1);
     await expect(mention).toHaveText('r5-scribe');
 
-    await expect(mention).toHaveAttribute('href', '/app/resources/agents/a1');
+    await expect(mention).not.toHaveAttribute('href', /.*/);
 
     await expect(stream.locator('.chat-md-item--ordered').first()).toContainText('第一步：读取配置');
     const nested = stream.locator('.chat-md-item--bullet[data-depth="1"]');
@@ -533,7 +532,7 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await expect(final.locator('strong', { hasText: '全部通过' })).toHaveCount(1);
   });
 
-  test('F-R15: robot row identity chip (live face, #741) — avatar+name anchor, click navigates the whole chain into the Agent settings page', async ({
+  test('F-R15: robot row identity chip (live face, #741) — avatar+name anchor, click navigates into the routing settings page', async ({
     page,
   }) => {
     await stubEventSource(page);
@@ -548,13 +547,10 @@ test.describe('chief drawer streaming face (live mock, #651)', () => {
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('r5-scribe');
 
-    await expect(chip).toHaveAttribute('href', /^\/app\/resources\/agents\/agent-1/);
+    await expect(chip).toHaveAttribute('href', /^\/app\/resources\/routing-settings/);
 
     await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/resources/agents/agent-1');
-    await expect(page.locator('.agent-detail')).toBeVisible();
-    await expect(page.locator('.agent-missing')).toHaveCount(0);
-    await expect(page.locator('.agent-detail')).toContainText('r5-scribe');
+    await page.waitForURL((u) => u.pathname === '/app/settings/work-routing');
   });
 });
 

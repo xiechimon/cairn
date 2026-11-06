@@ -9,7 +9,14 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { AGENT_ID, api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  type RealServer,
+  seedWorld,
+  startLegacyBuild,
+  waitFor,
+} from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
@@ -96,18 +103,13 @@ afterAll(async () => {
 });
 
 test('plan card converges via the team-stream phase event when the conv stream is dead (#666)', async () => {
-  const { projectId, todoId } = await seedWorld(
+  const { todoId } = await seedWorld(
     server.url,
     server.teamId,
     { title: '#666 收敛探针', spec: '在 plan.md 落一版方案。' },
     { repoKind: 'hosted', projectName: 'c666-convergence' },
   );
-  const started = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
-    todoIds: [todoId],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    withPlan: true,
-  });
-  expect(started.status).toBe(201);
+  startLegacyBuild(server, todoId, { withPlan: true });
 
   let blocked = 0;
   await page.route('**/api/conversations/*/stream', (route) => {

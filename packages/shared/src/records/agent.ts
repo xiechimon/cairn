@@ -16,12 +16,6 @@ export type PersonaRole = (typeof PERSONA_ROLES)[number];
 
 export const personaRoleSchema = z.enum(PERSONA_ROLES);
 
-export const REVIEW_FANOUT_ROLES: readonly PersonaRole[] = [
-  'code_reviewer',
-  'security_auditor',
-  'test_engineer',
-];
-
 export const agentStatusSchema = z.enum(['active']);
 
 export const AGENT_TOOL_SWITCHES = [
@@ -41,8 +35,6 @@ export const AGENT_TOOL_SKILL_UPDATE: AgentToolSwitch = '更新技能';
 export const AGENT_TOOL_TAG: AgentToolSwitch = '创建标签';
 
 export const AGENT_TOOL_DEFAULTS: readonly AgentToolSwitch[] = [AGENT_TOOL_PUSH];
-
-export const AGENT_DESC_MAX_LENGTH = 2000;
 
 export const AGENT_TOOL_COPY: Record<(typeof AGENT_TOOL_SWITCHES)[number], string> = {
   合并分支: '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。',
@@ -94,43 +86,3 @@ export const agentRecordSchema = z.object({
   fallbackModels: fallbackModelsSchema.nullish(),
 });
 export type AgentRecord = z.infer<typeof agentRecordSchema>;
-
-export const createAgentBodySchema = z.object({
-  displayName: z.string().min(1),
-  description: z
-    .string()
-    .max(AGENT_DESC_MAX_LENGTH, `职责过长（最多 ${AGENT_DESC_MAX_LENGTH} 字）`)
-    .nullish(),
-  provider: z.string().nullish(),
-  modelId: z.string().nullish(),
-  thinkingLevel: z.string().nullish(),
-  persona: z.enum(PERSONA_ROLES).nullish(),
-  tools: z.array(z.string()).optional(),
-  secrets: z.array(z.string()).optional(),
-  defaultSkill: z.string().nullish(),
-  skillsAllowlist: z.array(z.string()).nullish(),
-  mcpServers: z.array(z.string()).optional(),
-  maxConcurrentTasks: z.number().int().min(1).max(50).nullish(),
-  machineId: recordId,
-  requiredCapabilities: requiredCapabilitiesSchema.nullish(),
-  fallbackModels: fallbackModelsSchema.nullish(),
-});
-export type CreateAgentBody = z.infer<typeof createAgentBodySchema>;
-
-export const agentTaskSchema = z.object({
-  kind: z.literal('build'),
-  state: z.literal('waiting').nullable(),
-  buildId: recordId,
-  todo: z.object({
-    id: recordId,
-    seqNum: z.number().int(),
-    title: z.string(),
-    phase: phaseSchema,
-  }),
-});
-export type AgentTask = z.infer<typeof agentTaskSchema>;
-
-export const patchAgentBodySchema = createAgentBodySchema.partial().extend({
-  displayName: z.string().min(1).optional(),
-});
-export type PatchAgentBody = z.infer<typeof patchAgentBodySchema>;

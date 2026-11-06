@@ -1,15 +1,14 @@
 import {
+  buildVerifyStepPrompt,
   claimedStepSchema,
   GATE_LIMITS,
   parseReviewPromptMeta,
   parseVerifyPromptMeta,
-  REVIEW_FANOUT_ROLES,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   gateVerdict,
   project as projectTable,
@@ -21,12 +20,13 @@ import type { FetchLike } from '../src/lib/github.js';
 import { flushVerdictDigests } from '../src/services/builds.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
-import { ensurePersonasSeeded } from '../src/services/personas.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
 
@@ -37,8 +37,6 @@ const OTHER = 'ef'.repeat(20);
 const BLOB = '99'.repeat(20);
 const PR = 7;
 const TOKEN = 'ghs_test_token';
-const BUILDER_ID = 'agent-gate-builder';
-const REVIEWER_ID = 'agent-gate-reviewer';
 
 const DELIVERY_FILE = {
   filename: 'apps/server/src/a.ts',
@@ -190,34 +188,14 @@ async function setup(opts: { githubFetch?: FetchLike } = {}) {
       updatedAt: Date.now(),
     })
     .run();
-  ensurePersonasSeeded(s.db, s.team.id);
-  s.db
-    .insert(agentTable)
-    .values({
-      id: BUILDER_ID,
-      teamId: s.team.id,
-      displayName: 'gate-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: REVIEWER_ID,
-      teamId: s.team.id,
-      displayName: 'gate-reviewer',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
+  seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'gate-mbp', cliVersion: '0.1.0' },
   });
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
-  bindAllAgents(s);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: 'verdict binding probe', spec: 'S5a' },
@@ -229,9 +207,10 @@ async function setup(opts: { githubFetch?: FetchLike } = {}) {
     machineToken,
     todoId,
     projectId,
-    async startBuild(assignment: Record<string, unknown>, withPlan = false) {
+    async startBuild(withPlan = false) {
+      if (withPlan) return startLegacyBuild(s, todoId, { withPlan: true });
       const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: { todoIds: [todoId], assignment, withPlan },
+        body: { todoIds: [todoId] },
       });
       expect(res.status).toBe(201);
       return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
@@ -276,17 +255,17 @@ const unreachableGithub: FetchLike = async () => {
   throw new Error('getaddrinfo ENOTFOUND api.github.com');
 };
 
-async function reachReviewGate(w: World, assignment: Record<string, unknown>): Promise<string> {
-  const buildId = await w.startBuild(assignment, false);
+async function reachReviewGate(w: World): Promise<string> {
+  const buildId = await w.startBuild(false);
   const claimed = await w.claim();
-  expect(claimed.kind).toBe('build');
+  expect(claimed.kind).toBe('session');
   await w.done(claimed.stepId, { status: 'success', hasChanges: true, commit: HEAD });
   return buildId;
 }
 
 async function claimReview(w: World, buildId: string): Promise<string> {
   const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-    body: { action: 'review', agentId: REVIEWER_ID },
+    body: { action: 'review' },
   });
   expect(reviewRes.status).toBe(202);
   const claimed = await w.claim();
@@ -295,30 +274,36 @@ async function claimReview(w: World, buildId: string): Promise<string> {
 }
 
 async function reachVerify(w: World): Promise<string> {
-  const verifierId =
-    w.s.db
-      .select({ id: agentTable.id })
-      .from(agentTable)
-      .where(eq(agentTable.persona, 'verifier'))
-      .get()?.id ?? '';
-  expect(verifierId).not.toBe('');
-  return reachReviewGate(w, {
-    plan: { agentId: BUILDER_ID },
-    build: { agentId: BUILDER_ID },
-    verify: { agentId: verifierId },
-  });
+  const buildId = await reachReviewGate(w);
+  const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
+  const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get()!;
+  w.s.db
+    .insert(stepTable)
+    .values({
+      id: `step-verify-${buildId}`,
+      buildId,
+      kind: 'verify',
+      status: 'pending',
+      prompt: buildVerifyStepPrompt({
+        ticketRef: String(todoRow.seqNum),
+        taskText: todoRow.title,
+        planText: '',
+        pr: null,
+        expectedHeadSha: HEAD,
+      }),
+      createdAt: Date.now() + 10,
+    })
+    .run();
+  return buildId;
 }
 
 describe('#1404 S5a verdict binding', () => {
   test('the review gate dispatch meta carries expectedHeadSha; extraction failure lands as extraction_failed and reads back', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review', agentId: REVIEWER_ID },
+      body: { action: 'review' },
     });
     expect(reviewRes.status).toBe(202);
     const reviewStep = w.stepsOf(buildId).find((r) => r.kind === 'review');
@@ -346,18 +331,7 @@ describe('#1404 S5a verdict binding', () => {
   test('verify extraction failure lands as extraction_failed, expectedHeadSha reads back from the database', async () => {
     world = await setup();
     const w = world;
-    const verifierId =
-      w.s.db
-        .select({ id: agentTable.id })
-        .from(agentTable)
-        .where(eq(agentTable.persona, 'verifier'))
-        .get()?.id ?? '';
-    expect(verifierId).not.toBe('');
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-      verify: { agentId: verifierId },
-    });
+    const buildId = await reachVerify(w);
     const verifyStep = w.stepsOf(buildId).find((r) => r.kind === 'verify');
     expect(verifyStep).toBeDefined();
     const meta = parseVerifyPromptMeta(verifyStep?.prompt ?? null);
@@ -383,12 +357,9 @@ describe('#1404 S5a verdict binding', () => {
   test('an extracted passing verdict lands as pass, with expectedHeadSha', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review', agentId: REVIEWER_ID },
+      body: { action: 'review' },
     });
     const claimed = await w.claim();
     await w.done(claimed.stepId, {
@@ -405,10 +376,7 @@ describe('#1404 S5a verdict binding', () => {
   test('no gate_verdict row when the confirm gate has no code head', async () => {
     world = await setup();
     const w = world;
-    const buildId = await w.startBuild(
-      { plan: { agentId: BUILDER_ID }, build: { agentId: BUILDER_ID } },
-      true,
-    );
+    const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
     expect(planClaimed.kind).toBe('plan');
     const urlsRes = await call(w.s.app, 'POST', `/api/machine/upload-urls/${planClaimed.stepId}`, {
@@ -425,7 +393,7 @@ describe('#1404 S5a verdict binding', () => {
     expect(put.status).toBe(200);
     await w.done(planClaimed.stepId, { status: 'success' });
     const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review', agentId: REVIEWER_ID },
+      body: { action: 'review' },
     });
     expect(reviewRes.status).toBe(202);
     const reviewStep = w.stepsOf(buildId).find((r) => r.kind === 'review');
@@ -441,11 +409,8 @@ describe('#1404 S5a verdict binding', () => {
   test('when the latest checkpoint is not a lowercase SHA, dispatch still binds the previous delivery SHA', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
-    const buildStep = w.stepsOf(buildId).find((r) => r.kind === 'build' && r.status === 'done');
+    const buildId = await reachReviewGate(w);
+    const buildStep = w.stepsOf(buildId).find((r) => r.kind === 'session' && r.status === 'done');
     expect(buildStep?.checkpointCommit).toBe(HEAD);
     expect(buildStep?.finishedAt).toEqual(expect.any(Number));
     const later = (buildStep?.finishedAt ?? 0) + 1_000;
@@ -454,7 +419,7 @@ describe('#1404 S5a verdict binding', () => {
       .values({
         id: 'step-upper-head',
         buildId,
-        kind: 'build',
+        kind: 'session',
         status: 'done',
         checkpointCommit: HEAD.toUpperCase(),
         createdAt: later,
@@ -471,10 +436,7 @@ describe('#1404 S5a verdict binding', () => {
   test('a review blocking verdict lands as block; with no reported commit it still binds expectedHeadSha', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, {
       status: 'success',
@@ -492,10 +454,7 @@ describe('#1404 S5a verdict binding', () => {
   test('a failed review step lands through the failure funnel as step_failed, head from expectedHeadSha', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, { status: 'failed', errorMessage: 'review process exited' });
     const row = w.verdictOf(stepId);
@@ -536,10 +495,7 @@ describe('#1404 S5a verdict binding', () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
@@ -641,10 +597,7 @@ describe('#1404 S5a verdict binding', () => {
   test('when gateHeadSha is another SHA, record it; expected is not substituted', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, {
       status: 'success',
@@ -659,10 +612,7 @@ describe('#1404 S5a verdict binding', () => {
   test('a gateHeadSha the gate does not recognise is ignored; review still binds expectedHeadSha', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, {
       status: 'success',
@@ -679,10 +629,7 @@ describe('#1404 S5a verdict binding', () => {
     };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, {
@@ -696,37 +643,10 @@ describe('#1404 S5a verdict binding', () => {
     expect(row?.patchDigest).toBeNull();
   });
 
-  test('the three-perspective fan-out writes one verdict each, perspective being each role', async () => {
-    world = await setup();
-    const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
-    const reviewRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      body: { action: 'review' },
-    });
-    expect(reviewRes.status).toBe(202);
-    const stepIds: string[] = [];
-    for (const _ of REVIEW_FANOUT_ROLES) {
-      const claimed = await w.claim();
-      expect(claimed.kind).toBe('review');
-      stepIds.push(claimed.stepId);
-    }
-    for (const stepId of stepIds) {
-      await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
-    }
-    const perspectives = stepIds.map((id) => w.verdictOf(id)?.perspective).sort();
-    expect(perspectives).toEqual([...REVIEW_FANOUT_ROLES].sort());
-  });
-
   test('finishing again after the verdict row exists does not throw; the first-written row stays', async () => {
     world = await setup();
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     const stepId = await claimReview(w, buildId);
     w.s.db
       .insert(gateVerdict)
@@ -763,10 +683,7 @@ describe('#1404 S5a verdict binding', () => {
       },
     });
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
     const started = Date.now();
@@ -784,10 +701,7 @@ describe('#1404 S5a verdict binding', () => {
   test('the digest stays unbound when GitHub is unreachable', async () => {
     world = await setup({ githubFetch: unreachableGithub });
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, { status: 'success', findings: PASS_FINDINGS });
@@ -867,10 +781,7 @@ describe('#1404 S5a verdict binding', () => {
     const ranges: Record<string, unknown> = { [`${BASE}...${HEAD}`]: deliveryCompare() };
     world = await setup({ githubFetch: scriptedGithub(ranges) });
     const w = world;
-    const buildId = await reachReviewGate(w, {
-      plan: { agentId: BUILDER_ID },
-      build: { agentId: BUILDER_ID },
-    });
+    const buildId = await reachReviewGate(w);
     attachGithubRepo(w, buildId);
     const stepId = await claimReview(w, buildId);
     await w.done(stepId, {

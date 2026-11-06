@@ -110,7 +110,6 @@ describe('translate plural form', () => {
 
 describe('English count rendering', () => {
   it.each([0, 1, 2])('renders real dictionary counts for %s', (n) => {
-    expect(translate('en', EN, '{n} 个成员', { n })).toBe(`${n} ${n === 1 ? 'member' : 'members'}`);
     expect(translate('en', EN, '{n} 次运行', { n })).toBe(`${n} ${n === 1 ? 'run' : 'runs'}`);
   });
 
@@ -130,6 +129,6 @@ describe('English count rendering', () => {
     expect(translate('en', dict, 'count', { a: 1 })).toBe('1 member, {b## task|# tasks}');
     expect(translate('en', dict, 'count')).toBe(dict.count);
     expect(translate('en', dict, '{n} missing', { n: 'one' })).toBe('one missing');
-    expect(translate('zh', EN, '{n} 个成员', { n: 1 })).toBe('1 个成员');
+    expect(translate('zh', EN, '{n} 次运行', { n: 1 })).toBe('1 次运行');
   });
 });

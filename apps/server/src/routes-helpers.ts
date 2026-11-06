@@ -1,8 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import {
-  type AgentRecord,
   apiKeyRecordSchema,
-  assignmentSlotSchema,
   BRAND,
   githubIssueStateSchema,
   type MemoryRecord,
@@ -10,10 +8,10 @@ import {
   routeOverrideSchema,
   type TagRecord,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { agent, type agentMemory, apiKey, project, type tag } from './db/schema.js';
+import { type agentMemory, apiKey, project, type tag } from './db/schema.js';
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
@@ -56,12 +54,7 @@ export const patchTodoBodySchema = z.object({
   tagIds: z.array(z.string()).optional(),
   orderIndex: z.number().optional(),
   projectId: z.string().min(1).optional(),
-  assignment: z
-    .object({
-      plan: assignmentSlotSchema.optional(),
-      build: assignmentSlotSchema.optional(),
-    })
-    .optional(),
+  assignment: z.unknown().optional(),
   routeOverride: routeOverrideSchema.nullable().optional(),
 });
 
@@ -72,39 +65,6 @@ export const patchSecretBodySchema = z.object({
 });
 
 export const createApiKeyBodySchema = apiKeyRecordSchema.extend({ name: z.string().nullish() });
-
-export function requireAgentRow(ctx: AppContext, teamId: string, agentId: string) {
-  const row = ctx.db
-    .select()
-    .from(agent)
-    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId)))
-    .get();
-  if (!row) throw notFound(`agent ${agentId}`);
-  return row;
-}
-
-export function agentRecordOf(row: typeof agent.$inferSelect): AgentRecord {
-  return {
-    id: row.id,
-    displayName: row.displayName,
-    description: row.description,
-    status: 'active',
-    avatarUrl: row.avatarUrl,
-    provider: row.provider,
-    modelId: row.modelId,
-    thinkingLevel: row.thinkingLevel,
-    tools: row.tools,
-    secrets: row.secrets,
-    defaultSkill: row.defaultSkill,
-    skillsAllowlist: row.skillsAllowlist,
-    mcpServers: row.mcpServers,
-    maxConcurrentTasks: row.maxConcurrentTasks,
-    machineId: row.machineId,
-    persona: row.persona,
-    requiredCapabilities: row.requiredCapabilities,
-    fallbackModels: row.fallbackModels,
-  };
-}
 
 export function toMemoryRecord(row: typeof agentMemory.$inferSelect): MemoryRecord {
   return {
@@ -153,7 +113,6 @@ export function verifyGitBasicAuth(ctx: AppContext, header: string): string | un
 
 export function svcOf(ctx: AppContext) {
   return {
-    intakeAgentAllowlist: ctx.intakeAgentAllowlist,
     db: ctx.db,
     hub: ctx.hub,
     machineHub: ctx.machineHub,

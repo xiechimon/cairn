@@ -1,6 +1,5 @@
 import type {
   ActiveRun,
-  Assignment,
   AutonomyGateReason,
   AutonomyKind,
   AutonomySettings,
@@ -23,7 +22,6 @@ import type {
   ModelRef,
   NamedPromptOverrides,
   NotificationType,
-  PersonaRole,
   Phase,
   ProjectColor,
   ProjectIcon,
@@ -125,7 +123,6 @@ export const todo = sqliteTable(
     snoozeMode: text('snoozeMode').$type<SnoozeMode>(),
     seqNum: integer('seqNum').notNull(),
     orderIndex: real('orderIndex').notNull().default(0),
-    assignment: json<Assignment | null>('assignment'),
     routeOverride: json<RouteOverride | null>('routeOverride'),
     latestBuildId: text('latestBuildId'),
     lastRunAt: epochMs('lastRunAt'),
@@ -479,38 +476,6 @@ export const notification = sqliteTable(
   (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
 );
 
-export const agent = sqliteTable(
-  'agent',
-  {
-    id: text('id').primaryKey(),
-    teamId: text('teamId')
-      .notNull()
-      .references(() => team.id),
-    displayName: text('displayName').notNull(),
-    description: text('description'),
-    status: text('status').notNull().default('active'),
-    avatarUrl: text('avatarUrl'),
-    provider: text('provider'),
-    modelId: text('modelId'),
-    thinkingLevel: text('thinkingLevel'),
-    persona: text('persona').$type<PersonaRole | null>(),
-    machineId: text('machineId').references(() => machine.id),
-    tools: json<string[]>('tools').notNull().default(sql`'[]'`),
-    secrets: json<string[]>('secrets').notNull().default(sql`'[]'`),
-    defaultSkill: text('defaultSkill'),
-    skillsAllowlist: json<string[]>('skillsAllowlist'),
-    mcpServers: json<string[]>('mcpServers').notNull().default(sql`'[]'`),
-    maxConcurrentTasks: integer('maxConcurrentTasks'),
-    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
-    fallbackModels: json<ModelRef[] | null>('fallbackModels'),
-  },
-  (t) => [
-    uniqueIndex('agent_team_persona_unique')
-      .on(t.teamId, t.persona)
-      .where(sql`${t.persona} is not null`),
-  ],
-);
-
 export const routingRule = sqliteTable(
   'routing_rule',
   {
@@ -530,7 +495,6 @@ export const routingRule = sqliteTable(
     skillsAllowlist: json<string[] | null>('skillsAllowlist'),
     defaultSkill: text('defaultSkill'),
     secrets: json<string[] | null>('secrets'),
-    adoptedAgentIds: json<string[] | null>('adoptedAgentIds'),
     seededFromAgentId: text('seededFromAgentId'),
     createdAt: epochMs('createdAt').notNull(),
     updatedAt: epochMs('updatedAt').notNull(),
@@ -841,7 +805,6 @@ export const chief = sqliteTable('chief', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
-  agentId: text('agentId'),
   charter: text('charter').notNull().default(''),
   watches: json<ChiefWatch[]>('watches').notNull().default(sql`'[]'`),
   wakes: json<Record<string, unknown>[]>('wakes').notNull().default(sql`'[]'`),

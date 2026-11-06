@@ -12,10 +12,10 @@ import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import { agent, team, user } from './db/schema.js';
+import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { parseWith } from './lib/errors.js';
-import { agentRecordOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
+import { jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection } from './services/events.js';
@@ -29,10 +29,10 @@ import {
 } from './services/notifications.js';
 import {
   listRoutingSettings,
-  seedRoutingSettings,
   upsertRoutingRule,
   upsertWorkPolicy,
 } from './services/routing-rules.js';
+import { filterKnownSkillIds } from './services/skills.js';
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
@@ -82,12 +82,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(listRoutingSettings(ctx.db, id));
   });
 
-  app.post('/api/teams/:id/routing-settings/seed', (c) => {
-    const id = c.req.param('id');
-    requireTeam(ctx, id);
-    return c.json(seedRoutingSettings(ctx.db, id));
-  });
-
   app.patch('/api/teams/:id/routing-rules/:use', async (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
@@ -101,7 +95,14 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, id);
     const use = parseWith(policyUseSchema, c.req.param('use'), 'use');
     const body = parseWith(patchWorkPolicyBodySchema, await jsonBody(c), 'body');
-    return c.json(upsertWorkPolicy(ctx.db, id, use, body));
+    const known: typeof body = { ...body };
+    if (body.skillsAllowlist != null) {
+      known.skillsAllowlist = filterKnownSkillIds(ctx.skillsDir, body.skillsAllowlist);
+    }
+    if (body.defaultSkill != null) {
+      known.defaultSkill = filterKnownSkillIds(ctx.skillsDir, [body.defaultSkill])[0] ?? null;
+    }
+    return c.json(upsertWorkPolicy(ctx.db, id, use, known));
   });
 
   app.patch('/api/teams/:id', async (c) => {
@@ -153,15 +154,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
         actor: ctx.user,
       },
     ];
-    for (const row of ctx.db.select().from(agent).where(eq(agent.teamId, id)).all()) {
-      rows.push({
-        id: `member-${row.id}`,
-        teamId: id,
-        actorId: row.id,
-        memberType: 'agent',
-        actor: agentRecordOf(row),
-      });
-    }
     return c.json(rows);
   });
 

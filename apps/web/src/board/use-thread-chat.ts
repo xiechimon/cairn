@@ -47,7 +47,6 @@ export interface ThreadChat {
   buildId: string | null;
   buildLegDone: boolean;
   infoOutput: boolean;
-  buildAgentId: string | null;
   planDoc: DocBlock[] | undefined;
   planVersions: PlanVersion[] | undefined;
   changes: ThreadChanges;
@@ -310,7 +309,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     transcript,
     buildId,
     infoOutput: wire?.output === 'info',
-    buildAgentId: wire?.assignment?.build?.agentId ?? null,
     planDoc: live
       ? latestPlan !== undefined
         ? mapPlanDoc(latestPlan.content)

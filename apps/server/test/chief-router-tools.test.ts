@@ -6,9 +6,8 @@ import {
   CHIEF_TOOLS_REMOVED_UNDER_D60,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
-  agent,
   build,
   chiefMessage,
   message,
@@ -19,13 +18,12 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { buildChiefSystemPrompt, chiefToolDefHashes } from '../src/services/chief.js';
-import { resolveStepCredentials } from '../src/services/credentials.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { releaseResearchBeforePlanHolds } from '../src/services/research-before-plan.js';
-import { chiefRemoteTools, setRoutingRulesEnabled } from '../src/services/routing-rules.js';
-import { createSecret } from '../src/services/secrets.js';
+import { chiefRemoteTools } from '../src/services/routing-rules.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
-import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
 
@@ -75,8 +73,8 @@ function expectRejected(promise: Promise<unknown>, status: number, message: RegE
 }
 
 describe('router tool vocabulary', () => {
-  test('the base vocabulary is untouched and the router tools are a separate five', () => {
-    expect(CHIEF_REMOTE_TOOLS).toHaveLength(55);
+  test('the router tools are a separate five from the base vocabulary', () => {
+    expect(CHIEF_REMOTE_TOOLS).toHaveLength(46);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) {
       expect(CHIEF_REMOTE_TOOLS.map((t) => t.name)).not.toContain(name);
@@ -89,61 +87,21 @@ describe('router tool vocabulary', () => {
     }
   });
 
-  test('every tool the router replaces still exists in the base vocabulary', () => {
+  test('no tool removed under D60 is still advertised', () => {
     const base = CHIEF_REMOTE_TOOLS.map((t) => t.name);
-    for (const name of Object.keys(CHIEF_TOOLS_REMOVED_UNDER_D60)) expect(base).toContain(name);
+    for (const name of Object.keys(CHIEF_TOOLS_REMOVED_UNDER_D60)) expect(base).not.toContain(name);
   });
 
-  test('flag off: the advertised tools and their hashes are exactly the base vocabulary', () => {
-    expect(chiefRemoteTools()).toBe(CHIEF_REMOTE_TOOLS);
-    expect(Object.keys(chiefToolDefHashes())).toHaveLength(55);
-  });
-
-  test('flag on: the router tools are advertised and hashed after the base vocabulary', () => {
-    setRoutingRulesEnabled(true);
-    try {
-      expect(chiefRemoteTools().map((t) => t.name)).toEqual([
-        ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
-        ...CHIEF_ROUTER_TOOL_NAMES,
-      ]);
-      expect(Object.keys(chiefToolDefHashes())).toHaveLength(60);
-    } finally {
-      setRoutingRulesEnabled(false);
-    }
+  test('the router tools are advertised and hashed after the base vocabulary', () => {
+    expect(chiefRemoteTools().map((t) => t.name)).toEqual([
+      ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
+      ...CHIEF_ROUTER_TOOL_NAMES,
+    ]);
+    expect(Object.keys(chiefToolDefHashes())).toHaveLength(51);
   });
 });
 
-describe('flag off', () => {
-  test.each(CHIEF_ROUTER_TOOL_NAMES)('%s is refused and changes nothing', async (name) => {
-    const id = seedTodo();
-    await expectRejected(relay(name, { todoId: id, content: 'hi' }), 409, /routing rules are off/);
-    expect(H.s.db.select().from(build).all()).toHaveLength(0);
-  });
-
-  test('run_builds still dispatches an assigned build', async () => {
-    const id = seedTodo();
-    const out = (await relay('run_builds', {
-      todoIds: [id],
-      assignment: { build: { agentId: AGENT_ID } },
-      withPlan: false,
-    })) as { builds: { id: string }[] };
-    expect(out.builds).toHaveLength(1);
-  });
-
-  test('the system prompt keeps the roster and the plan-first rules', () => {
-    const text = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
-    expect(text).toContain('agents:');
-    expect(text).toContain('派发判定');
-    expect(text).toContain('run_builds');
-    expect(text).not.toContain('open_thread');
-    expect(text).not.toContain('needs-you:');
-  });
-});
-
-describe('flag on', () => {
-  beforeEach(() => setRoutingRulesEnabled(true));
-  afterEach(() => setRoutingRulesEnabled(false));
-
+describe('router tools', () => {
   describe('removed tools', () => {
     test.each(Object.keys(CHIEF_TOOLS_REMOVED_UNDER_D60))(
       '%s says it was removed under D60 and does nothing',
@@ -166,10 +124,16 @@ describe('flag on', () => {
           new RegExp(`${name} was removed under D60`),
         );
         expect(H.s.db.select().from(build).all()).toHaveLength(0);
-        expect(H.s.db.select().from(agent).all()).toHaveLength(2);
         expect(H.s.db.select().from(todo).all()).toHaveLength(1);
       },
     );
+
+    test('closing missing tasks retains skipped results', async () => {
+      expect(await relay('close_todos', { todoIds: ['missing-task'] })).toEqual({
+        transitioned: [],
+        skipped: ['missing-task'],
+      });
+    });
 
     test('the other base tools keep working', async () => {
       const created = (await relay('create_todo', {
@@ -199,73 +163,14 @@ describe('flag on', () => {
       const row = H.s.db.select().from(todo).where(eq(todo.id, id)).get()!;
       expect(row.phase).toBe('queued');
       expect(row.latestBuildId).toBe(out.buildId);
-      expect(row.assignment).toEqual({ plan: null, build: null });
       const buildRow = H.s.db.select().from(build).where(eq(build.id, out.buildId)).get()!;
       expect(buildRow).toMatchObject({ withPlan: false, triggerSource: 'chief' });
       const chiefRow = H.s.db.query.chief.findFirst().sync();
       expect(chiefRow?.watches).toEqual([]);
     });
 
-    test('keeps the intake-label trust marker and withholds secrets from the opened thread', async () => {
-      const id = seedTodo({
-        assignment: {
-          source: 'intake-label',
-          plan: { agentId: AGENT2_ID },
-          build: { agentId: AGENT2_ID },
-        },
-      });
-      const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
-      const row = H.s.db.select().from(todo).where(eq(todo.id, id)).get()!;
-      expect(row.assignment).toEqual({
-        source: 'intake-label',
-        plan: { agentId: AGENT2_ID },
-        build: { agentId: AGENT2_ID },
-      });
-      const secret = createSecret(
-        { db: H.s.db, box: H.s.secretBox },
-        { teamId: H.teamId, name: 'LATE_SECRET', description: null, value: 'late-secret-value' },
-      );
-      H.s.db
-        .update(agent)
-        .set({ secrets: [secret.id] })
-        .where(eq(agent.id, AGENT2_ID))
-        .run();
-      const session = H.s.db.select().from(step).where(eq(step.buildId, out.buildId)).get()!;
-      expect(session.kind).toBe('session');
-      expect(
-        resolveStepCredentials({ db: H.s.db, box: H.s.secretBox }, session.id).secrets,
-      ).toEqual({});
-    });
-
-    test('a todo without the intake marker still starts with an empty assignment', async () => {
-      const id = seedTodo({ assignment: { plan: { agentId: AGENT2_ID }, build: null } });
-      await relay('open_thread', { todoId: id });
-      expect(H.s.db.select().from(todo).where(eq(todo.id, id)).get()!.assignment).toEqual({
-        plan: null,
-        build: null,
-      });
-    });
-
     test('a faster task opens research and holds the session until that research finishes', async () => {
-      H.s.db
-        .insert(agent)
-        .values({
-          id: 'agent-claude',
-          teamId: H.teamId,
-          displayName: 'Claude',
-          description: 'research',
-          status: 'active',
-          avatarUrl: null,
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5-5',
-          thinkingLevel: null,
-          tools: [],
-          secrets: [],
-          defaultSkill: null,
-          skillsAllowlist: null,
-          mcpServers: [],
-        })
-        .run();
+      seedSessionRoute(H.s);
       const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
       const out = (await relay('open_thread', { todoId: id })) as { buildId: string };
       const research = H.s.db
@@ -303,25 +208,7 @@ describe('flag on', () => {
     });
 
     test('a delivered tier-2 report in review releases the hold', async () => {
-      H.s.db
-        .insert(agent)
-        .values({
-          id: 'agent-claude',
-          teamId: H.teamId,
-          displayName: 'Claude',
-          description: 'research',
-          status: 'active',
-          avatarUrl: null,
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5-5',
-          thinkingLevel: null,
-          tools: [],
-          secrets: [],
-          defaultSkill: null,
-          skillsAllowlist: null,
-          mcpServers: [],
-        })
-        .run();
+      seedSessionRoute(H.s);
       const id = seedTodo({
         title: 'make the export faster',
         spec: `The board export is slow. ${'detail '.repeat(800)}`,
@@ -356,25 +243,7 @@ describe('flag on', () => {
     });
 
     test('resuming a stopped faster thread holds the replacement session', async () => {
-      H.s.db
-        .insert(agent)
-        .values({
-          id: 'agent-claude',
-          teamId: H.teamId,
-          displayName: 'Claude',
-          description: 'research',
-          status: 'active',
-          avatarUrl: null,
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5-5',
-          thinkingLevel: null,
-          tools: [],
-          secrets: [],
-          defaultSkill: null,
-          skillsAllowlist: null,
-          mcpServers: [],
-        })
-        .run();
+      seedSessionRoute(H.s);
       const id = seedTodo({ title: 'make the export faster', spec: 'The board export is slow.' });
       const opened = (await relay('open_thread', { todoId: id })) as { buildId: string };
       await relay('stop_thread', { todoId: id });
@@ -456,7 +325,7 @@ describe('flag on', () => {
       claimSession(buildId);
       await relay('message_thread', { todoId, content: 'Use the cached index' });
       const sent = H.s.db.select().from(message).all().at(-1)!;
-      expect(sent.actor).toBe(AGENT_ID);
+      expect(sent.actor).toBe('Coordinator');
       expect(sent.actor).not.toBe(H.s.user.displayName);
       expect(sent.id.startsWith('human-')).toBe(false);
       const marker = H.s.db
@@ -632,20 +501,6 @@ describe('flag on', () => {
       const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
       expect(row).toMatchObject({ phase: 'queued', latestBuildId: out.buildId });
       await expectRejected(relay('open_thread', { todoId }), 409, /already open/);
-    });
-
-    test('a stopped-before-first-run thread keeps the intake-label marker on resume', async () => {
-      const assignment = {
-        source: 'intake-label' as const,
-        plan: { agentId: AGENT2_ID },
-        build: { agentId: AGENT2_ID },
-      };
-      const { todoId } = await openThread({ assignment });
-      await relay('stop_thread', { todoId });
-      await relay('message_thread', { todoId, content: 'Go on' });
-      expect(H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!.assignment).toEqual(
-        assignment,
-      );
     });
 
     test('a todo in phase todo whose build ran a step is still refused', async () => {
@@ -855,7 +710,6 @@ describe('flag on', () => {
         'ADR 0014',
         'withPlan',
         'dispatchReason',
-        'assignment.build.agentId',
         '先规划再派发',
         'confirm_builds',
         'message_todo',
@@ -864,8 +718,6 @@ describe('flag on', () => {
       ]) {
         expect(text, gone).not.toContain(gone);
       }
-      expect(text).not.toContain(AGENT2_ID);
-      expect(text).not.toContain('负责代码实现与工程修改');
       expect(text).toContain('open_thread');
       expect(text).toContain('message_thread');
       expect(text).toContain('threads (1 open');

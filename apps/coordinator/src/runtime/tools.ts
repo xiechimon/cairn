@@ -102,15 +102,8 @@ export function coordinatorTool(
   });
 }
 
-export function coordinatorToolsExtension(
-  channel: ToolChannel,
-  gate: StepGate,
-  options: { routerTools?: boolean } = {},
-) {
-  const defs =
-    options.routerTools === true
-      ? [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS]
-      : CHIEF_REMOTE_TOOLS;
+export function coordinatorToolsExtension(channel: ToolChannel, gate: StepGate) {
+  const defs = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     tools: defs.map((def) => coordinatorTool(def, channel, gate)),

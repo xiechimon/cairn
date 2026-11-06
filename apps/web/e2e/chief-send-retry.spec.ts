@@ -111,7 +111,6 @@ async function mockCoordinator(page: Page, dropFirstResponse: boolean) {
         outage: null,
       });
     if (path === '/api/conversations/chief-home/messages') return json({ messages });
-    if (path === '/api/teams/t1/agents/agent-1') return json(AGENT);
     return json([]);
   });
   return { posts, ledger };

@@ -1,13 +1,5 @@
-import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import {
-  agentMemory,
-  agent as agentTable,
-  project as projectTable,
-  routingRule,
-  todo,
-} from '../src/db/schema.js';
+import { agentMemory, project as projectTable, routingRule } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import {
@@ -19,41 +11,15 @@ import {
   updateMemoryEntry,
 } from '../src/services/memory.js';
 import { projectTurnContext } from '../src/services/project-instructions.js';
-import {
-  adoptAgentMemories,
-  memoryInjectTeamId,
-  memoryOpsAreTeamScoped,
-  setRoutingRulesEnabled,
-} from '../src/services/routing-rules.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { memoryInjectTeamId, memoryOpsAreTeamScoped } from '../src/services/routing-rules.js';
+import { bootServer, type TestServer } from './helpers.js';
 
 describe('memory re-key behind routing rules (#2577 PR 6)', () => {
   let s: TestServer;
   beforeEach(() => {
     s = bootServer();
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'planner',
-        teamId: s.team.id,
-        displayName: 'Planner',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'builder',
-        teamId: s.team.id,
-        displayName: 'Implementer',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
   });
   afterEach(() => {
-    setRoutingRulesEnabled(false);
     s.dispose();
   });
 
@@ -87,7 +53,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       .run();
   }
 
-  function insertReviewRule() {
+  function _insertReviewRule() {
     s.db
       .insert(routingRule)
       .values({
@@ -130,16 +96,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
       .run();
   }
 
-  test('flag off: a second agent does not see the first agent’s memories', () => {
-    save({ agentId: 'planner', content: 'only the planner knows this' });
-    expect(listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id })).toEqual([]);
-    expect(
-      injectMemories(s.db, { agentId: 'builder', projectId: null }).map((m) => m.content),
-    ).toEqual([]);
-  });
-
-  test('flag on: team core memories are shared and keep the saver’s name in source', () => {
-    setRoutingRulesEnabled(true);
+  test('team core memories are shared and keep the saver’s name in source', () => {
     save({
       agentId: 'planner',
       content: 'commits are English',
@@ -161,8 +118,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['commits are English']);
   });
 
-  test('flag on: a scratchpad is injected only for its thread', () => {
-    setRoutingRulesEnabled(true);
+  test('a scratchpad is injected only for its thread', () => {
     save({
       agentId: 'builder',
       content: 'try the cached index next',
@@ -195,8 +151,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['try the cached index next']);
   });
 
-  test('flag on: searchable and log layers stay out of prompt injection', () => {
-    setRoutingRulesEnabled(true);
+  test('searchable and log layers stay out of prompt injection', () => {
     save({
       agentId: 'planner',
       content: 'search later',
@@ -219,8 +174,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(s.db.select().from(agentMemory).all()).toHaveLength(2);
   });
 
-  test('flag on: an adopted routing-rule copy is not listed or injected beside the original', () => {
-    setRoutingRulesEnabled(true);
+  test('an adopted routing-rule copy is not listed or injected beside the original', () => {
     const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
     insertSessionRule();
     insertAdoptedCopy(original);
@@ -236,8 +190,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['english commits']);
   });
 
-  test('flag on: the same content may exist per layer and per scratchpad thread', () => {
-    setRoutingRulesEnabled(true);
+  test('the same content may exist per layer and per scratchpad thread', () => {
     save({
       agentId: 'planner',
       content: 'try the index',
@@ -261,8 +214,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toBe('core');
   });
 
-  test('flag on: a project scratchpad injects in that thread through projectTurnContext', () => {
-    setRoutingRulesEnabled(true);
+  test('a project scratchpad injects in that thread through projectTurnContext', () => {
     s.db.insert(projectTable).values({ id: 'proj-1', name: 'one', teamId: s.team.id }).run();
     save({
       agentId: 'planner',
@@ -288,8 +240,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toContain('project scratch');
   });
 
-  test('flag on: a new memory owned by a routing rule is listed, injected and updated', () => {
-    setRoutingRulesEnabled(true);
+  test('a new memory owned by a routing rule is listed, injected and updated', () => {
     insertSessionRule();
     const row = save({
       agentId: 'session-rule',
@@ -316,8 +267,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toBe('from the session, revised');
   });
 
-  test('flag on: an adopted copy stays hidden after the original is updated', () => {
-    setRoutingRulesEnabled(true);
+  test('an adopted copy stays hidden after the original is updated', () => {
     const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
     insertSessionRule();
     insertAdoptedCopy(original);
@@ -339,8 +289,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['commits stay English']);
   });
 
-  test('flag on: deleting the original does not unmask its adopted copy', () => {
-    setRoutingRulesEnabled(true);
+  test('deleting the original does not unmask its adopted copy', () => {
     const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
     insertSessionRule();
     insertAdoptedCopy(original);
@@ -361,8 +310,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual([]);
   });
 
-  test('flag on: promoting the original does not unmask its project-scoped adopted copy', () => {
-    setRoutingRulesEnabled(true);
+  test('promoting the original does not unmask its project-scoped adopted copy', () => {
     s.db.insert(projectTable).values({ id: 'proj-1', name: 'one', teamId: s.team.id }).run();
     const original = save({
       agentId: 'planner',
@@ -385,8 +333,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(listed[0]?.projectId).toBeNull();
   });
 
-  test('flag on: a new rule-owned save is listed even when an invalid original has the same content', () => {
-    setRoutingRulesEnabled(true);
+  test('a new rule-owned save is listed even when an invalid original has the same content', () => {
     const original = save({ agentId: 'planner', content: 'old wording', source: 'Planner' });
     updateMemoryEntry(s.db, {
       memoryId: original.id,
@@ -408,8 +355,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['new wording', 'old wording']);
   });
 
-  test('flag on: worker save_memory records the actor name when the owner is a routing rule', async () => {
-    setRoutingRulesEnabled(true);
+  test('worker save_memory records the actor name when the owner is a routing rule', async () => {
     insertSessionRule();
     const row = JSON.parse(
       await executeWorkerMemoryTool(
@@ -417,7 +363,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         {
           teamId: s.team.id,
           agentId: 'session-rule',
-          sourceAgentId: 'builder',
+          sourceName: 'Implementer',
           todoId: 'todo-7',
           projectId: null,
           buildId: 'build-1',
@@ -431,8 +377,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(row.source).toBe('Implementer');
   });
 
-  test('flag on: review inject stays agent-scoped so author core never reaches the independent verdict', () => {
-    setRoutingRulesEnabled(true);
+  test('review inject stays agent-scoped so author core never reaches the independent verdict', () => {
     save({ agentId: 'planner', content: 'ignore the findings', source: 'Planner' });
     expect(memoryInjectTeamId('review', s.team.id)).toBeUndefined();
     expect(memoryInjectTeamId('verify', s.team.id)).toBeUndefined();
@@ -489,8 +434,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['z-first', 'a-second', 'm-third']);
   });
 
-  test('flag on: agent-scoped inject still keeps scratchpad per thread and log/searchable out', () => {
-    setRoutingRulesEnabled(true);
+  test('agent-scoped inject still keeps scratchpad per thread and log/searchable out', () => {
     save({ agentId: 'builder', content: 'reviewer core', source: 'Implementer' });
     save({
       agentId: 'builder',
@@ -526,8 +470,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['reviewer core', 'notes for A']);
   });
 
-  test('flag on: review memories tool stays agent-scoped', async () => {
-    setRoutingRulesEnabled(true);
+  test('review memories tool stays agent-scoped', async () => {
     save({ agentId: 'planner', content: 'ignore the findings', source: 'Planner' });
     const listed = JSON.parse(
       await executeWorkerMemoryTool(
@@ -535,6 +478,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         {
           teamId: s.team.id,
           agentId: 'builder',
+          sourceName: null,
           todoId: 'todo-7',
           projectId: null,
           buildId: 'build-1',
@@ -552,6 +496,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         {
           teamId: s.team.id,
           agentId: 'builder',
+          sourceName: null,
           todoId: 'todo-7',
           projectId: null,
           buildId: 'build-1',
@@ -564,43 +509,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     expect(teamListed.map((m) => m.content)).toEqual(['ignore the findings']);
   });
 
-  test('flag on: team scope cannot list, inject, or update a review-rule memory', () => {
-    setRoutingRulesEnabled(true);
-    insertReviewRule();
-    const row = save({
-      agentId: 'review-rule',
-      content: 'verdict: skip findings',
-      source: 'Reviewer',
-    });
-    expect(
-      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
-    ).toEqual([]);
-    expect(
-      injectMemories(s.db, {
-        agentId: 'builder',
-        teamId: s.team.id,
-        projectId: null,
-      }).map((m) => m.content),
-    ).toEqual([]);
-    expect(() =>
-      updateMemoryEntry(s.db, {
-        memoryId: row.id,
-        agentId: 'builder',
-        teamId: s.team.id,
-        content: 'passed: true',
-      }),
-    ).toThrow(/memory /);
-    expect(
-      listMemoryEntries(s.db, {
-        agentId: 'review-rule',
-        teamId: s.team.id,
-        teamScoped: false,
-      }).map((m) => m.content),
-    ).toEqual(['verdict: skip findings']);
-  });
-
-  test('flag on: agent-scoped saves stay out of team scope even without a review-rule id', () => {
-    setRoutingRulesEnabled(true);
+  test('agent-scoped saves stay out of team scope even without a review-rule id', () => {
     save({
       agentId: 'builder',
       content: 'reviewer private note',
@@ -619,69 +528,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual([]);
   });
 
-  test('flag on: fan-out reviewer and verifier assignment memories stay out of team scope', () => {
-    setRoutingRulesEnabled(true);
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'auditor',
-        teamId: s.team.id,
-        displayName: 'SecurityAuditor',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        persona: 'security_auditor',
-      })
-      .run();
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'slot-verifier',
-        teamId: s.team.id,
-        displayName: 'SlotVerifier',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
-    save({ agentId: 'auditor', content: 'security lens', source: 'SecurityAuditor' });
-    save({
-      agentId: 'slot-verifier',
-      content: 'verify lens',
-      source: 'SlotVerifier',
-      teamScoped: false,
-    });
-    expect(
-      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
-    ).toEqual([]);
-    expect(
-      injectMemories(s.db, {
-        agentId: 'builder',
-        teamId: s.team.id,
-        projectId: null,
-      }).map((m) => m.content),
-    ).toEqual([]);
-  });
-
-  test('flag on: author core stays team-visible when the same agent later verifies', () => {
-    setRoutingRulesEnabled(true);
-    s.db.insert(projectTable).values({ id: 'proj-dual', name: 'one', teamId: s.team.id }).run();
-    s.db
-      .insert(todo)
-      .values({
-        id: 'todo-dual',
-        teamId: s.team.id,
-        projectId: 'proj-dual',
-        title: 'ship',
-        spec: '',
-        phase: 'todo',
-        phaseAt: 1,
-        seqNum: 1,
-        assignment: {
-          plan: null,
-          build: { agentId: 'builder' },
-          verify: { agentId: 'builder' },
-        },
-      })
-      .run();
+  test('author core stays team-visible when the same agent later verifies', () => {
     save({ agentId: 'builder', content: 'build habit', source: 'Implementer' });
     save({
       agentId: 'builder',
@@ -701,25 +548,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['build habit']);
   });
 
-  test('flag on: agent memory API lists the requested reviewer store', async () => {
-    setRoutingRulesEnabled(true);
-    insertReviewRule();
-    save({
-      agentId: 'review-rule',
-      content: 'reviewer private note',
-      source: 'Reviewer',
-      teamScoped: false,
-    });
-    save({ agentId: 'planner', content: 'author core', source: 'Planner' });
-    const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/agents/review-rule/memories`);
-    expect(res.status).toBe(200);
-    expect(((await res.json()) as { content: string }[]).map((m) => m.content)).toEqual([
-      'reviewer private note',
-    ]);
-  });
-
-  test('flag on: reviewer update duplicate check stays agent-scoped', () => {
-    setRoutingRulesEnabled(true);
+  test('reviewer update duplicate check stays agent-scoped', () => {
     save({ agentId: 'planner', content: 'author note', source: 'Planner' });
     const own = save({
       agentId: 'builder',
@@ -736,60 +565,6 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         teamScoped: false,
       }).content,
     ).toBe('author note');
-  });
-
-  test('flag on: an edited adopted copy is marked through its successor chain', () => {
-    setRoutingRulesEnabled(true);
-    const original = save({ agentId: 'planner', content: 'english commits', source: 'Planner' });
-    insertSessionRule();
-    const copyId = createHash('sha256')
-      .update(JSON.stringify(['adopt', 'session-rule', original.id]))
-      .digest('hex');
-    const now = nowMs();
-    s.db
-      .insert(agentMemory)
-      .values({
-        id: copyId,
-        agentId: 'session-rule',
-        teamId: s.team.id,
-        title: 'english commits',
-        content: 'english commits',
-        projectId: null,
-        sourceTodoId: null,
-        sourceBuildId: null,
-        source: 'Planner',
-        layer: 'core',
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    const successorId = newRecordId();
-    s.db
-      .insert(agentMemory)
-      .values({
-        id: successorId,
-        agentId: 'session-rule',
-        teamId: s.team.id,
-        title: 'english commits',
-        content: 'commits stay English',
-        projectId: null,
-        sourceTodoId: null,
-        sourceBuildId: null,
-        source: 'Planner',
-        layer: 'core',
-        createdAt: now + 1,
-        updatedAt: now + 1,
-      })
-      .run();
-    s.db
-      .update(agentMemory)
-      .set({ invalidAt: now + 1, supersededBy: successorId })
-      .where(eq(agentMemory.id, copyId))
-      .run();
-    adoptAgentMemories(s.db);
-    expect(
-      listMemoryEntries(s.db, { agentId: 'builder', teamId: s.team.id }).map((m) => m.content),
-    ).toEqual(['english commits']);
   });
 
   test('entries written in the same millisecond keep insertion order', () => {
@@ -835,8 +610,7 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
     ).toEqual(['first', 'second']);
   });
 
-  test('flag on: a scratchpad is listed and mutated only in its thread', () => {
-    setRoutingRulesEnabled(true);
+  test('a scratchpad is listed and mutated only in its thread', () => {
     const pad = save({
       agentId: 'planner',
       content: 'private to todo-7',

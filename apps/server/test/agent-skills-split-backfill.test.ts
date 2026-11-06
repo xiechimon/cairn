@@ -33,9 +33,11 @@ function findSplitEntry(): { tag: string } {
   return entry!;
 }
 
-function preSplitMigrations(): string {
+function migrationsThrough(includeSplit: boolean): string {
   const journal = readJournal(MIGRATIONS_FOLDER);
-  const splitIdx = journal.entries.findIndex((entry) => entry.tag === findSplitEntry().tag);
+  const splitIdx =
+    journal.entries.findIndex((entry) => entry.tag === findSplitEntry().tag) +
+    (includeSplit ? 1 : 0);
   expect(splitIdx, 'split-field migration should be in the journal').toBeGreaterThan(0);
   const dir = temp('cairn-migrations-pre-split-');
   mkdirSync(join(dir, 'meta'));
@@ -64,7 +66,7 @@ function buildPreSplitDb(rows: LegacyAgent[]): { dbPath: string } {
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: preSplitMigrations() });
+  migrate(db, { migrationsFolder: migrationsThrough(false) });
   const { teamId } = insertLegacyUserAndTeam(sqlite, {
     userId: 'user-legacy',
     teamId: 'team-legacy',
@@ -105,7 +107,7 @@ describe('#1169 skills split-field backfill (legacy rows preserved + [] -> null 
     ]);
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });
-    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    migrate(db, { migrationsFolder: migrationsThrough(true) });
     sqlite.close();
 
     expect(readSplit(dbPath, 'sp-empty')).toEqual({ defaultSkill: null, skillsAllowlist: null });
@@ -130,7 +132,7 @@ describe('#1169 skills split-field backfill (legacy rows preserved + [] -> null 
     const { dbPath } = buildPreSplitDb([]);
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });
-    expect(() => migrate(db, { migrationsFolder: MIGRATIONS_FOLDER })).not.toThrow();
+    expect(() => migrate(db, { migrationsFolder: migrationsThrough(true) })).not.toThrow();
     sqlite.close();
     expect(
       new Database(dbPath, { readonly: true }).prepare('SELECT COUNT(*) n FROM agent').get(),

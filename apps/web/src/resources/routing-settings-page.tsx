@@ -46,6 +46,7 @@ const USE_LABELS: Record<RouteUse, string> = {
   review: '评审',
   digest: '摘要',
   compaction: '压缩',
+  citation_check: '引文检查',
 };
 
 const POLICY_LABELS: Record<PolicyUse, string> = {
@@ -255,8 +256,8 @@ export function RoutingSettingsPage() {
   const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useRoutingSettingsMutations(teamId);
   const settings: TeamRoutingSettings = live
-    ? (settingsQ.data ?? { enabled: false, rules: [], policies: [] })
-    : (fixtureSettings(searchParams) ?? { enabled: false, rules: [], policies: [] });
+    ? (settingsQ.data ?? { rules: [], policies: [] })
+    : (fixtureSettings(searchParams) ?? { rules: [], policies: [] });
   const machines = live
     ? (machinesQ.data ?? []).map((machine) => ({ id: machine.id, name: machine.name }))
     : (fixture.resources?.machines ?? [])
@@ -267,62 +268,15 @@ export function RoutingSettingsPage() {
     : toModelOptions(fixture.resources?.providerSources ?? []);
   const empty = settings.rules.length === 0 && settings.policies.length === 0;
   return (
-    <PageShell
-      route={ROUTING_SETTINGS_HREF}
-      title={t('工作路由')}
-      fixture={fixture}
-      actions={
-        live && empty ? (
-          <Button
-            data-testid="routing-settings-seed"
-            onClick={() =>
-              mutations.seed.mutate(undefined, {
-                onSuccess: () => toastSuccess(t('已从 Agent 生成规则与策略')),
-                onError: (error) => toastError(t('生成失败，请重试。'), error),
-              })
-            }
-          >
-            {t('从 Agent 生成')}
-          </Button>
-        ) : undefined
-      }
-    >
+    <PageShell route={ROUTING_SETTINGS_HREF} title={t('工作路由')} fixture={fixture}>
       <div className="flex flex-col gap-6">
-        <SettingsCard>
-          <SettingsRow
-            label={t('路由规则开关')}
-            hint={
-              settings.enabled
-                ? t('CAIRN_ROUTING_RULES 已开启；调度走规则与策略。')
-                : t('CAIRN_ROUTING_RULES=0 已关闭规则路由；调度仍走 Agent。')
-            }
-          >
-            <span data-testid="routing-rules-enabled" className="text-ui text-content-secondary">
-              {settings.enabled ? t('规则已启用') : t('规则未启用')}
-            </span>
-          </SettingsRow>
-        </SettingsCard>
         {empty ? (
           <EmptyState
             testId="routing-settings-empty"
             className="mt-2"
             icon={Route}
             title={t('还没有路由规则。')}
-            description={t(
-              '从现有 Agent 生成 session / review 规则与工作策略，或重启服务器由启动迁移写入。',
-            )}
-            action={
-              live
-                ? {
-                    label: t('从 Agent 生成'),
-                    onClick: () =>
-                      mutations.seed.mutate(undefined, {
-                        onSuccess: () => toastSuccess(t('已从 Agent 生成规则与策略')),
-                        onError: (error) => toastError(t('生成失败，请重试。'), error),
-                      }),
-                  }
-                : undefined
-            }
+            description={t('重启服务器会写入默认的 session 规则与工作策略。')}
           />
         ) : (
           <>

@@ -1,7 +1,8 @@
-import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_AGENT } from '@cairn/shared';
+import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_TEAM } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
-import { useApiMutations, useChief, useMachines, useMembers, useMemories } from '../api/hooks.js';
+import { useNavigate } from 'react-router';
+import { useApiMutations, useChief, useMachines, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SETTINGS_HINT_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
@@ -11,7 +12,7 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
-import { ChiefAgentDialog, type ChiefAgentOption } from './chief-agent-dialog.js';
+import { ROUTING_SETTINGS_HREF } from '../resources/routing-settings-page.js';
 import { ChiefQuestionEntry } from './chief-question-panel.js';
 import { ChiefSpiralFace } from './chief-spiral-face.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
@@ -48,7 +49,6 @@ export function ChiefSettings({
   const [tab, setTab] = useState<ChiefSettingsTab>(chief.tab ?? 'agent');
   const { live, teamId } = useLiveData();
   const chiefQ = useChief(teamId, live);
-  const membersQ = useMembers(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const charter = live ? (chiefQ.data?.chief.charter ?? '') : '';
@@ -60,31 +60,12 @@ export function ChiefSettings({
           avatarUrl: chiefQ.data.agentActor.avatarUrl,
         }
       : null;
-  const agentOptions: ChiefAgentOption[] | undefined = live
-    ? (membersQ.data ?? [])
-        .filter((m) => m.memberType === 'agent')
-        .map((m) => {
-          const actor = m.actor as { displayName?: string; avatarUrl?: string | null } | undefined;
-          return {
-            id: m.actorId,
-            name: actor?.displayName ?? m.actorId,
-            avatarUrl: actor?.avatarUrl ?? null,
-          };
-        })
-    : undefined;
-  const [agentOpen, setAgentOpen] = useState(false);
   const [charterOpen, setCharterOpen] = useState(false);
-  const memoriesQ = useMemories(teamId, boundAgent?.id, live && boundAgent != null);
+  const navigate = useNavigate();
+  const memoriesQ = useMemories(teamId, live && boundAgent != null);
   const memories = memoriesQ.data ?? [];
   const watches = live ? (chiefQ.data?.watches ?? []) : [];
   const wakes = live ? (chiefQ.data?.wakes ?? []) : [];
-  const bindAgent = live
-    ? (agentId: string) =>
-        mutations.patchChief.mutate(
-          { agent: { agentId } },
-          { onSuccess: () => setAgentOpen(false) },
-        )
-    : undefined;
   const saveCharter = live
     ? (value: string) =>
         mutations.patchChief.mutate({ charter: value }, { onSuccess: () => setCharterOpen(false) })
@@ -135,7 +116,7 @@ export function ChiefSettings({
                   SETTINGS_ROW_CLS,
                   "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 border-b border-border text-left text-ui font-normal text-foreground hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent [&_svg:first-child]:text-content-tertiary [&_svg:not([class*='size-'])]:size-auto",
                 )}
-                onClick={() => setAgentOpen(true)}
+                onClick={() => navigate(ROUTING_SETTINGS_HREF)}
               >
                 {boundAgent != null ? (
                   boundAgent.avatarUrl != null ? (
@@ -165,7 +146,7 @@ export function ChiefSettings({
                           model: boundModelId,
                           machine: boundMachineName ?? t('未设归属机'),
                         })
-                      : t('跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。')}
+                      : t('跟随 coordinator 路由规则，在路由设置里调整。')}
                   </span>
                 </span>
               </div>
@@ -198,7 +179,7 @@ export function ChiefSettings({
               memoriesQ.data != null ? (
                 <div>
                   <p className="mt-4 text-meta text-content-tertiary">
-                    {t('记忆 · {n} / {max}', { n: memories.length, max: MEMORY_QUOTA_PER_AGENT })}
+                    {t('记忆 · {n} / {max}', { n: memories.length, max: MEMORY_QUOTA_PER_TEAM })}
                   </p>
                   <SettingsCard className="mt-2">
                     {memories.length === 0 ? (
@@ -257,13 +238,6 @@ export function ChiefSettings({
           )}
         </div>
       </div>
-      <ChiefAgentDialog
-        open={agentOpen}
-        onClose={() => setAgentOpen(false)}
-        agents={agentOptions}
-        boundAgentId={boundAgent?.id ?? null}
-        onBind={bindAgent}
-      />
       <EditCharterDialog
         open={charterOpen}
         onClose={() => setCharterOpen(false)}

@@ -24,15 +24,13 @@ import {
   setCoordinatorMachineId,
   setCoordinatorServerContextEnabled,
 } from './services/coordinator-context.js';
-import { setCoordinatorRouteLog } from './services/coordinator-route.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
-import { runRoutingMigration } from './services/routing-migration.js';
-import { setRoutingRulesEnabled } from './services/routing-rules.js';
+import { seedDefaultRouting } from './services/routing-migration.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -71,19 +69,9 @@ const vapidKeys = loadOrCreateVapidKeys(
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
-setRoutingRulesEnabled(config.routingRules);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext);
 setCoordinatorMachineId(config.coordinatorMachineId);
-setCoordinatorRouteLog((teamId, reason) =>
-  logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
-);
-if (config.routingRules) {
-  const { withheldSecrets, ...inserted } = runRoutingMigration(db);
-  logger.info(inserted, 'routing rules migration');
-  for (const row of withheldSecrets) {
-    logger.warn(row, 'routing rules migration: agent secrets not granted to the session policy');
-  }
-}
+logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {
@@ -129,7 +117,6 @@ const app = createApp(
     webDir: config.webDir,
     authToken: config.authToken,
     mcpConfigPath: config.mcpConfigPath,
-    intakeAgentAllowlist: config.intakeAgentAllowlist,
     logger,
   },
   logger,
@@ -148,7 +135,6 @@ const scheduler = createScheduler(
     vapidKeys,
     convHub,
     box: secretBox,
-    intakeAgentAllowlist: config.intakeAgentAllowlist,
     reposDir,
     githubFetch,
     oauthClient: config.githubOauth,

@@ -5,11 +5,12 @@ import {
   todoDocEventSchema,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { bootServer, openStream, req } from './helpers.js';
+import { bootServer, openStream, req, seedSessionRoute } from './helpers.js';
 
 describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
   test('the first frame on connect is a ping; todo/build changes push full document events, seq increasing within the connection', async () => {
     const s = bootServer({ pingIntervalMs: 50 });
+    seedSessionRoute(s);
     const stream = await openStream(s.app, s.team.id);
     try {
       const ping1 = pingEventSchema.parse(await stream.next((ev) => ev.type === 'ping'));
@@ -30,8 +31,6 @@ describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
 
       await req(s.app, 'POST', `/api/projects/${project.id}/builds`, {
         todoIds: [created.id],
-        assignment: { plan: null, build: null },
-        withPlan: true,
       });
       const buildEv = buildDocEventSchema.parse(await stream.next((ev) => ev.type === 'build'));
       expect(buildEv.doc.todoId).toBe(created.id);

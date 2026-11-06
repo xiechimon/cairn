@@ -1,21 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import {
-  agent,
-  build,
-  machine,
-  project,
-  pushDelivery,
-  step,
-  team,
-  todo,
-} from '../src/db/schema.js';
+import { build, machine, project, pushDelivery, step, team, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { sweepAbandonedBuildSteps, sweepAbandonedShipSteps } from '../src/services/builds.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machines.js';
 import { appendShipGateInstruction } from '../src/services/ship-gate.js';
-import { bootServer, insertMachine } from './helpers.js';
+import { bootServer, insertMachine, seedSessionRoute } from './helpers.js';
 
 const JUDGED = 'a'.repeat(40);
 const PUSHED = 'e'.repeat(40);
@@ -57,17 +48,7 @@ function world(pull: { merged: boolean; head: string }) {
       githubRepo: 'octo/demo',
     })
     .run();
-  s.db
-    .insert(agent)
-    .values({
-      id: 'a1',
-      teamId: s.team.id,
-      displayName: 'Shipper',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   s.db
     .insert(todo)
     .values({
@@ -80,7 +61,6 @@ function world(pull: { merged: boolean; head: string }) {
       seqNum: 1,
       latestBuildId: 'b1',
       hasChanges: true,
-      assignment: { plan: null, build: { agentId: 'a1' } },
     })
     .run();
   s.db

@@ -7,7 +7,6 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
 import {
-  agent as agentTable,
   build,
   chief,
   gateDigest,
@@ -33,7 +32,13 @@ import {
   MERGE_GATE_RUN_KIND,
 } from '../src/services/merge-gate-run.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  postProject,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -146,7 +151,6 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
   buildId: string;
   stepId: string;
   reviewerId: string;
-  authorId: string;
 }> {
   const s = bootServer();
   servers.push(s);
@@ -156,48 +160,16 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
     .set({ repoKind: 'github', githubRepo: `${OWNER}/${REPO}` })
     .where(eq(project.id, projectId))
     .run();
-  const authorId = 'agent-author';
-  const reviewerId = 'agent-reviewer';
-  const chiefId = 'agent-chief';
-  s.db
-    .insert(agentTable)
-    .values([
-      {
-        id: authorId,
-        teamId: s.team.id,
-        displayName: 'Builder',
-        persona: 'implementer',
-        modelId: 'claude-opus-4-8',
-      },
-      {
-        id: reviewerId,
-        teamId: s.team.id,
-        displayName: 'Reviewer',
-        persona: 'code_reviewer',
-        modelId: 'gpt-5.4',
-      },
-      {
-        id: 'agent-verifier',
-        teamId: s.team.id,
-        displayName: 'Verifier',
-        persona: 'verifier',
-        modelId: 'claude-verifier',
-      },
-      {
-        id: chiefId,
-        teamId: s.team.id,
-        displayName: 'Chief',
-        modelId: 'claude-chief',
-      },
-    ])
-    .run();
+  const reviewerId = 'route-reviewer';
+  seedSessionRoute(s, { modelId: 'claude-opus-4-8' });
+  seedRoute(s, 'review', { id: reviewerId, provider: 'openai-codex', modelId: 'gpt-5.4' });
+  seedRoute(s, 'coordinator', { modelId: 'claude-chief' });
   s.db
     .insert(chief)
     .values({
       id: 'chief-1794',
       userId: s.user.id,
       teamId: s.team.id,
-      agentId: chiefId,
       createdAt: 1,
     })
     .run();
@@ -217,7 +189,6 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
       latestBuildId: buildId,
       sourceKind: 'github-issue',
       sourceRef: `github:${OWNER}/${REPO}#1794`,
-      assignment: { plan: null, build: { agentId: authorId }, review: null, verify: null },
     })
     .run();
   s.db
@@ -243,7 +214,7 @@ async function world(stepKind: 'build' | 'session' = 'build'): Promise<{
       createdAt: 1,
     })
     .run();
-  return { s, buildId, stepId, reviewerId, authorId };
+  return { s, buildId, stepId, reviewerId };
 }
 
 describe('in-product merge gate', () => {

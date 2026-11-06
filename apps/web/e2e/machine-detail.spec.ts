@@ -10,26 +10,13 @@ test('list row machine name is a link → detail page', async ({ page }) => {
   await expect(page.getByTestId('machine-detail-online')).toBeVisible();
 });
 
-test('detail page fact strip + grid lists only agents bound to this machine', async ({ page }) => {
+test('detail page fact strip shows the online state', async ({ page }) => {
   await page.goto(DETAIL);
   await expect(page.getByTestId('machine-detail-online')).toContainText('在线');
-
-  await expect(page.getByTestId('team-agent-grid')).toBeVisible();
-  await expect(page.getByTestId('team-agent-card')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: '迁移到' })).toBeVisible();
 });
 
-test('create slot preselects this machine as the owner machine', async ({ page }) => {
-  await page.goto(DETAIL);
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-  const dialog = page.getByRole('dialog', { name: '创建 agent' });
-  await expect(dialog).toBeVisible();
-
-  await expect(dialog.locator('.dlg-agent-machine-select')).toContainText('mea-wsl');
-  await dialog.getByLabel('名称').fill('probe');
-  await expect(dialog.getByRole('button', { name: '创建', exact: true })).toBeEnabled();
-});
-
-test('delete gate: deletable with no bound agents; disabled when a whole-machine migrate has no target picked', async ({ page }) => {
+test('delete gate: deletable; whole-machine migrate is disabled until a target is picked', async ({ page }) => {
   await page.goto(DETAIL);
 
   await expect(page.getByRole('button', { name: '删除', exact: true })).toBeEnabled();

@@ -100,17 +100,12 @@ const PAGES: AuditPage[] = [
     url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
     ready: (p) => p.locator('.prj-set-avatar'),
   },
-  { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agent-card').first() },
-  {
-    name: 'agent detail',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
-    ready: (p) => p.locator('.agent-skill-select'),
-  },
+  { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agents-removed') },
   { name: 'machines', url: '/app/resources/machines?scenario=06', ready: row },
   {
     name: 'machine detail',
     url: '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
-    ready: (p) => p.getByTestId('team-agent-grid'),
+    ready: (p) => p.getByTestId('machine-detail-online'),
   },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {

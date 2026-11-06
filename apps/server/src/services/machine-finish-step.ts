@@ -18,10 +18,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import {
-  type agent,
-  agent as agentTable,
   build,
-  chief,
   chiefMessage,
   chiefThread,
   chiefTurnUsage,
@@ -61,7 +58,6 @@ import {
 } from './ci-loop.js';
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
-import { routedChiefAgent } from './coordinator-route.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
@@ -69,10 +65,10 @@ import { githubTokenOrNull } from './github-connection.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { stopStepComputer } from './machine-computer.js';
 import {
-  agentForStep,
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  profileForStep,
   publishStepStatus,
   stepTeamId,
   upsertChiefRow,
@@ -96,6 +92,7 @@ import {
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
+import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import { verifyShipLanding } from './ship-gate.js';
 import { drainTaskMessageQueue } from './task-message-queue.js';
@@ -150,7 +147,7 @@ function recordSkillInjectionCheck(
     const todoRow = buildRow
       ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
       : undefined;
-    const agentRow = todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : null;
+    const agentRow = todoRow ? profileForStep(deps, todoRow, stepRow.kind) : null;
     if (agentRow == null) return;
     skillsAllowlist = agentRow.skillsAllowlist ?? null;
     defaultSkill = agentRow.defaultSkill;
@@ -687,13 +684,13 @@ async function finishStepReport(
 function workerStepContext(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
-): { todoRow: typeof todo.$inferSelect; agentRow: typeof agent.$inferSelect | null } | null {
+): { todoRow: typeof todo.$inferSelect; agentRow: RouteProfile | null } | null {
   if (isChiefConversation(stepRow.buildId)) return null;
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return null;
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) return null;
-  return { todoRow, agentRow: agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) };
+  return { todoRow, agentRow: profileForStep(deps, todoRow, stepRow.kind) };
 }
 
 function requeueStep(
@@ -728,17 +725,12 @@ function requeueStep(
   publishStepStatus(deps, stepRow.id);
 }
 
-function chiefStepAgent(
-  deps: MachineDeps,
-  stepRow: typeof step.$inferSelect,
-): typeof agent.$inferSelect | null {
+function chiefStepAgent(deps: MachineDeps, stepRow: typeof step.$inferSelect): RouteProfile | null {
   if (stepRow.kind !== 'chief' || !isChiefConversation(stepRow.buildId)) return null;
-  const row = deps.db
-    .select({ agentRow: agentTable, teamId: chiefThread.teamId })
+  const thread = deps.db
+    .select({ teamId: chiefThread.teamId })
     .from(chiefThread)
-    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-    .innerJoin(agentTable, eq(chief.agentId, agentTable.id))
     .where(eq(chiefThread.id, stepRow.buildId))
     .get();
-  return row ? routedChiefAgent(deps.db, row.teamId, row.agentRow) : null;
+  return thread ? coordinatorProfile(deps.db, thread.teamId) : null;
 }

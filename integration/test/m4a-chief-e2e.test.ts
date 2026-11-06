@@ -13,14 +13,7 @@ import {
   tokenUsage,
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import {
-  AGENT_ID,
-  api,
-  bootRealServer,
-  daemonLogLines,
-  type RealServer,
-  waitFor,
-} from './helpers.js';
+import { api, bootRealServer, daemonLogLines, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 let stub: StubLlm;
@@ -73,9 +66,12 @@ afterAll(async () => {
 
 describe('M4a Chief E2E: pi session + remoteTools relay round trip (02 §4.3/r5 §3.1)', () => {
   test('bind → send message → claim chief step → pi relay tool → done → chief_message persisted', async () => {
-    const patch = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
-    });
+    const patch = await api(
+      server.url,
+      'PATCH',
+      `/api/teams/${server.teamId}/routing-rules/coordinator`,
+      { provider: 'stub-gw', modelId: 'stub-model' },
+    );
     expect(patch.status).toBe(200);
 
     const sent = await api(server.url, 'POST', `/api/teams/${server.teamId}/chief/threads`, {

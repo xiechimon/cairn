@@ -68,19 +68,3 @@ export const stepQueueBlockedSchema = z.object({
   missing: z.array(z.string()),
 });
 export type StepQueueBlocked = z.infer<typeof stepQueueBlockedSchema>;
-
-export const agentMachineFitRowSchema = z.object({
-  machineId: recordId,
-  name: z.string(),
-  online: z.boolean(),
-  runtimeOk: z.boolean(),
-  missing: z.array(z.string()).nullable(),
-  mcpGaps: z.array(z.string()).nullable(),
-  canRun: z.boolean(),
-});
-export type AgentMachineFitRow = z.infer<typeof agentMachineFitRowSchema>;
-
-export const agentMachineFitResponseSchema = z.object({
-  machines: z.array(agentMachineFitRowSchema),
-});
-export type AgentMachineFitResponse = z.infer<typeof agentMachineFitResponseSchema>;

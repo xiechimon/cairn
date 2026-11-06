@@ -13,6 +13,7 @@ import type { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
 import { message, plan as planTable, todo, tokenUsage } from './db/schema.js';
+import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { jsonBody, requestOrigin, requireProject, svcOf } from './routes-helpers.js';
 import {
@@ -136,13 +137,12 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/projects/:id/builds', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(startBuildsBodySchema, await jsonBody(c), 'body');
+    if (body.assignment != null) throw new HttpError(410, AGENTS_REMOVED_MESSAGE);
     let builds: BuildRecord[];
     try {
       builds = startBuilds(svc, {
         projectId: row.id,
         todoIds: body.todoIds,
-        assignment: body.assignment,
-        withPlan: body.withPlan,
         ...(body.routeOverride !== undefined ? { routeOverride: body.routeOverride } : {}),
       });
     } catch (err) {

@@ -11,7 +11,6 @@ import {
   ENV_VARS,
   formatAccessTokenFile,
   parseAccessTokenFile,
-  routingRulesFlagOn,
   SKILLS_DIR_DEFAULT,
   TEAM_STREAM_PING_INTERVAL_MS,
 } from '@cairn/shared';
@@ -59,11 +58,9 @@ export const serverConfigSchema = z.object({
   host: z.string().min(1),
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
-  intakeAgentAllowlist: z.array(z.string()),
   scheduling: z.boolean(),
   coordinatorServerContext: z.boolean(),
   coordinatorMachineId: z.string().nullable(),
-  routingRules: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
   trajectoryReflectCurate: z.boolean(),
   trajectoryReflectOpenGuardIssues: z.boolean(),
@@ -181,14 +178,9 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
     issueIntake: envFlag(ENV_VARS.issueIntake),
-    intakeAgentAllowlist: (process.env[ENV_VARS.intakeAgentAllowlist] ?? '')
-      .split(',')
-      .map((name) => name.trim())
-      .filter((name) => name !== ''),
     scheduling: envFlag(ENV_VARS.scheduling),
     coordinatorServerContext: envFlag(ENV_VARS.coordinatorServerContext),
     coordinatorMachineId: envStr(ENV_VARS.coordinatorMachineId),
-    routingRules: routingRulesFlagOn(process.env[ENV_VARS.routingRules]),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
     trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),

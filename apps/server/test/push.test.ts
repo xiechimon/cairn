@@ -171,7 +171,6 @@ function insertChiefThread(s: ReturnType<typeof bootServer>, threadId: string): 
       id: `chief-${s.user.id}-${s.team.id}`,
       userId: s.user.id,
       teamId: s.team.id,
-      agentId: null,
       charter: '',
       lastTurnAt: null,
       createdAt: now,

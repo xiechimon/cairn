@@ -149,7 +149,7 @@ test('all three long-content tabs of chief settings scroll to the bottom (#1032)
   await page.route('**/api/teams/team-1/chief', (route) =>
     route.fulfill({ json: wireChief(longCharter, 30) }),
   );
-  await page.route('**/api/teams/team-1/agents/agent-1/memories', (route) =>
+  await page.route('**/api/teams/team-1/memories', (route) =>
     route.fulfill({ json: MEMORIES }),
   );
   await openChiefSettings(page);

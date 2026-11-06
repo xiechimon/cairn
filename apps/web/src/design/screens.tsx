@@ -38,13 +38,8 @@ const SCREENS = [
     parts: 'Schedule cards, frequency, next run',
   },
   {
-    title: 'Team',
-    url: '/app/team?scenario=12',
-    parts: 'Agent cards, team switch',
-  },
-  {
-    title: 'Agent settings',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
+    title: 'Work routing',
+    url: '/app/settings/work-routing?scenario=routing-settings',
     parts: 'Settings list, runtime and model pickers',
   },
   {

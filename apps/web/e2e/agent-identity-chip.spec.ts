@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const SCENARIO = '/app/schedules?scenario=chief-agent-chip';
-const AGENT_HREF = '/app/resources/agents/r3-builder';
+const ROUTING_HREF = '/app/resources/routing-settings';
 
 function stubDicebear(page: Page) {
   return page.route('**/api.dicebear.com/**', (route) =>
@@ -22,7 +22,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     await drawer.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   });
 
-  test('F-E1/E2/E10: avatar+name side by side in a chain, href points at the Agent settings page, geometry canon does not drift', async ({
+  test('F-E1/E2/E10: avatar+name side by side in a chain, href points at the routing settings page, geometry canon does not drift', async ({
     page,
   }) => {
 
@@ -33,7 +33,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     await expect(img).toBeVisible();
     await expect(chip.getByText('r3-builder')).toHaveText('r3-builder');
 
-    await expect(chip).toHaveAttribute('href', `${AGENT_HREF}?scenario=chief-agent-chip`);
+    await expect(chip).toHaveAttribute('href', `${ROUTING_HREF}?scenario=chief-agent-chip`);
 
     const box = await img.boundingBox();
     expect(box?.width).toBe(24);
@@ -53,15 +53,9 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     expect(await chip.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
   });
 
-  test('F-E3: click → SPA navigation into the Agent settings page, detail page resolves the real record', async ({ page }) => {
+  test('F-E3: click → SPA navigation into the routing settings page', async ({ page }) => {
     await page.getByTestId('chief-stream').getByRole('link', { name: 'r3-builder' }).click();
-    await page.waitForURL((u) => u.pathname === AGENT_HREF);
-
-    await expect(page.locator('.agent-detail')).toBeVisible();
-    await expect(page.locator('.agent-missing')).toHaveCount(0);
-    await expect(page.locator('.agent-detail')).toContainText('r3-builder');
-
-    await expect(page.locator('.agent-tabs')).toBeVisible();
+    await page.waitForURL((u) => u.pathname === '/app/settings/work-routing');
   });
 
   test('F-E4: keyboard reachable — focus lands on the chip, Enter activates navigation', async ({ page }) => {
@@ -70,7 +64,7 @@ test.describe('drawer robot row identity chip (fixture, #741 gap 1)', () => {
     const focused = await chip.evaluate((el) => el === document.activeElement);
     expect(focused).toBe(true);
     await page.keyboard.press('Enter');
-    await page.waitForURL((u) => u.pathname === AGENT_HREF);
+    await page.waitForURL((u) => u.pathname === '/app/settings/work-routing');
   });
 });
 
@@ -79,16 +73,15 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
     await stubDicebear(page);
   });
 
-  test('F-E5: drawer-face agent mention chips form links with click navigation (same recipe as F-R13)', async ({ page }) => {
+  test('F-E5: drawer-face agent mention chips stay lazy spans', async ({ page }) => {
     await page.goto(SCENARIO);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const chip = page.getByTestId('chief-stream').locator('.mention-chip--agent');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('r5-scribe');
 
-    await expect(chip).toHaveAttribute('href', '/app/resources/agents/a1');
-    await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/resources/agents/a1');
+    expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
+    await expect(chip).not.toHaveAttribute('href', /.*/);
   });
 
   test('F-E6: side chat transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
@@ -96,9 +89,8 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
     const chip = page.locator('.side-panel .mention-chip--agent');
     await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveAttribute('href', '/app/resources/agents/a1');
-    await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/resources/agents/a1');
+    expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
+    await expect(chip).not.toHaveAttribute('href', /.*/);
   });
 
   test('F-E7: skill/project/machine mentions stay lazy spans (literal negative cases)', async ({ page }) => {

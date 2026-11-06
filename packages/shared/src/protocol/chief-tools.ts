@@ -29,7 +29,6 @@ export const CHIEF_TOOLS_ADDED = [
   'create_skill',
   'update_skill',
   'models',
-  'split_todo',
   'update_memory',
   'snooze_todos',
   'search_history',
@@ -40,7 +39,6 @@ export const CHIEF_TOOL_CATEGORIES = {
   read: [
     'projects',
     'todos',
-    'agents',
     'models',
     'machines',
     'skills',
@@ -59,19 +57,14 @@ export const CHIEF_TOOL_CATEGORIES = {
   ],
   organize: [
     'create_todo',
-    'split_todo',
     'update_todo',
     'delete_todos',
     'close_todos',
     'reopen_todos',
     'complete_todos',
-    'message_todo',
     'create_project',
     'update_project',
     'connect_repo',
-    'create_agent',
-    'update_agent',
-    'delete_agents',
     'create_skill',
     'update_skill',
     'set_secret',
@@ -80,7 +73,7 @@ export const CHIEF_TOOL_CATEGORIES = {
     'unschedule_todo',
     'snooze_todos',
   ],
-  execute: ['run_builds', 'run_review', 'confirm_builds', 'cancel_builds', 'merge_builds'],
+  execute: ['cancel_builds', 'merge_builds'],
   private: [
     'ask_user',
     'notify_user',
@@ -205,16 +198,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     replaySafe: true,
   },
   {
-    name: 'agents',
-    description:
-      'List the team agents with their responsibility text (description), model and permissions — the input for dispatch weighting.',
-    parameters: obj({}),
-    replaySafe: true,
-  },
-  {
     name: 'models',
     description:
-      'List the model candidates for agents as rows {provider, providerLabel, modelId, modelName}. Read this before setting provider/modelId on create_agent or update_agent — only values from this list are valid.',
+      'List the model candidates for agents as rows {provider, providerLabel, modelId, modelName}. Read this before setting provider/modelId on a routing rule — only values from this list are valid.',
     parameters: obj({}),
     replaySafe: true,
   },
@@ -365,37 +351,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     ),
   },
   {
-    name: 'split_todo',
-    description:
-      'Split a big todo into N sub-cards with blocking dependency edges (ADR 0018 layer 2). Each sub-card pins one role agent and runs direct-execute (no per-card plan gate). The split scheme lands on the parent plan doc; the project split policy sends it to human review, shadow recording, or automatic dispatch after the checker. Automatic dispatch starts unblocked sub-cards; later waves auto-start as their blockers finish; the parent auto-completes when every sub-card is done. Split only when subtasks are truly independent or orderable — single-view single-artifact work should run as one todo, not be split.',
-    parameters: obj(
-      {
-        todoId: str('Parent todo id to split.'),
-        subtodos: arr(
-          obj(
-            {
-              title: str('Sub-card title (verb phrase).'),
-              spec: str(
-                'Self-contained task text — the sub-card agent sees only this, not the parent ticket.',
-              ),
-              agentId: str('Role agent id pinned to the sub-card (execution slot).'),
-              blockedBy: arr(
-                { type: 'number' },
-                'Optional 1-based indices of prerequisite sub-cards in this array (e.g. [1, 2] = waits for the 1st and 2nd).',
-              ),
-              output: str(
-                'Optional deliverable kind of this sub-card: "code" (default) or "info" (research/report card: read-only workspace, deliverable is a report attachment, never merged).',
-              ),
-            },
-            ['title', 'spec', 'agentId'],
-          ),
-          'Sub-cards to create, in dispatch order.',
-        ),
-      },
-      ['todoId', 'subtodos'],
-    ),
-  },
-  {
     name: 'update_todo',
     description:
       'Update fields of a todo (title/spec/tags/order), or move an unstarted todo to another project.',
@@ -434,14 +389,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     parameters: obj({ todoIds: idArr('Todo ids to complete.') }, ['todoIds']),
   },
   {
-    name: 'message_todo',
-    description: 'Post a message into the latest build conversation of a todo (steer or feedback).',
-    parameters: obj({ todoId: str('Todo id.'), content: str('Message text.') }, [
-      'todoId',
-      'content',
-    ]),
-  },
-  {
     name: 'create_project',
     description: 'Create a project (hosted repo or plain).',
     parameters: obj(
@@ -466,38 +413,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       { projectId: str('Project id.'), githubRepo: str('GitHub "owner/repo" reference.') },
       ['projectId', 'githubRepo'],
     ),
-  },
-  {
-    name: 'create_agent',
-    description: 'Create an agent with model, responsibility text and permissions.',
-    parameters: obj(
-      {
-        displayName: str('Agent display name.'),
-        description: str('Responsibility text (injected into every task and used for dispatch).'),
-        provider: str('Optional provider id; call `models` for the candidate list.'),
-        modelId: str('Optional model id; call `models` for the candidate list.'),
-      },
-      ['displayName'],
-    ),
-  },
-  {
-    name: 'update_agent',
-    description: 'Update an agent (responsibility text, model, permission switches).',
-    parameters: obj(
-      {
-        agentId: str('Agent id.'),
-        displayName: str('Optional new display name.'),
-        description: str('Optional new responsibility text.'),
-        provider: str('Optional provider id; call `models` for the candidate list.'),
-        modelId: str('Optional model id; call `models` for the candidate list.'),
-      },
-      ['agentId'],
-    ),
-  },
-  {
-    name: 'delete_agents',
-    description: 'Delete agents from the team.',
-    parameters: obj({ agentIds: idArr('Agent ids to delete.') }, ['agentIds']),
   },
   {
     name: 'create_skill',
@@ -596,54 +511,6 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
       },
       ['todoIds', 'until'],
     ),
-  },
-  {
-    name: 'run_builds',
-    description:
-      'Start builds for todos: assignment picks the executing agent per responsibility fit; withPlan is your per-dispatch judgment (omit = plan first) — state the reason via dispatchReason; the review gate applies either way. Assignment must set at least one slot (plan and/or build agentId) — an empty assignment is rejected.',
-    parameters: obj(
-      {
-        todoIds: idArr('Todo ids to start.'),
-        assignment: obj(
-          {
-            plan: obj({ agentId: str('Planning agent id.') }),
-            build: obj({ agentId: str('Executing agent id.') }),
-            review: obj({
-              agentId: str('Fallback review agent id (used when no review persona is seeded).'),
-            }),
-            verify: obj({
-              agentId: str(
-                'Verifier agent id — set to enqueue a verify step when the review gate is reached.',
-              ),
-            }),
-          },
-          [],
-        ),
-        withPlan: {
-          type: 'boolean',
-          description:
-            'true (default when omitted) = plan first, parking at the confirm gate; false = direct fix, skipping only plan confirmation (the review gate always stands). Omit when unsure.',
-        },
-        dispatchReason: str(
-          'Why plan-first or direct — recorded on the dispatch receipt so the user can audit or override the judgment.',
-        ),
-        machineId: str(
-          'Optional pinned machine id for the builds; omit to inherit the todo machine (null = automatic).',
-        ),
-      },
-      ['todoIds'],
-    ),
-  },
-  {
-    name: 'run_review',
-    description:
-      'Request an independent review run of a build: fans out the three review perspectives (CodeReviewer / SecurityAuditor / TestEngineer) as parallel read-only review steps, each reporting its own verdict; falls back to the assignment review slot when personas are absent.',
-    parameters: obj({ buildId: str('Build id.') }, ['buildId']),
-  },
-  {
-    name: 'confirm_builds',
-    description: 'Confirm parked plans (confirm gate → building).',
-    parameters: obj({ buildIds: idArr('Build ids to confirm.') }, ['buildIds']),
   },
   {
     name: 'cancel_builds',
@@ -789,7 +656,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 55;
+export const CHIEF_TOOL_COUNT = 46;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
@@ -850,6 +717,7 @@ export const CHIEF_TOOLS_REMOVED_UNDER_D60 = {
   confirm_builds: 'message_thread (a thread runs plan to self-check without a confirm gate)',
   run_review: 'the merge gate (independent review is no longer started by hand)',
   split_todo: 'create_todo for each part and open_thread on each',
+  agents: 'routing rules (the team has no agents; models and machines come from routing rules)',
   create_agent: 'routing rules (agents are no longer configured here)',
   update_agent: 'routing rules (agents are no longer configured here)',
   delete_agents: 'routing rules (agents are no longer configured here)',

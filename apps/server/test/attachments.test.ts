@@ -805,6 +805,7 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
         {
           teamId: s.team.id,
           agentId: 'a',
+          sourceName: null,
           todoId,
           projectId: 'p',
           buildId: 'b',
@@ -836,6 +837,7 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
         {
           teamId: s.team.id,
           agentId: 'a',
+          sourceName: null,
           todoId,
           projectId: 'p',
           buildId: 'b',
@@ -862,6 +864,7 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
           {
             teamId: s.team.id,
             agentId: 'a',
+            sourceName: null,
             todoId: 't',
             projectId: 'p',
             buildId: 'b',
@@ -888,6 +891,7 @@ describe('attachments -- worker-step relay (#310/r9 section 3.1: spec `attachmen
           {
             teamId: sB.team.id,
             agentId: 'a',
+            sourceName: null,
             todoId: 't',
             projectId: 'p',
             buildId: 'b',

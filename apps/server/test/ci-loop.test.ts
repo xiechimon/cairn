@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -29,7 +28,7 @@ import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
 import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedRoute, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 let throttleHome: string;
@@ -182,7 +181,6 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
       phaseAt: base,
       seqNum: 1,
       latestBuildId: buildId,
-      assignment: { plan: null, build: { agentId: `agent-ci-${rnd}` } },
     })
     .run();
   s.db
@@ -675,33 +673,16 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     expect(w.mock.requests.length).toBe(before);
   });
 
-  function addResearchAgents(w: PrWorld) {
-    w.s.db
-      .insert(agentTable)
-      .values([
-        {
-          id: `agent-research-${w.buildId}`,
-          teamId: w.teamId,
-          displayName: 'Research',
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5-5',
-        },
-        {
-          id: `agent-checker-${w.buildId}`,
-          teamId: w.teamId,
-          displayName: 'Checker',
-          provider: 'openai-codex',
-          modelId: 'gpt-6.1-sol',
-        },
-      ])
-      .run();
+  function addResearchRoutes(w: PrWorld) {
+    seedSessionRoute(w.s);
+    seedRoute(w.s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
   }
 
   test('an earlier red CI round still appends a fix step and does not open research', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(1);
     expect(
@@ -718,7 +699,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX - 1);
     expect(w.todoRow().phase).toBe('building');
@@ -745,7 +726,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     const requested = w.s.db
       .select()
@@ -775,7 +756,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     const research = w.s.db
       .select()
@@ -840,7 +821,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     w.s.db
       .update(buildTable)
       .set({ errorMessage: 'monthly usage limit' })

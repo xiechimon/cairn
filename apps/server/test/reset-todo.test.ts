@@ -9,8 +9,7 @@ import {
   stopPending as stopPendingTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { startBuilds } from '../src/services/builds.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, postProject, req, startLegacyBuild, type TestServer } from './helpers.js';
 
 async function setupStarted(phase: Phase): Promise<{ s: TestServer; id: string }> {
   const s = bootServer();
@@ -20,12 +19,7 @@ async function setupStarted(phase: Phase): Promise<{ s: TestServer; id: string }
       await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'p', spec: 'x' })
     ).json(),
   );
-  startBuilds(s.svc, {
-    projectId,
-    todoIds: [created.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
-  });
+  startLegacyBuild(s, created.id, { withPlan: true });
   s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, created.id)).run();
   return { s, id: created.id };
 }

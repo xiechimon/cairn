@@ -1,24 +1,40 @@
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { MergePolicy, ProjectRepoKind } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import type {
+  MergePolicy,
+  ModelRef,
+  PolicyUse,
+  ProjectRepoKind,
+  RequiredCapabilities,
+  RouteUse,
+} from '@cairn/shared';
+import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { onTestFinished } from 'vitest';
 import webpush from 'web-push';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
-import { openMemoryDb } from '../src/db/client.js';
-import { agent as agentTable, apiKey, machine as machineTable } from '../src/db/schema.js';
+import { type Db, openMemoryDb } from '../src/db/client.js';
+import {
+  apiKey,
+  build as buildTable,
+  machine as machineTable,
+  routingRule,
+  todo as todoTable,
+  workPolicy,
+} from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { sha256Hex } from '../src/lib/crypto.js';
-import { newRecordId } from '../src/lib/ids.js';
+import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
+import { enqueueStep } from '../src/services/builds.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { productionHarnessEvalConfig } from '../src/services/harness-eval-production.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { VapidKeys } from '../src/services/push.js';
+import { setTodoPhase } from '../src/services/todos.js';
 
 export interface LegacyWorldIds {
   userId: string;
@@ -40,6 +56,7 @@ export function insertLegacyUserAndTeam(
 
 export function bootServer(
   opts: {
+    db?: Db;
     pingIntervalMs?: number;
     claimHoldMs?: number;
     reposDir?: string;
@@ -62,7 +79,7 @@ export function bootServer(
     deployRecordPath?: string;
   } = {},
 ) {
-  const db = openMemoryDb();
+  const db = opts.db ?? openMemoryDb();
   const { user, team } = seed(db);
   const hub = new TeamStreamHub();
   const machineHub = new MachineWakeHub();
@@ -330,16 +347,114 @@ export function insertMachine(
   return id;
 }
 
-export function bindAllAgents(s: TestServer, machineId?: string): void {
-  const mid =
-    machineId ??
-    s.db.select().from(machineTable).where(eq(machineTable.teamId, s.team.id)).get()?.id;
-  if (mid === undefined) throw new Error('bindAllAgents: 世界里还没有机器（先 enroll/插入）');
-  s.db.update(agentTable).set({ machineId: mid }).run();
+export interface RouteSeed {
+  id?: string;
+  provider?: string;
+  modelId?: string;
+  thinkingLevel?: string | null;
+  machineId?: string | null;
+  requiredCapabilities?: RequiredCapabilities | null;
+  fallbackModels?: ModelRef[] | null;
+  mcpServers?: string[] | null;
 }
 
-export function bindAgentHome(s: TestServer, agentId: string, machineId: string): void {
-  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, agentId)).run();
+export function seedRoute(s: TestServer, use: RouteUse, opts: RouteSeed = {}): string {
+  const existing = s.db
+    .select()
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, s.team.id), eq(routingRule.use, use)))
+    .get();
+  const values = {
+    provider: opts.provider ?? 'claude-code',
+    modelId: opts.modelId ?? 'claude-sonnet-5-5',
+    thinkingLevel: opts.thinkingLevel ?? null,
+    machineId: opts.machineId ?? null,
+    requiredCapabilities: opts.requiredCapabilities ?? null,
+    fallbackModels: opts.fallbackModels ?? null,
+    mcpServers: opts.mcpServers ?? null,
+    updatedAt: Date.now(),
+  };
+  if (existing !== undefined) {
+    s.db.update(routingRule).set(values).where(eq(routingRule.id, existing.id)).run();
+    return existing.id;
+  }
+  const id = opts.id ?? newRecordId();
+  s.db
+    .insert(routingRule)
+    .values({ id, teamId: s.team.id, use, ...values, createdAt: Date.now() })
+    .run();
+  return id;
+}
+
+export interface PolicySeed {
+  tools?: string[];
+  mcpServers?: string[];
+  skillsAllowlist?: string[] | null;
+  defaultSkill?: string | null;
+  secrets?: string[];
+}
+
+export function seedPolicy(s: TestServer, use: PolicyUse, opts: PolicySeed = {}): void {
+  const values = {
+    tools: opts.tools ?? [],
+    mcpServers: opts.mcpServers ?? [],
+    skillsAllowlist: opts.skillsAllowlist ?? null,
+    defaultSkill: opts.defaultSkill ?? null,
+    secrets: opts.secrets ?? [],
+    updatedAt: Date.now(),
+  };
+  const existing = s.db
+    .select()
+    .from(workPolicy)
+    .where(and(eq(workPolicy.teamId, s.team.id), eq(workPolicy.use, use)))
+    .get();
+  if (existing !== undefined) {
+    s.db.update(workPolicy).set(values).where(eq(workPolicy.id, existing.id)).run();
+    return;
+  }
+  s.db
+    .insert(workPolicy)
+    .values({ id: newRecordId(), teamId: s.team.id, use, ...values, createdAt: Date.now() })
+    .run();
+}
+
+export function seedSessionRoute(s: TestServer, opts: RouteSeed & PolicySeed = {}): string {
+  const id = seedRoute(s, 'session', opts);
+  seedPolicy(s, 'session', opts);
+  return id;
+}
+
+export function pinSessionRoute(s: TestServer, machineId: string): void {
+  s.db
+    .update(routingRule)
+    .set({ machineId })
+    .where(and(eq(routingRule.teamId, s.team.id), eq(routingRule.use, 'session')))
+    .run();
+}
+
+export function startLegacyBuild(
+  s: TestServer,
+  todoId: string,
+  opts: { withPlan: boolean; prompt?: string; triggerSource?: 'user' | 'schedule' },
+): string {
+  const todoRow = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+  if (todoRow === undefined) throw new Error(`startLegacyBuild: todo ${todoId} missing`);
+  const id = newUuidv7();
+  const createdAt = Date.now();
+  s.db
+    .insert(buildTable)
+    .values({
+      id,
+      todoId,
+      withPlan: opts.withPlan,
+      prevPhase: todoRow.phase,
+      triggerSource: opts.triggerSource ?? 'user',
+      createdAt,
+    })
+    .run();
+  enqueueStep(s.svc, id, opts.withPlan ? 'plan' : 'build', todoRow.teamId, opts.prompt);
+  setTodoPhase(s.svc, todoId, 'queued', { latestBuildId: id, lastRunAt: createdAt });
+  return id;
 }
 
 export function machineIdByName(s: TestServer, name: string): string {

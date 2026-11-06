@@ -6,7 +6,7 @@ import { DEMO_MODE } from '../demo/demo-gate.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
 import { SCENARIO_PARAM, SCENARIOS_ENABLED } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { useMembers, useSession, useTeams } from './hooks.js';
+import { useSession, useTeams } from './hooks.js';
 import { isFixtureMode } from './mode.js';
 import { useTeamStream } from './sse.js';
 
@@ -33,19 +33,6 @@ const LiveDataContext = createContext<LiveData>({
 
 export function useLiveData(): LiveData {
   return useContext(LiveDataContext);
-}
-
-export function useAgentAvatarUrlById(): Map<string, string | null> {
-  const { live, teamId } = useLiveData();
-  const members = useMembers(teamId, live);
-  return useMemo(() => {
-    const map = new Map<string, string | null>();
-    for (const m of members.data ?? []) {
-      if (m.memberType !== 'agent') continue;
-      map.set(m.actorId, (m.actor as { avatarUrl?: string | null } | undefined)?.avatarUrl ?? null);
-    }
-    return map;
-  }, [members.data]);
 }
 
 const queryClient = new QueryClient({

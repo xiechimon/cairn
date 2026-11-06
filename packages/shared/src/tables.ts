@@ -15,7 +15,6 @@ export const DB_TABLES = [
   'schedule',
   'schedule_report',
   'notification',
-  'agent',
   'agent_memory',
   'provider',
   'secret',

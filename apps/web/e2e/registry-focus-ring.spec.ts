@@ -5,7 +5,7 @@ const AGENT =
   '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks';
-const AGENT_PERMS = '/app/resources/agents/r3-builder?scenario=agent-detail';
+const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
 const BADGES = '/app?scenario=home-c&pane=machines';
@@ -200,8 +200,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectGlobalOutline(unchecked);
     expect(unchecked.borderTopColor).toBe(hexToRgb(unchecked.inputColor));
 
-    await themed(page, 'dark', AGENT_PERMS);
-    await page.locator('.agent-detail .agent-tab').nth(2).click();
+    await themed(page, 'dark', ROUTING_POLICIES);
     const sw = page.locator('[data-slot="switch"]').first();
     await expect(sw).toBeVisible();
     await focusKeyboard(sw);

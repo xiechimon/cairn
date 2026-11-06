@@ -4,7 +4,6 @@ import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   message as messageTable,
   project as projectTable,
@@ -23,7 +22,7 @@ import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateTodo } from '../src/services/todos.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
 const globalFetch = vi.fn(() => Promise.reject(new Error('Unexpected global fetch')));
 beforeEach(() => {
@@ -293,7 +292,6 @@ function makeWorld(
       phase: opts.phase ?? 'review',
       phaseAt: opts.phaseAt ?? base,
       seqNum: 1,
-      assignment: { plan: null, build: { agentId: `agent-rec-${rnd}` } },
     })
     .run();
   if (opts.olderClosedPr !== undefined) {
@@ -454,7 +452,6 @@ function addReviewCard(w: World, prNumber: number): void {
       phase: 'review',
       phaseAt: Date.now(),
       seqNum: prNumber,
-      assignment: { plan: null, build: null },
     })
     .run();
   w.s.db
@@ -1086,13 +1083,9 @@ describe('#1403 PR reconcile for review-phase builds', () => {
 
   test('㉖b AI review: the reconcile finishes the card while the changes are read → no review step', async () => {
     const w = makeWorld();
-    w.s.db
-      .insert(agentTable)
-      .values({ id: 'agent-x', teamId: w.s.team.id, displayName: 'reviewer x' })
-      .run();
+    seedRoute(w.s, 'review');
     const pending = applyBuildStepAction({ ...w.s.svc, reposDir: '/nonexistent' }, w.buildId, {
       action: 'review',
-      agentId: 'agent-x',
     });
     w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
     await expect(pending).rejects.toThrow('读取变更期间任务相位已变为 done');
@@ -1902,7 +1895,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     w.s.db
       .insert(todoTable)
-      .values({ ...card(parentId, 'building', 10), assignment: { plan: null, build: null } })
+      .values(card(parentId, 'building', 10))
       .run();
     w.s.db.update(todoTable).set({ sourceTodo: parentId }).where(eq(todoTable.id, w.todoId)).run();
     w.s.db
@@ -1911,7 +1904,6 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         ...card(siblingId, 'todo', 11),
         sourceTodo: parentId,
         blockedBy: [w.todoId],
-        assignment: { plan: null, build: { agentId: 'agent-split-next' } },
       })
       .run();
     const phaseOf = (id: string) =>

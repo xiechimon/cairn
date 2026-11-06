@@ -3623,9 +3623,6 @@ exports[`body/envelope schema snapshots > buildStepActionBody > buildStepActionB
           "const": "review",
           "type": "string",
         },
-        "agentId": {
-          "type": "string",
-        },
         "focus": {
           "type": "string",
         },
@@ -5035,25 +5032,6 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "agents": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "displayName": {
-            "type": "string",
-          },
-          "id": {
-            "type": "string",
-          },
-        },
-        "required": [
-          "id",
-          "displayName",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-    },
     "filters": {
       "items": {
         "additionalProperties": false,
@@ -5178,7 +5156,6 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
   "required": [
     "todos",
     "projects",
-    "agents",
   ],
   "type": "object",
 }
@@ -5221,96 +5198,7 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "assignment": {
-      "additionalProperties": false,
-      "properties": {
-        "build": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "agentId": {
-                  "type": "string",
-                },
-              },
-              "required": [
-                "agentId",
-              ],
-              "type": "object",
-            },
-            {
-              "type": "null",
-            },
-          ],
-        },
-        "plan": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "agentId": {
-                  "type": "string",
-                },
-              },
-              "required": [
-                "agentId",
-              ],
-              "type": "object",
-            },
-            {
-              "type": "null",
-            },
-          ],
-        },
-        "review": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "agentId": {
-                  "type": "string",
-                },
-              },
-              "required": [
-                "agentId",
-              ],
-              "type": "object",
-            },
-            {
-              "type": "null",
-            },
-          ],
-        },
-        "source": {
-          "const": "intake-label",
-          "type": "string",
-        },
-        "verify": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "agentId": {
-                  "type": "string",
-                },
-              },
-              "required": [
-                "agentId",
-              ],
-              "type": "object",
-            },
-            {
-              "type": "null",
-            },
-          ],
-        },
-      },
-      "required": [
-        "plan",
-        "build",
-      ],
-      "type": "object",
-    },
+    "assignment": {},
     "routeOverride": {
       "additionalProperties": false,
       "properties": {
@@ -5348,14 +5236,10 @@ exports[`body/envelope schema snapshots > startBuildsBody > startBuildsBody.json
       },
       "type": "array",
     },
-    "withPlan": {
-      "type": "boolean",
-    },
+    "withPlan": {},
   },
   "required": [
     "todoIds",
-    "assignment",
-    "withPlan",
   ],
   "type": "object",
 }
@@ -5813,132 +5697,12 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
         "doc": {
           "additionalProperties": false,
           "properties": {
-            "agent": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "displayName": {
-                      "type": "string",
-                    },
-                    "id": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "id",
-                    "displayName",
-                  ],
-                  "type": "object",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
             "archivedAt": {
               "anyOf": [
                 {
                   "maximum": 9007199254740991,
                   "minimum": -9007199254740991,
                   "type": "integer",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "assignment": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "build": {
-                      "anyOf": [
-                        {
-                          "additionalProperties": false,
-                          "properties": {
-                            "agentId": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agentId",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "type": "null",
-                        },
-                      ],
-                    },
-                    "plan": {
-                      "anyOf": [
-                        {
-                          "additionalProperties": false,
-                          "properties": {
-                            "agentId": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agentId",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "type": "null",
-                        },
-                      ],
-                    },
-                    "review": {
-                      "anyOf": [
-                        {
-                          "additionalProperties": false,
-                          "properties": {
-                            "agentId": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agentId",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "type": "null",
-                        },
-                      ],
-                    },
-                    "source": {
-                      "const": "intake-label",
-                      "type": "string",
-                    },
-                    "verify": {
-                      "anyOf": [
-                        {
-                          "additionalProperties": false,
-                          "properties": {
-                            "agentId": {
-                              "type": "string",
-                            },
-                          },
-                          "required": [
-                            "agentId",
-                          ],
-                          "type": "object",
-                        },
-                        {
-                          "type": "null",
-                        },
-                      ],
-                    },
-                  },
-                  "required": [
-                    "plan",
-                    "build",
-                  ],
-                  "type": "object",
                 },
                 {
                   "type": "null",
@@ -6309,8 +6073,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
             "seqNum",
             "orderIndex",
             "tagIds",
-            "assignment",
-            "agent",
             "latestBuildId",
             "lastRunAt",
             "hasChanges",
@@ -6876,7 +6638,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > DELETE surface ru
 }
 `;
 
-exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > MCP server surface: 24-tool whitelist + six capability groups (02 §7.2) 1`] = `
+exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > MCP server surface: 21-tool whitelist + six capability groups (02 §7.2) 1`] = `
 {
   "MCP_CAPABILITY_GROUPS": [
     "Read the workspace",
@@ -6890,7 +6652,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > MCP server surfac
     "Todos",
     "Projects",
     "Conversation",
-    "Agents",
     "Schedules",
     "Attachment",
     "Skills",
@@ -6903,8 +6664,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > MCP server surfac
     "Create Todo",
     "Update Todo",
     "Message Todo",
-    "Run Builds",
-    "Run Review",
     "Confirm Builds",
     "Merge Builds",
     "Cancel Builds",
@@ -7055,13 +6814,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "githubOauthClientSecret": "CAIRN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "CAIRN_HOME",
     "hookTimeoutMs": "CAIRN_HOOK_TIMEOUT_MS",
-    "intakeAgentAllowlist": "CAIRN_INTAKE_AGENT_ALLOWLIST",
     "issueIntake": "CAIRN_ISSUE_INTAKE",
     "mcpConfig": "CAIRN_MCP_CONFIG",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
     "researchIntakeProjectId": "CAIRN_RESEARCH_INTAKE_PROJECT_ID",
-    "routingRules": "CAIRN_ROUTING_RULES",
     "scheduling": "CAIRN_SCHEDULING",
     "server": "CAIRN_SERVER",
     "skillsDir": "CAIRN_SKILLS_DIR",
@@ -7516,7 +7273,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "schedule",
   "schedule_report",
   "notification",
-  "agent",
   "agent_memory",
   "provider",
   "secret",
@@ -10059,132 +9815,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "agent": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "displayName": {
-              "type": "string",
-            },
-            "id": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "id",
-            "displayName",
-          ],
-          "type": "object",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
     "archivedAt": {
       "anyOf": [
         {
           "maximum": 9007199254740991,
           "minimum": -9007199254740991,
           "type": "integer",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
-    "assignment": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "build": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "agentId": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "agentId",
-                  ],
-                  "type": "object",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "plan": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "agentId": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "agentId",
-                  ],
-                  "type": "object",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "review": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "agentId": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "agentId",
-                  ],
-                  "type": "object",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-            "source": {
-              "const": "intake-label",
-              "type": "string",
-            },
-            "verify": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "agentId": {
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "agentId",
-                  ],
-                  "type": "object",
-                },
-                {
-                  "type": "null",
-                },
-              ],
-            },
-          },
-          "required": [
-            "plan",
-            "build",
-          ],
-          "type": "object",
         },
         {
           "type": "null",
@@ -10555,8 +10191,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
     "seqNum",
     "orderIndex",
     "tagIds",
-    "assignment",
-    "agent",
     "latestBuildId",
     "lastRunAt",
     "hasChanges",

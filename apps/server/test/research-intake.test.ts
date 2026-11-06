@@ -8,7 +8,6 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
-  agent,
   build,
   chiefMessage,
   chiefReport,
@@ -16,6 +15,8 @@ import {
   chiefThread,
   message,
   retroProposal,
+  routingRule,
+  step,
   todo,
   tokenUsage,
   user,
@@ -29,7 +30,7 @@ import { openCitationCheck } from '../src/services/research-citations.js';
 import { planResearchIntake } from '../src/services/research-intake.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, postProject, req, seedRoute } from './helpers.js';
 
 const TZ = 'Asia/Shanghai';
 const DAY_MS = 86_400_000;
@@ -72,37 +73,15 @@ async function world(opts: { github?: { calls: string[] } } = {}) {
   const projectId =
     calls === undefined ? await postProject(s.app, 'cairn') : await postGithubProject(s.app);
   const teamId = s.team.id;
-  s.db
-    .insert(agent)
-    .values({
-      id: 'agent-opus',
-      teamId,
-      displayName: 'opus',
-      provider: 'claude-code',
-      modelId: 'claude-opus-5-5',
-    })
-    .run();
-  s.db
-    .insert(agent)
-    .values({
-      id: 'citation-checker',
-      teamId,
-      displayName: 'Checker',
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
-    })
-    .run();
-  s.db
-    .insert(agent)
-    .values({ id: 'agent-coord', teamId, displayName: 'coord', provider: 'stub-gw', modelId: 'm' })
-    .run();
+  seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-opus-5-5' });
+  seedRoute(s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'm' });
   s.db
     .insert(chiefTable)
     .values({
       id: 'chief-1',
       userId: s.user.id,
       teamId,
-      agentId: 'agent-coord',
       tz: TZ,
       createdAt: 1,
     })
@@ -146,7 +125,6 @@ function addCoordinator(w: World, n: number) {
       id: `chief-${n}`,
       userId,
       teamId: w.teamId,
-      agentId: 'agent-coord',
       tz: TZ,
       createdAt: 1,
     })
@@ -381,7 +359,8 @@ describe('daily intake tick', () => {
       projectId: w.projectId,
       sourceRef: 'research-intake:2026-10-27',
     });
-    expect(row?.assignment).toMatchObject({ build: { agentId: 'agent-opus' } });
+    const [first] = w.s.db.select().from(step).all();
+    expect(first?.kind).toBe('session');
     expect(row?.spec).toContain('package.json');
     expect(row?.spec).toContain('```json');
     expect(row?.spec).toContain('claude-haiku-5-5');
@@ -418,10 +397,10 @@ describe('daily intake tick', () => {
     ).toEqual(['research-intake:2026-10-27', 'research-intake:2026-10-28']);
   });
 
-  test('no Claude Code agent: a clear error, nothing created, and the scheduler survives', async () => {
+  test('no session routing rule: a clear error, nothing created, and the scheduler survives', async () => {
     const w = await world();
-    w.s.db.delete(agent).where(eq(agent.id, 'agent-opus')).run();
-    expect(() => runIntake(w, D1_0630)).toThrow(/Claude Code agent/);
+    w.s.db.delete(routingRule).where(eq(routingRule.use, 'session')).run();
+    expect(() => runIntake(w, D1_0630)).toThrow(/session routing rule/);
     expect(w.s.db.select().from(todo).all()).toHaveLength(0);
     await createScheduler(w.s.svc, {
       tickMs: 60_000,

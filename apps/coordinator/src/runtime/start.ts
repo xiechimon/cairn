@@ -16,7 +16,7 @@ export async function startRuntime(config: CoordinatorConfig, api: MachineApi) {
   const context = BACKGROUND_CONTEXT;
   const models = createCoordinatorModels();
   const gate = createStepGate();
-  const tools = coordinatorToolsExtension(api, gate, { routerTools: config.routerTools });
+  const tools = coordinatorToolsExtension(api, gate);
   let active: ModelRef | null = null;
   const compaction = coordinatorCompactionExtension(() =>
     active === null ? null : { provider: active.provider, modelId: config.summaryModelId },

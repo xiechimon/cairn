@@ -10,7 +10,14 @@ import { describe, expect, test } from 'vitest';
 import { plan as planTable, step as stepTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  postProject,
+  req,
+  seedSessionRoute,
+  startLegacyBuild,
+  type TestServer,
+} from './helpers.js';
 
 interface StepRow {
   id: string;
@@ -33,12 +40,8 @@ async function worldInReview(): Promise<{
       await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'gate', spec: 'body' })
     ).json(),
   );
-  const started = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    todoIds: [todoDoc.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
-  });
-  const b = buildRecordSchema.parse(((await started.json()) as { builds: unknown[] }).builds[0]);
+  seedSessionRoute(s);
+  const b = { id: startLegacyBuild(s, todoDoc.id, { withPlan: true }) };
   const stepsOf = async () =>
     ((await (await req(s.app, 'GET', `/api/builds/${b.id}/steps`)).json()) as unknown[]).map(
       (r) => r as StepRow,
@@ -183,14 +186,8 @@ describe('#701 human rejection at the review gate (the revision action surface r
           })
         ).json(),
       );
-      const started = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        todoIds: [todoDoc.id],
-        assignment: { plan: null, build: null },
-        withPlan: true,
-      });
-      const b = buildRecordSchema.parse(
-        ((await started.json()) as { builds: unknown[] }).builds[0],
-      );
+      seedSessionRoute(s);
+      const b = { id: startLegacyBuild(s, todoDoc.id, { withPlan: true }) };
       const stepsOf = async () =>
         ((await (await req(s.app, 'GET', `/api/builds/${b.id}/steps`)).json()) as unknown[]).map(
           (r) => r as StepRow,

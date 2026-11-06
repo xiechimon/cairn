@@ -13,9 +13,7 @@ import {
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agent,
   build,
-  chief,
   gateDigest,
   gateRound,
   gateState,
@@ -30,7 +28,6 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { isCorrectionTask, recordCorrectionGuard } from './correction.js';
-import { agentForStep } from './dispatch-eligibility.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { readGithubAutonomyPause } from './github-autonomy-brake.js';
 import { teamGithubToken } from './github-connection.js';
@@ -53,6 +50,7 @@ import { type FinalVerdictLine, parseFinalVerdictLine } from './merge-gate/verdi
 import { githubGatePort } from './merge-gate-github.js';
 import { effectiveModel } from './model-fallback.js';
 import { projectMergeConfigOf } from './projects.js';
+import { coordinatorProfile, profileForStep, routeForStep } from './routing-rules.js';
 import { notifyEvaluatedReview, pendingReviewPushEntry } from './thread-push.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -186,14 +184,6 @@ export async function evaluateMergeGate(
     );
   }
   const steps = deps.db.select().from(step).where(eq(step.buildId, buildId)).all();
-  const agents = new Map(
-    deps.db
-      .select()
-      .from(agent)
-      .where(eq(agent.teamId, todoRow.teamId))
-      .all()
-      .map((row) => [row.id, row]),
-  );
   const stored = deps.db.select().from(gateVerdict).where(eq(gateVerdict.buildId, buildId)).all();
   if (digest?.patchDigest != null && head !== null) {
     for (const row of stored) {
@@ -242,13 +232,11 @@ export async function evaluateMergeGate(
     answers.set(record.stepId, parsed.data);
   }
   const reviewModelOf = (reviewStep: typeof step.$inferSelect): string | null => {
-    const reviewer = agentForStep(deps.db, todoRow, 'review', reviewStep.prompt);
+    const reviewer = profileForStep(deps.db, todoRow, 'review');
     return reviewer === null ? null : effectiveModel(reviewer, reviewStep).modelId;
   };
-  const perspectiveOf = (prompt: string | null): string => {
-    const id = parseReviewPromptMeta(prompt)?.agentId;
-    return (id !== undefined ? agents.get(id)?.persona : null) ?? 'review';
-  };
+  const perspectiveOfStep = (stepId: string): string =>
+    stored.find((row) => row.stepId === stepId)?.perspective ?? 'review';
   const views: GateVerdictView[] = stored.map((row) => {
     const reviewStep = steps.find((item) => item.id === row.stepId);
     const meta = reviewStep?.kind === 'review' ? parseReviewPromptMeta(reviewStep.prompt) : null;
@@ -256,7 +244,7 @@ export async function evaluateMergeGate(
     const answer = answers.get(row.stepId);
     return {
       kind: row.kind,
-      perspective: row.perspective ?? (reviewStep ? perspectiveOf(reviewStep.prompt) : null),
+      perspective: row.perspective ?? (reviewStep ? 'review' : null),
       outcome: row.outcome,
       patchDigest: row.patchDigest,
       headSha: row.headSha,
@@ -268,7 +256,7 @@ export async function evaluateMergeGate(
   });
   const perspectives = [
     ...new Set(
-      steps.filter((item) => item.kind === 'review').map((item) => perspectiveOf(item.prompt)),
+      steps.filter((item) => item.kind === 'review').map((item) => perspectiveOfStep(item.id)),
     ),
   ];
   const buildSteps = steps
@@ -276,13 +264,8 @@ export async function evaluateMergeGate(
     .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt));
   const authorStep = buildSteps.at(-1);
   const authorAgent =
-    authorStep !== undefined
-      ? agentForStep(deps.db, todoRow, authorStep.kind, authorStep.prompt)
-      : null;
-  const chiefRow = deps.db.select().from(chief).where(eq(chief.teamId, todoRow.teamId)).get();
-  const verifier =
-    todoRow.assignment?.verify?.agentId != null ||
-    [...agents.values()].some((item) => item.persona === 'verifier');
+    authorStep !== undefined ? profileForStep(deps.db, todoRow, authorStep.kind) : null;
+  const verifier = routeForStep(deps.db, todoRow, 'session') !== null;
   const policy = autonomousMergePolicy(
     deps.db,
     todoRow.teamId,
@@ -331,7 +314,7 @@ export async function evaluateMergeGate(
     availability: {
       reviewerPerspectives: perspectives,
       verifier,
-      decider: chiefRow?.agentId != null,
+      decider: coordinatorProfile(deps.db, todoRow.teamId) !== null,
     },
     harnessEvalText: facts.harnessEvalText,
     ...(facts.harnessEval !== null ? { harnessEval: facts.harnessEval } : {}),
@@ -364,7 +347,7 @@ export async function evaluateMergeGate(
     const dispatches = Object.fromEntries(
       steps
         .filter((item) => item.kind === 'review')
-        .map((item) => [perspectiveOf(item.prompt), { count: 1, lastAt: item.createdAt }]),
+        .map((item) => [perspectiveOfStep(item.id), { count: 1, lastAt: item.createdAt }]),
     );
     const existing = deps.db
       .select()

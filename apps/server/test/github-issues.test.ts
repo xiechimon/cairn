@@ -11,7 +11,6 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   project as projectTable,
   tag as tagTable,
   todo as todoTable,
@@ -22,11 +21,11 @@ import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
   req,
+  seedSessionRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -572,8 +571,6 @@ describe('POST /api/projects/{id}/github/issues/import (D17-D22)', () => {
 });
 
 describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', () => {
-  const AGENT_ID = 'agent-446';
-
   async function world(kind: 'github' | 'plain', viaImport: boolean) {
     const mock = ghMock(defaultRoutes());
     const s = bootServer({ githubFetch: mock.impl, claimHoldMs: 250 });
@@ -584,17 +581,7 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       body: { teamId: s.team.id, name: 'l446', cliVersion: '0.1.0' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({
-        id: AGENT_ID,
-        teamId: s.team.id,
-        displayName: 'meta',
-        provider: 'p',
-        modelId: 'm',
-      })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, { provider: 'p', modelId: 'm' });
 
     const projectId = kind === 'github' ? await postGithubProject(s.app) : await postProject(s.app);
     let todoId: string;
@@ -610,11 +597,7 @@ describe('set_task_meta vocabulary invariant two shapes (E23-E26 / F27-F28)', ()
       todoId = ((await todoRes.json()) as { id: string }).id;
     }
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: null, build: { agentId: AGENT_ID } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoId] },
     });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,

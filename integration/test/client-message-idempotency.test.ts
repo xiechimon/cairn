@@ -1,15 +1,21 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { chiefMessage, step } from '../../apps/server/src/db/schema.js';
-import { AGENT_ID, api, bootRealServer, type RealServer } from './helpers.js';
+import { api, bootRealServer, type RealServer } from './helpers.js';
 
 let server: RealServer;
 
 beforeEach(async () => {
   server = await bootRealServer({ providerBaseUrl: 'http://127.0.0.1:9' });
-  const bound = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-    agent: { agentId: AGENT_ID, thinkingLevel: null },
-  });
+  const bound = await api(
+    server.url,
+    'PATCH',
+    `/api/teams/${server.teamId}/routing-rules/coordinator`,
+    {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+    },
+  );
   expect(bound.status).toBe(200);
 });
 
