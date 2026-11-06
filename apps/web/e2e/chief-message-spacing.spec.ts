@@ -38,7 +38,8 @@ test('text gaps match Claude.ai (52px after a user message, 36px after a reply) 
     gaps.push(b.y - (a.y + a.height));
   }
   for (const [index, gap] of gaps.entries()) {
-    expect(gap, `gap after ${TEXTS[index]}`).toBeLessThanOrEqual(index % 2 === 0 ? 60 : 36);
+    const target = index % 2 === 0 ? 52 : 36;
+    expect(Math.abs(gap - target), `gap after ${TEXTS[index]} is ${gap}`).toBeLessThanOrEqual(4);
   }
   const older = page.getByTestId('home-c').getByTestId('chief-msg').first();
   const tools = older.locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]');

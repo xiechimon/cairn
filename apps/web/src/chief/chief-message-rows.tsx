@@ -69,7 +69,8 @@ const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const MSG_ROW_CLS = 'mt-4';
+const USER_ROW_CLS = 'mt-6';
+const REPLY_ROW_CLS = 'mt-9';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
@@ -353,7 +354,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'user')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`${MSG_ROW_CLS} justify-end`} data-testid="chief-msg">
+        <Message className={`${USER_ROW_CLS} justify-end`} data-testid="chief-msg">
           <MessageContent
             className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
             data-testid="chief-msg-col"
@@ -400,7 +401,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'thinking')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${MSG_ROW_CLS}`}>
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ThinkingRow text={item.text} />
           </MessageContent>
@@ -410,7 +411,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${MSG_ROW_CLS}`}>
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
             <ChiefQuestionCard
               item={item}
@@ -442,7 +443,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     ];
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
-        <Message className={MSG_ROW_CLS} data-testid="chief-msg">
+        <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
           <MessageContent className={MSG_COL_LIVE_CLS}>
             <LiveRow
               variant="chief"
@@ -470,7 +471,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   const tools = turnToolSteps(item.tools);
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message className={MSG_ROW_CLS} data-testid="chief-msg">
+      <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           {tools.length > 0 && (
             <TraceGroup
