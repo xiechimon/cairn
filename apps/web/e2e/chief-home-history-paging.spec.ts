@@ -88,6 +88,7 @@ test('a newest page too short to fill the view keeps loading older pages until h
   page,
 }) => {
   const requested = await mockPagedHistory(page, 9, 3);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/app');
   await expect(row(page, 'question 0')).toHaveCount(1);
   expect(requested).toEqual([null, 'h-0006', 'h-0003']);
