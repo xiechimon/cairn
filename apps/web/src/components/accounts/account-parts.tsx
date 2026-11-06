@@ -440,7 +440,7 @@ export function VendorTabs({
   value: AccountVendor;
   counts: Record<AccountVendor, number>;
   onChange: (vendor: AccountVendor) => void;
-  onAdd: () => void;
+  onAdd?: () => void;
 }) {
   const { t } = useI18n();
   return (
@@ -466,15 +466,17 @@ export function VendorTabs({
           };
         })}
       />
-      <Button
-        variant="ghost"
-        className="ml-auto flex-none"
-        aria-label={t('添加 {vendor} 账户', { vendor: VENDORS[value].label })}
-        onClick={onAdd}
-      >
-        <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-        <span className="hidden sm:inline">{t('添加账户')}</span>
-      </Button>
+      {onAdd !== undefined && (
+        <Button
+          variant="ghost"
+          className="ml-auto flex-none"
+          aria-label={t('添加 {vendor} 账户', { vendor: VENDORS[value].label })}
+          onClick={onAdd}
+        >
+          <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+          <span className="hidden sm:inline">{t('添加账户')}</span>
+        </Button>
+      )}
     </div>
   );
 }

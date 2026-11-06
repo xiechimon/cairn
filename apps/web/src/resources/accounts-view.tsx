@@ -25,7 +25,7 @@ export interface SubscriptionAccountsProps {
   now: number;
   actionsFor: (account: SubscriptionAccount) => AccountRowActions;
   statusFor?: (account: SubscriptionAccount) => ReactNode;
-  onAdd: (vendor: AccountVendor) => void;
+  onAdd?: (vendor: AccountVendor) => void;
   vendor?: AccountVendor;
   onVendorChange?: (vendor: AccountVendor) => void;
   gate?: (vendor: AccountVendor, section: ReactNode) => ReactNode;
@@ -94,7 +94,7 @@ export function SubscriptionAccounts(props: SubscriptionAccountsProps) {
           setLocalVendor(next);
           props.onVendorChange?.(next);
         }}
-        onAdd={() => props.onAdd(vendor)}
+        onAdd={props.onAdd === undefined ? undefined : () => props.onAdd?.(vendor)}
       />
       {(props.gate ?? ((_vendor, section) => section))(
         vendor,

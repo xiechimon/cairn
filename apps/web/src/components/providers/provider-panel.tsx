@@ -1,8 +1,8 @@
 import { cn } from 'cn';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { SettingsCard, SettingsFlat } from '../settings-list.js';
+import { SettingsPanel } from '../settings-list.js';
 import { ToggleSwitch } from '../toggle-switch.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
@@ -108,21 +108,20 @@ export function ProviderPanel({
   items,
   selectedId,
   onSelect,
-  onAdd,
+  header,
   empty,
   children,
 }: {
   items: ProviderItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onAdd?: () => void;
+  header?: ReactNode;
   empty?: ReactNode;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
   return (
-    <div className="@container">
-      <SettingsCard className="overflow-hidden @3xl:grid @3xl:grid-cols-[17rem_minmax(0,1fr)]">
+    <SettingsPanel header={header}>
+      <div className="flex min-w-0 flex-col @3xl:grid @3xl:grid-cols-[17rem_minmax(0,1fr)]">
         <div
           data-testid="provider-list"
           className="flex flex-col divide-y divide-border border-b border-border @3xl:border-r @3xl:border-b-0"
@@ -135,22 +134,12 @@ export function ProviderPanel({
               onSelect={() => onSelect(item.id)}
             />
           ))}
-          {onAdd !== undefined && (
-            <Button
-              variant="ghost"
-              onClick={onAdd}
-              className="h-auto justify-start gap-2.5 rounded-none px-3.5 py-3 text-ui font-normal text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover"
-            >
-              <Plus aria-hidden className="size-4" />
-              {t('添加服务商')}
-            </Button>
-          )}
         </div>
         <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
-          <SettingsFlat>{items.length === 0 ? empty : children}</SettingsFlat>
+          {items.length === 0 ? empty : children}
         </div>
-      </SettingsCard>
-    </div>
+      </div>
+    </SettingsPanel>
   );
 }
 

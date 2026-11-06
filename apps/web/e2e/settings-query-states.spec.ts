@@ -121,7 +121,8 @@ test('providers: a failed team providers fetch does not hide the machine scope e
   await page.goto('/app/settings/providers');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('query-error')).toBeVisible();
-  await settings.getByRole('tab', { name: /alpha/ }).click();
+  await settings.getByRole('combobox', { name: '作用于' }).click();
+  await page.getByRole('option', { name: /alpha/ }).click();
   await expect(settings.getByTestId('query-error')).toHaveCount(0);
   await expect(settings.getByTestId('provider-instance').first()).toBeVisible();
 });

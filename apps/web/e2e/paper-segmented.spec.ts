@@ -26,11 +26,6 @@ const CONTROLS: Control[] = [
     track: (page) => page.getByRole('banner').getByRole('tablist'),
   },
   {
-    name: 'providers runtime',
-    url: '/app/resources/providers?scenario=10',
-    track: (page) => page.getByRole('tablist', { name: '范围' }),
-  },
-  {
     name: 'settings appearance',
     url: '/app/settings/appearance?scenario=01',
     track: (page) => page.getByRole('radiogroup', { name: '外观' }),
@@ -143,7 +138,7 @@ function hexToRgb(hex: string) {
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 }
 
-for (const control of [CONTROLS[1], CONTROLS[3]]) {
+for (const control of [CONTROLS[1]]) {
   test(`${control.name}: keyboard focus draws the ring inside the option`, async ({ page }) => {
     await themed(page, 'light', control.url);
     const option = control.track(page).locator('[data-segmented="option"][data-active]');

@@ -1,5 +1,6 @@
 import type { ClaudeUsage, ProviderRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
@@ -26,7 +27,9 @@ import {
   useModelRouting,
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { VENDORS } from '../components/accounts/account-parts.js';
 import { QueryGate } from '../components/query-gate.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import {
   SettingsCard,
@@ -36,6 +39,7 @@ import {
   SettingsSegmented,
 } from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
+import { Button } from '../components/ui/button.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -172,25 +176,56 @@ export function ModelRoutingPage() {
     );
   };
 
+  const addAccount = (target: AccountVendor) => {
+    if (target === 'claude') {
+      createSubscription.reset();
+      setAdding(true);
+      return;
+    }
+    const params = new URLSearchParams({ add: VENDOR_PRESETS[target] });
+    const scenario = searchParams.get('scenario');
+    if (scenario !== null) params.set('scenario', scenario);
+    navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
+  };
+
   return (
     <PageShell
       route={MODEL_ROUTING_HREF}
       title={t('模型路由')}
       selected={MODEL_ROUTING_HREF}
       fixture={fixture}
-      tabs={[
-        { id: 'accounts', label: '账户' },
-        { id: 'routing', label: '路由' },
-      ]}
-      tab={tab}
-      onTab={(next) => {
-        const params = new URLSearchParams(searchParams);
-        if (next === 'routing') params.set('tab', 'routing');
-        else params.delete('tab');
-        setSearchParams(params, { replace: true });
-      }}
     >
-      <SettingsPanel>
+      <SettingsPanel
+        header={
+          <>
+            <SegmentedTabs
+              label={t('视图')}
+              value={tab}
+              onChange={(next) => {
+                const params = new URLSearchParams(searchParams);
+                if (next === 'routing') params.set('tab', 'routing');
+                else params.delete('tab');
+                setSearchParams(params, { replace: true });
+              }}
+              options={[
+                { value: 'accounts', label: t('账户') },
+                { value: 'routing', label: t('路由') },
+              ]}
+            />
+            {tab === 'accounts' && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('添加 {vendor} 账户', { vendor: VENDORS[vendor].label })}
+                title={t('添加账户')}
+                onClick={() => addAccount(vendor)}
+              >
+                <Plus aria-hidden strokeWidth={1.75} />
+              </Button>
+            )}
+          </>
+        }
+      >
         <div className="p-4">
           {tab === 'accounts' ? (
             <SubscriptionAccounts
@@ -208,17 +243,6 @@ export function ModelRoutingPage() {
                 const params = new URLSearchParams(searchParams);
                 params.set('vendor', next);
                 setSearchParams(params, { replace: true });
-              }}
-              onAdd={(vendor) => {
-                if (vendor === 'claude') {
-                  createSubscription.reset();
-                  setAdding(true);
-                  return;
-                }
-                const params = new URLSearchParams({ add: VENDOR_PRESETS[vendor] });
-                const scenario = searchParams.get('scenario');
-                if (scenario !== null) params.set('scenario', scenario);
-                navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
               }}
               statusFor={(account) =>
                 verifying === account.id ? (

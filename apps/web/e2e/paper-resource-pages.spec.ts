@@ -55,17 +55,6 @@ test('machines: `添加机器` is the plus beside the list heading, no dashed fu
   await expect(local.locator('[data-on]')).toHaveCSS('background-color', 'rgb(95, 143, 79)');
 });
 
-test('providers scope tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
-  await light(page, '/app/resources/providers?scenario=06');
-  const list = page.getByRole('tablist', { name: '范围' });
-  await expect(list).toHaveCSS('background-color', 'rgb(230, 231, 225)');
-  const chosen = list.getByRole('tab', { selected: true });
-  await expect(chosen).toHaveCSS('background-color', 'rgb(253, 253, 251)');
-  const ring = await chosen.evaluate((el) => getComputedStyle(el).boxShadow);
-  expect(ring).toContain('0px 0px 0px 1px');
-  await expect(chosen).toHaveCSS('height', '28px');
-});
-
 for (const [name, url, open, submit] of [
   ['secret', '/app/resources/secrets?scenario=01', '新建', '添加密钥'],
   ['skill', '/app/resources/skills?scenario=06', '新建', '新建技能'],

@@ -1,6 +1,6 @@
 import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared';
 import { MACHINE_RUNTIMES } from '@cairn/shared';
-import { Cpu } from 'lucide-react';
+import { Cpu, Plus } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useModelSources, useProviders } from '../api/hooks.js';
@@ -10,7 +10,14 @@ import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
 import { QueryGate } from '../components/query-gate.js';
-import { SegmentedTabs } from '../components/segmented.js';
+import { Button } from '../components/ui/button.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -20,7 +27,6 @@ import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
 import { PROVIDERS_HREF } from './hrefs.js';
-import { ResourceNewButton } from './parts.js';
 import {
   ClaudeCodeEditor,
   claudeCodeStatus,
@@ -258,34 +264,68 @@ export function ProvidersPage() {
   const itemParam = searchParams.get('item');
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
+  const scopeOptions = [
+    { value: TEAM_SCOPE, label: t('团队') },
+    ...machines.flatMap((m) =>
+      m.id === undefined ? [] : [{ value: m.id, label: scopeLabel(m, t) }],
+    ),
+  ];
   return (
     <PageShell
       route={PROVIDERS_HREF}
       title={t('模型服务')}
       selected={PROVIDERS_HREF}
-      actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
-      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-2 pb-16">
-        <div className="overflow-x-auto pb-1">
-          <SegmentedTabs
-            label={t('范围')}
+      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-4 pb-16">
+        <div className="flex items-center gap-2 px-1 text-meta text-content-tertiary">
+          <span id="provider-scope-label">{t('作用于')}</span>
+          <Select
             value={scope}
-            onChange={(next) => setParams({ scope: next === TEAM_SCOPE ? null : next, item: null })}
-            options={[
-              { value: TEAM_SCOPE, label: t('团队') },
-              ...machines.flatMap((m) =>
-                m.id === undefined ? [] : [{ value: m.id, label: scopeLabel(m, t) }],
-              ),
-            ]}
-          />
+            onValueChange={(next) =>
+              setParams({ scope: next === TEAM_SCOPE ? null : (next as string), item: null })
+            }
+          >
+            <SelectTrigger
+              aria-labelledby="provider-scope-label"
+              size="sm"
+              className="text-ui text-foreground"
+            >
+              <SelectValue>
+                {scopeOptions.find((option) => option.value === scope)?.label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent aria-label={t('范围')}>
+              {scopeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <QueryGate query={machine === undefined ? providersQ : sourcesQ} live={live}>
           <ProviderPanel
+            header={
+              <div className="flex items-center gap-1">
+                <h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>
+                {machine === undefined && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('添加服务商')}
+                    title={t('添加服务商')}
+                    data-testid="resource-new"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus aria-hidden strokeWidth={1.75} />
+                  </Button>
+                )}
+              </div>
+            }
             items={entries.map((e) => e.item)}
             selectedId={selected?.item.id ?? null}
             onSelect={(id) => setParams({ item: id })}
-            onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
             empty={
               <EmptyState
                 testId="providers-empty"

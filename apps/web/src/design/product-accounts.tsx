@@ -87,7 +87,7 @@ function ProviderPanelSpecimen() {
       items={items}
       selectedId={selected}
       onSelect={setSelected}
-      onAdd={() => undefined}
+      header={<h2 className="m-0 text-card-title font-semibold text-foreground">Providers</h2>}
     >
       <SettingsCard>
         <ProviderModelRow
@@ -219,7 +219,7 @@ export function AccountsSection() {
         title="Provider panel"
         note="Providers page: list of instances (status dot ok, warn, off; optional runtime switch) beside the selected one's editor; model rows show name, id, retired, remove"
         stage="sheet"
-        code={`<ProviderPanel items={items} selectedId={id} onSelect={select} onAdd={add}>{editor}</ProviderPanel>`}
+        code={`<ProviderPanel items={items} selectedId={id} onSelect={select} header={title}>{editor}</ProviderPanel>`}
       >
         <div className="w-full">
           <ProviderPanelSpecimen />

@@ -1837,4 +1837,7 @@ export const EN: Record<string, string> = {
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
   '无法加载，请重试。': 'Could not load. Try again.',
   正在加载: 'Loading',
+  作用于: 'Applies to',
+  视图: 'View',
+  '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
 };
