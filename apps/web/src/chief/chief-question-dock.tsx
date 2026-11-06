@@ -120,7 +120,7 @@ export function ChiefQuestionDock({
   const { t } = useI18n();
   const _root = useOptionalChiefRoot();
   const [searchParams] = useSearchParams();
-  const numberKeys = searchParams.get(THREAD_PARAM) === null;
+  const numberKeys = composer !== undefined && searchParams.get(THREAD_PARAM) === null;
   const pending = useShownQuestions();
   const [index, setIndex] = useState(0);
   useSyncExternalStore(

@@ -328,6 +328,22 @@ export function ChiefQuestionCard({
       latest.composer.setText('');
     };
   }, []);
+  const boundComposerRef = useRef(composer);
+  useEffect(() => {
+    const previous = boundComposerRef.current;
+    boundComposerRef.current = composer;
+    if (!pending) return;
+    if (previous !== undefined && composer === undefined) {
+      const stored = withComposerText(drafts[step], questions[step], previous.text);
+      if (stored !== undefined)
+        commit(
+          drafts.map((draftAt, index) => (index === step ? stored : draftAt)),
+          step,
+        );
+      previous.setText('');
+    }
+    if (previous === undefined && composer !== undefined) composer.setText(textOf(drafts[step]));
+  }, [composer === undefined]);
   const wasSubmittingRef = useRef(submitting);
   useEffect(() => {
     const was = wasSubmittingRef.current;

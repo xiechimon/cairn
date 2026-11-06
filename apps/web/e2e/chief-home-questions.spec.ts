@@ -676,3 +676,44 @@ test('targeting a thread turns the composer back into a normal send and leaves t
   expect(answered).toEqual([]);
   await expect(page.getByTestId('chief-question-card')).toBeVisible();
 });
+
+test('with a thread targeted, digits type, option clicks and page switches leave the thread draft alone', async ({
+  page,
+}) => {
+  const answered: string[] = [];
+  const messaged: { content?: string }[] = [];
+  const withTodo = { ...structuredClone(TWO), todos: [{ ...TASK, phase: 'confirm' }] };
+  await mockLive(page, withTodo, (path, route, json) => {
+    if (path.endsWith('/answer') && route.request().method() === 'POST') {
+      answered.push(path);
+      return json({});
+    }
+    if (/^\/api\/todos\/[^/]+\/messages$/.test(path) && route.request().method() === 'POST') {
+      messaged.push(route.request().postDataJSON());
+      return json({ todoId: 'todo-1', conversationId: 'build-1', delivered: 'revision' }, 201);
+    }
+    return undefined;
+  });
+  await page.goto('/app');
+  const composer = page.getByTestId('chief-composer-input');
+  await page.getByRole('button', { name: '对某个 thread 说' }).click();
+  await page.getByRole('menuitemradio').filter({ hasText: '#9' }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await composer.click();
+  await expect(composer).toBeFocused();
+  await page.keyboard.type('1abc');
+  await expect(composer).toHaveValue('1abc');
+  await expect(page.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'false');
+  await page.getByTestId('chief-question-option-0-1').click();
+  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(composer).toHaveValue('1abc');
+  await page.getByTestId('chief-question-next').click();
+  await expect(page.getByTestId('chief-question-position')).toHaveText('2 / 2');
+  await expect(composer).toHaveValue('1abc');
+  await page.getByTestId('chief-question-prev').click();
+  await expect(composer).toHaveValue('1abc');
+  await composer.press('Enter');
+  await expect.poll(() => messaged.length).toBe(1);
+  expect(messaged[0]?.content).toBe('1abc');
+  expect(answered).toEqual([]);
+});

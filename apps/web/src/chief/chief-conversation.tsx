@@ -734,7 +734,10 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} composer={{ text: wire.draft, setText: wire.setDraft }} />
+        <ChiefQuestionDock
+          home={home}
+          {...(answerHere ? { composer: { text: wire.draft, setText: wire.setDraft } } : {})}
+        />
         {composerReplacement ?? (
           <>
             {composerError != null && (
