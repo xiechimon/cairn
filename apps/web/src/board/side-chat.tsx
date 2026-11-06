@@ -227,6 +227,7 @@ function ThreadBody({
           spec={todo.spec.trim() !== '' ? todo.spec : undefined}
           autoScroll={chat.transcript.length > 0}
           running={threadStatus(todo) === 'running'}
+          settled={chat.transcriptSettled}
           threadKey={todo.id}
         />
       )}

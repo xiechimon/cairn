@@ -46,6 +46,7 @@ export interface ThreadChat {
   transcript: TranscriptItem[];
   buildId: string | null;
   buildLegDone: boolean;
+  transcriptSettled: boolean;
   infoOutput: boolean;
   buildAgentId: string | null;
   planDoc: DocBlock[] | undefined;
@@ -325,6 +326,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     },
     wire,
     buildLegDone: hasDoneBuildLeg(steps),
+    transcriptSettled:
+      !live ||
+      (!todoQ.isPending &&
+        (buildId === null || (!buildQ.isPending && !stepsQ.isPending && !messagesQ.isPending))),
     started,
     locked: !open,
     running,

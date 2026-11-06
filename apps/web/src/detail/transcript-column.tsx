@@ -30,6 +30,7 @@ interface TranscriptColumnProps {
   spec?: string;
   autoScroll: boolean;
   running?: boolean;
+  settled?: boolean;
   threadKey?: string;
 }
 
@@ -54,6 +55,7 @@ function TranscriptColumnInner({
   onOpenPlan,
   spec,
   running,
+  settled = true,
   threadKey,
   handleRef,
 }: Omit<TranscriptColumnProps, 'autoScroll'> & {
@@ -64,7 +66,7 @@ function TranscriptColumnInner({
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const anchoredKey = useRef<string | undefined>(undefined);
-  const anchor = running === undefined ? null : openingAnchor(running, transcript);
+  const anchor = running === undefined || !settled ? null : openingAnchor(running, transcript);
   useEffect(() => {
     if (anchor === null || anchoredKey.current === threadKey) return;
     anchoredKey.current = threadKey;
