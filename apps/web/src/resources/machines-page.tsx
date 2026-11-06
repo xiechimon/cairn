@@ -10,6 +10,7 @@ import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
+import { withCodeSpans } from '../components/notice-banner.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
@@ -520,12 +521,15 @@ export function MachinesPage() {
                 </span>
                 {loginWarning !== null && (
                   <span
-                    className="basis-full text-meta"
+                    className={cn(
+                      'basis-full text-meta',
+                      notice?.kind === 'expired' && 'font-medium text-foreground',
+                    )}
                     data-testid="claude-login-warning"
                     data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
                     role="status"
                   >
-                    {loginWarning}
+                    {withCodeSpans(loginWarning)}
                   </span>
                 )}
               </ResourceRow>

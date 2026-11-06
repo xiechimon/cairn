@@ -27,7 +27,7 @@ import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
-import { fleetStatusLine } from './fleet-status.js';
+import { fleetSummary } from './fleet-status.js';
 import { needsYouCount } from './needs-you.js';
 import { splitProjectsByArchive } from './project-archive.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
@@ -245,11 +245,10 @@ export function BoardSidebar({
   const activityLink = {
     to: { pathname: ACTIVITY_PATH, search: plain },
   };
-  const offlineLabel =
-    fleetStatusLine(
-      { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
-      t,
-    ) ?? '';
+  const fleet = fleetSummary(
+    { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
+    t,
+  );
 
   if (collapsed) {
     const railLink = (
@@ -322,17 +321,16 @@ export function BoardSidebar({
               );
             })}
         </nav>
-        {machinesOffline > 0 && (
+        {fleet != null && (
           <Link
-            {...railLink(
-              { pathname: settingsHref('machines'), search: plain },
-              false,
-              offlineLabel,
-            )}
+            {...railLink({ pathname: settingsHref('machines'), search: plain }, false, fleet.title)}
             data-testid="sidebar-attention"
+            data-fleet={fleet.tone}
           >
             <Server className={ICON} strokeWidth={STROKE} />
-            <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--chip-confirm-fg)" />
+            {fleet.tone === 'offline' && (
+              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+            )}
           </Link>
         )}
         <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings">
@@ -425,7 +423,7 @@ export function BoardSidebar({
             {t('项目')}
             <ChevronDown
               aria-hidden
-              className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+              className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
               strokeWidth={STROKE}
             />
           </Button>
@@ -490,7 +488,7 @@ export function BoardSidebar({
               <span className="tabular-nums">{archivedRows.length}</span>
               <ChevronDown
                 aria-hidden
-                className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+                className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
                 strokeWidth={STROKE}
               />
             </Button>
@@ -510,30 +508,39 @@ export function BoardSidebar({
         )}
       </nav>
 
-      <div data-testid="sidebar-footer" className="flex flex-none flex-col gap-1 pt-2">
-        <div className="flex w-full items-center gap-0.5">
-          <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
-            <Settings className={ICON} strokeWidth={STROKE} />
+      <div
+        data-testid="sidebar-footer"
+        className="box-content flex h-8 flex-none items-center gap-0.5 pt-2"
+      >
+        <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
+          <Settings className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
+          <Activity className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        {usageNav && (
+          <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
+            <ChartColumn className={ICON} strokeWidth={STROKE} />
           </SidebarFooterIcon>
-          <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
-            <Activity className={ICON} strokeWidth={STROKE} />
-          </SidebarFooterIcon>
-          {usageNav && (
-            <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
-              <ChartColumn className={ICON} strokeWidth={STROKE} />
-            </SidebarFooterIcon>
-          )}
-        </div>
-        {machinesOffline > 0 && (
-          <Link
-            data-testid="sidebar-attention"
-            to={{ pathname: settingsHref('machines'), search: plain }}
-            title={offlineLabel}
-            className={`flex min-h-6 w-full min-w-0 items-start gap-1.5 rounded-md bg-(--chip-confirm-bg) px-2 py-1 text-caption font-medium text-(--chip-confirm-fg) no-underline ${FOCUS}`}
-          >
-            <span aria-hidden className="mt-1 size-1.5 flex-none rounded-full bg-current" />
-            <span className="min-w-0 break-words">{offlineLabel}</span>
-          </Link>
+        )}
+        {fleet != null && (
+          <div className="@container flex min-w-0 flex-1 justify-end">
+            <Link
+              data-testid="sidebar-attention"
+              data-fleet={fleet.tone}
+              to={{ pathname: settingsHref('machines'), search: plain }}
+              title={fleet.title}
+              aria-label={fleet.title}
+              className={`flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 text-caption whitespace-nowrap text-content-tertiary no-underline hover:text-content-secondary ${FOCUS}`}
+            >
+              <span
+                aria-hidden
+                className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-content-tertiary'}`}
+              />
+              <span className="@min-[9rem]:hidden">{fleet.short}</span>
+              <span className="hidden @min-[9rem]:inline">{fleet.label}</span>
+            </Link>
+          </div>
         )}
       </div>
     </aside>

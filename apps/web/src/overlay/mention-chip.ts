@@ -5,11 +5,11 @@ const CHIP_BASE =
 
 const KIND_CHIP_CLS: Record<string, string> = {
   todo: 'cursor-pointer',
-  agent: 'bg-(--chip-done-bg) text-(--chip-done-fg)',
-  project: 'bg-(--tile-orange-bg) text-(--tile-orange-fg)',
-  machine: 'bg-(--chip-idle-bg) text-(--col-dot-building)',
-  skill: 'bg-(--chip-idle-bg) text-(--chip-idle-fg)',
-  file: 'bg-(--chip-idle-bg) text-(--chip-idle-fg)',
+  agent: 'bg-secondary text-content-secondary',
+  project: 'bg-secondary text-content-secondary',
+  machine: 'bg-secondary text-content-secondary',
+  skill: 'bg-secondary text-content-secondary',
+  file: 'bg-secondary text-content-secondary',
 };
 
 export function mentionChipClass(kind: string | null | undefined): string {
@@ -22,10 +22,10 @@ const ICON_BASE =
 
 const KIND_ICON_CLS: Record<string, string> = {
   todo: 'bg-(--spot-text-on-tint)/18 text-(--spot-text-on-tint)',
-  skill: 'bg-(--chip-idle-fg)/18 text-(--chip-idle-fg)',
-  agent: 'bg-(--col-dot-done)/18 text-(--col-dot-done)',
-  project: 'bg-(--tile-orange-fg)/18 text-(--tile-orange-fg)',
-  machine: 'bg-(--col-dot-building)/18 text-(--col-dot-building)',
+  skill: 'text-content-secondary',
+  agent: 'text-content-secondary',
+  project: 'text-content-secondary',
+  machine: 'text-content-secondary',
 };
 
 export function mentionIconClass(kind: string): string {

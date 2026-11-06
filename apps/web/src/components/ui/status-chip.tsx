@@ -4,11 +4,11 @@ import type { ReactNode } from 'react';
 import { Badge } from './badge.js';
 
 const TONE_SKIN = {
-  idle: 'bg-(--chip-idle-bg) text-(--chip-idle-fg)',
-  plan: 'bg-(--chip-plan-bg) text-(--chip-plan-fg)',
-  confirm: 'bg-(--chip-confirm-bg) text-(--chip-confirm-fg)',
-  done: 'bg-(--chip-done-bg) text-(--chip-done-fg)',
-  failed: 'bg-(--chip-failed-bg) text-(--chip-failed-fg)',
+  idle: 'bg-secondary text-content-secondary',
+  plan: 'bg-secondary text-content-secondary',
+  confirm: 'bg-secondary text-(--waiting-ink)',
+  done: 'bg-secondary text-content-secondary',
+  failed: 'bg-secondary text-destructive',
 } as const;
 
 const TONE_ICON = {
@@ -31,7 +31,7 @@ export function StatusChip({ tone, className, children }: StatusChipProps) {
   const Icon = TONE_ICON[tone];
   return (
     <Badge data-tone={tone} className={cn('gap-1 pl-1.5', TONE_SKIN[tone], className)}>
-      <Icon aria-hidden="true" strokeWidth={2} />
+      <Icon aria-hidden="true" />
       {children}
     </Badge>
   );
