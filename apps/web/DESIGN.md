@@ -230,6 +230,7 @@ See "Page patterns · Settings list" below.
 ### Live run
 - There is no separate live block: the open group is the live row. A 7px pulse dot (`live-pulse` in `app.css`, still under reduced motion) sits under the last line while the agent works; a quiet live row hides its label when a running group above already speaks.
 - The elapsed time lives in the composer next to the stop button ("Working · 1:12"), not in the transcript.
+- **End space under the Coordinator conversation**: the scroller reserves `--chat-end-space` (160px) below the last message, so the newest reply sits about 165px above the composer top, measured on Claude.ai (118px to its dock plus the dock's own padding and disclaimer); Claude.ai draws no fade there. `FadeScrollerViewport` requires an explicit `reserveEnd`; the thread transcript keeps its own `--chat-extra-space`.
 - When the turn ends the pulse disappears and the group turns past tense.
 
 ### Stone language components
@@ -339,10 +340,10 @@ The stone is quiet. Motion only says where a surface came from or that something
 | Loop | Running task card footer and the busy Coordinator: the spiral mark spins | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
 
 - Animate only `opacity` / `transform` / shadow / color, never layout properties (width / height / top).
-- Instant, no transition: press (the card background tint only; a pressed button, link or `role="button"` never changes opacity, because the dip fades in and out and reads as a flash on every click), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames), the user's own chat message, the composer ring on hover and focus, closing a menu, popover, Select or tooltip (the `[data-closed]` rule in `motion.css`), and the side panel docked beside the page.
+- Instant, no transition: press (a pressed `Button` lays a 10% black (light) or white (dark) inset tint over whatever background it has, so a custom skin such as `bg-foreground text-background` keeps its contrast, or takes the card background tint, in the same frame: `active:duration-0` zeroes the transition while pressed, and release fades back; a pressed button, link or `role="button"` never moves, because `translate-y` and `scale` shift the label and its hit area under the pointer, and never changes opacity, because the dip fades in and out and reads as a flash on every click), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames), the user's own chat message, the composer ring on hover and focus, closing a menu, popover, Select or tooltip (the `[data-closed]` rule in `motion.css`), and the side panel docked beside the page.
 - `prefers-reduced-motion`: every keyframe animation shrinks to 0.01ms and loops run once (the site-wide rule in `motion.css`); transitions are untouched.
 - Not used: route transitions, list FLIP, cross-column flights, entry animations on new board cards or chat messages, spring easings.
-- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the retired ones; `e2e/motion-quiet.spec.ts` pins the instant surfaces above, the floating panel slide, and that pressing a control never dims or fades it; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
+- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the retired ones; `e2e/motion-quiet.spec.ts` pins the instant surfaces above, the floating panel slide, and that pressing a control never dims or fades it; `e2e/button-press.spec.ts` pins that a pressed `Button` never moves and tints with no transition, and `e2e/button-press-contrast.spec.ts` pins 4.5:1 contrast of the Send buttons and bulk-bar actions while pressed, light and dark; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
 
 ## Texture
 

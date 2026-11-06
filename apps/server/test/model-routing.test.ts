@@ -7,7 +7,14 @@ import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { createProvider } from '../src/services/providers.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
-import { bootServer, insertMachine, req, seedRoute, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  issueApiKey,
+  req,
+  seedRoute,
+  seedSessionRoute,
+} from './helpers.js';
 
 test.each([
   { report: 'empty', models: [] },
@@ -446,5 +453,75 @@ test.each([
       connections: RoutingConnection[];
     };
     expect(body.connections.find((entry) => entry.id === `machine:${id}`)?.kind).toBe(kind);
+  },
+);
+
+test.each([
+  { state: 'ok', expiry: 'future', online: true, runtime: true, available: true },
+  { state: 'expired', expiry: 'past', online: true, runtime: true, available: false },
+  { state: 'ok', expiry: 'past', online: true, runtime: true, available: false },
+  { state: 'absent', expiry: 'none', online: true, runtime: true, available: false },
+  { state: 'unknown', expiry: 'none', online: true, runtime: true, available: false },
+  { state: 'missing', expiry: 'none', online: true, runtime: true, available: false },
+  { state: 'ok', expiry: 'none', online: true, runtime: true, available: false },
+  { state: 'ok', expiry: 'future', online: false, runtime: true, available: false },
+  { state: 'ok', expiry: 'future', online: true, runtime: false, available: false },
+])(
+  'machine Codex routing: $state/$expiry online=$online pi=$runtime',
+  async ({ state, expiry, online, runtime, available }) => {
+    const s = bootServer();
+    const apiKey = await issueApiKey(s);
+    const enrolled = await s.app.request('/api/machine/enroll', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ teamId: s.team.id, name: 'codex-machine' }),
+    });
+    expect(enrolled.status).toBe(200);
+    const { machineId: id, token } = (await enrolled.json()) as {
+      machineId: string;
+      token: string;
+    };
+    s.db
+      .update(machine)
+      .set({ enabledRuntimes: runtime ? ['pi'] : ['claude-code'] })
+      .where(eq(machine.id, id))
+      .run();
+    const login = {
+      state,
+      ...(expiry === 'none'
+        ? {}
+        : { expiresAt: Date.now() + (expiry === 'future' ? 60_000 : -60_000) }),
+    };
+    const presence = await s.app.request('/api/machine/presence', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          ...(state === 'missing' ? {} : { codexLogin: login }),
+        },
+      }),
+    });
+    expect(presence.status).toBe(200);
+    s.db.update(machine).set({ online }).where(eq(machine.id, id)).run();
+    const body = (await (
+      await req(s.app, 'GET', `/api/teams/${s.team.id}/model-routing`)
+    ).json()) as { connections: RoutingConnection[]; edges: RoutingEdge[] };
+    expect(
+      body.connections.some((connection) => connection.vendor === 'openai' && connection.available),
+    ).toBe(available);
+    if (available) {
+      expect(body.connections).toContainEqual({
+        id: `machine:${id}:codex`,
+        vendor: 'openai',
+        kind: 'subscription',
+        models: ['gpt-6.1-sol'],
+        available: true,
+      });
+      expect(body.edges.find((edge) => edge.use === 'implementation')?.connectionId).toBe(
+        `machine:${id}:codex`,
+      );
+    }
   },
 );
