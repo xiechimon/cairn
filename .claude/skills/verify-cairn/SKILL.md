@@ -55,6 +55,10 @@ The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupant
 
 **Lane wrap-up**: `VERIFY_REPO_ROOT` controls the stack and runtime state. Evidence defaults to the main checkout so it survives worktree cleanup. Share the relevant results; archive into `docs/verify/<ticket>/` only when useful.
 
+## GitHub emulator
+
+For GitHub-facing PR evidence, follow [GitHub emulator evidence](features/github-emulator.md): pinned npx startup, `CAIRN_GITHUB_API_BASE_URL`, and `vp.mjs drive github-emulator pr-watch`. This runs the real D109 poller over HTTP without GitHub credentials. E2B and Langfuse remain follow-ups.
+
 ## Launch
 
 ```sh
