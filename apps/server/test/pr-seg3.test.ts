@@ -931,7 +931,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     ['a fork PR with the same branch name', { headRepoId: 9999 }],
     ['a deleted fork (head repo null)', { headRepoId: null }],
     ['a PR from another branch', { headRef: 'feature/other' }],
-    ['a closed PR', { pullState: 'closed' }],
     ['a PR into another base branch', { baseRef: 'release' }],
   ] as const)(
     '[s3-F25] building, the recorded PR is %s: no merge-conflict step; checks are read by the build’s own branch name',
@@ -946,6 +945,16 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       ]);
     },
   );
+
+  test('[s3-F25] building, a closed PR moves to review without checks or a merge-conflict step', async () => {
+    const w = makeWorld();
+    w.fake.pullState = 'closed';
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep();
+    expect(conflictSteps(w)).toEqual([]);
+    expect(w.fake.reads('/check-runs')).toEqual([]);
+    expect(w.phase()).toBe('review');
+  });
 
   test.each([
     ['a deleted fork (head repo null)', { headRepoId: null }],
