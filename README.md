@@ -32,7 +32,7 @@
 - **Only what needs you.** The home page pins the decisions waiting on you and shows what is in progress. A push notification goes out only when a person must act.
 - **Evidence-bound merge gate.** Before an agent merges, the gate counts only review verdicts bound to the PR's current patch digest and refuses if the head moved after the verdict; its rules are model-checked in TLA+. The manual merge button still checks only the pinned commit (spec 18, F1). Protected paths still stop for you, and the AI reviewer can block a merge, not just comment on it.
 - **Eval-gated harness.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Changes to the Coordinator's dispatch harness must clear an eval regression floor before they merge; paired-trial adoption for prompt, skill and routing changes is planned. "Training" here means improving the harness, never fine-tuning weights.
-- **Your machines.** Register any host by running the daemon on it. A thread runs on any machine that meets its runtime, model and tool constraints, in its own git worktree, or in a throwaway per-task Orb container where the host supports it (`CAIRN_EXECUTOR=orb`, opt-in for now). Plans, diffs and tool calls stream back live.
+- **Your machines.** Register any host by running the daemon on it. A thread runs on any machine that meets its runtime, model and tool constraints, in its own git worktree, or in a throwaway per-task Orb container where the host supports it (`CAIRN_EXECUTOR=orb`, opt-in for now). Planned: E2B and Daytona sandboxes using your own key; the project never resells compute. Plans, diffs and tool calls stream back live. Cairn runs on your own machine with no hosted control plane, and credentials stay there.
 - **Projects.** A project home with its instructions, memory, secrets and a concurrency limit; a person's message always jumps the queue. Repos are hosted by the server itself or connected from GitHub.
 - **Bootstrap loop.** Cairn takes its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
 
@@ -73,7 +73,7 @@ Register a machine when you want agents to build on it, or run the server in Doc
 |---|---|
 | [docs/getting-started.md](./docs/getting-started.md) | Run the server, enroll a machine, Docker, deploy publicly, build from source |
 | [docs/configuration.md](./docs/configuration.md) | Every server and daemon environment variable |
-| [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | Private access from your phone over Tailscale |
+| [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | Private access from your phone over Tailscale (embedded tsnet with automatic LAN, tailnet or optional Funnel routing is planned) |
 | [CONTEXT.md](./CONTEXT.md) | Domain model and glossary |
 | [docs/spec/](./docs/spec/) | Implementation canon |
 
@@ -106,4 +106,4 @@ After your team's first pull request merges, Cairn can show a dismissible card l
 
 ## License
 
-Apache-2.0 — see [LICENSE](./LICENSE).
+Apache-2.0 — see [LICENSE](./LICENSE). All code is open source with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. Contributions use DCO sign-off, not a CLA: see [CONTRIBUTING.md](./CONTRIBUTING.md).

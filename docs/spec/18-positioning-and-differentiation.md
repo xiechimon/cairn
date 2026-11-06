@@ -94,11 +94,11 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 
 ## 4. What Not to Do (#515 Out of scope fixed)
 
-- The paid three-piece set (built-in models gateway / cloud sandbox / subscription billing) — volume 02 exclusions, inherited.
+- Selling anything or gating features (owner plan D96–D105, 2026-11-06): all code is Apache-2.0 open source with DCO sign-off and no CLA, the current audience is individual developers, and only the private rotating eval holdout stays unpublished. No project-run hosted control plane and no resold compute (built-in models gateway / subscription billing stay out); credentials stay on the user's machine. Threads run on the app's machine, registered runners, or planned E2B/Daytona sandboxes with the user's own key.
 - The Squad object — Chief's subset, and explicitly "does not raise concurrency, does not merge agents"; only copy its wake-rule table, do not introduce the object.
 - Chief autonomous dispatch — first want "shutdown without breaking the chain", not "still deciding on its own when shut down".
 - Gantt view / multiple workspaces / third-party Git (Forgejo / Gitea / GitLab) — meaningless for self-use, killed outright.
-- Directly chasing Multica's integration-surface breadth (IM five, desktop app, iOS) — recorded as "possible future C class".
+- Directly chasing Multica's integration-surface breadth (IM five, desktop app) — recorded as "possible future C class". Phone access today is Tailscale; embedded tsnet with automatic LAN / tailnet / optional Funnel routing is planned, and a hosted relay may come later.
 - todos.dev baseline re-photography and pixel parity — volume 06 D1 released the parity obligation.
 
 (Multica's three philosophical tenets see §3.3, not entering this section.)
