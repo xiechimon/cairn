@@ -50,6 +50,7 @@ import {
   notInArray,
   sql,
 } from 'drizzle-orm';
+import { rewindWatermark } from '../coordinator/watermark.js';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -57,6 +58,8 @@ import {
   chief,
   chiefMessage,
   chiefThread,
+  coordinatorConversation,
+  coordinatorEntry,
   machine,
   plan,
   project,
@@ -894,6 +897,28 @@ export function enqueueChiefStep(
   return id;
 }
 
+function markStoreRewind(db: Db, threadId: string, anchorId: string, doomedIds: string[]): void {
+  const conversation = db
+    .select()
+    .from(coordinatorConversation)
+    .where(eq(coordinatorConversation.threadId, threadId))
+    .get();
+  if (conversation === undefined) return;
+  const anchorEntry = db
+    .select({ entryId: coordinatorEntry.entryId })
+    .from(coordinatorEntry)
+    .where(eq(coordinatorEntry.chiefMessageId, anchorId))
+    .get();
+  const before = anchorEntry === undefined ? 0 : Math.max(Number(anchorEntry.entryId) - 1, 0);
+  db.delete(coordinatorEntry)
+    .where(inArray(coordinatorEntry.chiefMessageId, [anchorId, ...doomedIds]))
+    .run();
+  db.update(coordinatorConversation)
+    .set({ lastMirroredEntryId: rewindWatermark(before), updatedAt: nowMs() })
+    .where(eq(coordinatorConversation.threadId, threadId))
+    .run();
+}
+
 export function rewindChiefThread(
   deps: ChiefDeps,
   teamId: string,
@@ -932,6 +957,12 @@ export function rewindChiefThread(
   requireRewindStaysInProject(
     deps.db,
     anchor,
+    doomed.map((row) => row.id),
+  );
+  markStoreRewind(
+    deps.db,
+    threadId,
+    anchor.id,
     doomed.map((row) => row.id),
   );
   for (const row of doomed) {

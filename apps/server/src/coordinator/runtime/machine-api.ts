@@ -14,6 +14,8 @@ export interface MachineApi {
   token(stepId: string): Promise<MachineTokenResponse>;
   heartbeat(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
+  steer?(stepId: string): Promise<string | null>;
+  ackSteer?(stepId: string): Promise<void>;
   relayTool(stepId: string, name: string, params: Record<string, unknown>): Promise<string>;
   askUser(stepId: string, body: MachineAskBody, signal?: AbortSignal): Promise<MachineAskResponse>;
   transcriptRow(stepId: string, row: TranscriptRow, entryId?: string): Promise<void>;

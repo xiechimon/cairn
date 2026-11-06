@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import type { ClaimedStep, MachineDoneBody, ModelUsage } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { AssistantEntry, type EntryRecord, type Harness } from '@earendil-works/pi-durable';
 import { compactionWindow, estimateTokens, type ModelRef } from './compaction.js';
+import { activeConversation, type Conversation } from './conversations.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
@@ -10,9 +12,16 @@ import type { ConversationGate, StepGate } from './tools.js';
 import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
+const STEER_REQUEST_HASH_CHARS = 16;
+
+function steerRequestId(stepId: string, content: string): string {
+  const digest = createHash('sha256').update(content).digest('hex');
+  return `steer-${stepId}-${digest.slice(0, STEER_REQUEST_HASH_CHARS)}`;
+}
 
 export interface TurnDeps {
   harness: Harness;
+  conversationId?: string | null;
   models: CoordinatorModels;
   api: MachineApi;
   context: Context;
@@ -51,7 +60,7 @@ export const SWITCH_FOLD_INSTRUCTIONS =
 
 async function foldBeforeModelSwitch(
   deps: TurnDeps,
-  root: Awaited<ReturnType<Harness['root']>>,
+  root: Conversation,
   next: ModelRef,
 ): Promise<void> {
   const current = (await root.agent(deps.context)).model;
@@ -95,9 +104,13 @@ export async function runCoordinatorTurn(
   deps.gate?.set(stepId);
   deps.onModel?.({ provider, modelId });
   let stopPoll: ReturnType<typeof setInterval> | undefined;
+  let steerPoll: ReturnType<typeof setInterval> | undefined;
   let rootKey: string | null = null;
   try {
-    const root = await harness.root(context);
+    const root = await activeConversation(harness, deps.conversationId, context);
+    if (root === undefined) {
+      return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
+    }
     rootKey = String(root.id);
     deps.conversationGate?.set(rootKey, stepId);
     deps.volatile?.set(rootKey, deps.volatileText ?? null);
@@ -114,6 +127,32 @@ export async function runCoordinatorTurn(
         .catch(() => {})
         .finally(() => {
           polling = false;
+        });
+    }, deps.stopPollMs ?? STOP_POLL_MS);
+    let inFlight = false;
+    let steering = false;
+    steerPoll = setInterval(() => {
+      if (!inFlight || steering || stopping !== null || api.steer === undefined) return;
+      steering = true;
+      void api
+        .steer(stepId)
+        .then(async (content) => {
+          if (content === null) return;
+          await root.submit(
+            {
+              type: 'input',
+              content,
+              whenBusy: 'steer',
+              whenIdle: 'reject',
+              requestId: steerRequestId(stepId, content),
+            },
+            context,
+          );
+          await api.ackSteer?.(stepId);
+        })
+        .catch(() => {})
+        .finally(() => {
+          steering = false;
         });
     }, deps.stopPollMs ?? STOP_POLL_MS);
     await foldBeforeModelSwitch(deps, root, { provider, modelId });
@@ -135,7 +174,10 @@ export async function runCoordinatorTurn(
       { type: 'input', content: claimed.instruction ?? '', requestId: stepId },
       context,
     );
+    inFlight = true;
     const settled = await submission.wait(context);
+    inFlight = false;
+    clearInterval(steerPoll);
     if (settled.entry !== undefined) await api.mapUserEntry?.(stepId, String(settled.entry));
     await watch.stop();
     const turnEntries =
@@ -173,6 +215,7 @@ export async function runCoordinatorTurn(
     return finished;
   } finally {
     clearInterval(stopPoll);
+    clearInterval(steerPoll);
     deps.gate?.set(null);
     if (rootKey !== null) {
       deps.conversationGate?.set(rootKey, null);

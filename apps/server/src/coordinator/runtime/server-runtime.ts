@@ -10,6 +10,7 @@ import {
 import type { MachineApi } from './machine-api.js';
 import { createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
+import { syncToRewind } from './rewind-sync.js';
 import { threadStorePath } from './thread-harnesses.js';
 import { coordinatorToolsExtension, createConversationGate } from './tools.js';
 import { runCoordinatorTurn } from './turn.js';
@@ -22,6 +23,7 @@ export interface ServerRuntimeConfig {
   fixedProviders?: readonly Provider[];
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
+  recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   onReconciled?(threadId: string, outcome: ReconcileOutcome, stale: string[]): void;
 }
 
@@ -64,15 +66,16 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const busy = new Map<string, number>();
   const lastUsed = new Map<string, number>();
 
-  const openThread = (threadId: string): Promise<Harness> => {
+  const openThread = (threadId: string, forceReseed = false): Promise<Harness> => {
     const existing = open.get(threadId);
     if (existing !== undefined) return existing;
+    const facts = config.factsFor(threadId);
     const opening = openReconciledHarness(
       threadStorePath(config.storageDir, threadId),
       models.models,
       context,
       { extensions, settings },
-      config.factsFor(threadId),
+      forceReseed ? { ...facts, forceReseed: true, hasClaimedStep: false } : facts,
     ).then((result) => {
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
@@ -102,10 +105,18 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       summaryRef = { provider: turn.summary.config.providerId, modelId: turn.summary.modelId };
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
       try {
-        const harness = await openThread(threadId);
+        let harness = await openThread(threadId);
+        const synced = await syncToRewind(harness, context, config.factsFor(threadId));
+        if (synced.action === 'reseed') {
+          await closeThread(threadId);
+          harness = await openThread(threadId, true);
+        } else if (synced.action === 'forked') {
+          config.recordConversation?.(threadId, synced.conversationId, synced.entryId);
+        }
         return await runCoordinatorTurn(
           {
             harness,
+            conversationId: config.factsFor(threadId).conversationId,
             models,
             api,
             context,

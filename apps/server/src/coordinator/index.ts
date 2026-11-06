@@ -218,6 +218,12 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
       ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
       factsFor,
+      recordConversation: (threadId, conversationId, entryId) => {
+        db.update(coordinatorConversation)
+          .set({ conversationId, lastMirroredEntryId: String(entryId), updatedAt: nowMs() })
+          .where(eq(coordinatorConversation.threadId, threadId))
+          .run();
+      },
       onReconciled: (threadId, outcome, stale) => {
         logger.info({ threadId, outcome, stale }, 'coordinator store reconciled');
       },
