@@ -1,11 +1,8 @@
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import type { AskUserAnswer } from '@cairn/shared';
-import { useState } from 'react';
-import { FOLLOW_THRESHOLD } from '../components/chat/jump-to-latest.js';
-import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChiefConversation, ChiefFollowArmed } from './chief-conversation.js';
+import { ChiefConversation, ChiefScrollProvider } from './chief-conversation.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 export { CHIEF_DRAFT_STORAGE_KEY } from './chief-conversation.js';
@@ -34,7 +31,6 @@ interface DrawerProps {
 export function ChiefDrawer(props: DrawerProps) {
   const { open = true } = props;
   const { t } = useI18n();
-  const [atBottom, setAtBottom] = useState(true);
   return (
     <DialogPrimitive.Root open={open} modal={false} disablePointerDismissal>
       <DialogPrimitive.Portal keepMounted>
@@ -45,14 +41,9 @@ export function ChiefDrawer(props: DrawerProps) {
           initialFocus={false}
           finalFocus={false}
         >
-          <MessageScrollerProvider
-            autoScroll={open && atBottom}
-            scrollEdgeThreshold={FOLLOW_THRESHOLD}
-            defaultScrollPosition="end"
-          >
-            <ChiefFollowArmed onAtBottom={setAtBottom} />
+          <ChiefScrollProvider open={open}>
             <ChiefConversation variant="drawer" {...props} />
-          </MessageScrollerProvider>
+          </ChiefScrollProvider>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

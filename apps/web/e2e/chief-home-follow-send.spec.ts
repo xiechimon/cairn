@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { mockLive, type Row, THREAD } from './chief-home-mock';
+import { mockLive, type Row, THREAD, toolRow } from './chief-home-mock';
 import { evidenceShot } from './evidence';
+import { openChiefWindow } from './helpers.js';
 
 const historyOf = (total: number): Row[] =>
   Array.from({ length: total }, (_, i) => ({
@@ -10,7 +11,7 @@ const historyOf = (total: number): Row[] =>
     createdAt: 1_000 + i,
   }));
 
-async function mockSlowSend(page: Page, total = 250) {
+async function mockSlowSend(page: Page, total = 250): Promise<Row[]> {
   const history = historyOf(total);
   let running = false;
   await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
@@ -40,6 +41,7 @@ async function mockSlowSend(page: Page, total = 250) {
       nextCursor: start > 0 ? (history[start]?.id ?? null) : null,
     });
   });
+  return history;
 }
 
 const home = (page: Page) => page.getByTestId('home-c');
@@ -75,6 +77,7 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
     window.__es.find((es) => es.url.includes(u))?.emit({ type: 'text_delta', text: 'typing back' });
   }, streamUrl);
   await expect(home(page).getByText('typing back')).toBeInViewport();
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await expect(row(page, 'follow me down')).toBeInViewport();
   await expect
     .poll(() => opacityOf(messageOf(page, 'follow me down').getByTestId('chief-msg-tools')))
@@ -105,4 +108,101 @@ test('only the newest message keeps its actions visible; older ones show them on
   await expect.poll(() => opacityOf(olderFoot)).toBe(1);
   await messageOf(page, 'question 4').hover();
   await expect.poll(() => opacityOf(olderUserTools)).toBe(1);
+});
+
+const gapToBottom = (page: Page) =>
+  viewport(page).evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight);
+const streamUrl = `/api/conversations/${THREAD.id}/stream`;
+const emit = (page: Page, ev: unknown) =>
+  page.evaluate(
+    ([u, e]) => window.__es.find((es) => es.url.includes(u as string))?.emit(e),
+    [streamUrl, ev] as const,
+  );
+const paragraph = (n: number) => `line ${n} ${'streamed words '.repeat(14)}`;
+
+async function sendAtBottom(page: Page) {
+  const history = await mockSlowSend(page);
+  await page.goto('/app');
+  await expect(row(page, 'answer 249')).toBeInViewport();
+  const input = home(page).getByTestId('chief-composer-input');
+  await input.fill('stay pinned');
+  await input.press('Enter');
+  await expect(row(page, 'stay pinned')).toBeInViewport();
+  await expect
+    .poll(() => page.evaluate((u) => window.__es.some((es) => es.url.includes(u)), streamUrl))
+    .toBe(true);
+  return history;
+}
+
+test('the status line after a send is visible without scrolling', async ({ page }) => {
+  await sendAtBottom(page);
+  await emit(page, { type: 'activity', activity: { phase: 'starting' } });
+  const status = home(page).getByText('正在连接模型...');
+  await expect(status).toBeInViewport({ ratio: 1 });
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+  await evidenceShot(page, 'chief-stick-status.png');
+});
+
+test('streaming growth and a tool row stay pinned while the reader is at the bottom', async ({
+  page,
+}) => {
+  const history = await sendAtBottom(page);
+  for (let n = 0; n < 6; n++) {
+    await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
+    await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+  }
+  const tool = toolRow('tool-1', 'todo_write', {}, 5_000);
+  history.push(tool);
+  await emit(page, { type: 'message', message: tool });
+  await emit(page, { type: 'text_delta', text: `${paragraph(99)}\n\n` });
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+  await expect(home(page).getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'false');
+  await evidenceShot(page, 'chief-stick-streaming.png');
+});
+
+test('scrolling up stops following, and the jump button resumes it', async ({ page }) => {
+  await sendAtBottom(page);
+  await emit(page, { type: 'text_delta', text: `${paragraph(0)}\n\n` });
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+
+  await viewport(page).hover();
+  await page.mouse.wheel(0, -700);
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
+  const parked = await gapToBottom(page);
+  for (let n = 1; n < 4; n++) await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
+  await expect(home(page).getByText(paragraph(3).trim(), { exact: false })).toBeAttached();
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThanOrEqual(parked);
+  const jump = home(page).getByTestId('jump-to-latest');
+  await expect(jump).toHaveAttribute('data-active', 'true');
+
+  await jump.click();
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+  await emit(page, { type: 'text_delta', text: `${paragraph(4)}\n\n` });
+  await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+  await expect(jump).toHaveAttribute('data-active', 'false');
+});
+
+test('the drawer follows a send and its streaming growth too', async ({ page }) => {
+  await mockSlowSend(page);
+  await page.goto('/app/schedules');
+  await openChiefWindow(page);
+  const drawer = page.locator('.chief-drawer');
+  await expect(drawer).toBeVisible();
+  const body = drawer.getByTestId('chief-body');
+  const gap = () => body.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight);
+  await expect(drawer.getByText('answer 249', { exact: true })).toBeInViewport();
+  await body.evaluate((node) => {
+    node.scrollTop = node.scrollHeight - node.clientHeight - 600;
+  });
+  const input = drawer.getByTestId('chief-composer-input');
+  await input.fill('drawer send');
+  await input.press('Enter');
+  await expect(drawer.getByTestId('chief-stream').getByText('drawer send', { exact: true })).toBeInViewport();
+  await expect
+    .poll(() => page.evaluate((u) => window.__es.some((es) => es.url.includes(u)), streamUrl))
+    .toBe(true);
+  for (let n = 0; n < 5; n++) {
+    await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
+    await expect.poll(gap).toBeLessThanOrEqual(2);
+  }
 });

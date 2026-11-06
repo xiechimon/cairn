@@ -9,7 +9,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
-import { ChiefConversation } from '../chief/chief-conversation.js';
+import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
 import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
@@ -18,7 +18,6 @@ import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { TextureSkeleton } from '../components/texture/texture.js';
 import { Button } from '../components/ui/button.js';
-import { MessageScrollerProvider } from '../components/ui/message-scroller.js';
 import type {
   ChiefStreamItem,
   MachineRow,
@@ -444,7 +443,7 @@ export function HomeC({
         {banner != null && (
           <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
         )}
-        <MessageScrollerProvider defaultScrollPosition="end">
+        <ChiefScrollProvider>
           <ChiefConversation
             variant="global"
             chief={{ ...chiefData, stream: conversation, examples: undefined }}
@@ -487,7 +486,7 @@ export function HomeC({
               composerRef.current = node;
             }}
           />
-        </MessageScrollerProvider>
+        </ChiefScrollProvider>
       </section>
       {workPanel}
     </div>
