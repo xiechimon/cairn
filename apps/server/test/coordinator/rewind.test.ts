@@ -1,7 +1,7 @@
 import { fauxAssistantMessage } from '@earendil-works/pi-ai';
 import { asc } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { chiefMessage, coordinatorConversation } from '../../src/db/schema.js';
+import { chiefMessage, coordinatorConversation, coordinatorEntry } from '../../src/db/schema.js';
 import { req } from '../helpers.js';
 import { boot, stub, type World, world } from './runner-world.js';
 
@@ -52,6 +52,14 @@ describe('Coordinator rewind', () => {
     await say(w, coordinator, 'third question');
     expect(seen).toHaveLength(3);
     const before = w.s.db.select().from(coordinatorConversation).get();
+    const newestMapped = Math.max(
+      ...w.s.db
+        .select()
+        .from(coordinatorEntry)
+        .all()
+        .map((e) => Number(e.entryId)),
+    );
+    expect(Number(before?.lastMirroredEntryId)).toBe(newestMapped);
 
     await rewindTo(w, 'second question');
     expect(w.s.db.select().from(coordinatorConversation).get()?.lastMirroredEntryId).toMatch(

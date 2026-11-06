@@ -21,6 +21,7 @@ import {
   reportTranscriptRow,
 } from '../services/machines.js';
 import type { MachineApi } from './runtime/machine-api.js';
+import { parseWatermark } from './watermark.js';
 
 const ASK_HOLD_MS = 24 * 60 * 60 * 1000;
 
@@ -104,6 +105,18 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       const owned = stepRow(stepId);
       if (!isChiefConversation(owned.buildId)) return;
       mapEntry(stepId, owned.buildId, entryId);
+      const conversation = deps.db
+        .select()
+        .from(coordinatorConversation)
+        .where(eq(coordinatorConversation.threadId, owned.buildId))
+        .get();
+      const mirrored = parseWatermark(conversation?.lastMirroredEntryId ?? null);
+      if (
+        conversation === undefined ||
+        (mirrored?.kind === 'mirrored' && mirrored.entryId >= Number(entryId))
+      ) {
+        return;
+      }
       deps.db
         .update(coordinatorConversation)
         .set({ lastMirroredEntryId: entryId, updatedAt: Date.now() })
