@@ -403,6 +403,7 @@ export function HomeC({
         <WorkPanel
           pane={pane}
           todos={scoped}
+          projectId={projectId}
           schedules={
             projectId === null
               ? schedules

@@ -21,6 +21,7 @@ const count = z.number().int().min(0);
 export const prPanelRowSchema = z.object({
   buildId: recordId,
   threadId: recordId,
+  projectId: recordId.nullable(),
   repo: z.string(),
   number: z.number().int().min(1),
   title: z.string(),

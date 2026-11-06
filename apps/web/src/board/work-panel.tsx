@@ -30,13 +30,22 @@ const live = (todo: TodoRecord) => todo.archivedAt == null;
 interface WorkPanelProps {
   pane: Exclude<WorkPane, 'machines'>;
   todos: readonly TodoRecord[];
+  projectId: string | null;
   schedules: readonly ScheduleRecord[];
   now: number;
   onClose: () => void;
   onOpenThread: (id: string) => void;
 }
 
-export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }: WorkPanelProps) {
+export function WorkPanel({
+  pane,
+  todos,
+  projectId,
+  schedules,
+  now,
+  onClose,
+  onOpenThread,
+}: WorkPanelProps) {
   const { t } = useI18n();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const fold = (id: string) => ({
@@ -46,8 +55,9 @@ export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }
   const title = pane === 'tasks' ? t('任务') : t('成果');
   const { live: connected, teamId } = useLiveData();
   const prs = usePrs(teamId, undefined, connected);
-  const scopedIds = new Set(todos.map((todo) => todo.id));
-  const scopedPrs = (prs.data ?? []).filter((pr) => scopedIds.has(pr.threadId));
+  const scopedPrs = (prs.data ?? []).filter(
+    (pr) => projectId === null || pr.projectId === projectId,
+  );
   const prOf = prByThread(scopedPrs);
   const [, setSearchParams] = useSearchParams();
   const row = (todo: TodoRecord, tone = threadTone(todo)) => (

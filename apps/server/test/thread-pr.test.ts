@@ -247,6 +247,23 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
     });
   });
 
+  test('the panel row carries the project of its thread, archived or not', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    await watchFor(s, mock).sweep(1_000);
+    const projectId = s.db
+      .select()
+      .from(todoTable)
+      .where(eq(todoTable.id, t.todoId))
+      .get()?.projectId;
+    expect(projectId).toBeTruthy();
+    expect(listThreadPrs(s.db, { teamId: s.team.id })[0]?.projectId).toBe(projectId);
+    s.db.update(todoTable).set({ archivedAt: 5 }).where(eq(todoTable.id, t.todoId)).run();
+    expect(listThreadPrs(s.db, { teamId: s.team.id })[0]?.projectId).toBe(projectId);
+  });
+
   test('the panel row names the branch, its base and the failing checks', async () => {
     const s = boot();
     const mock = new GithubMock();

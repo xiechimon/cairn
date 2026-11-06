@@ -10,6 +10,7 @@ function prRow(over: Record<string, unknown> = {}) {
   return {
     buildId: 'build-1',
     threadId: 'todo-1',
+    projectId: 'proj-1',
     repo: 'xiechimon/cairn',
     number: 42,
     title: 'web(3122): the thread-owned PR panel',
@@ -190,7 +191,7 @@ test('a project-filtered tasks pane lists only that project’s PRs, the unfilte
   const other = { ...TASK, id: 'todo-2', projectId: 'proj-2', title: 'Other project thread', phase: 'review', phaseAt: Date.now(), seqNum: 10 };
   const rows = [
     prRow({ buildId: 'build-1', threadId: 'todo-1', number: 42, title: 'docs(1): project one change' }),
-    prRow({ buildId: 'build-2', threadId: 'todo-2', number: 77, title: 'docs(2): project two change' }),
+    prRow({ buildId: 'build-2', threadId: 'todo-2', projectId: 'proj-2', number: 77, title: 'docs(2): project two change' }),
   ];
   await setup(page, { rows }, 'light', {
     todos: [other],
@@ -204,6 +205,23 @@ test('a project-filtered tasks pane lists only that project’s PRs, the unfilte
   await expect(list.getByRole('heading')).toContainText('1');
   await page.goto('/app?pane=tasks');
   await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toHaveCount(2);
+});
+
+test('an open PR of an archived thread stays in the home list and under its project, and the count stays', async ({ page }) => {
+  const rows = [
+    prRow({ buildId: 'build-1', threadId: 'todo-1', number: 42, title: 'docs(1): live thread change' }),
+    prRow({ buildId: 'build-2', threadId: 'todo-2', projectId: 'proj-2', number: 77, title: 'docs(2): archived thread change' }),
+  ];
+  const more = { projects: [PROJECT, { ...PROJECT, id: 'proj-2', name: 'other' }] };
+  await setup(page, { rows }, 'light', more);
+  await page.goto('/app?pane=tasks');
+  const list = page.getByTestId('work-prs');
+  await expect(list.locator('[data-slot="pr-list-row"]')).toHaveCount(2);
+  await expect(list).toContainText('archived thread change');
+  await expect(list.getByRole('heading')).toContainText('2');
+  await page.goto('/app?project=proj-2&pane=tasks&chat=1');
+  await expect(page.getByTestId('work-prs').locator('[data-slot="pr-list-row"]')).toHaveCount(1);
+  await expect(page.getByTestId('work-prs')).toContainText('archived thread change');
 });
 
 test('a project with no PRs shows the empty line even when other projects have some', async ({ page }) => {

@@ -53,10 +53,14 @@ export function checkTallyOf(runs: readonly GithubCheckRun[]): CheckTally {
   return tally;
 }
 
-export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
+export function toPrPanelRow(
+  row: typeof threadPr.$inferSelect,
+  projectId: string | null,
+): PrPanelRow {
   return prPanelRowSchema.parse({
     buildId: row.buildId,
     threadId: row.threadId,
+    projectId,
     repo: row.repo,
     number: row.number,
     title: row.title,
@@ -92,7 +96,7 @@ export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
 
 export function listThreadPrs(db: Db, query: { teamId: string; threadId?: string }): PrPanelRow[] {
   const rows = db
-    .select({ row: threadPr })
+    .select({ row: threadPr, projectId: todo.projectId })
     .from(threadPr)
     .innerJoin(todo, eq(todo.id, threadPr.threadId))
     .where(
@@ -107,5 +111,5 @@ export function listThreadPrs(db: Db, query: { teamId: string; threadId?: string
     )
     .orderBy(desc(threadPr.updatedAt), desc(threadPr.id))
     .all();
-  return rows.map(({ row }) => toPrPanelRow(row));
+  return rows.map(({ row, projectId }) => toPrPanelRow(row, projectId));
 }

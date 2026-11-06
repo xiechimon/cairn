@@ -15,6 +15,7 @@ function row(over: Partial<PrPanelRow> = {}): PrPanelRow {
   return {
     buildId: 'b1',
     threadId: 't1',
+    projectId: 'p1',
     repo: 'octo/demo',
     number: 42,
     title: 'a change',
