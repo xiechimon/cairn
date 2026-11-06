@@ -893,6 +893,31 @@ export const chiefTurnUsage = sqliteTable(
   ],
 );
 
+export const coordinatorConversation = sqliteTable('coordinator_conversation', {
+  threadId: text('threadId').primaryKey(),
+  conversationId: text('conversationId').notNull(),
+  lastMirroredEntryId: text('lastMirroredEntryId'),
+  piVersion: text('piVersion').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const coordinatorEntry = sqliteTable(
+  'coordinator_entry',
+  {
+    chiefMessageId: text('chiefMessageId').primaryKey(),
+    threadId: text('threadId').notNull(),
+    conversationId: text('conversationId').notNull(),
+    entryId: text('entryId').notNull(),
+  },
+  (t) => [index('coordinator_entry_thread_idx').on(t.threadId, t.conversationId)],
+);
+
+export const coordinatorLease = sqliteTable('coordinator_lease', {
+  storeKey: text('storeKey').primaryKey(),
+  owner: text('owner'),
+  heartbeatAt: epochMs('heartbeatAt').notNull(),
+});
+
 export const chiefSummary = sqliteTable('chief_summary', {
   threadId: text('threadId').primaryKey(),
   summary: text('summary').notNull(),

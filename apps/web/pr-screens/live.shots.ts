@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { ONLY, prepare, record, recordError, slugOf, THEMES } from './capture-core.js';
+import { FROZEN_AT } from './frozen-time.mjs';
 import { type LiveState, STATE_PAGES } from './state-pages.js';
 
 const PORTS = {
@@ -22,6 +23,36 @@ const stateOf = (world: keyof typeof PORTS): LiveState =>
       );
 
 test.describe.configure({ mode: 'parallel' });
+
+if (!ONLY || ONLY.has('failed-thread')) {
+  test('failed-thread server timestamps match the browser clock', async ({ page, request }) => {
+    const state = stateOf('seeded');
+    const origin = `http://127.0.0.1:${PORTS.seeded}`;
+    const response = await request.get(`${origin}/api/todos/${state.todoIds.failed}`);
+    expect(response.ok()).toBe(true);
+    expect(await response.json()).toMatchObject({
+      phase: 'failed',
+      phaseAt: FROZEN_AT,
+      lastRunAt: FROZEN_AT,
+    });
+    await prepare(page, 'light');
+    await page.goto(`${origin}/app?thread=${state.todoIds.failed}`);
+    await expect(
+      page.getByTestId('side-chat-action').getByRole('button', { name: '重试' }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => Date.now())).toBe(FROZEN_AT);
+    const time = await page.evaluate(
+      (ms) =>
+        new Intl.DateTimeFormat('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).format(ms),
+      FROZEN_AT,
+    );
+    await expect(page.getByText(time, { exact: true })).toBeVisible();
+  });
+}
 
 for (const theme of THEMES) {
   for (const p of STATE_PAGES) {

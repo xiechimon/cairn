@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { readThreadRows, seedCoordinatorStore } from './runtime/seed.js';
+import { readThreadRows, seedCoordinatorStore } from '../../server/src/coordinator/runtime/seed.js';
 
 const { values } = parseArgs({
   options: {
