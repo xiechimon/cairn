@@ -1,0 +1,1 @@
+ALTER TABLE `plan` ADD `autoApprovePausedAt` integer;

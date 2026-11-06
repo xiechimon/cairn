@@ -56,6 +56,21 @@ export function getModelRouting(db: Db, teamId: string) {
     }
   }
   for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
+    const codexLogin = row.capabilities?.codexLogin;
+    if (codexLogin !== undefined) {
+      connections.push({
+        id: `machine:${row.id}:codex`,
+        vendor: 'openai',
+        kind: 'subscription',
+        models: ['gpt-6.1-sol'],
+        available:
+          row.online &&
+          row.enabledRuntimes.includes('pi') &&
+          codexLogin.state === 'ok' &&
+          codexLogin.expiresAt !== undefined &&
+          codexLogin.expiresAt > now,
+      });
+    }
     const report = row.claudeCodeReport;
     if (!report?.installed && (row.claudeRateLimits?.length ?? 0) === 0) continue;
     const id = `machine:${row.id}`;

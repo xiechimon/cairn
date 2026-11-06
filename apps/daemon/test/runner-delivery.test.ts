@@ -12,13 +12,13 @@ import type {
 } from '@cairn/shared';
 import { CHANGES_DIFF_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { GitPushHookError } from '../src/git.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
-import { testTempDir } from './test-temp-dir.js';
 
 const probeMock = vi.fn();
 vi.mock('../src/github-probe.js', async (importOriginal) => {
@@ -248,33 +248,37 @@ async function runOnce(opts: RunOpts): Promise<MachineDoneBody> {
   probeMock.mockReset();
   if (opts.probe instanceof Error) probeMock.mockRejectedValue(opts.probe);
   else probeMock.mockResolvedValue(opts.probe);
-  const home = testTempDir('cairn-runner-delivery-');
-  const paths = statePaths(home, join(home, 'workspaces'));
-  const { logger } = captureLogger();
-  const client = new FakeClient();
-  const journal = new StepJournal(paths.outboxDir);
-  const backend = doneBackend();
-  const { ws } = fakeWorkspace(join(home, 'ws', 'conv-1'), opts.diff);
-  if (opts.pushError)
-    ws.push = async () => {
-      throw opts.pushError;
-    };
-  await runStep(
-    {
-      client,
-      journal,
-      backendFor: () => backend,
-      logger,
-      paths,
-      workspace: ws,
-      workspacesDir: join(home, 'workspaces'),
-      mcpConfigPath: join(home, 'claude.json'),
-      heartbeatIntervalMs: 60_000,
-    },
-    opts.claimed,
-  );
-  expect(client.doneBodies).toHaveLength(1);
-  return client.doneBodies[0]!.body;
+  const home = makeTestTempDir('cairn-runner-delivery-');
+  try {
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const { logger } = captureLogger();
+    const client = new FakeClient();
+    const journal = new StepJournal(paths.outboxDir);
+    const backend = doneBackend();
+    const { ws } = fakeWorkspace(join(home, 'ws', 'conv-1'), opts.diff);
+    if (opts.pushError)
+      ws.push = async () => {
+        throw opts.pushError;
+      };
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => backend,
+        logger,
+        paths,
+        workspace: ws,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+      },
+      opts.claimed,
+    );
+    expect(client.doneBodies).toHaveLength(1);
+    return client.doneBodies[0]!.body;
+  } finally {
+    releaseTestTempDir(home);
+  }
 }
 
 const SAMPLE_DIFF = 'diff --git a/README.md b/README.md\n@@ -1 +1,2 @@\n hello\n+probe\n';

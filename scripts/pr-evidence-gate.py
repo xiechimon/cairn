@@ -62,7 +62,10 @@ Fenced code blocks do not exempt image links: agents list evidence in
 code fences, and an image link in a fence renders nowhere (#940 keeps
 this a non-goal).
 
-Schema evidence: with `--schema-glance <file>` (the output of
+Schema evidence: only the first contiguous block of table lines (or the
+No schema changes line) directly under the heading is compared; later prose
+and tables are ignored. `node scripts/pr-schema-sync.mjs <pr-number>` rewrites
+the section in a body file. With `--schema-glance <file>` (the output of
 scripts/schema-glance.mjs from the merge base of base and head to head,
 passed by the workflow only when base...head touches apps/server/drizzle/**,
 so migrations merged into main after the PR branched never count), the body
@@ -82,6 +85,14 @@ also carry non-empty `Live:`, `Mocked:` and `Not covered:` lines (`Not
 verified:` was merged into `Not covered:`; a label with only markup after it
 counts as empty). The gate checks the card's shape;
 whether it matches the requirement stays a reviewer judgment.
+
+Baseline evidence: with `--changed-baselines <file>` (one path per line,
+passed by the workflow only when merge base...head adds or modifies a
+`*-snapshots/*.png` file), the body must show each changed baseline: a table
+row naming the file with at least two embedded images (old baseline and new
+render), or a `<file>: <verdict>` line naming it. The file is matched by its
+name with or without `.png`; a pair inside a code fence does not render and
+does not count. Each baseline without either is named.
 
 Usage:
   python3 scripts/pr-evidence-gate.py body.md                # CI entry point
@@ -307,11 +318,15 @@ def schema_rows(markdown):
     heading = SCHEMA_HEADING.search(text)
     if heading is None:
         return None
-    rest = text[heading.end():]
-    following = ANY_HEADING.search(rest)
-    section = rest[:following.start()] if following else rest
-    return [' '.join(line.split()) for line in section.splitlines()
-            if line.strip().startswith('|') or line.strip() == NO_SCHEMA_CHANGES]
+    rows = []
+    for line in text[heading.end():].splitlines():
+        stripped = line.strip()
+        is_row = stripped.startswith('|') or stripped == NO_SCHEMA_CHANGES
+        if is_row:
+            rows.append(' '.join(stripped.split()))
+        elif stripped or rows:
+            break
+    return rows
 
 
 def schema_verdict(body, expected_markdown):
@@ -402,6 +417,26 @@ def coverage_problems(body):
     return problems
 
 
+def baseline_token(path):
+    stem = re.escape(path.rsplit('/', 1)[-1].removesuffix('.png'))
+    return rf'(?<![\w-]){stem}(?:\.png)?(?![\w-])'
+
+
+def baseline_shown(rendered, with_fences, path):
+    token = baseline_token(path)
+    for line in rendered.splitlines():
+        if line.strip().startswith('|') and re.search(token, line) and len(embedded_images(line)) >= 2:
+            return True
+    verdict = re.compile(token + r'[*_`]*[ \t]*:(?P<rest>.*)$', re.M)
+    return any(has_content(match['rest']) for match in verdict.finditer(with_fences))
+
+
+def baseline_problems(body, baselines):
+    rendered = visible_markdown(body)
+    with_fences = visible_markdown(body, blank_fences=False)
+    return [path for path in baselines if not baseline_shown(rendered, with_fences, path)]
+
+
 def split_option(args, name):
     if name not in args:
         return args, None
@@ -422,6 +457,7 @@ def split_schema_glance(argv):
 def main():
     args, changed_file = split_option(sys.argv[1:], '--changed-files')
     args, schema_glance = split_schema_glance(args)
+    args, baseline_file = split_option(args, '--changed-baselines')
     if args:
         with open(args[0], encoding='utf-8') as f:
             body = f.read()
@@ -438,7 +474,19 @@ def main():
             print("pr-evidence: schema-changes: matches the schema-glance output")
         else:
             failures.append('schema-changes')
-            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
+            print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes', or run: node scripts/pr-schema-sync.mjs <pr-number> and apply the printed file with gh pr edit --body-file")
+
+    if baseline_file is not None:
+        with open(baseline_file, encoding='utf-8') as f:
+            baselines = [line.strip() for line in f if line.strip()]
+        missing = baseline_problems(body, baselines)
+        for path in missing:
+            failures.append('baseline-evidence')
+            print(f"FAIL baseline-evidence: {path}")
+        if missing:
+            print("pr-evidence: show each changed snapshot baseline as an old baseline | new render image pair, or a '<file>: <verdict>' line; see .claude/skills/pr-cairn/SKILL.md, 'Snapshot baselines'")
+        else:
+            print(f"pr-evidence: baseline-evidence: {len(baselines)} changed baseline(s) shown")
 
     if changed_file is not None:
         with open(changed_file, encoding='utf-8') as f:

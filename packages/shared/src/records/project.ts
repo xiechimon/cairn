@@ -76,6 +76,7 @@ export const projectRecordSchema = z.object({
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 
 export const projectMergeConfigSchema = z.object({
+  planAutoApproveEnabled: z.boolean().default(true),
   mergePolicy: mergePolicySchema.default('autonomous'),
   localChecks: z.array(z.string().min(1)).default([]),
   requireUpToDate: z.boolean().default(false),
@@ -83,6 +84,9 @@ export const projectMergeConfigSchema = z.object({
 export type ProjectMergeConfig = z.infer<typeof projectMergeConfigSchema>;
 export const patchProjectMergeConfigSchema = z
   .object({
+    planAutoApproveEnabled: projectMergeConfigSchema.shape.planAutoApproveEnabled
+      .unwrap()
+      .optional(),
     mergePolicy: projectMergeConfigSchema.shape.mergePolicy.unwrap().optional(),
     localChecks: projectMergeConfigSchema.shape.localChecks.unwrap().optional(),
     requireUpToDate: projectMergeConfigSchema.shape.requireUpToDate.unwrap().optional(),
