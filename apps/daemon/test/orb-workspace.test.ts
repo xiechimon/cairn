@@ -1,19 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import {
-  copyFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir, userInfo } from 'node:os';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { gitPrim } from '../src/git.js';
 import { createDaemonLogger } from '../src/log.js';
 import { orbAgentHome, orbWorkspacesRoot } from '../src/orb/worker.js';
 import { WorkspaceManager } from '../src/workspace.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function copySeedRepo(src: string, dest: string): void {
   mkdirSync(dest, { recursive: true });
@@ -26,7 +20,7 @@ function copySeedRepo(src: string, dest: string): void {
 }
 
 test('seeds a private base clone, fetches with the step credential and leaves the seed untouched', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-seed-'));
+  const root = testTempDir('orb-seed-');
   const truth = join(root, 'truth');
   const seedRoot = join(root, 'seed');
   const seed = join(seedRoot, 'project', 'repo');

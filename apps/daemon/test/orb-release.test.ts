@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { createConnection } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { encodeOrbFrame } from '../src/orb/protocol.js';
 import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
 import { CLAIMED, FakeMachineApi } from './machine-loop-harness.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const releaseA = '0.2.2-abcd-dist-aaaaaaaaaaaaaaaa';
 const releaseB = '0.2.2-abcd-dist-bbbbbbbbbbbbbbbb';
@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 async function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'orb-release-'));
+  const root = testTempDir('orb-release-');
   const socketPath = join(root, 'relay.sock');
   const api = new FakeMachineApi();
   const onAuthenticated = vi.fn();
