@@ -172,9 +172,12 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(pending, 'Q1').toHaveCSS('border-top-left-radius', await token(page, '--radius-card'));
     await expect(pending, 'Q1').toHaveCSS('background-color', card);
     const waiting = pending.getByTestId('chief-question-status');
+    await expect(waiting, 'Q1').toHaveClass(/sr-only/);
+    await pending.getByTestId('chief-question-collapse').click();
     await expect(waiting, 'Q1').toHaveText('待你决定');
     await expect(waiting.locator('svg'), 'Q1').toHaveCount(1);
     await expect(waiting, 'Q1').toHaveCSS('color', accent);
+    await pending.getByTestId('chief-question-collapse').click();
 
     const answered = win.locator('[data-testid="chief-question-card"][data-status="answered"]');
     const done = answered.getByTestId('chief-question-status');
@@ -182,9 +185,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(done.locator('svg'), 'Q1').toHaveCount(1);
     await expect(done, 'Q1').toHaveCSS('color', ink3);
 
-    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '15px');
-    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-weight', '500');
-    await expect(pending.getByTestId('chief-question-step'), 'Q2').toHaveCSS(
+    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
+    await expect(pending.getByTestId('chief-question-position'), 'Q2').toHaveCSS(
       'font-size',
       '12px',
     );

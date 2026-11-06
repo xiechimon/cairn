@@ -89,7 +89,7 @@ export function QueuedCapsules({
     <ul
       data-testid="queued-capsules"
       aria-label={t('排队中的消息')}
-      className="flex flex-col items-start gap-1.5 pb-2.5"
+      className="flex max-h-28 flex-col items-start gap-1.5 overflow-y-auto pb-2.5"
     >
       {messages.map((message) => {
         const failed = message.error != null && message.error !== '';

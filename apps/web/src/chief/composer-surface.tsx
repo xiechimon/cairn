@@ -34,7 +34,10 @@ const SEND_ON_CLS =
 const STOP_CLS =
   'text-foreground hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover)';
 const HOME_COMPOSER_CLS =
-  'mx-auto mt-2 mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
+  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
+const DRAWER_COMPOSER_CLS = 'mx-4 mb-2.5 shrink-0';
+const ATTACHED_COMPOSER_CLS = 'mt-0';
+const FREE_COMPOSER_CLS = 'rounded-t-(--radius-composer)';
 
 export interface ComposerSurfaceHandle {
   focus: (options?: FocusOptions) => void;
@@ -45,9 +48,15 @@ export interface ComposerSurfaceProps {
   editable: boolean;
   onSend?: ((text: string) => void | Promise<void>) | undefined;
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
-  mentionGroups: MentionGroups;
+  mentionGroups?: MentionGroups | undefined;
   onPickProject?: ((project: { id: string }) => void) | undefined;
-  slash: { reviewAvailable: boolean; stopAvailable: boolean; onStop: () => void };
+  slash?: { reviewAvailable: boolean; stopAvailable: boolean; onStop: () => void } | undefined;
+  onAdvance?: (() => void) | undefined;
+  primary?: ReactNode;
+  active?: boolean;
+  attached?: boolean;
+  onFocusEnter?: (() => void) | undefined;
+  onFocusLeave?: (() => void) | undefined;
   placeholder: string;
   invalid: boolean;
   home: boolean;
@@ -70,6 +79,12 @@ export function ComposerSurface({
   mentionGroups,
   onPickProject,
   slash,
+  onAdvance,
+  primary,
+  active = true,
+  attached = false,
+  onFocusEnter,
+  onFocusLeave,
   placeholder,
   invalid,
   home,
@@ -88,12 +103,14 @@ export function ComposerSurface({
     editable,
     draft: binding.draft,
     onDraftChange: binding.setDraft,
+    ...(binding.readDraft !== undefined ? { readDraft: binding.readDraft } : {}),
     onSend,
     onAttachment,
-    mentionGroups,
+    ...(mentionGroups !== undefined ? { mentionGroups } : {}),
     ...(onPickProject !== undefined ? { onPickProject } : {}),
-    slash,
+    ...(slash !== undefined ? { slash } : {}),
     growCap: 120,
+    active,
   });
   const {
     handlePaste,
@@ -171,11 +188,17 @@ export function ComposerSurface({
     [textareaRef, composerRef],
   );
   const stopMode = canStop && wire.draft === '' && wire.tokens.length === 0;
+  const placement = attached
+    ? ATTACHED_COMPOSER_CLS
+    : `${FREE_COMPOSER_CLS} ${home ? 'mt-2' : 'mt-2.5'}`;
   return (
     <div
+      hidden={!active}
+      inert={!active}
+      aria-hidden={active ? undefined : true}
       data-invalid={invalid ? '' : undefined}
-      className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
-      style={home ? { viewTransitionName: 'chief-composer' } : undefined}
+      className={`${active ? 'chief-composer ' : ''}${placement} ${home ? HOME_COMPOSER_CLS : DRAWER_COMPOSER_CLS} data-invalid:ring-1 data-invalid:ring-destructive rounded-b-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+      style={home && active ? { viewTransitionName: 'chief-composer' } : undefined}
     >
       {above}
       <ComposerAttachments
@@ -186,20 +209,37 @@ export function ComposerSurface({
       <div className="relative">
         <Textarea
           ref={attachComposer}
-          data-testid="chief-composer-input"
+          data-testid={active ? 'chief-composer-input' : undefined}
           data-compose-target=""
           aria-invalid={invalid ? true : undefined}
-          className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary)`}
+          className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
           readOnly={!editable}
           value={wire.draft}
           onChange={wire.handleChange}
-          onKeyDown={wire.handleKeyDown}
+          onKeyDown={(event) => {
+            if (
+              onAdvance !== undefined &&
+              event.key === 'Enter' &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
+              event.preventDefault();
+              if (!attaching) onAdvance();
+              return;
+            }
+            wire.handleKeyDown(event);
+          }}
           onPaste={handlePaste}
           onKeyUp={handleCaretMoved}
           onClick={handleCaretMoved}
           onSelect={handleCaretMoved}
           onCompositionEnd={handleCompositionEnd}
-          onBlur={handleBlur}
+          onFocus={onFocusEnter}
+          onBlur={(event) => {
+            handleBlur();
+            const node = event.currentTarget;
+            if (node.isConnected && node.checkVisibility()) onFocusLeave?.();
+          }}
           placeholder={placeholder}
           {...(inlineOpen
             ? {
@@ -222,6 +262,15 @@ export function ComposerSurface({
               ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
               : {})}
         />
+        {wire.draft === '' && (
+          <span
+            aria-hidden
+            data-testid={active ? 'chief-composer-placeholder' : undefined}
+            className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 pt-0.5 font-sans text-card-title tabular-nums text-(--text-tertiary)"
+          >
+            {placeholder}
+          </span>
+        )}
         <MentionHighlight
           text={wire.draft}
           registry={wire.mentionRegistry}
@@ -286,32 +335,33 @@ export function ComposerSurface({
             {t('工作中 · {time}', { time: formatClock(turnElapsed) })}
           </span>
         )}
-        {stopMode ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('停止 Coordinator 这次回复')}
-            className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
-            onClick={onStop}
-          >
-            <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('发送')}
-            className={cn(
-              SEND_BTN_CLS,
-              (wire.draft !== '' || wire.tokens.length > 0 || pendingAttachments.length > 0) &&
-                SEND_ON_CLS,
-              turnElapsed != null && 'ml-2',
-            )}
-            onClick={wire.send}
-          >
-            <ArrowUp width={16} height={16} />
-          </Button>
-        )}
+        {primary ??
+          (stopMode ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('停止 Coordinator 这次回复')}
+              className={cn(SEND_BTN_CLS, STOP_CLS, turnElapsed != null && 'ml-2')}
+              onClick={onStop}
+            >
+              <span className="size-2.25 rounded-(--cds-radius-xs) bg-current" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('发送')}
+              className={cn(
+                SEND_BTN_CLS,
+                (wire.draft !== '' || wire.tokens.length > 0 || pendingAttachments.length > 0) &&
+                  SEND_ON_CLS,
+                turnElapsed != null && 'ml-2',
+              )}
+              onClick={wire.send}
+            >
+              <ArrowUp width={16} height={16} />
+            </Button>
+          ))}
       </div>
       <SlashHelp
         open={helpOpen}
