@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openCoordinatorHarness } from '../src/runtime/harness.js';
-import { createCoordinatorModels } from '../src/runtime/models.js';
-import { coordinatorToolsExtension, createStepGate } from '../src/runtime/tools.js';
-import { runCoordinatorTurn } from '../src/runtime/turn.js';
+import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
+import { coordinatorToolsExtension, createStepGate } from '../../src/coordinator/runtime/tools.js';
+import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 
 const ctx = BACKGROUND_CONTEXT;

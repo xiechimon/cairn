@@ -6,7 +6,7 @@ import type {
   StepRecord,
   TranscriptRow,
 } from '@cairn/shared';
-import type { MachineApi } from '../src/machine-api.js';
+import type { MachineApi } from '../../src/coordinator/runtime/machine-api.js';
 
 export interface FakeMachineApi extends MachineApi {
   queue: ClaimedStep[];
