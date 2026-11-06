@@ -158,3 +158,80 @@ for (const viewport of VIEWPORTS) {
     });
   }
 }
+
+const MASK_CASES = [
+  { name: '1440x900 at DPR 1', width: 1440, height: 900, dpr: 1 },
+  { name: '1440x900 at DPR 2', width: 1440, height: 900, dpr: 2 },
+  { name: '1600x1000 at DPR 2', width: 1600, height: 1000, dpr: 2 },
+];
+
+for (const mask of MASK_CASES) {
+  for (const surface of SURFACES) {
+    test.describe(`mask on ${surface.name} at ${mask.name}`, () => {
+      test.use({
+        viewport: { width: mask.width, height: mask.height },
+        deviceScaleFactor: mask.dpr,
+      });
+
+      test('the bottom fade is off whenever the list is within 2px of the end', async ({
+        page,
+      }) => {
+        const { state, scope } = await open(page, surface);
+        const body = scope.getByTestId('chief-body');
+        await body.evaluate((node) => {
+          const log: { gap: number; fade: string }[] = [];
+          (window as unknown as { __maskLog: typeof log }).__maskLog = log;
+          const tick = () => {
+            log.push({
+              gap: node.scrollHeight - node.scrollTop - node.clientHeight,
+              fade: node.style.getPropertyValue('--scroll-fade-bottom'),
+            });
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+        await sendAndReply(page, scope, state, REPLY);
+        await expect(scope.getByText(REPLY, { exact: true })).toBeVisible();
+        await page.waitForTimeout(1500);
+        const log = await page.evaluate(
+          () => (window as unknown as { __maskLog: { gap: number; fade: string }[] }).__maskLog,
+        );
+        const stale = log.filter((s) => s.gap <= 2 && s.fade !== '0px');
+        expect(stale).toEqual([]);
+        const settled = await body.evaluate((node) => ({
+          gap: node.scrollHeight - node.scrollTop - node.clientHeight,
+          fade: node.style.getPropertyValue('--scroll-fade-bottom'),
+        }));
+        expect(settled.gap).toBeLessThanOrEqual(2);
+        expect(settled.fade).toBe('0px');
+      });
+
+      test('the bottom fade follows layout changes that fire no scroll or DOM event', async ({
+        page,
+      }) => {
+        const { state, scope } = await open(page, surface);
+        await sendAndReply(page, scope, state, REPLY);
+        await expect(scope.getByText(REPLY, { exact: true })).toBeVisible();
+        const body = scope.getByTestId('chief-body');
+        const read = () =>
+          body.evaluate((node) => ({
+            gap: Math.round(node.scrollHeight - node.scrollTop - node.clientHeight),
+            fade: node.style.getPropertyValue('--scroll-fade-bottom'),
+          }));
+        await expect.poll(read).toEqual({ gap: 0, fade: '0px' });
+
+        await body.evaluate((node) => {
+          const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
+          content.style.paddingBottom = '12px';
+        });
+        await expect.poll(read).toEqual({ gap: 12, fade: '28px' });
+
+        await body.evaluate((node) => {
+          const content = node.querySelector('[data-testid="chief-stream"]') as HTMLElement;
+          content.style.paddingBottom = '';
+        });
+        await expect.poll(read).toEqual({ gap: 0, fade: '0px' });
+      });
+    });
+  }
+}
