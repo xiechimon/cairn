@@ -37,14 +37,11 @@ test('each side installs, installs its browser, runs and uploads from its own tr
   );
 });
 
-test('only the harness is copied from head into the base tree', () => {
-  const copies = capture.split('\n').filter((line) => /^\s+cp /.test(line));
-  assert.deepEqual(
-    copies.map((line) => line.trim().replace(/"\$tree\/[^"]*"/g, 'TREE')),
-    [
-      'cp apps/web/pr-screens/* TREE',
-      'cp apps/web/e2e/audit-pages.ts apps/web/e2e/helpers.ts TREE',
-      'cp apps/web/playwright.pr-screens.config.ts apps/web/playwright.pr-screens-live.config.ts "$tree/apps/web/"',
-    ].map((line) => line.replace(/"\$tree\/[^"]*"/g, 'TREE')),
+test('both sides get the harness from one checkout of the workflow merge ref, not from the PR head', () => {
+  assert.match(capture, /path: \.pr-screens-harness/);
+  assert.match(
+    capture,
+    /node \.pr-screens-harness\/scripts\/pr-screens-harness\.mjs \.pr-screens-harness "\$tree"/,
   );
+  assert.equal(capture.split('\n').filter((line) => /^\s+cp /.test(line)).length, 0);
 });

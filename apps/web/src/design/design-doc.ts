@@ -57,7 +57,6 @@ export const RADIUS_EXPRS: Record<string, string> = {
 const SECTION_RE = /^([\w-]+):\s*$/;
 const ENTRY_RE = /^ {2}([\w-]+):\s*(\[[^\]]*\]|'[^']*'|"[^"]*"|[^#\s][^#]*?)\s*(?:#.*)?$/;
 const QUOTED_RE = /^(['"])(.*)\1$/;
-const TILE_KEY = 'project-tiles';
 
 export function parseFrontmatter(markdown: string): Frontmatter {
   const block = markdown.split(/^---\r?$/m)[1] ?? '';
@@ -89,18 +88,7 @@ export function docChecks(
   const unmapped: string[] = [];
   for (const [key, value] of Object.entries(colors)) {
     if (Array.isArray(value)) {
-      if (key !== TILE_KEY) {
-        unmapped.push(key);
-        continue;
-      }
-      value.forEach((expected, i) => {
-        checks.push({
-          key: `${key}-${i + 1}`,
-          expected,
-          cssExpr: `var(--project-tile-${i + 1})`,
-          kind: 'color',
-        });
-      });
+      unmapped.push(key);
       continue;
     }
     const cssVar = COLOR_VARS[key];

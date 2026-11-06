@@ -162,6 +162,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     name: row.name,
     teamId: row.teamId,
     online: row.online,
+    lastSeenAt: row.lastSeenAt,
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
     enabledRuntimes: row.enabledRuntimes,

@@ -1,0 +1,76 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, test } from 'vitest';
+import { ProjectAvatar } from '../src/board/project-avatar.js';
+
+const SRC = new URL('../src/', import.meta.url).pathname;
+const ROOT = new URL('../', import.meta.url).pathname;
+
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    return statSync(path).isDirectory() ? walk(path) : [path];
+  });
+}
+
+const sourceFiles = walk(SRC)
+  .filter((path) => /\.(tsx?|css)$/.test(path))
+  .map((path) => ({ path: path.slice(SRC.length), text: readFileSync(path, 'utf8') }));
+
+const appCss = readFileSync(join(SRC, 'styles/app.css'), 'utf8');
+const rules = readFileSync(join(ROOT, 'DESIGN-RULES.md'), 'utf8');
+
+function offenders(pattern: RegExp): string[] {
+  return sourceFiles.filter(({ text }) => pattern.test(text)).map(({ path }) => path);
+}
+
+describe('V11 identity carries no colour', () => {
+  test('a project avatar renders no letter and no hue', () => {
+    const html = renderToStaticMarkup(createElement(ProjectAvatar, { name: 'cairn', tone: 2 }));
+    expect(html).not.toContain('>C<');
+    expect(html).not.toMatch(/project-(tile|ink)/);
+    expect(html).toContain('<svg');
+  });
+
+  test('a chosen icon and colour still render neutral', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProjectAvatar, { name: 'cairn', tone: 0, icon: 'rocket', color: 'rose' }),
+    );
+    expect(html).not.toMatch(/project-(tile|ink)/);
+  });
+
+  test('no project tile or ink token remains', () => {
+    expect(offenders(/project-(tile|ink)/)).toEqual([]);
+  });
+});
+
+describe('V16 no texture or gradient surfaces', () => {
+  test('the user bubble is a flat tint', () => {
+    expect(offenders(/bubble-gradient/)).toEqual([]);
+    expect(offenders(/--bubble-(wash|rim)/)).toEqual([]);
+    expect(appCss).not.toMatch(/feTurbulence|radial-gradient|conic-gradient/);
+  });
+});
+
+describe('palette roles', () => {
+  test('chip fill and tile tint tokens are gone', () => {
+    expect(offenders(/--(chip-(idle|plan|confirm|done|failed)-(bg|fg)|tile-orange-(bg|fg))/)).toEqual([]);
+  });
+});
+
+describe('DESIGN-RULES carries the anti-slop rules', () => {
+  test.each(['V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'T3'])(
+    '%s is a row with a measured baseline',
+    (id) => {
+      const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));
+      expect(row).toBeDefined();
+      expect(row).toMatch(/\| (M|H)(;| \|)/);
+    },
+  );
+
+  test('V3 no longer exempts the bubble', () => {
+    expect(rules).not.toMatch(/except `bubble-gradient`/);
+  });
+});

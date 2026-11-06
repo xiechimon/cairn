@@ -6,7 +6,6 @@ import {
   DriftField,
   SpiralArt,
   SpiralMark,
-  TexturedTile,
   TextureSkeleton,
 } from '../components/texture/texture.js';
 import type { TextureFilter } from '../components/texture/texture-core.js';
@@ -58,7 +57,7 @@ export function TextureSection() {
           <FilterSwitch value={artFilter} onChange={setArtFilter} />
           <SpiralArt filter={artFilter} className="h-96 w-full max-w-120">
             <div className="flex h-96 flex-col justify-end p-6">
-              <p className="m-0 font-serif text-greeting text-project-ink-1">
+              <p className="m-0 font-serif text-greeting text-foreground">
                 Agents that bring back
                 <br />
                 <i>only what needs you.</i>
@@ -125,23 +124,12 @@ export function TextureSection() {
         </div>
       </Specimen>
       <Specimen
-        id="textured-tiles-and-loading"
-        title="Textured tiles and loading"
-        note="Project tiles at 40px and up, and a dot sweep for loading; smaller tiles stay flat"
-        code={`<TexturedTile letter="C" tone={1} />\n<TextureSkeleton />`}
+        id="loading"
+        title="Loading"
+        note="A dot sweep for loading"
+        code={`<TextureSkeleton />`}
       >
         <div className="flex w-full flex-col gap-5">
-          <Labeled label="TexturedTile, tones 1–6">
-            <div className="flex gap-3">
-              {(['C', 'S', 'W', 'D', 'A', 'M'] as const).map((letter, i) => (
-                <TexturedTile
-                  key={letter}
-                  letter={letter}
-                  tone={(i + 1) as 1 | 2 | 3 | 4 | 5 | 6}
-                />
-              ))}
-            </div>
-          </Labeled>
           <Labeled label="TextureSkeleton">
             <TextureSkeleton />
           </Labeled>
