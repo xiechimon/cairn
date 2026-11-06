@@ -178,7 +178,7 @@ export function injectMemories(
                 : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
         ),
       )
-      .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
+      .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
     if (rows.length > 0) {
       tx.update(agentMemory)
@@ -222,7 +222,7 @@ export function memoriesInScope(
             : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
       ),
     )
-    .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
+    .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
     .all();
 }
 
