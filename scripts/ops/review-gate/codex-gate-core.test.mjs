@@ -273,6 +273,27 @@ test('usageLimitHit blocks only the head whose request the notice answered', () 
   assert.equal(usageLimitHit([], stateEntry, SHA), false);
 });
 
+test('usageLimitHit orders same-second comments by id', () => {
+  const actions = { login: 'github-actions[bot]', type: 'Bot' };
+  const at = '2026-01-01T00:00:20Z';
+  const request = (body, id) => ({ id, body, user: actions, created_at: at });
+  const limit = (id) => ({ id, body: LIMIT_BODY, user: CODEX, created_at: at });
+  assert.equal(usageLimitHit([request(requestMarker(SHA), 5), limit(6)], null, SHA), true);
+  assert.equal(usageLimitHit([request(requestMarker(SHA), 7), limit(6)], null, SHA), false);
+  assert.equal(usageLimitHit([request(retryMarker(SHA, 1), 5), limit(6)], null, SHA), true);
+  assert.equal(
+    usageLimitHit(
+      [request(requestMarker(SHA), 1), request(retryMarker(SHA, 1), 8), limit(6)],
+      null,
+      SHA,
+    ),
+    false,
+  );
+  const stateEntry = { comment: { id: 9, updated_at: at } };
+  assert.equal(usageLimitHit([request(requestMarker(SHA), 5), limit(10)], stateEntry, SHA), true);
+  assert.equal(usageLimitHit([request(requestMarker(SHA), 5), limit(8)], stateEntry, SHA), false);
+});
+
 test('decide retries a limited head once the last request is two hours old', () => {
   const retries = { count: 1, pending: false };
   const early = decide(pr, null, [], retries, true, {

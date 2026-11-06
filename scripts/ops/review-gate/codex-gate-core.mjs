@@ -73,40 +73,43 @@ export function trustedStateComment(comments, kind = 'code_review') {
     });
   return trusted.reduce(
     (latest, entry) =>
-      !latest || Date.parse(entry.comment.updated_at) >= Date.parse(latest.comment.updated_at)
+      !latest || commentOrder(entry.comment, latest.comment, 'updated_at', 'updated_at') >= 0
         ? entry
         : latest,
     null,
   );
 }
 
-export function lastGateRequestAt(comments, sha) {
+const idOf = (comment) => (Number.isFinite(Number(comment.id)) ? Number(comment.id) : 0);
+
+export function commentOrder(a, b, field = 'created_at', otherField = 'created_at') {
+  return Date.parse(a[field]) - Date.parse(b[otherField]) || idOf(a) - idOf(b);
+}
+
+export function lastGateRequest(comments, sha) {
   const prefixes = [`<!-- review-gate-request:${sha} -->`, `<!-- review-gate-retry:${sha}:`];
-  const times = comments
-    .filter(
-      (comment) =>
-        comment.user?.login === ACTIONS_LOGIN &&
-        prefixes.some((prefix) => comment.body?.startsWith(prefix)),
-    )
-    .map((comment) => Date.parse(comment.created_at));
-  return times.length > 0 ? Math.max(...times) : null;
+  const gateComments = comments.filter(
+    (comment) =>
+      comment.user?.login === ACTIONS_LOGIN &&
+      prefixes.some((prefix) => comment.body?.startsWith(prefix)),
+  );
+  return gateComments.reduce(
+    (latest, comment) => (!latest || commentOrder(comment, latest) > 0 ? comment : latest),
+    null,
+  );
 }
 
 export function usageLimitHit(comments, stateEntry, sha) {
   const newest = comments
     .filter((comment) => isCodexAuthor(comment.user?.login, comment.user?.type))
     .reduce(
-      (latest, comment) =>
-        !latest || Date.parse(comment.created_at) >= Date.parse(latest.created_at)
-          ? comment
-          : latest,
+      (latest, comment) => (!latest || commentOrder(comment, latest) >= 0 ? comment : latest),
       null,
     );
   if (!newest || !LIMIT_RE.test(newest.body ?? '')) return false;
-  const noticeAt = Date.parse(newest.created_at);
-  const requestedAt = lastGateRequestAt(comments, sha);
-  if (requestedAt === null || noticeAt <= requestedAt) return false;
-  return !stateEntry || noticeAt > Date.parse(stateEntry.comment.updated_at);
+  const request = lastGateRequest(comments, sha);
+  if (!request || commentOrder(newest, request) <= 0) return false;
+  return !stateEntry || commentOrder(newest, stateEntry.comment, 'created_at', 'updated_at') > 0;
 }
 
 export function badgeOf(body) {
