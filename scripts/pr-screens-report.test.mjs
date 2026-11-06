@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import {
   classify,
   collectDiffImages,
+  commonPages,
   diffAxe,
   failedCompareFiles,
   render,
@@ -42,15 +43,46 @@ test('a failed compare with a base image is changed, without one it is new, base
   });
 });
 
-test('axe diff reports new and fixed rules only for pages rendered on both sides', () => {
+const violation = (rule, impact, targets) => ({ rule, impact, nodes: targets.length, targets });
+
+test('axe diff compares rule and target node, so more nodes of an existing rule are new', () => {
+  const base = new Map([['p-dark', [violation('color-contrast', 'serious', ['.a'])]]]);
+  const head = new Map([
+    ['p-dark', [violation('color-contrast', 'serious', ['.a', '.b', '.c', '.d'])]],
+  ]);
+  const { added, fixed } = diffAxe(base, head);
+  assert.deepEqual(added, [
+    { page: 'p-dark', rule: 'color-contrast', impact: 'serious', nodes: 3, target: '.b' },
+  ]);
+  assert.deepEqual(fixed, []);
+  assert.deepEqual(totals(base), { critical: 0, serious: 1, moderate: 0, minor: 0 });
+  assert.deepEqual(totals(head), { critical: 0, serious: 4, moderate: 0, minor: 0 });
+});
+
+test('the same node count on different nodes is one new and one fixed', () => {
+  const base = new Map([['p-dark', [violation('label', 'critical', ['.a'])]]]);
+  const head = new Map([['p-dark', [violation('label', 'critical', ['.b'])]]]);
+  const { added, fixed } = diffAxe(base, head);
+  assert.deepEqual(
+    added.map((v) => `${v.rule}:${v.target}`),
+    ['label:.b'],
+  );
+  assert.deepEqual(
+    fixed.map((v) => `${v.rule}:${v.target}`),
+    ['label:.a'],
+  );
+});
+
+test('new and fixed rules are reported only for pages rendered on both sides', () => {
   const base = new Map([
-    ['p-dark', [{ rule: 'color-contrast', impact: 'serious', nodes: 2 }]],
+    ['p-dark', [violation('color-contrast', 'serious', ['.a'])]],
     ['q-dark', []],
+    ['only-base-dark', [violation('label', 'critical', ['.x'])]],
   ]);
   const head = new Map([
-    ['p-dark', [{ rule: 'label', impact: 'critical', nodes: 1 }]],
-    ['q-dark', [{ rule: 'region', impact: 'moderate', nodes: 1 }]],
-    ['only-head-dark', [{ rule: 'label', impact: 'critical', nodes: 1 }]],
+    ['p-dark', [violation('label', 'critical', ['.b'])]],
+    ['q-dark', [violation('region', 'moderate', ['body'])]],
+    ['only-head-dark', [violation('label', 'critical', ['.y'])]],
   ]);
   const { added, fixed } = diffAxe(base, head);
   assert.deepEqual(
@@ -61,26 +93,32 @@ test('axe diff reports new and fixed rules only for pages rendered on both sides
     fixed.map((v) => `${v.page}:${v.rule}`),
     ['p-dark:color-contrast'],
   );
-  assert.deepEqual(totals(head), { critical: 2, serious: 0, moderate: 1, minor: 0 });
+  const common = commonPages(base, head);
+  assert.deepEqual([...common].sort(), ['p-dark', 'q-dark']);
+  assert.deepEqual(totals(head, common), { critical: 1, serious: 0, moderate: 1, minor: 0 });
+  assert.deepEqual(totals(base, common), { critical: 0, serious: 1, moderate: 0, minor: 0 });
 });
 
 test('the report names counts, changed pages, axe additions and job time', () => {
   const text = render({
     classes: { changed: ['a-dark.png'], added: [], removed: [], unchanged: 5 },
     axeDiff: {
-      added: [{ page: 'a-dark', rule: 'label', impact: 'critical', nodes: 1 }],
+      added: [{ page: 'a-dark', rule: 'label', impact: 'critical', nodes: 1, target: '.x' }],
       fixed: [],
     },
     baseTotals: totals(new Map()),
-    headTotals: totals(new Map([['a-dark', [{ rule: 'label', impact: 'critical', nodes: 1 }]]])),
+    headTotals: totals(new Map([['a-dark', [violation('label', 'critical', ['.x'])]]])),
     headErrors: [],
     baseErrors: [],
     durations: { head: 119.6 },
   });
-  assert.match(text, /1 changed, 0 new, 0 removed, 5 unchanged\. Job time: head 120s\./);
+  assert.match(
+    text,
+    /Screens \(page x theme\): 1 changed, 0 new, 0 removed, 5 unchanged\. Job time: head 120s\./,
+  );
   assert.match(text, /\| a-dark \| changed \|/);
   assert.match(text, /head 1 critical/);
-  assert.match(text, /\| a-dark \| label \| critical \| 1 \|/);
+  assert.match(text, /\| a-dark \| label \| critical \| 1 \| `\.x` \|/);
 });
 
 test('changed pages render inline as images from the asset base, capped, with the selection line', () => {
@@ -128,4 +166,20 @@ test('changed pages are copied with base, head and the Playwright diff', () => {
   } finally {
     releaseTestTempDir(dir);
   }
+});
+
+test('the report says so when the two sides were installed from different lockfiles', () => {
+  const input = {
+    classes: { changed: [], added: [], removed: [], unchanged: 2 },
+    axeDiff: { added: [], fixed: [] },
+    baseTotals: totals(new Map()),
+    headTotals: totals(new Map()),
+    headErrors: [],
+    baseErrors: [],
+  };
+  assert.match(
+    render({ ...input, lockfilesDiffer: true }),
+    /Dependencies differ: each side was installed from its own pnpm-lock\.yaml/,
+  );
+  assert.doesNotMatch(render({ ...input, lockfilesDiffer: false }), /Dependencies differ/);
 });

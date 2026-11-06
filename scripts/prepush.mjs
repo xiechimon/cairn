@@ -35,6 +35,7 @@ export const selfTests = [
   'scripts/agent-rules.test.mjs',
   'scripts/pr-screens-report.test.mjs',
   'scripts/pr-screens-select.test.mjs',
+  'scripts/pr-screens-workflow.test.mjs',
   'scripts/ops/merge-route-audit.test.mjs',
 ];
 

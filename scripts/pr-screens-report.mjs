@@ -21,6 +21,11 @@ function listFiles(dir, suffix) {
     : [];
 }
 
+function readLock(dir) {
+  const file = join(dir, 'lock.sha256');
+  return existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
+}
+
 function walk(dir, found = []) {
   if (!existsSync(dir)) return found;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -42,24 +47,62 @@ export function readAxe(dir) {
   return byPage;
 }
 
+export function commonPages(base, head) {
+  return new Set([...base.keys()].filter((key) => head.has(key)));
+}
+
+function nodeMap(violations) {
+  const nodes = new Map();
+  for (const v of violations ?? []) {
+    for (const target of v.targets) nodes.set(`${v.rule}\u0000${target}`, { ...v, target });
+  }
+  return nodes;
+}
+
+function groupNodes(page, nodes) {
+  const groups = new Map();
+  for (const node of nodes) {
+    const group = groups.get(node.rule);
+    if (group) group.nodes += 1;
+    else
+      groups.set(node.rule, {
+        page,
+        rule: node.rule,
+        impact: node.impact,
+        nodes: 1,
+        target: node.target,
+      });
+  }
+  return [...groups.values()];
+}
+
 export function diffAxe(base, head) {
   const added = [];
   const fixed = [];
-  const keys = new Set([...base.keys(), ...head.keys()]);
-  for (const key of [...keys].sort()) {
-    const before = new Map((base.get(key) ?? []).map((v) => [v.rule, v]));
-    const after = new Map((head.get(key) ?? []).map((v) => [v.rule, v]));
-    if (!base.has(key) || !head.has(key)) continue;
-    for (const [rule, v] of after) if (!before.has(rule)) added.push({ page: key, ...v });
-    for (const [rule, v] of before) if (!after.has(rule)) fixed.push({ page: key, ...v });
+  for (const key of [...commonPages(base, head)].sort()) {
+    const before = nodeMap(base.get(key));
+    const after = nodeMap(head.get(key));
+    added.push(
+      ...groupNodes(
+        key,
+        [...after].filter(([id]) => !before.has(id)).map(([, node]) => node),
+      ),
+    );
+    fixed.push(
+      ...groupNodes(
+        key,
+        [...before].filter(([id]) => !after.has(id)).map(([, node]) => node),
+      ),
+    );
   }
   return { added, fixed };
 }
 
-export function totals(axe) {
+export function totals(axe, pages) {
   const counts = Object.fromEntries(SEVERITY.map((level) => [level, 0]));
-  for (const violations of axe.values()) {
-    for (const v of violations) counts[v.impact ?? 'minor'] += 1;
+  for (const [key, violations] of axe) {
+    if (pages && !pages.has(key)) continue;
+    for (const v of violations) counts[v.impact ?? 'minor'] += v.nodes;
   }
   return counts;
 }
@@ -97,6 +140,8 @@ export function render({
   runUrl,
   assetBase,
   selection,
+  comparedPages,
+  lockfilesDiffer,
 }) {
   const lines = ['### PR screenshots and accessibility (non-blocking)', ''];
   const duration = Object.entries(durations ?? {})
@@ -108,9 +153,14 @@ export function render({
       '',
     );
   lines.push(
-    `Pages: ${classes.changed.length} changed, ${classes.added.length} new, ${classes.removed.length} removed, ${classes.unchanged} unchanged.${duration ? ` Job time: ${duration}.` : ''}`,
+    `Screens (page x theme): ${classes.changed.length} changed, ${classes.added.length} new, ${classes.removed.length} removed, ${classes.unchanged} unchanged.${duration ? ` Job time: ${duration}.` : ''}`,
     '',
   );
+  if (lockfilesDiffer)
+    lines.push(
+      'Dependencies differ: each side was installed from its own pnpm-lock.yaml, so upgrades show in the screenshots.',
+      '',
+    );
   if (classes.changed.length + classes.added.length + classes.removed.length > 0) {
     lines.push('| Page | State |', '|---|---|');
     for (const name of classes.changed) lines.push(`| ${name.replace(/\.png$/, '')} | changed |`);
@@ -138,21 +188,29 @@ export function render({
     lines.push('');
   }
   const level = (counts) => SEVERITY.map((s) => `${counts[s]} ${s}`).join(', ');
-  lines.push(`axe (WCAG 2.2 AA): base ${level(baseTotals)}; head ${level(headTotals)}.`, '');
+  lines.push(
+    `axe (WCAG 2.2 AA), violating nodes on the ${comparedPages ?? 'audited'} screens rendered on both sides: base ${level(baseTotals)}; head ${level(headTotals)}.`,
+    '',
+  );
   if (axeDiff.added.length > 0) {
-    lines.push('New on this head:', '', '| Page | Rule | Impact | Nodes |', '|---|---|---|---|');
+    lines.push(
+      'New on this head, by rule and node:',
+      '',
+      '| Page | Rule | Impact | New nodes | First node |',
+      '|---|---|---|---|---|',
+    );
     for (const v of axeDiff.added)
-      lines.push(`| ${v.page} | ${v.rule} | ${v.impact} | ${v.nodes} |`);
+      lines.push(`| ${v.page} | ${v.rule} | ${v.impact} | ${v.nodes} | \`${v.target}\` |`);
     lines.push('');
   }
   if (axeDiff.fixed.length > 0)
     lines.push(
-      `Fixed on this head: ${axeDiff.fixed.map((v) => `${v.page} ${v.rule}`).join(', ')}.`,
+      `Fixed on this head: ${axeDiff.fixed.map((v) => `${v.page} ${v.rule} (${v.nodes})`).join(', ')}.`,
       '',
     );
   if (headErrors.length + baseErrors.length > 0) {
     lines.push(
-      `Pages that did not render: head ${headErrors.length}, base ${baseErrors.length} (see the artifact).`,
+      `Screens that did not render: head ${headErrors.length}, base ${baseErrors.length} (see the artifact).`,
       '',
     );
   }
@@ -194,11 +252,14 @@ function main(argv) {
   );
   const baseAxe = readAxe(baseDir);
   const headAxe = readAxe(headDir);
+  const common = commonPages(baseAxe, headAxe);
   const markdown = render({
     classes,
     axeDiff: diffAxe(baseAxe, headAxe),
-    baseTotals: totals(baseAxe),
-    headTotals: totals(headAxe),
+    baseTotals: totals(baseAxe, common),
+    headTotals: totals(headAxe, common),
+    comparedPages: common.size,
+    lockfilesDiffer: readLock(baseDir) !== readLock(headDir),
     headErrors: listFiles(headDir, '.error.txt'),
     baseErrors: listFiles(baseDir, '.error.txt'),
     durations,

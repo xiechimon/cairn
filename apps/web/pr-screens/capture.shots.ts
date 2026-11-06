@@ -39,7 +39,7 @@ for (const theme of ['light', 'dark'] as const) {
           impact: v.impact,
           help: v.help,
           nodes: v.nodes.length,
-          targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+          targets: v.nodes.map((n) => n.target.join(' ')),
         }));
         writeFileSync(join(OUT, `${key}.axe.json`), `${JSON.stringify(found, null, 1)}\n`);
       } catch (error) {

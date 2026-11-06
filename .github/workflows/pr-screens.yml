@@ -79,15 +79,25 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Use the merge base sources for the base side
-        if: ${{ matrix.side == 'base' }}
+      - name: Prepare the tree this side builds from
+        id: tree
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SIDE: ${{ matrix.side }}
         run: |
-          merge_base="$(git merge-base "$BASE_SHA" HEAD)"
-          git checkout "$merge_base" -- apps/web/src apps/web/public apps/web/index.html apps/web/design.html apps/web/vite.config.ts apps/web/postcss.config.js packages
+          tree="$GITHUB_WORKSPACE"
+          if [ "$SIDE" = "base" ]; then
+            tree="$RUNNER_TEMP/base-tree"
+            git worktree add --detach "$tree" "$(git merge-base "$BASE_SHA" HEAD)"
+            mkdir -p "$tree/apps/web/pr-screens" "$tree/apps/web/e2e"
+            cp apps/web/pr-screens/* "$tree/apps/web/pr-screens/"
+            cp apps/web/e2e/audit-pages.ts apps/web/e2e/helpers.ts "$tree/apps/web/e2e/"
+            cp apps/web/playwright.pr-screens.config.ts "$tree/apps/web/"
+          fi
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies
+      - name: Install dependencies from this side's own lockfile
+        working-directory: ${{ steps.tree.outputs.tree }}
         run: pnpm install --frozen-lockfile
 
       - name: Use the primary Ubuntu mirror with bounded apt retries
@@ -95,21 +105,28 @@ jobs:
           sudo sed -i 's#azure.archive.ubuntu.com#archive.ubuntu.com#g' /etc/apt/apt-mirrors.txt
           printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-bounded > /dev/null
 
-      - name: Install Playwright chromium
+      - name: Install Playwright chromium for this side's version
+        working-directory: ${{ steps.tree.outputs.tree }}
         run: pnpm exec playwright install chromium --with-deps
 
-      - name: Screenshot every audited page and run axe
-        working-directory: apps/web
+      - name: Screenshot the selected pages and run axe
+        working-directory: ${{ steps.tree.outputs.tree }}/apps/web
         continue-on-error: true
         env:
           PR_SCREENS_OUT: pr-screens-out
           PR_SCREENS_PAGES: ${{ needs.select.outputs.pages }}
         run: pnpm exec playwright test -c playwright.pr-screens.config.ts
 
+      - name: Record the lockfile this side was built from
+        working-directory: ${{ steps.tree.outputs.tree }}
+        run: |
+          mkdir -p apps/web/pr-screens-out
+          sha256sum pnpm-lock.yaml | cut -d' ' -f1 > apps/web/pr-screens-out/lock.sha256
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: screens-${{ matrix.side }}
-          path: apps/web/pr-screens-out/
+          path: ${{ steps.tree.outputs.tree }}/apps/web/pr-screens-out/
           if-no-files-found: error
           retention-days: 7
 
