@@ -4,6 +4,7 @@ import {
   PROVIDER_PRESET_IDS,
   type ProviderApi,
   type ProviderRecord,
+  type ProviderTestResult,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Server } from 'lucide-react';
@@ -21,6 +22,7 @@ import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dia
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 
 const PROTOCOL_LABELS: Record<ProviderApi, string> = {
   'anthropic-messages': 'Anthropic Messages',
@@ -126,7 +128,71 @@ export interface ProviderEditActions {
       apiKey?: string;
     },
   ) => Promise<unknown>;
+  test?: () => Promise<ProviderTestResult>;
   remove?: () => void;
+}
+
+export function describeTestResult(result: ProviderTestResult, t: TFunc): string {
+  if (result.status === 'ok') {
+    return t('连接正常 · {model} · {ms}ms · 模型数 {n}', {
+      model: result.probe.echoedModel ?? result.probe.requestedModel ?? '',
+      ms: result.probe.latencyMs ?? 0,
+      n: result.listing.modelCount ?? 0,
+    });
+  }
+  const error = result.probe.error ?? result.listing.error;
+  const http = result.probe.httpStatus ?? result.listing.httpStatus;
+  return t('连接失败 · {type}{http} · {message}', {
+    type: error?.type ?? 'other',
+    http: http === null ? '' : ` (HTTP ${http})`,
+    message: error?.message ?? '',
+  });
+}
+
+function TestRow({ onTest }: { onTest: () => Promise<ProviderTestResult> }) {
+  const { t } = useI18n();
+  const [pending, setPending] = useState(false);
+  const [outcome, setOutcome] = useState<{ ok: boolean; text: string } | null>(null);
+  const run = () => {
+    setPending(true);
+    setOutcome(null);
+    onTest()
+      .then((result) =>
+        setOutcome({ ok: result.status === 'ok', text: describeTestResult(result, t) }),
+      )
+      .catch((error: unknown) =>
+        setOutcome({
+          ok: false,
+          text: `${t('测试没能跑完，请重试。')} ${error instanceof Error ? error.message : ''}`.trim(),
+        }),
+      )
+      .finally(() => setPending(false));
+  };
+  return (
+    <SettingsRow
+      label={t('测试连接')}
+      hint={t('发一个最小请求，不会显示密钥')}
+      className="flex-wrap gap-y-2 py-2.5"
+    >
+      <span className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+        {outcome !== null && (
+          <span
+            role="status"
+            data-testid="provider-test-result"
+            className={cn(
+              'max-w-full text-meta break-words',
+              outcome.ok ? 'text-content-secondary' : 'text-destructive',
+            )}
+          >
+            {outcome.text}
+          </span>
+        )}
+        <Button variant="outline" size="sm" disabled={pending} onClick={run}>
+          {pending ? t('测试中…') : t('测试')}
+        </Button>
+      </span>
+    </SettingsRow>
+  );
 }
 
 export function TeamProviderEditor({
@@ -194,6 +260,7 @@ export function TeamProviderEditor({
           />
         </SettingsRow>
         {!oauth && <KeyRow onReplace={(apiKey) => fire({ apiKey })} />}
+        {!oauth && actions.test !== undefined && <TestRow onTest={actions.test} />}
       </SettingsCard>
       <ProviderSection title={t('模型列表')} hint={t('这里的模型会出现在模型选择器里')}>
         <SettingsCard>
