@@ -1,4 +1,5 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join, sep } from 'node:path';
@@ -58,10 +59,10 @@ async function relayFixture(
   underHome = false,
 ) {
   const root = underHome
-    ? mkdtempSync(join(homedir(), '.cache', 'cairn-podman-widen-'))
+    ? join(homedir(), '.cache', `cairn-podman-widen-${randomUUID()}`)
     : makeTestTempDir('egr-');
   const directory = join(root, directoryName);
-  mkdirSync(directory, { mode: 0o700 });
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
   const socketPath = join(directory, socketName);
   const server = createServer((socket) => socket.destroy());
   await new Promise<void>((resolve) => server.listen(socketPath, resolve));
