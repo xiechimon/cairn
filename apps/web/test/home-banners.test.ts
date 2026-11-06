@@ -56,3 +56,16 @@ describe('pickHomeBanners with the Claude login warning', () => {
     ).toEqual(['login', 'quota']);
   });
 });
+
+describe('pickHomeBanners with login, backup, quota and first-PR together', () => {
+  it('shows exactly two and keeps the login warning', () => {
+    const picked = pickHomeBanners([
+      { kind: 'first-pr' as const },
+      { kind: 'quota' as const },
+      { kind: 'login' as const },
+      { kind: 'notify' as const },
+    ]);
+    expect(picked).toHaveLength(2);
+    expect(kinds(picked)).toContain('login');
+  });
+});
