@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useConnected } from '../api/connection-state.js';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -65,22 +66,26 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
-import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import {
+  ChiefConnectionBanner,
+  ChiefFallbackBanner,
+  ChiefOutageBanner,
+} from './chief-outage-banner.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
-  "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
 export const TOOL_BTN_CLS =
-  "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
 
 export const PROJECT_CHIP_CLS =
-  "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) [&_svg:not([class*='size-'])]:size-auto";
 
 const SEND_BTN_CLS =
-  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary aria-expanded:bg-transparent';
 const SEND_ON_CLS =
   'bg-foreground text-background hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90';
 const STOP_CLS =
@@ -88,7 +93,7 @@ const STOP_CLS =
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
-const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5 pb-4';
+const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5';
 const HOME_COMPOSER_CLS =
   'mx-auto mt-2 mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
 
@@ -429,6 +434,7 @@ export function ChiefConversation({
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
       : undefined;
+  const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
   const turnElapsed =
     turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
@@ -543,7 +549,7 @@ export function ChiefConversation({
               return (
                 <Button
                   variant="ghost"
-                  className="h-auto min-h-16 w-full cursor-pointer justify-start gap-3 rounded-(--radius-card) border-none bg-(--card) px-3 py-3 text-left whitespace-normal font-normal ring-1 ring-(--border) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                  className="h-auto min-h-16 w-full cursor-pointer justify-start gap-3 rounded-(--radius-card) border-none bg-(--card) px-3 py-3 text-left whitespace-normal font-normal ring-1 ring-(--border) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent [&_svg:not([class*='size-'])]:size-auto"
                   key={ex.text}
                   onClick={onSend != null ? () => void onSend(ex.text, chipProjectId) : undefined}
                 >
@@ -656,7 +662,7 @@ export function ChiefConversation({
         <>
           {intro}
           <MessageScroller className={SCROLLER_ROOT_CLS}>
-            <FadeScrollerViewport ref={viewportRef} data-testid="chief-body">
+            <FadeScrollerViewport reserveEnd ref={viewportRef} data-testid="chief-body">
               <MessageScrollerContent
                 className={home ? SCROLLER_CONTENT_HOME_CLS : SCROLLER_CONTENT_CLS}
                 data-testid="chief-stream"
@@ -695,7 +701,9 @@ export function ChiefConversation({
         </>
       )}
 
-      {chief.outage != null ? (
+      {!connected ? (
+        <ChiefConnectionBanner />
+      ) : chief.outage != null ? (
         <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
       ) : (
         chief.fallbackModel != null && (

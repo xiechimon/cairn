@@ -114,6 +114,7 @@
   --composer-max-h: 384px;
   --composer-bottom-gap: 24px;
   --scroll-fade-size: 28px;
+  --chat-end-space: 160px;
   --chat-extra-space: 35vh;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
   --type-page: calc(1.25rem * var(--type-scale));

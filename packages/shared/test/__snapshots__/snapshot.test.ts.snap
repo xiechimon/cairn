@@ -8974,6 +8974,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "codexLogin": {
+              "additionalProperties": false,
+              "properties": {
+                "expiresAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "state": {
+                  "enum": [
+                    "ok",
+                    "expired",
+                    "absent",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": [
+                "state",
+              ],
+              "type": "object",
+            },
             "computer": {
               "const": true,
               "type": "boolean",

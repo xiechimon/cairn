@@ -1,17 +1,19 @@
 import { type ReactNode, useEffect, useState } from 'react';
+import { useConnected } from '../../api/connection-state.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TVars } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
 import { TraceTriangle } from './trace-parts.js';
 
 export function useLiveSeconds(startedAt: number | null | undefined): number | null {
+  const connected = useConnected();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (startedAt == null) return;
+    if (startedAt == null || !connected) return;
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [startedAt]);
+  }, [startedAt, connected]);
   if (startedAt == null) return null;
   return Math.max(1, Math.round((now - startedAt) / 1000));
 }
@@ -25,7 +27,7 @@ const HEAD =
   'flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-ui leading-6 text-(--text-tertiary)';
 
 const HEAD_BTN =
-  "h-auto min-h-0 w-fit cursor-pointer justify-start rounded-md border-none bg-transparent px-0 py-0.5 text-left font-normal hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "h-auto min-h-0 w-fit cursor-pointer justify-start rounded-md border-none bg-transparent px-0 py-0.5 text-left font-normal hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
 export function LivePulse({ className }: { className?: string }) {
   return (
