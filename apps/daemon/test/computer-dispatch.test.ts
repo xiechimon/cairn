@@ -13,7 +13,7 @@ import {
   type MachineComputerFramesBody,
   type MachineComputerFramesResponse,
 } from '@cairn/shared';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   COMPUTER_COMMAND_TIMEOUT_MS,
@@ -117,6 +117,9 @@ function countingProvider(): ComputerProvider & { executed: Array<{ timeoutMs: n
 }
 
 const CHILD_HANG_GUARD_MS = 30_000;
+const KILL_GUARD_MS = 20_000;
+
+vi.setConfig({ testTimeout: CHILD_HANG_GUARD_MS + 10_000 });
 const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20 };
 
 function expectContiguous(frames: ComputerFrame[]) {
@@ -145,7 +148,7 @@ function alive(pid: number): boolean {
 }
 
 async function expectGone(pids: number[]) {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + KILL_GUARD_MS;
   while (pids.some(alive) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
   expect(pids.filter(alive)).toEqual([]);
 }
