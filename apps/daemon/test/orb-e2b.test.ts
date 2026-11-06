@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import type { AgentBackend } from '@cairn/shared';
@@ -127,7 +126,7 @@ class FakeE2b implements E2bClient {
 }
 
 function checkout() {
-  const root = mkdtempSync(join(tmpdir(), 'orb-e2b-'));
+  const root = makeTestTempDir('orb-e2b-');
   return createOrbCheckout(root);
 }
 
