@@ -1814,4 +1814,6 @@ export const EN: Record<string, string> = {
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
   'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  '连接断开，正在重连…': 'Connection lost, reconnecting…',
+  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };
