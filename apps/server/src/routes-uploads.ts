@@ -3,12 +3,14 @@ import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import {
   grantUpload as grantAttachmentUpload,
   readAttachment,
   uploadFile as uploadAttachmentFile,
 } from './services/attachments.js';
+import { assertDeviceActive } from './services/paired-devices.js';
 
 const INLINE_ATTACHMENT_MIME_TYPES = new Set([
   'image/png',
@@ -58,6 +60,7 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(400, 'file missing');
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
+    assertDeviceActive(pairedDeviceIdOf(c));
     const out = uploadAttachmentFile(
       {
         db: ctx.db,
