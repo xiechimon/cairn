@@ -6,6 +6,7 @@ export const ACTIONS_LOGIN = 'github-actions[bot]';
 export const GATE_CHECK = 'review-gate';
 export const STALL_LABEL = 'review-stalled';
 export const HUMAN_LABEL = 'review-gate-human';
+export const QUEUED_LABEL = 'queued';
 export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;

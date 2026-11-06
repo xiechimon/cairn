@@ -6,6 +6,7 @@ const gatePathsPath = 'packages/shared/merge-gate-paths.json';
 export const configPath = '.mergify.yml';
 const prOnlyChecks = ['pr-evidence'];
 const botAuthor = 'cairnwright[bot]';
+const gateBot = 'github-actions[bot]';
 const mergeBotAccount = 'xiechimon';
 export const admitLabel = 'queue-admit';
 const batchHeadRe = '^B[0-9]+/';
@@ -67,6 +68,12 @@ ${rule('default', `-author = ${botAuthor}`, 'squash')}
 ${rule('bot', `author = ${botAuthor}`, 'rebase')}
 merge_protections_settings:
   auto_merge_conditions: true
+commands_restrictions:
+  dequeue:
+    conditions:
+      - or:
+          - sender-permission >= write
+          - sender = ${gateBot}
 merge_queue:
   mode: parallel
   max_parallel_checks: 3
