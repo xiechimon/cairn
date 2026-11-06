@@ -339,10 +339,10 @@ The stone is quiet. Motion only says where a surface came from or that something
 | Loop | Running task card footer and the busy Coordinator: the spiral mark spins | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
 
 - Animate only `opacity` / `transform` / shadow / color, never layout properties (width / height / top).
-- Instant, no transition: press (`:active` darkening, card background tint), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames), the user's own chat message, the composer ring on hover and focus, closing a menu, popover, Select or tooltip (the `[data-closed]` rule in `motion.css`), and the side panel docked beside the page.
+- Instant, no transition: press (the card background tint only; a pressed button, link or `role="button"` never changes opacity, because the dip fades in and out and reads as a flash on every click), everything under a coarse pointer, drop placement (`dropAnimation` is null, matching the reference sites), sidebar expand / collapse, theme switch (`.theme-suppress` turns transitions off for two frames), the user's own chat message, the composer ring on hover and focus, closing a menu, popover, Select or tooltip (the `[data-closed]` rule in `motion.css`), and the side panel docked beside the page.
 - `prefers-reduced-motion`: every keyframe animation shrinks to 0.01ms and loops run once (the site-wide rule in `motion.css`); transitions are untouched.
 - Not used: route transitions, list FLIP, cross-column flights, entry animations on new board cards or chat messages, spring easings.
-- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the retired ones; `e2e/motion-quiet.spec.ts` pins the instant surfaces above and the floating panel slide; `e2e/card-press.spec.ts` pins instant press; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
+- Pins: `e2e/cds-motion.spec.ts` pins the motion slots and the retired ones; `e2e/motion-quiet.spec.ts` pins the instant surfaces above, the floating panel slide, and that pressing a control never dims or fades it; `e2e/color-freeze.spec.ts` pins `--ease-out-expo`.
 
 ## Texture
 
@@ -383,6 +383,8 @@ Dark is the `:root` default (`.light` is the light theme). Values live in the `c
 Dark adds one more slot, `--top` (an `inset 0 1px 0` top highlight at 5% white), spliced only into the `--e2` / `--e3` pools so lifted surfaces read as lit from above; in light it is a zero-alpha no-op (it is not written as `none`, because `none` mixed into a comma list would invalidate the whole box-shadow).
 
 ## Aesthetic constraints for agents (paste into prompts)
+
+Read `DESIGN-RULES.md` (next to this file) first: it holds the short checkable rules and the anti-patterns. The block below is the token summary to paste into a prompt.
 
 ```text
 Cairn UI rules (source: apps/web/DESIGN.md):

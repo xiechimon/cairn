@@ -18,11 +18,13 @@ the global template even if it also matches.
 Start from `.github/PULL_REQUEST_TEMPLATE.md`. Write in English for a reader
 who did not watch the work. Use this order:
 
-1. `## Proof`: for UI, a before / after / unchanged screenshot table with one
-   value line under each image, as in t3code #27472. For backend changes, one
-   line naming the test that fails on main, quoting its failure text, and
-   stating that it passes here. End with one `Not verified:` line naming
-   checks not run or unrelated failures on main.
+1. `## Proof`, screenshot first (D117): real screenshots of the running
+   product or of the API tool, taken from the live verify-cairn stack, never
+   from a fixture page (`?scenario=`) or hand-made HTML. For UI, a before /
+   after / unchanged table with one value line under each image, as in t3code
+   #27472. For backend changes, the evidence card below. Text request and
+   response blocks and the test name are a supplement, not the proof. End
+   with the three coverage lines (below).
 2. `## What`: one line explaining the change, why, and any existing ticket or known overlap.
 3. `<details><summary>Review and risk</summary>` containing `## Review` and
    `## Risk`, separated from the HTML tags by blank lines and closed with
@@ -61,12 +63,64 @@ HTML comments still makes the task gate red, including inside details.
 Closing keywords belong in commit messages. For a multi-segment ticket,
 only the closing segment's commit message carries the parent closing keyword.
 
+## Evidence card (backend and API changes)
+
+The `pr-evidence` gate requires this card whenever the diff changes
+`apps/server/src/routes*.ts`, in the style of the schema table. Put it under
+`## Proof`, outside code fences and comments:
+
+```markdown
+### Requirement
+
+[#3104](https://github.com/xiechimon/cairn/issues/3104)
+
+> what the user typed ... must survive closing the app and reopening it on any device
+
+### Requests
+
+![Request and response](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/3110/calls.png)
+
+| Clause | Request | Response | Rows before to after | ok |
+|---|---|---|---|---|
+| Before | `GET /api/teams/$T/drafts/todo:x` | `404` | table absent | - |
+| survives close | `PUT .../drafts/todo:x` `{"content":"a"}` | `200 {"content":"a"}` | 0 to 1 | yes |
+```
+
+- Requirement: an internal source is a link to an issue, PR or plan decision
+  (`Dxxx`) plus a quoted excerpt. A third-party API needs an embedded
+  screenshot of the official doc; mark it with a `Third-party:` line. Any link
+  outside this repository also counts as third-party.
+- Requests: an embedded screenshot of the real call with request and response
+  visible (Swagger, Postman or the app), and a table with one row per
+  requirement clause. A new endpoint or behavior change needs a Before row;
+  one 404 or the old response is enough. At least one row names an HTTP status.
+- Generate the table, transcript and screenshots instead of copying them by
+  hand: `node .claude/skills/verify-cairn/scripts/vp.mjs drive api-evidence-card card -- <spec.json>`
+  (`.claude/skills/verify-cairn/features/api-evidence-card.md`).
+- The gate checks the card's shape. Whether it matches the requirement is
+  the review's judgment.
+
+## Coverage lines (every PR that changes more than docs)
+
+End Proof with three non-empty lines. Put them in a ```` ```text ```` fence so
+they stay out of the 600-character cap; the gate also accepts them as plain
+lines:
+
+```text
+Live: isolated verify stack on <sha>, SQLite read with sqlite3 -readonly.
+Mocked: none. Auth was off (CAIRN_AUTH=off).
+Not covered: attachment tokens, two real browsers, the 30-day expiry.
+```
+
+`Not verified:` was merged into `Not covered:`. The gate reds a code PR that
+lacks any of the three lines and says which.
+
 ## Glance card by change type
 
 Put one glance card under Proof so a reviewer sees the change without reading the diff:
 
 - Migrations (`apps/server/drizzle/**`): paste the output of `node scripts/schema-glance.mjs --base "$(git merge-base origin/main HEAD)" --head HEAD`, heading included. When the PR changes `apps/server/drizzle/**` since its merge base, the `pr-evidence` gate reds it if its `### Schema changes` rows differ from the script's output from that merge base to the PR head.
-- API changes: before and after request and response, captured with `verify-cairn`.
+- API changes (`apps/server/src/routes*.ts`): the evidence card below; the gate enforces it.
 - Cross-component flows: a Mermaid `sequenceDiagram`.
 - `scripts/ops/**`: the command and its run output.
 
@@ -98,6 +152,22 @@ links using the pushed asset commit's full SHA:
 Use the side-branch commit SHA, never the implementation head or a branch
 name. Push before linking and never merge the asset branch. Keep the branch
 so the images remain reachable. Images belong outside code fences.
+
+## UI reference comparison
+
+A PR that changes `apps/web/src` adds a reference table under Proof, one row per state that has a reference shot (D120):
+
+```markdown
+| State | Reference | Ours | Verdict |
+| --- | --- | --- | --- |
+| Empty composer | ![Claude.ai](https://raw.githubusercontent.com/xiechimon/cairn/<sha>/docs/verify/<n>/empty-compare.png) | (right half of the same image) | Matches the single composer; model chip still sits left of the mode label |
+```
+
+- Make one side-by-side image per state (`magick montage`, see `.claude/skills/verify-cairn/SKILL.md`, "UI reference comparison") from `docs/design/references/<surface>/` and a live capture; store it like the other screenshots.
+- The verdict is one sentence, and says what is still worse than the reference. Fixture-only pairs say `fixture`.
+- Name the surface, the reference product, and the `apps/web/DESIGN-RULES.md` ids checked, in a line under the table. The `Not covered:` line lists states with no shot.
+- A PR with no reference for its surface says so and links the owner's decision; do not substitute another product.
+- Sentences in the verdict column are table text and stay outside the 600-character cap.
 
 ## Review
 
@@ -151,5 +221,7 @@ Do not run a local `codex exec` or `claude -p` review before pushing. Codex clou
 | `## Proof`, `## What`, `## Review`, `## Risk` answered, including headings inside details (legacy `## Verified` aliases Proof; Upstream is optional) | pr-evidence (required check) |
 | at most 600 visible prose characters outside tables, images, code, comments and details; complete legacy six-section bodies exempt | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
+| a diff touching `apps/server/src/routes*.ts` carries `### Requirement` (internal link plus quote, or a doc screenshot; third-party needs the screenshot) and `### Requests` (a call screenshot, a Before row, a row with an HTTP status) | pr-evidence (required check, `--changed-files`) |
+| a diff changing more than docs has non-empty `Live:`, `Mocked:` and `Not covered:` lines | pr-evidence (required check, `--changed-files`) |
 | no unchecked tasks anywhere outside fenced code and HTML comments; no tasks required | pr-evidence (required check, pr-tasks step) |
 | body is English (Chinese only inside backticks or fences) | pr-evidence (required check, language step) |

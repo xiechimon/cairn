@@ -1,19 +1,27 @@
 import { PanelLeft } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { useLocation } from 'react-router';
-import { useMachines, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
+import { useLocation, useNavigate } from 'react-router';
+import {
+  useApiMutations,
+  useMachines,
+  useProjects,
+  useSearchResults,
+  useTodos,
+} from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { coordinatorBadgeCount } from '../chief/question-dock-index.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useTypeToCompose } from '../overlay/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { recordOutsideLocation } from '../settings/settings-href.js';
+import { fleetStatus } from './fleet-status.js';
 import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
@@ -49,6 +57,8 @@ export function AppSidebar({
   const chiefRoot = useOptionalChiefRoot();
   const todosQ = useTodos(teamId, live);
   const machinesQ = useMachines(teamId, live);
+  const mutations = useApiMutations(teamId);
+  const navigate = useNavigate();
   const projectsQ = useProjects(teamId, live);
   const projects: SidebarProject[] | undefined = useMemo(() => {
     if (live) {
@@ -57,6 +67,7 @@ export function AppSidebar({
         name: p.name,
         icon: p.icon,
         color: p.color,
+        archivedAt: p.archivedAt,
       }));
     }
     if (fixture.projectNames == null) return undefined;
@@ -96,34 +107,43 @@ export function AppSidebar({
     [todos, live, todosQ.data, fixture.todos],
   );
   const fixtureMachines = fixture.resources?.machines;
-  const machinesOnline = live
-    ? (machinesQ.data ?? []).filter((m) => m.online).length
-    : fixtureMachines != null
-      ? fixtureMachines.filter((m) => m.online === true).length
-      : fixture.chief != null
-        ? 1
-        : 0;
-  const machinesOffline = live
-    ? (machinesQ.data ?? []).filter((m) => !m.online).length
-    : (fixtureMachines ?? []).filter((m) => m.online === false).length;
+  const fleet = fleetStatus(live ? (machinesQ.data ?? []) : (fixtureMachines ?? []));
+  const machinesOnline =
+    live || fixtureMachines != null ? fleet.online : fixture.chief != null ? 1 : 0;
   const { pathname, search: locationSearch } = location;
   useEffect(
     () => recordOutsideLocation(`${pathname}${locationSearch}`),
     [pathname, locationSearch],
   );
   useTypeToCompose();
+  const archiveProject = (id: string, archived: boolean) => {
+    mutations.setProjectArchived.mutate(
+      { id, archived },
+      {
+        onSuccess: () => {
+          if (archived && new URLSearchParams(locationSearch).get('project') === id) {
+            navigate({ pathname: '/app' });
+          }
+        },
+        onError: (error) =>
+          toastError(t(archived ? '无法归档项目。' : '无法取消归档项目。'), error),
+      },
+    );
+  };
   const sidebarProps = {
     attention: coordinatorBadgeCount(
       needsYouCount(resolvedTodos),
       chiefRoot?.pendingQuestions.length ?? 0,
     ),
     machinesOnline,
-    machinesOffline,
+    machinesOffline: fleet.offline,
+    offlineMachineNames: fleet.offlineNames,
     todos: resolvedTodos,
     onSearch: onSearch ?? (() => search.setOpen(true)),
     usageNav: fixture.usageNav === true,
     selected,
     projects,
+    onArchiveProject: live ? archiveProject : undefined,
   };
   return (
     <>
