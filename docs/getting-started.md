@@ -12,6 +12,8 @@ npx @xiechimon/cairn
 
 One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team. Use a different port with `PORT=9000 npx @xiechimon/cairn`.
 
+The server listens on loopback only and always requires an access token. The first start generates one in `~/.cairn/token` (mode 0600) and prints a one-time login link such as `http://127.0.0.1:8787/app#token=<token>`; open it once and the browser remembers the token. `cairn token` prints it again later. To reach the server from another machine, set `HOST=0.0.0.0` (or the LAN address) together with `CAIRN_TOKEN=<long random string>`; without a token a non-loopback `HOST` refuses to start. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
+
 ## Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
