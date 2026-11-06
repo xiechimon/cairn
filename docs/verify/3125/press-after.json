@@ -1,0 +1,17 @@
+{
+  "omarchy": {
+    "minOpacity": 1,
+    "framesBelow1": 0,
+    "frames": 37
+  },
+  "tasksPill": {
+    "minOpacity": 1,
+    "framesBelow1": 0,
+    "frames": 37
+  },
+  "sidebarCoordinator": {
+    "minOpacity": 1,
+    "framesBelow1": 0,
+    "frames": 37
+  }
+}
