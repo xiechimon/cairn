@@ -64,12 +64,12 @@ function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: 
 const TURN_NOTE_CLS = 'px-3 py-2 text-meta leading-5 text-(--text-tertiary)';
 
 const MSG_COL_CLS =
-  'min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
+  'relative min-w-0 flex-1 text-card-title text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const MSG_ROW_CLS = 'mt-3.5';
+const MSG_ROW_CLS = 'mt-4';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
@@ -263,6 +263,9 @@ const messageToolsReveal = (latest: boolean) =>
     ? 'opacity-100'
     : 'opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 
+const messageToolsPlace = (latest: boolean, side: 'left' | 'right', flowGap: string) =>
+  latest ? flowGap : `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
+
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
@@ -356,7 +359,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`${MSG_ROW_CLS} justify-end`} data-testid="chief-msg">
           <MessageContent
-            className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
+            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-0"
             data-testid="chief-msg-col"
           >
             <div
@@ -367,7 +370,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </div>
             <div
-              className={`mt-1 flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace(latest, 'right', 'mt-1')} flex items-center gap-1 text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-tools"
             >
               <MessageStamp createdAt={item.createdAt} fallback={item.at} />
@@ -515,7 +518,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           {item.typing === true && <LivePulse className="mt-1 ml-0.5" />}
           {item.typing !== true && (
             <div
-              className={`mt-2 flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
+              className={`${messageToolsPlace(latest, 'left', 'mt-2')} flex items-center gap-2 text-meta text-(--text-tertiary) ${messageToolsReveal(latest)}`}
               data-testid="chief-msg-foot"
             >
               <Button
