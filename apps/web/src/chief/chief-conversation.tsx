@@ -761,7 +761,7 @@ export function ChiefConversation({
                   data-testid="chief-composer-input"
                   data-compose-target=""
                   aria-invalid={composerError != null ? true : undefined}
-                  className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-transparent`}
+                  className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
                   readOnly={onSend == null}
                   value={wire.draft}
                   onChange={wire.handleChange}
@@ -798,7 +798,7 @@ export function ChiefConversation({
                   <span
                     aria-hidden
                     data-testid="chief-composer-placeholder"
-                    className="pointer-events-none absolute inset-x-0.5 top-0.5 truncate font-sans text-card-title tabular-nums text-(--text-tertiary)"
+                    className="pointer-events-none absolute inset-x-0 top-0 truncate px-0.5 pt-0.5 font-sans text-card-title tabular-nums text-(--text-tertiary)"
                   >
                     {composerPlaceholder}
                   </span>
