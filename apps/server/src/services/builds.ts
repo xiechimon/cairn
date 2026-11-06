@@ -2584,6 +2584,7 @@ export function failStepWithEvents(
 }
 
 export const BUILD_ABANDONED_STEP_MS = 120_000;
+export const ABANDONED_CLAIM_QUARANTINE_LIMIT = 3;
 
 export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
   const exitedLeftovers = deps.db
@@ -2703,7 +2704,22 @@ function releaseClaimedStep(
     const projectRow = projectOfTodo(deps.db, todoRow);
     if (projectRow && projectMergeConfigOf(projectRow).mergePolicy === 'autonomous') return;
   }
-  deps.db.update(step).set({ status: 'pending', machineId: null }).where(eq(step.id, row.id)).run();
+  const noProgress =
+    row.lastHeartbeatAt === null || row.lastHeartbeatAt <= (row.claimedAt ?? row.createdAt);
+  const claims = noProgress ? row.claimCount + 1 : row.claimCount;
+  if (noProgress && claims >= ABANDONED_CLAIM_QUARANTINE_LIMIT) {
+    applyStepFailure(
+      deps,
+      row,
+      `crashed ${claims} times after being claimed without progress; quarantined`,
+    );
+  } else {
+    deps.db
+      .update(step)
+      .set({ status: 'pending', machineId: null, claimCount: claims })
+      .where(eq(step.id, row.id))
+      .run();
+  }
   const released = deps.db.select().from(step).where(eq(step.id, row.id)).get();
   if (released) {
     deps.convHub?.publishStep(row.buildId, {

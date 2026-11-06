@@ -41,9 +41,9 @@ test('dispatch-issue never-list match is exact, not a prefix', (t) => {
   assert.doesNotMatch(result.stdout, /never-dispatch/);
 });
 
-test('dispatch-issue does not look at by:batch or batch:B*/batch:C* labels today', (t) => {
+test('dispatch-issue does not look at batch labels today', (t) => {
   const result = dispatch(t, {
-    gh: { state: 'OPEN', labels: ['by:batch', 'batch:B1', 'batch:C1'] },
+    gh: { state: 'OPEN', labels: ['batch:now', 'batch:next'] },
   });
   assert.match(result.stdout, /#77 has no tier yet; not dispatching/);
   assert.equal(

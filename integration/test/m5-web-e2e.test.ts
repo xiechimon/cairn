@@ -1,6 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MERGE_ANNOUNCEMENT, type TranscriptRow } from '@cairn/shared';
@@ -12,6 +11,7 @@ import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { plan as planTable, step as stepTable } from '../../apps/server/src/db/schema.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
@@ -101,7 +101,7 @@ beforeAll(async () => {
     webDir: WEB_DIST,
     scheduler: true,
   });
-  home = mkdtempSync(join(tmpdir(), 'cairn-m5web-home-'));
+  home = makeTestTempDir('cairn-m5web-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'm5-web' },
     {},

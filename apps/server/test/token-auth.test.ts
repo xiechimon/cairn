@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -8,6 +7,7 @@ import {
   MCP_TOOL_REGISTRY,
 } from '@cairn/shared';
 import { afterAll, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   insecureBindWarning,
   loadConfig,
@@ -134,7 +134,7 @@ describe('token auth: the four exempt surfaces (failure modes 3/4/5/8)', () => {
   });
 
   test('on + /_mp/* and the static SPA shell -> exempt (the 204 no-op and the non-secret UI)', async () => {
-    const webDir = mkdtempSync(join(tmpdir(), 'cairn-token-spa-'));
+    const webDir = makeTestTempDir('cairn-token-spa-');
     tmpDirs.push(webDir);
     writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>shell</title>');
     const s = bootServer({ authToken: TOKEN, webDir });
@@ -305,7 +305,7 @@ function writeTokenFile(home: string, token: string): void {
 
 describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
   test('env unset + file present -> authToken = file value (same store `cairn token` prints)', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    const home = makeTestTempDir('cairn-token-file-');
     tmpDirs.push(home);
     writeTokenFile(home, FILE_TOKEN);
     vi.stubEnv(ENV_VARS.home, home);
@@ -315,7 +315,7 @@ describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
   });
 
   test('env set + file present -> env wins (precedence unchanged)', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    const home = makeTestTempDir('cairn-token-file-');
     tmpDirs.push(home);
     writeTokenFile(home, FILE_TOKEN);
     vi.stubEnv(ENV_VARS.home, home);
@@ -325,7 +325,7 @@ describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
   });
 
   test('file missing -> authToken null until ensureAccessToken generates one', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    const home = makeTestTempDir('cairn-token-file-');
     tmpDirs.push(home);
     vi.stubEnv(ENV_VARS.home, home);
     vi.stubEnv(ENV_VARS.token, '');
@@ -334,7 +334,7 @@ describe('#1708 token file fallback ($CAIRN_HOME/token, env wins)', () => {
   });
 
   test('file present but malformed -> startup fails fail-closed (never silently opens the API)', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    const home = makeTestTempDir('cairn-token-file-');
     tmpDirs.push(home);
     writeFileSync(join(home, ACCESS_TOKEN_FILE_NAME), 'OTHER_KEY=x\n');
     vi.stubEnv(ENV_VARS.home, home);
@@ -379,7 +379,7 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
   });
 
   test('container mode + file source -> still no token value, no login link', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    const home = makeTestTempDir('cairn-token-file-');
     tmpDirs.push(home);
     writeTokenFile(home, FILE_TOKEN);
     vi.stubEnv(ENV_VARS.home, home);
@@ -392,7 +392,7 @@ describe('#1708 startup lines (token location + one-time login link)', () => {
   });
 
   test('file source -> names the absolute token file path', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-file-'));
+    const home = makeTestTempDir('cairn-token-file-');
     tmpDirs.push(home);
     writeTokenFile(home, FILE_TOKEN);
     vi.stubEnv(ENV_VARS.home, home);
@@ -462,7 +462,7 @@ describe('the bare-bind WARN (failure modes 9/10)', () => {
   });
 
   test('env mapping: CAIRN_TOKEN -> authToken (empty string = unset); HOST -> host, default loopback', () => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-token-env-'));
+    const home = makeTestTempDir('cairn-token-env-');
     tmpDirs.push(home);
     vi.stubEnv(ENV_VARS.home, home);
     vi.stubEnv(ENV_VARS.token, TOKEN);

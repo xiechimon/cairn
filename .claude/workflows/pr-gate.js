@@ -24,7 +24,7 @@ const REPO = 'xiechimon/cairn'
 const MAX_SKEPTICS = 4
 
 // Path class does not route to the user. A green review-gate, the required
-// checks, and the absence of coordinator-hold and needs-decision admit the PR.
+// checks, and the absence of coordinator-hold admit the PR.
 // Size never routes or blocks (D68): the review gate judges one problem per PR.
 // pr-gate runs 3, 4 and 5 each found another agent-steering or gate file that a
 // list of names missed (AGENTS.override.md, .pi/skills, nested .claude/).

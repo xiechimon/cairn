@@ -1,5 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -14,6 +13,7 @@ import {
   step as stepTable,
 } from '../../apps/server/src/db/schema.js';
 import { ASK_PARK_MS } from '../../apps/server/src/services/chief-questions.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
@@ -111,7 +111,7 @@ beforeAll(async () => {
     { content: '收到答复，按优先级继续。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'cairn-ask-home-'));
+  home = makeTestTempDir('cairn-ask-home-');
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'ask-mbp' },
     {},

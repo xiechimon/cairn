@@ -139,7 +139,7 @@ test('required check shape retains unconditional job, trigger coverage, and brak
   assert.ok(
     text.indexOf('name: Check the autonomy brake') < text.indexOf('name: Check PR body evidence'),
   );
-  assert.match(text, /needs-decision\.flag.*autonomy-paused\.flag/);
+  assert.match(text, /hold\.flag.*autonomy-paused\.flag/);
 });
 
 test('paused schedule sweeps and workflow permissions and triggers retain the outage path', (t) => {

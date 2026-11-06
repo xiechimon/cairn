@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import type { RosterAgent } from '../eval/chief-dispatch/grade.mts';
 import { isLearnCase } from '../eval/learn/grade.mts';
 import { isMemoryCase } from '../eval/memory-regression/grade.mts';
@@ -277,7 +277,7 @@ describe('plan flow runner', () => {
     };
     const passCase = dataset.cases.find((c) => c.expect.maxSplits === 1) ?? dataset.cases[0];
     if (passCase === undefined) throw new Error('no plan case');
-    const home = mkdtempSync(join(tmpdir(), 'cairn-plan-flow-'));
+    const home = makeTestTempDir('cairn-plan-flow-');
     homes.push(home);
     copyPlanFlow(home, [{ ...passCase, id: 'plan-pass' }], dataset.roster);
     const stub = await startPlanStub({
@@ -323,7 +323,7 @@ describe('plan flow runner', () => {
     const dataset = JSON.parse(readFileSync(join(planFlow, 'cases.json'), 'utf8')) as {
       roster: RosterAgent[];
     };
-    const home = mkdtempSync(join(tmpdir(), 'cairn-plan-unknown-'));
+    const home = makeTestTempDir('cairn-plan-unknown-');
     homes.push(home);
     copyPlanFlow(
       home,

@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { builtinToolNames } from '../../apps/daemon/src/backend/pi.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { CAIRN_BENCH_TASKS } from '../eval/routing/bench.mts';
 import { type RoutingRunRow, runRoutingRun } from '../eval/routing/driver.mts';
 import { type RoleBoundary, sessionTools } from '../eval/routing/session-tools.mts';
@@ -30,7 +30,7 @@ let root: string;
 let stub: StubLlm | undefined;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'routing-driver-'));
+  root = makeTestTempDir('routing-driver-');
 });
 
 afterEach(async () => {
@@ -71,7 +71,7 @@ describe('#1986 planner read-only role invariants outside the runner', () => {
 
   test('every non-read local tool is denied for the planner role', async () => {
     const evidence: RoleBoundary = { executions: [], violations: [] };
-    root = mkdtempSync(join(tmpdir(), 'routing-tools-'));
+    root = makeTestTempDir('routing-tools-');
     const tools = sessionTools(root, true, evidence, 20_000);
     expect(tools.map((tool) => tool.name).sort()).toEqual(['bash', 'edit', 'read', 'write']);
     for (const tool of tools) {

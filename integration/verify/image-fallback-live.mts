@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
@@ -20,6 +20,7 @@ import { runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { statePaths } from '../../apps/daemon/src/state.js';
 import type { GrantOutput, UploadOutput } from '../../apps/server/src/services/attachments.js';
 import { bootServer, issueApiKey, req } from '../../apps/server/test/helpers.js';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 process.umask(0o077);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -56,7 +57,7 @@ if (typeof authorization !== 'string' || !authorization || authorization.startsW
 }
 const upstream = new URL(`${configured.baseUrl.replace(/\/$/, '')}/chat/completions`);
 if (upstream.username || upstream.password) throw new Error('Unexpected upstream URL credentials');
-const runDir = mkdtempSync(join(tmpdir(), 'cairn-1671-live-'));
+const runDir = makeTestTempDir('cairn-1671-live-');
 process.once('exit', () => rmSync(runDir, { recursive: true, force: true }));
 for (const entry of ['home', 'repos', 'attachments', 'skills']) mkdirSync(join(runDir, entry));
 const trial = bootServer({

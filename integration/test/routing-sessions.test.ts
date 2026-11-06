@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
+import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { CAIRN_BENCH_TASKS } from '../eval/routing/bench.mts';
 import { runRoutingRun } from '../eval/routing/driver.mts';
 import { gradeBoundedRun } from '../eval/routing/grade.mts';
@@ -27,7 +27,7 @@ afterEach(async () => {
 test.skipIf(!nativeToolchain)(
   'planner programmatic shell writes are denied before execution',
   async () => {
-    root = mkdtempSync(join(tmpdir(), 'routing-sessions-'));
+    root = makeTestTempDir('routing-sessions-');
     writeFileSync(join(root, 'sentinel'), 'private-sentinel-1986');
     const task = CAIRN_BENCH_TASKS.find((entry) => entry.id === 'slugify');
     if (!task) throw new Error('Missing slugify task');
@@ -71,7 +71,7 @@ async function runSessionCase(options: {
   timeoutMs?: number;
   onResponse?: () => void;
 }) {
-  root = mkdtempSync(join(tmpdir(), 'routing-sessions-'));
+  root = makeTestTempDir('routing-sessions-');
   writeFileSync(join(root, 'sentinel'), 'private-sentinel-1986');
   const task = CAIRN_BENCH_TASKS.find((entry) => entry.id === 'slugify');
   if (!task) throw new Error('Missing slugify task');
