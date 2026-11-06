@@ -60,7 +60,7 @@ test('the project avatar picker sets an icon that reaches the sidebar, then rese
   expect(pageErrors).toEqual([]);
 });
 
-test('the fixture sidebar shows picked icons bare and projects without one keep the letter tile', async ({
+test('the fixture sidebar shows picked icons bare and projects without one show the neutral folder glyph', async ({
   page,
 }) => {
   await page.goto('/app?scenario=sidebar-project-icons');
@@ -70,5 +70,5 @@ test('the fixture sidebar shows picked icons bare and projects without one keep 
   await expect(rows.nth(1).locator('[data-project-icon="rocket"]')).toBeVisible();
   await expect(rows.nth(2).locator('[data-project-icon="database"]')).toBeVisible();
   await expect(rows.nth(3).locator('[data-project-icon]')).toHaveCount(0);
-  await expect(rows.nth(3).locator('.project-avatar')).toHaveText('P');
+  await expect(rows.nth(3).locator('.project-avatar[data-project-type="folder"]')).toBeVisible();
 });
