@@ -240,7 +240,6 @@ export function MachineDetailPane({
     <div
       data-testid="machine-detail"
       data-machine-id={machine.id}
-      data-kind={machine.kind ?? 'remote'}
       className="flex min-w-0 flex-col gap-6 border-t border-border px-4 py-4"
     >
       {!online && (

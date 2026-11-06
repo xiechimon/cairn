@@ -13,7 +13,8 @@ test('settings row labels name the agent detail selects', async ({ page }) => {
 
 test('the evacuate picker keeps its deliberate name', async ({ page }) => {
   await page.goto(MACHINE_DETAIL);
-  await expect(page.getByTestId('team-agent-grid')).toBeVisible();
+  await page.getByTestId('machine-item').filter({ hasText: 'mea-wsl' }).getByTestId('machine-menu').click();
+  await page.getByTestId('machine-menu-evacuate').click();
   await expect(page.getByRole('combobox', { name: '迁移到' })).toBeVisible();
 });
 
