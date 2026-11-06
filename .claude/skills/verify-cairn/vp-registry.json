@@ -48,6 +48,10 @@
     "vp-registry-gate.mjs": {
       "kind": "test",
       "purpose": "Registry gate: every file in scripts/ is registered, no new drive-<number> script, registry paths, statuses and needs are valid, a docs/verify writer needs rewrites-evidence, and every feature map names its vp.mjs drive line. Run by vp-selftest.mjs."
+    },
+    "api-card-table.mjs": {
+      "kind": "infra",
+      "purpose": "Renders the Requests table rows of the PR evidence card with pipes escaped; api-evidence-card.mjs writes the card with it and scripts/pr-evidence-gate.test.py round-trips its output through the gate."
     }
   },
   "features": {

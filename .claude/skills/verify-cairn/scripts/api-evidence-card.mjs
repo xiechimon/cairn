@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
+import { requestsRow, requestsTable } from './api-card-table.mjs';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 const ROOT = process.env.VERIFY_REPO_ROOT ? resolve(process.env.VERIFY_REPO_ROOT) : SCRIPT_ROOT;
@@ -62,8 +63,7 @@ const teamOf = async (base) => {
 };
 
 const transcript = [];
-const table = ['| Clause | Request | Response | Rows before to after | ok |', '|---|---|---|---|---|'];
-const cell = (text) => text.replaceAll('|', '\\|').replaceAll('\n', ' ');
+const tableRows = [];
 const live = [];
 let failures = 0;
 
@@ -88,7 +88,6 @@ for (const [index, step] of spec.steps.entries()) {
   const rows = step.on === 'before' ? (step.sql === undefined ? 'n/a' : 'other stack') : describeRows(before, after);
   const ok = step.expectStatus === undefined ? '-' : res.status === step.expectStatus ? 'yes' : 'NO';
   if (ok === 'NO') failures += 1;
-  const shortBody = text.length > 120 ? `${text.slice(0, 117)}...` : text;
   transcript.push(
     `$ curl -s -X ${method} '${base}${path}'${body === undefined ? '' : ` -H 'content-type: application/json' -d '${body}'`}`,
     `HTTP ${res.status}`,
@@ -96,15 +95,14 @@ for (const [index, step] of spec.steps.entries()) {
     ...(step.sql === undefined || step.on === 'before' ? [] : [`rows before: ${JSON.stringify(before)}`, `rows after:  ${JSON.stringify(after)}`]),
     '',
   );
-  const requestCell = `\`${method} ${step.path}\`${body === undefined ? '' : ` \`${body}\``}`;
-  table.push(`| ${cell(step.clause)} | ${cell(requestCell)} | ${cell(`\`${res.status}\` ${shortBody === '' ? '' : `\`${shortBody}\``}`)} | ${cell(rows)} | ${ok} |`);
+  tableRows.push(requestsRow({ clause: step.clause, method, path: step.path, body, status: res.status, responseText: text, rows, ok }));
   console.log(`${ok === 'NO' ? 'FAIL' : 'PASS'}  ${step.clause}: ${method} ${path} -> ${res.status}${step.expectStatus === undefined ? '' : ` (expected ${step.expectStatus})`}`);
   if (step.shot === true && method === 'GET') live.push({ index, url: `${base}${path}` });
 }
 
 const transcriptPath = join(EVIDENCE, 'calls.txt');
 writeFileSync(transcriptPath, `${transcript.join('\n')}\n`);
-writeFileSync(join(EVIDENCE, 'card-requests.md'), `### Requests\n\n![Request and response](calls.png)\n\n${table.join('\n')}\n`);
+writeFileSync(join(EVIDENCE, 'card-requests.md'), `### Requests\n\n![Request and response](calls.png)\n\n${requestsTable(tableRows)}\n`);
 
 const browser = await chromium.launch();
 try {

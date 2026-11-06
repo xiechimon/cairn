@@ -139,6 +139,7 @@ INTERNAL_LINK = re.compile(r'https://(?:github\.com|raw\.githubusercontent\.com)
 INTERNAL_REF = re.compile(r'https://github\.com/xiechimon/cairn/(?:issues|pull|blob)/|\bD\d{1,4}\b')
 THIRD_PARTY_LINE = re.compile(r'^[ \t]*(?:[-*]\s+)?(?:\*\*)?Third-party:', re.M | re.I)
 QUOTE_LINE = re.compile(r'^[ \t]*>[ \t]?(.*)$', re.M)
+UNESCAPED_PIPE = re.compile(r'(?<!\\)\|')
 MARKUP = re.compile(r'[*_`~\s]+')
 
 
@@ -340,7 +341,8 @@ def table_rows(section):
         stripped = line.strip()
         if not stripped.startswith('|'):
             continue
-        cells = [cell.strip() for cell in stripped.strip('|').split('|')]
+        inner = stripped[1:-1] if stripped.endswith('|') and not stripped.endswith('\\|') else stripped[1:]
+        cells = [cell.replace('\\|', '|').strip() for cell in UNESCAPED_PIPE.split(inner)]
         if all(re.fullmatch(r':?-+:?', cell) for cell in cells):
             continue
         rows.append(cells)

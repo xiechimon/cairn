@@ -553,6 +553,63 @@ class EvidenceCardTests(unittest.TestCase):
         self.assertEqual(result, 1, output)
         self.assertIn('FAIL api-card: Requests table has no row with an HTTP status code in the Response column', output)
 
+    DRIVER_CASES = [
+        {'clause': 'Before (old | code)', 'method': 'GET', 'path': '/drafts/a|b', 'status': 404, 'responseText': '{"error":"Not | found"}', 'rows': 'table absent', 'ok': 'yes'},
+        {'clause': 'pipe in request json', 'method': 'PUT', 'path': '/drafts/x', 'body': '{"content":"a|b"}', 'status': 200, 'responseText': '{"content":"a|b","updatedAt":1}', 'rows': '0 to 1 ({"scope":"x","content":"a|b|c"})', 'ok': 'yes'},
+        {'clause': 'escaped backslash-pipe', 'method': 'PUT', 'path': '/drafts/x', 'body': '{"content":"a\\\\|b"}', 'status': 200, 'responseText': '{"content":"a\\\\|b"}', 'rows': '1 to 1', 'ok': 'yes'},
+        {'clause': 'long response', 'method': 'GET', 'path': '/drafts/x', 'status': 400, 'responseText': '{"error":"' + 'p|' * 80 + '"}', 'rows': 'n/a', 'ok': 'NO'},
+        {'clause': 'empty response', 'method': 'DELETE', 'path': '/drafts/x', 'status': 204, 'responseText': '', 'rows': '1 to 0', 'ok': 'yes'},
+        {'clause': 'newline in rows', 'method': 'GET', 'path': '/x', 'status': 200, 'responseText': '{"a":"line1\nline2"}', 'rows': '1 to 1 ({"content":"l1\nl2"})', 'ok': '-'},
+    ]
+
+    def driver_table(self):
+        script = (
+            "import { requestsRow, requestsTable } from './.claude/skills/verify-cairn/scripts/api-card-table.mjs';"
+            "const cases = JSON.parse(process.argv[1]);"
+            "process.stdout.write(requestsTable(cases.map(requestsRow)));"
+        )
+        result = subprocess.run(['node', '--input-type=module', '-e', script, json.dumps(self.DRIVER_CASES)], capture_output=True, text=True, check=True)
+        return result.stdout
+
+    def test_the_drivers_table_passes_the_gate_for_every_cell_type(self):
+        requests = '### Requests\n\n![Swagger request and response](https://example.org/call.png)\n\n' + self.driver_table() + '\n\n'
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 0, output)
+
+    def test_the_drivers_cells_round_trip_through_the_gate_parser(self):
+        header, rows = gate.table_rows('### Requests\n\n' + self.driver_table() + '\n')
+        self.assertEqual(header, ['Clause', 'Request', 'Response', 'Rows before to after', 'ok'])
+        self.assertEqual(len(rows), len(self.DRIVER_CASES))
+        for row, case in zip(rows, self.DRIVER_CASES):
+            with self.subTest(clause=case['clause']):
+                self.assertEqual(len(row), 5)
+                self.assertEqual(row[0], case['clause'])
+                self.assertIn(case['path'], row[1])
+                self.assertTrue(row[2].startswith(f"`{case['status']}`"), row[2])
+                self.assertEqual(row[3], case['rows'].replace('\n', ' '))
+                self.assertEqual(row[4], case['ok'])
+                if 'body' in case:
+                    self.assertIn(case['body'], row[1])
+
+    def test_an_escaped_pipe_does_not_shift_the_response_column(self):
+        requests = ('### Requests\n\n![call](https://example.org/call.png)\n\n'
+                    '| Clause | Request | Response | Rows | OK |\n|---|---|---|---|---|\n'
+                    '| Before | `GET /x` | `404` | table absent | - |\n'
+                    '| pipe | `PUT /x` `{"content":"a\\|b"}` | `200` `{"content":"a\\|b"}` | 0 to 1 | yes |\n\n')
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 0, output)
+        _, rows = gate.table_rows(requests)
+        self.assertEqual(rows[1][1], '`PUT /x` `{"content":"a|b"}`')
+
+    def test_status_in_an_earlier_escaped_cell_does_not_count_as_the_response(self):
+        requests = ('### Requests\n\n![call](https://example.org/call.png)\n\n'
+                    '| Clause | Request | Response | Rows | OK |\n|---|---|---|---|---|\n'
+                    '| Before | `GET /x` | not found | table absent | - |\n'
+                    '| pipe | `PUT /x` `{"id":"200\\|x"}` | ok | 0 to 1 | yes |\n\n')
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 1, output)
+        self.assertIn('no row with an HTTP status code in the Response column', output)
+
     def test_workflow_passes_the_changed_files_to_the_gate(self):
         workflow = Path('.github/workflows/pr-evidence.yml').read_text()
         self.assertIn('--changed-files', workflow)
