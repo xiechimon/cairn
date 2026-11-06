@@ -11,12 +11,20 @@ import {
   build as buildTable,
   gateVerdict,
   message as messageTable,
+  plan as planTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { completeStep, flushVerdictDigests } from '../src/services/builds.js';
-import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  seedRoute,
+  seedSessionRoute,
+  withVerification,
+} from './helpers.js';
 
 const HEAD = 'ab'.repeat(20);
 const FIX_HEAD = 'cd'.repeat(20);
@@ -83,7 +91,18 @@ async function setup(opts: { withVerifierRoute?: boolean } = {}) {
         body: { todoIds: [todoId] },
       });
       expect(res.status).toBe(201);
-      return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
+      const buildId = ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
+      s.db
+        .insert(planTable)
+        .values({
+          id: `plan-${buildId}`,
+          buildId,
+          version: 1,
+          content: withVerification('## Changes\n- touch a.ts'),
+          createdAt: Date.now(),
+        })
+        .run();
+      return buildId;
     },
     async claim() {
       const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {

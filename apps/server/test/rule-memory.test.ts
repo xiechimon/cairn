@@ -20,9 +20,10 @@ describe('D71 memory owned by the session rule', () => {
   test('plan, build and session steps read and write memory through the session rule', () => {
     const s = world();
     const ruleId = seedRoute(s, 'session', { provider: 'stub-gw', modelId: 'stub-model' });
-    for (const kind of ['plan', 'build', 'session', 'verify', 'merge'] as const) {
+    for (const kind of ['plan', 'build', 'session', 'merge'] as const) {
       expect(memoryOwnerOf(s.db, s.team.id, kind)).toBe(ruleId);
     }
+    expect(memoryOwnerOf(s.db, s.team.id, 'verify')).toBe(`${ruleId}:verify`);
   });
 
   test('a review step owns its own memory through the review rule', () => {

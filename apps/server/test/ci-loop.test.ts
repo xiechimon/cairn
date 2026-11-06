@@ -12,6 +12,7 @@ import {
   build as buildTable,
   machine as machineTable,
   message as messageTable,
+  plan as planTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -33,7 +34,13 @@ import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
 import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, seedRoute, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+  withVerification,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 let throttleHome: string;
@@ -916,6 +923,16 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
     seedSessionRoute(w.s);
+    w.s.db
+      .insert(planTable)
+      .values({
+        id: 'plan-verify-ci',
+        buildId: w.buildId,
+        version: 1,
+        content: withVerification('## Changes\n- touch a.ts'),
+        createdAt: w.base,
+      })
+      .run();
     const delivered = 'ab'.repeat(20);
     const fixed = headOf(w.prNumber);
     w.s.db

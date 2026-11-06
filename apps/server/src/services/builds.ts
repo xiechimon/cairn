@@ -1158,11 +1158,13 @@ export function maybeEnqueueVerifyStep(
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
   const planRow = latestPlanRow(deps, buildId);
+  const verificationItems = planVerificationItems(planRow?.content ?? '');
+  if (verificationItems.length === 0) return;
   const prompt = buildVerifyStepPrompt({
     ticketRef: ticketRefOf(todoRow),
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
-    verificationItems: planVerificationItems(planRow?.content ?? ''),
+    verificationItems,
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
     expectedHeadSha,
   });
