@@ -17,16 +17,16 @@ export interface PrCardProps {
 type Tone = 'neutral' | 'ok' | 'warn' | 'fail';
 
 const TONE_CHIP: Record<Tone, string> = {
-  neutral: 'bg-(--chip-idle-bg) text-(--chip-idle-fg)',
-  ok: 'bg-(--chip-done-bg) text-(--chip-done-fg)',
-  warn: 'bg-(--chip-confirm-bg) text-(--chip-confirm-fg)',
-  fail: 'bg-(--chip-failed-bg) text-(--chip-failed-fg)',
+  neutral: 'bg-secondary text-content-secondary',
+  ok: 'bg-secondary text-content-secondary',
+  warn: 'bg-secondary text-(--waiting-ink)',
+  fail: 'bg-secondary text-destructive',
 };
 
 const TONE_TEXT: Record<Tone, string> = {
   neutral: 'text-content-secondary',
-  ok: 'text-(--chip-done-fg)',
-  warn: 'text-(--chip-confirm-fg)',
+  ok: 'text-content-secondary',
+  warn: 'text-(--waiting-ink)',
   fail: 'text-(--fail-fg)',
 };
 
@@ -108,7 +108,7 @@ function VerdictLine({ pr }: { pr: PrCardModel }) {
   }
   if (pr.state === 'owner-route') {
     return (
-      <p className="m-0 text-meta text-(--chip-confirm-fg)">
+      <p className="m-0 text-meta text-(--waiting-ink)">
         {pr.ownerRoute ?? t('交给负责人合并')}
         {verdict != null && !stale && (
           <>
@@ -131,7 +131,7 @@ function VerdictLine({ pr }: { pr: PrCardModel }) {
   }
   if (stale) {
     return (
-      <p className="m-0 text-meta text-(--chip-confirm-fg)">
+      <p className="m-0 text-meta text-(--waiting-ink)">
         {t('head 已移到')} <Sha value={pr.currentHead} /> {'· '}
         {t('审核结论已过期')} ({t('评审于')} <Sha value={verdict.judgedHead} />)
       </p>
@@ -278,7 +278,7 @@ export function PrCard(props: PrCardProps) {
       <Collapsible className="group/details">
         <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-md text-meta text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50">
           {t('详情')}
-          <ChevronDown className="size-3 transition-transform group-data-[open]/details:rotate-180" />
+          <ChevronDown className="size-3.5 transition-transform group-data-[open]/details:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Details pr={pr} />

@@ -66,7 +66,7 @@ export function PermissionCard({
       className={cn('rounded-(--radius-card) bg-card px-4 py-3.5 shadow-(--e1)', className)}
     >
       <div className="flex items-center gap-2 text-ui font-semibold text-foreground">
-        <Lock className="size-4 flex-none text-(--chip-confirm-fg)" />
+        <Lock className="size-4 flex-none text-(--waiting-ink)" />
         {title}
       </div>
       <pre className="mt-2.5 mb-0 overflow-auto rounded-xl bg-canvas px-3 py-2.5 font-mono text-meta whitespace-pre-wrap text-content-secondary">

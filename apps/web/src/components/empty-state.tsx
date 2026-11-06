@@ -31,9 +31,7 @@ export function EmptyState({
   return (
     <Empty data-testid={testId} className={cn('empty-state', className)}>
       <EmptyHeader className="gap-1">
-        <EmptyMedia className="mb-3 text-icon">
-          {media ?? <Icon className="size-8" strokeWidth={1.5} />}
-        </EmptyMedia>
+        <EmptyMedia className="mb-3 text-icon">{media ?? <Icon className="size-8" />}</EmptyMedia>
         <h2 className="m-0 font-heading text-heading font-title text-balance text-foreground">
           {title}
         </h2>
