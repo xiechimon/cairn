@@ -83,6 +83,14 @@ verified:` was merged into `Not covered:`; a label with only markup after it
 counts as empty). The gate checks the card's shape;
 whether it matches the requirement stays a reviewer judgment.
 
+Baseline evidence: with `--changed-baselines <file>` (one path per line,
+passed by the workflow only when merge base...head adds or modifies a
+`*-snapshots/*.png` file), the body must show each changed baseline: a table
+row naming the file with at least two embedded images (old baseline and new
+render), or a `<file>: <verdict>` line naming it. The file is matched by its
+name with or without `.png`; a pair inside a code fence does not render and
+does not count. Each baseline without either is named.
+
 Usage:
   python3 scripts/pr-evidence-gate.py body.md                # CI entry point
   PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py
@@ -402,6 +410,26 @@ def coverage_problems(body):
     return problems
 
 
+def baseline_token(path):
+    stem = re.escape(path.rsplit('/', 1)[-1].removesuffix('.png'))
+    return rf'(?<![\w-]){stem}(?:\.png)?(?![\w-])'
+
+
+def baseline_shown(rendered, with_fences, path):
+    token = baseline_token(path)
+    for line in rendered.splitlines():
+        if line.strip().startswith('|') and re.search(token, line) and len(embedded_images(line)) >= 2:
+            return True
+    verdict = re.compile(token + r'[*_`]*[ \t]*:(?P<rest>.*)$', re.M)
+    return any(has_content(match['rest']) for match in verdict.finditer(with_fences))
+
+
+def baseline_problems(body, baselines):
+    rendered = visible_markdown(body)
+    with_fences = visible_markdown(body, blank_fences=False)
+    return [path for path in baselines if not baseline_shown(rendered, with_fences, path)]
+
+
 def split_option(args, name):
     if name not in args:
         return args, None
@@ -422,6 +450,7 @@ def split_schema_glance(argv):
 def main():
     args, changed_file = split_option(sys.argv[1:], '--changed-files')
     args, schema_glance = split_schema_glance(args)
+    args, baseline_file = split_option(args, '--changed-baselines')
     if args:
         with open(args[0], encoding='utf-8') as f:
             body = f.read()
@@ -439,6 +468,18 @@ def main():
         else:
             failures.append('schema-changes')
             print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
+
+    if baseline_file is not None:
+        with open(baseline_file, encoding='utf-8') as f:
+            baselines = [line.strip() for line in f if line.strip()]
+        missing = baseline_problems(body, baselines)
+        for path in missing:
+            failures.append('baseline-evidence')
+            print(f"FAIL baseline-evidence: {path}")
+        if missing:
+            print("pr-evidence: show each changed snapshot baseline as an old baseline | new render image pair, or a '<file>: <verdict>' line; see .claude/skills/pr-cairn/SKILL.md, 'Snapshot baselines'")
+        else:
+            print(f"pr-evidence: baseline-evidence: {len(baselines)} changed baseline(s) shown")
 
     if changed_file is not None:
         with open(changed_file, encoding='utf-8') as f:

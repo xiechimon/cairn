@@ -715,6 +715,162 @@ class SchemaGlanceWorkflowTests(unittest.TestCase):
         self.assertIn('schema-changes: matches', result.stdout)
 
 
+class BaselineEvidenceTests(unittest.TestCase):
+    sections = '## What\nUpdate a specimen.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+    dark = 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots/pr-card-dark-linux.png'
+    light = 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots/pr-card-light-linux.png'
+    old = '![old](https://example.org/old.png)'
+    new = '![new](https://example.org/new.png)'
+
+    def verdict(self, proof, baselines=(dark,)):
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            argv = ['pr-evidence-gate.py']
+            if baselines is not None:
+                path = Path(directory, 'changed-baselines.txt')
+                path.write_text('\n'.join(baselines) + '\n')
+                argv += ['--changed-baselines', str(path)]
+            body = '## Proof\n' + proof + '\n' + self.sections
+            with patch.object(sys, 'argv', argv), patch.dict(gate.os.environ, {'PR_BODY': body}), patch.object(gate, 'http_code', return_value='200'), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def pair_table(self, *names):
+        rows = ''.join(f'| `{name}` | {self.old} | {self.new} |\n' for name in names)
+        return '| Baseline | Old baseline | New render |\n|---|---|---|\n' + rows
+
+    def test_changed_baseline_without_evidence_fails_and_names_it(self):
+        result, output = self.verdict('Checks passed.\n')
+        self.assertEqual(result, 1, output)
+        self.assertIn(f'FAIL baseline-evidence: {self.dark}', output)
+
+    def test_old_and_new_image_pair_passes(self):
+        result, output = self.verdict(self.pair_table('pr-card-dark-linux.png'))
+        self.assertEqual(result, 0, output)
+        self.assertIn('baseline-evidence: 1 changed baseline(s) shown', output)
+
+    def test_full_path_in_the_pair_row_passes(self):
+        result, output = self.verdict(self.pair_table(self.dark))
+        self.assertEqual(result, 0, output)
+
+    def test_verdict_line_passes_in_prose_lists_and_text_fences(self):
+        for proof in ['pr-card-dark-linux.png: badge moved 2px left, intended.\n',
+                      '- `pr-card-dark-linux.png`: unchanged layout, new badge color.\n',
+                      'Baselines read.\n```text\npr-card-dark-linux: read, only the chip text changed.\n```\n',
+                      '<details><summary>Baselines</summary>\n\npr-card-dark-linux.png: read; spacing intended.\n\n</details>\n']:
+            with self.subTest(proof=proof):
+                result, output = self.verdict(proof)
+                self.assertEqual(result, 0, output)
+
+    def test_a_row_with_one_image_is_not_a_pair(self):
+        proof = f'| Baseline | New render |\n|---|---|\n| `pr-card-dark-linux.png` | {self.new} |\n'
+        result, output = self.verdict(proof)
+        self.assertEqual(result, 1, output)
+        self.assertIn(f'FAIL baseline-evidence: {self.dark}', output)
+
+    def test_empty_or_hidden_verdicts_do_not_count(self):
+        for proof in ['pr-card-dark-linux.png:\n', 'pr-card-dark-linux.png: **  **\n',
+                      '<!-- pr-card-dark-linux.png: looked fine -->\n',
+                      'Updated pr-card-dark-linux.png after the change.\n']:
+            with self.subTest(proof=proof):
+                result, output = self.verdict(proof)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL baseline-evidence:', output)
+
+    def test_a_pair_inside_a_fence_does_not_count(self):
+        result, output = self.verdict('```\n' + self.pair_table('pr-card-dark-linux.png') + '```\n')
+        self.assertEqual(result, 1, output)
+        self.assertIn(f'FAIL baseline-evidence: {self.dark}', output)
+
+    def test_evidence_must_name_the_exact_baseline(self):
+        other = 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots/card-dark-linux.png'
+        result, output = self.verdict(self.pair_table('pr-card-dark-linux.png'), baselines=(other,))
+        self.assertEqual(result, 1, output)
+        self.assertIn(f'FAIL baseline-evidence: {other}', output)
+
+    def test_only_the_missing_baselines_are_named(self):
+        result, output = self.verdict(self.pair_table('pr-card-dark-linux.png'), baselines=(self.dark, self.light))
+        self.assertEqual(result, 1, output)
+        self.assertIn(f'FAIL baseline-evidence: {self.light}', output)
+        self.assertNotIn(f'FAIL baseline-evidence: {self.dark}', output)
+
+    def test_without_a_baseline_list_nothing_is_enforced(self):
+        result, output = self.verdict('Checks passed.\n', baselines=None)
+        self.assertEqual(result, 0, output)
+        self.assertNotIn('baseline-evidence', output)
+
+    def test_skill_names_the_rule(self):
+        skill = Path('.claude/skills/pr-cairn/SKILL.md').read_text()
+        self.assertIn('baseline-evidence', skill)
+        self.assertIn('--changed-baselines', skill)
+
+
+class BaselineWorkflowTests(unittest.TestCase):
+    body = ('## Proof\nChecks passed.\n```text\nLive: temp repo.\nMocked: none.\nNot covered: real CI.\n```\n'
+            '## What\nUpdate a specimen.\n## Review\nReviewed.\n## Risk\nReversible.\n')
+    snapshots = 'apps/web/e2e/gallery-snapshots.spec.ts-snapshots'
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name).resolve()
+        self.repo = root / 'repo'
+        self.temp = root / 'runner'
+        self.temp.mkdir()
+        (self.repo / 'scripts').mkdir(parents=True)
+        (self.repo / self.snapshots).mkdir(parents=True)
+        (self.repo / 'docs').mkdir()
+        for name in ('pr-evidence-gate.py', 'pr_body.py', 'schema-glance.mjs'):
+            (self.repo / 'scripts' / name).write_text(Path('scripts', name).read_text())
+        self.git('init', '-q', '-b', 'main')
+        self.git('config', 'user.email', 't@example.com')
+        self.git('config', 'user.name', 't')
+        self.git('config', 'commit.gpgsign', 'false')
+        self.git('add', 'scripts')
+        self.commit(f'{self.snapshots}/pr-card-dark-linux.png', 'old', 'base')
+        self.commit(f'{self.snapshots}/gone-dark-linux.png', 'old', 'base two')
+        self.commit('docs/diagram.png', 'old', 'base three')
+        self.git('checkout', '-q', '-b', 'feature')
+
+    def git(self, *args):
+        return subprocess.run(['git', '-C', str(self.repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(self, path, content, message):
+        (self.repo / path).write_text(content)
+        self.git('add', path)
+        self.git('commit', '-q', '-m', message)
+
+    def run_step(self, body):
+        (self.temp / 'pr.json').write_text(json.dumps({'base': {'sha': self.git('rev-parse', 'main')}, 'head': {'sha': self.git('rev-parse', 'feature')}}))
+        (self.temp / 'pr-body.md').write_text(body)
+        return subprocess.run(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', SchemaGlanceWorkflowTests.step_script()], cwd=self.repo,
+                              env={**os.environ, 'RUNNER_TEMP': str(self.temp)}, capture_output=True, text=True)
+
+    def test_changed_baseline_needs_evidence_in_the_body(self):
+        self.commit(f'{self.snapshots}/pr-card-dark-linux.png', 'new', 'accept baseline')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(f'FAIL baseline-evidence: {self.snapshots}/pr-card-dark-linux.png', result.stdout)
+        result = self.run_step(self.body.replace('Checks passed.', 'pr-card-dark-linux.png: read it; the badge is darker on purpose.'))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_added_baseline_needs_evidence_and_deleted_one_does_not(self):
+        self.commit(f'{self.snapshots}/fresh-dark-linux.png', 'new', 'add baseline')
+        self.git('rm', '-q', f'{self.snapshots}/gone-dark-linux.png')
+        self.git('commit', '-q', '-m', 'drop baseline')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(f'FAIL baseline-evidence: {self.snapshots}/fresh-dark-linux.png', result.stdout)
+        self.assertNotIn('gone-dark-linux.png', result.stdout)
+
+    def test_other_images_do_not_trigger_the_rule(self):
+        self.commit('docs/diagram.png', 'new', 'docs image')
+        result = self.run_step(self.body)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('baseline-evidence', result.stdout)
+        self.assertFalse((self.temp / 'changed-baselines.txt').exists() and (self.temp / 'changed-baselines.txt').read_text().strip())
+
+
 def load_tests(loader, tests, pattern):
     task_spec = importlib.util.spec_from_file_location('task_tests', Path(__file__).with_name('pr-tasks-gate.test.py'))
     task_tests = importlib.util.module_from_spec(task_spec)

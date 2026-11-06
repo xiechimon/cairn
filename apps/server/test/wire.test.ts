@@ -82,6 +82,8 @@ const INFERRED_ROUTES = [
   'GET /api/projects/{id}/commits',
   'GET /api/projects/{id}/commits/{sha}',
   'GET /api/builds/{id}/plans',
+  'GET /api/builds/{id}/merge-permission',
+  'POST /api/builds/{id}/plans/{planId}/pause-auto-approve',
   'GET /api/builds/{id}/changes',
   'GET /api/builds/{id}/changes/file',
   'GET /api/builds/{id}/usage',

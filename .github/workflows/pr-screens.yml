@@ -270,4 +270,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/pr-assets/screens-$PR_NUMBER" || echo "no screenshot branch for #$PR_NUMBER"
+        run: |
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/pr-assets/screens-$PR_NUMBER" || echo "no screenshot branch for #$PR_NUMBER"

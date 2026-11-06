@@ -979,7 +979,7 @@ export async function confirmBuild(
     throw new HttpError(404, `build ${buildId}`);
   }
   try {
-    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor, 'automatic');
   } catch (err) {
     if (
       err instanceof HttpError &&

@@ -411,6 +411,7 @@ export const plan = sqliteTable('plan', {
   version: integer('version').notNull().default(1),
   content: text('content').notNull().default(''),
   stepId: text('stepId'),
+  autoApprovePausedAt: epochMs('autoApprovePausedAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
