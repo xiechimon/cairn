@@ -57,7 +57,6 @@
   "apps/daemon/test/runner-claude-rate-limit.test.ts": 1,
   "apps/daemon/test/runner-create-tag.test.ts": 1,
   "apps/daemon/test/runner-cred-fallback.test.ts": 1,
-  "apps/daemon/test/runner-delivery.test.ts": 1,
   "apps/daemon/test/runner-error-lifecycle.test.ts": 1,
   "apps/daemon/test/runner-image-degrade.test.ts": 2,
   "apps/daemon/test/runner-images.test.ts": 1,

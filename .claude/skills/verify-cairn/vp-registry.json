@@ -1682,6 +1682,22 @@
           "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
+    },
+    "github-emulator": {
+      "recipe": "features/github-emulator.md",
+      "cases": {
+        "pr-watch": {
+          "script": "integration/verify/github-emulator.mts",
+          "runner": "tsx",
+          "cwd": "integration",
+          "args": [],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "D109 PrWatch, CI checks, review feedback and merge against stateful emulate.dev over loopback HTTP; saves wire responses and SQLite rows."
+        }
+      }
     }
   }
 }

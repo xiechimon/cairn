@@ -22,6 +22,7 @@ test('each side installs, installs its browser, runs and uploads from its own tr
     'Install dependencies from this side',
     "Install Playwright chromium for this side's version",
     'Screenshot the selected pages and run axe',
+    'Screenshot the selected key states on a seeded server',
     'Record the lockfile this side was built from',
   ];
   for (const name of treeSteps) {
@@ -43,7 +44,7 @@ test('only the harness is copied from head into the base tree', () => {
     [
       'cp apps/web/pr-screens/* TREE',
       'cp apps/web/e2e/audit-pages.ts apps/web/e2e/helpers.ts TREE',
-      'cp apps/web/playwright.pr-screens.config.ts "$tree/apps/web/"',
+      'cp apps/web/playwright.pr-screens.config.ts apps/web/playwright.pr-screens-live.config.ts "$tree/apps/web/"',
     ].map((line) => line.replace(/"\$tree\/[^"]*"/g, 'TREE')),
   );
 });
