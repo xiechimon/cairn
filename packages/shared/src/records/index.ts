@@ -1,5 +1,4 @@
 import type { z } from 'zod';
-import { agentRecordSchema } from './agent.js';
 import { apiKeyRecordSchema } from './api-key.js';
 import { buildRecordSchema } from './build.js';
 import { chiefRecordSchema, chiefThreadSchema } from './chief.js';

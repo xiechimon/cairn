@@ -8,7 +8,7 @@ import {
   routeOverrideSchema,
   type TagRecord,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';

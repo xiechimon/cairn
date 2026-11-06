@@ -14,7 +14,6 @@ import {
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  api,
   bootRealServer,
   daemonLogLines,
   pinSessionRouteMachine,

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BRAND } from '../brand.js';
-import { phaseSchema, recordId } from './common.js';
+import { recordId } from './common.js';
 import { requiredCapabilitiesSchema } from './machine-capabilities.js';
 import { SECRET_MIN_CLI_VERSION } from './secret.js';
 

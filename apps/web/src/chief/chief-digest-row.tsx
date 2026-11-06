@@ -102,30 +102,28 @@ export function ChiefDigestRow({
                         )}
                       </div>
                       {memory !== undefined && !gone && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={ICON_BTN_CLS}
-                            aria-label={t('让 Coordinator 忘掉这条')}
-                            onClick={() => {
-                              const markGone = () =>
-                                setForgotten((prev) => new Set(prev).add(memory.id));
-                              if (!live) markGone();
-                              else
-                                mutations.deleteMemory.mutate(
-                                  { memoryId: memory.id },
-                                  {
-                                    onSuccess: markGone,
-                                    onError: (error) =>
-                                      toastError(t('删除记忆失败，请重试。'), error),
-                                  },
-                                );
-                            }}
-                          >
-                            <Trash2 width={14} height={14} />
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={ICON_BTN_CLS}
+                          aria-label={t('让 Coordinator 忘掉这条')}
+                          onClick={() => {
+                            const markGone = () =>
+                              setForgotten((prev) => new Set(prev).add(memory.id));
+                            if (!live) markGone();
+                            else
+                              mutations.deleteMemory.mutate(
+                                { memoryId: memory.id },
+                                {
+                                  onSuccess: markGone,
+                                  onError: (error) =>
+                                    toastError(t('删除记忆失败，请重试。'), error),
+                                },
+                              );
+                          }}
+                        >
+                          <Trash2 width={14} height={14} />
+                        </Button>
                       )}
                     </li>
                   );

@@ -335,11 +335,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/src/routes/create-agent-dialog.tsx",
-    "line": "// 只出模型名——原版的 `· 128k` 是原版内置模型目录的上下文窗口，cairn 是本",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/src/routes/team-page.tsx",
     "line": "// client-state key (r2 §1.5 `cairn.teamMembersLayout`); chart drops the",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"

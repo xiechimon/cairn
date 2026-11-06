@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { recordId } from './common.js';
 
 export const machineHardwareSchema = z.object({
   cpuCores: z.number().int().positive(),

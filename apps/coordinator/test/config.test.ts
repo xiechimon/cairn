@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readConfig, readMachineToken } from '../src/config.js';
+import { readMachineToken } from '../src/config.js';
 
 const dirs: string[] = [];
 afterEach(() => {
