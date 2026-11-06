@@ -46,6 +46,7 @@ export function ProductBoardSection() {
       lede="The banners shown above the home conversation, and the project avatar."
     >
       <Specimen
+        id="banners"
         title="Banners"
         note="Shown above the home conversation"
         stage="canvas"
@@ -85,6 +86,7 @@ export function ProductBoardSection() {
         </Labeled>
       </Specimen>
       <Specimen
+        id="project-avatar"
         title="Project avatar"
         note="ProjectAvatar: letter tile by index tone, or a chosen icon and colour"
       >
