@@ -1,3 +1,4 @@
+import { type PairResponse, parsePairFragment, type RemoteDescriptor } from '@cairn/shared';
 import { useSyncExternalStore } from 'react';
 
 export const TOKEN_STORAGE_KEY = 'cairn.token';
@@ -113,6 +114,40 @@ export async function consumeLoginFragment(): Promise<void> {
   }
   if (await probeToken(token)) passGate(token);
   else rejectGate();
+}
+
+const DESCRIPTOR_PATH = '/api/remote/descriptor';
+const PAIR_PATH = '/api/remote/pair';
+const FALLBACK_DEVICE_NAME = 'Browser';
+
+function pairedDeviceName(): string {
+  const platform = (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform;
+  return platform !== undefined && platform !== '' ? platform : FALLBACK_DEVICE_NAME;
+}
+
+export async function consumePairFragment(
+  onFailure: (error: unknown) => void = () => {},
+): Promise<void> {
+  const pair = parsePairFragment(window.location.hash);
+  if (pair === null) return;
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  try {
+    const descriptor = await fetch(DESCRIPTOR_PATH);
+    if (!descriptor.ok) throw new Error(`descriptor ${descriptor.status}`);
+    const { environmentId } = (await descriptor.json()) as RemoteDescriptor;
+    if (environmentId !== pair.environmentId) throw new Error('environment mismatch');
+    const res = await fetch(PAIR_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: pair.code, name: pairedDeviceName() }),
+    });
+    if (!res.ok) throw new Error(`pair ${res.status}`);
+    const paired = (await res.json()) as PairResponse;
+    if (paired.environmentId !== pair.environmentId) throw new Error('environment mismatch');
+    passGate(paired.token);
+  } catch (error) {
+    onFailure(error);
+  }
 }
 
 export function awaitGate(): Promise<void> {
