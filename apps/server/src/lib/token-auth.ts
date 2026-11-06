@@ -10,12 +10,19 @@ const STREAM_PATH_PATTERNS = [
   /^\/api\/conversations\/[^/]+\/stream$/,
 ];
 
+const OPEN_REMOTE_PATHS = new Set(['/api/remote/descriptor', '/api/remote/pair']);
+
+export function isOpenRemotePath(pathname: string): boolean {
+  return OPEN_REMOTE_PATHS.has(pathname);
+}
+
 function isExempt(pathname: string): boolean {
   if (pathname.includes('%')) return false;
   if (!pathname.startsWith('/api/')) return true;
   if (pathname === '/api/machine' || pathname.startsWith('/api/machine/')) return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
+  if (isOpenRemotePath(pathname)) return true;
   return false;
 }
 
@@ -41,9 +48,19 @@ export function isLoopbackPeer(c: Context): boolean {
   return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
 }
 
-export function registerTokenAuth(app: Hono, token: string | null): void {
+export interface TokenAuthOptions {
+  isDeviceToken?: (provided: string) => boolean;
+}
+
+export function registerTokenAuth(
+  app: Hono,
+  token: string | null,
+  options: TokenAuthOptions = {},
+): void {
   if (token === null) return;
-  const verify = makeVerifier(token);
+  const verifyOwner = makeVerifier(token);
+  const verify = (provided: string): boolean =>
+    verifyOwner(provided) || options.isDeviceToken?.(provided) === true;
   app.use('*', async (c, next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;

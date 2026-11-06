@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import {
   beginGateProbe,
   consumeLoginFragment,
+  consumePairFragment,
   passGate,
   probeToken,
   rejectGate,
@@ -11,6 +12,7 @@ import {
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Input } from '../components/ui/input.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 
 export function TokenGate() {
@@ -21,6 +23,9 @@ export function TokenGate() {
 
   useEffect(() => {
     void consumeLoginFragment();
+    void consumePairFragment((error) =>
+      toastError(t('配对失败，请在电脑上重新生成二维码。'), error),
+    );
   }, []);
 
   useEffect(() => {

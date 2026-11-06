@@ -1817,4 +1817,20 @@ export const EN: Record<string, string> = {
   'The project for this thread is unavailable.': 'The project for this thread is unavailable.',
   'Scheduled tasks could not be loaded.': 'Scheduled tasks could not be loaded.',
   'Loading scheduled tasks…': 'Loading scheduled tasks…',
+  远程访问: 'Remote access',
+  配对新设备: 'Pair a new device',
+  '用手机扫描二维码，5 分钟内有效，只能用一次。':
+    'Scan with your phone. Valid for 5 minutes, works once.',
+  配对二维码: 'Pairing QR code',
+  '手机将连接到 {origin}': 'Your phone will connect to {origin}',
+  '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
+  '这台电脑暂时没有手机可用的线路。': 'This computer has no route your phone can use yet.',
+  '请先登录 Tailscale：{url}': 'Sign in to Tailscale first: {url}',
+  '设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。':
+    'Set CAIRN_TSNET=1 and restart to reach this computer from your phone over Tailscale.',
+  Tailscale: 'Tailscale',
+  局域网: 'Local network',
+  撤销设备: 'Revoke',
+  '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
+  '配对失败，请在电脑上重新生成二维码。': 'Pairing failed. Create a new QR code on your computer.',
 };

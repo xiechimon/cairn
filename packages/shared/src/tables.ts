@@ -20,6 +20,7 @@ export const DB_TABLES = [
   'provider',
   'secret',
   'api_key',
+  'paired_device',
   'machine',
   'token_usage',
   'chief',
