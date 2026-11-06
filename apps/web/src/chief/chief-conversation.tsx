@@ -201,7 +201,8 @@ export function ChiefConversation({
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
-  const answerActive = answerHere && answerKey !== null;
+  const [threadOverride, setThreadOverride] = useState(false);
+  const answerActive = answerHere && answerKey !== null && !threadOverride;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -312,16 +313,34 @@ export function ChiefConversation({
     focusedComposerRef.current = null;
   }, []);
   const shownComposerRef = useRef(activeComposer);
+  const threadFocusPendingRef = useRef(false);
   useLayoutEffect(() => {
     const previous = shownComposerRef.current;
     shownComposerRef.current = activeComposer;
+    if (activeComposer === THREAD_COMPOSER && threadFocusPendingRef.current) {
+      threadFocusPendingRef.current = false;
+      surfaceRef.current?.focus({ preventScroll: true });
+      return;
+    }
     if (previous === activeComposer || focusedComposerRef.current !== previous) return;
     const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
     incoming.current?.focus({ preventScroll: true });
   }, [activeComposer]);
+  const restoreToThread = (update: (current: string) => string) => {
+    setThreadOverride(true);
+    setLiveDraft(update);
+    if (shownComposerRef.current === THREAD_COMPOSER)
+      surfaceRef.current?.focus({ preventScroll: true });
+    else threadFocusPendingRef.current = true;
+  };
   const composerBinding = serverDraftBinding(
     onSend != null ? liveDraft : (chief.draft ?? ''),
-    onSend != null ? setLiveDraft : undefined,
+    onSend != null
+      ? (value: string) => {
+          setLiveDraft(value);
+          if (value === '') setThreadOverride(false);
+        }
+      : undefined,
   );
   const sendFromComposer =
     onSend == null
@@ -343,8 +362,7 @@ export function ChiefConversation({
   const prefillText = prefill?.text;
   useEffect(() => {
     if (prefillKey == null || prefillText == null) return;
-    setLiveDraft(prefillText);
-    surfaceRef.current?.focus({ preventScroll: true });
+    restoreToThread(() => prefillText);
   }, [prefillKey, prefillText]);
   const home = variant !== 'drawer';
   const ownHeader = variant !== 'global';
@@ -380,8 +398,7 @@ export function ChiefConversation({
           onWithdraw(messageId).then(
             () => {
               followSentRef.current = false;
-              setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
-              surfaceRef.current?.focus({ preventScroll: true });
+              restoreToThread((cur) => (cur === '' ? text : `${cur}\n${text}`));
             },
             () => {},
           );
@@ -695,7 +712,7 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} bound={answerHere} />
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
         {composerReplacement ?? (
           <>
             {composerError != null && (

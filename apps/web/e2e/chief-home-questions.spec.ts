@@ -718,14 +718,88 @@ test('with a thread targeted, digits type, option clicks and page switches leave
   expect(answered).toEqual([]);
 });
 
+test('an answer upload in flight still blocks submit and paging after a withdraw switches to the thread composer', async ({
+  page,
+}) => {
+  const answered: { path: string; body: unknown }[] = [];
+  const state = {
+    ...structuredClone(TWO),
+    threads: [
+      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'queued' }] },
+    ],
+  };
+  state.messages = [...state.messages, { id: 'q1', role: 'user', content: 'queued note', createdAt: 30 }];
+  const answer = answerRoute(state, answered);
+  await mockLive(page, state, (path, route, json) => {
+    if (path === `/api/teams/t1/chief/threads/${THREAD.id}/messages/q1` && route.request().method() === 'DELETE') {
+      state.threads = [{ ...THREAD, activeRun: null, pending: [] }];
+      state.messages = state.messages.filter((row) => row.id !== 'q1');
+      return json({ ok: true });
+    }
+    return answer(path, route, json);
+  });
+  const held: Route[] = [];
+  await page.route('**/api/uploads/grant', (route) => {
+    held.push(route);
+  });
+  await page.route('**/api/uploads/upload', (route) => {
+    held.push(route);
+  });
+  await page.goto('/app');
+  const composer = page.getByTestId('chief-composer-input');
+  const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
+  const dock = page.getByTestId('chief-question-dock');
+  await composer.fill('typed answer');
+  await activeComposer.locator('input[type="file"]').setInputFiles({
+    name: 'slow.log',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('slow'),
+  });
+  await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
+  await page.getByTestId('home-c').getByTestId('queued-message').getByRole('button', { name: '撤回' }).click();
+  await expect(composer).toHaveValue('queued note');
+  const submit = dock.getByRole('button', { name: /^提交回答/ });
+  await expect(submit).toBeDisabled();
+  await expect(page.getByTestId('chief-question-next')).toBeDisabled();
+  await expect(async () => {
+    let n = 0;
+    for (const route of held.splice(0)) {
+      n += 1;
+      if (route.request().url().endsWith('/grant'))
+        await route.fulfill({
+          json: { uploadUrl: '/api/uploads', grant: `grant-${n}`, key: `t1/slow-${n}.log`, attachmentId: `slow-${n}` },
+        });
+      else await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 4 } });
+    }
+    await expect(submit).toBeEnabled({ timeout: 500 });
+  }).toPass();
+  await expect(page.getByTestId('chief-question-next')).toBeEnabled();
+  expect(answered).toEqual([]);
+  await composer.fill('');
+  await expect(composer).toHaveValue('typed answer');
+  await expect(activeComposer.getByTestId('composer-attachments')).toContainText('slow.log');
+});
+
 test('answer drafts per request and the thread draft stay separate through every transition', async ({
   page,
 }) => {
   const answered: { path: string; body: { answers: unknown[] } }[] = [];
   const messaged: { content?: string }[] = [];
-  const state = { ...structuredClone(TWO), todos: [{ ...TASK, phase: 'confirm' }] };
+  const state = {
+    ...structuredClone(TWO),
+    threads: [
+      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'queued' }] },
+    ],
+    todos: [{ ...TASK, phase: 'confirm' }],
+  };
+  state.messages = [...state.messages, { id: 'q1', role: 'user', content: 'queued note', createdAt: 30 }];
   const answer = answerRoute(state, answered as { path: string; body: unknown }[]);
   await mockLive(page, state, (path, route, json) => {
+    if (path === `/api/teams/t1/chief/threads/${THREAD.id}/messages/q1` && route.request().method() === 'DELETE') {
+      state.threads = [{ ...THREAD, activeRun: null, pending: [] }];
+      state.messages = state.messages.filter((row) => row.id !== 'q1');
+      return json({ ok: true });
+    }
     if (/^\/api\/todos\/[^/]+\/messages$/.test(path) && route.request().method() === 'POST') {
       messaged.push(route.request().postDataJSON());
       return json({ todoId: 'todo-1', conversationId: 'build-1', delivered: 'revision' }, 201);
@@ -754,6 +828,15 @@ test('answer drafts per request and the thread draft stay separate through every
       }
     }
   };
+  let releaseLoad: () => void = () => undefined;
+  const loadGate = new Promise<void>((resolve) => {
+    releaseLoad = resolve;
+  });
+  await page.route('**/api/**', async (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    await loadGate;
+    return route.fallback();
+  });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
   const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
@@ -785,8 +868,56 @@ test('answer drafts per request and the thread draft stay separate through every
     extra?: () => Promise<void>;
   }[] = [
     {
+      name: 'text typed while loading lands in the thread composer while a question is pending',
+      run: async () => {
+        await page.getByTestId('loading-composer').getByRole('textbox').fill('typed while loading');
+        releaseLoad();
+        await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+      },
+      composer: 'typed while loading',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
+        await expect(page.getByTestId('chief-question-dock').getByRole('button', { name: /^提交回答/ })).toBeVisible();
+      },
+    },
+    {
+      name: 'emptying the thread text returns the composer to the answer',
+      run: () => composer.fill(''),
+      composer: '',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-primary')).toBeVisible();
+        await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('输入你自己的回答，或留空使用选中的选项');
+      },
+    },
+    {
+      name: 'withdrawing a queued message while answering shows it in the focused thread composer',
+      run: async () => {
+        await composer.fill('customA');
+        await page.getByTestId('home-c').getByTestId('queued-message').getByRole('button', { name: '撤回' }).click();
+      },
+      composer: 'queued note',
+      extra: async () => {
+        await expect(composer).toBeFocused();
+        await expect(page.getByTestId('home-c').getByTestId('queued-message')).toHaveCount(0);
+        await expect(page.getByTestId('chief-question-dock')).toBeVisible();
+        await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
+        await expect(
+          page.getByTestId('chief-question-dock').getByRole('button', { name: /^提交回答/ }),
+        ).toBeEnabled();
+      },
+    },
+    {
+      name: 'emptying the restored text returns to the answer, whose draft is untouched',
+      run: () => composer.fill(''),
+      composer: 'customA',
+      extra: async () => {
+        await expect(page.getByTestId('chief-question-primary')).toBeVisible();
+      },
+    },
+    {
       name: 'slash and mention in the answer are plain text with no menu',
       run: async () => {
+        await composer.fill('');
         await focusComposer();
         await page.keyboard.type('/re @ag');
       },
