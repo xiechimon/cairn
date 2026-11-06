@@ -9,11 +9,11 @@ import {
   Server,
   Settings,
 } from 'lucide-react';
-import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
-import { SidebarProjectRow } from '../components/shell/sidebar-project.js';
+import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -27,12 +27,10 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
 import { fleetStatusLine } from './fleet-status.js';
-import { needsYouThreads } from './needs-you.js';
 import { splitProjectsByArchive } from './project-archive.js';
-import { ProjectAvatar } from './project-avatar.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
-import { SidebarProjectThreads } from './sidebar-project-threads.js';
-import { projectThreads } from './sidebar-threads.js';
+import { SidebarThreadGroups } from './sidebar-thread-groups.js';
+import { groupThreads } from './sidebar-threads.js';
 import { THREAD_PARAM, threadHref } from './thread-copy.js';
 
 export type SidebarSelected =
@@ -207,13 +205,14 @@ export function BoardSidebar({
         onToggleArchive={() => onArchiveProject(row.id, !archived)}
       />
     );
-  const waitingByProject = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const todo of needsYouThreads(todos ?? [])) {
-      counts.set(todo.projectId, (counts.get(todo.projectId) ?? 0) + 1);
-    }
-    return counts;
-  }, [todos]);
+  const threadGroups = useMemo(
+    () => groupThreads(todos ?? [], activeProject),
+    [todos, activeProject],
+  );
+  const projectNames = useMemo(
+    () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
+    [projectRows, archivedRows],
+  );
 
   const [projectsCollapsed, setProjectsCollapsed] = useState(() =>
     readProjectsCollapsed(safeLocalStorage()),
@@ -303,11 +302,11 @@ export function BoardSidebar({
             />
           </Button>
           {!projectsCollapsed &&
-            projectRows.map((row, i) => {
+            projectRows.map((row) => {
               const href = projectHref(row.id);
               return (
                 <Link key={row.id} {...railLink(href, activeProject === row.id, row.name)}>
-                  <ProjectAvatar name={row.name} tone={i} icon={row.icon} color={row.color} bare />
+                  <ProjectGlyph name={row.name} icon={row.icon} />
                 </Link>
               );
             })}
@@ -394,9 +393,15 @@ export function BoardSidebar({
         ref={navRef}
         className={`-mx-1 mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 ${scrollFadeClassName()}`}
       >
+        <SidebarThreadGroups
+          groups={threadGroups}
+          openThreadId={openThreadId}
+          projectNames={projectNames}
+          onOpen={(id) => navigate(threadHref(id, baseParams.toString()))}
+        />
         <div
           data-testid="project-group"
-          className="mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
+          className="mt-3 mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
         >
           <Button
             variant="ghost"
@@ -422,24 +427,15 @@ export function BoardSidebar({
           </Link>
         </div>
         {!projectsCollapsed &&
-          projectRows.map((row, i) => (
-            <Fragment key={row.id}>
-              <SidebarProjectRow
-                name={row.name}
-                tone={i}
-                icon={row.icon}
-                color={row.color}
-                waiting={waitingByProject.get(row.id) ?? 0}
-                active={activeProject === row.id}
-                onClick={() => navigate(projectHref(row.id))}
-                menu={projectMenu(row, false)}
-              />
-              <SidebarProjectThreads
-                threads={projectThreads(todos ?? [], row.id)}
-                openThreadId={openThreadId}
-                onOpen={(id) => navigate(threadHref(id, baseParams.toString()))}
-              />
-            </Fragment>
+          projectRows.map((row) => (
+            <SidebarProjectRow
+              key={row.id}
+              name={row.name}
+              icon={row.icon}
+              active={activeProject === row.id}
+              onClick={() => navigate(projectHref(row.id))}
+              menu={projectMenu(row, false)}
+            />
           ))}
         {archivedRows.length > 0 && (
           <div data-testid="archived-group" className="mt-2 flex flex-col gap-px">
@@ -460,13 +456,11 @@ export function BoardSidebar({
               />
             </Button>
             {archivedExpanded &&
-              archivedRows.map((row, i) => (
+              archivedRows.map((row) => (
                 <SidebarProjectRow
                   key={row.id}
                   name={row.name}
-                  tone={projectRows.length + i}
                   icon={row.icon}
-                  color={row.color}
                   muted
                   active={activeProject === row.id}
                   onClick={() => navigate(projectHref(row.id))}
