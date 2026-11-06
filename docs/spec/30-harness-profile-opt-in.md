@@ -1,6 +1,6 @@
 # 30 · Harness profile: opt-in unified configuration across machines and harnesses
 
-> Ruling source = ian, 2026-11-06: one configuration should serve every harness and every machine, and it has to be optional, because some people want their machines managed separately while he wants his unified. The decision row is D84 in the owner plan; the phased plan is section 22 of the same file. This volume locks the contract for T0 and names what later phases may not change.
+> Ruling source = ian, 2026-11-06: one configuration should serve every harness and every machine, and it has to be optional, because some people want their machines managed separately while he wants his unified. The decision row is D95 in the owner plan; the phased plan is section 22 of the same file. This volume locks the contract for T0 and names what later phases may not change.
 >
 > This volume does not overturn spec 13 Q6 ("server display and daemon execution each read their own machine"), spec 11 A4 (the daemon reports its local `~/.claude/settings.json`), or `docs/research/machine-execution-plane.md` §4-9 (runtime credentials do not cross machines). It adds a declared, secret-free layer above them and nothing else.
 
