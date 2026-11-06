@@ -90,7 +90,7 @@ Judgment = title keyword match, first rule in the table wins, and no match = Gen
 | referenced PRs (no rows, §3.2) | 116 |
 | unresolvable ticket numbers (§3.3) | 0 |
 | evidence directories that are not GitHub ticket numbers (§3.4) | 106 |
-| scan surface: spec volumes / test files | 31 / 950 |
+| scan surface: spec volumes / test files | 31 / 955 |
 
 ## 2. Feature map
 
