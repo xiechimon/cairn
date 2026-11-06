@@ -124,7 +124,7 @@ for (const theme of ['light', 'dark'] as const) {
         const icon = el.querySelector('svg')!.getBoundingClientRect();
         return {
           bg: cs.backgroundColor,
-          shadow: cs.boxShadow,
+          shadow: cs.boxShadow.replaceAll('rgba(0, 0, 0, 0) 0px 0px 0px 0px', '').replaceAll(', ', '') || 'none',
           color: cs.color,
           opacity: cs.opacity,
           iconX: icon.x,

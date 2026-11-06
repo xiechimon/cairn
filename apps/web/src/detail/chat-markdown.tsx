@@ -315,7 +315,7 @@ export function AttachmentChip({
     return (
       <Button
         variant="ghost"
-        className={`spec-chip spec-chip--image ${SPEC_CHIP} ${SPEC_CHIP_IMAGE} h-auto cursor-pointer rounded-(--cds-radius-md) whitespace-normal font-normal active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto`}
+        className={`spec-chip spec-chip--image ${SPEC_CHIP} ${SPEC_CHIP_IMAGE} h-auto cursor-pointer rounded-(--cds-radius-md) whitespace-normal font-normal [&_svg:not([class*='size-'])]:size-auto`}
         title={name}
         nativeButton={false}
         render={<a href={href} />}

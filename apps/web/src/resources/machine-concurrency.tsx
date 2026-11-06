@@ -110,7 +110,7 @@ export function MachineConcurrencySelect({
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
             data-concurrency-source={source}
-            className="h-8 w-20 cursor-pointer justify-between gap-2 rounded-md px-2.5 text-ui font-normal text-foreground active:not-aria-[haspopup]:translate-y-0"
+            className="h-8 w-20 cursor-pointer justify-between gap-2 rounded-md px-2.5 text-ui font-normal text-foreground"
           />
         }
       >
@@ -238,7 +238,7 @@ export function MachineConcurrencySelect({
             data-testid="machine-concurrency-reset"
             data-concurrency-action="reset"
             onMouseDown={keepFocus}
-            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-meta font-normal text-content-secondary hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
+            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-meta font-normal text-content-secondary hover:bg-(--surface-hover)"
             onClick={() => {
               setDirty(false);
               setOpen(false);
