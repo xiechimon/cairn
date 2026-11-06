@@ -105,6 +105,8 @@ export const chiefGetResponseSchema = z.object({
 });
 export type ChiefGetResponse = z.infer<typeof chiefGetResponseSchema>;
 
+export const COORDINATOR_NOT_READY = 'coordinator-not-ready';
+
 export const CHIEF_ORCHESTRATION_STATES = ['queued', 'running', 'failed'] as const;
 
 export const chiefOrchestrationSchema = z.object({
