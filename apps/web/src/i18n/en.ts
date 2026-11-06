@@ -1833,4 +1833,6 @@ export const EN: Record<string, string> = {
   连接状态: 'Connection',
   用途与连接: 'Uses and connections',
   接任务中: 'Taking tasks',
+  '连接断开，正在重连…': 'Connection lost, reconnecting…',
+  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
 };

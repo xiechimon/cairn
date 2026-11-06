@@ -59,7 +59,11 @@ function TranscriptColumnInner({
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
   return (
     <MessageScroller className={ROOT_CLS}>
-      <FadeScrollerViewport data-testid="transcript-col" className={VIEWPORT_CLS}>
+      <FadeScrollerViewport
+        reserveEnd={false}
+        data-testid="transcript-col"
+        className={VIEWPORT_CLS}
+      >
         <MessageScrollerContent className={CONTENT_CLS}>
           {spec != null && <SpecBlock spec={spec} />}
           <Transcript

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { PAGES } from '../e2e/audit-pages.js';
 import { settleTransitions } from '../e2e/helpers.js';
+import { runRules } from './rules.js';
 
 const OUT = process.env.PR_SCREENS_OUT ?? 'pr-screens-out';
 const FROZEN_AT = new Date('2026-10-31T14:00:00+08:00');
@@ -42,6 +43,12 @@ for (const theme of ['light', 'dark'] as const) {
           targets: v.nodes.map((n) => n.target.join(' ')),
         }));
         writeFileSync(join(OUT, `${key}.axe.json`), `${JSON.stringify(found, null, 1)}\n`);
+        try {
+          const rules = await runRules(page);
+          writeFileSync(join(OUT, `${key}.rules.json`), `${JSON.stringify(rules, null, 1)}\n`);
+        } catch (error) {
+          writeFileSync(join(OUT, `${key}.rules-error.txt`), `${String(error).slice(0, 600)}\n`);
+        }
       } catch (error) {
         writeFileSync(join(OUT, `${key}.error.txt`), `${String(error).slice(0, 600)}\n`);
       }

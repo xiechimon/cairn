@@ -4,6 +4,7 @@ import {
   type MachineRuntime,
   PUBLISHED_PACKAGES,
 } from '@cairn/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
 import { Fragment, type ReactNode, useRef, useState } from 'react';
@@ -171,6 +172,7 @@ export function MachineDetailPane({
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
   const mutations = useApiMutations(teamId);
+  const queryClient = useQueryClient();
 
   const membersQ = useMembers(teamId, live);
   const agents = live ? mapTeam(membersQ.data ?? []).agents : (fixture.team?.agents ?? []);
@@ -261,6 +263,8 @@ export function MachineDetailPane({
           new Error(body.rejected?.map((r) => r.reason).join('；')),
         );
       }
+      void queryClient.invalidateQueries({ queryKey: ['machines', teamId] });
+      void queryClient.invalidateQueries({ queryKey: ['members', teamId] });
       navigate({ pathname, search: withoutMachine(search) });
     } catch (error) {
       toastError(t('整机迁移失败，请重试。'), error);
@@ -278,6 +282,8 @@ export function MachineDetailPane({
         const body = (await res.json()) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
+      void queryClient.invalidateQueries({ queryKey: ['machines', teamId] });
+      void queryClient.invalidateQueries({ queryKey: ['members', teamId] });
       navigate({ pathname, search: withoutMachine(search) });
     } catch (error) {
       toastError(t('删除机器失败，请重试。'), error);

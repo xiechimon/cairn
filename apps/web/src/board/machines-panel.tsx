@@ -9,6 +9,7 @@ import {
   releaseComputerControl,
   renewComputerControl,
 } from '../api/computer-screen.js';
+import { useConnected } from '../api/connection-state.js';
 import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
@@ -54,8 +55,9 @@ export function MachineChip({
   onToggle: () => void;
 }) {
   const { t } = useI18n();
+  const connected = useConnected();
   const host = coordinatorMachine(machines);
-  const hostOnline = host?.online === true;
+  const hostOnline = connected && host?.online === true;
   const running = hostOnline ? (host?.runningSteps ?? 0) : 0;
   return (
     <Button
@@ -64,13 +66,18 @@ export function MachineChip({
       aria-pressed={open}
       onClick={onToggle}
       data-testid="machines-button"
-      title={host === null ? undefined : `${host.name} · ${machineStateLabel(host, t)}`}
-      className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+      title={
+        host === null
+          ? undefined
+          : `${host.name} · ${connected ? machineStateLabel(host, t) : t('连接断开，正在重连…')}`
+      }
+      data-connected={connected}
+      className="mr-1 h-7 gap-1.5 rounded-full px-2.5 text-meta font-normal text-content-secondary hover:text-foreground data-[connected=false]:opacity-60 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
     >
       <Laptop aria-hidden="true" className="size-3.5" />
       <span className="max-w-32 truncate max-[640px]:sr-only">{host?.name ?? t('电脑')}</span>
-      <OnlineDot online={host?.online === true} />
-      {host != null && !hostOnline && (
+      <OnlineDot online={hostOnline} />
+      {host != null && connected && !hostOnline && (
         <span className="text-content-tertiary max-[640px]:hidden">{t('离线')}</span>
       )}
       {running > 0 && (

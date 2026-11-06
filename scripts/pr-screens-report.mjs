@@ -12,6 +12,7 @@ import { join } from 'node:path';
 const SEVERITY = ['critical', 'serious', 'moderate', 'minor'];
 const INLINE_LIMIT = 8;
 const IMAGE_WIDTH = 320;
+const RULES_LIMIT = 15;
 
 function listFiles(dir, suffix) {
   return existsSync(dir)
@@ -45,6 +46,38 @@ export function readAxe(dir) {
     );
   }
   return byPage;
+}
+
+export function readRules(dir) {
+  const byPage = new Map();
+  for (const name of listFiles(dir, '.rules.json')) {
+    byPage.set(
+      name.slice(0, -'.rules.json'.length),
+      JSON.parse(readFileSync(join(dir, name), 'utf8')),
+    );
+  }
+  return byPage;
+}
+
+export function countRules(rules, pages) {
+  const counts = {};
+  for (const [page, findings] of rules) {
+    if (pages && !pages.has(page)) continue;
+    for (const f of findings) counts[f.id] = (counts[f.id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export function diffRules(base, head) {
+  const added = [];
+  const fixed = [];
+  for (const page of [...commonPages(base, head)].sort()) {
+    const before = new Map(base.get(page).map((f) => [f.key, f]));
+    const after = new Map(head.get(page).map((f) => [f.key, f]));
+    for (const [key, f] of after) if (!before.has(key)) added.push({ page, ...f });
+    for (const [key, f] of before) if (!after.has(key)) fixed.push({ page, ...f });
+  }
+  return { added, fixed };
 }
 
 export function commonPages(base, head) {
@@ -142,6 +175,9 @@ export function render({
   selection,
   comparedPages,
   lockfilesDiffer,
+  rulesDiff,
+  baseRules,
+  headRules,
 }) {
   const lines = ['### PR screenshots and accessibility (non-blocking)', ''];
   const duration = Object.entries(durations ?? {})
@@ -200,7 +236,7 @@ export function render({
       '|---|---|---|---|---|',
     );
     for (const v of axeDiff.added)
-      lines.push(`| ${v.page} | ${v.rule} | ${v.impact} | ${v.nodes} | \`${v.target}\` |`);
+      lines.push(`| ${v.page} | A3: ${v.rule} | ${v.impact} | ${v.nodes} | \`${v.target}\` |`);
     lines.push('');
   }
   if (axeDiff.fixed.length > 0)
@@ -208,6 +244,27 @@ export function render({
       `Fixed on this head: ${axeDiff.fixed.map((v) => `${v.page} ${v.rule} (${v.nodes})`).join(', ')}.`,
       '',
     );
+  if (rulesDiff) {
+    const ids = [
+      ...new Set([...Object.keys(baseRules ?? {}), ...Object.keys(headRules ?? {})]),
+    ].sort();
+    lines.push('#### Look and feel (non-blocking)', '');
+    if (ids.length > 0) {
+      lines.push('| Rule | base | head |', '|---|---|---|');
+      for (const id of ids)
+        lines.push(`| ${id} | ${baseRules?.[id] ?? 0} | ${headRules?.[id] ?? 0} |`);
+      lines.push('');
+    }
+    if (rulesDiff.added.length > 0) {
+      lines.push('New on this head:', '', '| Page | Finding |', '|---|---|');
+      for (const f of rulesDiff.added.slice(0, RULES_LIMIT))
+        lines.push(`| ${f.page} | ${f.message.replaceAll('|', '\\|')} |`);
+      if (rulesDiff.added.length > RULES_LIMIT)
+        lines.push('', `${rulesDiff.added.length - RULES_LIMIT} more are in the artifact.`);
+      lines.push('');
+    } else lines.push('No new look-and-feel findings.', '');
+    if (rulesDiff.fixed.length > 0) lines.push(`Gone on this head: ${rulesDiff.fixed.length}.`, '');
+  }
   if (headErrors.length + baseErrors.length > 0) {
     lines.push(
       `Screens that did not render: head ${headErrors.length}, base ${baseErrors.length} (see the artifact).`,
@@ -253,12 +310,18 @@ function main(argv) {
   const baseAxe = readAxe(baseDir);
   const headAxe = readAxe(headDir);
   const common = commonPages(baseAxe, headAxe);
+  const baseRules = readRules(baseDir);
+  const headRules = readRules(headDir);
+  const commonRules = commonPages(baseRules, headRules);
   const markdown = render({
     classes,
     axeDiff: diffAxe(baseAxe, headAxe),
     baseTotals: totals(baseAxe, common),
     headTotals: totals(headAxe, common),
     comparedPages: common.size,
+    rulesDiff: diffRules(baseRules, headRules),
+    baseRules: countRules(baseRules, commonRules),
+    headRules: countRules(headRules, commonRules),
     lockfilesDiffer: readLock(baseDir) !== readLock(headDir),
     headErrors: listFiles(headDir, '.error.txt'),
     baseErrors: listFiles(baseDir, '.error.txt'),
