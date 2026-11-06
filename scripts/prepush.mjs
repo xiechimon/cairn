@@ -41,7 +41,6 @@ export const localOnly = [
   ['node', 'scripts/ui-registry-gate.mjs'],
   ['node', 'scripts/ui-consumer-shape-gate.mjs'],
   ['node', 'scripts/lint-warning-cap.mjs'],
-  ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
 ];
 
 const SOURCE_TREES = /^(apps|packages|integration)\//;
@@ -110,6 +109,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
     ['python3', 'scripts/pr-evidence-archive.test.py'],
+    ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],

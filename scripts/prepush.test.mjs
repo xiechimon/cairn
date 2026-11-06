@@ -198,7 +198,9 @@ test('CI classifies before heavy work and always runs push coverage', () => {
     ['vitest-integration', 'integration'],
   ]) {
     const job = jobs.get(name);
-    assert.ok(job.includes(`run: VITEST_PROJECT_SET=${suite} pnpm test`));
+    assert.ok(
+      job.includes(`run: VITEST_PROJECT_SET=${suite} node scripts/test-temp-run.mjs -- pnpm test`),
+    );
     assert.match(job, /pnpm install --frozen-lockfile/);
   }
   assert.ok(
@@ -522,6 +524,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/ui-drift-gate.mjs'],
         ['node', 'scripts/ui-page-style-gate.mjs'],
         ['python3', 'scripts/pr-evidence-archive.test.py'],
+        ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
         ['pnpm', 'lint'],
         ['pnpm', 'typecheck'],
         ['pnpm', 'spec:parse'],
@@ -537,9 +540,15 @@ test('code changes keep suites in CI and out of local plans', () => {
   }
   const jobs = workflowJobs();
   assert.ok(readFileSync('vitest.config.ts', 'utf8').includes("'apps/web'"));
-  assert.ok(jobs.get('vitest-light').includes('run: VITEST_PROJECT_SET=light pnpm test'));
   assert.ok(
-    jobs.get('vitest-integration').includes('run: VITEST_PROJECT_SET=integration pnpm test'),
+    jobs
+      .get('vitest-light')
+      .includes('run: VITEST_PROJECT_SET=light node scripts/test-temp-run.mjs -- pnpm test'),
+  );
+  assert.ok(
+    jobs
+      .get('vitest-integration')
+      .includes('run: VITEST_PROJECT_SET=integration node scripts/test-temp-run.mjs -- pnpm test'),
   );
   assert.ok(jobs.get('e2e').includes('run: pnpm prepush --e2e-shard'));
 });
@@ -694,6 +703,18 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
   ]) {
     assert.ok(!workflow.includes(`run: ${command}`));
   }
+});
+
+test('the temp-dir ratchet is a required gate and CI vitest runs sit under the supervisor', () => {
+  const ratchet = ['node', 'scripts/test-tmp-ratchet-gate.mjs'].join(' ');
+  for (const mode of ['local', 'ci'])
+    assert.ok(
+      prepushPlan(['apps/web/src/main.tsx'], mode).some((args) => args.join(' ') === ratchet),
+    );
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const vitestRuns = workflow.match(/run: VITEST_PROJECT_SET=\w+ .*pnpm test .*/g) ?? [];
+  assert.equal(vitestRuns.length, 2);
+  for (const run of vitestRuns) assert.match(run, /node scripts\/test-temp-run\.mjs -- pnpm test /);
 });
 
 const prepushEnv = (overrides = {}) => ({ ...scrubGateEnv(), ...overrides });
