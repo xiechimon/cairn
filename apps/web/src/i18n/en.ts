@@ -178,25 +178,17 @@ export const EN: Record<string, string> = {
   还没有完成的工作: 'Nothing finished yet',
   '任务合并完成后会出现在这里。': 'Tasks show up here once they merge.',
   新建项目: 'New project',
-  开始使用: 'Get started',
-  '先接上这三样，Coordinator 才能回答': 'Connect these three so the Coordinator can answer',
-  接入一个模型来源: 'Connect a model source',
-  '添加模型服务商，或在机器上登录 Claude Code，Coordinator 才有模型可用。':
-    'Add a provider, or sign in to Claude Code on a machine, so the Coordinator has a model.',
-  去添加: 'Add',
+  接入模型来源: 'Connect a model source',
+  '添加模型服务商，或在机器上登录 Claude Code':
+    'Add a provider, or sign in to Claude Code on a machine',
   连接一台机器: 'Connect a machine',
-  '机器在线，任务才有地方运行。': 'With a machine online, tasks have somewhere to run.',
-  去连接: 'Connect',
+  运行: 'Run',
+  连接这台机器: 'to connect this machine',
   '设置 Coordinator': 'Set up the Coordinator',
-  '给 Coordinator 选一个 Agent，它才能回答。':
-    'Pick an Agent for the Coordinator so it can answer.',
-  去设置: 'Set up',
-  有可用的模型来源: 'A model source is available',
-  有机器在线: 'A machine is online',
-  'Coordinator 可以回答': 'The Coordinator can answer',
+  '给 Coordinator 选一个 Agent，它才能回答': 'Pick an Agent for the Coordinator so it can answer',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
-  '按首页清单把模型服务、机器和 Coordinator 接上，再发一次。':
-    'Finish the checklist on the home page (provider, machine, Coordinator), then send again.',
+  '点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。':
+    'Use the button below the box to connect a model source, a machine and the Coordinator, then send again.',
 
   '{n} 分': '{n}m',
   '{n} 小时': '{n}h',

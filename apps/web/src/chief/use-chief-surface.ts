@@ -338,7 +338,7 @@ export function useChiefSurface(
             if (isCoordinatorNotReady(error)) {
               toastCoordinatorNotReady(
                 t('Coordinator 还不能回答'),
-                t('按首页清单把模型服务、机器和 Coordinator 接上，再发一次。'),
+                t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
               );
             } else {
               toastError(t('发送失败，请重试。'), error);

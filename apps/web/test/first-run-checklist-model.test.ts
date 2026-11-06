@@ -4,6 +4,7 @@ import {
   modelSourceCount,
   firstRunComplete,
   firstRunSteps,
+  nextOpenStep,
 } from '../src/board/first-run-checklist-model.js';
 
 const done = { modelSources: 1, machinesOnline: 1, coordinatorCanAnswer: true };
@@ -68,4 +69,23 @@ test('nothing configured is zero sources, and still loading is unknown', () => {
   expect(modelSourceCount([], [])).toBe(0);
   expect(modelSourceCount(undefined, [])).toBeUndefined();
   expect(modelSourceCount([], undefined)).toBeUndefined();
+});
+
+test('the next open step follows the fixed order for every missing combination', () => {
+  const next = (modelSources: number, machinesOnline: number, canAnswer: boolean) =>
+    nextOpenStep(firstRunSteps({ modelSources, machinesOnline, coordinatorCanAnswer: canAnswer }));
+  expect(next(0, 0, false)).toBe('model-source');
+  expect(next(0, 1, true)).toBe('model-source');
+  expect(next(1, 0, false)).toBe('machine');
+  expect(next(1, 0, true)).toBe('machine');
+  expect(next(1, 1, false)).toBe('coordinator');
+  expect(next(1, 1, true)).toBeNull();
+});
+
+test('no step is named before the facts have loaded', () => {
+  expect(
+    nextOpenStep(
+      firstRunSteps({ modelSources: undefined, machinesOnline: 1, coordinatorCanAnswer: true }),
+    ),
+  ).toBeNull();
 });

@@ -54,69 +54,101 @@ async function open(page: Page, world: World) {
   await page.goto('/app');
 }
 
-const checklist = (page: Page) => page.getByTestId('first-run-checklist');
-const step = (page: Page, id: string) => page.getByTestId(`first-run-step-${id}`);
+const chip = (page: Page) => page.getByTestId('composer-setup-chip');
+const hint = (page: Page) => page.getByTestId('composer-setup-hint');
 
 const fresh = (): World => ({ providers: [], machines: [], bound: false, teamPaths: [] });
+const ONLINE = { id: 'm1', name: 'omarchy', online: true };
+const LOCAL_LOGIN = {
+  id: 'machine:m1',
+  vendor: 'anthropic',
+  kind: 'subscription',
+  models: ['claude-sonnet-5'],
+  available: true,
+};
 
-test('a fresh install shows the three steps open, each with a link to where it is fixed', async ({
-  page,
-}) => {
+test('a fresh install shows one chip for the first missing step and no card', async ({ page }) => {
   await open(page, fresh());
-  await expect(checklist(page)).toBeVisible();
-  for (const id of ['model-source', 'machine', 'coordinator']) {
-    await expect(step(page, id)).toHaveAttribute('data-done', 'false');
-  }
-  await expect(step(page, 'model-source').getByRole('link', { name: '去添加' })).toHaveAttribute(
-    'href',
-    /\/app\/settings\/providers/,
-  );
-  await expect(step(page, 'machine').getByRole('link', { name: '去连接' })).toHaveAttribute(
-    'href',
-    /\/app\/settings\/machines/,
-  );
-  await expect(step(page, 'coordinator').getByRole('button', { name: '去设置' })).toBeVisible();
+  await expect(chip(page)).toHaveCount(1);
+  await expect(chip(page)).toHaveAttribute('data-step', 'model-source');
+  await expect(chip(page)).toHaveText('接入模型来源');
+  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/providers/);
+  await expect(hint(page)).toContainText('Claude Code');
+  await expect(page.getByTestId('first-run-checklist')).toHaveCount(0);
   await expect(page.getByTestId('chief-gate')).toHaveCount(0);
 });
 
-test('a machine coming online ticks its step without a reload', async ({ page }) => {
+test('with a model source the chip asks for a machine and the hint shows the start command', async ({
+  page,
+}) => {
+  await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }] });
+  await expect(chip(page)).toHaveAttribute('data-step', 'machine');
+  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
+  await expect(hint(page).locator('code')).toHaveText(/ start$/);
+});
+
+test('with a source and a machine the chip opens the Coordinator settings', async ({ page }) => {
+  await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], machines: [ONLINE] });
+  await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
+  await expect(chip(page)).toHaveText('设置 Coordinator');
+  await chip(page).click();
+  await expect(page.getByTestId('chief-composer-input')).toHaveCount(0);
+});
+
+test('a machine going offline only advances the chip when it is the first gap', async ({
+  page,
+}) => {
   const world: World = {
     providers: [{ id: 'p1', name: 'gw' }],
-    machines: [{ id: 'm1', name: 'omarchy', online: false }],
+    machines: [{ ...ONLINE, online: false }],
     bound: false,
     teamPaths: [],
   };
   await open(page, world);
-  await expect(step(page, 'model-source')).toHaveAttribute('data-done', 'true');
-  await expect(step(page, 'machine')).toHaveAttribute('data-done', 'false');
-  world.machines = [{ id: 'm1', name: 'omarchy', online: true }];
+  await expect(chip(page)).toHaveAttribute('data-step', 'machine');
+  world.machines = [ONLINE];
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
-  await expect(step(page, 'machine')).toHaveAttribute('data-done', 'true');
-  await expect(step(page, 'coordinator')).toHaveAttribute('data-done', 'false');
+  await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
 });
 
-test('the checklist is gone once the provider, a machine and the Coordinator are all ready', async ({
+test('the chip and hint are gone once the provider, a machine and the Coordinator are ready', async ({
   page,
 }) => {
   await open(page, {
     providers: [{ id: 'p1', name: 'gw' }],
-    machines: [{ id: 'm1', name: 'omarchy', online: true }],
+    machines: [ONLINE],
     bound: true,
     teamPaths: [],
   });
   await expect(page.getByTestId('home-c')).toBeVisible();
-  await expect(checklist(page)).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
+  await expect(chip(page)).toHaveCount(0);
+  await expect(hint(page)).toHaveCount(0);
 });
 
 test('every status read is scoped to the current team', async ({ page }) => {
   const world = fresh();
   await open(page, world);
-  await expect(checklist(page)).toBeVisible();
+  await expect(chip(page)).toBeVisible();
   expect(world.teamPaths).toEqual(
     expect.arrayContaining(['/api/teams/t1/providers', '/api/teams/t1/machines', '/api/teams/t1/chief']),
   );
+});
+
+test('nothing shows until every status read has loaded', async ({ page }) => {
+  await mockLive(
+    page,
+    { threads: [], messages: [], projects: [PROJECT], todos: [] },
+    (path, route, json) => {
+      if (path === '/api/teams/t1/machines') return new Promise(() => undefined);
+      return undefined;
+    },
+  );
+  await page.goto('/app');
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
+  await expect(chip(page)).toHaveCount(0);
 });
 
 test('sending before the Coordinator is ready shows an actionable translated message, not the raw error', async ({
@@ -127,40 +159,22 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   await page.keyboard.press('Enter');
   const toast = page.locator('[data-sonner-toast]').first();
   await expect(toast).toContainText('Coordinator 还不能回答');
-  await expect(toast).toContainText('首页清单');
+  await expect(toast).toContainText('输入框下方的按钮');
   await expect(page.locator('[data-sonner-toast]')).not.toContainText('chief agent not bound');
 });
-
-const LOCAL_LOGIN = {
-  id: 'machine:m1',
-  vendor: 'anthropic',
-  kind: 'subscription',
-  models: ['claude-sonnet-5'],
-  available: true,
-};
 
 test('a machine-local Claude Code login completes the model step with no provider record', async ({
   page,
 }) => {
-  await open(page, {
-    providers: [],
-    connections: [LOCAL_LOGIN],
-    machines: [{ id: 'm1', name: 'omarchy', online: true }],
-    bound: false,
-    teamPaths: [],
-  });
-  await expect(step(page, 'model-source')).toHaveAttribute('data-done', 'true');
-  await expect(step(page, 'machine')).toHaveAttribute('data-done', 'true');
-  await expect(step(page, 'coordinator')).toHaveAttribute('data-done', 'false');
+  await open(page, { ...fresh(), connections: [LOCAL_LOGIN], machines: [ONLINE] });
+  await expect(chip(page)).toHaveAttribute('data-step', 'coordinator');
 });
 
 test('an unavailable local login does not complete the model step', async ({ page }) => {
   await open(page, {
-    providers: [],
+    ...fresh(),
     connections: [{ ...LOCAL_LOGIN, available: false }],
-    machines: [{ id: 'm1', name: 'omarchy', online: true }],
-    bound: false,
-    teamPaths: [],
+    machines: [ONLINE],
   });
-  await expect(step(page, 'model-source')).toHaveAttribute('data-done', 'false');
+  await expect(chip(page)).toHaveAttribute('data-step', 'model-source');
 });

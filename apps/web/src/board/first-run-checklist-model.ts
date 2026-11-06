@@ -41,6 +41,10 @@ export function firstRunSteps(facts: FirstRunFacts): FirstRunStep[] | null {
   ];
 }
 
+export function nextOpenStep(steps: readonly FirstRunStep[] | null): FirstRunStepId | null {
+  return steps?.find((step) => !step.done)?.id ?? null;
+}
+
 export function firstRunComplete(steps: readonly FirstRunStep[] | null): boolean {
   return steps === null || steps.every((step) => step.done);
 }
