@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +18,7 @@ import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { StepStops } from '../src/step-stops.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const NETWORK_ERROR = 'upstream stream disconnected: connection reset by peer';
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached"}';
@@ -213,7 +212,7 @@ async function runNetworkCase(
   opened: { kind: 'new' | 'continue'; sessionId: string | null }[];
   retryDelays: number[];
 }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-net-'));
+  const home = testTempDir('cairn-runner-net-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

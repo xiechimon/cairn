@@ -1,5 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
@@ -9,6 +8,7 @@ import {
   WorkspaceHookError,
 } from '../src/workspace-hooks.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const CREDS: BoundGitCredentials = {
   username: 'x-access-token',
@@ -17,7 +17,7 @@ const CREDS: BoundGitCredentials = {
 };
 
 function tmpRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-hook-'));
+  return testTempDir('cairn-hook-');
 }
 
 function writeHook(dir: string, name: string, body: string, opts: { exec?: boolean } = {}): string {

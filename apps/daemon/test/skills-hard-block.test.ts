@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
@@ -14,9 +13,10 @@ import {
   createSkillReadGate,
   type DeniedSkillEntry,
 } from '../src/backend/skills.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-hardblock-${tag}-`));
+  return testTempDir(`cairn-hardblock-${tag}-`);
 }
 
 function writeSkill(root: string, dirName: string, name?: string): string {
@@ -39,7 +39,9 @@ describe('collectDeniedSkillDirs (spec 14 §post-ruling scope 2: unauthorized se
     const root = fixtureRoot('chief');
     writeSkill(root, 'alpha');
     writeSkill(root, 'beta');
-    expect(collectDeniedSkillDirs({ skillsDir: root, cwd: tmpdir() }, {})).toEqual([]);
+    expect(
+      collectDeniedSkillDirs({ skillsDir: root, cwd: testTempDir('daemon-cwd-') }, {}),
+    ).toEqual([]);
   });
 
   test('partial authorization = entries outside the list are all in the set by baseDir+name, entries inside are not', () => {
@@ -47,7 +49,7 @@ describe('collectDeniedSkillDirs (spec 14 §post-ruling scope 2: unauthorized se
     const beta = writeSkill(root, 'beta');
     writeSkill(root, 'alpha');
     const denied = collectDeniedSkillDirs(
-      { skillsDir: root, cwd: tmpdir() },
+      { skillsDir: root, cwd: testTempDir('daemon-cwd-') },
       {
         skillsAllowlist: ['alpha'],
       },
@@ -60,7 +62,7 @@ describe('collectDeniedSkillDirs (spec 14 §post-ruling scope 2: unauthorized se
     writeSkill(root, 'alpha');
     writeSkill(root, 'beta');
     const denied = collectDeniedSkillDirs(
-      { skillsDir: root, cwd: tmpdir() },
+      { skillsDir: root, cwd: testTempDir('daemon-cwd-') },
       {
         skillsAllowlist: [],
       },
@@ -74,7 +76,7 @@ describe('collectDeniedSkillDirs (spec 14 §post-ruling scope 2: unauthorized se
     writeSkill(local, 'local-a');
     const teamB = writeSkill(team, 'team-b');
     const denied = collectDeniedSkillDirs(
-      { skillsDir: local, cwd: tmpdir() },
+      { skillsDir: local, cwd: testTempDir('daemon-cwd-') },
       {
         skillsAllowlist: ['local-a'],
         teamSkillsDir: team,
@@ -88,7 +90,7 @@ describe('collectDeniedSkillDirs (spec 14 §post-ruling scope 2: unauthorized se
     writeSkill(root, 'alpha');
     const beta = writeSkill(root, 'beta');
     const denied = collectDeniedSkillDirs(
-      { skillsDir: root, cwd: tmpdir() },
+      { skillsDir: root, cwd: testTempDir('daemon-cwd-') },
       {
         skillsAllowlist: ['alpha', 'ghost-slug'],
       },
@@ -98,7 +100,7 @@ describe('collectDeniedSkillDirs (spec 14 §post-ruling scope 2: unauthorized se
 
   test('scan failure (directory missing) = fail-open empty set, does not block the session (same rule as catalog)', () => {
     const denied = collectDeniedSkillDirs(
-      { skillsDir: join(fixtureRoot('gone'), 'no-such'), cwd: tmpdir() },
+      { skillsDir: join(fixtureRoot('gone'), 'no-such'), cwd: testTempDir('daemon-cwd-') },
       { skillsAllowlist: ['alpha'] },
     );
     expect(denied).toEqual([]);
@@ -401,7 +403,7 @@ describe('[skills] catalog observation line (#917 reading 5: catalog entry count
     const logsFull: string[] = [];
     const catalog = buildSkillsCatalog({
       skillsDir: root,
-      cwd: tmpdir(),
+      cwd: testTempDir('daemon-cwd-'),
       log: (m) => logsFull.push(m),
     });
     expect(logsFull).toContain(
@@ -411,7 +413,7 @@ describe('[skills] catalog observation line (#917 reading 5: catalog entry count
     const logsZero: string[] = [];
     buildSkillsCatalog({
       skillsDir: root,
-      cwd: tmpdir(),
+      cwd: testTempDir('daemon-cwd-'),
       allowlist: [],
       log: (m) => logsZero.push(m),
     });
