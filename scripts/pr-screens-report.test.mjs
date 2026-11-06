@@ -6,7 +6,9 @@ import {
   classify,
   collectDiffImages,
   commonPages,
+  countRules,
   diffAxe,
+  diffRules,
   failedCompareFiles,
   render,
   totals,
@@ -118,7 +120,7 @@ test('the report names counts, changed pages, axe additions and job time', () =>
   );
   assert.match(text, /\| a-dark \| changed \|/);
   assert.match(text, /head 1 critical/);
-  assert.match(text, /\| a-dark \| label \| critical \| 1 \| `\.x` \|/);
+  assert.match(text, /\| a-dark \| A3: label \| critical \| 1 \| `\.x` \|/);
 });
 
 test('changed pages render inline as images from the asset base, capped, with the selection line', () => {
@@ -182,4 +184,69 @@ test('the report says so when the two sides were installed from different lockfi
     /Dependencies differ: each side was installed from its own pnpm-lock\.yaml/,
   );
   assert.doesNotMatch(render({ ...input, lockfilesDiffer: false }), /Dependencies differ/);
+});
+
+const rule = (id, key, text = key) => ({ id, key: `${id}|${key}`, message: `${id}: ${text}` });
+
+test('look-and-feel findings are new only when the id and key are new on a page rendered on both sides', () => {
+  const base = new Map([
+    ['p-dark', [rule('C3', 'msg1', 'gap 42px'), rule('V8', 'a:5')]],
+    ['only-base-dark', [rule('C1', 'x')]],
+  ]);
+  const head = new Map([
+    [
+      'p-dark',
+      [
+        rule('C3', 'msg1', 'gap 44px'),
+        rule('V8', 'a:5'),
+        rule('V8', 'b:6', 'padding 6px'),
+        rule('A1', 'btn'),
+      ],
+    ],
+    ['only-head-dark', [rule('C1', 'y')]],
+  ]);
+  const common = commonPages(base, head);
+  const { added, fixed } = diffRules(base, head);
+  assert.deepEqual(
+    added.map((f) => f.message),
+    ['V8: padding 6px', 'A1: btn'],
+  );
+  assert.deepEqual(fixed, []);
+  assert.deepEqual(countRules(base, common), { C3: 1, V8: 1 });
+  assert.deepEqual(countRules(head, common), { C3: 1, V8: 2, A1: 1 });
+});
+
+test('the report lists look-and-feel counts by rule id and the new findings with the page', () => {
+  const text = render({
+    classes: { changed: [], added: [], removed: [], unchanged: 2 },
+    axeDiff: { added: [], fixed: [] },
+    baseTotals: totals(new Map()),
+    headTotals: totals(new Map()),
+    headErrors: [],
+    baseErrors: [],
+    rulesDiff: {
+      added: [{ page: 'p-dark', ...rule('C3', 'msg1', 'gap 42px outside 16-24px') }],
+      fixed: [],
+    },
+    baseRules: { C3: 0 },
+    headRules: { C3: 1 },
+  });
+  assert.match(text, /Look and feel \(non-blocking\)/);
+  assert.match(text, /\| C3 \| 0 \| 1 \|/);
+  assert.match(text, /\| p-dark \| C3: gap 42px outside 16-24px \|/);
+});
+
+test('axe rows carry the A3 rule id', () => {
+  const text = render({
+    classes: { changed: [], added: [], removed: [], unchanged: 1 },
+    axeDiff: {
+      added: [{ page: 'p-dark', rule: 'label', impact: 'critical', nodes: 1, target: '.x' }],
+      fixed: [],
+    },
+    baseTotals: totals(new Map()),
+    headTotals: totals(new Map()),
+    headErrors: [],
+    baseErrors: [],
+  });
+  assert.match(text, /\| p-dark \| A3: label \|/);
 });
