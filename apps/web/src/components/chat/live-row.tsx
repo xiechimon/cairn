@@ -1,17 +1,19 @@
 import { type ReactNode, useEffect, useState } from 'react';
+import { useConnected } from '../../api/connection-state.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TVars } from '../../i18n/translate.js';
 import { Button } from '../ui/button.js';
 import { TraceTriangle } from './trace-parts.js';
 
 export function useLiveSeconds(startedAt: number | null | undefined): number | null {
+  const connected = useConnected();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (startedAt == null) return;
+    if (startedAt == null || !connected) return;
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [startedAt]);
+  }, [startedAt, connected]);
   if (startedAt == null) return null;
   return Math.max(1, Math.round((now - startedAt) / 1000));
 }

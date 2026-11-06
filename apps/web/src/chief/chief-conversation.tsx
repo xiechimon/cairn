@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useConnected } from '../api/connection-state.js';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
@@ -65,7 +66,11 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
-import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
+import {
+  ChiefConnectionBanner,
+  ChiefFallbackBanner,
+  ChiefOutageBanner,
+} from './chief-outage-banner.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
@@ -429,6 +434,7 @@ export function ChiefConversation({
     chief.running === true
       ? chief.stream?.findLast((item) => item.kind === 'streaming')
       : undefined;
+  const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
   const turnElapsed =
     turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
@@ -695,7 +701,9 @@ export function ChiefConversation({
         </>
       )}
 
-      {chief.outage != null ? (
+      {!connected ? (
+        <ChiefConnectionBanner />
+      ) : chief.outage != null ? (
         <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
       ) : (
         chief.fallbackModel != null && (
