@@ -5,6 +5,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChiefQuestionCard, type QuestionPager, recommendedFirst } from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import { clampQuestionIndex } from './question-dock-index.js';
+import { questionDockState } from './question-dock-state.js';
 import {
   emptyQuestionDrafts,
   questionDraftComplete,
@@ -88,12 +89,24 @@ function DockQuestion({
   );
 }
 
+function useShownQuestions(): OriginChiefQuestion[] {
+  const root = useOptionalChiefRoot();
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  return (root?.pendingQuestions ?? []).filter(
+    (request) => !questionDockState.isDismissing(request.item.requestId),
+  );
+}
+
+export function useQuestionDockVisible(): boolean {
+  return useShownQuestions().length > 0;
+}
+
 export function ChiefQuestionDock({ home }: { home: boolean }) {
   const { t } = useI18n();
-  const root = useOptionalChiefRoot();
+  const _root = useOptionalChiefRoot();
   const [searchParams] = useSearchParams();
   const numberKeys = searchParams.get(THREAD_PARAM) === null;
-  const pending = root?.pendingQuestions ?? [];
+  const pending = useShownQuestions();
   const [index, setIndex] = useState(0);
   useSyncExternalStore(
     questionDraftStore.subscribe,

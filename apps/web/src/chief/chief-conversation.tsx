@@ -66,7 +66,7 @@ import { useServerDraft } from '../overlay/use-server-draft.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import { ChiefFallbackBanner, ChiefOutageBanner } from './chief-outage-banner.js';
-import { ChiefQuestionDock } from './chief-question-dock.js';
+import { ChiefQuestionDock, useQuestionDockVisible } from './chief-question-dock.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
@@ -91,7 +91,10 @@ const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
 const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5 pb-4';
 const HOME_COMPOSER_CLS =
-  'mx-auto mt-2 mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
+  'mx-auto mb-[max(var(--composer-bottom-gap),env(safe-area-inset-bottom))] w-[calc(100%-2rem)] max-w-182 flex-none';
+
+const ATTACHED_COMPOSER_CLS = 'mt-0 rounded-(--radius-composer) rounded-t-none';
+const FREE_COMPOSER_CLS = 'rounded-(--radius-composer)';
 
 const EXAMPLE_ICONS = {
   'user-plus': ChiefUserPlus,
@@ -194,6 +197,7 @@ export function ChiefConversation({
   composerTools,
   targetPlaceholder = null,
 }: ChiefConversationProps) {
+  const questionAttached = useQuestionDockVisible();
   const projectMark = useProjectMark();
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -722,7 +726,7 @@ export function ChiefConversation({
             )}
             <div
               data-invalid={composerError != null ? '' : undefined}
-              className={`chief-composer ${home ? HOME_COMPOSER_CLS : 'mx-4 my-2.5 shrink-0'} data-invalid:ring-1 data-invalid:ring-destructive rounded-(--radius-composer) border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
+              className={`chief-composer ${questionAttached ? ATTACHED_COMPOSER_CLS : `${FREE_COMPOSER_CLS} ${home ? 'mt-2' : 'mt-2.5'}`} ${home ? HOME_COMPOSER_CLS : 'mx-4 mb-2.5 shrink-0'} data-invalid:ring-1 data-invalid:ring-destructive border-0 bg-card px-3.5 pt-3 pb-2.5 shadow-(--shadow-composer) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)`}
               style={home ? { viewTransitionName: 'chief-composer' } : undefined}
             >
               <QueuedCapsules

@@ -294,7 +294,10 @@ for (const size of [
     expect(dockBox!.height).toBeLessThanOrEqual(frame!.height * 0.65 + 1);
     const scrolls = await dock
       .getByTestId('chief-question-option-0-5')
-      .evaluate((node) => node.parentElement!.scrollHeight > node.parentElement!.clientHeight);
+      .evaluate((node) => {
+        const scroller = node.parentElement!.parentElement!;
+        return scroller.scrollHeight > scroller.clientHeight;
+      });
     expect(scrolls).toBe(true);
     await dock.getByTestId('chief-question-option-0-5').scrollIntoViewIfNeeded();
     await expect(dock.getByRole('button', { name: '提交回答' })).toBeVisible();
@@ -440,8 +443,125 @@ for (const locale of ['zh', 'en'] as const) {
       });
       expect(defects).toEqual([]);
       const dock = drawer.getByTestId('chief-question-dock');
-      await expect(dock.getByRole('button', { name: locale === 'zh' ? '取消提问' : 'Dismiss question' })).toBeInViewport({ ratio: 1 });
+      await expect(dock.getByTestId('chief-question-dismiss')).toBeInViewport({ ratio: 1 });
       await expect(dock.getByRole('button', { name: locale === 'zh' ? '提交回答' : 'Submit answers' })).toBeInViewport({ ratio: 1 });
     });
   }
+}
+
+for (const size of [
+  { name: '1440 home', url: '/app', width: 1440, height: 900 },
+  { name: '380px drawer', url: '/app/schedules?chief=chief-home', width: 1440, height: 900 },
+  { name: '375px phone', url: '/app', width: 375, height: 667 },
+]) {
+  test(`the card is as wide as the composer and fused to its top (${size.name})`, async ({ page }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await mockLive(page, structuredClone(TWO));
+    await page.goto(size.url);
+    const scope = size.name === '380px drawer' ? page.locator('.chief-drawer') : page;
+    const card = scope.getByTestId('chief-question-card');
+    const composer = scope.locator('.chief-composer');
+    await expect(card).toBeVisible();
+    await expect
+      .poll(async () => {
+        const cardBox = (await card.boundingBox())!;
+        const composerBox = (await composer.boundingBox())!;
+        return [
+          Math.round(cardBox.x - composerBox.x),
+          Math.round(cardBox.width - composerBox.width),
+          Math.round(cardBox.y + cardBox.height - composerBox.y),
+        ];
+      })
+      .toEqual([0, 0, 0]);
+  });
+}
+
+test('the card collapses to a one-line bar, stays collapsed per question, and expands again', async ({
+  page,
+}) => {
+  await mockLive(page, structuredClone(MIXED));
+  await page.goto('/app');
+  const card = page.getByTestId('chief-question-card');
+  await expect(card.getByTestId('chief-question-text')).toBeVisible();
+  const open = (await card.boundingBox())!;
+  await card.getByTestId('chief-question-collapse').click();
+  await expect(card).toHaveAttribute('data-collapsed', '');
+  await expect(card.getByTestId('chief-question-text')).toHaveCount(0);
+  await expect(card.getByTestId('chief-question-position')).toHaveText('1 / 3');
+  expect((await card.boundingBox())!.height).toBeLessThan(open.height / 3);
+  await page.reload();
+  await expect(page.getByTestId('chief-question-card')).toHaveAttribute('data-collapsed', '');
+});
+
+test('collapsed state survives stepping and re-expands from the chevron', async ({ page }) => {
+  await mockLive(page, structuredClone(MIXED));
+  await page.goto('/app');
+  const card = page.getByTestId('chief-question-card');
+  await card.getByRole('button', { name: '收起提问' }).last().click();
+  await expect(card).toHaveAttribute('data-collapsed', '');
+  await card.getByRole('button', { name: '展开提问' }).last().click();
+  await expect(card).not.toHaveAttribute('data-collapsed', '');
+  await expect(card.getByTestId('chief-question-text')).toBeVisible();
+});
+
+test('dismissing shows a five-second undo; undo keeps the question, waiting cancels it', async ({
+  page,
+}) => {
+  const cancelled: string[] = [];
+  await mockLive(page, structuredClone(ONE), (path, route, json) => {
+    if (!path.endsWith('/cancel') || route.request().method() !== 'POST') return undefined;
+    cancelled.push(path);
+    return json({});
+  });
+  await page.goto('/app');
+  const card = page.getByTestId('chief-question-card');
+  await page.getByTestId('chief-question-dismiss').click();
+  await expect(card).toHaveCount(0);
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: '已取消提问' });
+  await expect(toast).toBeVisible();
+  await toast.getByRole('button', { name: '撤销' }).click();
+  await expect(card).toBeVisible();
+  expect(cancelled).toEqual([]);
+  await page.getByTestId('chief-question-dismiss').click();
+  await expect(card).toHaveCount(0);
+  await expect.poll(() => cancelled.length, { timeout: 8000 }).toBe(1);
+});
+
+const VERY_LONG = {
+  threads: [THREAD],
+  messages: [
+    { id: 'request', role: 'user', content: 'Ship the relay fix', createdAt: 10 },
+    question(
+      'ask-0000000a',
+      'A header that keeps going and going '.repeat(8),
+      'A prompt that explains far too much before it asks anything at all. '.repeat(30),
+      [{ label: 'Yes' }, { label: 'No' }],
+    ),
+  ],
+  todos: [],
+};
+
+for (const size of [
+  { name: 'drawer', url: '/app/schedules?chief=chief-home', width: 1440, height: 900 },
+  { name: '375px phone', url: '/app/schedules?chief=chief-home', width: 375, height: 667 },
+]) {
+  test(`a very long header and prompt scroll inside the card and keep dismiss and submit clickable (${size.name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await mockLive(page, structuredClone(VERY_LONG));
+    await page.goto(size.url);
+    const drawer = page.locator('.chief-drawer');
+    const card = drawer.getByTestId('chief-question-card');
+    await expect(card).toBeVisible();
+    await expect.poll(async () => (await card.boundingBox())!.height).toBeLessThanOrEqual(size.height * 0.4 + 1);
+    await drawer.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
+    await drawer.getByTestId('chief-question-option-0-0').click();
+    const dismiss = card.getByTestId('chief-question-dismiss');
+    const submit = card.getByRole('button', { name: '提交回答' });
+    await expect(dismiss).toBeInViewport({ ratio: 1 });
+    await expect(submit).toBeInViewport({ ratio: 1 });
+    await dismiss.click({ trial: true });
+    await submit.click({ trial: true });
+  });
 }

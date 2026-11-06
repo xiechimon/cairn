@@ -2,11 +2,14 @@ import type { AskUserAnswer } from '@cairn/shared';
 import {
   Ban,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CircleCheck,
   CircleHelp,
   type LucideIcon,
+  X,
 } from 'lucide-react';
 import {
   type ReactNode,
@@ -21,10 +24,11 @@ import { STATUS_WORDS } from '../board/status-words.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
-import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { questionDockState } from './question-dock-state.js';
 import {
   applyQuestionPick,
   emptyQuestionDrafts,
@@ -60,10 +64,10 @@ const NUM_CLS =
   'grid size-5 shrink-0 place-items-center rounded-(--cds-radius-sm) border text-caption leading-none font-semibold';
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
-const PENDING_CARD_CLS =
-  '@container flex min-h-0 flex-col overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)';
+const ATTACHED_CARD_CLS =
+  '@container flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
 const OPTION_ROW_CLS =
-  'h-auto w-full items-start justify-start gap-4 whitespace-normal rounded-none px-4 py-4 text-left font-normal';
+  'h-auto w-full items-start justify-start gap-2.5 whitespace-normal rounded-md px-2 py-1.5 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
 const OPT_TXT_CLS = 'min-w-0 flex-1';
 const ROW_STATIC_CLS =
@@ -187,9 +191,22 @@ export function ChiefQuestionCard({
   const question = questions[step] ?? questions[0];
   const draft = drafts[step];
   const cardRef = useRef<HTMLDivElement | null>(null);
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const collapsed = questionDockState.isCollapsed(item.requestId);
+  useEffect(() => {
+    if (item.status !== 'pending') questionDockState.forgetCollapsed(item.requestId);
+  }, [item.status, item.requestId]);
+  const toggleCollapsed = () => questionDockState.toggleCollapsed(item.requestId);
 
   useLayoutEffect(() => {
-    if (!pending || !numberKeys || question === undefined || question.options.length === 0) return;
+    if (
+      !pending ||
+      collapsed ||
+      !numberKeys ||
+      question === undefined ||
+      question.options.length === 0
+    )
+      return;
     const max = question.options.length + 1;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -203,7 +220,7 @@ export function ChiefQuestionCard({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [pending, numberKeys, step, question]);
+  }, [pending, collapsed, numberKeys, step, question]);
 
   const stepComplete = useMemo(() => questionDraftComplete(draft, question), [draft, question]);
   const allComplete = useMemo(
@@ -311,26 +328,38 @@ export function ChiefQuestionCard({
       ref={cardRef}
       data-testid="chief-question-card"
       data-status={item.status}
-      className={PENDING_CARD_CLS}
+      data-collapsed={collapsed ? '' : undefined}
+      className={ATTACHED_CARD_CLS}
     >
-      <div className="flex flex-none items-start gap-4 bg-(--hover-1) px-4 py-3">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-caption text-content-tertiary">{question.header}</span>
-          <div data-testid="chief-question-text" className="text-ui text-foreground">
-            {question.question}
-          </div>
-        </div>
+      <div className="flex flex-none items-center gap-1 px-3.5 pt-2 pb-1">
+        <QuestionStatus status={item.status} />
+        <button
+          type="button"
+          data-testid="chief-question-collapse"
+          aria-expanded={!collapsed}
+          title={collapsed ? t('展开提问') : t('收起提问')}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left text-caption text-content-tertiary outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          onClick={toggleCollapsed}
+        >
+          <span className="max-w-1/2 truncate">{question.header}</span>
+          {collapsed && (
+            <>
+              <span aria-hidden className="h-3 w-px flex-none bg-border" />
+              <span className="min-w-0 flex-1 truncate text-foreground">{question.question}</span>
+            </>
+          )}
+        </button>
         {shownPager !== undefined && (
-          <div className="flex flex-none items-center gap-1">
+          <div className="flex flex-none items-center">
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs"
               data-testid="chief-question-prev"
               aria-label={t('上一步')}
               disabled={!pending || !shownPager.canPrev}
               onClick={shownPager.onPrev}
             >
-              <ChevronLeft aria-hidden className="size-4" />
+              <ChevronLeft aria-hidden className="size-3.5" />
             </Button>
             <span
               data-testid="chief-question-position"
@@ -340,135 +369,174 @@ export function ChiefQuestionCard({
             </span>
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs"
               data-testid="chief-question-next"
               aria-label={t('下一步')}
               disabled={!pending || !shownPager.canNext}
               onClick={shownPager.onNext}
             >
-              <ChevronRight aria-hidden className="size-4" />
+              <ChevronRight aria-hidden className="size-3.5" />
             </Button>
           </div>
         )}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={collapsed ? t('展开提问') : t('收起提问')}
+          onClick={toggleCollapsed}
+        >
+          {collapsed ? (
+            <ChevronUp aria-hidden className="size-3.5" />
+          ) : (
+            <ChevronDown aria-hidden className="size-3.5" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          data-testid="chief-question-dismiss"
+          aria-label={t('取消提问')}
+          title={t('取消提问')}
+          disabled={!pending || onCancel === undefined}
+          onClick={() =>
+            questionDockState.dismissWithUndo(
+              item.requestId,
+              { title: t('已取消提问'), undo: t('撤销') },
+              () => onCancel?.(item.requestId),
+            )
+          }
+        >
+          <X aria-hidden className="size-3.5" />
+        </Button>
       </div>
-      {question.options.length === 0 ? (
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <Input
-            data-testid={`chief-question-input-${step}`}
-            className={FORM_CONTROL_CLS}
-            placeholder={t('输入你的回答')}
-            value={draft?.kind === 'text' ? draft.value : ''}
-            disabled={!pending}
-            onChange={(e) => {
-              const value = e.target.value;
-              setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
-            }}
-          />
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col divide-y divide-border overflow-y-auto">
-          {question.options.map((option, oi) => {
-            const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
-            return (
-              <Button
-                key={oi}
-                variant="ghost"
-                data-testid={`chief-question-option-${step}-${oi}`}
-                disabled={!pending}
-                aria-pressed={selected}
-                className={OPTION_ROW_CLS}
-                onClick={() => pick(oi)}
-              >
-                <ChoiceMark multi={multi} selected={selected} />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-ui text-foreground">
-                    {option.label}
-                    {option.recommended === true && (
-                      <>
-                        {' '}
-                        <RecommendedMark />
-                      </>
-                    )}
-                  </span>
-                  {option.description !== undefined && (
-                    <span className="text-ui text-content-tertiary">{option.description}</span>
-                  )}
-                </span>
-                {oi < 9 && (
-                  <span className="flex-none text-caption tabular-nums text-content-tertiary">
-                    {oi + 1}
-                  </span>
-                )}
-              </Button>
-            );
-          })}
-          <div className="flex flex-col">
-            <Button
-              variant="ghost"
-              data-testid={`chief-question-other-${step}`}
-              disabled={!pending}
-              aria-pressed={otherSelected}
-              className={OPTION_ROW_CLS}
-              onClick={() => pick(question.options.length)}
+      {!collapsed && (
+        <>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div
+              data-testid="chief-question-text"
+              className="flex-none px-3.5 pb-1.5 text-ui break-words text-foreground"
             >
-              <ChoiceMark multi={multi} selected={otherSelected} />
-              <span className="min-w-0 flex-1 text-ui text-foreground">
-                {t('用我自己的话回答')}
-              </span>
-              {question.options.length < 9 && (
-                <span className="flex-none text-caption tabular-nums text-content-tertiary">
-                  {question.options.length + 1}
-                </span>
-              )}
-            </Button>
-            {otherSelected && (
-              <div className="px-4 pb-4 pl-13">
+              {question.question}
+            </div>
+            {question.options.length === 0 ? (
+              <div className="flex-none px-3.5 pb-2">
                 <Input
                   data-testid={`chief-question-input-${step}`}
                   className={FORM_CONTROL_CLS}
                   placeholder={t('输入你的回答')}
-                  value={draft?.kind === 'choices' ? draft.otherText : ''}
+                  value={draft?.kind === 'text' ? draft.value : ''}
                   disabled={!pending}
                   onChange={(e) => {
                     const value = e.target.value;
-                    setDrafts((prev) => {
-                      const current = prev[step];
-                      if (current?.kind !== 'choices') return prev;
-                      return replaceQuestionDraft(prev, step, { ...current, otherText: value });
-                    });
+                    setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
                   }}
                 />
               </div>
+            ) : (
+              <div className="flex flex-none flex-col px-1.5">
+                {question.options.map((option, oi) => {
+                  const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
+                  return (
+                    <Button
+                      key={oi}
+                      variant="ghost"
+                      data-testid={`chief-question-option-${step}-${oi}`}
+                      disabled={!pending}
+                      aria-pressed={selected}
+                      className={OPTION_ROW_CLS}
+                      onClick={() => pick(oi)}
+                    >
+                      <ChoiceMark multi={multi} selected={selected} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-ui text-foreground">
+                          {option.label}
+                          {option.recommended === true && (
+                            <>
+                              {' '}
+                              <RecommendedMark />
+                            </>
+                          )}
+                        </span>
+                        {option.description !== undefined && (
+                          <span className="text-caption text-content-tertiary">
+                            {option.description}
+                          </span>
+                        )}
+                      </span>
+                      {oi < 9 && <Keycap>{oi + 1}</Keycap>}
+                    </Button>
+                  );
+                })}
+                <div className="flex flex-col">
+                  <Button
+                    variant="ghost"
+                    data-testid={`chief-question-other-${step}`}
+                    disabled={!pending}
+                    aria-pressed={otherSelected}
+                    className={OPTION_ROW_CLS}
+                    onClick={() => pick(question.options.length)}
+                  >
+                    <ChoiceMark multi={multi} selected={otherSelected} />
+                    <span className="min-w-0 flex-1 text-ui text-foreground">
+                      {t('用我自己的话回答')}
+                    </span>
+                    {question.options.length < 9 && <Keycap>{question.options.length + 1}</Keycap>}
+                  </Button>
+                  {otherSelected && (
+                    <div className="pt-1 pr-2 pb-1.5 pl-8.5">
+                      <Input
+                        data-testid={`chief-question-input-${step}`}
+                        className={FORM_CONTROL_CLS}
+                        placeholder={t('输入你的回答')}
+                        value={draft?.kind === 'choices' ? draft.otherText : ''}
+                        disabled={!pending}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setDrafts((prev) => {
+                            const current = prev[step];
+                            if (current?.kind !== 'choices') return prev;
+                            return replaceQuestionDraft(prev, step, {
+                              ...current,
+                              otherText: value,
+                            });
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-        </div>
+          <div className="flex flex-none flex-wrap items-center gap-2 px-3.5 py-1.5">
+            {hintText !== '' && (
+              <span data-testid="chief-question-hint" className={HINT_CLS}>
+                {hintText}
+              </span>
+            )}
+            <Button
+              className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
+              disabled={!primaryEnabled}
+              onClick={advance}
+            >
+              {last ? t('提交回答') : t('下一步')}
+              <ShortcutHint
+                keys={['mod', 'enter']}
+                className="@max-md:hidden pointer-coarse:hidden ml-1"
+              />
+            </Button>
+          </div>
+        </>
       )}
-      <div className="flex flex-none flex-wrap items-center gap-2 px-4 py-3">
-        <QuestionStatus status={item.status} />
-        {hintText !== '' && (
-          <span data-testid="chief-question-hint" className={HINT_CLS}>
-            {hintText}
-          </span>
-        )}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <Button
-            variant="ghost"
-            className={DIALOG_TEXT_BUTTON}
-            disabled={!pending || onCancel === undefined}
-            onClick={() => onCancel?.(item.requestId)}
-          >
-            {t('取消提问')}
-          </Button>
-          <Button className={DIALOG_PRIMARY_BUTTON} disabled={!primaryEnabled} onClick={advance}>
-            {last ? t('提交回答') : t('下一步')}
-            <ShortcutHint
-              keys={['mod', 'enter']}
-              className="@max-md:hidden pointer-coarse:hidden ml-1"
-            />
-          </Button>
-        </div>
-      </div>
     </div>
+  );
+}
+
+function Keycap({ children }: { children: ReactNode }) {
+  return (
+    <span className="grid h-5 min-w-5 flex-none place-items-center rounded-(--cds-radius-sm) bg-(--hover-1) px-1 text-caption tabular-nums text-content-tertiary">
+      {children}
+    </span>
   );
 }
 
@@ -477,15 +545,15 @@ function ChoiceMark({ multi, selected }: { multi: boolean; selected: boolean }) 
   return (
     <span
       aria-hidden
-      className={`mt-0.5 grid size-5 flex-none place-items-center border ${shape} ${
+      className={`mt-0.5 grid size-4 flex-none place-items-center border ${shape} ${
         selected ? 'border-transparent bg-primary text-primary-foreground' : 'border-input'
       }`}
     >
       {selected &&
         (multi ? (
-          <Check strokeWidth={2.5} className="size-3" />
+          <Check strokeWidth={2.5} className="size-2.5" />
         ) : (
-          <span className="size-2 rounded-full bg-primary-foreground" />
+          <span className="size-1.5 rounded-full bg-primary-foreground" />
         ))}
     </span>
   );
