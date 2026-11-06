@@ -11,14 +11,14 @@ async function press(page: Page, control: Locator) {
   if (box === null) throw new Error('control has no box');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.waitForTimeout(250);
-  const resting = await control.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const resting = await control.evaluate((el) => getComputedStyle(el).boxShadow);
   await page.mouse.down();
   const pressed = await control.evaluate((el) => {
     const style = getComputedStyle(el);
     return {
       transform: style.transform,
       translate: style.translate,
-      background: style.backgroundColor,
+      shadow: style.boxShadow,
       duration: style.transitionDuration,
     };
   });
@@ -58,14 +58,15 @@ for (const surface of SURFACES) {
   });
 }
 
-test('a pressed ghost button deepens its background at once, with no transition', async ({
+test('a pressed ghost button lays a tint over its own background at once, with no transition', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/app?scenario=home-c');
   const control = page.getByTestId('home-c-pane-buttons').getByRole('button', { name: '任务' });
   const { resting, pressed } = await press(page, control);
-  expect(pressed.background).not.toBe(resting);
+  expect(pressed.shadow).not.toBe(resting);
+  expect(pressed.shadow).toContain('inset');
   expect(pressed.duration).toBe('0s');
   expect(pressed.transform).toBe('none');
 });

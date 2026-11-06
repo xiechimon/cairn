@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "fa76a07f6e82740a788d4cf1d2e173ab273b9eed",
+    "sha": "1a9d869fd129263ba729c816adb2d9c9b86c0dfc",
     "date": "2026-11-06"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -46,7 +46,7 @@
       "upstreamItem": "button",
       "status": "deviated",
       "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries.",
-      "hash": "eb78208b098b37104a9d23df106ff0e2d26e6ecdb61d29175bd01025079115b7"
+      "hash": "e7a480b92aa514297f53d119a578a6501b4d6f78b97205a8b2d1a1a1a02c2dae"
     },
     "card.tsx": {
       "kind": "registry",
