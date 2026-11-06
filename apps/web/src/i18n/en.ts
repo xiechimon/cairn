@@ -1838,8 +1838,12 @@ export const EN: Record<string, string> = {
     'The first PR merged on day one. You can post about it in GitHub Discussions',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
-  '{count} 处 Claude 登录需要处理': '{count} Claude logins need attention',
-  '都已过期。': 'All have expired.',
-  '{expired} 处已过期，其余快到期。': '{expired} expired, the rest expire soon.',
   查看: 'View',
+  '{count} 处 Claude 登录已过期': '{count} Claude logins have expired',
+  '{count} 处 Claude 登录即将过期': '{count} Claude logins are about to expire',
+  '{expired} 处已过期，{expiring} 处即将过期': '{expired} expired, {expiring} about to expire',
+  '到期前重新登录，任务才不会中断。':
+    'Sign in again before they expire so tasks are not interrupted.',
+  '重新登录前，这些机器和订阅不会接新任务。':
+    'Until you sign in again, these machines and subscriptions take no new tasks.',
 };

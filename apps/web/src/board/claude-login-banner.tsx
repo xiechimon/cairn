@@ -75,20 +75,25 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
     );
   }
   const expired = warnings.filter((warning) => warning.kind === 'expired').length;
+  const expiring = warnings.length - expired;
+  const title =
+    expiring === 0
+      ? t('{count} 处 Claude 登录已过期', { count: expired })
+      : expired === 0
+        ? t('{count} 处 Claude 登录即将过期', { count: expiring })
+        : t('{expired} 处已过期，{expiring} 处即将过期', { expired, expiring });
+  const body =
+    expired === 0
+      ? t('到期前重新登录，任务才不会中断。')
+      : t('重新登录前，这些机器和订阅不会接新任务。');
   return (
     <NoticeBanner
       data-testid="claude-login-banner"
       tone="warning"
       icon={KeyRound}
       className="mt-4"
-      title={t('{count} 处 Claude 登录需要处理', { count: warnings.length })}
-      body={
-        <span data-testid="claude-login-summary">
-          {expired === warnings.length
-            ? t('都已过期。')
-            : t('{expired} 处已过期，其余快到期。', { expired })}
-        </span>
-      }
+      title={title}
+      body={<span data-testid="claude-login-summary">{body}</span>}
       actions={
         <Button variant="outline" size="sm" className="px-3" render={<Link to={MACHINES_HREF} />}>
           {t('查看')}

@@ -57,8 +57,8 @@ test('home warns for expiring and expired Claude Code logins above Needs you', a
   const home = page.getByTestId('home-c');
   const banner = home.getByTestId('claude-login-banner');
   await expect(banner).toBeVisible();
-  await expect(banner.getByTestId('claude-login-summary')).toHaveText('1 处已过期，其余快到期。');
-  await expect(banner).toContainText('2 处 Claude 登录需要处理');
+  await expect(banner.getByTestId('claude-login-summary')).toHaveText('重新登录前，这些机器和订阅不会接新任务。');
+  await expect(banner).toContainText('1 处已过期，1 处即将过期');
   await expect(banner.getByRole('link', { name: '查看' })).toHaveAttribute(
     'href',
     '/app/resources/machines',
