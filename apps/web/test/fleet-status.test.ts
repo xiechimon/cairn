@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fleetStatus, fleetStatusLine, machineStateLabel } from '../src/board/fleet-status.js';
+import { fleetStatus, fleetStatusLine, fleetSummary, machineStateLabel } from '../src/board/fleet-status.js';
 import type { MachineRow } from '../src/fixtures/records.js';
 import type { TFunc, TVars } from '../src/i18n/translate.js';
 
@@ -51,6 +51,28 @@ describe('fleetStatusLine', () => {
 
   it('is empty when nothing is offline', () => {
     expect(fleetStatusLine({ online: 3, offline: 0, offlineNames: [] }, t)).toBeNull();
+  });
+});
+
+describe('fleetSummary', () => {
+  it('is a short count line with the offline names as the tooltip', () => {
+    expect(fleetSummary({ online: 2, offline: 1, offlineNames: ['xmonsMac'] }, t)).toEqual({
+      label: '2 在线 · 1 离线',
+      title: '2 台在线 · 1 台离线（xmonsMac）',
+      tone: 'offline',
+    });
+  });
+
+  it('is neutral and nameless when every machine is online', () => {
+    expect(fleetSummary({ online: 3, offline: 0, offlineNames: [] }, t)).toEqual({
+      label: '3 在线',
+      title: '3 在线',
+      tone: 'online',
+    });
+  });
+
+  it('is absent without machines', () => {
+    expect(fleetSummary({ online: 0, offline: 0, offlineNames: [] }, t)).toBeNull();
   });
 });
 

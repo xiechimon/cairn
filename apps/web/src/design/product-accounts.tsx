@@ -171,15 +171,14 @@ export function AccountsSection() {
         title="Account row"
         note="ok, cooling, expired; the number matches the bar segment; ⋯ opens Rename R, Verify V, Remove D"
         stage="sheet"
-        code={`<AccountRow account={account} index={0} now={now} actions={{ onRename, onVerify, onRemove }} />`}
+        code={`<AccountRow account={account} now={now} actions={{ onRename, onVerify, onRemove }} />`}
       >
         <div className="w-full">
           <SettingsCard>
-            {claude.map((account, index) => (
+            {claude.map((account) => (
               <AccountRow
                 key={account.id}
                 account={account}
-                index={index}
                 now={NOW}
                 actions={actionsFor(account)}
               />

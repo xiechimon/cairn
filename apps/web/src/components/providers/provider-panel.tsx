@@ -29,7 +29,7 @@ export interface ProviderItem {
 
 const TONE_DOT: Record<ProviderTone, string> = {
   ok: 'bg-running',
-  warn: 'bg-(--chip-confirm-fg)',
+  warn: 'bg-(--waiting-ink)',
   off: 'bg-content-dim',
 };
 

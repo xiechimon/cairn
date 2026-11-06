@@ -124,7 +124,7 @@ export function SidebarThreadRow({
       >
         <ToneGlyph tone={tone} />
         <span className="min-w-0 truncate">{title}</span>
-        {snoozed && <AlarmClockOff className="size-3 flex-none text-content-tertiary" />}
+        {snoozed && <AlarmClockOff className="size-3.5 flex-none text-content-tertiary" />}
       </Button>
       {meta != null && (
         <span

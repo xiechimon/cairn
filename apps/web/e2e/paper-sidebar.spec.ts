@@ -84,31 +84,22 @@ test('active row = sidebar-active fill, no ring', async ({ page }) => {
   expect(m.ring).toBe('none');
 });
 
-test('project rows: tile letters follow --project-ink-N in order, open-task counts', async ({
-  page,
-}) => {
+test('project rows: neutral folder glyph, no letter tile, open-task counts', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(3);
-  const probe = await rows.evaluateAll((els) => {
-    const root = getComputedStyle(document.documentElement);
-    return els.map((el, i) => {
-      const tile = el.querySelector('.project-avatar')!;
-      const probeEl = document.createElement('span');
-      probeEl.style.color = root.getPropertyValue(`--project-ink-${(i % 6) + 1}`);
-      document.body.append(probeEl);
-      const want = getComputedStyle(probeEl).color;
-      probeEl.remove();
+  const probe = await rows.evaluateAll((els) =>
+    els.map((el) => {
+      const avatar = el.querySelector('.project-avatar')!;
       return {
-        tile: getComputedStyle(tile).color,
-        want,
-        initial: tile.textContent,
+        letter: avatar.textContent,
+        glyph: avatar.querySelector('svg') !== null,
         count: el.querySelector('[data-slot="sidebar-project-count"]')?.textContent ?? null,
       };
-    });
-  });
-  for (const row of probe) expect(row.tile).toBe(row.want);
-  expect(probe.map((r) => r.initial)).toEqual(['R', 'R', 'R']);
+    }),
+  );
+  expect(probe.map((r) => r.letter)).toEqual(['', '', '']);
+  expect(probe.map((r) => r.glyph)).toEqual([true, true, true]);
   expect(probe.map((r) => r.count)).toEqual(['1', null, null]);
 
   await page.getByTestId('project-group').getByRole('link', { name: '新建项目' }).click();

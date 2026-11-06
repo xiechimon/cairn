@@ -1,7 +1,6 @@
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
 import designDoc from '../../DESIGN.md?raw';
-import { ProjectAvatar } from '../board/project-avatar.js';
 import { Button } from '../components/ui/button.js';
 import { docChecks, type GalleryTheme, parseFrontmatter } from './design-doc.js';
 import {
@@ -159,8 +158,6 @@ const MOTION = [
   { name: 'Coordinator window grows', dur: '--dur-overlay', ease: '--ease-drawer' },
 ];
 
-const TILES = [1, 2, 3, 4, 5, 6] as const;
-
 const ELEVATIONS = [
   {
     name: 'Card',
@@ -284,31 +281,6 @@ export function ColorSection() {
           {SEMANTIC.map(([name, cssVar]) => (
             <Swatch key={name} name={name} cssVar={cssVar} />
           ))}
-        </div>
-      </Specimen>
-      <Specimen title="Project tiles" note="Ink letter on an 18% tint of the same hue">
-        <div className="flex flex-wrap gap-4">
-          {TILES.map((i) => {
-            const tint = rgba(`var(--project-tile-${i})`);
-            const k = contrast(rgba(`var(--project-ink-${i})`), over({ ...tint, a: 0.18 }, card));
-            return (
-              <div key={i} className="flex items-center gap-2.5">
-                <ProjectAvatar
-                  name={'CSWDAM'[i - 1] ?? ''}
-                  tone={i - 1}
-                  className="size-8 text-ui"
-                />
-                <span
-                  className={cn(
-                    'text-meta tabular-nums',
-                    k < 4.5 ? 'text-destructive' : 'text-content-tertiary',
-                  )}
-                >
-                  {k.toFixed(2)}
-                </span>
-              </div>
-            );
-          })}
         </div>
       </Specimen>
     </Section>
@@ -513,7 +485,6 @@ function runDocCheck(theme: GalleryTheme) {
 
 const DOC_GROUPS: [string, (key: string) => boolean][] = [
   ['Corners', (k) => k.startsWith('rounded.')],
-  ['Tiles', (k) => k.startsWith('project-tiles')],
   ['Running', (k) => k.startsWith('running')],
   ['Ink', (k) => k.startsWith('ink') || k === 'icon'],
   ['Overlay', (k) => k === 'backdrop'],
@@ -667,7 +638,7 @@ export function DocCheckSection({ theme }: { theme: GalleryTheme }) {
                 className={cn(
                   'rounded-full px-2.5 py-0.5 text-meta font-medium',
                   g.ok === g.total
-                    ? 'bg-(--chip-done-bg) text-(--chip-done-fg)'
+                    ? 'bg-secondary text-content-secondary'
                     : 'bg-danger-soft text-destructive',
                 )}
               >

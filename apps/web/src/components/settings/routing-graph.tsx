@@ -43,7 +43,7 @@ function Dot({ side, className, ...props }: { side: 'left' | 'right' } & Compone
     <span
       aria-hidden
       className={cn(
-        'absolute top-[calc(50%-3px)] size-1.5 rounded-full',
+        'absolute top-[calc(50%-3px)] size-1.5 rounded-full bg-content-tertiary',
         side === 'right' ? '-right-0.75' : '-left-0.75',
         className,
       )}
@@ -60,15 +60,12 @@ function JobNode({ job }: { job: RoutingJob }) {
       data-slot="routing-node"
       data-unavailable={off ? '' : undefined}
       className={cn('relative rounded-lg border bg-card text-meta', off && UNAVAILABLE_NODE)}
-      style={
-        off
-          ? undefined
-          : { borderColor: `color-mix(in oklab, var(--project-tile-${job.tone}) 55%, transparent)` }
-      }
     >
       <div
-        className="flex items-center gap-1.5 px-2.5 pt-1.75 pb-1.5 font-semibold"
-        style={{ color: off ? 'var(--text-tertiary)' : `var(--project-ink-${job.tone})` }}
+        className={cn(
+          'flex items-center gap-1.5 px-2.5 pt-1.75 pb-1.5 font-semibold',
+          off ? 'text-content-tertiary' : 'text-foreground',
+        )}
       >
         {job.name}
         {off && <UnavailableTag />}
@@ -81,13 +78,7 @@ function JobNode({ job }: { job: RoutingJob }) {
           {job.model}
         </span>
       </div>
-      {!off && (
-        <Dot
-          side="right"
-          data-wire-out={job.id}
-          style={{ background: `var(--project-ink-${job.tone})` }}
-        />
-      )}
+      {!off && <Dot side="right" data-wire-out={job.id} />}
     </div>
   );
 }
@@ -186,8 +177,8 @@ export function RoutingGraph({
             key={wire.key}
             d={wire.d}
             fill="none"
-            strokeWidth={1.5}
-            style={{ stroke: `var(--project-ink-${wire.tone})` }}
+            strokeWidth={1.75}
+            style={{ stroke: 'var(--text-tertiary)' }}
           />
         ))}
       </svg>

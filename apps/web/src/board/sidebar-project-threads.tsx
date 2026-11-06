@@ -76,7 +76,7 @@ export function SidebarProjectThreads({
           <span className="tabular-nums">{threads.earlier.length}</span>
           <ChevronDown
             aria-hidden
-            className={`size-3 transition-transform duration-150 ${earlierOpen ? '' : '-rotate-90'}`}
+            className={`size-3.5 transition-transform duration-150 ${earlierOpen ? '' : '-rotate-90'}`}
             strokeWidth={1.75}
           />
         </Button>

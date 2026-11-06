@@ -263,7 +263,7 @@ export function ConversationSection() {
     >
       <Specimen
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="bubble-gradient rounded-(--cds-radius-xl) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <div className="rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2">…</div>\n  </MessageContent>\n</Message>\n<Message><MessageContent>{agent && <ChiefIdentity … />}<TraceGroup … />…reply text</MessageContent></Message>\n<Marker variant="separator"><MarkerContent>Plan approved</MarkerContent></Marker>`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -271,7 +271,7 @@ export function ConversationSection() {
               className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
               data-testid="turn-user"
             >
-              <div className="bubble-gradient w-fit max-w-full rounded-(--cds-radius-xl) px-3 py-2 text-card-title text-foreground">
+              <div className="w-fit max-w-full rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title text-foreground">
                 Why does pnpm install fail in CI?
               </div>
               <div className="mt-1 flex items-center gap-1 text-content-tertiary">

@@ -25,6 +25,25 @@ export function fleetStatusLine(status: FleetStatus, t: Translate): string | nul
   });
 }
 
+export interface FleetSummary {
+  label: string;
+  title: string;
+  tone: 'online' | 'offline';
+}
+
+export function fleetSummary(status: FleetStatus, t: Translate): FleetSummary | null {
+  if (status.online + status.offline === 0) return null;
+  if (status.offline === 0) {
+    const label = t('{online} 在线', { online: status.online });
+    return { label, title: label, tone: 'online' };
+  }
+  return {
+    label: t('{online} 在线 · {offline} 离线', { online: status.online, offline: status.offline }),
+    title: fleetStatusLine(status, t) ?? '',
+    tone: 'offline',
+  };
+}
+
 export function machineStateLabel(machine: MachineRow, t: Translate): string {
   if (machine.online !== true) return t('离线');
   const running = machine.runningSteps ?? 0;
