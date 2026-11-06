@@ -139,6 +139,9 @@ export function unassignedStepReason(
     }
     return `verify 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Verifier 后重新运行任务。`;
   }
+  if (kind === 'session') {
+    return 'session 步无路由规则：团队还没有 session routing rule，无人可领。在设置的路由规则里添加 session 规则后重新运行任务。';
+  }
   if (kind !== 'plan') {
     const slot = todoRow.assignment?.build;
     if (slot?.agentId == null) {
