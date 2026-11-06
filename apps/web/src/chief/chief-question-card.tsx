@@ -589,7 +589,7 @@ function ChoiceMark({ multi, selected }: { multi: boolean; selected: boolean }) 
     >
       {selected &&
         (multi ? (
-          <Check strokeWidth={2.5} className="size-2.5" />
+          <Check strokeWidth={1.75} className="size-3.5" />
         ) : (
           <span className="size-1.5 rounded-full bg-primary-foreground" />
         ))}
