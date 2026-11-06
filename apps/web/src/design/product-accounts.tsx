@@ -18,6 +18,7 @@ import {
   ProviderModelRow,
   ProviderPanel,
 } from '../components/providers/provider-panel.js';
+import { QueryError, QueryLoading } from '../components/query-gate.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsCard } from '../components/settings-list.js';
@@ -237,6 +238,18 @@ export function AccountsSection() {
         code={`<SettingsNav groups={groups} current={id} hrefFor={hrefFor} query={q} onQuery={setQ} />`}
       >
         <SettingsNavSpecimen />
+      </Specimen>
+      <Specimen
+        id="query-states"
+        title="List loading and error states"
+        note="a list pane shows a quiet skeleton while loading and an inline error with Retry when the fetch fails; the empty state appears only after a successful fetch"
+        stage="sheet"
+        code={`<QueryGate query={listQuery} live={live}>{list}</QueryGate>`}
+      >
+        <div className="flex w-full flex-col gap-2">
+          <QueryLoading rows={2} />
+          <QueryError onRetry={() => undefined} />
+        </div>
       </Specimen>
       <Specimen
         id="providers-on-one-machine"
