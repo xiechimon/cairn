@@ -26,6 +26,11 @@ import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.
 import { buildChiefSystemPrompt } from '../src/services/chief.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import {
+  GITHUB_OVERLAP_BUDGET_MS,
+  GITHUB_OVERLAP_FILE_CONCURRENCY,
+  lookupGithubOverlaps,
+} from '../src/services/github-overlap.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -1228,6 +1233,108 @@ describe('github_overlap Coordinator read', () => {
     ]);
     expect(w.mock.calls.filter((call) => call.url.pathname.endsWith('/files'))).toHaveLength(3);
   });
+
+  test('bounds concurrent file lookups and preserves sorted serial results for twelve pulls', async () => {
+    const numbers = Array.from({ length: 12 }, (_, index) => 12 - index);
+    const w = overlapWorld({
+      [PULLS_PATH]: {
+        body: numbers.map((number) => ({ number, title: `Pull ${number}`, state: 'open' })),
+      },
+      ...Object.fromEntries(
+        numbers.map((number) => [
+          `${PULLS_PATH}/${number}/files`,
+          { body: [{ filename: 'src/clock.ts' }] },
+        ]),
+      ),
+    });
+    const params = { projectId: w.projectId, terms: ['clock'], paths: ['src/clock.ts'] };
+    const serialFetch = w.mock.impl;
+    let serialQueue = Promise.resolve();
+    w.mock.impl = (input, init) => {
+      const response = serialQueue.then(() => serialFetch(input, init));
+      serialQueue = response.then(() => undefined);
+      return response;
+    };
+    const serial = await chief<{ filePulls: { number: number }[]; checkedAt: string }>(
+      w,
+      'github_overlap',
+      params,
+    );
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let searchInFlight = 0;
+    let maxSearchInFlight = 0;
+    w.mock.impl = async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      const fileLookup = path.endsWith('/files');
+      const searchLookup = path === '/search/issues';
+      if (fileLookup) maxInFlight = Math.max(maxInFlight, ++inFlight);
+      if (searchLookup) maxSearchInFlight = Math.max(maxSearchInFlight, ++searchInFlight);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return await serialFetch(input, init);
+      } finally {
+        if (fileLookup) inFlight--;
+        if (searchLookup) searchInFlight--;
+      }
+    };
+    const result = await chief(w, 'github_overlap', params);
+    expect(GITHUB_OVERLAP_FILE_CONCURRENCY).toBe(8);
+    expect(GITHUB_OVERLAP_BUDGET_MS).toBe(8_000);
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(GITHUB_OVERLAP_FILE_CONCURRENCY);
+    expect(maxSearchInFlight).toBe(3);
+    expect(result).toEqual({
+      ...serial,
+      checkedAt: result.checkedAt,
+      filePulls: serial.filePulls.sort((a, b) => a.number - b.number),
+    });
+  });
+
+  test.each(['openIssues', 'filePulls open PRs', 'filePulls files for PR #1'])(
+    'fails closed with a shared lookup budget naming %s',
+    async (lookup) => {
+      const w = overlapWorld();
+      const fetchImpl: FetchLike = async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        const delayed =
+          lookup === 'openIssues' ||
+          (lookup === 'filePulls open PRs' && path === PULLS_PATH) ||
+          (lookup === 'filePulls files for PR #1' && path === `${PULLS_PATH}/1/files`);
+        if (delayed) {
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, 250);
+            init?.signal?.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer);
+                reject(init.signal?.reason);
+              },
+              { once: true },
+            );
+          });
+        }
+        return w.mock.impl(input, init);
+      };
+      await expect(
+        lookupGithubOverlaps(
+          fetchImpl,
+          { owner: OWNER, repo: REPO_NAME, slug: REPO, token: TOKEN },
+          ['clock'],
+          ['src/clock.ts'],
+          {
+            timeoutMs: 6_000,
+            budgetMs: 100,
+            cleanTitle: (title) => title,
+            readFailure: (failure) => new HttpError(502, failure.kind),
+          },
+        ),
+      ).rejects.toMatchObject({
+        status: 504,
+        message: `github_overlap ${lookup}: lookup budget of 100ms spent; pass fewer paths and repeat`,
+      });
+    },
+  );
 
   test.each([
     ['incomplete results', { body: { total_count: 0, incomplete_results: true, items: [] } }],
