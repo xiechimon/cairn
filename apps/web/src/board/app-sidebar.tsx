@@ -10,6 +10,7 @@ import {
 } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -51,7 +52,7 @@ export function AppSidebar({
   onSearch,
 }: AppSidebarProps) {
   const { t } = useI18n();
-  const { live, teamId } = useLiveData();
+  const { live, teamId, teamsQuery } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
@@ -74,6 +75,9 @@ export function AppSidebar({
       ...fixture.projectAvatars?.[id],
     }));
   }, [live, projectsQ.data, fixture.projectNames, fixture.projectAvatars]);
+  const projectsPhase = live
+    ? queryPhase(withTeamsFailure(projectsQ, teamsQuery), (projectsQ.data ?? []).length === 0)
+    : undefined;
   const search = useSearchState(false, '');
   const searchResults = useSearchResults(search.query, live && search.open);
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
@@ -138,6 +142,12 @@ export function AppSidebar({
     selected,
     projects,
     onArchiveProject: live ? archiveProject : undefined,
+    projectsState:
+      projectsPhase === 'loading' || projectsPhase === 'error' ? projectsPhase : undefined,
+    onRetryProjects: () => {
+      if (projectsQ.data === undefined && teamId === undefined) void teamsQuery?.refetch();
+      else void projectsQ.refetch();
+    },
   };
   return (
     <>
@@ -185,6 +195,7 @@ export function AppSidebar({
           onQuery={search.setQuery}
           onClose={() => search.setOpen(false)}
           server={live ? searchResults.data : undefined}
+          serverQuery={live ? searchResults : undefined}
         />
       )}
     </>

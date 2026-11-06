@@ -13,6 +13,7 @@ import { useComputers } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { useLiveData } from '../api/provider.js';
 import { ListCard } from '../components/list-card.js';
+import { QueryBoundary, type QueryLike, queryPhase } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
@@ -379,9 +380,11 @@ function MachineCard({
 export function MachinesPanel({
   machines,
   onClose,
+  query,
 }: {
   machines: readonly MachineRow[];
   onClose: () => void;
+  query?: QueryLike;
 }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -390,6 +393,7 @@ export function MachinesPanel({
   const computers = computersQ.data ?? [];
   const host = coordinatorMachine(machines);
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
+  const machinesPhase = queryPhase(query, machines.length === 0);
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
   return (
@@ -398,21 +402,29 @@ export function MachinesPanel({
         <SidePanelTitle>{t('电脑')}</SidePanelTitle>
       </SidePanelHead>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pt-3 pb-4">
-        {ordered.length <= 1 && (
+        {ordered.length <= 1 && machinesPhase !== 'loading' && machinesPhase !== 'error' && (
           <p className="m-0 px-1 text-meta text-content-tertiary">
             {t('没有其他电脑时，任务都在 Coordinator 这台电脑上跑。')}
           </p>
         )}
         <CoordinatorComputer />
-        {ordered.map((machine) => (
-          <MachineCard
-            key={machine.id ?? machine.name}
-            machine={machine}
-            coordinator={machine === host}
-            computer={computerFor(machine)}
-            teamId={teamId}
-          />
-        ))}
+        <QueryBoundary
+          query={query}
+          isEmpty={machines.length === 0}
+          loadingLabel={t('正在加载电脑')}
+          errorTitle={t('电脑没能加载')}
+          empty={null}
+        >
+          {ordered.map((machine) => (
+            <MachineCard
+              key={machine.id ?? machine.name}
+              machine={machine}
+              coordinator={machine === host}
+              computer={computerFor(machine)}
+              teamId={teamId}
+            />
+          ))}
+        </QueryBoundary>
         <Button
           variant="ghost"
           size="sm"

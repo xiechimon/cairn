@@ -2,6 +2,7 @@ import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { EmptyState } from '../components/empty-state.js';
+import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { StoneGroup, StoneTrail } from '../components/stone/stone-group.js';
 import { ThreadRow } from '../components/thread/thread-row.js';
@@ -30,9 +31,18 @@ interface WorkPanelProps {
   now: number;
   onClose: () => void;
   onOpenThread: (id: string) => void;
+  query?: QueryLike;
 }
 
-export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }: WorkPanelProps) {
+export function WorkPanel({
+  pane,
+  todos,
+  schedules,
+  now,
+  onClose,
+  onOpenThread,
+  query,
+}: WorkPanelProps) {
   const { t } = useI18n();
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const fold = (id: string) => ({
@@ -63,70 +73,82 @@ export function WorkPanel({ pane, todos, schedules, now, onClose, onOpenThread }
     .filter((todo) => threadStatus(todo) === 'done' && live(todo))
     .sort((a, b) => b.phaseAt - a.phaseAt);
 
+  const tasksView = (
+    <StoneTrail className="px-0">
+      <StoneGroup
+        tone="waiting"
+        label={t('等你处理')}
+        {...fold('needs-you')}
+        count={needsYou.length}
+        emptyHint={t('没有等你的事')}
+      >
+        {needsYou.map((todo) => row(todo))}
+      </StoneGroup>
+      <StoneGroup
+        tone="working"
+        label={t('在进行')}
+        {...fold('running')}
+        count={running.length}
+        emptyHint={t('没有在进行的任务')}
+      >
+        {running.map((todo) => row(todo, 'working'))}
+      </StoneGroup>
+      <StoneGroup
+        tone="idle"
+        label={t('空闲')}
+        {...fold('idle')}
+        count={idle.length + waitingSchedules.length}
+        emptyHint={t('没有空闲的任务')}
+      >
+        {idle.map((todo) => row(todo, 'idle'))}
+        {waitingSchedules.map((schedule) => (
+          <ThreadRow
+            key={schedule.id}
+            title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
+            tone="idle"
+            reason={scheduleSummary(schedule, now, t)}
+            onOpen={() => onOpenThread(schedule.todoId)}
+          />
+        ))}
+      </StoneGroup>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mt-1 self-start text-meta text-content-secondary"
+        render={<Link to="/app/schedules" />}
+      >
+        {t('管理定时')}
+      </Button>
+    </StoneTrail>
+  );
+  const madeView =
+    made.length === 0 ? (
+      <EmptyState
+        testId="made-empty"
+        icon={PackageCheck}
+        title={t('还没有完成的工作')}
+        description={t('任务合并完成后会出现在这里。')}
+        className="mt-[10vh]"
+      />
+    ) : (
+      <StoneTrail className="px-0">{made.map((todo) => row(todo, 'resolved'))}</StoneTrail>
+    );
+
   return (
     <SidePanel label={title} onDismiss={onClose}>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{title}</SidePanelTitle>
       </SidePanelHead>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-3 pb-4">
-        {pane === 'tasks' ? (
-          <StoneTrail className="px-0">
-            <StoneGroup
-              tone="waiting"
-              label={t('等你处理')}
-              {...fold('needs-you')}
-              count={needsYou.length}
-              emptyHint={t('没有等你的事')}
-            >
-              {needsYou.map((todo) => row(todo))}
-            </StoneGroup>
-            <StoneGroup
-              tone="working"
-              label={t('在进行')}
-              {...fold('running')}
-              count={running.length}
-              emptyHint={t('没有在进行的任务')}
-            >
-              {running.map((todo) => row(todo, 'working'))}
-            </StoneGroup>
-            <StoneGroup
-              tone="idle"
-              label={t('空闲')}
-              {...fold('idle')}
-              count={idle.length + waitingSchedules.length}
-              emptyHint={t('没有空闲的任务')}
-            >
-              {idle.map((todo) => row(todo, 'idle'))}
-              {waitingSchedules.map((schedule) => (
-                <ThreadRow
-                  key={schedule.id}
-                  title={`#${schedule.todo.seqNum} ${schedule.todo.title}`}
-                  tone="idle"
-                  reason={scheduleSummary(schedule, now, t)}
-                  onOpen={() => onOpenThread(schedule.todoId)}
-                />
-              ))}
-            </StoneGroup>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-1 self-start text-meta text-content-secondary"
-              render={<Link to="/app/schedules" />}
-            >
-              {t('管理定时')}
-            </Button>
-          </StoneTrail>
-        ) : made.length === 0 ? (
-          <EmptyState
-            testId="made-empty"
-            icon={PackageCheck}
-            title={t('还没有完成的工作')}
-            description={t('任务合并完成后会出现在这里。')}
-            className="mt-[10vh]"
-          />
-        ) : (
-          <StoneTrail className="px-0">{made.map((todo) => row(todo, 'resolved'))}</StoneTrail>
-        )}
+        <QueryBoundary
+          query={query}
+          isEmpty={todos.length === 0 && schedules.length === 0}
+          loadingLabel={pane === 'tasks' ? t('正在加载任务') : t('正在加载成果')}
+          errorTitle={pane === 'tasks' ? t('任务没能加载') : t('成果没能加载')}
+          empty={pane === 'tasks' ? tasksView : madeView}
+        >
+          {pane === 'tasks' ? tasksView : madeView}
+        </QueryBoundary>
       </div>
     </SidePanel>
   );

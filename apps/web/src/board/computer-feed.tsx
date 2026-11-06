@@ -5,6 +5,7 @@ import { computerFeedStore, mergeComputerFeed } from '../api/computer-feed.js';
 import { useComputerCommands, useComputers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { ListCard } from '../components/list-card.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
@@ -186,12 +187,23 @@ function CommandFeed({ computerId }: { computerId: string }) {
   }, [commands]);
   if (commands.length === 0) {
     return (
-      <p
-        data-testid="computer-feed-empty"
-        className="m-0 px-3.5 py-3 text-meta text-content-tertiary"
+      <QueryBoundary
+        query={history}
+        isEmpty
+        loadingLabel={t('正在加载命令记录')}
+        errorTitle={t('命令记录没能加载')}
+        className="px-3.5 py-3"
+        empty={
+          <p
+            data-testid="computer-feed-empty"
+            className="m-0 px-3.5 py-3 text-meta text-content-tertiary"
+          >
+            {t('还没有命令。Coordinator 在这台电脑上跑的命令会出现在这里。')}
+          </p>
+        }
       >
-        {t('还没有命令。Coordinator 在这台电脑上跑的命令会出现在这里。')}
-      </p>
+        {null}
+      </QueryBoundary>
     );
   }
   return (
@@ -240,19 +252,26 @@ function ComputerSection() {
   const { teamId } = useLiveData();
   const computers = useComputers(teamId, true);
   const computer = computers.data?.[0];
-  if (computers.data === undefined) return null;
-  if (computer === undefined) {
-    return (
-      <p data-testid="computer-none" className="m-0 px-1 text-meta text-content-tertiary">
-        {t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')}
-      </p>
-    );
-  }
   return (
-    <ListCard className="flex-none">
-      <ComputerHead computer={computer} />
-      <CommandFeed computerId={computer.id} />
-    </ListCard>
+    <QueryBoundary
+      query={computers}
+      isEmpty={computer === undefined}
+      loadingLabel={t('正在加载 Coordinator 的电脑')}
+      errorTitle={t('Coordinator 的电脑没能加载')}
+      skeletonRows={1}
+      empty={
+        <p data-testid="computer-none" className="m-0 px-1 text-meta text-content-tertiary">
+          {t('Coordinator 还没有自己的电脑。第一次需要时会自动开一台。')}
+        </p>
+      }
+    >
+      {computer !== undefined && (
+        <ListCard className="flex-none">
+          <ComputerHead computer={computer} />
+          <CommandFeed computerId={computer.id} />
+        </ListCard>
+      )}
+    </QueryBoundary>
   );
 }
 

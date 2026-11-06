@@ -15,6 +15,7 @@ import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import type { QueryLike } from '../components/query-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
 import { TextureSkeleton } from '../components/texture/texture.js';
@@ -102,6 +103,8 @@ interface HomeCProps {
   machines?: readonly MachineRow[];
   schedules?: readonly ScheduleRecord[];
   coordinatorMachineId?: string | null;
+  machinesQuery?: QueryLike;
+  workQuery?: QueryLike;
 }
 
 function projectHomeSearch(params: URLSearchParams): string {
@@ -120,6 +123,8 @@ export function HomeC({
   machines,
   schedules = [],
   coordinatorMachineId = null,
+  machinesQuery,
+  workQuery,
 }: HomeCProps) {
   const { t, locale } = useI18n();
   const { user, live } = useLiveData();
@@ -396,7 +401,7 @@ export function HomeC({
 
   const workPanel =
     threadId !== null ? null : pane === 'machines' ? (
-      <MachinesPanel machines={computers} onClose={() => showPane(null)} />
+      <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
     ) : (
       pane !== null && (
         <WorkPanel
@@ -410,6 +415,7 @@ export function HomeC({
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}
+          query={workQuery}
         />
       )
     );

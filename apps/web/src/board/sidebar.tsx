@@ -16,6 +16,7 @@ import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -67,6 +68,8 @@ interface BoardSidebarProps {
   projects?: SidebarProject[];
   todos?: TodoRecord[];
   onArchiveProject?: (id: string, archived: boolean) => void;
+  projectsState?: 'loading' | 'error';
+  onRetryProjects?: () => void;
 }
 
 export const GROUP_STORAGE_KEYS = {
@@ -172,6 +175,8 @@ export function BoardSidebar({
   projects,
   todos,
   onArchiveProject,
+  projectsState,
+  onRetryProjects,
 }: BoardSidebarProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -417,6 +422,37 @@ export function BoardSidebar({
             <Plus className="size-3.5" strokeWidth={STROKE} />
           </Link>
         </div>
+        {!projectsCollapsed && projectsState === 'loading' && (
+          <div
+            data-testid="sidebar-projects-loading"
+            aria-busy="true"
+            className="flex flex-col gap-1.5 px-2.5 py-1"
+          >
+            <span role="status" className="sr-only">
+              {t('正在加载项目')}
+            </span>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-6 w-full" />
+            ))}
+          </div>
+        )}
+        {!projectsCollapsed && projectsState === 'error' && (
+          <div
+            role="alert"
+            data-testid="sidebar-projects-error"
+            className="flex items-center gap-2 px-2.5 py-1 text-meta text-content-secondary"
+          >
+            <span className="min-w-0 flex-1">{t('项目没能加载')}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-meta"
+              onClick={onRetryProjects}
+            >
+              {t('重试')}
+            </Button>
+          </div>
+        )}
         {!projectsCollapsed &&
           projectRows.map((row, i) => (
             <SidebarProjectRow

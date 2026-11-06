@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -45,22 +46,29 @@ export function SecretsPage() {
       actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
-      {secrets.length === 0 ? (
-        <EmptyState
-          testId="resource-empty"
-          className="mt-6"
-          icon={KeyRound}
-          title={t('尚无密钥。')}
-          description={t(
-            '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。',
-          )}
-          action={{ label: t('添加密钥'), onClick: () => setCreateOpen(true) }}
-          hint={{
-            icon: Lightbulb,
-            text: t('也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。'),
-          }}
-        />
-      ) : (
+      <QueryBoundary
+        query={live ? secretsQ : undefined}
+        isEmpty={secrets.length === 0}
+        loadingLabel={t('正在加载密钥')}
+        errorTitle={t('密钥没能加载')}
+        className="mt-6"
+        empty={
+          <EmptyState
+            testId="resource-empty"
+            className="mt-6"
+            icon={KeyRound}
+            title={t('尚无密钥。')}
+            description={t(
+              '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。',
+            )}
+            action={{ label: t('添加密钥'), onClick: () => setCreateOpen(true) }}
+            hint={{
+              icon: Lightbulb,
+              text: t('也可以让 Coordinator 添加：它会开一张安全输入卡填写值，值不会进入对话。'),
+            }}
+          />
+        }
+      >
         <ResourceList>
           {secrets.map((secret) => (
             <ResourceRow key={secret.id}>
@@ -78,7 +86,7 @@ export function SecretsPage() {
             </ResourceRow>
           ))}
         </ResourceList>
-      )}
+      </QueryBoundary>
       <CreateSecretDialog
         key={searchParams.get('project') ?? ''}
         projects={projects}
