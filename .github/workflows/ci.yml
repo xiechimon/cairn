@@ -533,6 +533,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/aged-prs.test.mjs scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot-callers.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/lanes-retry.test.mjs scripts/ops/host/identity-compat.test.mjs
 
+      - name: Test temp guard fixtures (#1954)
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ops/host/test-temp-guard.test.mjs
+
       - name: merge-pr Mergify queue fixtures
         if: ${{ !cancelled() }}
         run: node --test scripts/ops/host/merge-pr-queue.test.mjs
