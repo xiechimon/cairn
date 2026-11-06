@@ -381,3 +381,23 @@ describe('computer capabilities (D75)', () => {
     });
   });
 });
+
+it('keeps only Codex login state and expiry in reported capabilities', () => {
+  const report = {
+    mcpServers: [],
+    skills: [],
+    codexLogin: {
+      state: 'ok',
+      expiresAt: 2000,
+      access: 'secret',
+      refresh: 'private',
+    },
+  };
+  const expected = { mcpServers: [], skills: [], codexLogin: { state: 'ok', expiresAt: 2000 } };
+  expect(parseReportedCapabilities(report)).toEqual(expected);
+  expect(machineCapabilitiesSchema.parse(report)).toEqual(expected);
+  expect(parseReportedCapabilities({ ...report, codexLogin: { state: 'bogus' } })).toEqual({
+    mcpServers: [],
+    skills: [],
+  });
+});
