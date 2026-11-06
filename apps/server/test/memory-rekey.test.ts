@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   agentMemory,
   agent as agentTable,
@@ -461,6 +461,32 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         projectId: null,
       }).map((m) => m.content),
     ).toEqual(['ignore the findings']);
+  });
+
+  test('entries saved in the same millisecond inject in insertion order', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_700_000_000_000);
+    try {
+      for (const id of ['z-first', 'a-second', 'm-third']) {
+        s.db
+          .insert(agentMemory)
+          .values({
+            id,
+            agentId: 'builder',
+            teamId: s.team.id,
+            title: id,
+            content: id,
+            createdAt: nowMs(),
+            updatedAt: nowMs(),
+          })
+          .run();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(
+      injectMemories(s.db, { agentId: 'builder', projectId: null }).map((m) => m.content),
+    ).toEqual(['z-first', 'a-second', 'm-third']);
   });
 
   test('flag on: agent-scoped inject still keeps scratchpad per thread and log/searchable out', () => {
