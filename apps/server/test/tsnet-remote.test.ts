@@ -1,0 +1,368 @@
+import { EventEmitter } from 'node:events';
+import { chmodSync, existsSync, mkdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
+import { join } from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
+import { ENV_VARS } from '@cairn/shared';
+import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { loadConfig, type TsnetSettings } from '../src/config.js';
+import type { SidecarProcess } from '../src/lib/tsnet-sidecar.js';
+import { startTsnetRemote, tsnetPathsOf } from '../src/services/tsnet-remote.js';
+import { bootServer } from './helpers.js';
+
+const TOKEN = 'tsnet-remote-token-0123456789abcdef';
+const tmpDirs: string[] = [];
+const stoppers: Array<() => Promise<void>> = [];
+
+afterEach(async () => {
+  for (const stop of stoppers.splice(0)) await stop();
+  vi.unstubAllEnvs();
+});
+
+afterAll(() => {
+  for (const dir of tmpDirs.splice(0)) releaseTestTempDir(dir);
+});
+
+function freshHome(): string {
+  const home = makeTestTempDir('tn-');
+  tmpDirs.push(home);
+  return home;
+}
+
+class FakeSidecar extends EventEmitter implements SidecarProcess {
+  readonly stdout = new PassThrough();
+  readonly stderr = new PassThrough();
+  readonly written: string[] = [];
+  readonly stdin = new Writable({
+    write: (chunk: Buffer, _encoding, done) => {
+      this.written.push(chunk.toString('utf8'));
+      done();
+    },
+  });
+
+  constructor() {
+    super();
+    this.stdin.on('finish', () => queueMicrotask(() => this.emit('exit', 0, null)));
+  }
+
+  kill(): boolean {
+    return true;
+  }
+}
+
+function installBinary(home: string): string {
+  const binaryPath = join(home, 'bin', 'tsnet-sidecar');
+  mkdirSync(join(home, 'bin'), { recursive: true });
+  writeFileSync(binaryPath, '#!/bin/sh\nexit 0\n');
+  chmodSync(binaryPath, 0o755);
+  return binaryPath;
+}
+
+function settings(home: string, overrides: Partial<TsnetSettings> = {}): TsnetSettings {
+  return {
+    enabled: true,
+    binaryPath: join(home, 'bin', 'tsnet-sidecar'),
+    hostname: 'cairn',
+    uploadLogs: false,
+    controlUrl: null,
+    ...overrides,
+  };
+}
+
+const silentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+interface Spawned {
+  command: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  child: FakeSidecar;
+}
+
+function fakeSpawner(): {
+  spawned: Spawned[];
+  spawnProcess: (command: string, args: string[], env: NodeJS.ProcessEnv) => SidecarProcess;
+} {
+  const spawned: Spawned[] = [];
+  return {
+    spawned,
+    spawnProcess: (command, args, env) => {
+      const child = new FakeSidecar();
+      spawned.push({ command, args, env, child });
+      return child;
+    },
+  };
+}
+
+async function start(
+  home: string,
+  overrides: Partial<TsnetSettings> = {},
+  parentEnv: NodeJS.ProcessEnv = { PATH: '/usr/bin', CAIRN_TOKEN: 'secret' },
+) {
+  const spawner = fakeSpawner();
+  const s = bootServer({ authToken: TOKEN });
+  const remote = await startTsnetRemote({
+    settings: settings(home, overrides),
+    homeDir: home,
+    app: s.app,
+    logger: silentLogger,
+    parentEnv,
+    spawnProcess: spawner.spawnProcess,
+  });
+  if (remote !== null) stoppers.push(() => remote.stop());
+  return { remote, spawner, paths: tsnetPathsOf(home) };
+}
+
+function stubFreshInstall(home: string): void {
+  vi.stubEnv(ENV_VARS.home, home);
+  vi.stubEnv(ENV_VARS.token, '');
+  vi.stubEnv(ENV_VARS.requireToken, '');
+  vi.stubEnv(ENV_VARS.auth, '');
+  vi.stubEnv('HOST', '');
+  for (const name of [
+    ENV_VARS.tsnet,
+    ENV_VARS.tsnetBinary,
+    ENV_VARS.tsnetHostname,
+    ENV_VARS.tsnetUploadLogs,
+    ENV_VARS.tsnetControlUrl,
+  ]) {
+    vi.stubEnv(name, '');
+  }
+}
+
+describe('config: off unless explicitly enabled, log upload off unless opted in', () => {
+  test('a fresh install has tsnet disabled and log upload off', () => {
+    const home = freshHome();
+    stubFreshInstall(home);
+    expect(loadConfig().tsnet).toEqual({
+      enabled: false,
+      binaryPath: join(home, 'bin', 'tsnet-sidecar'),
+      hostname: 'cairn',
+      uploadLogs: false,
+      controlUrl: null,
+    });
+  });
+
+  test.each(['1', 'true', 'yes'])('CAIRN_TSNET=%s enables it', (value) => {
+    stubFreshInstall(freshHome());
+    vi.stubEnv(ENV_VARS.tsnet, value);
+    expect(loadConfig().tsnet.enabled).toBe(true);
+  });
+
+  test.each(['0', 'false', 'off', 'enabled', 'on'])(
+    'CAIRN_TSNET=%s does not enable it',
+    (value) => {
+      stubFreshInstall(freshHome());
+      vi.stubEnv(ENV_VARS.tsnet, value);
+      expect(loadConfig().tsnet.enabled).toBe(false);
+    },
+  );
+
+  test('enabling tsnet alone does not opt in to log upload', () => {
+    stubFreshInstall(freshHome());
+    vi.stubEnv(ENV_VARS.tsnet, '1');
+    expect(loadConfig().tsnet.uploadLogs).toBe(false);
+  });
+
+  test('CAIRN_TSNET_UPLOAD_LOGS=1 is the explicit opt-in', () => {
+    stubFreshInstall(freshHome());
+    vi.stubEnv(ENV_VARS.tsnetUploadLogs, '1');
+    expect(loadConfig().tsnet.uploadLogs).toBe(true);
+  });
+
+  test('binary, hostname and control URL come from their variables', () => {
+    stubFreshInstall(freshHome());
+    vi.stubEnv(ENV_VARS.tsnetBinary, '/opt/tsnet-sidecar');
+    vi.stubEnv(ENV_VARS.tsnetHostname, 'my-cairn');
+    vi.stubEnv(ENV_VARS.tsnetControlUrl, 'https://control.example');
+    expect(loadConfig().tsnet).toMatchObject({
+      binaryPath: '/opt/tsnet-sidecar',
+      hostname: 'my-cairn',
+      controlUrl: 'https://control.example',
+    });
+  });
+
+  test('an invalid hostname fails config loading', () => {
+    stubFreshInstall(freshHome());
+    vi.stubEnv(ENV_VARS.tsnetHostname, 'not a hostname');
+    expect(() => loadConfig()).toThrow();
+  });
+});
+
+describe('default off: no process, no listener, no files', () => {
+  test('disabled returns null, spawns nothing and creates nothing under the home', async () => {
+    const home = freshHome();
+    const spawner = fakeSpawner();
+    const s = bootServer({ authToken: TOKEN });
+    const remote = await startTsnetRemote({
+      settings: settings(home, { enabled: false }),
+      homeDir: home,
+      app: s.app,
+      logger: silentLogger,
+      parentEnv: {},
+      spawnProcess: spawner.spawnProcess,
+    });
+    expect(remote).toBeNull();
+    expect(spawner.spawned).toHaveLength(0);
+    expect(existsSync(tsnetPathsOf(home).root)).toBe(false);
+    expect(existsSync(tsnetPathsOf(home).socketPath)).toBe(false);
+  });
+});
+
+describe('enabled', () => {
+  test('creates a 0700 state area, an owner-only socket and starts the sidecar', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = await start(home);
+    expect(remote?.status().state).toBe('starting');
+    expect(statSync(paths.root).mode & 0o777).toBe(0o700);
+    expect(statSync(paths.stateDir).mode & 0o777).toBe(0o700);
+    expect(statSync(paths.socketPath).mode & 0o777).toBe(0o600);
+    expect(spawner.spawned).toHaveLength(1);
+    expect(spawner.spawned[0]?.command).toBe(join(home, 'bin', 'tsnet-sidecar'));
+    expect(spawner.spawned[0]?.args).toEqual([
+      '--state-dir',
+      paths.stateDir,
+      '--tailnet-upstream',
+      `unix:${paths.socketPath}`,
+      '--hostname',
+      'cairn',
+    ]);
+  });
+
+  test('the tailnet socket serves the app', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { paths } = await start(home);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request({
+        socketPath: paths.socketPath,
+        path: '/api/teams',
+        headers: { authorization: `Bearer ${TOKEN}`, host: 'cairn.tail.ts.net' },
+      });
+      req.on('response', (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(200);
+  });
+
+  test('D116: log upload is off unless opted in, and that reaches the sidecar as args and env', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { spawner } = await start(home);
+    expect(spawner.spawned[0]?.args).not.toContain('--upload-logs');
+    expect(spawner.spawned[0]?.env.TS_NO_LOGS_NO_SUPPORT).toBe('true');
+    expect(spawner.spawned[0]?.env).not.toHaveProperty('CAIRN_TOKEN');
+  });
+
+  test('D116: the opt-in passes --upload-logs and drops the env disable', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { spawner } = await start(home, { uploadLogs: true });
+    expect(spawner.spawned[0]?.args).toContain('--upload-logs');
+    expect(spawner.spawned[0]?.env).not.toHaveProperty('TS_NO_LOGS_NO_SUPPORT');
+  });
+
+  test('a ready event is exposed through status', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner } = await start(home);
+    spawner.spawned[0]?.child.stdout.write(
+      `${JSON.stringify({ type: 'ready', ips: ['100.64.0.2'], dnsName: 'cairn.ts.net' })}\n`,
+    );
+    await vi.waitFor(() => expect(remote?.status().state).toBe('ready'));
+    expect(remote?.status()).toMatchObject({ ips: ['100.64.0.2'], dnsName: 'cairn.ts.net' });
+  });
+
+  test('stop shuts the sidecar down and removes the socket', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = await start(home);
+    const child = spawner.spawned[0]?.child;
+    await remote?.stop();
+    expect(child?.written.join('')).toBe('{"cmd":"shutdown"}\n');
+    expect(existsSync(paths.socketPath)).toBe(false);
+    expect(remote?.status().state).toBe('stopped');
+  });
+
+  test('a sidecar that cannot be spawned closes the tailnet listener', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = await start(home);
+    expect(existsSync(paths.socketPath)).toBe(true);
+    spawner.spawned[0]?.child.emit('error', new Error('spawn EACCES'));
+    await vi.waitFor(() => expect(existsSync(paths.socketPath)).toBe(false));
+    expect(remote?.status()).toMatchObject({ state: 'failed', lastError: 'spawn EACCES' });
+  });
+});
+
+describe('failure modes leave the server running with no listener and no process', () => {
+  test('a missing sidecar binary fails without spawning, listening or creating files', async () => {
+    const home = freshHome();
+    const { remote, spawner, paths } = await start(home);
+    expect(remote?.status().state).toBe('failed');
+    expect(remote?.status().lastError).toMatch(/sidecar binary/);
+    expect(spawner.spawned).toHaveLength(0);
+    expect(existsSync(paths.root)).toBe(false);
+  });
+
+  test('a binary that is not executable fails the same way', async () => {
+    const home = freshHome();
+    const binaryPath = installBinary(home);
+    chmodSync(binaryPath, 0o644);
+    const { remote, spawner } = await start(home);
+    expect(remote?.status().state).toBe('failed');
+    expect(spawner.spawned).toHaveLength(0);
+  });
+
+  test('a loosely-permissioned state directory is tightened to 0700', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const paths = tsnetPathsOf(home);
+    mkdirSync(paths.stateDir, { recursive: true, mode: 0o755 });
+    chmodSync(paths.root, 0o755);
+    chmodSync(paths.stateDir, 0o755);
+    const { remote } = await start(home);
+    expect(remote?.status().state).toBe('starting');
+    expect(statSync(paths.root).mode & 0o777).toBe(0o700);
+    expect(statSync(paths.stateDir).mode & 0o777).toBe(0o700);
+  });
+
+  test('a state directory that is a symlink is refused', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const paths = tsnetPathsOf(home);
+    const elsewhere = freshHome();
+    mkdirSync(paths.root, { recursive: true, mode: 0o700 });
+    symlinkSync(elsewhere, paths.stateDir);
+    const { remote, spawner } = await start(home);
+    expect(remote?.status()).toMatchObject({ state: 'failed' });
+    expect(remote?.status().lastError).toMatch(/state/);
+    expect(spawner.spawned).toHaveLength(0);
+    expect(existsSync(paths.socketPath)).toBe(false);
+  });
+
+  test('a state path that is a regular file is refused', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const paths = tsnetPathsOf(home);
+    mkdirSync(paths.root, { recursive: true, mode: 0o700 });
+    writeFileSync(paths.stateDir, 'not a directory');
+    const { remote, spawner } = await start(home);
+    expect(remote?.status().state).toBe('failed');
+    expect(spawner.spawned).toHaveLength(0);
+  });
+
+  test('a home so deep the unix socket path would not fit is refused with the reason', async () => {
+    const home = join(freshHome(), 'd'.repeat(110));
+    installBinary(home);
+    const { remote, spawner } = await start(home);
+    expect(remote?.status().state).toBe('failed');
+    expect(remote?.status().lastError).toMatch(/socket path/);
+    expect(spawner.spawned).toHaveLength(0);
+  });
+});
