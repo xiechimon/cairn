@@ -1,0 +1,262 @@
+{
+  "head": "0d4257e12b10e79769af4cdcf1ef0e5cd0a90b6d",
+  "baseline": "5f672eab9f6a062effa1192742814d2e74f4821f",
+  "focusedVitest": {
+    "filesPassed": 6,
+    "testsPassed": 157
+  },
+  "localGates": {
+    "lint": "passed",
+    "typecheck": "passed",
+    "specParse": "passed",
+    "prepush": {
+      "checksPassed": 22,
+      "pushHook": "passed"
+    }
+  },
+  "browserFull": {
+    "passed": 1433,
+    "failed": 8,
+    "skipped": 21
+  },
+  "browserHeadRecheck": {
+    "passed": 6,
+    "failed": 2,
+    "skipped": 0
+  },
+  "browserBaselineRecheck": {
+    "passed": 4,
+    "failed": 4,
+    "skipped": 0
+  },
+  "baselineShutdown": {
+    "testsFailed": 2,
+    "testsSkipped": 30
+  },
+  "localChangedVitest": {
+    "status": "interrupted",
+    "completedPassingFiles": 249,
+    "workers": 2,
+    "reason": "Ended to release host resources after all full head CI code and test checks passed; no full local pass is claimed."
+  },
+  "api": {
+    "mode": "isolated real server and MachineClient; synthetic OAuth credentials; CAIRN_AUTH=off",
+    "activeAvailable": true,
+    "expiredAvailable": false,
+    "absentAvailable": false,
+    "oauthTokenValuesInPayload": false,
+    "sqliteRead": "read-only"
+  },
+  "ciChecks": [
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42250849840/job/128005201425",
+      "name": "pr-evidence",
+      "state": "FAILURE"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42250849840/job/128005201088",
+      "name": "merge-route",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42250849897/job/128005204982",
+      "name": "silent-revert-gate",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://dashboard.mergify.com/orgs/xiechimon/repos/cairn/queues/status?branch=main&pull=3177",
+      "name": "Mergify Merge Queue",
+      "state": "NEUTRAL"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/128001709536",
+      "name": "check",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/128001521410",
+      "name": "e2e-gate",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111059/job/128001063886",
+      "name": "compare",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111059/job/127999278549",
+      "name": "capture (head)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111059/job/127999278550",
+      "name": "capture (base)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259939",
+      "name": "pack-smoke",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259987",
+      "name": "check-core",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999260134",
+      "name": "tsnet-sidecar-build (windows, amd64)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259856",
+      "name": "gates",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999260208",
+      "name": "vitest-integration (1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://dashboard.mergify.com/orgs/xiechimon/repos/cairn/activity-log?pull_request=3177",
+      "name": "Mergify Merge Protections",
+      "state": "NEUTRAL"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259924",
+      "name": "vitest-integration (4)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999260008",
+      "name": "vitest-light (1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259955",
+      "name": "e2e-affected (5)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999260320",
+      "name": "tsnet-sidecar-build (linux, amd64)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999260005",
+      "name": "tsnet-sidecar-build (darwin, arm64)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259847",
+      "name": "vitest-light (2)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259665",
+      "name": "vitest-integration (2)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259666",
+      "name": "vitest-integration (3)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259491",
+      "name": "ops-backup-test",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259859",
+      "name": "dead-class-gate",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259905",
+      "name": "e2e-affected (1)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259943",
+      "name": "e2e-affected (2)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259920",
+      "name": "e2e-affected (3)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259962",
+      "name": "e2e-affected (4)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999260016",
+      "name": "tsnet-sidecar-build (linux, arm64)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259662",
+      "name": "tsnet-sidecar-test",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259811",
+      "name": "vitest-light (3)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999259953",
+      "name": "tsnet-sidecar-build (darwin, amd64)",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999263035",
+      "name": "e2e",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111148/job/127999100636",
+      "name": "changes",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249110539/job/127999100543",
+      "name": "evaluate",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249110640/job/127999101345",
+      "name": "label",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111059/job/127999100492",
+      "name": "select",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111815/job/127999101763",
+      "name": "diagram-text-fit",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111028/job/127999099396",
+      "name": "commit-author",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/xiechimon/cairn/actions/runs/42249111059/job/127999102465",
+      "name": "cleanup",
+      "state": "SKIPPED"
+    },
+    {
+      "link": "",
+      "name": "autonomy-brake",
+      "state": "FAILURE"
+    }
+  ]
+}
