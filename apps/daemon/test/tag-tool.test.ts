@@ -1,27 +1,21 @@
 import { spawn } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, GitCredentials } from '@cairn/shared';
-import { afterAll, describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test } from 'vitest';
 import { commitEnv, runGit } from '../src/git.js';
 import { buildCreateTagTool } from '../src/tag-tool.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const IDENTITY = { name: 'tag-agent', email: 'tag@cairn.local' };
 const PROBE_TOKEN = 'ghp_PROBE0000000000000000000000000000';
 const PROBE_CRED: GitCredentials = { username: 'x-access-token', password: PROBE_TOKEN };
 
-const dirs: string[] = [];
 function workdir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), `cairn-tag-${prefix}-`));
-  dirs.push(dir);
-  return dir;
+  return testTempDir(`cairn-tag-${prefix}-`);
 }
-afterAll(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
 
 async function git(args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<string> {
   const r = await runGit(args, { cwd, env, timeoutMs: 60_000 });
@@ -85,6 +79,7 @@ function decodeChunked(buf: Buffer): Buffer {
 }
 
 async function startHttpGit(opts: { root: string; accept: GitCredentials }): Promise<HttpGit> {
+  const children = new Map<ReturnType<typeof spawn>, Promise<void>>();
   const server = createServer((req, res) => {
     const want = `Basic ${Buffer.from(`${opts.accept.username}:${opts.accept.password}`).toString('base64')}`;
     if ((req.headers.authorization ?? '') !== want) {
@@ -111,9 +106,22 @@ async function startHttpGit(opts: { root: string; accept: GitCredentials }): Pro
           GIT_COMMITTER_EMAIL: 'http@cairn.local',
         },
       });
+      children.set(
+        child,
+        new Promise<void>((resolve) => {
+          child.once('close', () => {
+            children.delete(child);
+            resolve();
+          });
+        }),
+      );
+      child.on('error', (error) => res.destroy(error));
       const out: Buffer[] = [];
       child.stdout.on('data', (c: Buffer) => out.push(c));
       child.stderr.resume();
+      child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EPIPE') res.destroy(error);
+      });
       child.stdin.end(body);
       child.on('close', () => {
         const raw = Buffer.concat(out);
@@ -157,12 +165,19 @@ async function startHttpGit(opts: { root: string; accept: GitCredentials }): Pro
   server.listen(0);
   await new Promise<void>((r) => server.once('listening', r));
   const port = (server.address() as AddressInfo).port;
+  let closing: Promise<void> | undefined;
+  const close = () =>
+    (closing ??= (async () => {
+      const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+      for (const child of children.keys()) child.kill('SIGKILL');
+      await Promise.all(children.values());
+      server.closeAllConnections();
+      await closed;
+    })());
+  onTestFinished(close);
   return {
     url: `http://127.0.0.1:${port}`,
-    close: () =>
-      new Promise<void>((r) => {
-        server.close(() => r());
-      }),
+    close,
   };
 }
 

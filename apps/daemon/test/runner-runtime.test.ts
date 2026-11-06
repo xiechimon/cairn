@@ -1,5 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +19,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { resumePendingUpload, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -199,7 +199,7 @@ async function setup(
     runEnv?: Record<string, string>;
   } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
+  const home = testTempDir('cairn-runner-runtime-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(opts.tokenProvider ?? null, opts.subscriptionToken);
@@ -372,7 +372,7 @@ describe('runner runtime-step session continuation (spec 17 A7)', () => {
       ...claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),
       session: { action: 'continue' as const, sessionId: 'sdk-session-uuid' },
     };
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
+    const home = testTempDir('cairn-runner-runtime-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient(null);
@@ -499,7 +499,7 @@ describe('subscription credential isolation', () => {
 
 test('subscription session uploads stay redacted when a failed final report is replayed after restart', async () => {
   const token = 'private-recovery-subscription-token';
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-subscription-session-'));
+  const directory = testTempDir('cairn-subscription-session-');
   const sessionFile = join(directory, 'session.jsonl');
   writeFileSync(sessionFile, `${JSON.stringify({ text: token })}\n`);
   const result = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
