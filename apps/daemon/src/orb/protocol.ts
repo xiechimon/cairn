@@ -31,6 +31,7 @@ export function isOrbPathId(id: string): boolean {
 }
 
 export const ORB_RPC_PREFIX = 'cairn-orb-rpc:';
+export const ORB_RELAY_TOKEN_ENV = 'CAIRN_ORB_RELAY_TOKEN';
 export const ORB_STEP_METHODS = [
   'heartbeat',
   'tool',

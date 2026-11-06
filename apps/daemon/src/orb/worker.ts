@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync, rmSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
+import { Duplex, type Readable, type Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
 import { createGeminiBackend } from '../backend/acp.js';
@@ -18,6 +19,26 @@ import { StepStops, type StopRequest } from '../step-stops.js';
 import { WorkspaceManager } from '../workspace.js';
 import { type OrbFrame, orbReleaseFromEntry } from './protocol.js';
 import { OrbStaleReleaseError, RelayMachineApi } from './relay.js';
+
+export function stdioDuplex(input: Readable, output: Writable): Duplex {
+  const duplex = new Duplex({
+    read: () => input.resume(),
+    write: (chunk: Buffer, encoding, callback) => {
+      output.write(chunk, encoding, callback);
+    },
+    final: (callback) => callback(),
+  });
+  input.on('data', (chunk: Buffer) => {
+    if (!duplex.push(chunk)) input.pause();
+  });
+  input.on('end', () => {
+    duplex.once('end', () => duplex.destroy());
+    duplex.push(null);
+  });
+  input.on('close', () => duplex.destroy());
+  input.on('error', (error) => duplex.destroy(error));
+  return duplex;
+}
 
 export function orbAgentHome(): string {
   return userInfo().homedir;
@@ -65,7 +86,8 @@ export function orbBackendFor(deps: {
 }
 
 export async function runOrbWorker(options: {
-  socketPath: string;
+  socketPath?: string;
+  stdio?: { input: Readable; output: Writable; token: string };
   entryPath?: string;
   backendFor?: (provider: string | null | undefined) => AgentBackend;
   home?: string;
@@ -92,40 +114,49 @@ export async function runOrbWorker(options: {
   const stops = new StepStops();
   let activeStep: string | null = null;
   let stopRequest: StopRequest | undefined;
-  while (!existsSync(options.socketPath) || !existsSync(`${options.socketPath}.token`))
-    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+  const { socketPath, stdio } = options;
+  if (!stdio) {
+    if (!socketPath) throw new Error('Orb worker needs a relay socket or stdio');
+    while (!existsSync(socketPath) || !existsSync(`${socketPath}.token`))
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+  }
+  const onFrame = (frame: OrbFrame) => {
+    if (frame.type === 'stop') {
+      stopRequest = { discard: frame.discard };
+      if (activeStep)
+        void stops
+          .get(activeStep)
+          ?.deliver(stopRequest)
+          .catch((error: unknown) => send({ type: 'log', message: String(error) }));
+    } else if (frame.type === 'steer' && activeStep) {
+      const session = sessions.get(activeStep);
+      void (
+        session
+          ? session.steer(frame.text, frame.images)
+          : Promise.reject(new Error('No live orb session'))
+      ).then(
+        () => send({ type: 'steered', id: frame.id }),
+        (error: unknown) => send({ type: 'steered', id: frame.id, error: String(error) }),
+      );
+    }
+  };
+  const onClose = () => {
+    if (activeStep)
+      void stops
+        .get(activeStep)
+        ?.deliver({ discard: false })
+        .catch(() => {});
+  };
   try {
-    relay = await RelayMachineApi.connect(
-      options.socketPath,
-      release,
-      (frame) => {
-        if (frame.type === 'stop') {
-          stopRequest = { discard: frame.discard };
-          if (activeStep)
-            void stops
-              .get(activeStep)
-              ?.deliver(stopRequest)
-              .catch((error: unknown) => send({ type: 'log', message: String(error) }));
-        } else if (frame.type === 'steer' && activeStep) {
-          const session = sessions.get(activeStep);
-          void (
-            session
-              ? session.steer(frame.text, frame.images)
-              : Promise.reject(new Error('No live orb session'))
-          ).then(
-            () => send({ type: 'steered', id: frame.id }),
-            (error: unknown) => send({ type: 'steered', id: frame.id, error: String(error) }),
-          );
-        }
-      },
-      () => {
-        if (activeStep)
-          void stops
-            .get(activeStep)
-            ?.deliver({ discard: false })
-            .catch(() => {});
-      },
-    );
+    relay = stdio
+      ? await RelayMachineApi.connectStream(
+          stdioDuplex(stdio.input, stdio.output),
+          stdio.token,
+          release,
+          onFrame,
+          onClose,
+        )
+      : await RelayMachineApi.connect(socketPath ?? '', release, onFrame, onClose);
   } catch (error) {
     if (!(error instanceof OrbStaleReleaseError)) throw error;
     process.stderr.write(`${error.message}\n`);
