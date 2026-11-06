@@ -144,6 +144,7 @@ test('live face: a rejected send keeps the draft in the box and in storage (#631
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
   await input.press('Enter');
 
+  await expect(page.getByText('发送失败，请重试。')).toBeVisible();
   await expect(input).toHaveValue(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);
   await evidenceShot(page, 'send-rejected-draft-persisted.png');
@@ -202,6 +203,9 @@ test('live face: the draft is saved to the server and a fresh device restores it
   if (store === null) throw new Error('server stub missing');
   await input.fill(DRAFT);
   await expect.poll(() => store.content).toBe(DRAFT);
+  await expect
+    .poll(() => page.evaluate((key) => localStorage.getItem(`${key}.sync`), DRAFT_KEY))
+    .toContain('"dirty":false');
 
   await page.evaluate(() => localStorage.clear());
   await page.reload();

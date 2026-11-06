@@ -69,7 +69,9 @@ export function SidebarProjectRow({
       )}
     >
       <ProjectGlyph icon={icon} />
-      <span className="min-w-0 truncate">{name}</span>
+      <span className="min-w-0 truncate" title={name}>
+        {name}
+      </span>
     </Button>
   );
   if (menu == null) return button;
@@ -201,7 +203,7 @@ export function SidebarGroupHeader({
         <ChevronDown
           aria-hidden
           className={cn(
-            'size-3 text-content-dim transition-transform duration-150',
+            'size-3.5 text-content-dim transition-transform duration-150',
             !expanded && '-rotate-90',
           )}
           strokeWidth={1.75}

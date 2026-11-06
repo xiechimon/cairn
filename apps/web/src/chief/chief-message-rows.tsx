@@ -75,7 +75,7 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
-  'bubble-gradient w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground)';
+  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title break-words text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
 const MARKER_CONTENT_CLS = 'max-w-[85%]';
@@ -109,7 +109,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
             <span
               key={i}
               data-testid="chief-chip-todo"
-              className={`${CHIP_INLINE_CLS} bg-(--chip-plan-bg) text-(--chip-plan-fg)`}
+              className={`${CHIP_INLINE_CLS} bg-secondary text-content-secondary`}
             >
               <FileText width={11} height={11} />
               {s.todo}

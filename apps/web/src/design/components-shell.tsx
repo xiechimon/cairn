@@ -191,7 +191,7 @@ export function ProjectsSection() {
                 label: 'Coordinator',
                 icon: <SpiralMark busy={false} className="size-5" />,
               },
-              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-5" /> },
+              { id: 'projects', label: 'Projects', icon: <LayoutGrid className="size-4.5" /> },
             ]}
           />
         </div>

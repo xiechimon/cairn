@@ -102,9 +102,9 @@ export function PrBar({
                 data-ci={ci.state}
                 className={cn(
                   'inline-flex h-6.5 items-center gap-1.5 rounded-lg px-2.25 text-meta font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                  ci.state === 'passed' && 'bg-(--chip-done-bg) text-(--chip-done-fg)',
+                  ci.state === 'passed' && 'bg-secondary text-content-secondary',
                   ci.state === 'running' && 'bg-secondary text-content-secondary',
-                  ci.state === 'failed' && 'bg-(--chip-failed-bg) text-(--chip-failed-fg)',
+                  ci.state === 'failed' && 'bg-danger-soft text-destructive',
                 )}
               >
                 <CiIcon
@@ -114,7 +114,7 @@ export function PrBar({
                   )}
                 />
                 {CI_LABEL[ci.state]}
-                <ChevronDown className="size-3" />
+                <ChevronDown className="size-3.5" />
               </PopoverTrigger>
               <PopoverContent side="top" align="end" className="w-75 gap-0.5 p-2.5">
                 <div className="flex items-baseline justify-between px-1 py-1.5 text-ui">

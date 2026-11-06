@@ -14,8 +14,6 @@ import {
   type TextureFilter,
 } from './texture-core.js';
 
-export type TextureTone = 1 | 2 | 3 | 4 | 5 | 6;
-
 type Source =
   | { kind: 'spiral'; frame: SpiralFrame }
   | { kind: 'ramp' }
@@ -30,7 +28,6 @@ interface TextureLayerProps {
   bias: number;
   veil: boolean;
   ground: string | null;
-  tone: TextureTone;
   inkVar?: string;
   animate: boolean;
   className?: string;
@@ -69,7 +66,6 @@ function TextureLayer({
   bias,
   veil,
   ground,
-  tone,
   inkVar,
   animate,
   className,
@@ -98,11 +94,7 @@ function TextureLayer({
         canvas.height = height;
         spiral = null;
       }
-      const dark = !document.documentElement.classList.contains('light');
-      const ink = readRgb(
-        canvas,
-        inkVar ?? (dark ? `--project-ink-${tone}` : `--project-tile-${tone}`),
-      );
+      const ink = readRgb(canvas, inkVar ?? '--text-tertiary');
       const groundRgb = ground == null ? null : readRgb(canvas, ground);
       const font = getComputedStyle(document.documentElement).getPropertyValue('--font-mono');
       const elapsed = running ? now - started : STILL_ELAPSED_MS;
@@ -187,7 +179,7 @@ function TextureLayer({
       seen.disconnect();
       document.removeEventListener('visibilitychange', sync);
     };
-  }, [sourceKey, filter, cell, alpha, bias, veil, ground, tone, inkVar, animate]);
+  }, [sourceKey, filter, cell, alpha, bias, veil, ground, inkVar, animate]);
   return (
     <div aria-hidden="true" className={cn('pointer-events-none size-full', className)}>
       <canvas ref={ref} data-slot="texture" data-filter={filter} className="block size-full" />
@@ -197,12 +189,10 @@ function TextureLayer({
 
 export function SpiralArt({
   filter = 'ascii',
-  tone = 1,
   className,
   children,
 }: {
   filter?: TextureFilter;
-  tone?: TextureTone;
   className?: string;
   children?: ReactNode;
 }) {
@@ -222,7 +212,6 @@ export function SpiralArt({
         bias={0}
         veil
         ground="--secondary"
-        tone={tone}
         animate={false}
         className="absolute inset-0"
       />
@@ -233,11 +222,9 @@ export function SpiralArt({
 
 export function SpiralMark({
   filter = 'dither',
-  tone = 1,
   className,
 }: {
   filter?: TextureFilter;
-  tone?: TextureTone;
   className?: string;
 }) {
   return (
@@ -253,7 +240,6 @@ export function SpiralMark({
         bias={0}
         veil={false}
         ground="--secondary"
-        tone={tone}
         animate={false}
       />
     </div>
@@ -263,12 +249,10 @@ export function SpiralMark({
 export function DriftField({
   active,
   filter = 'dither',
-  tone = 1,
   className,
 }: {
   active: boolean;
   filter?: TextureFilter;
-  tone?: TextureTone;
   className?: string;
 }) {
   return (
@@ -285,7 +269,6 @@ export function DriftField({
         bias={0.12}
         veil={false}
         ground={null}
-        tone={tone}
         animate={active}
       />
       <div className="absolute inset-0 bg-linear-to-b from-transparent via-background/30 to-background" />
@@ -296,12 +279,10 @@ export function DriftField({
 export function DriftEdge({
   active,
   filter = 'dither',
-  tone = 1,
   className,
 }: {
   active: boolean;
   filter?: TextureFilter;
-  tone?: TextureTone;
   className?: string;
 }) {
   return (
@@ -320,7 +301,6 @@ export function DriftEdge({
         bias={0.18}
         veil={false}
         ground={null}
-        tone={tone}
         animate={active}
       />
     </div>
@@ -353,54 +333,8 @@ export function TextureSkeleton({
         bias={0}
         veil={false}
         ground={null}
-        tone={1}
         animate
       />
     </div>
   );
 }
-
-export function TexturedTile({
-  letter,
-  tone,
-  className,
-}: {
-  letter: string;
-  tone: TextureTone;
-  className?: string;
-}) {
-  return (
-    <span
-      data-slot="textured-tile"
-      className={cn(
-        'relative inline-grid size-10 flex-none place-items-center overflow-hidden rounded-(--radius-control) text-ui font-semibold text-card',
-        TILE_GROUND[tone - 1],
-        className,
-      )}
-    >
-      <TextureLayer
-        source={{ kind: 'ramp' }}
-        filter="dither"
-        cell={3}
-        alpha={0.55}
-        bias={0}
-        veil={false}
-        ground={null}
-        tone={tone}
-        inkVar="--card"
-        animate={false}
-        className="absolute inset-0"
-      />
-      <span className="relative">{letter}</span>
-    </span>
-  );
-}
-
-const TILE_GROUND = [
-  'bg-project-tile-1',
-  'bg-project-tile-2',
-  'bg-project-tile-3',
-  'bg-project-tile-4',
-  'bg-project-tile-5',
-  'bg-project-tile-6',
-] as const;
