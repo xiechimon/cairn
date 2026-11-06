@@ -21,10 +21,14 @@ export type PlanRecord = z.infer<typeof planRecordSchema>;
 
 export const planRowSchema = planRecordSchema.extend({
   content: z.string(),
+});
+export type PlanRow = z.infer<typeof planRowSchema>;
+
+export const planResponseSchema = planRowSchema.extend({
   autoApproveAt: epochMs.nullable().optional(),
   autoApprovePausedAt: epochMs.nullable().optional(),
 });
-export type PlanRow = z.infer<typeof planRowSchema>;
+export type PlanResponse = z.infer<typeof planResponseSchema>;
 
 export type PlanContractCheck = { ok: true; items: string[] } | { ok: false; problem: string };
 

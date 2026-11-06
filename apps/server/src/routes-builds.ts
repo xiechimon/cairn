@@ -5,7 +5,7 @@ import {
   buildStopBodySchema,
   conversationMessagesQuerySchema,
   createBranchSyncBodySchema,
-  planRowSchema,
+  planResponseSchema,
   prPanelListSchema,
   prPanelQuerySchema,
   startBuildsBodySchema,
@@ -262,7 +262,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       .all();
     return c.json(
       rows.map((r) =>
-        planRowSchema.parse({
+        planResponseSchema.parse({
           id: r.id,
           buildId: r.buildId,
           version: r.version,
@@ -303,7 +303,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     }
     const autoApprovePausedAt = row.autoApprovePausedAt ?? Date.now();
     ctx.db.update(planTable).set({ autoApprovePausedAt }).where(eq(planTable.id, planId)).run();
-    return c.json(planRowSchema.parse({ ...row, autoApproveAt: null, autoApprovePausedAt }));
+    return c.json(planResponseSchema.parse({ ...row, autoApproveAt: null, autoApprovePausedAt }));
   });
 
   app.get('/api/builds/:id/changes', async (c) =>
