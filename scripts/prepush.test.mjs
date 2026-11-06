@@ -177,7 +177,14 @@ test('CI classifies before heavy work and always runs push coverage', () => {
   assert.match(changes, /\|\| has_code=true/);
   assert.match(changes, /fetch-depth: 0/);
   assert.doesNotMatch(readFileSync('.github/workflows/ci.yml', 'utf8'), /^ {4}paths(?:-ignore)?:/m);
-  for (const name of ['vitest-light', 'vitest-integration', 'pack-smoke', 'dead-class-gate']) {
+  for (const name of [
+    'vitest-light',
+    'vitest-integration',
+    'tsnet-sidecar-test',
+    'tsnet-sidecar-build',
+    'pack-smoke',
+    'dead-class-gate',
+  ]) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
     assert.match(
@@ -225,7 +232,17 @@ test('CI classifies before heavy work and always runs push coverage', () => {
 test('required aggregates only accept skipped work after a successful docs-only classification', () => {
   const jobs = workflowJobs();
   for (const [name, dependencies] of [
-    ['check', ['changes', 'check-core', 'vitest-light', 'vitest-integration']],
+    [
+      'check',
+      [
+        'changes',
+        'check-core',
+        'vitest-light',
+        'vitest-integration',
+        'tsnet-sidecar-test',
+        'tsnet-sidecar-build',
+      ],
+    ],
   ]) {
     const job = jobs.get(name);
     assert.ok(job.includes(`    needs: [${dependencies.join(', ')}]\n`));
