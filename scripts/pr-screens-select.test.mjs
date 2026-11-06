@@ -65,7 +65,7 @@ test('shared surfaces select every page', () => {
     'pnpm-lock.yaml',
     'apps/web/vite.config.ts',
     'apps/web/e2e/audit-pages.ts',
-    'apps/web/pr-screens/capture.spec.ts',
+    'apps/web/pr-screens/capture.shots.ts',
   ]) {
     const result = selectPages({
       changed: ['apps/web/src/routes/api-keys-page.tsx', path],

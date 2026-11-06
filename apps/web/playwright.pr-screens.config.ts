@@ -4,7 +4,7 @@ const PORT = Number(process.env.E2E_PORT ?? 8399);
 
 export default defineConfig({
   testDir: './pr-screens',
-  testMatch: 'capture.spec.ts',
+  testMatch: 'capture.shots.ts',
   outputDir: 'pr-screens-results',
   fullyParallel: true,
   workers: 3,
