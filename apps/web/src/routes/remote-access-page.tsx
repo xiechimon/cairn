@@ -1,4 +1,4 @@
-import { type PairingCodeResponse, pairingLink, type RemoteRoute } from '@cairn/shared';
+import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
 import { Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -11,31 +11,24 @@ import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shel
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { pairingOrigin } from '../lib/pairing-origin.js';
 import { PageShell } from '../pages/shell.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
 export const REMOTE_ACCESS_ROUTE = 'remote-access';
 
-function pairingOrigin(routes: RemoteRoute[]): string {
-  const preferred =
-    routes.find((route) => route.kind === 'tailnet') ??
-    routes.find((route) => route.kind === 'lan');
-  return preferred?.url ?? window.location.origin;
-}
-
 function PairingDialog({
   pairing,
-  routes,
+  origin,
   environmentId,
   onClose,
 }: {
   pairing: PairingCodeResponse;
-  routes: RemoteRoute[];
+  origin: string;
   environmentId: string;
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const origin = pairingOrigin(routes);
   const link = pairingLink({ origin, code: pairing.code, environmentId });
   return (
     <DialogShell
@@ -72,6 +65,8 @@ export function RemoteAccessPage() {
   const mutations = useRemoteMutations();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const routes = routesQ.data?.routes ?? [];
+  const origin = routesQ.data === undefined ? null : pairingOrigin(routes, window.location.origin);
+  const pairingBlocked = live && routesQ.data !== undefined && origin === null;
   const tailnet = routesQ.data?.tailnet;
   const devices = devicesQ.data ?? [];
   const startPairing = () =>
@@ -89,7 +84,7 @@ export function RemoteAccessPage() {
         live ? (
           <Button
             className={DIALOG_PRIMARY_BUTTON}
-            disabled={mutations.createPairingCode.isPending}
+            disabled={mutations.createPairingCode.isPending || origin === null}
             onClick={startPairing}
             data-testid="pair-new-device"
           >
@@ -98,6 +93,13 @@ export function RemoteAccessPage() {
         ) : null
       }
     >
+      {pairingBlocked && (
+        <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
+          {t(
+            '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请设置 CAIRN_TSNET=1 后重启，或用局域网或 Tailscale 地址打开本页。',
+          )}
+        </p>
+      )}
       {live && routesQ.data === undefined ? null : routes.length === 0 ? (
         <EmptyState
           testId="remote-routes-empty"
@@ -146,10 +148,10 @@ export function RemoteAccessPage() {
           ))}
         </ResourceList>
       )}
-      {pairing !== null && routesQ.data !== undefined && (
+      {pairing !== null && routesQ.data !== undefined && origin !== null && (
         <PairingDialog
           pairing={pairing}
-          routes={routes}
+          origin={origin}
           environmentId={routesQ.data.environmentId}
           onClose={() => setPairing(null)}
         />

@@ -69,6 +69,7 @@ export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
+  'paired_device',
   'branch_sync',
   'stop_pending',
   'queued_message',
