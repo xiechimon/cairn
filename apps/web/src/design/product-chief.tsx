@@ -37,6 +37,7 @@ export function ProductChiefSection() {
       lede="The Coordinator's parts: questions it asks you, the conversation digest, the home summary line, its identity, outage banners and the project picker."
     >
       <Specimen
+        id="question-card"
         title="Question card"
         note={last ?? 'ChiefQuestionCard: answer with clicks or the number keys'}
         stage="canvas"
@@ -68,6 +69,7 @@ export function ProductChiefSection() {
         </Labeled>
       </Specimen>
       <Specimen
+        id="digest"
         title="Digest"
         note="ChiefDigestRow: expand to see the grouped summary"
         stage="canvas"
@@ -86,7 +88,7 @@ export function ProductChiefSection() {
           </Labeled>
         </MessageScrollerProvider>
       </Specimen>
-      <Specimen title="Identity" note="ChiefIdentity" stage="canvas">
+      <Specimen id="identity" title="Identity" note="ChiefIdentity" stage="canvas">
         <Cell label="Identity, idle">
           <ChiefIdentity agent={CHIEF} />
         </Cell>
@@ -98,6 +100,7 @@ export function ProductChiefSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="outage-banners"
         title="Outage banners"
         note="ChiefOutageBanner, ChiefFallbackBanner"
         stage="canvas"
@@ -123,6 +126,7 @@ export function ProductChiefSection() {
         </Labeled>
       </Specimen>
       <Specimen
+        id="project-menu"
         title="Project menu"
         note="ProjectMenu with and without the automatic choice"
         stage="canvas"
