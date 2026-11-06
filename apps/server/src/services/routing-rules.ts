@@ -169,9 +169,12 @@ export function coordinatorProfile(db: Pick<Db, 'select'>, teamId: string): Rout
   return route === null ? null : routeProfile(route);
 }
 
+export const VERIFY_MEMORY_OWNER_SUFFIX = ':verify';
+
 export function memoryOwnerOf(db: Pick<Db, 'select'>, teamId: string, kind: StepKind): string {
   const route = routeForStep(db, { teamId }, kind) ?? ruleRow(db, teamId, 'session');
-  return route?.id ?? teamId;
+  const owner = route?.id ?? teamId;
+  return kind === 'verify' ? `${owner}${VERIFY_MEMORY_OWNER_SUFFIX}` : owner;
 }
 
 export function memoryOpsAreTeamScoped(kind: StepKind): boolean {

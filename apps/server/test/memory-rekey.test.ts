@@ -11,7 +11,11 @@ import {
   updateMemoryEntry,
 } from '../src/services/memory.js';
 import { projectTurnContext } from '../src/services/project-instructions.js';
-import { memoryInjectTeamId, memoryOpsAreTeamScoped } from '../src/services/routing-rules.js';
+import {
+  memoryInjectTeamId,
+  memoryOpsAreTeamScoped,
+  memoryOwnerOf,
+} from '../src/services/routing-rules.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 describe('memory re-key behind routing rules (#2577 PR 6)', () => {
@@ -406,6 +410,32 @@ describe('memory re-key behind routing rules (#2577 PR 6)', () => {
         projectId: null,
       }).map((m) => m.content),
     ).toEqual(['ignore the findings']);
+  });
+
+  test('the verifier has its own memory owner: implementer memories are invisible and immutable to it', () => {
+    insertSessionRule();
+    const implementer = memoryOwnerOf(s.db, s.team.id, 'build');
+    const verifier = memoryOwnerOf(s.db, s.team.id, 'verify');
+    expect(implementer).toBe('session-rule');
+    expect(verifier).not.toBe(implementer);
+    const mine = save({ agentId: implementer, content: 'implementer secret sauce' });
+    const scope = { agentId: verifier, teamId: s.team.id, teamScoped: false };
+    save({ agentId: verifier, content: 'verifier lens', teamScoped: false });
+    expect(listMemoryEntries(s.db, scope).map((m) => m.content)).toEqual(['verifier lens']);
+    expect(
+      injectMemories(s.db, {
+        agentId: verifier,
+        teamId: memoryInjectTeamId('verify', s.team.id),
+        projectId: null,
+      }).map((m) => m.content),
+    ).toEqual(['verifier lens']);
+    expect(() =>
+      updateMemoryEntry(s.db, { ...scope, memoryId: mine.id, content: 'tampered' }),
+    ).toThrow(/memory/);
+    expect(deleteMemoryEntry(s.db, { ...scope, memoryId: mine.id })).toBe(0);
+    expect(
+      listMemoryEntries(s.db, { agentId: implementer, teamId: s.team.id }).map((m) => m.content),
+    ).toEqual(['implementer secret sauce']);
   });
 
   test('entries saved in the same millisecond inject in insertion order', () => {

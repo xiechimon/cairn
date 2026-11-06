@@ -397,7 +397,7 @@ describe('removing the agent table from a seeded legacy install', () => {
         teamScoped: memoryOpsAreTeamScoped(kind),
       }).map((entry) => entry.title);
     expect(titles('review')).toEqual(['review fact']);
-    expect(titles('verify')).toContain('verify fact');
+    expect(titles('verify')).toEqual(['verify fact']);
     expect(titles('build')).not.toContain('review fact');
     expect(titles('build')).not.toContain('verify fact');
     expect(titles('build')).toContain('impl fact');
