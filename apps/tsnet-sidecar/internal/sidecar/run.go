@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -22,18 +23,45 @@ type Config struct {
 	Logf            func(format string, args ...any)
 }
 
+type connContextKey struct{}
+
 type listenerServer struct {
 	server *http.Server
 	done   chan struct{}
+	mu     sync.Mutex
+	active map[net.Conn]struct{}
 }
 
 func serve(listener net.Listener, handler http.Handler) *listenerServer {
-	ls := &listenerServer{server: &http.Server{Handler: handler}, done: make(chan struct{})}
+	ls := &listenerServer{done: make(chan struct{}), active: map[net.Conn]struct{}{}}
+	ls.server = &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			conn := r.Context().Value(connContextKey{}).(net.Conn)
+			ls.track(conn)
+			defer ls.untrack(conn)
+			handler.ServeHTTP(w, r)
+		}),
+		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+			return context.WithValue(ctx, connContextKey{}, conn)
+		},
+	}
 	go func() {
 		defer close(ls.done)
 		_ = ls.server.Serve(listener)
 	}()
 	return ls
+}
+
+func (ls *listenerServer) track(conn net.Conn) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	ls.active[conn] = struct{}{}
+}
+
+func (ls *listenerServer) untrack(conn net.Conn) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	delete(ls.active, conn)
 }
 
 func (ls *listenerServer) close() {
@@ -42,6 +70,11 @@ func (ls *listenerServer) close() {
 	if ls.server.Shutdown(ctx) != nil {
 		_ = ls.server.Close()
 	}
+	ls.mu.Lock()
+	for conn := range ls.active {
+		_ = conn.Close()
+	}
+	ls.mu.Unlock()
 	<-ls.done
 }
 
