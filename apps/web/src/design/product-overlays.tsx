@@ -88,6 +88,7 @@ function SearchSpecimen() {
   const [withContext, setWithContext] = useState(false);
   return (
     <Specimen
+      id="search"
       title="Search"
       note="SearchPanel: on a task page the task rides along as a chip and its commands come first"
       stage="canvas"
@@ -141,6 +142,7 @@ function PickersSpecimen() {
   const inlineId = useId();
   return (
     <Specimen
+      id="slash-menu-and-mentions"
       title="Slash menu and mentions"
       note={picked ?? 'SlashMenu and MentionInline as they float over the composer'}
       stage="canvas"
@@ -202,6 +204,7 @@ function AttachmentsSpecimen() {
   const onPreview = (name: string, src: string) => setPreview({ name, src });
   return (
     <Specimen
+      id="attachments-2"
       title="Attachments"
       note="AttachmentCard states; click a done card for AttachmentPreview"
       stage="canvas"
@@ -260,6 +263,7 @@ function MenusSpecimen() {
   const moreRef = useRef<HTMLButtonElement>(null);
   return (
     <Specimen
+      id="menus-and-popovers"
       title="Menus and popovers"
       note={last ?? 'MoreMenu, PaneTitle, PaneViewButtons, the status menu and the agent picker'}
       stage="canvas"
@@ -356,6 +360,7 @@ function ConfirmsSpecimen() {
   ] as const;
   return (
     <Specimen
+      id="confirmations"
       title="Confirmations"
       note={last ?? 'Each button opens the real confirmation'}
       stage="canvas"

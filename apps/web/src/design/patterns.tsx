@@ -62,7 +62,7 @@ export function ProvidersPattern() {
       title="Empty to filled"
       lede="A resource page from its first visit: an empty state, a two-step dialog with a grouped picker, a toast, then the list."
     >
-      <Specimen title="Providers page" stage="canvas" className="block">
+      <Specimen id="providers-page" title="Providers page" stage="canvas" className="block">
         <div className="mx-auto flex max-w-160 flex-col gap-4">
           <div className="flex items-center justify-between">
             <span className="text-page font-medium">Providers</span>

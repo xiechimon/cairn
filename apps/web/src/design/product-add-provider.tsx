@@ -48,6 +48,7 @@ export function ProductAddProviderSection() {
       lede="The add-provider form after a preset is picked: connection settings fold behind a one-line summary, and models are chips picked from pi's catalog, searched in a popover, or typed as a custom id."
     >
       <Specimen
+        id="connection-disclosure-and-model-chips"
         title="Connection disclosure and model chips"
         note="Anthropic preset (newest per family picked) · OpenRouter (386 models, none picked, search to add)"
         stage="canvas"

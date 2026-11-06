@@ -26,6 +26,7 @@ import type {
   TodoRecord,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
@@ -471,6 +472,7 @@ export function HomeC({
             onStop={surface.onStop}
             earlier={surface.earlier}
             onSettings={() => surface.setChiefView('settings')}
+            showBindGate={!live}
             hero={hero}
             lead={lead}
             prefill={prefill}
@@ -482,12 +484,17 @@ export function HomeC({
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
             composerTools={
-              <ComposerThreadTarget
-                targets={thread.targets}
-                picked={thread.picked}
-                composerRef={composerRef}
-                onPick={thread.pick}
-              />
+              <>
+                <ComposerThreadTarget
+                  targets={thread.targets}
+                  picked={thread.picked}
+                  composerRef={composerRef}
+                  onPick={thread.pick}
+                />
+                <ComposerSetupHint
+                  onOpenCoordinatorSettings={() => surface.setChiefView('settings')}
+                />
+              </>
             }
             composerRef={(node) => {
               composerRef.current = node;

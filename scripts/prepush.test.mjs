@@ -310,7 +310,11 @@ test('folded gates stay visibly red, continue after failures and retain full his
   for (const [name, variable] of expected) {
     const step = gates
       .split(/\n(?= {6}- )/)
-      .find((step) => step.startsWith(`      - name: ${name}\n`));
+      .find(
+        (step) =>
+          step.startsWith(`      - name: ${name}\n`) ||
+          step.startsWith(`      - name: "${name}"\n`),
+      );
     assert.ok(step, name);
     if (name.startsWith('Comment discipline')) assert.match(step, /continue-on-error: true/, name);
     else assert.doesNotMatch(step, /continue-on-error:/, name);

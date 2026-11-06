@@ -4848,6 +4848,66 @@ exports[`body/envelope schema snapshots > patchChiefBody > patchChiefBody.json 1
 }
 `;
 
+exports[`body/envelope schema snapshots > planResponse > planResponse.json 1`] = `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "autoApproveAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "autoApprovePausedAt": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "buildId": {
+      "type": "string",
+    },
+    "content": {
+      "type": "string",
+    },
+    "createdAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
+    "id": {
+      "type": "string",
+    },
+    "version": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer",
+    },
+  },
+  "required": [
+    "id",
+    "buildId",
+    "version",
+    "createdAt",
+    "content",
+  ],
+  "type": "object",
+}
+`;
+
 exports[`body/envelope schema snapshots > planRow > planRow.json 1`] = `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8974,6 +9034,29 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
         {
           "additionalProperties": false,
           "properties": {
+            "codexLogin": {
+              "additionalProperties": false,
+              "properties": {
+                "expiresAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "state": {
+                  "enum": [
+                    "ok",
+                    "expired",
+                    "absent",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": [
+                "state",
+              ],
+              "type": "object",
+            },
             "computer": {
               "const": true,
               "type": "boolean",
