@@ -5,6 +5,8 @@ import {
   conversationMessagesQuerySchema,
   createBranchSyncBodySchema,
   planRowSchema,
+  prPanelListSchema,
+  prPanelQuerySchema,
   startBuildsBodySchema,
   tokenUsageSchema,
 } from '@cairn/shared';
@@ -43,6 +45,7 @@ import { readMergeGateState } from './services/merge-gate-run.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { holdSecondRejectionRework } from './services/research-stuck.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
+import { listThreadPrs } from './services/thread-pr.js';
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -52,6 +55,18 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     const record = getBuild(svc, id);
     if (!record) throw notFound(`build ${id}`);
     return c.json(record);
+  });
+
+  app.get('/api/prs', (c) => {
+    const { threadId } = parseWith(prPanelQuerySchema, c.req.query(), 'query');
+    return c.json(
+      prPanelListSchema.parse(
+        listThreadPrs(ctx.db, {
+          teamId: ctx.team.id,
+          ...(threadId !== undefined ? { threadId } : {}),
+        }),
+      ),
+    );
   });
 
   app.get('/api/builds/:id/gate', (c) => {
