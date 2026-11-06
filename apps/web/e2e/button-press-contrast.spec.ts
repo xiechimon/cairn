@@ -17,11 +17,13 @@ function contrast(a: Rgba, b: Rgba): number {
 }
 
 async function pressedColors(page: Page, control: Locator) {
+  await control.scrollIntoViewIfNeeded();
   const box = await control.boundingBox();
   if (box === null) throw new Error('control has no box');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.waitForTimeout(300);
   await page.mouse.down();
+  expect(await control.evaluate((el) => el.matches(':active')), 'the control is pressed').toBe(true);
   const pressed = await control.evaluate((el) => {
     const toRgba = (css: string): [number, number, number, number] => {
       const probe = document.createElement('canvas').getContext('2d');
@@ -88,8 +90,11 @@ for (const theme of ['light', 'dark'] as const) {
       await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/design.html');
       await page.getByRole('checkbox').first().check();
-      const bar = page.getByRole('button', { name: /Resolve|解决|完成/ }).first();
-      await expectReadable(page, bar, 'bulk action');
+      const bar = page.locator('[data-slot="bulk-bar"]');
+      await expect(bar).toBeVisible();
+      for (const name of ['Resolve', 'Snooze', 'Archive', 'Clear selection']) {
+        await expectReadable(page, bar.getByRole('button', { name }), `bulk ${name}`);
+      }
     });
   });
 }
