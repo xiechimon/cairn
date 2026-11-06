@@ -199,7 +199,6 @@ export function AccountsSection() {
             stickiness={ACCOUNT_STICKINESS}
             now={NOW}
             actionsFor={actionsFor}
-            onAdd={() => undefined}
           />
         </div>
       </Specimen>

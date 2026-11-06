@@ -431,52 +431,53 @@ export function VendorSection({
   );
 }
 
-export function VendorTabs({
+export function VendorList({
   value,
   counts,
   onChange,
-  onAdd,
 }: {
   value: AccountVendor;
   counts: Record<AccountVendor, number>;
   onChange: (vendor: AccountVendor) => void;
-  onAdd?: () => void;
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex items-center gap-3">
-      <SegmentedTabs
-        label={t('订阅账户')}
-        value={value}
-        onChange={onChange}
-        className="min-w-0"
-        options={ACCOUNT_VENDORS.map((vendor) => {
-          const { short, Mark } = VENDORS[vendor];
-          return {
-            value: vendor,
-            label: `${short} ${counts[vendor]}`,
-            icon: (
-              <Mark
-                width={14}
-                height={14}
-                className="block flex-none text-foreground [&_path]:fill-current"
-              />
-            ),
-            data: { 'data-vendor': vendor },
-          };
-        })}
-      />
-      {onAdd !== undefined && (
-        <Button
-          variant="ghost"
-          className="ml-auto flex-none"
-          aria-label={t('添加 {vendor} 账户', { vendor: VENDORS[value].label })}
-          onClick={onAdd}
-        >
-          <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-          <span className="hidden sm:inline">{t('添加账户')}</span>
-        </Button>
-      )}
+    <div
+      role="tablist"
+      aria-orientation="vertical"
+      aria-label={t('订阅账户')}
+      data-testid="vendor-list"
+      className="flex w-full flex-none flex-col border-b border-border @3xl:w-64 @3xl:border-r @3xl:border-b-0"
+    >
+      {ACCOUNT_VENDORS.map((vendor) => {
+        const { label, short, Mark } = VENDORS[vendor];
+        const selected = vendor === value;
+        return (
+          <button
+            key={vendor}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-label={`${short} ${counts[vendor]}`}
+            data-vendor={vendor}
+            onClick={() => onChange(vendor)}
+            className="flex items-center gap-2.5 border-b border-border px-3.5 py-2.5 text-left outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-selected:bg-secondary"
+          >
+            <Mark
+              aria-hidden
+              width={16}
+              height={16}
+              className="block flex-none text-content-secondary [&_path]:fill-current"
+            />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-ui font-medium text-foreground">{label}</span>
+              <span className="truncate text-meta text-content-tertiary">
+                {t('{n} 个账户', { n: counts[vendor] })}
+              </span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

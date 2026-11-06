@@ -53,9 +53,9 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
 test('fixture: empty team shows every vendor with an add action and no quota', async ({ page }) => {
   await page.goto('/app/resources/model-routing?scenario=model-routing-empty');
   await expect(page.getByRole('tablist', { name: '订阅账户' }).getByRole('tab')).toHaveText([
-    /Claude 0/,
-    /Codex 0/,
-    /Grok 0/,
+    /Claude\s*0 个账户/,
+    /Codex\s*0 个账户/,
+    /Grok\s*0 个账户/,
   ]);
   await expect(page.getByTestId('pool-window')).toHaveCount(0);
   await expect(page.getByText('还没有 Claude 账户')).toBeVisible();

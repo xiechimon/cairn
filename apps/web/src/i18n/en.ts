@@ -1840,4 +1840,5 @@ export const EN: Record<string, string> = {
   作用于: 'Applies to',
   视图: 'View',
   '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
+  '{n} 个账户': '{n} accounts',
 };

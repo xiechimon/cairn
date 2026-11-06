@@ -2,7 +2,7 @@ import { cn } from 'cn';
 import { X } from 'lucide-react';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { SettingsPanel } from '../settings-list.js';
+import { SettingsPanel, SettingsSection } from '../settings-list.js';
 import { ToggleSwitch } from '../toggle-switch.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
@@ -176,13 +176,9 @@ export function ProviderSection({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex flex-col px-1">
-        <h3 className="m-0 text-ui font-medium text-foreground">{title}</h3>
-        {hint !== undefined && <span className="text-meta text-content-tertiary">{hint}</span>}
-      </div>
+    <SettingsSection title={title} description={hint}>
       {children}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -206,7 +202,7 @@ export function ProviderModelRow({
       data-model-id={id}
       data-liveness={dead ? 'dead' : 'alive'}
       className={cn(
-        'flex min-h-11 items-center gap-3 px-4 py-1.5',
+        'settings-flat-block flex min-h-11 items-center gap-3 px-4 py-1.5',
         dead && 'text-content-tertiary',
       )}
     >

@@ -226,7 +226,7 @@ export function ModelRoutingPage() {
           </>
         }
       >
-        <div className="p-4">
+        <div className={tab === 'routing' ? 'p-4' : undefined}>
           {tab === 'accounts' ? (
             <SubscriptionAccounts
               gate={(forVendor, section) => (

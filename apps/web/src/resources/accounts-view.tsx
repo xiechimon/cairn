@@ -11,8 +11,8 @@ import {
   type AccountRowActions,
   AccountStepRow,
   StickyThreadRow,
+  VendorList,
   VendorSection,
-  VendorTabs,
 } from '../components/accounts/account-parts.js';
 import { ListCard } from '../components/list-card.js';
 import { SETTINGS_ROW_CLS } from '../components/settings-list.js';
@@ -25,7 +25,6 @@ export interface SubscriptionAccountsProps {
   now: number;
   actionsFor: (account: SubscriptionAccount) => AccountRowActions;
   statusFor?: (account: SubscriptionAccount) => ReactNode;
-  onAdd?: (vendor: AccountVendor) => void;
   vendor?: AccountVendor;
   onVendorChange?: (vendor: AccountVendor) => void;
   gate?: (vendor: AccountVendor, section: ReactNode) => ReactNode;
@@ -85,8 +84,8 @@ export function SubscriptionAccounts(props: SubscriptionAccountsProps) {
   const count = (v: AccountVendor) => props.accounts.filter((a) => a.vendor === v).length;
   const counts = { claude: count('claude'), codex: count('codex'), grok: count('grok') };
   return (
-    <div data-testid="subscription-accounts" className="flex flex-col gap-4">
-      <VendorTabs
+    <div data-testid="subscription-accounts" className="flex min-w-0 flex-col @3xl:flex-row">
+      <VendorList
         value={vendor}
         counts={counts}
         onChange={(next) => {
@@ -94,43 +93,44 @@ export function SubscriptionAccounts(props: SubscriptionAccountsProps) {
           setLocalVendor(next);
           props.onVendorChange?.(next);
         }}
-        onAdd={props.onAdd === undefined ? undefined : () => props.onAdd?.(vendor)}
       />
-      {(props.gate ?? ((_vendor, section) => section))(
-        vendor,
-        <VendorSection
-          key={vendor}
-          vendor={vendor}
-          accounts={props.accounts.filter((a) => a.vendor === vendor)}
-          now={props.now}
-          renderRow={(account, index) => {
-            const steps = props.stepsByAccount[account.id];
-            const expanded = open === account.id;
-            return (
-              <div key={account.id} className="flex flex-col">
-                <AccountRow
-                  account={account}
-                  index={index}
-                  now={props.now}
-                  actions={props.actionsFor(account)}
-                  status={props.statusFor?.(account)}
-                  expanded={expanded}
-                  onToggleExpanded={
-                    steps === undefined ? undefined : () => setOpen(expanded ? null : account.id)
-                  }
-                />
-                {expanded && steps !== undefined && (
-                  <AccountDetail
-                    steps={steps}
-                    sticky={props.stickiness.filter((s) => s.subscriptionId === account.id)}
+      <div className="min-w-0 flex-1 p-4">
+        {(props.gate ?? ((_vendor, section) => section))(
+          vendor,
+          <VendorSection
+            key={vendor}
+            vendor={vendor}
+            accounts={props.accounts.filter((a) => a.vendor === vendor)}
+            now={props.now}
+            renderRow={(account, index) => {
+              const steps = props.stepsByAccount[account.id];
+              const expanded = open === account.id;
+              return (
+                <div key={account.id} className="flex flex-col">
+                  <AccountRow
+                    account={account}
+                    index={index}
                     now={props.now}
+                    actions={props.actionsFor(account)}
+                    status={props.statusFor?.(account)}
+                    expanded={expanded}
+                    onToggleExpanded={
+                      steps === undefined ? undefined : () => setOpen(expanded ? null : account.id)
+                    }
                   />
-                )}
-              </div>
-            );
-          }}
-        />,
-      )}
+                  {expanded && steps !== undefined && (
+                    <AccountDetail
+                      steps={steps}
+                      sticky={props.stickiness.filter((s) => s.subscriptionId === account.id)}
+                      now={props.now}
+                    />
+                  )}
+                </div>
+              );
+            }}
+          />,
+        )}
+      </div>
     </div>
   );
 }
