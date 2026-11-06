@@ -261,6 +261,9 @@ export function BoardPage() {
               machines={machines}
               coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
               schedules={schedules}
+              machinesQuery={live ? machinesQ : undefined}
+              todosQuery={live ? todosQ : undefined}
+              schedulesQuery={live ? schedulesQ : undefined}
             />
           )}
           <ChiefQuestionPanel />
@@ -285,6 +288,7 @@ export function BoardPage() {
         onQuery={search.setQuery}
         onClose={() => search.setOpen(false)}
         server={live ? searchResults.data : undefined}
+        serverQuery={live ? searchResults : undefined}
       />
     </div>
   );

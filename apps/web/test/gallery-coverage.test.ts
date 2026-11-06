@@ -9,6 +9,10 @@ const COMPONENTS = join(SRC, 'components');
 const NOT_IN_GALLERY: Record<string, string> = {
   'ui/alert-dialog.tsx':
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
+  'conversation-skeleton.tsx':
+    'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
+  'query-state.tsx':
+    'Gap: wraps live queries on settings, panels and the team page; the gallery has no live queries, so no specimen yet.',
   'queued-capsules.tsx':
     'Rendered inside the Queued messages specimen through src/detail/composer.tsx.',
 };

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { stubLiveApiKeys } from './helpers.js';
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
@@ -58,6 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
   }) => {
     await setTheme(page, theme);
+    await stubLiveApiKeys(page);
     await page.goto('/app/api-keys');
     const empty = page.getByTestId('keys-empty');
     await expect(empty).toBeVisible();
