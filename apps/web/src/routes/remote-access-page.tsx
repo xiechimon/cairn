@@ -108,6 +108,7 @@ export function RemoteAccessPage() {
     routesQ.data === undefined ? [] : pairingCandidates(routes, window.location.origin);
   const pairingBlocked = live && routesQ.data !== undefined && candidates.length === 0;
   const tailnet = routesQ.data?.tailnet;
+  const awaitingTailnetLogin = tailnet?.state === 'needs-login' && tailnet.authUrl !== null;
   const devices = devicesQ.data ?? [];
   const startPairing = () =>
     mutations.createPairingCode.mutate(undefined, {
@@ -140,14 +141,23 @@ export function RemoteAccessPage() {
           )}
         </p>
       )}
-      {live && routesQ.data === undefined ? null : routes.length === 0 ? (
+      {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
+        devices.length === 0 && (
+          <EmptyState
+            testId="remote-routes-empty"
+            className="mt-6"
+            icon={Smartphone}
+            title={t('还没有配对的设备')}
+          />
+        )
+      ) : routes.length === 0 ? (
         <EmptyState
           testId="remote-routes-empty"
           className="mt-6"
           icon={Smartphone}
           title={t('这台电脑暂时没有手机可用的线路。')}
           description={
-            tailnet?.state === 'needs-login' && tailnet.authUrl !== null
+            awaitingTailnetLogin && tailnet?.authUrl
               ? t('请先登录 Tailscale：{url}', { url: tailnet.authUrl })
               : t('设置 CAIRN_TSNET=1 后重启，即可用 Tailscale 连接手机。')
           }

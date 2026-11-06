@@ -1833,6 +1833,7 @@ export const EN: Record<string, string> = {
   '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请设置 CAIRN_TSNET=1 后重启，或用局域网或 Tailscale 地址打开本页。':
     'Pairing is off: this page is open on an address that only works on this computer, so a phone would connect to itself. Set CAIRN_TSNET=1 and restart, or open this page through its LAN or Tailscale address.',
   当前页面地址: 'This page’s address',
+  还没有配对的设备: 'No paired devices yet',
   撤销设备: 'Revoke',
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',
   '配对失败，请在电脑上重新生成二维码。': 'Pairing failed. Create a new QR code on your computer.',
