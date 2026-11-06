@@ -4,7 +4,6 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readlinkSync,
   rmSync,
@@ -12,7 +11,6 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { expect, test } from 'vitest';
@@ -21,9 +19,10 @@ import { NspawnOrbProvider, runOrbCommand } from '../src/orb/provider.js';
 import { boot, CLAIMED, defer, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { createOrbCheckout } from './orb-dist-fixture.js';
 import { FakeOrbProvider } from './orb-fake.js';
+import { testTempDir } from './test-temp-dir.js';
 
 test('compiled worker runs an agent command with CAIRN_ORB through the real Unix socket relay', async () => {
-  const scratch = mkdtempSync(join(tmpdir(), 'cairn-orb-worker-'));
+  const scratch = testTempDir('cairn-orb-worker-');
   symlinkSync(resolve('apps/daemon/node_modules'), join(scratch, 'node_modules'), 'dir');
   copyFileSync(resolve('apps/daemon/package.json'), join(scratch, 'package.json'));
   const entry = join(scratch, 'dist', 'cli.mjs');
@@ -162,12 +161,11 @@ test('compiled worker runs an agent command with CAIRN_ORB through the real Unix
     await handle.stop();
     await handle.done;
     await stub.close();
-    rmSync(scratch, { recursive: true, force: true });
   }
 }, 180_000);
 
 test('a compiled waiting worker retains release A until refusal and release B authentication', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-up-'));
+  const root = testTempDir('orb-up-');
   const host = createOrbCheckout(root);
   symlinkSync(resolve('apps/daemon/node_modules'), join(root, 'node_modules'), 'dir');
   const distRoot = join(root, 'dist');
@@ -299,6 +297,5 @@ test('a compiled waiting worker retains release A until refusal and release B au
     controller.abort();
     await Promise.allSettled(workers);
     await stub.close();
-    rmSync(root, { recursive: true, force: true });
   }
 }, 180_000);
