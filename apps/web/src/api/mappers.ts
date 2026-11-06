@@ -1512,9 +1512,17 @@ function collectChiefStream(
               id: m.id,
               markdown: text,
               at: clockTime(m.createdAt),
+              createdAt: m.createdAt,
               ...rowProject(m),
             }
-          : { kind: 'user', text: head, id: m.id, at: clockTime(m.createdAt), ...rowProject(m) },
+          : {
+              kind: 'user',
+              text: head,
+              id: m.id,
+              at: clockTime(m.createdAt),
+              createdAt: m.createdAt,
+              ...rowProject(m),
+            },
       );
       continue;
     }
@@ -1524,6 +1532,7 @@ function collectChiefStream(
       markdown: rawText,
       seconds: '',
       id: m.id,
+      createdAt: m.createdAt,
       ...(pendingTools.length > 0
         ? { tools: pendingTools.map(({ running: _settled, ...tool }) => tool) }
         : {}),

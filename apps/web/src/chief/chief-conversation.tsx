@@ -19,7 +19,7 @@ import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
-import { JumpToLatestButton } from '../components/chat/jump-to-latest.js';
+import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
@@ -32,6 +32,7 @@ import {
 import {
   MessageScroller,
   MessageScrollerContent,
+  MessageScrollerProvider,
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
@@ -107,6 +108,26 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
     onAtBottom(!scrollable.end);
   }, [scrollable.end, onAtBottom]);
   return null;
+}
+
+export function ChiefScrollProvider({
+  open = true,
+  children,
+}: {
+  open?: boolean;
+  children: React.ReactNode;
+}) {
+  const [atBottom, setAtBottom] = useState(true);
+  return (
+    <MessageScrollerProvider
+      autoScroll={open && atBottom}
+      scrollEdgeThreshold={FOLLOW_THRESHOLD}
+      defaultScrollPosition="end"
+    >
+      <ChiefFollowArmed onAtBottom={setAtBottom} />
+      {children}
+    </MessageScrollerProvider>
+  );
 }
 
 export type ChiefConversationVariant = 'drawer' | 'global';
