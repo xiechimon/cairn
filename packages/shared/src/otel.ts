@@ -25,6 +25,14 @@ export function otlpStepSpanIdOfBuild(buildId: string, stepId: string): string {
   return deriveOtelId(8, 'span', buildId, 'step', stepId);
 }
 
+export function otlpTraceIdOfTurn(stepId: string): string {
+  return deriveOtelId(16, 'trace', 'turn', stepId);
+}
+
+export function otlpTraceIdOfStep(step: { kind: string; buildId: string; stepId: string }): string {
+  return step.kind === 'chief' ? otlpTraceIdOfTurn(step.stepId) : otlpTraceIdOfBuild(step.buildId);
+}
+
 export function otlpTraceparent(traceId: string, spanId: string): string {
   return `00-${traceId}-${spanId}-01`;
 }
@@ -68,17 +76,20 @@ export interface StepOtelContext {
   headers: Record<string, string>;
   exporterEndpoint: string;
   exporterHeaders: string;
+  environment?: string;
 }
 
 export function stepOtelContext(
   buildId: string,
   stepId: string,
   target: OtlpTarget,
+  options: { kind?: string; environment?: string | null } = {},
 ): StepOtelContext {
   const basePath = target.url.pathname.replace(/\/v1\/traces$/, '');
   return {
-    traceId: otlpTraceIdOfBuild(buildId),
+    traceId: otlpTraceIdOfStep({ kind: options.kind ?? '', buildId, stepId }),
     stepSpanId: otlpStepSpanIdOfBuild(buildId, stepId),
+    ...(options.environment != null ? { environment: options.environment } : {}),
     tracesUrl: `${target.url.origin}${target.url.pathname}`,
     headers: target.headers,
     exporterEndpoint: `${target.url.origin}${basePath}`,
@@ -165,14 +176,77 @@ export function otlpTracesRequest(
   };
 }
 
+export const OTLP_SEND_TIMEOUT_MS = 5000;
+
 export async function postOtlpTraces(
   target: OtlpTarget,
   request: OtlpTracesRequest,
+  timeoutMs = OTLP_SEND_TIMEOUT_MS,
 ): Promise<void> {
   const response = await fetch(target.url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...target.headers },
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`OTLP endpoint replied HTTP ${response.status}`);
+}
+
+export interface OtlpSenderLimits {
+  concurrency: number;
+  queue: number;
+  timeoutMs: number;
+}
+
+export interface OtlpSender {
+  send(
+    target: OtlpTarget,
+    request: OtlpTracesRequest,
+    onFailure?: (error: unknown) => void,
+  ): boolean;
+  dropped(): number;
+}
+
+interface Job {
+  target: OtlpTarget;
+  request: OtlpTracesRequest;
+  onFailure: ((error: unknown) => void) | undefined;
+}
+
+export function createOtlpSender(
+  limits: OtlpSenderLimits = { concurrency: 4, queue: 64, timeoutMs: OTLP_SEND_TIMEOUT_MS },
+  defaultOnFailure?: (error: unknown) => void,
+): OtlpSender {
+  const waiting: Job[] = [];
+  let active = 0;
+  let dropped = 0;
+  const run = (job: Job): void => {
+    active += 1;
+    postOtlpTraces(job.target, job.request, limits.timeoutMs)
+      .catch((error: unknown) => {
+        try {
+          (job.onFailure ?? defaultOnFailure)?.(error);
+        } catch {}
+      })
+      .finally(() => {
+        active -= 1;
+        const next = waiting.shift();
+        if (next !== undefined) run(next);
+      });
+  };
+  return {
+    send(target, request, onFailure) {
+      if (active < limits.concurrency) {
+        run({ target, request, onFailure });
+        return true;
+      }
+      if (waiting.length >= limits.queue) {
+        dropped += 1;
+        return false;
+      }
+      waiting.push({ target, request, onFailure });
+      return true;
+    },
+    dropped: () => dropped,
+  };
 }
