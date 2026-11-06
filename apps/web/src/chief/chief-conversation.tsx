@@ -733,7 +733,7 @@ export function ChiefConversation({
               <p
                 role="alert"
                 data-testid="chief-composer-error"
-                className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex items-center gap-1.5 text-meta text-destructive`}
+                className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
               >
                 <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
                 {composerError}

@@ -483,3 +483,36 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await expect(page).toHaveURL(/[?&]thread=todo-1/);
   });
 });
+
+test.describe('queued messages never push the input out of the composer', () => {
+  for (const target of [
+    { name: 'home at 600px height', url: '/app', width: 1440, height: 600 },
+    { name: 'drawer at 600px height', url: '/app/schedules?chief=chief-home', width: 1440, height: 600 },
+  ]) {
+    test(`ten queued messages keep the input and send button in view (${target.name})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: target.width, height: target.height });
+      const queued = Array.from({ length: 10 }, (_, n) => ({
+        id: `q${n}`,
+        role: 'user',
+        content: `Queued message number ${n + 1} with enough words to look like a real follow-up`,
+        createdAt: 12 + n,
+      }));
+      await mockLive(page, {
+        activeRun: { phase: 'chief' },
+        pending: queued.map((row) => ({ messageId: row.id, state: 'queued' as const })),
+        fallbackModel: null,
+        outage: null,
+        messages: [FIRST, ...queued],
+      });
+      await page.goto(target.url);
+      const root = target.url.includes('chief=') ? page.locator('.chief-drawer') : page.getByTestId('home-c');
+      await expect(root.getByTestId('queued-message')).toHaveCount(10);
+      await expect(root.getByTestId('chief-composer-input')).toBeInViewport({ ratio: 1 });
+      await expect(root.getByRole('button', { name: '停止 Coordinator 这次回复' })).toBeInViewport({ ratio: 1 });
+      const capsules = await root.getByTestId('queued-capsules').evaluate((node) => node.scrollHeight > node.clientHeight);
+      expect(capsules).toBe(true);
+    });
+  }
+});
