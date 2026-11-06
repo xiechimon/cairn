@@ -1,9 +1,13 @@
 import { existsSync, readdirSync } from 'node:fs';
 import * as http from 'node:http';
-import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { createTestTempRun, testTempRunId } from '../../scripts/test-tmpdir.mjs';
+import {
+  createTestTempRun,
+  testTempPrefix,
+  testTempRoot,
+  testTempRunId,
+} from '../../scripts/test-tmpdir.mjs';
 import { bootRealServer, type RealServer } from './helpers.js';
 
 const servers: RealServer[] = [];
@@ -63,15 +67,15 @@ describe('bootRealServer fixture lifecycle', () => {
 
   test('twenty sequential boot/close cycles leave zero owned entries', async () => {
     const foreign = createTestTempRun();
-    const prefix = `cairn-test-${testTempRunId}-`;
+    const prefix = testTempPrefix(testTempRunId);
     try {
-      const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith(prefix)));
+      const before = new Set(readdirSync(testTempRoot()).filter((name) => name.startsWith(prefix)));
       for (let i = 0; i < 20; i++) {
         if (i === 10) foreign.allocate('server-repos-');
         const server = await bootRealServer({ providerBaseUrl: 'http://127.0.0.1:9' });
         await server.close();
       }
-      const leaked = readdirSync(tmpdir()).filter(
+      const leaked = readdirSync(testTempRoot()).filter(
         (name) => name.startsWith(prefix) && !before.has(name),
       );
       expect(leaked).toEqual([]);

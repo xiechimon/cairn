@@ -1,11 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { makeTestTempDir, testTempPrefix, testTempRoot } from '../../../scripts/test-tmpdir.mjs';
 import { bootServer } from './helpers.js';
 
 const vitestBin = fileURLToPath(
@@ -79,8 +78,8 @@ test('startup failure cleans owned dirs', () => {
 `,
       });
       expect(result.status, `${result.stderr}${result.stdout}`).toBe(0);
-      const leftover = readdirSync(tmpdir()).filter((name) =>
-        name.includes(`ct-${runId.slice(0, 8)}-`),
+      const leftover = readdirSync(testTempRoot()).filter((name) =>
+        name.includes(testTempPrefix(runId)),
       );
       expect(leftover).toEqual([]);
     } finally {
@@ -116,11 +115,11 @@ test('leaks without dispose', () => {
       const owned = JSON.parse(readFileSync(ownedPath, 'utf8')) as string[];
       expect(owned.length).toBe(4);
       for (const dir of owned) {
-        expect(dir.includes(`ct-${runId.slice(0, 8)}-`)).toBe(true);
+        expect(dir.includes(testTempPrefix(runId))).toBe(true);
         expect(existsSync(dir)).toBe(false);
       }
-      const leftover = readdirSync(tmpdir()).filter((name) =>
-        name.includes(`ct-${runId.slice(0, 8)}-`),
+      const leftover = readdirSync(testTempRoot()).filter((name) =>
+        name.includes(testTempPrefix(runId)),
       );
       expect(leftover).toEqual([]);
     } finally {
