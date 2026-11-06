@@ -46,6 +46,7 @@ for (const theme of THEMES) {
       for (let i = 0; i < total; i += 1) {
         const label = (await grid.nth(i).getAttribute('data-pr-card-case')) ?? '';
         await cardOf(page, label).getByRole('button', { name: /Menu for PR/ }).click();
+        await expect(page.getByRole('menuitem', { name: 'Open on GitHub' })).toBeVisible();
         await expect(page.getByRole('menuitem', { name: 'Resolve' }), label).toHaveCount(
           withResolve.includes(label) ? 1 : 0,
         );
