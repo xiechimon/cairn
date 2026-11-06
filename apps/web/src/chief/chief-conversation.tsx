@@ -485,8 +485,6 @@ export function ChiefConversation({
       index={i}
       latest={i === latestMessage?.i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
-      bound={chief.bound}
-      agent={chief.agent}
       runningTool={chief.runningTool}
       copiedKey={copiedKey}
       onCopy={copyText}

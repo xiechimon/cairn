@@ -5,7 +5,7 @@ import { StatStrip } from '../components/stat-strip.js';
 import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import type { ThreadUsageSummary } from './thread-usage-model.js';
+import { type ThreadUsageSummary, threadUsageCaption } from './thread-usage-model.js';
 import { useThreadUsage } from './use-thread-usage.js';
 
 export function ThreadUsageFooter({ todo }: { todo: TodoRecord }) {
@@ -29,22 +29,12 @@ export function ThreadUsageDisclosure({
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
   const contentId = useId();
-  const models =
-    summary.models.length === 0
-      ? '—'
-      : summary.models.length === 1
-        ? summary.models[0]
-        : t('{n} 个模型', { n: summary.models.length });
   const caption =
     state === 'loading'
       ? t('正在加载用量…')
       : state === 'error'
         ? t('用量加载失败')
-        : t('{cost} · Token 数：{tokens} · — · {models}', {
-            cost: summary.cost,
-            tokens: summary.tokens,
-            models: models ?? '—',
-          });
+        : threadUsageCaption(summary, t);
   const toggle = (
     <Button
       variant="ghost"
