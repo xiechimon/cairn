@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive, THREAD } from './chief-home-mock';
 
 const DELAY_MS = 5000;
 
@@ -118,4 +119,29 @@ test('home: the composer stays usable while loading and send is disabled with a 
   await composer.getByRole('textbox').fill('draft typed while loading');
   await expect(composer.getByRole('textbox')).toHaveValue('draft typed while loading');
   await expect(composer.getByRole('button', { name: '发送' })).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('home: text typed while loading is still in the composer after loading, and send then works', async ({
+  page,
+}) => {
+  const sent = await mockLive(page, { threads: [THREAD], messages: [] });
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/**', async (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    await gate;
+    return route.fallback();
+  });
+  await page.goto('/app');
+  const loading = page.getByTestId('loading-composer');
+  await expect(loading).toBeVisible();
+  await loading.getByRole('textbox').fill('hello');
+  release();
+  const composer = page.getByTestId('chief-composer-input');
+  await expect(composer).toHaveValue('hello');
+  await expect(page.getByTestId('loading-composer')).toHaveCount(0);
+  await composer.press('Enter');
+  await expect.poll(() => sent).toContain('hello');
 });
