@@ -7,8 +7,13 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { openDbWithHandle } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
+import { listMemoryEntries } from '../src/services/memory.js';
 import { seedDefaultRouting } from '../src/services/routing-migration.js';
-import { routeForStep } from '../src/services/routing-rules.js';
+import {
+  memoryOpsAreTeamScoped,
+  memoryOwnerOf,
+  routeForStep,
+} from '../src/services/routing-rules.js';
 import { bootServer, subscriptionClaudeReport } from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
 
@@ -216,6 +221,11 @@ function customRoleWorld(): LegacyWorld {
       verify: { agentId: 'agent-verifier' },
     }),
   );
+  world.sqlite.exec(
+    `INSERT INTO agent_memory (id, agentId, teamId, title, content, createdAt, updatedAt) VALUES
+       ('mem-custom-review', 'agent-custom-reviewer', 't1', 'review fact', 'the custom reviewer learned this', 1, 1),
+       ('mem-verify', 'agent-verifier', 't1', 'verify fact', 'the verifier learned this', 1, 1)`,
+  );
   migrateAll(world.sqlite);
   return world;
 }
@@ -367,6 +377,30 @@ describe('removing the agent table from a seeded legacy install', () => {
     expect(routeForStep(opened.db, todoRow, 'review')?.modelId).toBe('glm-5.3');
     expect(routeForStep(opened.db, todoRow, 'verify')?.modelId).toBe('claude-sonnet-5-5');
     expect(routeForStep(opened.db, todoRow, 'plan')?.modelId).toBe('claude-sonnet-5-5');
+    opened.close();
+  });
+
+  test('reviewer and verifier memories follow their replacement owners and stay out of team memory', () => {
+    const world = customRoleWorld();
+    world.sqlite.close();
+    const opened = openDbWithHandle(world.dbPath);
+    const todoRow = opened.db
+      .select()
+      .from(schema.todo)
+      .where(eq(schema.todo.id, 'todo-flight'))
+      .get();
+    if (todoRow === undefined) throw new Error('fixture todo missing');
+    const titles = (kind: 'review' | 'verify' | 'build') =>
+      listMemoryEntries(opened.db, {
+        agentId: memoryOwnerOf(opened.db, 't1', kind),
+        teamId: 't1',
+        teamScoped: memoryOpsAreTeamScoped(kind),
+      }).map((entry) => entry.title);
+    expect(titles('review')).toEqual(['review fact']);
+    expect(titles('verify')).toContain('verify fact');
+    expect(titles('build')).not.toContain('review fact');
+    expect(titles('build')).not.toContain('verify fact');
+    expect(titles('build')).toContain('impl fact');
     opened.close();
   });
 
