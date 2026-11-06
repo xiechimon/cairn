@@ -769,6 +769,23 @@ export const machine = sqliteTable(
   (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
 );
 
+export const harnessProfile = sqliteTable(
+  'harness_profile',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    mode: text('mode').notNull().default('independent'),
+    capabilities: json<string[]>('capabilities').notNull().default(sql`'[]'`),
+    targets: json<string[]>('targets').notNull().default(sql`'[]'`),
+    version: integer('version').notNull().default(0),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [uniqueIndex('harness_profile_team_unique').on(t.teamId)],
+);
+
 export const tokenUsage = sqliteTable(
   'token_usage',
   {

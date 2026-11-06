@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "eea2e66c-18db-459f-be5e-3708fcae5901",
+  "id": "5f96e5f0-4b3c-4d66-ac5c-e5f33b701245",
   "prevId": "036807ad-bfba-4475-84c7-26b9787d68f4",
   "tables": {
     "agent": {
@@ -2987,6 +2987,98 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "harness_profile": {
+      "name": "harness_profile",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'independent'"
+        },
+        "capabilities": {
+          "name": "capabilities",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "targets": {
+          "name": "targets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "harness_profile_team_unique": {
+          "name": "harness_profile_team_unique",
+          "columns": [
+            "teamId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "harness_profile_teamId_team_id_fk": {
+          "name": "harness_profile_teamId_team_id_fk",
+          "tableFrom": "harness_profile",
+          "tableTo": "team",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "machine": {
       "name": "machine",
       "columns": {
@@ -4993,14 +5085,6 @@
         },
         "holdCount": {
           "name": "holdCount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "claimCount": {
-          "name": "claimCount",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

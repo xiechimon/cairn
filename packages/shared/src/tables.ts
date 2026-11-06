@@ -57,6 +57,7 @@ export const DB_TABLES = [
   'due_event',
   'feature_flag',
   'client_message',
+  'harness_profile',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -100,4 +101,5 @@ export const INTERNAL_ONLY_TABLES = [
   'due_event',
   'feature_flag',
   'client_message',
+  'harness_profile',
 ] as const;
