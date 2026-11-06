@@ -42,7 +42,7 @@ test('the migration SQL counts; only its generated snapshot does not', () => {
 });
 
 test('the plan replaces a stale size label and leaves other labels alone', () => {
-  assert.deepEqual(sizeLabelPlan([f('apps/web/src/a.ts', 50)], ['review-gate', 'size:XS']), {
+  assert.deepEqual(sizeLabelPlan([f('apps/web/src/a.ts', 50)], ['bug', 'size:XS']), {
     lines: 50,
     label: 'size:M',
     color: 'fbca04',

@@ -123,7 +123,7 @@ class WorkflowTaskGuardTests(unittest.TestCase):
                 root = Path(directory)
                 root.joinpath('pr-tasks.log').write_text(task_log)
                 if pending:
-                    root.joinpath('needs-decision.flag').touch()
+                    root.joinpath('hold.flag').touch()
                 gh = root.joinpath('gh')
                 gh.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$GH_CALLS"\n')
                 gh.chmod(0o755)
@@ -132,7 +132,7 @@ class WorkflowTaskGuardTests(unittest.TestCase):
                 result = subprocess.run(['bash', '-e', '-c', script], cwd=directory, env=env, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 commands = calls.read_text() if calls.exists() else ''
-                self.assertEqual('--add-label needs-decision' in commands, expected_label, commands)
+                self.assertEqual('--add-label' in commands, expected_label, commands)
                 self.assertEqual('--disable-auto' in commands, expected_disarm, commands)
 
 
@@ -146,9 +146,9 @@ class WorkflowTaskGuardTests(unittest.TestCase):
                     break
                 lines.append(line[10:])
             return '\n'.join(lines)
-        refuse = step('Refuse while a person has a decision pending (needs-decision label)')
+        refuse = step('Refuse while a hold is on (coordinator-hold label)')
         disarm = step('Mark the decision pending and disarm auto-merge')
-        for labels, held in [('review-gate,coordinator-hold', True), ('review-gate', False)]:
+        for labels, held in [('bug,coordinator-hold', True), ('bug', False), ('needs-decision', False)]:
             with self.subTest(labels=labels), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 gh = root.joinpath('gh')

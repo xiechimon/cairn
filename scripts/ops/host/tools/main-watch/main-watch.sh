@@ -52,4 +52,3 @@ while IFS=$'\t' read -r chk url app; do
   fi
   touch $ST/$key
 done <<<"$red"
-(cd ~/.cairn/tools/review-gate && node gate-audit.mjs)

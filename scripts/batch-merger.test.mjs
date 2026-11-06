@@ -173,7 +173,7 @@ for (const [name, data] of [
   ['recovery label', { pulls: [{ ...pull(), labels: [{ name: 'cairn-recovery' }] }] }],
   ['draft', { pulls: [{ ...pull(), draft: true }] }],
   ['other base', { pulls: [{ ...pull(), base: { ref: 'release' } }] }],
-  ['decision label', { pulls: [{ ...pull(), labels: [{ name: 'needs-decision' }] }] }],
+  ['hold label', { pulls: [{ ...pull(), labels: [{ name: 'coordinator-hold' }] }] }],
   ['head changed', { fresh: { ...pull(), head: { ref: 'B1/work', sha: 'b'.repeat(40) } } }],
 ])
   test(`${name} prevents queueing`, (t) => {

@@ -45,11 +45,11 @@
       ]
     },
     {
-      "name": "#2167 agents never add needs-decision",
+      "name": "#2167 coordinator-hold is the only hold label",
       "run": [
         "node",
         "-e",
-        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('--add-label needs-decision'))bad.push('AGENTS.md still tells agents to add needs-decision');\nif(!/never add[s]? (the )?`?needs-decision`?/i.test(s))bad.push('AGENTS.md must say agents never add needs-decision');\nif(!s.includes('CAIRN_DECIDED=1'))bad.push('AGENTS.md lost the CAIRN_DECIDED=1 removal rule');\nif(!/already on/i.test(s))bad.push('AGENTS.md must keep that a label already on blocks merging');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
+        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('needs-decision'))bad.push('AGENTS.md still names the retired needs-decision label');\nif(!/put `coordinator-hold` on the PR while that decision is pending/.test(s))bad.push('AGENTS.md must hold a PR with coordinator-hold while a decision is pending');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
       ]
     }
   ],
