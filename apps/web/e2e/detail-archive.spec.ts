@@ -149,6 +149,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/teams/team-archive/notifications': { unreadThreadIds: [] },
       '/api/teams/team-archive/model-sources': { sources: [] },
       '/api/teams/team-archive/providers': { presets: [], providers: [] },
+      '/api/teams/team-archive/model-routing': { edges: [], connections: [], quota: [] },
       '/api/server/backup': { status: 'healthy' },
       '/api/schedules': [],
       '/api/teams/team-archive/claude-subscriptions': [],
