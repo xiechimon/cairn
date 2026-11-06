@@ -22,6 +22,7 @@ export function StoneSection() {
       lede="Six groups carry the inbox in a fixed order: waiting on you, failed, ready for review, working, idle, resolved. A state is drawn once per context: the group header carries the glyph and its rows carry none; a row outside a group carries its own. The reason is written, not iconised."
     >
       <Specimen
+        id="tone-glyph"
         title="Tone glyph"
         note="The status glyph family, one per tone; working is a turning arc, the spiral stays for agents"
         code={`<ToneGlyph tone="waiting" />\n<ToneGlyph tone="working" still />`}
@@ -36,6 +37,7 @@ export function StoneSection() {
         </Cell>
       </Specimen>
       <Specimen
+        id="stone-trail"
         title="Stone trail"
         note="Group header: glyph, label, count, collapse chevron; an empty group says so in one line"
         stage="canvas"
@@ -72,6 +74,7 @@ export function StoneSection() {
         </div>
       </Specimen>
       <Specimen
+        id="wait-pill-and-header-icon-buttons"
         title="Wait pill and header icon buttons"
         note="The pill sits beside a panel title; the attention dot marks a panel with something waiting"
         code={`<WaitPill count={2} />\n<HeaderIconButton attention active aria-label="Threads"><Inbox /></HeaderIconButton>`}
@@ -159,6 +162,7 @@ export function ThreadCardSection() {
       lede="The Coordinator stream shows each thread as one card that updates in place: glyph, title, one-line reason, and the next action. The glyph is the state; there is no second state tag. Step the state to see it change."
     >
       <Specimen
+        id="one-card-six-states"
         title="One card, six states"
         note={`State ${index + 1} of ${CARD_STATES.length}`}
         stage="canvas"
@@ -181,7 +185,7 @@ export function ThreadCardSection() {
           </div>
         </div>
       </Specimen>
-      <Specimen title="All states" stage="canvas" className="flex-col">
+      <Specimen id="all-states" title="All states" stage="canvas" className="flex-col">
         {CARD_STATES.map((s) => (
           <ThreadCard
             key={s.reason}
@@ -279,6 +283,7 @@ export function ThreadRowSection() {
       lede="The inbox row inside a group: title, PR number, reason and age, no glyph of its own. Hover reveals a checkbox in the left gutter; selecting rows floats the bulk bar."
     >
       <Specimen
+        id="inbox-trail"
         title="Inbox trail"
         note="Hover a row, tick the checkbox"
         stage="canvas"

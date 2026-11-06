@@ -25,6 +25,7 @@ export function PermissionSection() {
       lede="Two cards the agent puts in the stream when it needs a decision. The permission card is ochre-outlined until answered, then folds to one line; a proposal is dashed until you apply it."
     >
       <Specimen
+        id="permission-card"
         title="Permission card"
         note={resolution == null ? 'Pending' : 'Resolved'}
         stage="canvas"
@@ -50,7 +51,12 @@ export function PermissionSection() {
           </div>
         </div>
       </Specimen>
-      <Specimen title="Permission card, resolved variants" stage="canvas" className="flex-col">
+      <Specimen
+        id="permission-card-resolved-variants"
+        title="Permission card, resolved variants"
+        stage="canvas"
+        className="flex-col"
+      >
         {(['once', 'deny', 'always'] as const).map((choice) => (
           <PermissionCard
             key={choice}
@@ -65,6 +71,7 @@ export function PermissionSection() {
         ))}
       </Specimen>
       <Specimen
+        id="proposal-card"
         title="Proposal card"
         note={proposal}
         stage="canvas"
@@ -105,6 +112,7 @@ export function PlanSection() {
       lede="The plan approval row, then the usage strip and next steps that close a thread detail."
     >
       <Specimen
+        id="plan-approval"
         title="Plan approval"
         note={approved ? 'Approved' : 'Waiting for approval'}
         stage="canvas"
@@ -125,6 +133,7 @@ export function PlanSection() {
         </div>
       </Specimen>
       <Specimen
+        id="usage-strip-and-next-steps"
         title="Usage strip and next steps"
         stage="canvas"
         code={`<UsageStrip cost="$1.42" tokens="212k" cached="91%" duration="6m 02s" model="Opus 5.5" machine="omarchy" />`}
@@ -165,6 +174,7 @@ export function PrBarSection() {
       lede="Sits above the composer in a thread with a PR. The CI chip opens a popover with the automation toggles; an option that cannot be turned on says why."
     >
       <Specimen
+        id="open-pr"
         title="Open PR"
         note="Open the CI chip"
         stage="canvas"
@@ -186,7 +196,12 @@ export function PrBarSection() {
           onMerge={() => toastSuccess('Merge requested')}
         />
       </Specimen>
-      <Specimen title="CI states and merged" stage="canvas" className="flex-col">
+      <Specimen
+        id="ci-states-and-merged"
+        title="CI states and merged"
+        stage="canvas"
+        className="flex-col"
+      >
         <PrBar
           className="w-full max-w-130"
           number={2272}
@@ -339,6 +354,7 @@ export function PrCardSection() {
       lede="The merge gate's verdict for a pull request as one card in the thread, bound to the head it was judged on. When the head moves past the judged head the card asks for a re-review instead of saying ready."
     >
       <Specimen
+        id="pr-card"
         title="PR card"
         stage="canvas"
         code="<PrCard pr={prCardModel(facts, readiness)} onViewDiff={...} onResolve={...} githubHref={url} />"
@@ -368,6 +384,7 @@ export function ScheduledSection() {
       lede="One row per scheduled task: a still clock mark, name, trigger and next run, and a state tag. Active runs; Paused waits; Auto-disabled needs your attention."
     >
       <Specimen
+        id="row-states"
         title="Row states"
         stage="canvas"
         code={`<ScheduledTaskRow name="Nightly e2e sweep" trigger="Daily at 02:00" next="Sat Nov 1, 02:00" state="active" />`}
@@ -384,6 +401,7 @@ export function ScheduledSection() {
         </ListCard>
       </Specimen>
       <Specimen
+        id="trigger"
         title="Trigger"
         note="The existing segmented control picks how a task repeats"
         stage="canvas"

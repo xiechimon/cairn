@@ -44,6 +44,7 @@ function ScheduleDetailExamples() {
   return (
     <>
       <Specimen
+        id="trigger-editor"
         title="Trigger editor"
         note="The app's real fields, including timezone, on-the-hour note, weekdays and custom cron"
       >
@@ -52,6 +53,7 @@ function ScheduleDetailExamples() {
         </div>
       </Specimen>
       <Specimen
+        id="detail-dialog-states"
         title="Detail dialog states"
         note="Real DialogShell and actions with local data; these examples do not establish API acceptance."
       >

@@ -173,6 +173,7 @@ export interface ChiefConversationProps {
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
   targetPlaceholder?: string | null;
+  showBindGate?: boolean;
 }
 
 export function ChiefConversation({
@@ -204,6 +205,7 @@ export function ChiefConversation({
   composerReplacement,
   composerTools,
   targetPlaceholder = null,
+  showBindGate = true,
 }: ChiefConversationProps) {
   const questionAttached = useQuestionDockVisible();
   const projectMark = useProjectMark();
@@ -537,7 +539,7 @@ export function ChiefConversation({
   const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
   const intro = (
     <>
-      {!chief.bound && (
+      {!chief.bound && showBindGate && (
         <div
           data-testid="chief-gate"
           className={`${home ? 'mx-auto mt-4 w-[calc(100%-2rem)] max-w-182' : 'mx-4'} flex h-14 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)`}
