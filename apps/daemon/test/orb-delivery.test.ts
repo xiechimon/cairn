@@ -5,7 +5,6 @@ import {
   linkSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -14,7 +13,6 @@ import {
   truncateSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type AgentBackend, conversationBranch } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -24,6 +22,7 @@ import { runOrbWorker } from '../src/orb/worker.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
 import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -32,7 +31,7 @@ afterEach(() => {
 });
 
 async function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'orb-delivery-'));
+  const root = testTempDir('orb-delivery-');
   roots.push(root);
   const repo = join(root, 'repo');
   await runGitOk(['init', '-b', 'main', repo]);

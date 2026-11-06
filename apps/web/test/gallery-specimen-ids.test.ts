@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { readGalleryParams } from '../src/design/gallery-params.js';
 
 const DESIGN = resolve(import.meta.dirname, '../src/design');
+const SNAPSHOTS = resolve(import.meta.dirname, '../e2e/gallery-snapshots.spec.ts-snapshots');
+const BASELINE_NAME = /^(.+)-(?:light|dark)-linux\.png$/;
 const ID_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 interface SpecimenTag {
@@ -80,6 +82,30 @@ describe('gallery specimen ids', () => {
       '<Specimen id="sizes" title="Sizes">x</Specimen>\n<Specimen\n  id="sizes"\n  title="Sizes">y</Specimen>',
     );
     expect(problems(tags)).toEqual(['a.tsx:2 reuses id "sizes" from a.tsx:1']);
+  });
+});
+
+function orphanBaselines(files: string[], ids: Set<string>): string[] {
+  return files.filter((file) => {
+    const id = file.match(BASELINE_NAME)?.[1];
+    return id == null || !ids.has(id);
+  });
+}
+
+describe('gallery snapshot baselines', () => {
+  it('has no baseline file without a matching specimen id', () => {
+    const ids = new Set(galleryTags.flatMap(({ id }) => (id == null ? [] : [id])));
+    expect(
+      orphanBaselines(readdirSync(SNAPSHOTS), ids),
+      'Delete these baselines from gallery-snapshots.spec.ts-snapshots, or restore the specimen id they were rendered from.',
+    ).toEqual([]);
+  });
+
+  it('reports a baseline whose specimen was removed or renamed', () => {
+    const ids = new Set(['pr-card']);
+    expect(
+      orphanBaselines(['pr-card-light-linux.png', 'pr-card-dark-linux.png', 'gone-light-linux.png', 'notes.txt'], ids),
+    ).toEqual(['gone-light-linux.png', 'notes.txt']);
   });
 });
 

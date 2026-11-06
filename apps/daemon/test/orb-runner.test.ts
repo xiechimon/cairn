@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentBackend } from '@cairn/shared';
 import { expect, test, vi } from 'vitest';
@@ -19,6 +18,7 @@ import {
 } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
 import { orbTestEntry, orbTestRelease } from './orb-release-fixture.js';
+import { testTempDir } from './test-temp-dir.js';
 
 vi.mock('../src/backend/pi.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/backend/pi.js')>();
@@ -26,7 +26,7 @@ vi.mock('../src/backend/pi.js', async (importOriginal) => {
 });
 
 function socketWorker(backend: AgentBackend) {
-  const scratch = mkdtempSync(join(tmpdir(), 'orb-runtime-'));
+  const scratch = testTempDir('orb-runtime-');
   return new FakeOrbProvider({
     runner: async (argv, options) => {
       if (argv[0] !== 'orb-worker') return { code: 0, stdout: '', stderr: '' };
@@ -79,7 +79,7 @@ test('orb workers use a socket and never construct or run a host backend', async
 });
 
 test('fixed roots expose the socket, complete build and seed, and a per-step delivery outbox', async () => {
-  const repo = mkdtempSync(join(tmpdir(), 'orb-exec-seed-'));
+  const repo = testTempDir('orb-exec-seed-');
   execFileSync('git', ['init', '-b', 'main', repo]);
   execFileSync('git', [
     '-C',
@@ -187,7 +187,7 @@ test('a dead container receives a host failure report', async () => {
 });
 
 test('a scripted relay completes one fake-backend step and keeps credentials out of runtime files', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-scripted-'));
+  const root = testTempDir('orb-scripted-');
   const socketPath = join(root, 'step.sock');
   const api = new FakeMachineApi();
   const credential = 'credential-sentinel';
@@ -235,7 +235,7 @@ test('a scripted relay completes one fake-backend step and keeps credentials out
 });
 
 test('a lost host relay interrupts the container session', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-disconnect-'));
+  const root = testTempDir('orb-disconnect-');
   const socketPath = join(root, 'step.sock');
   const api = new FakeMachineApi();
   const release = defer();
@@ -288,7 +288,7 @@ test.each(['success', 'failed'] as const)(
   'orb worker heartbeats through finish-up until %s done settles',
   async (status) => {
     vi.useFakeTimers();
-    const root = mkdtempSync(join(tmpdir(), 'orb-finish-heartbeat-'));
+    const root = testTempDir('orb-finish-heartbeat-');
     const socketPath = join(root, 'step.sock');
     const api = new FakeMachineApi();
     const upload = defer();
@@ -372,7 +372,7 @@ test('machine start precedes the relay socket and token publication', async () =
 });
 
 test('a previous fake worker cannot disconnect the next step listener', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orb-worker-reuse-'));
+  const root = testTempDir('orb-worker-reuse-');
   const socketPath = join(root, 'relay.sock');
   const exit = defer();
   const provider = new FakeOrbProvider({

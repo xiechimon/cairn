@@ -1,13 +1,13 @@
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { SessionOpts, StepEvent } from '@cairn/shared';
 import { type OtlpTracesRequest, parseOtlpTarget, stepOtelContext } from '@cairn/shared/otel';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const secret = `sk-ant-oat01-${'synthetic'.repeat(8)}`;
 const cli = `
@@ -63,7 +63,7 @@ input.close();
 afterEach(() => vi.unstubAllEnvs());
 
 async function runCli(completion: string, configured = true, status = 200, token = secret) {
-  const directory = mkdtempSync(join(tmpdir(), 'cairn-claude-otel-'));
+  const directory = testTempDir('cairn-claude-otel-');
   const executablePath = join(directory, 'cli.mjs');
   const envFile = join(directory, 'env.json');
   writeFileSync(executablePath, cli);
