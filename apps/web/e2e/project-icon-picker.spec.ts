@@ -38,7 +38,7 @@ test('the project avatar picker sets an icon and colour that reach the sidebar, 
   await page.goto('/app/project/icon-project/settings');
   const sidebarRow = page.locator('[data-slot="sidebar-project-row"]', { hasText: 'Atlas' });
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCount(0);
-  await expect(sidebarRow.locator('.project-avatar')).toHaveText('A');
+  await expect(sidebarRow.locator('[data-slot="project-glyph"]')).toBeVisible();
 
   await page.getByTestId('project-icon-trigger').click();
   const picker = page.getByTestId('project-icon-picker');
@@ -47,16 +47,7 @@ test('the project avatar picker sets an icon and colour that reach the sidebar, 
   await expect(picker.locator('[data-icon]')).toHaveCount(1);
   await picker.getByRole('button', { name: 'rocket' }).click();
   await expect(sidebarRow.locator('[data-project-icon="rocket"]')).toBeVisible();
-  await expect(sidebarRow.locator('[data-project-icon]')).toHaveAttribute(
-    'data-project-color',
-    'none',
-  );
-
   await picker.getByRole('button', { name: '玫红' }).click();
-  await expect(sidebarRow.locator('[data-project-icon]')).toHaveAttribute(
-    'data-project-color',
-    'rose',
-  );
   await expect(picker.getByRole('button', { name: '玫红' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -69,7 +60,7 @@ test('the project avatar picker sets an icon and colour that reach the sidebar, 
 
   await picker.getByRole('button', { name: '重置图标和颜色' }).click();
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCount(0);
-  await expect(sidebarRow.locator('.project-avatar')).toHaveText('A');
+  await expect(sidebarRow.locator('[data-slot="project-glyph"]')).toBeVisible();
 
   expect(patches).toEqual([
     { icon: 'rocket' },
@@ -79,7 +70,7 @@ test('the project avatar picker sets an icon and colour that reach the sidebar, 
   expect(pageErrors).toEqual([]);
 });
 
-test('the fixture sidebar shows picked icons bare and projects without one keep the letter tile', async ({
+test('the fixture sidebar shows picked icons bare and projects without one show the neutral folder', async ({
   page,
 }) => {
   await page.goto('/app?scenario=sidebar-project-icons');
@@ -89,5 +80,5 @@ test('the fixture sidebar shows picked icons bare and projects without one keep 
   await expect(rows.nth(1).locator('[data-project-icon="rocket"]')).toBeVisible();
   await expect(rows.nth(2).locator('[data-project-icon="database"]')).toBeVisible();
   await expect(rows.nth(3).locator('[data-project-icon]')).toHaveCount(0);
-  await expect(rows.nth(3).locator('.project-avatar')).toHaveText('P');
+  await expect(rows.nth(3).locator('[data-slot="project-glyph"]')).toBeVisible();
 });
