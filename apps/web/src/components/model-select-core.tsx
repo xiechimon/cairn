@@ -96,7 +96,7 @@ export interface ModelRowSkin {
 export const FOCUS_INSET_CLS =
   'focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--focus-ring)';
 
-export const PICK_ROW_BTN_CLS = `w-full cursor-pointer justify-start border-none bg-transparent text-left font-normal whitespace-nowrap transition-[background-color,color] hover:bg-(--secondary) hover:text-(--foreground) dark:hover:bg-(--secondary) aria-expanded:bg-transparent aria-expanded:text-(--foreground) aria-selected:bg-(--spot-soft) active:not-aria-[haspopup]:translate-y-0 focus-visible:ring-0 ${FOCUS_INSET_CLS} [&_svg:not([class*='size-'])]:size-auto`;
+export const PICK_ROW_BTN_CLS = `w-full cursor-pointer justify-start border-none bg-transparent text-left font-normal whitespace-nowrap transition-[background-color,color] hover:bg-(--secondary) hover:text-(--foreground) dark:hover:bg-(--secondary) aria-expanded:bg-transparent aria-expanded:text-(--foreground) aria-selected:bg-(--spot-soft) focus-visible:ring-0 ${FOCUS_INSET_CLS} [&_svg:not([class*='size-'])]:size-auto`;
 
 interface ModelPickRowProps {
   skin: ModelRowSkin;

@@ -14,7 +14,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Check, Search } from '../icons/index.js';
 
 const AGENT_PICK_ROW_CLS =
-  "h-10 w-full cursor-pointer justify-start gap-2.5 whitespace-normal rounded-none border-none bg-transparent px-2 text-left text-sm font-normal text-(--foreground) hover:bg-(--secondary) hover:text-(--foreground) dark:hover:bg-(--secondary) aria-expanded:bg-transparent aria-expanded:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
+  "h-10 w-full cursor-pointer justify-start gap-2.5 whitespace-normal rounded-none border-none bg-transparent px-2 text-left text-sm font-normal text-(--foreground) hover:bg-(--secondary) hover:text-(--foreground) dark:hover:bg-(--secondary) aria-expanded:bg-transparent aria-expanded:text-(--foreground) [&_svg:not([class*='size-'])]:size-auto";
 
 const PICK_AVATAR_CLS = 'flex-none [&_img]:block [&_img]:size-6 [&_img]:rounded-full';
 

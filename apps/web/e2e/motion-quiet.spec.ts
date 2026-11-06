@@ -92,13 +92,20 @@ for (const surface of PRESS_SURFACES) {
     const handles = (await controls.elementHandles()).slice(0, 40);
     expect(handles.length).toBeGreaterThan(5);
     const dimmed: string[] = [];
+    let pressedCount = 0;
     for (const control of handles) {
+      const attached = await control.scrollIntoViewIfNeeded().then(
+        () => true,
+        () => false,
+      );
+      if (!attached) continue;
       const box = await control.boundingBox();
       if (box === null) continue;
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(250);
       const resting = await control.evaluate((el) => getComputedStyle(el).opacity);
       await page.mouse.down();
+      if (await control.evaluate((el) => el.matches(':active'))) pressedCount++;
       const sample = await control.evaluate(async (el) => {
         await new Promise((resolve) => setTimeout(resolve, 200));
         const opacityAnimations = el
@@ -116,6 +123,7 @@ for (const surface of PRESS_SURFACES) {
       if (sample.opacity !== resting || sample.fading > 0) dimmed.push(JSON.stringify(sample));
       await page.keyboard.press('Escape');
     }
+    expect(pressedCount).toBeGreaterThan(5);
     expect(dimmed).toEqual([]);
   });
 }
