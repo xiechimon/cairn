@@ -37,7 +37,9 @@ if (!ONLY || ONLY.has('failed-thread')) {
     });
     await prepare(page, 'light');
     await page.goto(`${origin}/app?thread=${state.todoIds.failed}`);
-    await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
+    await expect(
+      page.getByTestId('side-chat-action').getByRole('button', { name: '重试' }),
+    ).toBeVisible();
     expect(await page.evaluate(() => Date.now())).toBe(FROZEN_AT);
     const time = await page.evaluate(
       (ms) =>
