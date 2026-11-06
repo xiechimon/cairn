@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
@@ -10,6 +9,7 @@ import {
 } from '../src/orb/computer.js';
 import { NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { rejectGuestExec } from './orb-fake.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixture(
   options: {
@@ -21,8 +21,8 @@ function fixture(
   } = {},
 ) {
   const stopping = new Map<string, number>();
-  const runtimeRoot = mkdtempSync(join(tmpdir(), 'orb-computer-run-'));
-  const stateFile = join(mkdtempSync(join(tmpdir(), 'orb-computer-state-')), 'computers.json');
+  const runtimeRoot = testTempDir('orb-computer-run-');
+  const stateFile = join(testTempDir('orb-computer-state-'), 'computers.json');
   const commands: string[][] = [];
   const images = new Set<string>(['cairn-orb-base', 'cairn-orb-computer']);
   const machines = new Set<string>();
@@ -97,7 +97,7 @@ describe('computer machine names', () => {
   });
 
   test('worker Orbs never take a computer name, even for a conversation called computer-*', async () => {
-    const runtimeRoot = mkdtempSync(join(tmpdir(), 'orb-worker-run-'));
+    const runtimeRoot = testTempDir('orb-worker-run-');
     const runner: OrbCommandRunner = async () => ({ code: 0, stdout: '', stderr: '' });
     const provider = new NspawnOrbProvider({ runner, runtimeRoot });
     for (const conversationId of ['computer-abc', 'computer', 'Computer-x']) {
