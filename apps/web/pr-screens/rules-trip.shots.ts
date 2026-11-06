@@ -76,8 +76,8 @@ const MUTATIONS: Record<string, (page: Page) => Promise<void>> = {
     }),
   A2: (page) =>
     page.evaluate(() => {
-      document.head.insertAdjacentHTML('beforeend', '<style>*:focus,*:focus-visible{outline:none!important;box-shadow:none!important}</style>');
-      document.body.insertAdjacentHTML('afterbegin', '<button id="trip-focus" style="outline:none;box-shadow:none">f</button>');
+      document.head.insertAdjacentHTML('beforeend', '<style>*:focus,*:focus-visible{outline:none!important;box-shadow:none!important}@keyframes trip-blur{to{filter:hue-rotate(90deg)}}#trip-spin{animation:trip-blur 1s infinite}</style>');
+      document.body.insertAdjacentHTML('afterbegin', '<button id="trip-focus" style="outline:none;box-shadow:none">f</button><div id="trip-spin">s</div>');
     }),
   R1: (page) =>
     page.evaluate(() => {

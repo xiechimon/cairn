@@ -258,7 +258,7 @@ const A2: Rule = async (page) => {
   const moving = await page.evaluate(() =>
     document
       .getAnimations()
-      .filter((a) => a.playState === 'running' && a.effect instanceof KeyframeEffect)
+      .filter((a) => a instanceof CSSAnimation && a.effect instanceof KeyframeEffect && a.effect.getComputedTiming().iterations === Infinity)
       .flatMap((a) => Object.keys((a.effect as KeyframeEffect).getKeyframes()[0] ?? {}).filter((p) => !['offset', 'easing', 'composite', 'opacity', 'transform', 'computedOffset'].includes(p))),
   );
   for (const prop of new Set(moving)) found.push(finding('A2', `animation:${prop}`, `an animation runs on "${prop}" under reduced motion`));
