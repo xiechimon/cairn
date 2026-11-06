@@ -120,6 +120,22 @@
         }
       }
     },
+    "api-evidence-card": {
+      "recipe": "features/api-evidence-card.md",
+      "cases": {
+        "card": {
+          "script": ".claude/skills/verify-cairn/scripts/api-evidence-card.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Runs a spec of HTTP steps against the isolated stack, reads SQLite rows before and after each step read-only, and writes the transcript, a screenshot of it, live JSON screenshots and the Requests table for the PR evidence card.",
+          "usage": "<spec.json> [--before-port <port>]; env VERIFY_RUN_DIR, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
     "api-keys": {
       "recipe": "features/api-keys.md",
       "cases": {

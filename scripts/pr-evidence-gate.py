@@ -69,6 +69,19 @@ so migrations merged into main after the PR branched never count), the body
 must carry a
 `### Schema changes` section whose table rows equal that file's rows.
 
+Evidence card (D117): with `--changed-files <file>` (one changed path per line,
+passed by the workflow), a PR that changes `apps/server/src/routes*.ts` must
+carry, outside code fences and comments, a `### Requirement` section and a
+`### Requests` section. Requirement is an internal source (an issue, PR or
+plan decision link plus a quoted excerpt) or an embedded screenshot of the
+official doc; a third-party API (a `Third-party:` line or any link outside
+this repository) always needs the screenshot. Requests holds an embedded
+screenshot of the real call, and a table with a Before row and at least one
+row naming an HTTP status code. Every PR that changes more than docs must
+also carry non-empty `Live:`, `Mocked:` and `Not covered:` lines (`Not
+verified:` was merged into `Not covered:`). The gate checks the card's shape;
+whether it matches the requirement stays a reviewer judgment.
+
 Usage:
   python3 scripts/pr-evidence-gate.py body.md                # CI entry point
   PR_BODY='<pr body>' python3 scripts/pr-evidence-gate.py
@@ -115,6 +128,16 @@ PROSE_LIMIT = 600
 SCHEMA_HEADING = re.compile(r'^### Schema changes[ \t]*$', re.M)
 ANY_HEADING = re.compile(r'^#{1,6}[ \t]+', re.M)
 NO_SCHEMA_CHANGES = 'No schema changes'
+ROUTES_FILE = re.compile(r'^apps/server/src/routes[^/]*\.ts$')
+DOCS_FILE = re.compile(r'^docs/|\.md$')
+COVERAGE_LABELS = ('Live', 'Mocked', 'Not covered')
+CARD_HEADING = re.compile(r'^###[ \t]+(.+?)[ \t]*$', re.M)
+STOP_HEADING = re.compile(r'^#{1,3}[ \t]+', re.M)
+HTTP_STATUS = re.compile(r'(?<![\w.])[1-5]\d\d(?![\w.])')
+INTERNAL_LINK = re.compile(r'https://(?:github\.com|raw\.githubusercontent\.com)/xiechimon/cairn(?:/|$)')
+INTERNAL_REF = re.compile(r'https://github\.com/xiechimon/cairn/(?:issues|pull|blob)/|\bD\d{1,4}\b')
+THIRD_PARTY_LINE = re.compile(r'^[ \t]*(?:[-*]\s+)?(?:\*\*)?Third-party:', re.M | re.I)
+QUOTE_LINE = re.compile(r'^[ \t]*>[ \t]*(\S.{19,})$', re.M)
 
 
 
@@ -296,6 +319,82 @@ def schema_verdict(body, expected_markdown):
     return 'matches' if actual == expected else 'stale'
 
 
+def card_section(text, title):
+    for heading in CARD_HEADING.finditer(text):
+        if heading.group(1).strip().lower() == title.lower():
+            rest = text[heading.end():]
+            following = STOP_HEADING.search(rest)
+            return rest[:following.start()] if following else rest
+    return None
+
+
+def table_rows(section):
+    rows = []
+    for line in section.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith('|'):
+            continue
+        cells = [cell.strip() for cell in stripped.strip('|').split('|')]
+        if all(re.fullmatch(r':?-+:?', cell) for cell in cells):
+            continue
+        rows.append(cells)
+    return rows[1:]
+
+
+def embedded_images(section):
+    return [link for link in find_links(section) if link['embedded']]
+
+
+def card_problems(body):
+    text = visible_markdown(body)
+    problems = []
+    requirement = card_section(text, 'Requirement')
+    requests = card_section(text, 'Requests')
+    if requirement is None:
+        problems.append("missing '### Requirement' section: link the requirement and quote it, or screenshot the official doc")
+    else:
+        urls = URL.findall(requirement)
+        outside = [url for url in urls if not INTERNAL_LINK.match(url)
+                   and not IMG_EXT.search(urlsplit(url).path) and not is_media_host_image(url)]
+        third_party = bool(THIRD_PARTY_LINE.search(requirement)) or bool(outside)
+        shots = embedded_images(requirement)
+        if third_party:
+            if not shots:
+                problems.append('third-party Requirement needs an embedded screenshot of the official doc')
+        elif not shots and not (INTERNAL_REF.search(requirement) and QUOTE_LINE.search(requirement)):
+            problems.append('Requirement needs an internal link (issue, PR or plan decision Dxxx) plus a quoted excerpt, or an embedded screenshot of the doc')
+    if requests is None:
+        problems.append("missing '### Requests' section: screenshot the real call and add the Requests table")
+    else:
+        if not embedded_images(requests):
+            problems.append('Requests section has no embedded screenshot of the running product or API tool')
+        rows = table_rows(requests)
+        if not any(row and re.sub(r'[*`_ ]', '', row[0]).lower().startswith('before') for row in rows):
+            problems.append('Requests table has no Before row: one 404 or the old response is enough')
+        if not any(HTTP_STATUS.search(' '.join(row)) for row in rows):
+            problems.append('Requests table has no row with an HTTP status code')
+    return problems
+
+
+def coverage_problems(body):
+    text = visible_markdown(body, blank_fences=False)
+    problems = []
+    for label in COVERAGE_LABELS:
+        pattern = rf'^[ \t]*(?:[-*+]\s+)?(?:\*\*)?{label}:(?:\*\*)?[ \t]*\S'
+        if not re.search(pattern, text, re.M):
+            problems.append(f'missing {label}:')
+    if 'missing Not covered:' in problems and re.search(r'^[ \t]*(?:[-*+]\s+)?(?:\*\*)?Not verified:', text, re.M):
+        problems.append('Not verified: was merged into Not covered: (name what ran live, what was mocked, and what no check reached)')
+    return problems
+
+
+def split_option(args, name):
+    if name not in args:
+        return args, None
+    at = args.index(name)
+    return args[:at] + args[at + 2:], args[at + 1]
+
+
 def split_schema_glance(argv):
     args = list(argv)
     if '--schema-glance' not in args:
@@ -307,7 +406,8 @@ def split_schema_glance(argv):
 
 
 def main():
-    args, schema_glance = split_schema_glance(sys.argv[1:])
+    args, changed_file = split_option(sys.argv[1:], '--changed-files')
+    args, schema_glance = split_schema_glance(args)
     if args:
         with open(args[0], encoding='utf-8') as f:
             body = f.read()
@@ -325,6 +425,26 @@ def main():
         else:
             failures.append('schema-changes')
             print(f"FAIL schema-changes: {verdict}: paste the output of scripts/schema-glance.mjs from the merge base to head under '### Schema changes'")
+
+    if changed_file is not None:
+        with open(changed_file, encoding='utf-8') as f:
+            changed = [line.strip() for line in f if line.strip()]
+        if any(ROUTES_FILE.match(path) for path in changed):
+            problems = card_problems(body)
+            for problem in problems:
+                failures.append('api-card')
+                print(f"FAIL api-card: {problem}")
+            if problems:
+                print("pr-evidence: a PR that changes apps/server/src/routes*.ts carries the evidence card; see .claude/skills/pr-cairn/SKILL.md, 'Evidence card'")
+            else:
+                print("pr-evidence: api-card: complete")
+        if any(not DOCS_FILE.search(path) for path in changed):
+            problems = coverage_problems(body)
+            for problem in problems:
+                failures.append('coverage-lines')
+                print(f"FAIL coverage-lines: {problem}")
+            if not problems:
+                print("pr-evidence: coverage-lines: Live / Mocked / Not covered present")
 
     verdicts = section_verdicts(body)
     answered = sum(1 for v in verdicts.values() if v == 'answered')

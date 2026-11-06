@@ -371,8 +371,165 @@ class SchemaGlanceTests(unittest.TestCase):
         self.assertIn('--schema-glance', workflow)
 
 
+class EvidenceCardTests(unittest.TestCase):
+    sections = '## What\nAdd an endpoint.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+    lines = '```text\nLive: isolated verify stack on the PR head.\nMocked: none.\nNot covered: two real browsers.\n```\n'
+    internal = ('### Requirement\n\n[#3104](https://github.com/xiechimon/cairn/issues/3104)\n\n'
+                '> must survive closing the app and reopening it on any device\n\n')
+    third_party = ('### Requirement\n\nThird-party: [E2B sandbox API](https://e2b.dev/docs/sandbox)\n\n')
+    doc_shot = '![Official doc](https://example.org/doc.png)\n\n'
+    requests = ('### Requests\n\n![Swagger request and response](https://example.org/call.png)\n\n'
+                '| Clause | Request | Response | Rows | OK |\n|---|---|---|---|---|\n'
+                '| Before | `GET /drafts/x` | `404` | table absent | - |\n'
+                '| survives close | `PUT /drafts/x` | `200 {"content":"a"}` | 0 to 1 | yes |\n\n')
+
+    def verdict(self, proof, changed=('apps/server/src/routes-drafts.ts',)):
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            argv = ['pr-evidence-gate.py']
+            if changed is not None:
+                path = Path(directory, 'changed.txt')
+                path.write_text('\n'.join(changed) + '\n')
+                argv += ['--changed-files', str(path)]
+            body = '## Proof\n' + proof + '\n' + self.sections
+            with patch.object(sys, 'argv', argv), patch.dict(gate.os.environ, {'PR_BODY': body}), patch.object(gate, 'http_code', return_value='200'), contextlib.redirect_stdout(output):
+                result = gate.main()
+        return result, output.getvalue()
+
+    def card(self, requirement=None, requests=None, lines=None):
+        return ((self.internal if requirement is None else requirement)
+                + (self.requests if requests is None else requests)
+                + (self.lines if lines is None else lines))
+
+    def test_routes_change_without_a_card_fails(self):
+        result, output = self.verdict('Old run failed; new run passed.\n' + self.lines)
+        self.assertEqual(result, 1, output)
+        self.assertIn("FAIL api-card: missing '### Requirement' section", output)
+        self.assertIn("FAIL api-card: missing '### Requests' section", output)
+
+    def test_routes_change_with_a_card_passes(self):
+        result, output = self.verdict(self.card())
+        self.assertEqual(result, 0, output)
+        self.assertIn('pr-evidence: api-card: complete', output)
+
+    def test_every_routes_file_triggers_the_card(self):
+        for path in ['apps/server/src/routes.ts', 'apps/server/src/routes-core.ts']:
+            with self.subTest(path=path):
+                result, output = self.verdict('Checks passed.\n' + self.lines, changed=[path])
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL api-card:', output)
+
+    def test_other_server_files_do_not_trigger_the_card(self):
+        for path in ['apps/server/src/services/drafts.ts', 'apps/server/src/routes/x.ts', 'apps/web/src/routes-core.ts']:
+            with self.subTest(path=path):
+                result, output = self.verdict('Checks passed.\n' + self.lines, changed=[path])
+                self.assertEqual(result, 0, output)
+                self.assertNotIn('api-card', output)
+
+    def test_card_hidden_in_a_fence_or_comment_does_not_count(self):
+        for hidden in ['```\n' + self.card() + '```\n', '<!--\n' + self.card() + '-->\n']:
+            with self.subTest(hidden=hidden[:6]):
+                result, output = self.verdict(hidden + self.lines)
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL api-card:', output)
+
+    def test_card_needs_a_before_row(self):
+        requests = self.requests.replace('| Before | `GET /drafts/x` | `404` | table absent | - |\n', '')
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL api-card: Requests table has no Before row', output)
+
+    def test_card_needs_a_row_with_an_http_status(self):
+        requests = self.requests.replace('`404`', 'not found').replace('`200 {"content":"a"}`', 'ok')
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL api-card: Requests table has no row with an HTTP status code', output)
+
+    def test_card_needs_a_screenshot_of_the_call(self):
+        requests = self.requests.replace('![Swagger request and response](https://example.org/call.png)\n\n', '')
+        result, output = self.verdict(self.card(requests=requests))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL api-card: Requests section has no embedded screenshot', output)
+
+    def test_internal_requirement_needs_a_link_and_a_quote(self):
+        for requirement in ['### Requirement\n\n[#3104](https://github.com/xiechimon/cairn/issues/3104)\n\n',
+                            '### Requirement\n\n> must survive closing the app and reopening it on any device\n\n']:
+            with self.subTest(requirement=requirement):
+                result, output = self.verdict(self.card(requirement=requirement))
+                self.assertEqual(result, 1, output)
+                self.assertIn('FAIL api-card: Requirement needs', output)
+
+    def test_plan_decision_with_a_quote_is_an_internal_requirement(self):
+        requirement = '### Requirement\n\nD110, plan 30\n\n> composer drafts survive close and sync across devices\n\n'
+        result, output = self.verdict(self.card(requirement=requirement))
+        self.assertEqual(result, 0, output)
+
+    def test_third_party_requirement_without_a_doc_screenshot_fails(self):
+        result, output = self.verdict(self.card(requirement=self.third_party))
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL api-card: third-party Requirement needs an embedded screenshot of the official doc', output)
+
+    def test_third_party_requirement_with_a_doc_screenshot_passes(self):
+        result, output = self.verdict(self.card(requirement=self.third_party + self.doc_shot))
+        self.assertEqual(result, 0, output)
+
+    def test_an_external_link_makes_the_requirement_third_party_without_the_marker(self):
+        requirement = ('### Requirement\n\n[#3104](https://github.com/xiechimon/cairn/issues/3104) '
+                       '[docs](https://docs.github.com/en/rest)\n\n> must survive closing the app and reopening it on any device\n\n')
+        result, output = self.verdict(self.card(requirement=requirement))
+        self.assertEqual(result, 1, output)
+        self.assertIn('third-party Requirement needs an embedded screenshot', output)
+
+    def test_code_pr_needs_the_three_coverage_lines(self):
+        for missing in ['Live', 'Mocked', 'Not covered']:
+            with self.subTest(missing=missing):
+                lines = ''.join(line + '\n' for line in self.lines.splitlines() if not line.startswith(missing + ':'))
+                result, output = self.verdict('Checks passed.\n' + lines, changed=['apps/server/src/services/drafts.ts'])
+                self.assertEqual(result, 1, output)
+                self.assertIn(f'FAIL coverage-lines: missing {missing}:', output)
+
+    def test_empty_coverage_line_fails(self):
+        result, output = self.verdict('Checks passed.\n```text\nLive:\nMocked: none.\nNot covered: none.\n```\n', changed=['scripts/x.mjs'])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL coverage-lines: missing Live:', output)
+
+    def test_not_verified_alone_is_renamed_not_accepted(self):
+        proof = 'Checks passed.\n```text\nLive: a.\nMocked: none.\nNot verified: b.\n```\n'
+        result, output = self.verdict(proof, changed=['scripts/x.mjs'])
+        self.assertEqual(result, 1, output)
+        self.assertIn('FAIL coverage-lines: missing Not covered:', output)
+        self.assertIn('Not verified: was merged into Not covered:', output)
+
+    def test_coverage_lines_in_plain_prose_also_count(self):
+        proof = 'Checks passed.\n\nLive: a.\n\n**Mocked:** none.\n\n- Not covered: b.\n'
+        result, output = self.verdict(proof, changed=['scripts/x.mjs'])
+        self.assertEqual(result, 0, output)
+
+    def test_docs_only_pr_needs_no_coverage_lines(self):
+        result, output = self.verdict('Docs read back.', changed=['docs/research/x.md', 'README.md'])
+        self.assertEqual(result, 0, output)
+        self.assertNotIn('coverage-lines', output)
+
+    def test_without_a_changed_file_list_nothing_extra_is_enforced(self):
+        result, output = self.verdict('Checks passed.', changed=None)
+        self.assertEqual(result, 0, output)
+
+    def test_workflow_passes_the_changed_files_to_the_gate(self):
+        workflow = Path('.github/workflows/pr-evidence.yml').read_text()
+        self.assertIn('--changed-files', workflow)
+
+    def test_template_and_skill_name_the_card(self):
+        for path in ['.github/PULL_REQUEST_TEMPLATE.md', '.claude/skills/pr-cairn/SKILL.md']:
+            text = Path(path).read_text()
+            for needle in ['### Requirement', '### Requests', 'Live:', 'Mocked:', 'Not covered:']:
+                with self.subTest(path=path, needle=needle):
+                    self.assertIn(needle, text)
+            self.assertNotIn('one line naming the test that fails on main', text)
+
+
 class SchemaGlanceWorkflowTests(unittest.TestCase):
-    body = '## Proof\nOld run failed; new run passed.\n## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n'
+    body = ('## Proof\nOld run failed; new run passed.\n```text\nLive: temp repo.\nMocked: none.\nNot covered: real CI.\n```\n'
+            '## What\nAdd a column.\n## Review\nReviewed.\n## Risk\nReversible.\n')
 
     @staticmethod
     def step_script():
