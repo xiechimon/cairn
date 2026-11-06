@@ -85,7 +85,7 @@ export function QueryBoundary({
           {loadingLabel}
         </span>
         {Array.from({ length: skeletonRows }, (_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
+          <Skeleton key={i} className="h-10 w-full animate-none" />
         ))}
       </div>
     );

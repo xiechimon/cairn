@@ -432,9 +432,7 @@ export function BoardSidebar({
             aria-busy="true"
             className="flex flex-col gap-1.5 px-2.5 py-1"
           >
-            <span role="status" className="sr-only">
-              {t('正在加载项目')}
-            </span>
+            <span className="sr-only">{t('正在加载项目')}</span>
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-6 w-full" />
             ))}
@@ -442,7 +440,6 @@ export function BoardSidebar({
         )}
         {!projectsCollapsed && projectsState === 'error' && (
           <div
-            role="alert"
             data-testid="sidebar-projects-error"
             className="flex items-center gap-2 px-2.5 py-1 text-meta text-content-secondary"
           >

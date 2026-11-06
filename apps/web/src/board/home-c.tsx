@@ -13,12 +13,12 @@ import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversat
 import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
 import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
+import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
-import { TextureSkeleton } from '../components/texture/texture.js';
 import { Button } from '../components/ui/button.js';
 import type {
   ChiefStreamItem,
@@ -127,7 +127,7 @@ export function HomeC({
   workQuery,
 }: HomeCProps) {
   const { t, locale } = useI18n();
-  const { user, live } = useLiveData();
+  const { user, live, teamId, teamsQuery } = useLiveData();
   const navigate = useNavigate();
   const location = useLocation();
   const composeAt = composeRequest(location.state);
@@ -358,6 +358,7 @@ export function HomeC({
         machines={computers}
         open={pane === 'machines' && threadId === null}
         onToggle={() => togglePane('machines')}
+        loading={machinesQuery?.isPending === true}
       />
       <IconTooltip
         label={t('任务')}
@@ -420,13 +421,19 @@ export function HomeC({
       )
     );
 
-  if (surface.load !== 'ready') {
+  const load =
+    live && teamId === undefined
+      ? teamsQuery?.isError === true
+        ? 'error'
+        : 'loading'
+      : surface.load;
+  if (load !== 'ready') {
     return (
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {paneButtons}
-          {surface.load === 'loading' ? (
-            <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
+          {load === 'loading' ? (
+            <ConversationSkeleton />
           ) : (
             <>
               <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
@@ -438,7 +445,10 @@ export function HomeC({
                 icon={MessageSquareWarning}
                 title={t('对话加载失败')}
                 description={t('对话记录还在，重试一下。')}
-                action={{ label: t('重试'), onClick: surface.retry }}
+                action={{
+                  label: t('重试'),
+                  onClick: teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
+                }}
                 className="mt-[12vh]"
               />
             </>

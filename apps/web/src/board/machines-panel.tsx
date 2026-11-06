@@ -20,6 +20,7 @@ import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { X } from '../icons/index.js';
@@ -50,10 +51,12 @@ export function MachineChip({
   machines,
   open,
   onToggle,
+  loading = false,
 }: {
   machines: readonly MachineRow[];
   open: boolean;
   onToggle: () => void;
+  loading?: boolean;
 }) {
   const { t } = useI18n();
   const connected = useConnected();
@@ -77,8 +80,12 @@ export function MachineChip({
     >
       <Laptop aria-hidden="true" className="size-3.5" />
       <span className="max-w-32 truncate max-[640px]:sr-only">{host?.name ?? t('电脑')}</span>
-      <OnlineDot online={hostOnline} />
-      {host != null && connected && !hostOnline && (
+      {loading ? (
+        <Skeleton className="size-1.5 animate-none rounded-full" />
+      ) : (
+        <OnlineDot online={hostOnline} />
+      )}
+      {!loading && host != null && connected && !hostOnline && (
         <span className="text-content-tertiary max-[640px]:hidden">{t('离线')}</span>
       )}
       {running > 0 && (
