@@ -158,6 +158,10 @@ async function mockLive(page: Page, state: State) {
     if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json([TASK]);
     if (p === '/api/projects') return json([PROJECT]);
+    if (p === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);
+    if (p === '/api/teams/t1/providers') {
+      return json({ presets: [], providers: [{ id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' }] });
+    }
     return json([]);
   });
   return calls;
