@@ -7,17 +7,20 @@ import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 
-export function ClaudeLoginBanner({
-  machines = [],
-  now,
-}: {
-  machines?: readonly MachineRow[];
-  now: number;
-}) {
+export interface ClaudeLoginWarning {
+  key: string;
+  kind: 'expired' | 'expiring';
+  text: string;
+}
+
+export function useClaudeLoginWarnings(
+  machines: readonly MachineRow[] = [],
+  now: number,
+): ClaudeLoginWarning[] {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const subscriptions = useClaudeSubscriptions(teamId, live);
-  const warnings = [
+  return [
     ...machines.flatMap((machine) => {
       const notice = claudeLoginNotice(machine.claudeLogin, now);
       return notice === null
@@ -46,6 +49,10 @@ export function ClaudeLoginBanner({
           ];
     }),
   ];
+}
+
+export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLoginWarning[] }) {
+  const { t } = useI18n();
   if (warnings.length === 0) return null;
   return (
     <NoticeBanner

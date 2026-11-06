@@ -26,7 +26,6 @@ import type {
   TodoRecord,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
@@ -305,7 +304,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {entries.length === 0 && (
         <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
@@ -327,7 +325,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {chiefData.hasEarlier === true && (
         <p
@@ -425,7 +422,6 @@ export function HomeC({
             <>
               <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
                 {projectLinks}
-                <ClaudeLoginBanner machines={machines} now={now} />
               </div>
               <EmptyState
                 testId="home-c-error"

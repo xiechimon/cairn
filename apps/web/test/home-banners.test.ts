@@ -42,3 +42,17 @@ describe('pickHomeBanners', () => {
     expect(pickHomeBanners([])).toEqual([]);
   });
 });
+
+describe('pickHomeBanners with the Claude login warning', () => {
+  it('counts the login warning against the limit and ranks it as blocking', () => {
+    expect(
+      kinds(
+        pickHomeBanners([
+          { kind: 'first-pr' as const },
+          { kind: 'quota' as const },
+          { kind: 'login' as const },
+        ]),
+      ),
+    ).toEqual(['login', 'quota']);
+  });
+});

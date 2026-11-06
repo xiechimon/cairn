@@ -15,6 +15,7 @@ import { mapMachines, mapSchedules, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { BackupBanner } from '../board/backup-banner.js';
+import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { FirstPrCard, firstPrCardInfo } from '../board/first-pr-card.js';
 import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
 import { HomeC } from '../board/home-c.js';
@@ -140,9 +141,18 @@ export function BoardPage() {
 
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;
+  const loginWarnings = useClaudeLoginWarnings(machines, now);
   const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
+      : []),
+    ...(loginWarnings.length > 0
+      ? [
+          {
+            kind: 'login' as const,
+            node: <ClaudeLoginBanner key="login" warnings={loginWarnings} />,
+          },
+        ]
       : []),
     ...(quotaInfos != null
       ? [{ kind: 'quota' as const, node: <QuotaBanner key="quota" infos={quotaInfos} /> }]
