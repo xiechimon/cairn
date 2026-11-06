@@ -457,7 +457,7 @@ export function VendorList({
             aria-label={`${short} ${counts[vendor]}`}
             data-vendor={vendor}
             onClick={() => onChange(vendor)}
-            className="h-auto w-full justify-start gap-2.5 rounded-none border-0 border-b border-border px-3.5 py-2.5 text-left first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) font-normal whitespace-normal outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-[current=true]:bg-secondary"
+            className="h-auto w-full justify-start gap-2.5 rounded-none border-b border-border px-3.5 py-2.5 text-left first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) font-normal whitespace-normal outline-none transition-colors duration-(--dur-fast) last:border-b-0 hover:bg-menu-hover focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset aria-[current=true]:bg-secondary"
           >
             <Mark
               aria-hidden
