@@ -129,7 +129,6 @@ function MachineScreen({
   interactive: boolean;
   onExpand?: () => void;
 }) {
-  const { t } = useI18n();
   if (computer !== null && teamId !== undefined && desktopControlOnline(machine, computer)) {
     return (
       <MachineScreenSurface
