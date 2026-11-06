@@ -114,7 +114,7 @@ export function SidebarThreadRow({
       {meta != null && (
         <span
           data-slot="sidebar-thread-meta"
-          className="flex-none pr-1.5 text-caption text-content-tertiary tabular-nums"
+          className="flex-none pr-1.5 text-caption text-content-secondary tabular-nums"
         >
           {meta}
         </span>

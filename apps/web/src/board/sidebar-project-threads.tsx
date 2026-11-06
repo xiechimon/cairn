@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { SidebarThreadList, SidebarThreadRow } from '../components/shell/sidebar-project.js';
+import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
@@ -64,12 +65,12 @@ export function SidebarProjectThreads({
         />
       ))}
       {threads.earlier.length > 0 && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           data-testid="earlier-threads-toggle"
           aria-expanded={earlierOpen}
           onClick={() => setEarlierOpen((prev) => !prev)}
-          className="flex h-6 cursor-pointer items-center gap-1 rounded-(--radius-control) border-none bg-transparent px-2 text-caption text-content-tertiary outline-none hover:text-content-secondary focus-visible:[outline:2px_solid_var(--focus-ring)]"
+          className="h-6 w-fit cursor-pointer justify-start gap-1 px-2 text-caption font-normal text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent"
         >
           {t('更早')}
           <span className="tabular-nums">{threads.earlier.length}</span>
@@ -78,7 +79,7 @@ export function SidebarProjectThreads({
             className={`size-3 transition-transform duration-150 ${earlierOpen ? '' : '-rotate-90'}`}
             strokeWidth={1.75}
           />
-        </button>
+        </Button>
       )}
       {earlierOpen &&
         threads.earlier.map((todo) => (
