@@ -249,6 +249,18 @@ test('project disable survives restart, preserves other settings, and leaves man
   );
 });
 
+test('project list reports the stored plan auto-approve toggle', async () => {
+  const w = world();
+  await req(w.app, 'PATCH', '/api/projects/project/merge-policy', {
+    planAutoApproveEnabled: false,
+  });
+  const list = (await (await req(w.app, 'GET', '/api/projects')).json()) as {
+    id: string;
+    planAutoApproveEnabled?: boolean;
+  }[];
+  expect(list.find((item) => item.id === 'project')?.planAutoApproveEnabled).toBe(false);
+});
+
 test.each([
   'human',
   'questions',
