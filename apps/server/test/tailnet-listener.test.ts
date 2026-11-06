@@ -7,6 +7,7 @@ import { getRequestListener } from '@hono/node-server';
 import { afterAll, afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { listenOnTailnetSocket, tailnetIdentityOf } from '../src/lib/tailnet-listener.js';
+import { requestOrigin } from '../src/routes-helpers.js';
 import { bootServer } from './helpers.js';
 
 const TOKEN = 'tailnet-listener-token-0123456789abcdef';
@@ -65,14 +66,15 @@ async function viaTcp(
   return { status: res.status, body: await res.text() };
 }
 
-async function bothListeners(): Promise<{
+async function bothListeners(dnsName: string | null = null): Promise<{
   socketPath: string;
   port: number;
 }> {
   const s = bootServer({ authToken: TOKEN });
   s.app.get('/api/test/who', (c) => c.json({ identity: tailnetIdentityOf(c) }));
+  s.app.get('/api/test/origin', (c) => c.json({ origin: requestOrigin(c) }));
   const socketPath = join(tempDir(), 'tailnet.sock');
-  const tailnet = await listenOnTailnetSocket(s.app, socketPath);
+  const tailnet = await listenOnTailnetSocket(s.app, socketPath, () => dnsName);
   closers.push(() => tailnet.close());
   const port = await new Promise<number>((resolve) => {
     const server = createServer(getRequestListener(s.app.fetch));
@@ -143,6 +145,70 @@ describe('identity comes from the tailnet listener, never from a header on its o
       'Tailscale-User-Login': login,
     });
     expect(JSON.parse(reply.body)).toEqual({ identity: null });
+  });
+});
+
+describe('the tailnet listener restores the external https origin (P2)', () => {
+  const DNS_NAME = 'cairn.tail.ts.net';
+
+  test('request origin is https on the node DNS name, even for a spoofed Host or forwarded headers', async () => {
+    const { socketPath } = await bothListeners(DNS_NAME);
+    const reply = await viaSocket(socketPath, '/api/test/origin', {
+      ...bearer,
+      host: 'evil.example',
+      'x-forwarded-proto': 'http',
+      'x-forwarded-host': 'evil.example',
+    });
+    expect(JSON.parse(reply.body)).toEqual({ origin: `https://${DNS_NAME}` });
+  });
+
+  test('before the node name is known it falls back to https on the request host', async () => {
+    const { socketPath } = await bothListeners(null);
+    const reply = await viaSocket(socketPath, '/api/test/origin', bearer);
+    expect(JSON.parse(reply.body)).toEqual({ origin: 'https://cairn.tail.ts.net' });
+  });
+
+  test('the normal listener keeps its own http origin and ignores forwarded headers', async () => {
+    const { port } = await bothListeners(DNS_NAME);
+    const reply = await viaTcp(port, '/api/test/origin', {
+      ...bearer,
+      'x-forwarded-proto': 'https',
+      'x-forwarded-host': DNS_NAME,
+    });
+    expect(JSON.parse(reply.body)).toEqual({ origin: `http://127.0.0.1:${port}` });
+  });
+
+  test('the machine enrollment approval link is https on the tailnet and http locally', async () => {
+    const { socketPath, port } = await bothListeners(DNS_NAME);
+    const startPath = '/api/machine/enroll/start';
+    const viaTailnet = await new Promise<Reply>((resolve, reject) => {
+      const req = request({
+        socketPath,
+        path: startPath,
+        method: 'POST',
+        headers: { host: DNS_NAME, 'content-type': 'application/json' },
+      });
+      req.on('response', (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+        );
+      });
+      req.on('error', reject);
+      req.end(JSON.stringify({ name: 'laptop' }));
+    });
+    expect(JSON.parse(viaTailnet.body).url).toMatch(
+      new RegExp(`^https://${DNS_NAME}/app/machines/authorize\\?enroll=`),
+    );
+    const local = await fetch(`http://127.0.0.1:${port}${startPath}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'laptop' }),
+    });
+    expect(((await local.json()) as { url: string }).url).toMatch(
+      new RegExp(`^http://127.0.0.1:${port}/app/machines/authorize`),
+    );
   });
 });
 
@@ -232,5 +298,26 @@ describe('the identity header is read in exactly one module', () => {
     };
     walk(root);
     expect(offenders.sort()).toEqual(['config.ts', 'lib/tailnet-listener.ts']);
+  });
+});
+
+describe('request origins are derived in one place', () => {
+  test('only requestOrigin reads the origin of the request URL, so the tailnet scheme cannot be missed', () => {
+    const root = join(import.meta.dirname, '..', 'src');
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (
+          entry.name.endsWith('.ts') &&
+          /new URL\(c\.req\.url\)\.origin/.test(readFileSync(path, 'utf8'))
+        ) {
+          offenders.push(path.slice(root.length + 1));
+        }
+      }
+    };
+    walk(root);
+    expect(offenders).toEqual(['routes-helpers.ts']);
   });
 });

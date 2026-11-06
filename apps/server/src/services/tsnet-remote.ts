@@ -6,6 +6,7 @@ import { listenOnTailnetSocket, type TailnetListener } from '../lib/tailnet-list
 import {
   type SidecarLogger,
   type SidecarStatus,
+  type SidecarSupervisor,
   type SpawnSidecar,
   superviseSidecar,
 } from '../lib/tsnet-sidecar.js';
@@ -96,6 +97,7 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
   if (!settings.enabled) return null;
   const paths = tsnetPathsOf(input.homeDir);
   let listener: TailnetListener;
+  let supervisor: SidecarSupervisor | null = null;
   try {
     if (input.authToken === null) {
       throw new Error(
@@ -106,7 +108,11 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
     verifySocketPathFits(paths.socketPath);
     ensurePrivateDir(paths.root, 'tsnet directory');
     ensurePrivateDir(paths.stateDir, 'tsnet state directory');
-    listener = await listenOnTailnetSocket(input.app, paths.socketPath);
+    listener = await listenOnTailnetSocket(
+      input.app,
+      paths.socketPath,
+      () => supervisor?.status().dnsName ?? null,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error({ error: message }, 'tsnet remote access is enabled but could not start');
@@ -119,7 +125,7 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
     { socket: paths.socketPath, stateDir: paths.stateDir, hostname: settings.hostname },
     'tsnet remote access starting',
   );
-  const supervisor = superviseSidecar({
+  const running = superviseSidecar({
     launch: {
       binaryPath: settings.binaryPath,
       stateDir: paths.stateDir,
@@ -135,10 +141,11 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
       if (status.state === 'failed') void listener.close();
     },
   });
+  supervisor = running;
   return {
-    status: supervisor.status,
+    status: running.status,
     stop: async () => {
-      await supervisor.stop();
+      await running.stop();
       await listener.close();
     },
   };
