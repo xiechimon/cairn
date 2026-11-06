@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join, sep } from 'node:path';
@@ -52,8 +52,14 @@ function fixture(options: { command?: readonly string[] } = {}) {
   return { podman, runtime };
 }
 
-async function relayFixture(directoryName = 'cairn-orb-egress', socketName = 'egress.sock') {
-  const root = makeTestTempDir('egr-');
+async function relayFixture(
+  directoryName = 'cairn-orb-egress',
+  socketName = 'egress.sock',
+  underHome = false,
+) {
+  const root = underHome
+    ? mkdtempSync(join(homedir(), '.cache', 'cairn-podman-widen-'))
+    : makeTestTempDir('egr-');
   const directory = join(root, directoryName);
   mkdirSync(directory, { mode: 0o700 });
   const socketPath = join(directory, socketName);
@@ -62,7 +68,8 @@ async function relayFixture(directoryName = 'cairn-orb-egress', socketName = 'eg
   chmodSync(socketPath, 0o600);
   onTestFinished(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    releaseTestTempDir(root);
+    if (underHome) rmSync(root, { recursive: true, force: true });
+    else releaseTestTempDir(root);
   });
   return { root, directory, socketPath };
 }
@@ -164,20 +171,11 @@ describe('PodmanOrbRuntime.spawn argv', () => {
   });
 
   test.each([
-    ['the default temp root', undefined],
-    ['a temp root under the home directory', join(homedir(), '.cache', 'cairn-podman-widen-test')],
-  ])('never widens the sandbox with %s', async (_name, tempRoot) => {
-    if (tempRoot !== undefined) {
-      mkdirSync(tempRoot, { recursive: true });
-      const previous = process.env.CAIRN_TEST_TEMP_ROOT;
-      process.env.CAIRN_TEST_TEMP_ROOT = tempRoot;
-      onTestFinished(() => {
-        if (previous === undefined) delete process.env.CAIRN_TEST_TEMP_ROOT;
-        else process.env.CAIRN_TEST_TEMP_ROOT = previous;
-      });
-    }
+    ['the default temp root', false],
+    ['a relay socket under the home directory', true],
+  ])('never widens the sandbox with %s', async (_name, underHome) => {
     const { podman, runtime } = fixture();
-    const relay = await relayFixture();
+    const relay = await relayFixture('cairn-orb-egress', 'egress.sock', underHome);
     await runtime.spawn(
       spec({
         egress: { socketPath: relay.socketPath },
