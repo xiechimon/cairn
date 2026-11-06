@@ -84,29 +84,22 @@ test('active row = sidebar-active fill, no ring', async ({ page }) => {
   expect(m.ring).toBe('none');
 });
 
-test('project rows: neutral folder glyph, no letter tile, open-task counts', async ({ page }) => {
+test('project rows carry a neutral glyph, no colored tile and no count', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const rows = page.locator('[data-slot="sidebar-project-row"]');
   await expect(rows).toHaveCount(3);
   const probe = await rows.evaluateAll((els) =>
-    els.map((el) => {
-      const avatar = el.querySelector('.project-avatar')!;
-      return {
-        letter: avatar.textContent,
-        glyph: avatar.querySelector('svg') !== null,
-        count: el.querySelector('[data-slot="sidebar-project-count"]')?.textContent ?? null,
-      };
-    }),
+    els.map((el) => ({
+      glyphColor: getComputedStyle(el.querySelector('[data-slot="project-glyph"]')!).color,
+      tile: el.querySelector('.project-avatar') !== null,
+      count: el.querySelector('[data-slot="sidebar-project-count"]') !== null,
+    })),
   );
-  expect(probe.map((r) => r.letter)).toEqual(['', '', '']);
-  expect(probe.map((r) => r.glyph)).toEqual([true, true, true]);
-  expect(probe.map((r) => r.count)).toEqual(['1', null, null]);
-
-  await page.getByTestId('project-group').getByRole('link', { name: '新建项目' }).click();
-  await expect(page).toHaveURL(/\/app\/project\/new\?scenario=board-repos/);
+  expect(new Set(probe.map((r) => r.glyphColor)).size).toBe(1);
+  expect(probe.some((r) => r.tile || r.count)).toBe(false);
 });
 
-test('long project names truncate and keep the waiting count visible', async ({ page }) => {
+test('long project names truncate to one 32px line', async ({ page }) => {
   await page.goto('/app/schedules?scenario=board-repos');
   const m = await page
     .locator('[data-slot="sidebar-project-row"]')
@@ -114,19 +107,15 @@ test('long project names truncate and keep the waiting count visible', async ({ 
     .evaluate((row) => {
       const label = row.querySelector('span.truncate') as HTMLElement;
       label.textContent = '一个非常非常非常长的项目名字用来压测侧栏截断行为-with-latin-tail';
-      const count = row.querySelector('[data-slot="sidebar-project-count"]')!;
       const r = row.getBoundingClientRect();
-      const c = count.getBoundingClientRect();
       return {
         overflow: label.scrollWidth > label.clientWidth,
         ellipsis: getComputedStyle(label).textOverflow,
-        countInside: c.right <= r.right && c.width > 0,
         rowHeight: r.height,
       };
     });
   expect(m.overflow).toBe(true);
   expect(m.ellipsis).toBe('ellipsis');
-  expect(m.countInside).toBe(true);
   expect(m.rowHeight).toBe(32);
 });
 

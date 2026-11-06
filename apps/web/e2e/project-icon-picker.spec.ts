@@ -38,7 +38,7 @@ test('the project avatar picker sets an icon that reaches the sidebar, then rese
   await page.goto('/app/project/icon-project/settings');
   const sidebarRow = page.locator('[data-slot="sidebar-project-row"]', { hasText: 'Atlas' });
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCount(0);
-  await expect(sidebarRow.locator('.project-avatar[data-project-type="folder"]')).toBeVisible();
+  await expect(sidebarRow.locator('[data-slot="project-glyph"]')).toBeVisible();
 
   await page.getByTestId('project-icon-trigger').click();
   const picker = page.getByTestId('project-icon-picker');
@@ -51,7 +51,7 @@ test('the project avatar picker sets an icon that reaches the sidebar, then rese
 
   await picker.getByRole('button', { name: '重置图标' }).click();
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCount(0);
-  await expect(sidebarRow.locator('.project-avatar[data-project-type="folder"]')).toBeVisible();
+  await expect(sidebarRow.locator('[data-slot="project-glyph"]')).toBeVisible();
 
   expect(patches).toEqual([
     { icon: 'rocket' },
@@ -60,7 +60,7 @@ test('the project avatar picker sets an icon that reaches the sidebar, then rese
   expect(pageErrors).toEqual([]);
 });
 
-test('the fixture sidebar shows picked icons bare and projects without one show the neutral folder glyph', async ({
+test('the fixture sidebar shows picked icons bare and projects without one show the neutral folder', async ({
   page,
 }) => {
   await page.goto('/app?scenario=sidebar-project-icons');
@@ -70,5 +70,5 @@ test('the fixture sidebar shows picked icons bare and projects without one show 
   await expect(rows.nth(1).locator('[data-project-icon="rocket"]')).toBeVisible();
   await expect(rows.nth(2).locator('[data-project-icon="database"]')).toBeVisible();
   await expect(rows.nth(3).locator('[data-project-icon]')).toHaveCount(0);
-  await expect(rows.nth(3).locator('.project-avatar[data-project-type="folder"]')).toBeVisible();
+  await expect(rows.nth(3).locator('[data-slot="project-glyph"]')).toBeVisible();
 });

@@ -20,7 +20,6 @@ import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { recordOutsideLocation } from '../settings/settings-href.js';
 import { fleetStatus } from './fleet-status.js';
-import { needsYouCount } from './needs-you.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed';
@@ -128,7 +127,6 @@ export function AppSidebar({
     );
   };
   const sidebarProps = {
-    attention: needsYouCount(resolvedTodos),
     machinesOnline,
     machinesOffline: fleet.offline,
     offlineMachineNames: fleet.offlineNames,

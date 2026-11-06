@@ -61,7 +61,7 @@ test('keyboard focus rings on rail rows stay whole', async ({ page }) => {
   const rail = page.getByRole('complementary').getByRole('navigation');
   const rows = [
     sidebarLink(page, /^Coordinator/),
-    page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first(),
+    page.getByRole('complementary').locator('.rail-row:has([data-slot="project-glyph"])').first(),
     rail.getByRole('button').first(),
   ];
   for (const row of rows) {

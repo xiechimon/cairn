@@ -68,7 +68,7 @@ test('rail rows hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=03');
   await plantCanary(page);
 
-  await page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first().click();
+  await page.getByRole('complementary').locator('.rail-row:has([data-slot="project-glyph"])').first().click();
   await expect(page).toHaveURL(/\/app\?scenario=03&project=/);
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
@@ -118,7 +118,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 test('rail hover tints the row', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
-  const row = page.getByRole('complementary').locator('.rail-row:has(.project-avatar)').first();
+  const row = page.getByRole('complementary').locator('.rail-row:has([data-slot="project-glyph"])').first();
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();

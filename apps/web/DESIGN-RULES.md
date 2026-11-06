@@ -31,7 +31,7 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 | C7 | A disabled control says why next to it. No agent bound: the composer is disabled, and the reason with a link to settings sits above it. | M disabled composer has adjacent explanatory text |
 | C8 | Show connection and agent state where the user acts, on the composer line (Amp: a `Connect a machine` chip with the command beside it), not only on a settings page. | H |
 | C9 | First run is a checklist with live status per step (provider, machine, agent, first message), not a dead-end error. A step finished elsewhere ticks itself. | H |
-| C10 | A row that stands for work shows its state and its age (glyph, title, reason, time), grouped by what needs the user, as in the references. | H |
+| C10 | A row that stands for work shows its state and its age (glyph, title, reason, time), grouped by what needs the user, as in the references. In the sidebar the age follows L6. | H |
 | C11 | After sending, the user's message and the start of the reply are in the viewport; when the user has scrolled away, a jump-to-latest control appears (Claude.ai). Message tools show on hover and on the latest message; on touch, on the latest only. | M latest reply top is inside the viewport after send |
 | C12 | An empty state is one sentence and at most one primary action (`DESIGN.md`, Empty state). | G `ui-page-style-gate` |
 
@@ -43,7 +43,7 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 | V2 | Fonts are Source Serif 4, Instrument Sans and JetBrains Mono only. No Inter, system-ui default, Space Grotesk or another font that models converge on. | M computed `font-family` of every text node is in the set (CJK fallbacks allowed) |
 | V3 | No AI-default styling: no purple or blue-violet gradients, glow, gradient text, frosted blur panels, decorative blobs, emoji as icons or labels (a celebration emoji in a status line), or the same radius and shadow stamped on every block. There is no exception: the user bubble is a flat tint. | M no `linear-gradient` or `blur(` in new CSS; no emoji in `t()` strings |
 | V4 | Not everything is a card. A list is rows in one divided `ListCard`; no card inside a card; one card corner per page (`--radius-card`). | M nested `[data-slot=card]` count is 0 |
-| V5 | Three roles carry colour. Ochre, the one accent, means waiting on you. Green is a 6px dot for running or online and nothing else. Rust is failure and destructive actions only. Everything else is the ink ladder (slate and per-project hues are retired). Status is icon, color and text, never color alone. | G `ui-drift-gate`, `test/anti-slop-foundations.test.ts`; H |
+| V5 | Three roles carry colour. Ochre, the one accent, means waiting on you. Green is a 6px dot for running or online and nothing else. Rust is failure and destructive actions only. Everything else is the ink ladder (slate and per-project hues are retired). Status is icon, color and text, never color alone. Lists and sidebar rows are the exception and follow L1 and L2: one accent only. | G `ui-drift-gate`, `test/anti-slop-foundations.test.ts`; H |
 | V6 | One primary action per screen, and it is the `primary` Button. Card actions are text links. | H |
 | V7 | Elevation is `--e1`, `--e2` or `--e3` only; no second ring and no raw `box-shadow`. | G `ui-drift-gate` |
 | V8 | Spacing is on the 4px grid. | G `ui-debt-gate`; M computed margins and paddings are multiples of 4 |
@@ -65,6 +65,20 @@ Anti-slop rules (audit `docs/research/ui-ux-audit-2026-11-06.md`, section on AI 
 | V19 | A placeholder is not content. No text node consists only of `—`, `·` or `-` (extends C2 to trailing `—` and `· —`). | M | activity 7, machine settings 3, thread 1 (batch 2) |
 | T3 | No text node contains a backtick; code renders as `<code>`. | M | machine settings 1 (batch 2) |
 | V20 | An object list is rows in one card, not a grid of identical cards; a card grid is for true parallel choices only. | H | team page against t3code providers (batch 2) |
+
+## 3b. Lists and sidebars
+
+Source: the owner's reference-versus-ours review of the sidebar (#3144, 2026-11-06) against Amp and t3code. A list is any group of three or more rows that stand for entities (threads, projects, tasks). Measure inside the list container (`aside`, `[data-testid=thread-groups]`, a `ListCard`).
+
+| Id | Rule | Check |
+|---|---|---|
+| L1 | At most 2 distinct hues in a list, the accent included. Count the computed colors of glyphs, text, fills and borders whose HSL saturation is above 0.15 and lightness between 0.1 and 0.9, bucket them by 30 degrees of hue; neutrals and the ink ladder do not count. | M distinct chromatic hue buckets in the container is <= 2 |
+| L2 | Status in a row is a monochrome glyph (ink ladder) or a muted text tag, never a multi-color icon. Only the one state that needs the user may take the accent (needs-you glyph and its count); failed is a text tag (`Failed`), not a red icon. | M every `[data-slot=sidebar-thread-row]` glyph color is neutral unless `data-state=needs-you`; failed rows contain a `sidebar-thread-tag` |
+| L3 | No colored letter or tinted tile avatars in a list row. A row has no avatar or one neutral 16px type icon in `ink-3`. | M no row descendant has a chromatic background and a one-letter text; `.project-avatar` count is 0 |
+| L4 | The title gets the row. The title box is at least 80% of the row width, or 55% when the row also carries a running elapsed time or a failed tag, at the 248px sidebar and the 288px phone drawer. Nothing else shares the line. | M `title.width / row.width` is >= 0.8 for every thread row, >= 0.55 for a row with a tag or elapsed time |
+| L5 | Group by status with a count header, in this order: needs you, in progress, done (folded). Order comes from `threadStatus`; no thread becomes done by age. Archived threads show nowhere in the list. | G `test/sidebar-threads.test.ts`; M header order in the DOM |
+| L6 | Time shows only on running rows (elapsed) or on hover. A resting non-running row holds no time text, and the hover time takes no layout. | M resting `[data-slot=sidebar-thread-meta]` exists only inside `data-state=running` |
+| L7 | The running row and the open row carry one subtle emphasis step, a surface lift or the hover fill, never a color change or a border in a hue. | M computed background of the running or open row differs from a resting row; its border color is neutral |
 
 ## 4. Text, language, access
 
