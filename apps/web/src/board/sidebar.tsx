@@ -187,6 +187,8 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const threadParams = new URLSearchParams(baseParams);
+  if (projectParam !== null) threadParams.set('project', projectParam);
   const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
   const { active: projectRows, archived: archivedRows } = useMemo(
     () => splitProjectsByArchive((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
@@ -397,7 +399,7 @@ export function BoardSidebar({
           groups={threadGroups}
           openThreadId={openThreadId}
           projectNames={projectNames}
-          onOpen={(id) => navigate(threadHref(id, baseParams.toString()))}
+          onOpen={(id) => navigate(threadHref(id, threadParams.toString()))}
         />
         <div
           data-testid="project-group"

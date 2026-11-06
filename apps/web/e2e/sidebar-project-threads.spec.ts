@@ -13,7 +13,11 @@ async function open(page: Page) {
     { ...TASK, id: 't-arch', title: 'Archived work', phase: 'building', archivedAt: now },
     { ...TASK, id: 't-other', projectId: 'proj-x', title: 'Other project', phase: 'building' },
   ];
-  await mockLive(page, { threads: [THREAD], messages: [], todos, projects: [PROJECT] });
+  await mockLive(page, { threads: [THREAD], messages: [], todos, projects: [PROJECT] }, (path, _route, json) => {
+    const match = path.match(/^\/api\/todos\/([^/]+)$/);
+    const found = match === null ? undefined : todos.find((row) => row.id === match[1]);
+    return found === undefined ? undefined : json(found);
+  });
   await page.goto('/app');
 }
 
@@ -59,4 +63,21 @@ test('clicking a thread row opens that thread', async ({ page }) => {
   await open(page);
   await threadRows(page).filter({ hasText: 'Run the build' }).getByRole('button').click();
   await expect(page).toHaveURL(/[?&]thread=t-run/);
+});
+
+test('opening and closing a thread keeps the project filter', async ({ page }) => {
+  await open(page);
+  const sidebar = page.locator('aside.board-sidebar');
+  await sidebar.locator('[data-slot="sidebar-project-row"]', { hasText: PROJECT.name }).click();
+  await expect(page).toHaveURL(/[?&]project=proj-1/);
+  await expect(sidebar).not.toContainText('Other project');
+  await sidebar.locator('[data-slot="sidebar-thread-row"]', { hasText: 'Pick a provider' }).getByRole('button').click();
+  await expect(page).toHaveURL(/[?&]thread=t-ask/);
+  await expect(page).toHaveURL(/[?&]project=proj-1/);
+  await expect(sidebar).not.toContainText('Other project');
+  await expect(page.getByTestId('side-chat')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/[?&]thread=/);
+  await expect(page).toHaveURL(/[?&]project=proj-1/);
+  await expect(sidebar).not.toContainText('Other project');
 });
