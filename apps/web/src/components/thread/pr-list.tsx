@@ -1,18 +1,11 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
-import { Ellipsis, GitMerge, GitPullRequest, GitPullRequestClosed } from 'lucide-react';
+import { GitMerge, GitPullRequest, GitPullRequestClosed } from 'lucide-react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { Button } from '../ui/button.js';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu.js';
-import { toastSuccess } from '../ui/toaster.js';
 import { prChecksText } from './pr-panel-model.js';
+import { PrRowMenu } from './pr-row-menu.js';
 
 const VISIBLE_ROWS = 5;
 
@@ -56,44 +49,6 @@ function CheckCount({ checks }: { checks: PrPanelRow['checks'] }) {
   );
 }
 
-function RowMenu({
-  row,
-  onViewChanges,
-}: {
-  row: PrPanelRow;
-  onViewChanges: (row: PrPanelRow) => void;
-}) {
-  const { t } = useI18n();
-  const label = t('PR #{n} 的菜单', { n: row.number });
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon-xs" className="size-6" aria-label={label} />}
-      >
-        <Ellipsis />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-44">
-        <DropdownMenuItem
-          render={<a href={row.url} target="_blank" rel="noreferrer" />}
-          nativeButton={false}
-        >
-          {t('在 GitHub 打开')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            void navigator.clipboard?.writeText(row.url);
-            toastSuccess(t('已复制链接'));
-          }}
-        >
-          {t('复制链接')}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onViewChanges(row)}>{t('查看变更')}</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 export interface PrListProps {
   rows: readonly PrPanelRow[];
   onOpenThread: (threadId: string) => void;
@@ -131,7 +86,7 @@ export function PrList({ rows, onOpenThread, onViewChanges }: PrListProps) {
               </span>
             </span>
           </Button>
-          <RowMenu row={row} onViewChanges={onViewChanges} />
+          <PrRowMenu number={row.number} url={row.url} onViewChanges={() => onViewChanges(row)} />
         </div>
       ))}
       {rows.length > VISIBLE_ROWS && (

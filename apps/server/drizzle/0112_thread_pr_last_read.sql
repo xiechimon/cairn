@@ -1,1 +1,0 @@
-ALTER TABLE `thread_pr` ADD `lastReadAt` integer DEFAULT 0 NOT NULL;

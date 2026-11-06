@@ -231,10 +231,14 @@ const PR_CARD_BASE: PrCardModel = {
   number: 2512,
   title: 'web: PR card shows the gate verdict',
   branch: 'cairn/pr-card-2512',
+  base: 'main',
+  repo: 'xiechimon/cairn',
+  additions: 184,
+  deletions: 31,
   state: 'open',
   checks: { passed: 6, failed: 0, running: 0, total: 6 },
   verdict: null,
-  currentHead: 'a1b2c3d',
+  currentHead: '4f8e2c1',
 };
 
 const PR_CARD_LENSES = [
@@ -265,7 +269,13 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
     pr: {
       ...PR_CARD_BASE,
       state: 'checks-failed',
-      checks: { passed: 4, failed: 2, running: 0, total: 6 },
+      checks: {
+        passed: 4,
+        failed: 2,
+        running: 0,
+        total: 6,
+        failedNames: ['typecheck', 'web e2e (3)'],
+      },
       blockers: ['typecheck failed', 'web e2e failed'],
     },
   },
@@ -276,7 +286,7 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
       state: 'review-block',
       verdict: {
         result: 'block',
-        judgedHead: 'a1b2c3d',
+        judgedHead: '4f8e2c1',
         lenses: [
           { name: 'Correctness', result: 'block' },
           { name: 'Security', result: 'pass' },
@@ -291,7 +301,7 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
     pr: {
       ...PR_CARD_BASE,
       state: 'review-pass',
-      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+      verdict: { result: 'pass', judgedHead: '4f8e2c1', lenses: [...PR_CARD_LENSES] },
     },
   },
   {
@@ -299,8 +309,8 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
     pr: {
       ...PR_CARD_BASE,
       state: 'review-pass',
-      currentHead: 'e4f5a6b',
-      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+      currentHead: '9d03b7a',
+      verdict: { result: 'pass', judgedHead: '4f8e2c1', lenses: [...PR_CARD_LENSES] },
     },
   },
   {
@@ -309,7 +319,7 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
       ...PR_CARD_BASE,
       state: 'queued',
       queuePosition: 2,
-      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+      verdict: { result: 'pass', judgedHead: '4f8e2c1', lenses: [...PR_CARD_LENSES] },
     },
   },
   {
@@ -317,7 +327,7 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
     pr: {
       ...PR_CARD_BASE,
       state: 'merged',
-      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+      verdict: { result: 'pass', judgedHead: '4f8e2c1', lenses: [...PR_CARD_LENSES] },
     },
   },
   {
@@ -326,7 +336,7 @@ const PR_CARD_CASES: { label: string; pr: PrCardModel }[] = [
       ...PR_CARD_BASE,
       state: 'owner-route',
       ownerRoute: 'Touches apps/server/src/services/secrets.ts; ian merges',
-      verdict: { result: 'pass', judgedHead: 'a1b2c3d', lenses: [...PR_CARD_LENSES] },
+      verdict: { result: 'pass', judgedHead: '4f8e2c1', lenses: [...PR_CARD_LENSES] },
     },
   },
 ];
@@ -350,7 +360,12 @@ export function PrCardSection() {
           {PR_CARD_CASES.map(({ label, pr }) => (
             <div key={label} data-pr-card-case={label} className="flex min-w-0 flex-col gap-1.5">
               <span className="text-caption text-content-tertiary">{label}</span>
-              <PrCard pr={pr} githubHref="https://github.com" />
+              <PrCard
+                pr={pr}
+                githubHref="https://github.com/xiechimon/cairn/pull/2512"
+                onResolve={() => toastSuccess('Resolve requested')}
+                onViewDiff={() => toastSuccess('Diff opened')}
+              />
             </div>
           ))}
         </div>

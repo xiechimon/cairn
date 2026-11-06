@@ -32,6 +32,8 @@ interface PullSpec {
   head?: string;
   mergeable?: string;
   title?: string;
+  branch?: string;
+  base?: string;
   additions?: number;
   deletions?: number;
 }
@@ -98,7 +100,8 @@ class GithubMock {
         mergeable_state: spec.mergeable ?? 'clean',
         additions: spec.additions ?? 12,
         deletions: spec.deletions ?? 3,
-        head: { sha: spec.head ?? HEAD_A },
+        head: { sha: spec.head ?? HEAD_A, ref: spec.branch ?? 'cairn/feature' },
+        base: { ref: spec.base ?? 'main' },
       });
     }
     const runs = /\/commits\/([0-9a-f]+)\/check-runs/.exec(url);
@@ -240,6 +243,23 @@ describe('F1 a thread PR is recorded once, with the panel fields', () => {
       dismissed: false,
       wakeRounds: 0,
     });
+  });
+
+  test('the panel row names the branch, its base and the failing checks', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, { branch: 'cairn/pr-panel', base: 'main' });
+    mock.checks.set(HEAD_A, [
+      { name: 'unit', status: 'completed', conclusion: 'success' },
+      { name: 'lint', status: 'completed', conclusion: 'failure' },
+      { name: 'e2e (1)', status: 'completed', conclusion: 'timed_out' },
+      { name: 'e2e (1)', status: 'completed', conclusion: 'failure' },
+    ]);
+    await watchFor(s, mock).sweep(1_000);
+    const [row] = listThreadPrs(s.db, { teamId: s.team.id, threadId: t.todoId });
+    expect(row).toMatchObject({ branch: 'cairn/pr-panel', base: 'main' });
+    expect(row?.checks.failedNames).toEqual(['lint', 'e2e (1)']);
   });
 
   test('an unchanged PR polled successfully, including on a 304, moves lastReadAt and not updatedAt', async () => {

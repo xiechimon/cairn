@@ -27,6 +27,7 @@ export interface CheckTally {
   failed: number;
   running: number;
   total: number;
+  failedNames: string[];
 }
 
 export function mergeStateOf(mergeableState: string | null): PrMergeState {
@@ -34,11 +35,20 @@ export function mergeStateOf(mergeableState: string | null): PrMergeState {
 }
 
 export function checkTallyOf(runs: readonly GithubCheckRun[]): CheckTally {
-  const tally: CheckTally = { passed: 0, failed: 0, running: 0, total: runs.length };
+  const tally: CheckTally = {
+    passed: 0,
+    failed: 0,
+    running: 0,
+    total: runs.length,
+    failedNames: [],
+  };
   for (const run of runs) {
     if (run.status !== 'completed') tally.running += 1;
     else if (PASSING_CONCLUSIONS.has(run.conclusion ?? '')) tally.passed += 1;
-    else tally.failed += 1;
+    else {
+      tally.failed += 1;
+      if (!tally.failedNames.includes(run.name)) tally.failedNames.push(run.name);
+    }
   }
   return tally;
 }
@@ -60,7 +70,10 @@ export function toPrPanelRow(row: typeof threadPr.$inferSelect): PrPanelRow {
       failed: row.checksFailed,
       running: row.checksRunning,
       total: row.checksTotal,
+      failedNames: JSON.parse(row.checksFailedNames) as string[],
     },
+    branch: row.headRef,
+    base: row.baseRef,
     head: row.head,
     verdict:
       row.verdictResult !== null && row.verdictHead !== null

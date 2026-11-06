@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK } from './chief-home-mock.js';
 import { evidencePanelShot } from './evidence.js';
 
-const HEAD = 'a'.repeat(40);
+const HEAD = '4f8e2c1d9b0a63e57c1f08a2d4b6e9137a5c80de';
 const REVIEW_TASK = { ...TASK, phase: 'review', phaseAt: Date.now() };
 
 function prRow(over: Record<string, unknown> = {}) {
@@ -16,9 +16,11 @@ function prRow(over: Record<string, unknown> = {}) {
     url: 'https://github.com/xiechimon/cairn/pull/42',
     state: 'open',
     mergeState: 'clean',
+    branch: 'cairn/web-3122-pr-panel',
+    base: 'main',
     additions: 120,
     deletions: 14,
-    checks: { passed: 9, failed: 0, running: 0, total: 9 },
+    checks: { passed: 9, failed: 0, running: 0, total: 9, failedNames: [] },
     head: HEAD,
     verdict: { result: 'pass', judgedHead: HEAD },
     autoFix: true,
@@ -42,8 +44,8 @@ interface Case {
 
 const CASES: Case[] = [
   { name: 'draft', row: { state: 'draft', mergeState: 'blocked' }, cardState: 'draft', pill: 'Draft', ci: '9/9' },
-  { name: 'ci-running', row: { checks: { passed: 6, failed: 0, running: 3, total: 9 } }, cardState: 'checks-running', pill: 'Checks running', ci: '6/9' },
-  { name: 'ci-failed', row: { checks: { passed: 6, failed: 2, running: 1, total: 9 } }, cardState: 'checks-failed', pill: 'Checks failed', ci: '6/9' },
+  { name: 'ci-running', row: { checks: { passed: 6, failed: 0, running: 3, total: 9, failedNames: [] } }, cardState: 'checks-running', pill: 'Checks running', ci: '6/9' },
+  { name: 'ci-failed', row: { checks: { passed: 6, failed: 2, running: 1, total: 9, failedNames: ['lint', 'e2e (1)'] } }, cardState: 'checks-failed', pill: 'Checks failed', ci: '6/9' },
   { name: 'review-pending', row: { verdict: null }, cardState: 'review-pending', pill: 'Review pending', ci: '9/9' },
   { name: 'changes-requested', row: { verdict: { result: 'block', judgedHead: HEAD } }, cardState: 'review-block', pill: 'Review blocked', ci: '9/9' },
   { name: 'ready', row: {}, cardState: 'review-pass', pill: 'Ready to merge', ci: '9/9' },
@@ -51,7 +53,7 @@ const CASES: Case[] = [
   { name: 'closed', row: { state: 'closed' }, cardState: 'closed', pill: 'Closed', ci: '9/9' },
   { name: 'conflicts', row: { mergeState: 'dirty' }, cardState: 'conflicts', pill: 'Conflicts', ci: '9/9' },
   { name: 'behind', row: { mergeState: 'behind' }, cardState: 'behind', pill: 'Behind main', ci: '9/9' },
-  { name: 'stale-verdict', row: { verdict: { result: 'pass', judgedHead: 'b'.repeat(40) } }, cardState: 'review-pending', pill: 'Needs re-review', ci: '9/9' },
+  { name: 'stale-verdict', row: { verdict: { result: 'pass', judgedHead: '9d03b7a1e6c24f58b0a3d7e19c5f2468ab13c0de' } }, cardState: 'review-pending', pill: 'Needs re-review', ci: '9/9' },
 ];
 
 type PrsMode = { rows: unknown[] } | 'error';
@@ -84,7 +86,10 @@ for (const theme of ['light', 'dark'] as const) {
       const card = panel(page).locator('[data-slot="pr-card"]');
       await expect(card).toHaveAttribute('data-state', c.cardState);
       await expect(card.locator('[data-slot="pr-card-state"]')).toHaveText(c.pill);
-      await expect(card.getByRole('button', { name: 'Resolve' })).toHaveCount(0);
+      await card.getByRole('button', { name: /Menu for PR/ }).click();
+      await expect(page.getByRole('menuitem', { name: 'Resolve' })).toHaveCount(0);
+      await expect(page.getByRole('menuitem', { name: 'Open on GitHub' })).toHaveAttribute('href', /pull\/42$/);
+      await page.keyboard.press('Escape');
       await evidencePanelShot(page, `thread-pr-${c.name}-${theme}.png`, page.locator('.side-panel'));
     });
   }
@@ -130,7 +135,7 @@ test('the PR list shows every thread-owned PR with counts, a row menu and Show m
       url: `https://github.com/xiechimon/cairn/pull/${3060 - i}`,
       title: `docs(${3000 + i}): keep live counts in sync`,
       state: i === 4 ? 'merged' : 'open',
-      checks: { passed: 22 - i, failed: i === 2 ? 1 : 0, running: i === 1 ? 2 : 0, total: 23 },
+      checks: { passed: 22 - i, failed: i === 2 ? 1 : 0, running: i === 1 ? 2 : 0, total: 23, failedNames: i === 2 ? ['lint'] : [] },
       additions: 10 * (i + 1),
       deletions: 8,
     }),
@@ -185,7 +190,7 @@ test('the changes view does not leak into the next thread after closing', async 
 });
 
 test('a closed PR with an old verdict reads Closed, not Needs re-review', async ({ page }) => {
-  await setup(page, { rows: [prRow({ state: 'closed', verdict: { result: 'pass', judgedHead: 'b'.repeat(40) } })] });
+  await setup(page, { rows: [prRow({ state: 'closed', verdict: { result: 'pass', judgedHead: '9d03b7a1e6c24f58b0a3d7e19c5f2468ab13c0de' } })] });
   await page.goto('/app?thread=todo-1');
   await expect(status(page).getByTestId('side-chat-pr-status')).toHaveText('Closed');
   await expect(panel(page).locator('[data-slot="pr-card"]')).not.toHaveAttribute('data-stale', '');
@@ -193,7 +198,7 @@ test('a closed PR with an old verdict reads Closed, not Needs re-review', async 
 
 test('at 375px the panel and header fit without horizontal scroll', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await setup(page, { rows: [prRow({ checks: { passed: 6, failed: 2, running: 1, total: 9 } })] });
+  await setup(page, { rows: [prRow({ checks: { passed: 6, failed: 2, running: 1, total: 9, failedNames: ['lint', 'e2e (1)'] } })] });
   await page.goto('/app?thread=todo-1');
   await expect(panel(page)).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -202,7 +207,7 @@ test('at 375px the panel and header fit without horizontal scroll', async ({ pag
 });
 
 test('the panel passes axe in the failing state', async ({ page }) => {
-  await setup(page, { rows: [prRow({ checks: { passed: 6, failed: 2, running: 1, total: 9 } })] }, 'dark');
+  await setup(page, { rows: [prRow({ checks: { passed: 6, failed: 2, running: 1, total: 9, failedNames: ['lint', 'e2e (1)'] } })] }, 'dark');
   await page.goto('/app?thread=todo-1');
   await expect(panel(page)).toBeVisible();
   const results = await new AxeBuilder({ page }).include('.side-panel').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();

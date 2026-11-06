@@ -34,13 +34,17 @@ export interface PrCardChecks {
   failed: number;
   running: number;
   total: number;
+  failedNames?: string[];
 }
 
 export interface PrCardModel {
   number: number;
   title: string;
   branch?: string;
+  base?: string;
   repo?: string;
+  additions?: number;
+  deletions?: number;
   readAgoMinutes?: number;
   state: PrCardState;
   checks: PrCardChecks;

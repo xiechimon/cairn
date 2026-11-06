@@ -7,7 +7,7 @@ import {
   prChecksText,
 } from '../src/components/thread/pr-panel-model.js';
 
-const HEAD = 'a'.repeat(40);
+const HEAD = '4f8e2c1d9b0a63e57c1f08a2d4b6e9137a5c80de';
 const NOW = 1_000_000_000;
 
 function row(over: Partial<PrPanelRow> = {}): PrPanelRow {
@@ -22,7 +22,9 @@ function row(over: Partial<PrPanelRow> = {}): PrPanelRow {
     mergeState: 'clean',
     additions: 3,
     deletions: 1,
-    checks: { passed: 4, failed: 0, running: 0, total: 4 },
+    checks: { passed: 4, failed: 0, running: 0, total: 4, failedNames: [] },
+    branch: 'cairn/feature',
+    base: 'main',
     head: HEAD,
     verdict: { result: 'pass', judgedHead: HEAD },
     autoFix: false,
@@ -45,20 +47,20 @@ describe('a panel row maps onto one card state', () => {
     ['merged', { state: 'merged' }, 'merged'],
     ['closed', { state: 'closed' }, 'closed'],
     ['conflicts', { mergeState: 'dirty' }, 'conflicts'],
-    ['ci failed', { checks: { passed: 1, failed: 1, running: 0, total: 2 } }, 'checks-failed'],
-    ['ci running', { checks: { passed: 1, failed: 0, running: 1, total: 2 } }, 'checks-running'],
+    ['ci failed', { checks: { passed: 1, failed: 1, running: 0, total: 2, failedNames: [] } }, 'checks-failed'],
+    ['ci running', { checks: { passed: 1, failed: 0, running: 1, total: 2, failedNames: [] } }, 'checks-running'],
     ['review pending', { verdict: null }, 'review-pending'],
     ['changes requested', { verdict: { result: 'block', judgedHead: HEAD } }, 'review-block'],
-    ['stale verdict', { verdict: { result: 'pass', judgedHead: 'b'.repeat(40) } }, 'review-pending'],
+    ['stale verdict', { verdict: { result: 'pass', judgedHead: '9d03b7a1e6c24f58b0a3d7e19c5f2468ab13c0de' } }, 'review-pending'],
     ['behind', { mergeState: 'behind' }, 'behind'],
     ['blocked by GitHub', { mergeState: 'blocked' }, 'merge-blocked'],
     ['unstable still mergeable', { mergeState: 'unstable' }, 'review-pass'],
-  ] as const)('%s', (_name, over, expected) => {
+  ] satisfies [string, Partial<PrPanelRow>, string][])('%s', (_name, over, expected) => {
     expect(stateOf(over)).toBe(expected);
   });
 
   test('a failing check outranks a running one', () => {
-    expect(stateOf({ checks: { passed: 0, failed: 1, running: 1, total: 2 } })).toBe(
+    expect(stateOf({ checks: { passed: 0, failed: 1, running: 1, total: 2, failedNames: [] } })).toBe(
       'checks-failed',
     );
   });
@@ -88,7 +90,7 @@ describe('list helpers', () => {
   });
 
   test('a PR with no checks shows no count', () => {
-    expect(prChecksText({ passed: 0, failed: 0, running: 0, total: 0 })).toBeNull();
-    expect(prChecksText({ passed: 3, failed: 0, running: 0, total: 4 })).toBe('3/4');
+    expect(prChecksText({ passed: 0, failed: 0, running: 0, total: 0, failedNames: [] })).toBeNull();
+    expect(prChecksText({ passed: 3, failed: 0, running: 0, total: 4, failedNames: [] })).toBe('3/4');
   });
 });

@@ -291,9 +291,14 @@ export function createPrWatch(
       failed: existing?.checksFailed ?? 0,
       running: existing?.checksRunning ?? 0,
       total: existing?.checksTotal ?? 0,
+      failedNames:
+        existing !== undefined ? (JSON.parse(existing.checksFailedNames) as string[]) : [],
     };
     const checksNow =
-      counted ?? (sameLine || finished ? keep : { passed: 0, failed: 0, running: 0, total: 0 });
+      counted ??
+      (sameLine || finished
+        ? keep
+        : { passed: 0, failed: 0, running: 0, total: 0, failedNames: [] });
     const mergeState = finished
       ? (existing?.mergeState ?? 'unknown')
       : mergeStateOf(pull.mergeableState);
@@ -324,7 +329,10 @@ export function createPrWatch(
       checksFailed: checksNow.failed,
       checksRunning: checksNow.running,
       checksTotal: checksNow.total,
+      checksFailedNames: JSON.stringify(checksNow.failedNames),
       head,
+      headRef: pull.headRef,
+      baseRef: pull.baseRef,
       verdictResult: verdict?.result ?? null,
       verdictHead: verdict?.head ?? null,
       blockedSince,

@@ -27,6 +27,10 @@ export function prCardModelOfRow(row: PrPanelRow, now: number): PrCardModel {
     number: row.number,
     title: row.title,
     repo: row.repo,
+    branch: row.branch,
+    base: row.base,
+    additions: row.additions,
+    deletions: row.deletions,
     state,
     checks: row.checks,
     verdict:
