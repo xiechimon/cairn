@@ -44,15 +44,15 @@ test('rail project group collapse hides member rows and survives reload', async 
   await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
 
-  await expect(page.locator('.rail-row .project-avatar')).toBeVisible();
+  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toBeVisible();
   await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
 
   await page.locator('.rail-group[aria-label="收起项目"]').click();
-  await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
+  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(0);
 
   await page.reload();
   await expect(page.locator('.rail-group[aria-label="展开项目"]')).toBeVisible();
-  await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
+  await expect(page.locator('.rail-row [data-slot="project-glyph"]')).toHaveCount(0);
 });
 
 test('resources live in settings, not the sidebar', async ({ page }) => {
