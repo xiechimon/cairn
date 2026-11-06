@@ -2,6 +2,6 @@
 EXTENDS MergeGate
 
 ReviewHeadWasObserved ==
-  head /= "h1" \/ (\A v \in verdictRows : v.recordedHead = "h1")
+  \A v \in verdictRows : v.recordedHead \in used
 
 =============================================================================
