@@ -13,7 +13,6 @@ import type {
   SubscriptionAccount,
 } from '../../api/claude-accounts.js';
 import { ACCOUNT_VENDORS } from '../../api/claude-accounts.js';
-import { ProjectAvatar } from '../../board/project-avatar.js';
 import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
@@ -50,15 +49,6 @@ const WINDOW_LABELS: Record<string, string> = {
 };
 
 const WINDOW_ORDER = ['five_hour', 'seven_day', 'billing_period'];
-
-const SEGMENT_FILL = [
-  'bg-project-tile-1',
-  'bg-project-tile-2',
-  'bg-project-tile-3',
-  'bg-project-tile-4',
-  'bg-project-tile-5',
-  'bg-project-tile-6',
-] as const;
 
 export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> = {
   'claude-code': { label: 'Claude Code', Mark: ClaudeMark },
@@ -129,9 +119,8 @@ export function PoolWindowCard({
 }) {
   const { t } = useI18n();
   const clock = useClock();
-  const members = accounts.map((account, index) => ({
+  const members = accounts.map((account) => ({
     account,
-    index,
     window: account.windows.find((w) => w.name === name) ?? null,
   }));
   const reporting = members.flatMap((m) => (m.window === null ? [] : [m.window]));
@@ -176,7 +165,7 @@ export function PoolWindowCard({
           className="grid gap-x-3"
           style={{ gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))` }}
         >
-          {members.map(({ account, index, window }) => {
+          {members.map(({ account, window }) => {
             const pct = window === null ? null : leftPercent(window);
             return (
               <div
@@ -193,10 +182,7 @@ export function PoolWindowCard({
               >
                 {pct !== null && (
                   <i
-                    className={cn(
-                      'block h-full rounded-full',
-                      SEGMENT_FILL[index % SEGMENT_FILL.length],
-                    )}
+                    className="block h-full rounded-full bg-content-secondary"
                     style={{ width: `${pct}%` }}
                   />
                 )}
@@ -208,7 +194,7 @@ export function PoolWindowCard({
           className="flex flex-col gap-1 md:grid md:gap-x-3"
           style={{ gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))` }}
         >
-          {members.map(({ account, index, window }) => {
+          {members.map(({ account, window }) => {
             const pct = window === null ? null : leftPercent(window);
             const resets =
               window?.resetsAt == null
@@ -220,7 +206,6 @@ export function PoolWindowCard({
                 className="flex min-w-0 items-center gap-x-1.5 gap-y-1 text-caption text-content-tertiary md:flex-col md:items-stretch"
               >
                 <span className="flex min-w-0 flex-auto items-center gap-1.5 md:flex-none">
-                  <ProjectAvatar name={String(index + 1)} tone={index} />
                   <span className="truncate text-content-secondary">{account.label}</span>
                   <span
                     className={cn('ml-auto flex-none tabular-nums', isLowQuota(pct) && ACCENT_INK)}
@@ -257,7 +242,6 @@ export interface AccountRowActions {
 
 export function AccountRow({
   account,
-  index,
   now,
   actions,
   expanded,
@@ -265,7 +249,6 @@ export function AccountRow({
   status,
 }: {
   account: SubscriptionAccount;
-  index: number;
   now: number;
   actions: AccountRowActions;
   expanded?: boolean;
@@ -304,7 +287,6 @@ export function AccountRow({
         ) : (
           <span aria-hidden className="w-4.5 flex-none" />
         )}
-        <ProjectAvatar name={String(index + 1)} tone={index} />
         {draft === null ? (
           <span className="truncate text-ui font-semibold text-foreground">{account.label}</span>
         ) : (

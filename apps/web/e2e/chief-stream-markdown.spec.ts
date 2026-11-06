@@ -253,12 +253,14 @@ test.describe('chief drawer markdown face (fixture, #650)', () => {
     await expect(typing.locator('strong')).toHaveText('relay 通道');
   });
 
-  test('F-R6/R8: user row is a gradient bubble with no avatar, drawer body scrollable', async ({ page }) => {
+  test('F-R6/R8: user row is a flat bubble with no avatar, drawer body scrollable', async ({ page }) => {
     const userRow = page.getByTestId('chief-stream').getByTestId('chief-msg').first();
 
     await expect(userRow.locator('img')).toHaveCount(0);
     await expect(userRow.locator('> svg')).toHaveCount(0);
-    await expect(userRow.getByTestId('chief-bubble')).toHaveClass(/bubble-gradient/);
+    const bubble = userRow.getByTestId('chief-bubble');
+    await expect(bubble).toHaveCSS('background-image', 'none');
+    await expect(bubble).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
     const overflow = await page
       .getByTestId('chief-body')

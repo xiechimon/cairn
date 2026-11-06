@@ -26,14 +26,14 @@ const QUOTA_MANY =
   quotaBannerInfo([quotaTodo('Claude', 'quota', 30), quotaTodo('Codex', 'capacity', 10)]) ?? [];
 
 const AVATAR_ICONS = [
-  ['folder', undefined],
-  ['flask-conical', 'plum'],
-  ['rocket', 'amber'],
-  ['leaf', 'moss'],
-  ['database', 'slate'],
-  ['cloud', 'teal'],
-  ['heart', 'rose'],
-  ['server', 'gray'],
+  'folder',
+  'flask-conical',
+  'rocket',
+  'leaf',
+  'database',
+  'cloud',
+  'heart',
+  'server',
 ] as const;
 
 export function ProductBoardSection() {
@@ -88,23 +88,20 @@ export function ProductBoardSection() {
       <Specimen
         id="project-avatar"
         title="Project avatar"
-        note="ProjectAvatar: letter tile by index tone, or a chosen icon and colour"
+        note="ProjectAvatar: a neutral folder glyph, or the chosen icon; never a letter or a hue"
       >
-        {['cairn', 'docs-site', 'mobile', 'infra', 'billing', 'search', 'api'].map((name, i) => (
-          <Cell key={name} label={`tone ${i}`}>
-            <ProjectAvatar name={name} tone={i} />
-            <ProjectAvatar name={name} tone={i} className="size-7 text-ui" />
-            <span className="text-ui">{name}</span>
-          </Cell>
-        ))}
+        <Cell label="default">
+          <ProjectAvatar />
+          <span className="text-ui">cairn</span>
+        </Cell>
         <Cell label="icon tiles">
-          {AVATAR_ICONS.map(([icon, color]) => (
-            <ProjectAvatar key={icon} name={icon} tone={0} icon={icon} color={color} />
+          {AVATAR_ICONS.map((icon) => (
+            <ProjectAvatar key={icon} icon={icon} />
           ))}
         </Cell>
         <Cell label="icon bare">
-          {AVATAR_ICONS.map(([icon, color]) => (
-            <ProjectAvatar key={icon} name={icon} tone={0} icon={icon} color={color} bare />
+          {AVATAR_ICONS.map((icon) => (
+            <ProjectAvatar key={icon} icon={icon} bare />
           ))}
         </Cell>
       </Specimen>

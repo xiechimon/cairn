@@ -34,7 +34,6 @@ colors:
   pebble-idle: '#a8aea6'      # idle or snoozed
   pebble-resolved: '#c3c7bf'  # merged or resolved
   danger-line: '#d98c7d'      # error ring and danger-zone outline
-  project-tiles: ['#3f6c35', '#9a6b3a', '#5379a0', '#7a5b8e', '#3d7c7a', '#8a5560']
 colors-dark:
   # Dark (:root default): the same ladder in deep stone, brighter with elevation
   canvas: '#141715'
@@ -67,7 +66,6 @@ colors-dark:
   pebble-idle: '#5d655f'
   pebble-resolved: '#444b46'
   danger-line: '#8c4a3e'
-  project-tiles: ['#6f9c5f', '#b98a57', '#6f93bb', '#9a7cad', '#5fa3a0', '#b77f8a']
 typography:
   greeting:     { fontFamily: serif, fontSize: 26px, fontWeight: '600' }
   page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
@@ -128,10 +126,10 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 - **Borders are always 1 CSS pixel**: the main panel, task cards, the active nav item, and the new-task button stay 1px on high-density screens too (they do not follow `--hairline` down to 0.5px); borders must be visible.
 - **Three-tier shadow ladder** (#1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (`--e1` uses `line`; `--e2`/`--e3` use `--elevated-ring`, which is `line` in light and `--ring-inset-highlight` in dark, where `line` is invisible on the surface base). Light shadows are tinted ink (`rgb(29 35 31 / a)`) rather than neutral black so they sit in the paper, at the strength Claude.ai measures (`--e1` 0 1 2 .06 + 0 2 8 .06; `--e2` 0 2 6 .08 + 0 8 24 .12, its slash menu; `--e3` 0 4 12 .08 + 0 24 48 −12 .25, its ⌘K); dark uses neutral black at .3–.6. Tailwind's `shadow-xs` to `shadow-xl` resolve to the same tiers (`--cds-shadow-*`), so no surface carries an untinted default shadow; the composer rests on `--e1`'s pool, and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the Coordinator window) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
 - **Four ink steps**: `ink` headings and body text; `ink-2` nav, buttons, descriptions; `ink-3` meta information; `ink-4` decorative icons only. The lightest text ever uses is `ink-3`.
-- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 5.80, the same step as `ink-3`, so labelled icons read as solid as their text; `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. Project tiles draw their letter in `--project-ink-N` on an 18% tint of the same hue, 5.8 and up in both themes (measured live in the gallery). The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
+- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 5.80, the same step as `ink-3`, so labelled icons read as solid as their text; `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
 - **Focus ring**: `--focus-ring` is lichen `#3f6c35` in light (6.05 on the card) and `#9cc78b` in dark, so keyboard focus never reads as "waiting on you". Buttons, checkboxes, switches and badges draw it as a 2px outline 2px outside the box. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape, not a box inside a box. An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and, when focused, that border plus a 3px `--danger-halo` (destructive at 20%); it never stacks the green focus ring on top of the red border.
 - **Brand marks**: the spiral disc (the Coordinator's face) uses `--fab-surface` `#2f5a2a` with the `--fab-mark` `#f4f6f1` spiral in both themes, the nearest stone-green to the Cairn app icon.
-- **Status chips use five distinct hues**: idle neutral, plan slate blue, confirm ochre, done lichen green, failed rust (`--chip-*-bg` / `--chip-*-fg`, every pair 5.5+ in light and 7.0+ in dark). Plan is deliberately not ochre: only "waiting on you" may look like the accent.
+- **Palette roles** (anti-slop batch 1, 2026-11-06): ochre is the one accent and means "waiting on you" (`--waiting-ink` for text and icons, `--badge-attention` for dots); green is a 6px dot for running or online and nothing else; rust (`--destructive`, `--danger-soft`) is failure and destructive actions only. Status chips are one neutral fill (`bg-secondary`) with the status in the text and icon colour; there are no tinted chip fills, no slate and no per-project hues.
 - **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
 - **Status is never color alone**: every status is a triple of "icon + color + text" (failed ⊗ failed / awaiting confirmation ☰ awaiting confirmation / awaiting review ⑂ awaiting review); color-blind users can tell them apart by icon and text.
 - **The primary button is `primary`**: the shadcn Button default tier. In light it is deep lichen ink `#233127` with `#f4f6f1` text; in dark it is limestone `#e6e8e2` with deep stone text. Ochre is never the primary-button background, so "do this" and "waiting on you" never look alike.
@@ -206,14 +204,14 @@ From top to bottom:
 
 ### Task header and status
 - The task detail header is one 44px line (Amp): back, project tile + project name + `#seq` in `ink-3`, the title in sans 15px/600, the status as a ghost pill (bg only on hover, full radius, glyph in its tone, label in `ink`), then on the right the agent, ⋯ and the primary action when there is one.
-- Status glyphs are one circular family (`StatusGlyph`, Linear's model) used in the header, search rows, mentions and home rows: dashed ring = to start, ring + clock = queued, a pie that fills with progress (quarter = planning in `chip-plan-fg`, half = confirm in accent, three quarters = building in `running` or review in accent), filled check = done, filled cross = failed, filled slash = closed. Ochre still means it waits on you.
-- The right pane (`RightPane`, `DocPane`) is flat: a `--background` surface with one `--border` hairline on its left, no ring and no segmented control (Claude Code's right pane). The 40px header holds a plain dropdown title (`PaneTitle`: Plan or Changes) with the plan version beside it in `--text-tertiary` ("v2 · 10 min ago", still the version menu trigger), and on the right 26px icon buttons (`PaneViewButtons`, radius 7, hover `--menu-hover`) for plan and changes. Under the plan sit Branch, Usage and History as collapsible sections (`PaneSections`): 32px header in `--text-tertiary` meta 500 with a small triangle and an optional right-aligned summary, hairlines inset 14px between them; Usage starts open, Branch and History closed (Branch fetches its sync state only once opened); state is kept per section. Usage is one 6px stacked bar (1px gaps, `--project-tile-*` swatches) over a legend of label and tabular value, then cache hit rate, model and the cost group. Changes file rows read chevron, basename, directory in `--text-tertiary`, then +/- on the right; the change summary and expand-all sit on a thin row under the header.
+- Status glyphs are one circular family (`StatusGlyph`, Linear's model) used in the header, search rows, mentions and home rows: dashed ring = to start, ring + clock = queued, a pie that fills with progress (quarter = planning in secondary ink, half = confirm in accent, three quarters = building in `running` or review in accent), filled check = done, filled cross = failed, filled slash = closed. Ochre still means it waits on you.
+- The right pane (`RightPane`, `DocPane`) is flat: a `--background` surface with one `--border` hairline on its left, no ring and no segmented control (Claude Code's right pane). The 40px header holds a plain dropdown title (`PaneTitle`: Plan or Changes) with the plan version beside it in `--text-tertiary` ("v2 · 10 min ago", still the version menu trigger), and on the right 26px icon buttons (`PaneViewButtons`, radius 7, hover `--menu-hover`) for plan and changes. Under the plan sit Branch, Usage and History as collapsible sections (`PaneSections`): 32px header in `--text-tertiary` meta 500 with a small triangle and an optional right-aligned summary, hairlines inset 14px between them; Usage starts open, Branch and History closed (Branch fetches its sync state only once opened); state is kept per section. Usage is one 6px stacked bar (1px gaps, neutral `content-secondary` fill) over a legend of label and tabular value, then cache hit rate, model and the cost group. Changes file rows read chevron, basename, directory in `--text-tertiary`, then +/- on the right; the change summary and expand-all sit on a thin row under the header.
 
 ### Settings lists (account page, agent overview)
 See "Page patterns · Settings list" below.
 
 ### Conversation
-- User turns sit on the right as a gradient bubble (`bubble-gradient` in `app.css`): 12px radius, `8px 12px` padding, at most `min(85%, 42rem)` wide. The surface is `--bubble-base` plus three radial washes (`--bubble-wash-a/b/c`, the moss, slate and plum hues), a 120px soft-light grain and a 1px conic hairline (`--bubble-rim-a/b/c`) drawn by a masked `::after`. It is the only coloured surface in the thread.
+- User turns sit on the right as a flat bubble: 12px radius, `8px 12px` padding, at most `min(85%, 42rem)` wide, filled with the solid `--bubble-base` tint (no texture, gradient or ring), so the user's own messages stay distinguishable without a coloured surface.
 - Agent and Coordinator replies carry no avatar column: plain full-width text. A reply from a bound agent (not the coordinator) keeps a small identity line above it. Hovering a user message reveals a row under the bubble with its time, copy and restore actions; touch screens always show it.
 - Markers between turns ("Plan approved", handoffs, origin notes) are a centred hairline rule in `--text-tertiary`; an error marker stays a soft `danger-soft` box. A turn longer than a minute ends with a "Worked for N minutes" rule.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.
@@ -269,7 +267,7 @@ Pages like settings, resources, team, and project share the pieces below. A new 
 
 ### Empty state
 Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registry `Empty`).
-- **Icon**: a line icon, 32px, stroke 1.5, `icon` (`text-icon`), no background tile.
+- **Icon**: a line icon, 32px, stroke 1.75, `icon` (`text-icon`), no background tile.
 - **Title**: `h2`, display `text-heading` 650 `ink`; the description below is `text-ui` `ink-2`.
 - **Description**: `text-ui` `ink-2`, at most 320px wide (about 44ch), centered, `text-balance`.
 - **Primary action** (optional): shadcn Button default tier, `primary` background, 32px, 8px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
@@ -348,7 +346,7 @@ The stone is quiet. Motion only says where a surface came from or that something
 
 ## Texture
 
-Texture is the Cairn spiral and a slow noise field, drawn in the project hue as ASCII characters (` .,:;-=+xX08S#&@`) or 4×4 ordered-dither dots. It lives in `src/components/texture/`; every component takes `filter="ascii" | "dither"`.
+Texture is the Cairn spiral and a slow noise field, drawn in `--text-tertiary` as ASCII characters (` .,:;-=+xX08S#&@`) or 4×4 ordered-dither dots. It lives in `src/components/texture/`; every component takes `filter="ascii" | "dither"`.
 
 | Component | Use | Motion |
 | --- | --- | --- |
@@ -356,16 +354,14 @@ Texture is the Cairn spiral and a slow noise field, drawn in the project hue as 
 | `SpiralMark` | `EmptyState media` for large empty states (no projects, threads, keys) | none |
 | `DriftField` | Behind the Coordinator greeting | drifts only while `active` (agents running) |
 | `DriftEdge` | Right edge of a running thread card | same as `DriftField` |
-| `TexturedTile` | Project tiles at 40px and larger | none |
 | `TextureSkeleton` | Loading a large block | sweeps while mounted |
 
 Rules:
 
 - The subject is always the logo spiral or the noise field; no other pictures.
 - Never behind text you have to read: transcripts, diffs, menus, forms and lists stay flat. Headlines sit on the veil, not on dense characters.
-- Ink is `--project-tile-N` in light and `--project-ink-N` in dark, at the alphas the components set; do not pass colours.
+- Ink is `--text-tertiary` at the alphas the components set; do not pass colours.
 - One animated texture per screen. Motion stops under `prefers-reduced-motion`, in background tabs and off screen, and a still frame is always the same frame (screenshot baselines depend on it).
-- Tiles under 40px stay flat (`ProjectAvatar`); dots blur into noise below that.
 
 ## Dark
 
@@ -395,7 +391,7 @@ Cairn UI rules (source: apps/web/DESIGN.md):
 - Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges; lichen green (running) = working/online; slate blue = ready for review. Status chips: idle neutral, plan slate, confirm ochre, done lichen, failed rust. Everything else is ink greys.
 - Type: three families only. Source Serif 4 (font-serif, 600) for the Coordinator greeting and page titles; Instrument Sans for everything else, at 650 (font-heading font-title) for the brand, section and column headings, pane and dialog titles; JetBrains Mono for code, times, ids. Chinese falls back to Songti SC under the serif and PingFang SC under the sans. Sizes only 26/20/17/15/14/13/12 through text-greeting / text-page / text-heading / text-card-title / text-ui / text-meta and text-code / text-caption; body weight 450, row titles 600, display titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
-- Every status = icon + color + label. Every icon draws at stroke 1.75 (`test/icon-stroke.test.ts` pins `src/icons`). The spiral mark is the brand and the Coordinator avatar.
+- Every status = icon + color + label. Every icon draws at stroke 1.75 and at 14, 16 or 18px: `svg.lucide` pins the stroke in `app.css`, and `test/icon-stroke.test.ts` scans every icon usage in `src`. The spiral mark is the brand and the Coordinator avatar.
 - Primary button = shadcn default Button on --primary (light #233127 with #f4f6f1 text, dark #e6e8e2 with dark text), 8px corners, 32px tall. Card actions = accent text links. No solid buttons on cards except the one primary action of a thread card.
 - Radii: dialog and ⌘K 18px, card, composer and chat bubble 14px, menu and popover 12px, menu row, button, input and row 8px.
 - Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 17px display title + optional 13px sub-line, split footer (13px ink-3 hint left, actions right, primary button). Menus: popover color, 12px corners, 4px padding, 32px rows with 8px corners, 14px text, 15px ink-3 icons, --menu-hover, danger rows in destructive.

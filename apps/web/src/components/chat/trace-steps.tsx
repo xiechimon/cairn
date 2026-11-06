@@ -277,7 +277,7 @@ function CheckChip({ label, ok }: { label: string; ok: boolean }) {
     <div
       className={cn(
         'flex w-fit items-center gap-1.5 rounded-full py-0.5 pr-2.5 pl-1 text-meta font-medium',
-        ok ? 'bg-(--chip-done-bg) text-(--chip-done-fg)' : 'bg-danger-soft text-destructive',
+        ok ? 'bg-secondary text-content-secondary' : 'bg-danger-soft text-destructive',
       )}
     >
       <span

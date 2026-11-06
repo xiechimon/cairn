@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('the project avatar picker sets an icon and colour that reach the sidebar, then resets', async ({
+test('the project avatar picker sets an icon that reaches the sidebar, then resets', async ({
   page,
 }) => {
   let project: Record<string, unknown> = {
@@ -47,24 +47,14 @@ test('the project avatar picker sets an icon and colour that reach the sidebar, 
   await expect(picker.locator('[data-icon]')).toHaveCount(1);
   await picker.getByRole('button', { name: 'rocket' }).click();
   await expect(sidebarRow.locator('[data-project-icon="rocket"]')).toBeVisible();
-  await picker.getByRole('button', { name: '玫红' }).click();
-  await expect(picker.getByRole('button', { name: '玫红' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await expect(picker.getByRole('button', { name: '无颜色' })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCSS('width', '16px');
 
-  await picker.getByRole('button', { name: '重置图标和颜色' }).click();
+  await picker.getByRole('button', { name: '重置图标' }).click();
   await expect(sidebarRow.locator('[data-project-icon]')).toHaveCount(0);
   await expect(sidebarRow.locator('[data-slot="project-glyph"]')).toBeVisible();
 
   expect(patches).toEqual([
     { icon: 'rocket' },
-    { color: 'rose' },
     { icon: null, color: null },
   ]);
   expect(pageErrors).toEqual([]);
