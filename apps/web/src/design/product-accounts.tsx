@@ -10,7 +10,7 @@ import { toRoutingGraph } from '../api/model-routing.js';
 import {
   AccountRow,
   MachineProvidersCard,
-  PoolWindowCard,
+  QuotaSection,
 } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
 import {
@@ -155,16 +155,16 @@ export function AccountsSection() {
     <Section
       id="accounts"
       title="Accounts"
-      lede="Subscription accounts per vendor, pooled the way T3 Code's Usage → Limits does: one card per quota window, one bar segment per account, the number is what is left. They sit on top of the model routing page, above the graph."
+      lede="Subscription accounts per vendor, pooled the way T3 Code's Usage → Limits does: one flat row per quota window with a combined bar, one sub-row per account with what is left. They sit on top of the model routing page, above the graph."
     >
       <Specimen
-        title="Pooled window"
+        title="Quota section"
         note="5-hour window over three Claude accounts: one over its limit, one never reported (dashed)"
         stage="sheet"
-        code={`<PoolWindowCard name="five_hour" accounts={claudeAccounts} now={now} />`}
+        code={`<QuotaSection windows={['five_hour']} accounts={claudeAccounts} now={now} />`}
       >
         <div className="w-full">
-          <PoolWindowCard name="five_hour" accounts={claude} now={NOW} />
+          <QuotaSection windows={['five_hour']} accounts={claude} now={NOW} />
         </div>
       </Specimen>
       <Specimen

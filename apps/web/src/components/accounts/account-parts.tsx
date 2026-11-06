@@ -13,7 +13,6 @@ import type {
   SubscriptionAccount,
 } from '../../api/claude-accounts.js';
 import { ACCOUNT_VENDORS } from '../../api/claude-accounts.js';
-import { ProjectAvatar } from '../../board/project-avatar.js';
 import { relativeTime } from '../../board/rel-time.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
@@ -23,7 +22,7 @@ import { FORM_CONTROL_CLS } from '../form-layout.js';
 import { ListRow } from '../list-card.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../menu-keys.js';
 import { isLowQuota } from '../settings/quota-row.js';
-import { SETTINGS_ROW_CLS, SettingsCard } from '../settings-list.js';
+import { SETTINGS_ROW_CLS, SettingsCard, SettingsSection } from '../settings-list.js';
 import { type GlyphKind, StatusGlyph } from '../status-glyph.js';
 import { ToggleSwitch } from '../toggle-switch.js';
 import { Button } from '../ui/button.js';
@@ -48,15 +47,6 @@ const WINDOW_LABELS: Record<string, string> = {
 };
 
 const WINDOW_ORDER = ['five_hour', 'seven_day', 'billing_period'];
-
-const SEGMENT_FILL = [
-  'bg-project-tile-1',
-  'bg-project-tile-2',
-  'bg-project-tile-3',
-  'bg-project-tile-4',
-  'bg-project-tile-5',
-  'bg-project-tile-6',
-] as const;
 
 export const PROVIDERS: Record<ProviderRuntime, { label: string; Mark: Mark }> = {
   'claude-code': { label: 'Claude Code', Mark: ClaudeMark },
@@ -119,125 +109,124 @@ function accountStatus(
   }
 }
 
-export function PoolWindowCard({
-  name,
+export function QuotaSection({
+  windows,
   accounts,
   now,
 }: {
-  name: string;
+  windows: string[];
   accounts: SubscriptionAccount[];
   now: number;
 }) {
   const { t } = useI18n();
   const clock = useClock();
-  const members = accounts.map((account, index) => ({
-    account,
-    index,
-    window: account.windows.find((w) => w.name === name) ?? null,
-  }));
-  const reporting = members.flatMap((m) => (m.window === null ? [] : [m.window]));
-  const left =
-    reporting.length === 0
-      ? null
-      : Math.round(reporting.reduce((sum, w) => sum + leftPercent(w), 0) / reporting.length);
-  const next = reporting
-    .filter((w) => w.resetsAt !== null && w.utilization > 0)
-    .sort((a, b) => (a.resetsAt ?? 0) - (b.resetsAt ?? 0))[0];
-  const label = t(WINDOW_LABELS[name] ?? name);
   return (
-    <div
-      data-testid="pool-window"
-      data-window={name}
-      className="grid items-center gap-x-6 gap-y-3 rounded-(--radius-card) bg-card px-4 py-3 shadow-(--e1) md:grid-cols-[10rem_minmax(0,1fr)]"
-    >
-      <div className="flex flex-col gap-0.5">
-        <span className="text-ui font-medium text-foreground">{label}</span>
-        <span className="flex items-baseline gap-1.5">
-          <span
-            className={cn(
-              'text-page font-semibold text-foreground tabular-nums',
-              isLowQuota(left) && ACCENT_INK,
-            )}
-          >
-            {left === null ? '—' : `${left}%`}
-          </span>
-          <span className="text-meta text-content-tertiary">{t('剩余')}</span>
-        </span>
-        {next?.resetsAt != null && (
-          <span className="text-caption text-content-tertiary tabular-nums">
-            {t('{time} 回补 {n}%', {
-              time: clock(next.resetsAt, now),
-              n: Math.round((Math.min(1, next.utilization) * 100) / reporting.length),
-            })}
-          </span>
-        )}
-      </div>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <div
-          className="grid gap-x-3"
-          style={{ gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))` }}
-        >
-          {members.map(({ account, index, window }) => {
-            const pct = window === null ? null : leftPercent(window);
-            return (
-              <div
-                key={account.id}
-                role="progressbar"
-                aria-label={t('{name} {window} 剩余', { name: account.label, window: label })}
-                aria-valuenow={pct ?? undefined}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                className={cn(
-                  'h-2 overflow-hidden rounded-full bg-secondary',
-                  window === null && 'border border-dashed border-border bg-transparent',
-                )}
-              >
-                {pct !== null && (
-                  <i
-                    className={cn(
-                      'block h-full rounded-full',
-                      SEGMENT_FILL[index % SEGMENT_FILL.length],
-                    )}
-                    style={{ width: `${pct}%` }}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div
-          className="flex flex-col gap-1 md:grid md:gap-x-3"
-          style={{ gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))` }}
-        >
-          {members.map(({ account, index, window }) => {
-            const pct = window === null ? null : leftPercent(window);
-            const resets =
-              window?.resetsAt == null
-                ? null
-                : t('{time} 重置', { time: clock(window.resetsAt, now) });
-            return (
-              <div
-                key={account.id}
-                className="flex min-w-0 items-center gap-x-1.5 gap-y-1 text-caption text-content-tertiary md:flex-col md:items-stretch"
-              >
-                <span className="flex min-w-0 flex-auto items-center gap-1.5 md:flex-none">
-                  <ProjectAvatar name={String(index + 1)} tone={index} />
-                  <span className="truncate text-content-secondary">{account.label}</span>
-                  <span
-                    className={cn('ml-auto flex-none tabular-nums', isLowQuota(pct) && ACCENT_INK)}
-                  >
-                    {pct === null ? t('未上报') : `${pct}%`}
+    <SettingsSection title={t('额度')}>
+      <SettingsCard>
+        {windows.map((name) => {
+          const members = accounts.map((account, index) => ({
+            account,
+            index,
+            window: account.windows.find((w) => w.name === name) ?? null,
+          }));
+          const reporting = members.flatMap((m) => (m.window === null ? [] : [m.window]));
+          const left =
+            reporting.length === 0
+              ? null
+              : Math.round(
+                  reporting.reduce((sum, w) => sum + leftPercent(w), 0) / reporting.length,
+                );
+          const next = reporting
+            .filter((w) => w.resetsAt !== null && w.utilization > 0)
+            .sort((a, b) => (a.resetsAt ?? 0) - (b.resetsAt ?? 0))[0];
+          const label = t(WINDOW_LABELS[name] ?? name);
+          const meta = [
+            ...(left === null ? [] : [t('剩余 {n}%', { n: left })]),
+            ...(next?.resetsAt == null
+              ? []
+              : [
+                  t('{time} 回补 {n}%', {
+                    time: clock(next.resetsAt, now),
+                    n: Math.round((Math.min(1, next.utilization) * 100) / reporting.length),
+                  }),
+                ]),
+          ];
+          return (
+            <div
+              key={name}
+              data-testid="pool-window"
+              data-window={name}
+              className="flex flex-col divide-y divide-border"
+            >
+              <div className={cn(SETTINGS_ROW_CLS, 'gap-3')}>
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-ui text-foreground">{label}</span>
+                  <span className="text-meta text-content-tertiary tabular-nums">
+                    {meta.length === 0 ? t('未上报') : meta.join(' · ')}
                   </span>
                 </span>
-                {resets !== null && (
-                  <span className="flex-none truncate tabular-nums">{resets}</span>
-                )}
+                <span className="flex flex-none items-center justify-end @xl:w-56">
+                  <span
+                    role="progressbar"
+                    aria-label={t('{window} 剩余', { window: label })}
+                    aria-valuenow={left ?? undefined}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className={cn(
+                      'h-2 w-28 overflow-hidden rounded-full bg-secondary @xl:w-full',
+                      left === null && 'border border-dashed border-border bg-transparent',
+                    )}
+                  >
+                    {left !== null && (
+                      <i
+                        className={cn(
+                          'block h-full rounded-full',
+                          isLowQuota(left) ? 'bg-(--card-button)' : 'bg-running',
+                        )}
+                        style={{ width: `${left}%` }}
+                      />
+                    )}
+                  </span>
+                </span>
               </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+              {members.map(({ account, index, window }) => {
+                const pct = window === null ? null : leftPercent(window);
+                const resets =
+                  window?.resetsAt == null
+                    ? null
+                    : t('{time} 重置', { time: clock(window.resetsAt, now) });
+                return (
+                  <div
+                    key={account.id}
+                    data-testid="quota-account"
+                    className={cn(SETTINGS_ROW_CLS, 'min-h-11 gap-3 py-1.5')}
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-ui break-words text-foreground">{account.label}</span>
+                      <span className="text-meta text-content-tertiary">
+                        {t('优先级 {n}', { n: index + 1 })}
+                      </span>
+                    </span>
+                    <span
+                      className={cn(
+                        'flex-none text-right text-meta text-content-secondary tabular-nums',
+                        isLowQuota(pct) && ACCENT_INK,
+                      )}
+                    >
+                      {pct === null
+                        ? t('未上报')
+                        : resets === null
+                          ? `${pct}%`
+                          : `${pct}% · ${resets}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </SettingsCard>
+    </SettingsSection>
   );
 }
 
@@ -413,10 +402,8 @@ export function VendorSection({
         </SettingsCard>
       ) : (
         <>
-          {windows.map((name) => (
-            <PoolWindowCard key={name} name={name} accounts={accounts} now={now} />
-          ))}
           <SettingsCard>{accounts.map((account, index) => renderRow(account, index))}</SettingsCard>
+          {windows.length > 0 && <QuotaSection windows={windows} accounts={accounts} now={now} />}
           {windows.length === 0 && (
             <p className="m-0 text-meta text-content-tertiary">{t('还没有额度读数')}</p>
           )}

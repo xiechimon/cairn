@@ -1498,9 +1498,8 @@ export const EN: Record<string, string> = {
   验证: 'Verify',
   '5 小时': '5-hour',
   计费周期: 'Billing period',
-  剩余: 'left',
   '{time} 回补 {n}%': '+{n}% at {time}',
-  '{name} {window} 剩余': '{name} {window} left',
+  '{window} 剩余': '{window} left',
   未上报: 'not reported',
   添加账户: 'Add account',
   '添加 {vendor} 账户': 'Add a {vendor} account',
@@ -1847,4 +1846,6 @@ export const EN: Record<string, string> = {
   '24 小时 {n} 步': '{n#1 step|# steps} in 24h',
   '优先级 {n}': 'Priority {n}',
   还没用过: 'Not used yet',
+  额度: 'Quota',
+  '剩余 {n}%': '{n}% left',
 };

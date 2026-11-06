@@ -53,3 +53,32 @@ test('an account with nothing known about usage says it has not been used yet', 
   await expect(row.getByTestId('account-meta')).toHaveText('优先级 1 · 还没用过');
   await expect(row).not.toContainText('—');
 });
+
+for (const width of [1440, 375]) {
+  test(`quota section at ${width}px: flat heading, window rows with a combined bar, full account names, no chips`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(URL);
+    const windows = page.getByTestId('pool-window');
+    await expect(windows).toHaveCount(2);
+    await expect(page.getByRole('heading', { name: '额度', exact: true })).toBeVisible();
+    await expect(page.locator('[data-testid="pool-window"] [data-slot="card"]')).toHaveCount(0);
+    await expect(windows.first().getByRole('progressbar')).toHaveCount(1);
+    const first = windows.first();
+    await expect(first).toContainText('剩余 29%');
+    await expect(first.getByTestId('quota-account')).toHaveCount(3);
+    await expect(first.getByTestId('quota-account').nth(2)).toContainText('未上报');
+    const names = await first.getByTestId('quota-account').evaluateAll((rows) =>
+      rows.map((row) => {
+        const name = row.querySelector('span span');
+        return name === null ? 0 : name.scrollWidth - name.clientWidth;
+      }),
+    );
+    expect(names.every((overflow) => overflow <= 0)).toBe(true);
+    for (const full of ['Personal', 'Work', 'Old laptop']) {
+      await expect(first.getByTestId('quota-account').filter({ hasText: full }).first()).toBeVisible();
+    }
+    await expect(first.getByTestId('quota-account').first()).toContainText('优先级 1');
+  });
+}
