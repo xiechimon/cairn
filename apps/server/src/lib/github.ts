@@ -1393,9 +1393,10 @@ export interface GithubPullPanel {
   draft: boolean;
   title: string;
   htmlUrl: string | null;
+  baseSha?: string | null;
+  baseRef?: string | null;
   headSha: string | null;
   headRef: string;
-  baseRef: string;
   mergeableState: string | null;
   additions: number;
   deletions: number;
@@ -1429,7 +1430,7 @@ export async function githubPullPanel(
     additions?: unknown;
     deletions?: unknown;
     head?: { sha?: unknown; ref?: unknown } | null;
-    base?: { ref?: unknown } | null;
+    base?: { sha?: unknown; ref?: unknown } | null;
   };
   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
     return null;
@@ -1443,9 +1444,10 @@ export async function githubPullPanel(
       draft: raw.draft === true,
       title: typeof raw.title === 'string' ? raw.title : '',
       htmlUrl: optString(raw.html_url),
+      baseSha: optString(raw.base?.sha),
+      baseRef: optString(raw.base?.ref),
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
       headRef: typeof raw.head?.ref === 'string' ? raw.head.ref : '',
-      baseRef: typeof raw.base?.ref === 'string' ? raw.base.ref : '',
       mergeableState: optString(raw.mergeable_state),
       additions: typeof raw.additions === 'number' ? raw.additions : 0,
       deletions: typeof raw.deletions === 'number' ? raw.deletions : 0,
@@ -1454,6 +1456,7 @@ export async function githubPullPanel(
 }
 
 export interface GithubCheckRun {
+  id?: number;
   name: string;
   status: string;
   conclusion: string | null;
@@ -1492,6 +1495,7 @@ export async function githubCommitCheckRuns(
     if (typeof entry?.name !== 'string' || typeof entry.status !== 'string') continue;
     const output = (entry.output ?? null) as Record<string, unknown> | null;
     checkRuns.push({
+      ...(typeof entry.id === 'number' ? { id: entry.id } : {}),
       name: entry.name,
       status: entry.status,
       conclusion: typeof entry.conclusion === 'string' ? entry.conclusion : null,

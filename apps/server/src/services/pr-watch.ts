@@ -12,6 +12,7 @@ import type { BuildDeps } from './builds.js';
 import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
+import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
 
 export const PR_WATCH_INTERVAL_MS = 60_000;
@@ -79,6 +80,7 @@ export function createPrWatch(
   deps: BuildDeps,
   run: { githubFetch: FetchLike; logger?: { info(obj: object, msg: string): void } },
 ): PrWatch {
+  const wake = createPrWakes(deps);
   const pulls = new Map<string, { etag: string | null; pull: GithubPullPanel }>();
   const checks = new Map<string, { sha: string; etag: string | null; runs: GithubCheckRun[] }>();
   const rates = new Map<string, RateWindow>();
@@ -335,7 +337,7 @@ export function createPrWatch(
       checksReadFor:
         counted !== null ? head : sameLine || finished ? (existing?.checksReadFor ?? '') : '',
       headRef: pull.headRef,
-      baseRef: pull.baseRef,
+      baseRef: pull.baseRef ?? '',
       verdictResult: verdict?.result ?? null,
       verdictHead: verdict?.head ?? null,
       blockedSince,
@@ -356,23 +358,33 @@ export function createPrWatch(
         .onConflictDoNothing()
         .run();
       tally.created += 1;
-      return;
-    }
-    const changed = (Object.keys(values) as (keyof typeof values)[]).some(
-      (field) => existing[field] !== values[field],
-    );
-    if (!changed) {
-      if (readComplete) {
+    } else {
+      const changed = (Object.keys(values) as (keyof typeof values)[]).some(
+        (field) => existing[field] !== values[field],
+      );
+      if (changed) {
+        deps.db
+          .update(threadPr)
+          .set({ ...values, ...(readComplete ? { lastReadAt: now } : {}), updatedAt: now })
+          .where(eq(threadPr.id, existing.id))
+          .run();
+        tally.updated += 1;
+      } else if (readComplete) {
         deps.db.update(threadPr).set({ lastReadAt: now }).where(eq(threadPr.id, existing.id)).run();
       }
-      return;
     }
-    deps.db
-      .update(threadPr)
-      .set({ ...values, ...(readComplete ? { lastReadAt: now } : {}), updatedAt: now })
-      .where(eq(threadPr.id, existing.id))
-      .run();
-    tally.updated += 1;
+    const row = deps.db.select().from(threadPr).where(eq(threadPr.buildId, target.buildId)).get();
+    if (row !== undefined && !finished)
+      await wake({
+        row,
+        pull,
+        runs: counted === null ? null : (checks.get(key)?.runs ?? null),
+        fetch: fetchImpl,
+        token,
+        owner: target.owner,
+        repo: target.repo,
+        now,
+      });
   }
 
   return {
@@ -394,6 +406,7 @@ export function createPrWatch(
         for (const { id: teamId } of deps.db.select({ id: team.id }).from(team).all()) {
           try {
             tally.pruned += pruneSuperseded(teamId);
+            settlePrWakeNotices(deps, teamId);
             const token = await githubTokenOrNull(deps, teamId);
             if (token === null) continue;
             const pacing = pacingOf(rates.get(teamId), now);
