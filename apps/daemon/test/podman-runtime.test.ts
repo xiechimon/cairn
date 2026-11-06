@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
@@ -53,14 +53,21 @@ function fixture(options: { command?: readonly string[] } = {}) {
   return { podman, runtime };
 }
 
+const UNIX_SOCKET_PATH_LIMIT = 104;
+
+function homeRelayRoot(home: string): string | null {
+  const root = join(home, `.cp-${randomBytes(3).toString('hex')}`);
+  const socketPath = join(root, 'cairn-orb-egress', 'egress.sock');
+  return Buffer.byteLength(socketPath) < UNIX_SOCKET_PATH_LIMIT ? root : null;
+}
+
 async function relayFixture(
   directoryName = 'cairn-orb-egress',
   socketName = 'egress.sock',
   underHome = false,
 ) {
-  const root = underHome
-    ? join(homedir(), '.cache', `cairn-podman-widen-${randomUUID()}`)
-    : makeTestTempDir('egr-');
+  const root = underHome ? homeRelayRoot(homedir()) : makeTestTempDir('egr-');
+  if (root === null) throw new Error('home directory is too long for a unix socket path');
   const directory = join(root, directoryName);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const socketPath = join(directory, socketName);
@@ -171,10 +178,16 @@ describe('PodmanOrbRuntime.spawn argv', () => {
     ]);
   });
 
-  test.each([
-    ['the default temp root', false],
-    ['a relay socket under the home directory', true],
-  ])('never widens the sandbox with %s', async (_name, underHome) => {
+  test('a home directory too long for a unix socket yields no relay root', () => {
+    expect(
+      homeRelayRoot('/home/a-user-with-an-unusually-long-home-directory-name/and/more/depth'),
+    ).toBeNull();
+    const short = homeRelayRoot('/home/ian');
+    expect(short).not.toBeNull();
+    expect(short?.startsWith('/home/ian/')).toBe(true);
+  });
+
+  async function expectSandboxNotWidened(underHome: boolean) {
     const { podman, runtime } = fixture();
     const relay = await relayFixture('cairn-orb-egress', 'egress.sock', underHome);
     await runtime.spawn(
@@ -218,7 +231,14 @@ describe('PodmanOrbRuntime.spawn argv', () => {
       '--cap-drop=SETPCAP',
       '--cap-drop=SYS_CHROOT',
     ]);
-  });
+  }
+
+  test('never widens the sandbox with the default temp root', () => expectSandboxNotWidened(false));
+
+  test.skipIf(homeRelayRoot(homedir()) === null)(
+    'never widens the sandbox with a relay socket under the home directory (skipped when the home directory is too long for a unix socket path)',
+    () => expectSandboxNotWidened(true),
+  );
 
   test('egress socket adds one mount and one variable, none adds nothing', async () => {
     const none = fixture();
