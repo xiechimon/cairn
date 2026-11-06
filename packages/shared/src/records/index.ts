@@ -35,6 +35,7 @@ export * from './deploy-status.js';
 export * from './document-diff.js';
 export * from './first-pr-report.js';
 export * from './github.js';
+export * from './harness-profile.js';
 export * from './machine.js';
 export * from './machine-capabilities.js';
 export * from './mcp-server.js';
