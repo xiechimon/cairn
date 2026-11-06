@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest';
+import { PHASE_VALUES } from '../src/fixtures/records.js';
+import { threadStatus } from '../src/board/thread-copy.js';
 import { elapsedSince, projectThreads } from '../src/board/sidebar-threads.js';
 import { NOW, todo } from './helpers.js';
 
@@ -23,6 +25,31 @@ test('a thread that needs you or failed ranks above a running one', () => {
     'p1',
   );
   expect(live.map((t) => t.seqNum)).toEqual([3, 2, 1]);
+});
+
+test.each(['confirm', 'review'] as const)(
+  'a %s thread ranks above a newer running one',
+  (phase) => {
+    const newerRunning = { ...inProject(1, 'building'), phaseAt: NOW };
+    const waiting = { ...inProject(2, phase), phaseAt: NOW - 3_600_000 };
+    expect(projectThreads([newerRunning, waiting], 'p1').live.map((t) => t.seqNum)).toEqual([2, 1]);
+  },
+);
+
+test('an awaiting-reply thread ranks above a newer running one', () => {
+  const newerRunning = { ...inProject(1, 'building'), phaseAt: NOW };
+  const asking = { ...inProject(2, 'building'), awaitingReply: true, phaseAt: NOW - 3_600_000 };
+  expect(projectThreads([newerRunning, asking], 'p1').live.map((t) => t.seqNum)).toEqual([2, 1]);
+});
+
+test('every phase classified needs-you by threadStatus sorts first', () => {
+  const phases = PHASE_VALUES.filter((phase) => threadStatus(todo(1, phase)) === 'needs-you');
+  expect(phases.length).toBeGreaterThan(0);
+  for (const phase of phases) {
+    const running = { ...inProject(1, 'building'), phaseAt: NOW };
+    const waiting = { ...inProject(2, phase), phaseAt: NOW - 3_600_000 };
+    expect(projectThreads([running, waiting], 'p1').live[0]?.seqNum).toBe(2);
+  }
 });
 
 test('threads of other projects never appear', () => {

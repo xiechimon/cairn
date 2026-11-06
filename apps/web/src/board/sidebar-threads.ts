@@ -1,6 +1,5 @@
 import type { TodoRecord } from '../fixtures/records.js';
-import { actRank } from './needs-you.js';
-import { threadStatus } from './thread-copy.js';
+import { type ThreadStatus, threadStatus } from './thread-copy.js';
 
 export interface ProjectThreads {
   live: TodoRecord[];
@@ -13,6 +12,16 @@ const DAY = 24 * HOUR;
 
 export type ElapsedUnit = 'm' | 'h' | 'd';
 
+const LIVE_RANK: Partial<Record<ThreadStatus, number>> = {
+  'needs-you': 0,
+  failed: 1,
+  running: 2,
+};
+
+function liveRank(todo: TodoRecord): number {
+  return LIVE_RANK[threadStatus(todo)] ?? LIVE_RANK.running ?? 2;
+}
+
 export function projectThreads(todos: readonly TodoRecord[], projectId: string): ProjectThreads {
   const live: TodoRecord[] = [];
   const earlier: TodoRecord[] = [];
@@ -22,7 +31,7 @@ export function projectThreads(todos: readonly TodoRecord[], projectId: string):
     const inProgress = status === 'running' || status === 'needs-you' || status === 'failed';
     (inProgress && todo.snoozeMode == null ? live : earlier).push(todo);
   }
-  live.sort((a, b) => actRank(a) - actRank(b) || b.phaseAt - a.phaseAt);
+  live.sort((a, b) => liveRank(a) - liveRank(b) || b.phaseAt - a.phaseAt);
   earlier.sort((a, b) => b.phaseAt - a.phaseAt);
   return { live, earlier };
 }
