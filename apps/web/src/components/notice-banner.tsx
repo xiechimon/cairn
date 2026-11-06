@@ -42,7 +42,7 @@ export function NoticeBanner({
   return (
     <section
       className={cn(
-        'board-notify-banner flex items-start gap-3 rounded-(--radius-card) bg-card px-4 py-3 shadow-(--e1)',
+        'board-notify-banner flex flex-wrap items-start gap-3 sm:flex-nowrap rounded-(--radius-card) bg-card px-4 py-3 shadow-(--e1)',
         className,
       )}
       {...rest}
@@ -55,7 +55,9 @@ export function NoticeBanner({
         )}
       </div>
       {actions != null && (
-        <div className="-my-0.5 flex flex-none items-center gap-1 self-center">{actions}</div>
+        <div className="-my-0.5 flex flex-none items-center gap-1 self-center max-sm:basis-full max-sm:justify-end">
+          {actions}
+        </div>
       )}
     </section>
   );

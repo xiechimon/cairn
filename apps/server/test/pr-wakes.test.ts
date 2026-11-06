@@ -303,6 +303,27 @@ describe('D109 S3 F2 bounded, durable PR wakes', () => {
   });
 });
 
+describe('a quiet sweep leaves the PR row untouched', () => {
+  test('polling an unchanged PR with nothing to wake does not move updatedAt', async () => {
+    const f = fixture();
+    const watch = watchFor(f.s, f.mock);
+    await watch.sweep(1_000);
+    await watch.sweep(70_000);
+    await watch.sweep(140_000);
+    expect(rows(f.s)[0]).toMatchObject({ updatedAt: 1_000, wakeRounds: 0 });
+  });
+
+  test('a wake that changes the round count does move updatedAt', async () => {
+    const f = fixture();
+    const watch = watchFor(f.s, f.mock);
+    await watch.sweep(1_000);
+    f.fail(1);
+    await watch.sweep(70_000);
+    expect(rows(f.s)[0]?.wakeRounds).toBe(1);
+    expect(rows(f.s)[0]?.updatedAt).toBeGreaterThan(1_000);
+  });
+});
+
 describe('D109 S3 F3 base-red skip', () => {
   test.each(['failure', 'cancelled', null])(
     'base unit conclusion %s never starts a CI fix',

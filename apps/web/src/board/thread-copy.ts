@@ -58,6 +58,15 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
   if (todo.awaitingReply === true) {
     return { state: STATUS_WORDS.needsYou, reason: '在问你一个问题。', primary: '回答' };
   }
+  if (todo.quotaWait != null) {
+    return {
+      state: STATUS_WORDS.running,
+      reason:
+        todo.quotaWait.kind === 'quota'
+          ? '额度空了，等额度恢复后自动续跑。'
+          : '被限流，等恢复后自动续跑。',
+    };
+  }
   switch (todo.phase) {
     case 'confirm':
       return {

@@ -26,7 +26,6 @@ import type {
   TodoRecord,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ClaudeLoginBanner } from './claude-login-banner.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
@@ -307,7 +306,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {entries.length === 0 && (
         <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
@@ -329,7 +327,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {chiefData.hasEarlier === true && (
         <p
@@ -428,7 +425,6 @@ export function HomeC({
             <>
               <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
                 {projectLinks}
-                <ClaudeLoginBanner machines={machines} now={now} />
               </div>
               <EmptyState
                 testId="home-c-error"
@@ -455,7 +451,9 @@ export function HomeC({
       >
         {paneButtons}
         {banner != null && (
-          <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
+          <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
+            {banner}
+          </div>
         )}
         <ChiefScrollProvider>
           <ChiefConversation
