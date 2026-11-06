@@ -81,6 +81,7 @@ async function main() {
       PORT: String(SERVER_PORT),
       CAIRN_HOME: HOME_DIR,
       CAIRN_SKILLS_DIR: SKILLS_DIR,
+      CAIRN_AUTH: 'off',
     },
     detached: true,
     stdio: ['ignore', serverLog, serverLog],

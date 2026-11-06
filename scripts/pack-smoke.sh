@@ -93,7 +93,7 @@ for candidate in 8395 8396 8397 8398; do
 done
 [ -n "$PORT" ] || { echo "FAIL: ports 8395-8398 all in use"; exit 1; }
 echo "using port $PORT"
-PORT=$PORT CAIRN_HOME="$WORK/home" node "$PKG/dist/index.mjs" > "$WORK/server.out" 2>&1 &
+PORT=$PORT CAIRN_AUTH=off CAIRN_HOME="$WORK/home" node "$PKG/dist/index.mjs" > "$WORK/server.out" 2>&1 &
 SERVER_PID=$!
 
 wait_200() {

@@ -24,7 +24,7 @@ Machine tokens live in the database, so daemons keep their identity; only their 
 ## 1. Prepare omarchy (no downtime)
 
 - `scripts/ops/systemd/*.service` from a main that includes #2732 installed into `~/.config/systemd/user/` and `daemon-reload`ed, not started. Those units, `cairn-daemon-orb.service` and the self-deploy `CAIRN_CHECKOUT` all use `~/Code/AgentProjects/cairn-exec`; units from an older main point at the lanes' checkout and must not be installed.
-- Remove host drop-ins that point at mounts or addresses that no longer exist (for example a `TMPDIR` on a removed disk). Keep the proxy drop-ins the daemons need for outbound traffic, and the server drop-in that sets `CAIRN_TAILSCALE_USERS`.
+- Remove host drop-ins that point at mounts or addresses that no longer exist (for example a `TMPDIR` on a removed disk). Keep the proxy drop-ins the daemons need for outbound traffic, and the server drop-in. A `CAIRN_TAILSCALE_USERS` entry in it is ignored since #2057: sign in with the access token (`CAIRN_TOKEN`, or `$CAIRN_HOME/token`).
 - `tailscale set --operator=$USER` done once with sudo, so `tailscale serve` runs without sudo.
 - `~/Code/AgentProjects/cairn-exec` fetched. It is the only checkout the units and self-deploy use; lanes never work in it.
 

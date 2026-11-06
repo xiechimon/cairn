@@ -1,10 +1,11 @@
 import { ENV_VARS } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import {
+  authStartupRefusal,
+  ignoredTailscaleUsersWarning,
   insecureBindWarning,
   loadConfig,
   missingRequiredTokenError,
-  tailscaleBindWarning,
   tokenAuthStartupLines,
 } from '../src/config.js';
 import { startupMessage } from '../src/startup-log.js';
@@ -24,8 +25,11 @@ describe('startup log (#1998)', () => {
       ...tokenAuthStartupLines(loadConfig({ authToken: 'token', requireToken: true })),
       ...tokenAuthStartupLines(loadConfig({ authToken: 'token', host: '0.0.0.0' })),
       insecureBindWarning(loadConfig({ host: '0.0.0.0', authToken: null })),
-      tailscaleBindWarning(loadConfig({ tailscaleUsers: ['someone@example.com'] })),
+      insecureBindWarning(loadConfig({ host: '127.0.0.1', authOff: true, authToken: null })),
+      ignoredTailscaleUsersWarning({ CAIRN_TAILSCALE_USERS: 'someone@example.com' }),
       missingRequiredTokenError(loadConfig({ requireToken: true, authToken: null })),
+      authStartupRefusal(loadConfig({ host: '0.0.0.0', authToken: null })),
+      authStartupRefusal(loadConfig({ host: '0.0.0.0', authOff: true, authToken: null })),
     ];
     const written = lines.filter((line): line is string => line !== null);
     expect(written, 'a startup message builder returned null').toHaveLength(lines.length);

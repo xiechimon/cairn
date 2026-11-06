@@ -41,28 +41,13 @@ export function isLoopbackPeer(c: Context): boolean {
   return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
 }
 
-export function matchesAllowlistedTailscaleIdentity(
-  c: Context,
-  tailscaleUsers: readonly string[],
-): boolean {
-  if (tailscaleUsers.length === 0) return false;
-  const tailscaleLogin = c.req.header('tailscale-user-login');
-  if (tailscaleLogin === undefined || !tailscaleUsers.includes(tailscaleLogin)) return false;
-  return isLoopbackPeer(c);
-}
-
-export function registerTokenAuth(
-  app: Hono,
-  token: string | null,
-  tailscaleUsers: string[] = [],
-): void {
+export function registerTokenAuth(app: Hono, token: string | null): void {
   if (token === null) return;
   const verify = makeVerifier(token);
   app.use('*', async (c, next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
-    if (matchesAllowlistedTailscaleIdentity(c, tailscaleUsers)) return next();
     const authorization = c.req.header('authorization');
     if (authorization !== undefined) {
       const match = /^Bearer\s+(.+)$/i.exec(authorization);
