@@ -192,6 +192,8 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...(row.githubRepo !== null ? { githubRepo: row.githubRepo } : {}),
     ...(row.localPath !== null ? { localPath: row.localPath } : {}),
     ...projectMergeConfigSchema.parse({
+      planAutoApproveEnabled: (row.autonomy as { planAutoApproveEnabled?: unknown } | null)
+        ?.planAutoApproveEnabled,
       mergePolicy: (row.autonomy as { mergePolicy?: unknown } | null)?.mergePolicy,
       localChecks: (row.autonomy as { localChecks?: unknown } | null)?.localChecks,
       requireUpToDate: (row.autonomy as { requireUpToDate?: unknown } | null)?.requireUpToDate,

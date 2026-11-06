@@ -22,6 +22,13 @@ export const buildRecordSchema = z.object({
 });
 export type BuildRecord = z.infer<typeof buildRecordSchema>;
 
+export const buildMergePermissionSchema = z.object({
+  permitted: z.boolean(),
+  missingTools: z.array(z.string()),
+  prUrl: z.string().nullable(),
+});
+export type BuildMergePermission = z.infer<typeof buildMergePermissionSchema>;
+
 export const startBuildsBodySchema = z.object({
   todoIds: z.array(recordId),
   assignment: assignmentSchema,
