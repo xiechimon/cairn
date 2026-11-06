@@ -417,6 +417,26 @@ describe('F2 duplicate PR rows cannot exist', () => {
     const tally = await watch.sweep(70_000);
     expect(tally.pruned).toBe(1);
     expect(rows(s)).toHaveLength(0);
+    const other = seedThread(s, { prNumber: 350 });
+    await watch.sweep(140_000);
+    expect(rows(s).map((r) => [r.buildId, r.number])).toEqual([[other.buildId, 350]]);
+  });
+
+  test('a build rebound to another PR moves its row instead of keeping the old number', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s, { prNumber: 360 });
+    mock.pulls.set('octo/demo#360', {});
+    mock.pulls.set('octo/demo#361', {});
+    const watch = watchFor(s, mock);
+    await watch.sweep(1_000);
+    s.db
+      .update(buildTable)
+      .set({ prNumber: 361, prUrl: 'https://github.com/octo/demo/pull/361' })
+      .where(eq(buildTable.id, t.buildId))
+      .run();
+    await watch.sweep(70_000);
+    expect(rows(s).map((r) => [r.buildId, r.number])).toEqual([[t.buildId, 361]]);
   });
 });
 
