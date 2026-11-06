@@ -6,6 +6,7 @@ import {
   decide,
   GATE_CHECK,
   HUMAN_LABEL,
+  lastGateRequestAt,
   markPreExisting,
   preExistingThreads,
   QUEUED_LABEL,
@@ -180,15 +181,17 @@ function evaluate(repo, number) {
   const hasFindings = blockingThreads(loaded).length + preExistingThreads(loaded).length > 0;
   const threads = hasFindings ? markPreExisting(loaded, files) : loaded;
   const retries = retryStatus(comments, sha, stateEntry?.comment.updated_at ?? null);
+  const lastRequest = lastGateRequestAt(comments, sha);
   const result = decide(
     pr,
     stateEntry?.state ?? null,
     threads,
     retries,
-    usageLimitHit(comments, stateEntry),
+    usageLimitHit(comments, stateEntry, sha),
     {
       waitedMs: check ? Date.now() - Date.parse(check.started_at) : 0,
       requested: reviewRequested(comments, sha),
+      sinceRequestMs: lastRequest === null ? 0 : Date.now() - lastRequest,
     },
     blockRounds(comments, sha),
   );

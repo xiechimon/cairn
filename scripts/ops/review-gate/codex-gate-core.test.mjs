@@ -8,6 +8,7 @@ import {
   blockMarker,
   blockRounds,
   decide,
+  LIMIT_RETRY_AFTER_MS,
   markPreExisting,
   parseState,
   REQUEST_AFTER_MS,
@@ -215,8 +216,15 @@ test('decide ignores the limit flag once the current head has a completed review
   assert.equal(decide(pr, done, [], noRetries, true).conclusion, 'success');
 });
 
-test('usageLimitHit needs a trusted limit comment newer than the state comment', () => {
+test('usageLimitHit blocks only the head whose request the notice answered', () => {
   const stateEntry = { comment: { updated_at: '2026-01-01T00:00:10Z' } };
+  const actions = { login: 'github-actions[bot]', type: 'Bot' };
+  const request = (over = {}) => ({
+    body: requestMarker(SHA),
+    user: actions,
+    created_at: '2026-01-01T00:00:15Z',
+    ...over,
+  });
   const limit = (over = {}) => ({
     body: LIMIT_BODY,
     user: CODEX,
@@ -224,22 +232,64 @@ test('usageLimitHit needs a trusted limit comment newer than the state comment',
     updated_at: '2026-01-01T00:00:20Z',
     ...over,
   });
-  assert.equal(usageLimitHit([limit()], stateEntry), true);
-  assert.equal(usageLimitHit([limit()], null), true);
-  assert.equal(usageLimitHit([limit({ created_at: '2026-01-01T00:00:05Z' })], stateEntry), false);
+  assert.equal(usageLimitHit([request(), limit()], stateEntry, SHA), true);
+  assert.equal(usageLimitHit([request(), limit()], null, SHA), true);
+  assert.equal(usageLimitHit([limit()], stateEntry, SHA), false);
+  assert.equal(usageLimitHit([limit()], null, SHA), false);
+  assert.equal(usageLimitHit([request({ body: requestMarker(OTHER) }), limit()], null, SHA), false);
   assert.equal(
-    usageLimitHit([limit({ user: { login: 'mallory', type: 'User' } })], stateEntry),
+    usageLimitHit([request({ created_at: '2026-01-01T00:00:30Z' }), limit()], null, SHA),
     false,
   );
-  assert.equal(usageLimitHit([limit({ body: 'all good' })], stateEntry), false);
   assert.equal(
     usageLimitHit(
-      [limit(), { body: 'newer note', user: CODEX, created_at: '2026-01-01T00:00:30Z' }],
-      stateEntry,
+      [request({ body: retryMarker(SHA, 1), created_at: '2026-01-01T00:00:25Z' }), limit()],
+      null,
+      SHA,
     ),
     false,
   );
-  assert.equal(usageLimitHit([], stateEntry), false);
+  assert.equal(
+    usageLimitHit([request(), limit({ created_at: '2026-01-01T00:00:05Z' })], stateEntry, SHA),
+    false,
+  );
+  assert.equal(
+    usageLimitHit(
+      [request(), limit({ user: { login: 'mallory', type: 'User' } })],
+      stateEntry,
+      SHA,
+    ),
+    false,
+  );
+  assert.equal(usageLimitHit([request(), limit({ body: 'all good' })], stateEntry, SHA), false);
+  assert.equal(
+    usageLimitHit(
+      [request(), limit(), { body: 'newer note', user: CODEX, created_at: '2026-01-01T00:00:30Z' }],
+      stateEntry,
+      SHA,
+    ),
+    false,
+  );
+  assert.equal(usageLimitHit([], stateEntry, SHA), false);
+});
+
+test('decide retries a limited head once the last request is two hours old', () => {
+  const retries = { count: 1, pending: false };
+  const early = decide(pr, null, [], retries, true, {
+    waitedMs: 0,
+    requested: true,
+    sinceRequestMs: LIMIT_RETRY_AFTER_MS - 1,
+  });
+  assert.equal(early.title, 'Codex allowance exhausted');
+  assert.equal(early.retry, undefined);
+  const due = decide(pr, null, [], retries, true, {
+    waitedMs: 0,
+    requested: true,
+    sinceRequestMs: LIMIT_RETRY_AFTER_MS,
+  });
+  assert.equal(due.status, 'in_progress');
+  assert.equal(due.retry, retryMarker(SHA, 2));
+  assert.equal(due.addStall, true);
 });
 
 test('retryStatus counts only github-actions markers for the head', () => {

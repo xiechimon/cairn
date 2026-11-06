@@ -10,6 +10,7 @@ export const QUEUED_LABEL = 'queued';
 export const BLOCK_ROUND_CAP = 3;
 export const MAX_RETRIES = 2;
 export const REQUEST_AFTER_MS = 10 * 60 * 1000;
+export const LIMIT_RETRY_AFTER_MS = 2 * 60 * 60 * 1000;
 export const USAGE_DASHBOARD = 'https://chatgpt.com/codex/cloud/settings/usage';
 
 const gatePaths = JSON.parse(
@@ -79,7 +80,19 @@ export function trustedStateComment(comments, kind = 'code_review') {
   );
 }
 
-export function usageLimitHit(comments, stateEntry) {
+export function lastGateRequestAt(comments, sha) {
+  const prefixes = [`<!-- review-gate-request:${sha} -->`, `<!-- review-gate-retry:${sha}:`];
+  const times = comments
+    .filter(
+      (comment) =>
+        comment.user?.login === ACTIONS_LOGIN &&
+        prefixes.some((prefix) => comment.body?.startsWith(prefix)),
+    )
+    .map((comment) => Date.parse(comment.created_at));
+  return times.length > 0 ? Math.max(...times) : null;
+}
+
+export function usageLimitHit(comments, stateEntry, sha) {
   const newest = comments
     .filter((comment) => isCodexAuthor(comment.user?.login, comment.user?.type))
     .reduce(
@@ -90,7 +103,10 @@ export function usageLimitHit(comments, stateEntry) {
       null,
     );
   if (!newest || !LIMIT_RE.test(newest.body ?? '')) return false;
-  return !stateEntry || Date.parse(newest.created_at) > Date.parse(stateEntry.comment.updated_at);
+  const noticeAt = Date.parse(newest.created_at);
+  const requestedAt = lastGateRequestAt(comments, sha);
+  if (requestedAt === null || noticeAt <= requestedAt) return false;
+  return !stateEntry || noticeAt > Date.parse(stateEntry.comment.updated_at);
 }
 
 export function badgeOf(body) {
@@ -395,14 +411,23 @@ export function decide(
 ) {
   const sha = pr.head.sha;
   const reviewedHead = state?.commitSha === sha && state.status === 'completed';
-  if (limitHit && !reviewedHead)
+  if (limitHit && !reviewedHead) {
+    if (wait && wait.sinceRequestMs >= LIMIT_RETRY_AFTER_MS)
+      return {
+        status: 'in_progress',
+        title: `Codex allowance exhausted; asked again for ${short(sha)}`,
+        summary: `Codex had hit its usage limit for ${short(sha)} ${LIMIT_RETRY_AFTER_MS / 3600000} hours ago, so the gate commented \`@codex review\` again.`,
+        retry: retryMarker(sha, retries.count + 1),
+        addStall: true,
+      };
     return {
       status: 'completed',
       conclusion: 'failure',
       title: 'Codex allowance exhausted',
-      summary: `Codex reached its usage limit and did not review ${short(sha)}. See the [Codex usage dashboard](${USAGE_DASHBOARD}) and comment \`@codex review\` once the window resets.`,
+      summary: `Codex reached its usage limit and did not review ${short(sha)}. See the [Codex usage dashboard](${USAGE_DASHBOARD}) and the gate asks again every ${LIMIT_RETRY_AFTER_MS / 3600000} hours.`,
       addStall: true,
     };
+  }
   if (!state || state.commitSha !== sha || !state.status || state.status === 'running') {
     const unseen = !state || state.commitSha !== sha;
     if (unseen && wait && !wait.requested && wait.waitedMs >= REQUEST_AFTER_MS)
