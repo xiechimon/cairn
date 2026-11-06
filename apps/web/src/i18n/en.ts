@@ -1329,7 +1329,7 @@ export const EN: Record<string, string> = {
   输入你的回答: 'Type your answer',
   '（推荐）': '(Recommended)',
   用我自己的话回答: 'Answer in my own words',
-  '数字键 1–{n} 选择': 'Press 1–{n} to choose',
+  '{n} / {total}': '{n} of {total}',
   '已选 {n} 项': '{n} selected',
   未选: 'None selected',
   上一步: 'Back',

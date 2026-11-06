@@ -1,5 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useSyncExternalStore } from 'react';
+import { useSearchParams } from 'react-router';
+import { THREAD_PARAM } from '../board/thread-copy.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
@@ -8,9 +10,15 @@ import { clampQuestionIndex } from './question-dock-index.js';
 import { questionDraftKey, questionDraftStore } from './question-drafts.js';
 import type { OriginChiefQuestion } from './question-origin.js';
 
-const DOCK_CLS = 'flex max-h-[min(60dvh,32rem)] flex-none flex-col gap-1.5 overflow-y-auto';
+const DOCK_CLS = 'flex min-h-0 flex-col gap-1.5';
 
-function DockQuestion({ request }: { request: OriginChiefQuestion }) {
+function DockQuestion({
+  request,
+  numberKeys,
+}: {
+  request: OriginChiefQuestion;
+  numberKeys: boolean;
+}) {
   const root = useOptionalChiefRoot();
   const key = questionDraftKey({
     teamId: request.teamId,
@@ -36,7 +44,7 @@ function DockQuestion({ request }: { request: OriginChiefQuestion }) {
       <ChiefQuestionCard
         item={request.item}
         draftKey={key}
-        numberKeys={false}
+        numberKeys={numberKeys}
         onAnswer={(input) =>
           root?.surface.onAnswerQuestion?.({ ...input, threadId: request.conversationId })
         }
@@ -51,6 +59,8 @@ function DockQuestion({ request }: { request: OriginChiefQuestion }) {
 export function ChiefQuestionDock({ home }: { home: boolean }) {
   const { t } = useI18n();
   const root = useOptionalChiefRoot();
+  const [searchParams] = useSearchParams();
+  const numberKeys = searchParams.get(THREAD_PARAM) === null;
   const pending = root?.pendingQuestions ?? [];
   const [index, setIndex] = useState(0);
   const at = clampQuestionIndex(index, pending.length);
@@ -63,7 +73,7 @@ export function ChiefQuestionDock({ home }: { home: boolean }) {
       className={`${DOCK_CLS} ${home ? 'mx-auto mt-2 w-[calc(100%-2rem)] max-w-182' : 'mx-4 mt-2'}`}
     >
       {pending.length > 1 && (
-        <div className="flex items-center gap-1 text-caption text-content-tertiary">
+        <div className="flex flex-none items-center gap-1 text-caption text-content-tertiary">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -89,7 +99,7 @@ export function ChiefQuestionDock({ home }: { home: boolean }) {
           </Button>
         </div>
       )}
-      <DockQuestion key={shown.item.requestId} request={shown} />
+      <DockQuestion key={shown.item.requestId} request={shown} numberKeys={numberKeys} />
     </section>
   );
 }

@@ -281,3 +281,13 @@ test.describe('phone width changes', () => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(32);
   });
 });
+
+test('with a thread open, digits leave the Coordinator question alone', async ({ page }) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await expect(sideChat(page)).toBeVisible();
+  const option = page.getByTestId('chief-question-dock').getByTestId('chief-question-option-0-0');
+  await expect(option).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('1');
+  await expect(option).toHaveAttribute('aria-pressed', 'false');
+});

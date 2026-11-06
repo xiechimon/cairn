@@ -1,5 +1,13 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  CircleHelp,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -37,16 +45,15 @@ export interface ChiefQuestionCardProps {
 
 const CARD_CLS =
   'flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3';
-const PIP_CLS = 'h-0.75 flex-1 rounded-full bg-border transition-colors duration-200 ease-out';
-const PIP_ON_CLS = 'bg-primary';
-const HINT_CLS = 'flex-1 text-caption text-content-tertiary';
-const BIG_CLS = 'text-card-title font-medium text-foreground';
+const HINT_CLS = 'min-w-0 flex-1 truncate text-caption text-content-tertiary';
 const NUM_CLS =
   'grid size-5 shrink-0 place-items-center rounded-(--cds-radius-sm) border text-caption leading-none font-semibold';
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
-const OPT_CLS =
-  'h-auto w-full justify-start gap-2 whitespace-normal rounded-md border-border bg-transparent px-3 py-2.5 text-left text-ui leading-normal font-normal';
+const PENDING_CARD_CLS =
+  '@container flex min-h-0 flex-col overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)';
+const OPTION_ROW_CLS =
+  'h-auto w-full justify-start gap-4 whitespace-normal rounded-none px-4 py-4 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
 const OPT_TXT_CLS = 'min-w-0 flex-1';
 const ROW_STATIC_CLS =
@@ -68,15 +75,22 @@ function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
   return (
     <span
       data-testid="chief-question-status"
-      className={`flex flex-none items-center gap-1 text-meta whitespace-nowrap ${ink}`}
+      className={`flex min-w-0 shrink-0 items-center gap-1 text-meta whitespace-nowrap ${ink}`}
     >
       <Icon aria-hidden strokeWidth={1.75} className="size-3.25" />
-      {t(label)}
+      <span className="@max-md:sr-only">{t(label)}</span>
     </span>
   );
 }
 
 type Question = ChiefQuestionItem['questions'][number];
+
+function digitsReachCard(target: HTMLElement): boolean {
+  if (target.isContentEditable) return false;
+  if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-compose-target'))
+    return target.value === '';
+  return !/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+}
 
 export function recommendedFirst(question: Question): Question {
   return {
@@ -170,11 +184,7 @@ export function ChiefQuestionCard({
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (cardRef.current?.checkVisibility() !== true) return;
       const target = e.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
-      )
-        return;
+      if (target instanceof HTMLElement && !digitsReachCard(target)) return;
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
       e.preventDefault();
@@ -239,157 +249,205 @@ export function ChiefQuestionCard({
     );
   }
 
-  const scroll = question.options.length > 6;
   const pickedCount = draft?.kind === 'choices' ? draft.picked.length : 0;
   const otherSelected = draft?.kind === 'choices' && draft.other;
+  const multi = question.multiSelect === true;
   const hintText =
     question.options.length === 0
       ? ''
-      : question.multiSelect === true
+      : multi
         ? pickedCount > 0
           ? t('已选 {n} 项', { n: pickedCount })
           : t('未选')
-        : numberKeys
-          ? t('数字键 1–{n} 选择', { n: question.options.length + 1 })
-          : '';
+        : '';
+  const pick = (optionIndex: number) =>
+    setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
 
   return (
     <div
       ref={cardRef}
       data-testid="chief-question-card"
       data-status={item.status}
-      className={CARD_CLS}
+      className={PENDING_CARD_CLS}
     >
-      <div className="flex gap-1" aria-hidden="true">
-        {questions.map((_, i) => (
-          <span key={i} className={`${PIP_CLS}${i <= step ? ` ${PIP_ON_CLS}` : ''}`} />
-        ))}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <span data-testid="chief-question-step" className="text-caption text-content-tertiary">
-          {question.header} · {step + 1}/{total}
-        </span>
-        <QuestionStatus status={item.status} />
-      </div>
-      <div data-testid="chief-question-text" className={BIG_CLS}>
-        {question.question}
+      <div className="flex flex-none items-start gap-4 bg-(--hover-1) px-4 py-3">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="text-caption text-content-tertiary">{question.header}</span>
+          <div data-testid="chief-question-text" className="text-ui text-foreground">
+            {question.question}
+          </div>
+        </div>
+        {total > 1 && (
+          <div className="flex flex-none items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              data-testid="chief-question-step-prev"
+              aria-label={t('上一步')}
+              disabled={!pending || step === 0}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+            >
+              <ChevronLeft aria-hidden className="size-4" />
+            </Button>
+            <span
+              data-testid="chief-question-step"
+              className="text-caption tabular-nums text-content-tertiary"
+            >
+              {t('{n} / {total}', { n: step + 1, total })}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              data-testid="chief-question-step-next"
+              aria-label={t('下一步')}
+              disabled={!pending || last || !stepComplete}
+              onClick={() => setStep((s) => Math.min(lastStep, s + 1))}
+            >
+              <ChevronRight aria-hidden className="size-4" />
+            </Button>
+          </div>
+        )}
       </div>
       {question.options.length === 0 ? (
-        <Input
-          data-testid={`chief-question-input-${step}`}
-          className={FORM_CONTROL_CLS}
-          placeholder={t('输入你的回答')}
-          value={draft?.kind === 'text' ? draft.value : ''}
-          disabled={!pending}
-          onChange={(e) => {
-            const value = e.target.value;
-            setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
-          }}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <Input
+            data-testid={`chief-question-input-${step}`}
+            className={FORM_CONTROL_CLS}
+            placeholder={t('输入你的回答')}
+            value={draft?.kind === 'text' ? draft.value : ''}
+            disabled={!pending}
+            onChange={(e) => {
+              const value = e.target.value;
+              setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
+            }}
+          />
+        </div>
       ) : (
-        <div className={`flex flex-col gap-1.5${scroll ? ' max-h-54 overflow-y-auto pr-0.5' : ''}`}>
+        <div className="flex min-h-0 flex-1 flex-col divide-y divide-border overflow-y-auto">
           {question.options.map((option, oi) => {
             const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
             return (
               <Button
                 key={oi}
-                variant="outline"
-                size="sm"
+                variant="ghost"
                 data-testid={`chief-question-option-${step}-${oi}`}
                 disabled={!pending}
                 aria-pressed={selected}
-                title={option.description}
-                className={`${OPT_CLS}${selected ? ` ${OPT_SEL_CLS}` : ''}`}
-                onClick={() => setDrafts((prev) => applyQuestionPick(prev, step, question, oi))}
+                className={OPTION_ROW_CLS}
+                onClick={() => pick(oi)}
               >
-                <span className={`${NUM_CLS} ${selected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
-                  {oi + 1}
-                </span>
-                <span className={OPT_TXT_CLS}>
-                  {option.label}
-                  {option.recommended === true && (
-                    <>
-                      {' '}
-                      <RecommendedMark />
-                    </>
+                <ChoiceMark multi={multi} selected={selected} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-ui text-foreground">
+                    {option.label}
+                    {option.recommended === true && (
+                      <>
+                        {' '}
+                        <RecommendedMark />
+                      </>
+                    )}
+                  </span>
+                  {option.description !== undefined && (
+                    <span className="text-ui text-content-tertiary">{option.description}</span>
                   )}
                 </span>
+                {oi < 9 && (
+                  <span className="flex-none text-caption tabular-nums text-content-tertiary">
+                    {oi + 1}
+                  </span>
+                )}
               </Button>
             );
           })}
-          <Button
-            key="other"
-            variant="outline"
-            size="sm"
-            data-testid={`chief-question-other-${step}`}
-            disabled={!pending}
-            aria-pressed={otherSelected}
-            className={`${OPT_CLS}${otherSelected ? ` ${OPT_SEL_CLS}` : ''}`}
-            onClick={() =>
-              setDrafts((prev) => applyQuestionPick(prev, step, question, question.options.length))
-            }
-          >
-            <span className={`${NUM_CLS} ${otherSelected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
-              {question.options.length + 1}
-            </span>
-            <span className={OPT_TXT_CLS}>{t('用我自己的话回答')}</span>
-          </Button>
-          {otherSelected && (
-            <Input
-              data-testid={`chief-question-input-${step}`}
-              className={FORM_CONTROL_CLS}
-              placeholder={t('输入你的回答')}
-              value={draft?.kind === 'choices' ? draft.otherText : ''}
+          <div className="flex flex-col">
+            <Button
+              variant="ghost"
+              data-testid={`chief-question-other-${step}`}
               disabled={!pending}
-              onChange={(e) => {
-                const value = e.target.value;
-                setDrafts((prev) => {
-                  const current = prev[step];
-                  if (current?.kind !== 'choices') return prev;
-                  return replaceQuestionDraft(prev, step, { ...current, otherText: value });
-                });
-              }}
-            />
-          )}
+              aria-pressed={otherSelected}
+              className={OPTION_ROW_CLS}
+              onClick={() => pick(question.options.length)}
+            >
+              <ChoiceMark multi={multi} selected={otherSelected} />
+              <span className="min-w-0 flex-1 text-ui text-foreground">
+                {t('用我自己的话回答')}
+              </span>
+              {question.options.length < 9 && (
+                <span className="flex-none text-caption tabular-nums text-content-tertiary">
+                  {question.options.length + 1}
+                </span>
+              )}
+            </Button>
+            {otherSelected && (
+              <div className="px-4 pb-4 pl-13">
+                <Input
+                  data-testid={`chief-question-input-${step}`}
+                  className={FORM_CONTROL_CLS}
+                  placeholder={t('输入你的回答')}
+                  value={draft?.kind === 'choices' ? draft.otherText : ''}
+                  disabled={!pending}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setDrafts((prev) => {
+                      const current = prev[step];
+                      if (current?.kind !== 'choices') return prev;
+                      return replaceQuestionDraft(prev, step, { ...current, otherText: value });
+                    });
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          className={DIALOG_TEXT_BUTTON}
-          disabled={!pending || onCancel === undefined}
-          onClick={() => onCancel?.(item.requestId)}
-        >
-          {t('取消提问')}
-        </Button>
-        <span
-          data-testid="chief-question-hint"
-          className={question.multiSelect === true ? HINT_CLS : `${HINT_CLS} max-md:invisible`}
-        >
-          {hintText}
-        </span>
-        {step > 0 && (
+      <div className="flex flex-none items-center gap-2 px-4 py-3">
+        <QuestionStatus status={item.status} />
+        {hintText !== '' && (
+          <span data-testid="chief-question-hint" className={HINT_CLS}>
+            {hintText}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
             className={DIALOG_TEXT_BUTTON}
-            disabled={!pending}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
+            disabled={!pending || onCancel === undefined}
+            onClick={() => onCancel?.(item.requestId)}
           >
-            {t('上一步')}
+            {t('取消提问')}
           </Button>
-        )}
-        <Button
-          className={DIALOG_PRIMARY_BUTTON}
-          disabled={!pending || !(last ? allComplete : stepComplete)}
-          onClick={() => {
-            if (last) submit();
-            else setStep((s) => Math.min(lastStep, s + 1));
-          }}
-        >
-          {last ? t('提交回答') : t('下一步')}
-        </Button>
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            disabled={!pending || !(last ? allComplete : stepComplete)}
+            onClick={() => {
+              if (last) submit();
+              else setStep((s) => Math.min(lastStep, s + 1));
+            }}
+          >
+            {last ? t('提交回答') : t('下一步')}
+          </Button>
+        </div>
       </div>
     </div>
+  );
+}
+
+function ChoiceMark({ multi, selected }: { multi: boolean; selected: boolean }) {
+  const shape = multi ? 'rounded-md' : 'rounded-full';
+  return (
+    <span
+      aria-hidden
+      className={`mt-0.5 grid size-5 flex-none place-items-center border ${shape} ${
+        selected ? 'border-transparent bg-primary text-primary-foreground' : 'border-input'
+      }`}
+    >
+      {selected &&
+        (multi ? (
+          <Check strokeWidth={2.5} className="size-3" />
+        ) : (
+          <span className="size-2 rounded-full bg-primary-foreground" />
+        ))}
+    </span>
   );
 }
 

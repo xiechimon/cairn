@@ -182,8 +182,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(done.locator('svg'), 'Q1').toHaveCount(1);
     await expect(done, 'Q1').toHaveCSS('color', ink3);
 
-    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '15px');
-    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-weight', '500');
+    await expect(pending.getByTestId('chief-question-text'), 'Q2').toHaveCSS('font-size', '14px');
     await expect(pending.getByTestId('chief-question-step'), 'Q2').toHaveCSS(
       'font-size',
       '12px',

@@ -81,14 +81,20 @@ async function mockPendingQuestion(page: Page) {
   });
 }
 
-test('digits still type into the composer while a question is pending', async ({ page }) => {
+test('a pending question card takes digits when nothing is focused and leaves a typed composer alone', async ({
+  page,
+}) => {
   await mockPendingQuestion(page);
   await page.goto('/app');
   const composer = homeComposer(page);
-  await expect(page.getByTestId('chief-question-dock')).toBeVisible();
-  await expect(composer).toBeVisible();
+  const option = page.getByTestId('chief-question-option-0-0');
+  await expect(option).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.keyboard.type('1');
-  await expect(composer).toHaveValue('1');
-  await expect(page.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('1');
+  await expect(option).toHaveAttribute('aria-pressed', 'true');
+  await expect(composer).toHaveValue('');
+  await composer.fill('draft');
+  await page.keyboard.press('2');
+  await expect(composer).toHaveValue('draft2');
+  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
 });

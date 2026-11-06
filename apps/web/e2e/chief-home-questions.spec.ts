@@ -212,3 +212,91 @@ test('at 375px the card sits above the composer and the last message stays visib
   expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(375);
   expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(dockBox!.y);
 });
+
+test('digits pick an option while nothing is being typed, and stay text in a non-empty composer', async ({
+  page,
+}) => {
+  await mockLive(page, structuredClone(ONE));
+  await page.goto('/app');
+  const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  const option = page.getByTestId('chief-question-option-0-0');
+  await expect(option).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('2');
+  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(composer).toHaveValue('');
+  await composer.click();
+  await page.keyboard.press('1');
+  await expect(option).toHaveAttribute('aria-pressed', 'true');
+  await expect(composer).toHaveValue('');
+  await composer.fill('ship it');
+  await page.keyboard.press('2');
+  await expect(composer).toHaveValue('ship it2');
+  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('digits typed into the free-text answer stay text', async ({ page }) => {
+  await mockLive(page, structuredClone(ONE));
+  await page.goto('/app');
+  const dock = page.getByTestId('chief-question-dock');
+  await dock.getByTestId('chief-question-other-0').click();
+  const input = dock.getByTestId('chief-question-input-0');
+  await input.click();
+  await page.keyboard.type('12');
+  await expect(input).toHaveValue('12');
+  await expect(dock.getByTestId('chief-question-option-0-0')).toHaveAttribute('aria-pressed', 'false');
+});
+
+const LONG_OPTIONS = Array.from({ length: 6 }, (_, n) => ({
+  label: `Option ${n + 1}: a deliberately long label that keeps wrapping across several lines of the card`,
+  description: `Description ${n + 1}: the reasoning behind this option is spelled out in a full sentence so the row grows`,
+}));
+
+const LONG = {
+  threads: [THREAD],
+  messages: [
+    { id: 'request', role: 'user', content: 'Ship the relay fix', createdAt: 10 },
+    question(
+      'ask-0000000a',
+      'Plan · #3138',
+      'Which of these six rollouts should the Coordinator pick, given the long explanation that follows here?',
+      LONG_OPTIONS,
+    ),
+  ],
+  todos: [],
+};
+
+for (const size of [
+  { name: '600px drawer', width: 1440, height: 900 },
+  { name: '375px phone', width: 375, height: 667 },
+]) {
+  test(`a long question scrolls inside its card and keeps the composer and send button reachable (${size.name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await mockLive(page, structuredClone(LONG));
+    await page.goto('/app/schedules?chief=chief-home');
+    const drawer = page.locator('.chief-drawer');
+    await expect(drawer).toBeVisible();
+    const dock = drawer.getByTestId('chief-question-dock');
+    await expect(dock.getByTestId('chief-question-card')).toBeVisible();
+    const input = drawer.getByTestId('chief-composer-input');
+    await expect(input).toBeVisible();
+    const send = drawer.getByRole('button', { name: '发送' });
+    await expect(send).toBeVisible();
+    await send.click({ trial: true });
+    const frame = await drawer.boundingBox();
+    const sendBox = await send.boundingBox();
+    const dockBox = await dock.boundingBox();
+    const inputBox = await input.boundingBox();
+    expect(sendBox!.y + sendBox!.height).toBeLessThanOrEqual(frame!.y + frame!.height);
+    expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(inputBox!.y);
+    expect(dockBox!.height).toBeLessThanOrEqual(frame!.height * 0.65 + 1);
+    const scrolls = await dock
+      .getByTestId('chief-question-option-0-5')
+      .evaluate((node) => node.parentElement!.scrollHeight > node.parentElement!.clientHeight);
+    expect(scrolls).toBe(true);
+    await dock.getByTestId('chief-question-option-0-5').scrollIntoViewIfNeeded();
+    await expect(dock.getByRole('button', { name: '提交回答' })).toBeVisible();
+  });
+}
