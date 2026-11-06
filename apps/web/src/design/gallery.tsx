@@ -265,13 +265,13 @@ export function GalleryOnly({
   theme: GalleryTheme;
   width: number | null;
 }) {
+  const [target, setTarget] = useState<HTMLDivElement | null>(null);
   return (
-    <OnlySpecimen.Provider value={id}>
-      <div
-        data-gallery-only={id}
-        className="min-h-full bg-background text-foreground"
-        style={width == null ? undefined : { width }}
-      >
+    <OnlySpecimen.Provider value={{ id, target }}>
+      <div data-gallery-only={id} className="h-dvh overflow-y-auto bg-background text-foreground">
+        <div ref={setTarget} style={width == null ? undefined : { width }} />
+      </div>
+      <div hidden>
         <GallerySections theme={theme} />
       </div>
     </OnlySpecimen.Provider>

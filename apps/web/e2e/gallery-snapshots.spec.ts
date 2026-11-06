@@ -68,7 +68,7 @@ test.describe('?only= addresses one specimen', () => {
     await expect(root.locator('figure[data-specimen]')).toHaveCount(1);
     await expect(root.locator('figure[data-specimen]').first()).toHaveAttribute('data-specimen', 'pr-card');
     await expect(page.locator('html')).toHaveClass(/\blight\b/);
-    await expect(page.locator('figure')).toHaveCount(1);
+    await expect(page.locator('figure:visible')).toHaveCount(1);
     const outside = await root.evaluate((el) => {
       const text = (node: Element | null) => node?.textContent?.trim() ?? '';
       return text(el).replace(text(el.querySelector('figure')), '').trim();
@@ -89,6 +89,41 @@ test.describe('?only= addresses one specimen', () => {
     const root = await openOnly(page, 'only=no-such-specimen');
     await expect(root).toBeAttached();
     expect(await root.evaluate((el) => el.textContent?.trim() ?? '')).toBe('');
-    await expect(page.locator('figure')).toHaveCount(0);
+    await expect(page.locator('figure:visible')).toHaveCount(0);
+  });
+
+  test('renders every specimen at exactly the requested width', async ({ page }) => {
+    test.setTimeout(600_000);
+    await page.goto('/design.html');
+    await expect(page.locator('figure > figcaption').first()).toBeVisible();
+    const ids = await page
+      .locator('figure[data-specimen]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-specimen') ?? ''));
+    expect(ids.length).toBeGreaterThan(100);
+    const wrong: string[] = [];
+    for (const w of [375, 1280]) {
+      for (const id of ids) {
+        await page.goto(`/design.html?only=${id}&w=${w}`);
+        const figure = page.locator(`[data-gallery-only] figure[data-specimen="${id}"]`);
+        await figure.waitFor();
+        const width = await figure.evaluate((el) => el.getBoundingClientRect().width);
+        if (Math.abs(width - w) > 1) wrong.push(`${id} at w=${w}: ${width}px`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  test('scrolls a specimen taller than the viewport to its bottom', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 600 });
+    const root = await openOnly(page, 'only=plan-and-changes&w=1280');
+    const figure = root.locator('figure[data-specimen="plan-and-changes"]');
+    await figure.waitFor();
+    expect(await figure.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(600);
+    await root.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    expect(await root.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    const bottom = await figure.evaluate((el) => el.getBoundingClientRect().bottom);
+    expect(bottom).toBeLessThanOrEqual(600 + 1);
   });
 });

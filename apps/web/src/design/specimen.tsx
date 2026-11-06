@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronRight } from '../icons/index.js';
 
 export const DISPLAY_STYLE: CSSProperties = {
@@ -9,9 +10,14 @@ export const DISPLAY_STYLE: CSSProperties = {
   letterSpacing: '-0.02em',
 };
 
-export const OnlySpecimen = createContext<string | null>(null);
+export interface IsolatedSpecimen {
+  id: string;
+  target: HTMLElement | null;
+}
 
-export function useOnlySpecimen(): string | null {
+export const OnlySpecimen = createContext<IsolatedSpecimen | null>(null);
+
+export function useOnlySpecimen(): IsolatedSpecimen | null {
   return useContext(OnlySpecimen);
 }
 
@@ -26,7 +32,6 @@ export function Section({
   lede: string;
   children: ReactNode;
 }) {
-  if (useOnlySpecimen() != null) return children;
   return (
     <section id={id} data-gallery-section="" className="scroll-mt-4 pt-16">
       <h2 className="m-0 font-heading text-page font-title text-foreground">{title}</h2>
@@ -37,7 +42,6 @@ export function Section({
 }
 
 export function GroupTitle({ id, title, lede }: { id: string; title: string; lede: string }) {
-  if (useOnlySpecimen() != null) return null;
   return (
     <header id={id} className="scroll-mt-4 border-b border-border pt-24 pb-5">
       <h1 className="m-0 font-semibold text-foreground" style={DISPLAY_STYLE}>
@@ -66,8 +70,8 @@ export function Specimen({
   children: ReactNode;
 }) {
   const only = useOnlySpecimen();
-  if (only != null && only !== id) return null;
-  return (
+  if (only != null && (only.id !== id || only.target == null)) return null;
+  const figure = (
     <figure
       data-specimen={id}
       className="isolate m-0 overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)"
@@ -105,6 +109,7 @@ export function Specimen({
       )}
     </figure>
   );
+  return only?.target == null ? figure : createPortal(figure, only.target);
 }
 
 export function Cell({ label, children }: { label: string; children: ReactNode }) {
