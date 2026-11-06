@@ -11,6 +11,7 @@ import type {
 } from '@cairn/shared';
 import {
   canMoveTodoProject,
+  checkPlanContract,
   DONE_ANNOUNCEMENT,
   derivePlaceholderTitle,
   githubIssueSourceRef,
@@ -21,11 +22,12 @@ import {
   PLAN_AUTO_CONFIRM_GRACE_MS,
   parseGithubIssueSourceRef,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
+  buildFeedback,
   machine,
   message,
   plan as planTable,
@@ -57,6 +59,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
+import { planHasOpenDecisions } from './plan-decisions.js';
 import type { VapidKeys } from './push.js';
 import { routeForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
@@ -89,16 +92,47 @@ function notifyPhaseEntry(deps: TodoDeps, record: TodoRecord, from: Phase, to: P
   notifyThreadPhase(deps, record, to);
 }
 
-export function planAutoApproveEnabled(db: Db, row: TodoRow): boolean {
+export function planAutoPaused(db: Db, row: TodoRow): boolean {
+  if (row.planAutoHold) return true;
   const owner = db
     .select({ autonomy: project.autonomy })
     .from(project)
     .where(eq(project.id, row.projectId))
     .get();
-  return (
-    owner?.autonomy?.planAutoApprove !== false &&
-    (owner?.autonomy?.mergePolicy ?? 'autonomous') !== 'human'
-  );
+  return owner?.autonomy?.planAutoApprove === false;
+}
+
+export function planAutoPausedById(db: Db, id: string): boolean {
+  const row = db.select().from(todo).where(eq(todo.id, id)).get();
+  return row !== undefined && planAutoPaused(db, row);
+}
+
+export function planAutoConfirmable(db: Db, row: TodoRow): boolean {
+  if (row.latestBuildId === null || planAutoPaused(db, row)) return false;
+  const owner = db
+    .select({ autonomy: project.autonomy })
+    .from(project)
+    .where(eq(project.id, row.projectId))
+    .get();
+  if ((owner?.autonomy?.mergePolicy ?? 'autonomous') === 'human') return false;
+  if (childrenOfTodo(db, row.id).length > 0) return false;
+  const buildRow = db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  if (buildRow === undefined || buildRow.errorMessage !== null) return false;
+  const latestPlan = db
+    .select({ content: planTable.content })
+    .from(planTable)
+    .where(eq(planTable.buildId, row.latestBuildId))
+    .orderBy(desc(planTable.version))
+    .get();
+  if (latestPlan === undefined || !checkPlanContract(latestPlan.content).ok) return false;
+  if (planHasOpenDecisions(latestPlan.content)) return false;
+  const latestFeedback = db
+    .select({ kind: buildFeedback.kind, side: buildFeedback.side })
+    .from(buildFeedback)
+    .where(eq(buildFeedback.buildId, row.latestBuildId))
+    .orderBy(desc(buildFeedback.createdAt), desc(buildFeedback.id))
+    .get();
+  return !(latestFeedback?.kind === 'revision' && latestFeedback.side === 'plan');
 }
 
 export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoRecord {
@@ -168,7 +202,7 @@ export function toTodoRecord(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoReco
     ...(row.phase === 'confirm' && row.archivedAt === null
       ? row.planAutoHold
         ? { planAutoHold: true }
-        : planAutoApproveEnabled(db, row)
+        : planAutoConfirmable(db, row)
           ? { planAutoApproveAt: row.phaseAt + PLAN_AUTO_CONFIRM_GRACE_MS }
           : {}
       : {}),

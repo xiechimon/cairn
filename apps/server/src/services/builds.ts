@@ -45,7 +45,6 @@ import {
   parseVerifyPromptMeta,
   personaByRole,
   planVerificationItems,
-  projectMergeConfigSchema,
   REVIEW_ANNOUNCEMENT,
   REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
@@ -79,7 +78,6 @@ import {
   agent,
   autonomousMergeAdmission,
   build,
-  buildFeedback,
   chief,
   chiefMessage,
   gateVerdict,
@@ -150,7 +148,6 @@ import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
-import { planHasOpenDecisions } from './plan-decisions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
@@ -171,7 +168,7 @@ import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
   getTodo,
-  planAutoApproveEnabled,
+  planAutoConfirmable,
   setTodoPhase,
   settleSplitOnDone,
   splitBlockersSatisfied,
@@ -2824,15 +2821,12 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
     if (
       todoRow.archivedAt !== null ||
       todoRow.latestBuildId === null ||
-      todoRow.planAutoHold ||
-      !planAutoApproveEnabled(deps.db, todoRow) ||
       now - todoRow.phaseAt < PLAN_AUTO_CONFIRM_GRACE_MS
     ) {
       continue;
     }
     const buildId = todoRow.latestBuildId;
-    const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-    if (buildRow === undefined || buildRow.errorMessage !== null) continue;
+    if (!planAutoConfirmable(deps.db, todoRow)) continue;
     const liveStep = deps.db
       .select({ id: step.id })
       .from(step)
@@ -2844,20 +2838,6 @@ export function sweepPlanAutoConfirm(deps: BuildDeps, now: number = nowMs()): vo
       )
       .get();
     if (liveStep !== undefined) continue;
-    const latestPlan = latestPlanRow(deps, buildId);
-    if (latestPlan === undefined || !checkPlanContract(latestPlan.content).ok) continue;
-    if (planHasOpenDecisions(latestPlan.content)) continue;
-    const mergePolicy = projectMergeConfigSchema.parse({
-      mergePolicy: projectOfTodo(deps.db, todoRow)?.autonomy?.mergePolicy,
-    }).mergePolicy;
-    if (mergePolicy === 'human' || childrenOfTodo(deps.db, todoRow.id).length > 0) continue;
-    const latestFeedback = deps.db
-      .select({ kind: buildFeedback.kind, side: buildFeedback.side })
-      .from(buildFeedback)
-      .where(eq(buildFeedback.buildId, buildId))
-      .orderBy(desc(buildFeedback.createdAt), desc(buildFeedback.id))
-      .get();
-    if (latestFeedback?.kind === 'revision' && latestFeedback.side === 'plan') continue;
     const threadIds = [
       ...new Set(
         deps.db

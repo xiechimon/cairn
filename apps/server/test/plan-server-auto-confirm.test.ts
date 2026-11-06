@@ -17,13 +17,13 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { addChiefWatch } from '../src/services/chief.js';
+import { addChiefWatch, wakeFacts } from '../src/services/chief.js';
 import { answerQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { confirmBuild } from '../src/services/chief-tools.js';
 import { ensurePersonasSeeded } from '../src/services/personas.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
-import { getTodo } from '../src/services/todos.js';
+import { getTodo, planAutoPausedById } from '../src/services/todos.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 afterEach(() => vi.useRealTimers());
@@ -521,6 +521,37 @@ describe('D121 plan auto-approve is visible and can be held', () => {
       );
       expect(res.status).toBeLessThan(300);
       expect(w.todoRow().planAutoHold).toBe(false);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('no countdown for plans the sweep will never confirm', async () => {
+    const w = await planReady();
+    try {
+      w.s.db
+        .update(planTable)
+        .set({ content: `${GOOD_PLAN}\n## Open questions\nChoose the storage backend.\n` })
+        .run();
+      expect(getTodo(w.s.svc, w.todoId)!.planAutoApproveAt).toBeUndefined();
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('the Chief gate wake tells the Chief not to confirm a held plan', async () => {
+    const w = await planReady();
+    try {
+      const held = wakeFacts('gate', getTodo(w.s.svc, w.todoId)!, null, {
+        planText: GOOD_PLAN,
+        planAutoHeld: true,
+      });
+      expect(held).toContain('不要调 confirm_builds');
+      const open = wakeFacts('gate', getTodo(w.s.svc, w.todoId)!, null, { planText: GOOD_PLAN });
+      expect(open).toContain('自动确认规则');
+      expect(planAutoPausedById(w.s.db, w.todoId)).toBe(false);
+      await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { planAutoHold: true } });
+      expect(planAutoPausedById(w.s.db, w.todoId)).toBe(true);
     } finally {
       w.s.dispose();
     }

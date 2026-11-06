@@ -91,7 +91,7 @@ import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
 import { chiefRemoteTools, routingRulesEnabled } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
-import { getTodo } from './todos.js';
+import { getTodo, planAutoPausedById } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { buildVerified } from './verified.js';
 
@@ -1147,7 +1147,12 @@ function enqueueGateWake(
           .limit(1)
           .get()
       : undefined;
-  const facts = wakeFacts('gate', record, null, { isSplitParent, planText: latestPlan?.content });
+  const planAutoHeld = record.phase === 'confirm' && planAutoPausedById(deps.db, record.id);
+  const facts = wakeFacts('gate', record, null, {
+    isSplitParent,
+    planText: latestPlan?.content,
+    planAutoHeld,
+  });
   const metadata = `Gate todo=${encodeURIComponent(record.id)} build=${encodeURIComponent(record.latestBuildId ?? '')} phase=${record.phase} attempt=${retry ? 1 : 0}`;
   enqueueChiefStep(deps, threadId, {
     id,
@@ -1199,7 +1204,7 @@ export function wakeFacts(
   kind: ChiefWakeKind,
   todo: TodoRecord,
   errorMessage: string | null,
-  context?: { isSplitParent?: boolean; planText?: string },
+  context?: { isSplitParent?: boolean; planText?: string; planAutoHeld?: boolean },
 ): string {
   if (!isIssueSourcedTask(todo)) {
     return wakeFactText(kind, todo, `#${todo.seqNum}「${todo.title}」`, errorMessage, context);
@@ -1214,7 +1219,7 @@ function wakeFactText(
   todo: TodoRecord,
   ref: string,
   errorMessage: string | null,
-  context?: { isSplitParent?: boolean; planText?: string },
+  context?: { isSplitParent?: boolean; planText?: string; planAutoHeld?: boolean },
 ): string {
   switch (kind) {
     case 'gate': {
@@ -1240,6 +1245,14 @@ function wakeFactText(
           [
             `任务 ${ref} 停驻在 ${todo.phase} 关口。`,
             '本卡是 split_todo 父卡——拆解方案必须人审，不自动过闸。用 ask_user 把拆解方案交给用户确认，用户确认后才调 confirm_builds。',
+          ].join('') + planText
+        );
+      }
+      if (context?.planAutoHeld === true) {
+        return (
+          [
+            `任务 ${ref} 停驻在 ${todo.phase} 关口。用户暂停了这张卡的自动开工（或项目关了自动开工）。`,
+            '不要调 confirm_builds；需要用户知道或决定时，用 ask_user 或 notify_user 说明，用户明确同意后才调 confirm_builds，否则直接结束本轮。',
           ].join('') + planText
         );
       }
