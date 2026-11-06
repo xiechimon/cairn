@@ -6051,6 +6051,14 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
               "minimum": -9007199254740991,
               "type": "integer",
             },
+            "planAutoApproveAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "planAutoHold": {
+              "type": "boolean",
+            },
             "projectId": {
               "type": "string",
             },
@@ -10302,6 +10310,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "planAutoApproveAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
+    "planAutoHold": {
+      "type": "boolean",
     },
     "projectId": {
       "type": "string",
