@@ -48,6 +48,10 @@
     "vp-registry-gate.mjs": {
       "kind": "test",
       "purpose": "Registry gate: every file in scripts/ is registered, no new drive-<number> script, registry paths, statuses and needs are valid, a docs/verify writer needs rewrites-evidence, and every feature map names its vp.mjs drive line. Run by vp-selftest.mjs."
+    },
+    "api-card-table.mjs": {
+      "kind": "infra",
+      "purpose": "Renders the Requests table rows of the PR evidence card with pipes escaped; api-evidence-card.mjs writes the card with it and scripts/pr-evidence-gate.test.py round-trips its output through the gate."
     }
   },
   "features": {
@@ -117,6 +121,22 @@
           "status": "current",
           "purpose": "Seeds a failed build whose errorMessage is a real ANSI-polluted row, then proves the failure row and run history show it with no ESC or OSC8 sequences.",
           "usage": "env SERVER, WEB, POLLUTED_ROW_FILE, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "api-evidence-card": {
+      "recipe": "features/api-evidence-card.md",
+      "cases": {
+        "card": {
+          "script": ".claude/skills/verify-cairn/scripts/api-evidence-card.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Runs a spec of HTTP steps against the isolated stack, reads SQLite rows before and after each step read-only, and writes the transcript, a screenshot of it, live JSON screenshots and the Requests table for the PR evidence card.",
+          "usage": "<spec.json> [--before-port <port>]; env VERIFY_RUN_DIR, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
         }
       }
     },

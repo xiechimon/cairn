@@ -195,6 +195,11 @@ export const EN: Record<string, string> = {
   '按首页清单把模型服务、机器和 Coordinator 接上，再发一次。':
     'Finish the checklist on the home page (provider, machine, Coordinator), then send again.',
 
+  已归档: 'Archived',
+  归档: 'Archive',
+  '{name} 的菜单': '{name} menu',
+  '无法归档项目。': 'Could not archive the project.',
+  '无法取消归档项目。': 'Could not unarchive the project.',
   新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
   需要你: 'Needs you',
   在跑: 'Running',
