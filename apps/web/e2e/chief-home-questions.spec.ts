@@ -380,3 +380,68 @@ test('the primary button shows its shortcut and Ctrl+Enter or Cmd+Enter submits 
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({ answers: [{ header: 'Model · #74', choices: ['wokey · deepseek-v4.1-flash'] }] });
 });
+
+for (const locale of ['zh', 'en'] as const) {
+  for (const size of [
+    { name: '320px phone', width: 320, height: 640 },
+    { name: '375px phone', width: 375, height: 667 },
+    { name: 'desktop drawer', width: 1440, height: 900 },
+  ]) {
+    test(`nothing in the card or composer overflows or is clipped (${locale}, ${size.name}, 6 long options)`, async ({
+      page,
+    }) => {
+      await page.addInitScript((value) => localStorage.setItem('cairn-locale', value), locale);
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await mockLive(page, structuredClone(LONG));
+      await page.goto('/app/schedules?chief=chief-home');
+      const drawer = page.locator('.chief-drawer');
+      await expect(drawer.getByTestId('chief-question-card')).toBeVisible();
+      await expect(drawer.getByTestId('chief-composer-input')).toBeVisible();
+      const defects = await drawer.evaluate((root) => {
+        const found: string[] = [];
+        const scopes = [
+          root.querySelector('[data-testid="chief-question-card"]'),
+          root.querySelector('.chief-composer'),
+        ];
+        for (const scope of scopes) {
+          if (scope === null) continue;
+          const frame = scope.getBoundingClientRect();
+          for (const el of scope.querySelectorAll('*')) {
+            const name = `${el.tagName.toLowerCase()}[${el.getAttribute('data-testid') ?? el.className.toString().slice(0, 40)}]`;
+            const style = getComputedStyle(el);
+            if (style.display === 'none') continue;
+            if (el.classList.contains('sr-only') || el.closest('.sr-only') !== null) continue;
+            const box = el.getBoundingClientRect();
+            if (box.width <= 1 && box.height <= 1) continue;
+            if (box.left < frame.left - 0.5 || box.right > frame.right + 0.5)
+              found.push(`${name} leaves the frame horizontally`);
+            const ellipsis = style.textOverflow === 'ellipsis';
+            if (!ellipsis && el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0)
+              found.push(`${name} scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`);
+          }
+          for (const el of scope.querySelectorAll('button, textarea, input')) {
+            const box = el.getBoundingClientRect();
+            if (box.width === 0) continue;
+            if (box.bottom > frame.bottom + 0.5 || box.top < frame.top - 0.5) {
+              let scrolls = false;
+              for (let up = el.parentElement; up !== null && up !== scope; up = up.parentElement)
+                if (/(auto|scroll)/.test(getComputedStyle(up).overflowY)) scrolls = true;
+              if (!scrolls) found.push(`${el.tagName.toLowerCase()} leaves the frame vertically`);
+            }
+          }
+        }
+        const input = root.querySelector('[data-testid="chief-composer-input"]');
+        if (input !== null) {
+          const placeholder = getComputedStyle(input, '::placeholder');
+          if (placeholder.whiteSpace !== 'nowrap' || getComputedStyle(input).textOverflow !== 'ellipsis')
+            found.push('composer placeholder can wrap and clip');
+        }
+        return found;
+      });
+      expect(defects).toEqual([]);
+      const dock = drawer.getByTestId('chief-question-dock');
+      await expect(dock.getByRole('button', { name: locale === 'zh' ? '取消提问' : 'Dismiss question' })).toBeInViewport({ ratio: 1 });
+      await expect(dock.getByRole('button', { name: locale === 'zh' ? '提交回答' : 'Submit answers' })).toBeInViewport({ ratio: 1 });
+    });
+  }
+}

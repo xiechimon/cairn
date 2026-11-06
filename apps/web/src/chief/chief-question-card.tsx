@@ -63,7 +63,7 @@ const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
 const PENDING_CARD_CLS =
   '@container flex min-h-0 flex-col overflow-hidden rounded-(--radius-card) bg-card shadow-(--e1)';
 const OPTION_ROW_CLS =
-  'h-auto w-full justify-start gap-4 whitespace-normal rounded-none px-4 py-4 text-left font-normal';
+  'h-auto w-full items-start justify-start gap-4 whitespace-normal rounded-none px-4 py-4 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
 const OPT_TXT_CLS = 'min-w-0 flex-1';
 const ROW_STATIC_CLS =
@@ -443,14 +443,14 @@ export function ChiefQuestionCard({
           </div>
         </div>
       )}
-      <div className="flex flex-none items-center gap-2 px-4 py-3">
+      <div className="flex flex-none flex-wrap items-center gap-2 px-4 py-3">
         <QuestionStatus status={item.status} />
         {hintText !== '' && (
           <span data-testid="chief-question-hint" className={HINT_CLS}>
             {hintText}
           </span>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <Button
             variant="ghost"
             className={DIALOG_TEXT_BUTTON}
@@ -461,7 +461,10 @@ export function ChiefQuestionCard({
           </Button>
           <Button className={DIALOG_PRIMARY_BUTTON} disabled={!primaryEnabled} onClick={advance}>
             {last ? t('提交回答') : t('下一步')}
-            <ShortcutHint keys={['mod', 'enter']} className="pointer-coarse:hidden ml-1" />
+            <ShortcutHint
+              keys={['mod', 'enter']}
+              className="@max-md:hidden pointer-coarse:hidden ml-1"
+            />
           </Button>
         </div>
       </div>
