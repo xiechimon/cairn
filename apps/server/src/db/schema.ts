@@ -244,6 +244,7 @@ export const step = sqliteTable(
     holdReason: text('holdReason'),
     holdUntil: epochMs('holdUntil'),
     holdCount: integer('holdCount').notNull().default(0),
+    claimCount: integer('claimCount').notNull().default(0),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
