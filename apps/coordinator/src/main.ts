@@ -1,9 +1,9 @@
 import { mkdirSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { startRuntime } from '../../server/src/coordinator/runtime/start.js';
 import { readConfig } from './config.js';
 import { claimLoop } from './loop.js';
 import { httpMachineApi } from './machine-api.js';
-import { startRuntime } from './runtime/start.js';
 import { acquireStoreLock } from './store-lock.js';
 
 const config = readConfig(process.env);

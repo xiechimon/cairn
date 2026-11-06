@@ -5,14 +5,14 @@ import { DatabaseSync } from 'node:sqlite';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openCoordinatorHarness } from '../src/runtime/harness.js';
-import { createCoordinatorModels } from '../src/runtime/models.js';
+import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import {
   readThreadRows,
   SEED_ROW_MAX_CHARS,
   seedCoordinator,
   seedMessages,
-} from '../src/runtime/seed.js';
+} from '../../src/coordinator/runtime/seed.js';
 
 const ctx = BACKGROUND_CONTEXT;
 const dirs: string[] = [];

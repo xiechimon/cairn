@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createCoordinatorModels } from '../src/runtime/models.js';
+import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 
 const config = {
   kind: 'http' as const,
