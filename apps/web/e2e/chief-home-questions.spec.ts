@@ -433,12 +433,9 @@ for (const locale of ['zh', 'en'] as const) {
             }
           }
         }
-        const input = root.querySelector('[data-testid="chief-composer-input"]');
-        if (input !== null) {
-          const placeholder = getComputedStyle(input, '::placeholder');
-          if (placeholder.whiteSpace !== 'nowrap' || getComputedStyle(input).textOverflow !== 'ellipsis')
-            found.push('composer placeholder can wrap and clip');
-        }
+        const placeholder = root.querySelector('[data-testid="chief-composer-placeholder"]');
+        if (placeholder !== null && getComputedStyle(placeholder).textOverflow !== 'ellipsis')
+          found.push('composer placeholder does not ellipsize');
         return found;
       });
       expect(defects).toEqual([]);

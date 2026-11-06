@@ -200,6 +200,13 @@ export function ChiefConversation({
   const questionAttached = useQuestionDockVisible();
   const projectMark = useProjectMark();
   const { t } = useI18n();
+  const composerPlaceholder =
+    targetPlaceholder ??
+    (chief.outage != null
+      ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
+      : chief.running === true
+        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -746,7 +753,7 @@ export function ChiefConversation({
                   data-testid="chief-composer-input"
                   data-compose-target=""
                   aria-invalid={composerError != null ? true : undefined}
-                  className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) text-ellipsis [&::placeholder]:whitespace-nowrap`}
+                  className={`h-9 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 pt-0.5 pb-2.5 font-sans text-card-title md:text-card-title tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-transparent`}
                   readOnly={onSend == null}
                   value={wire.draft}
                   onChange={wire.handleChange}
@@ -757,14 +764,7 @@ export function ChiefConversation({
                   onSelect={handleCaretMoved}
                   onCompositionEnd={handleCompositionEnd}
                   onBlur={handleBlur}
-                  placeholder={
-                    targetPlaceholder ??
-                    (chief.outage != null
-                      ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-                      : chief.running === true
-                        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-                        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
-                  }
+                  placeholder={composerPlaceholder}
                   {...(inlineOpen
                     ? {
                         role: 'combobox',
@@ -786,6 +786,15 @@ export function ChiefConversation({
                       ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
                       : {})}
                 />
+                {wire.draft === '' && (
+                  <span
+                    aria-hidden
+                    data-testid="chief-composer-placeholder"
+                    className="pointer-events-none absolute inset-x-0.5 top-0.5 truncate font-sans text-card-title tabular-nums text-(--text-tertiary)"
+                  >
+                    {composerPlaceholder}
+                  </span>
+                )}
                 <MentionHighlight
                   text={wire.draft}
                   registry={wire.mentionRegistry}

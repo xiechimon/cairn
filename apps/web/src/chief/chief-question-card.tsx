@@ -338,7 +338,7 @@ export function ChiefQuestionCard({
           data-testid="chief-question-collapse"
           aria-expanded={!collapsed}
           title={collapsed ? t('展开提问') : t('收起提问')}
-          className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent"
+          className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent"
           onClick={toggleCollapsed}
         >
           <span className="max-w-1/2 truncate">{question.header}</span>
