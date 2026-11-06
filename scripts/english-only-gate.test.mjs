@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { fileViolations, textViolations } from './english-only-gate.mjs';
+import {
+  fileViolations,
+  RUNTIME_BLOCK_BEGIN,
+  RUNTIME_BLOCK_END,
+  textViolations,
+} from './english-only-gate.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const script = resolve('scripts/english-only-gate.mjs');
 
@@ -89,6 +95,53 @@ test('diff mode reds added Chinese lines and Chinese commit messages only', () =
     assert.equal(run({ ENGLISH_ONLY_BASE_SHA: 'missing-ref' }).status, 2);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('runtime markers match the daemon brief markers', () => {
+  const brief = readFileSync(resolve('packages/shared/src/brief-file.ts'), 'utf8');
+  assert.ok(brief.includes(`'${RUNTIME_BLOCK_BEGIN}'`));
+  assert.ok(brief.includes(`'${RUNTIME_BLOCK_END}'`));
+});
+
+test('diff mode skips an uncommitted runtime brief block but reds a committed one', () => {
+  const cwd = makeTestTempDir('english-gate-runtime-');
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=T', ...args], {
+      cwd,
+      stdio: 'pipe',
+    });
+  const run = () =>
+    spawnSync(process.execPath, [script], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, ENGLISH_ONLY_BASE_SHA: '', PREPUSH_BASE_SHA: '' },
+    });
+  const guide = '# Guide\n\nEnglish rules.\n';
+  const injected = `${guide}\n${RUNTIME_BLOCK_BEGIN}\n施工常驻职责\n${RUNTIME_BLOCK_END}\n`;
+  try {
+    git('init');
+    writeFileSync(join(cwd, 'AGENTS.md'), guide);
+    git('add', 'AGENTS.md');
+    git('commit', '-m', 'baseline');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+
+    writeFileSync(join(cwd, 'AGENTS.md'), injected);
+    assert.equal(run().status, 0, run().stderr);
+
+    writeFileSync(join(cwd, 'AGENTS.md'), `${injected}\n中文\n`);
+    const dirty = run();
+    assert.equal(dirty.status, 1);
+    assert.match(dirty.stderr, /AGENTS.md:9:/);
+    assert.doesNotMatch(dirty.stderr, /AGENTS.md:6:/);
+
+    writeFileSync(join(cwd, 'AGENTS.md'), injected);
+    git('commit', '-am', 'docs: commit the runtime block');
+    const committed = run();
+    assert.equal(committed.status, 1);
+    assert.match(committed.stderr, /AGENTS.md:6:/);
+  } finally {
+    releaseTestTempDir(cwd);
   }
 });
 
