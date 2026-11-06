@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
@@ -12,9 +11,10 @@ import {
   resolvePiCacheRetention,
   TRUST_PROTECTED_ENTRIES,
 } from '../src/backend/pi.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function worktree(): string {
-  return mkdtempSync(join(tmpdir(), 'cairn-trust-'));
+  return testTempDir('cairn-trust-');
 }
 
 function plant(dir: string, rel: string, content = 'x'): void {
