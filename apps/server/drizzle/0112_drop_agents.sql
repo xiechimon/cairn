@@ -48,14 +48,14 @@ WHERE r.`use` = 'session'
 AND NOT EXISTS (SELECT 1 FROM `work_policy` p WHERE p.`teamId` = r.`teamId` AND p.`use` = 'session');--> statement-breakpoint
 INSERT OR IGNORE INTO `work_policy` (`id`, `teamId`, `use`, `tools`, `mcpServers`, `skillsAllowlist`, `defaultSkill`, `secrets`, `seededFromAgentId`, `createdAt`, `updatedAt`)
 SELECT lower(hex(randomblob(16))), t.`id`, 'review',
-  coalesce((SELECT json_group_array(j.`value`) FROM `agent` a, json_each(a.`tools`) j WHERE a.`teamId` = t.`id` AND a.`persona` = 'code_reviewer' AND j.`value` NOT IN ('合并分支', '推送分支', '创建标签', '创建技能', '更新技能')), '[]'),
-  coalesce((SELECT a.`mcpServers` FROM `agent` a WHERE a.`teamId` = t.`id` AND a.`persona` = 'code_reviewer'), '[]'),
-  (SELECT a.`skillsAllowlist` FROM `agent` a WHERE a.`teamId` = t.`id` AND a.`persona` = 'code_reviewer'),
-  (SELECT a.`defaultSkill` FROM `agent` a WHERE a.`teamId` = t.`id` AND a.`persona` = 'code_reviewer'),
+  coalesce((SELECT json_group_array(j.`value`) FROM json_each(a.`tools`) j WHERE j.`value` NOT IN ('合并分支', '推送分支', '创建标签', '创建技能', '更新技能')), '[]'),
+  coalesce(a.`mcpServers`, '[]'),
+  a.`skillsAllowlist`,
+  a.`defaultSkill`,
   '[]',
-  (SELECT a.`id` FROM `agent` a WHERE a.`teamId` = t.`id` AND a.`persona` = 'code_reviewer'),
+  a.`id`,
   CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
-FROM `team` t
+FROM `team` t LEFT JOIN `agent` a ON a.`id` = coalesce((SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = t.`id` AND r.`use` = 'review'), (SELECT p.`id` FROM `agent` p WHERE p.`teamId` = t.`id` AND p.`persona` = 'code_reviewer')) AND a.`teamId` = t.`id`
 WHERE NOT EXISTS (SELECT 1 FROM `work_policy` p WHERE p.`teamId` = t.`id` AND p.`use` = 'review');--> statement-breakpoint
 INSERT OR IGNORE INTO `routing_rule` (`id`, `teamId`, `use`, `provider`, `modelId`, `thinkingLevel`, `fallbackModels`, `machineId`, `requiredCapabilities`, `mcpServers`, `seededFromAgentId`, `createdAt`, `updatedAt`)
 SELECT a.`id`, c.`teamId`, 'coordinator', a.`provider`, a.`modelId`, a.`thinkingLevel`, a.`fallbackModels`, a.`machineId`, a.`requiredCapabilities`, a.`mcpServers`, a.`id`, CAST(strftime('%s', 'now') AS integer) * 1000, CAST(strftime('%s', 'now') AS integer) * 1000
@@ -75,12 +75,12 @@ WHERE a.`id` = (
 )
 AND EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND t.`sourceKind` = 'research-citation-check')
 AND NOT EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'citation_check');--> statement-breakpoint
-UPDATE `agent_memory` SET `independent` = 1 WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (a.`persona` IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)) OR (a.`persona` = 'verifier' OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.verify.agentId') = a.`id`)));--> statement-breakpoint
+UPDATE `agent_memory` SET `independent` = 1 WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (coalesce(a.`persona`, '') IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)) OR (a.`persona` = 'verifier' OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.verify.agentId') = a.`id`)));--> statement-breakpoint
 UPDATE `agent_memory` SET `agentId` = (SELECT r.`id` FROM `routing_rule` r WHERE r.`teamId` = `agent_memory`.`teamId` AND r.`use` = 'review')
-WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (a.`persona` IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)))
+WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (coalesce(a.`persona`, '') IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)))
 AND EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = `agent_memory`.`teamId` AND r.`use` = 'review');--> statement-breakpoint
 UPDATE `agent_memory` SET `agentId` = (SELECT r.`id` || ':verify' FROM `routing_rule` r WHERE r.`teamId` = `agent_memory`.`teamId` AND r.`use` = 'session')
-WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (a.`persona` = 'verifier' OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.verify.agentId') = a.`id`)) AND NOT (a.`persona` IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)))
+WHERE `agentId` IN (SELECT a.`id` FROM `agent` a WHERE (a.`persona` = 'verifier' OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.verify.agentId') = a.`id`)) AND NOT (coalesce(a.`persona`, '') IN ('code_reviewer', 'security_auditor', 'test_engineer') OR a.`id` IN (SELECT r.`seededFromAgentId` FROM `routing_rule` r WHERE r.`teamId` = a.`teamId` AND r.`use` = 'review' AND r.`seededFromAgentId` IS NOT NULL) OR EXISTS (SELECT 1 FROM `todo` t WHERE t.`teamId` = a.`teamId` AND json_extract(t.`assignment`, '$.review.agentId') = a.`id`)))
 AND EXISTS (SELECT 1 FROM `routing_rule` r WHERE r.`teamId` = `agent_memory`.`teamId` AND r.`use` = 'session');--> statement-breakpoint
 INSERT INTO `agent_memory` (`id`, `agentId`, `teamId`, `title`, `content`, `projectId`, `sourceTodoId`, `sourceBuildId`, `source`, `layer`, `threadId`, `adoptedFrom`, `independent`, `history`, `invalidAt`, `supersededBy`, `lastInjectedAt`, `createdAt`, `updatedAt`)
 SELECT lower(hex(randomblob(16))), r.`id`, m.`teamId`, m.`title`, m.`content`, m.`projectId`, m.`sourceTodoId`, m.`sourceBuildId`, m.`source`, m.`layer`, m.`threadId`, m.`id`, m.`independent`, m.`history`, NULL, NULL, NULL, m.`createdAt`, m.`updatedAt`
