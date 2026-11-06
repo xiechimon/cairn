@@ -44,6 +44,8 @@ interface WorkerContext {
 
 interface FakeSandboxOptions {
   installed?: boolean;
+  startError?: Error;
+  killGate?: Promise<void>;
   worker: (context: WorkerContext) => Promise<E2bCommandExit | undefined>;
 }
 
@@ -69,6 +71,7 @@ class FakeSandbox implements E2bSandbox {
       onStderr: (chunk: string) => void;
     },
   ): Promise<E2bCommand> {
+    if (this.options.startError) throw this.options.startError;
     this.started.push({ command, envs: options.envs });
     const input = new PassThrough();
     const exited = this.options.worker({
@@ -105,6 +108,7 @@ class FakeSandbox implements E2bSandbox {
 
   async kill(): Promise<void> {
     this.killed += 1;
+    await this.options.killGate;
   }
 }
 
@@ -462,6 +466,45 @@ describe('sandbox lifecycle', () => {
     const { stream, failures } = await relayed(subject, handle);
     await new Promise<void>((resolve) => stream.once('close', () => resolve()));
     expect(failures[0]?.message).toBe('E2B worker exited with code 127');
+  });
+
+  test('a step started while the previous sandbox is still being killed gets a new sandbox', async () => {
+    let finishKill: () => void = () => {};
+    const killGate = new Promise<void>((resolve) => {
+      finishKill = resolve;
+    });
+    const client = new FakeE2b({ worker: async () => undefined, killGate });
+    const subject = provider(client);
+    const handle = await started(subject);
+    const stopping = subject.stop(handle);
+    await subject.start(handle);
+    expect(client.sandboxes).toHaveLength(2);
+    expect(handle.running).toBe(true);
+    await relayed(subject, handle);
+    expect(client.sandboxes[0]?.started).toHaveLength(0);
+    expect(client.sandboxes[1]?.started).toHaveLength(1);
+    finishKill();
+    await stopping;
+  });
+
+  test('a worker start failure kills the sandbox and the next step creates a new one', async () => {
+    const client = new FakeE2b({
+      worker: async () => undefined,
+      startError: new Error('envd down'),
+    });
+    const subject = provider(client);
+    const handle = await started(subject);
+    await expect(
+      subject.openRelayStream(handle, {
+        token: 'a'.repeat(64),
+        signal: new AbortController().signal,
+        onFailure: () => {},
+      }),
+    ).rejects.toThrow('envd down');
+    expect(client.sandboxes[0]?.killed).toBe(1);
+    expect(handle.running).toBe(false);
+    await subject.start(handle);
+    expect(client.sandboxes).toHaveLength(2);
   });
 
   test('destroy kills the sandbox and forgets the thread', async () => {

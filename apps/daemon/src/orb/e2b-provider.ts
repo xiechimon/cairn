@@ -84,6 +84,7 @@ export class E2bOrbProvider implements OrbProvider {
   private readonly handles = new Map<string, OrbHandle>();
   private readonly pending = new Map<string, Promise<OrbHandle>>();
   private readonly live = new Map<string, LiveSandbox>();
+  private readonly leaked = new Map<string, E2bSandbox[]>();
   private readonly client: E2bClient;
   private readonly template: string;
   private readonly sessionTimeoutMs: number;
@@ -192,17 +193,23 @@ export class E2bOrbProvider implements OrbProvider {
     this.validate(handle);
     const live = this.live.get(handle.id);
     if (!live) throw new Error('E2B sandbox is not running');
-    request.signal.throwIfAborted();
-    const release = orbReleaseKeySchema.parse(handle.expectedReleaseKey);
     const stream = new E2bStdioStream();
     let stderr = '';
-    const command = await live.sandbox.start(`node ${releaseEntry(release)} orb-step --stdio`, {
-      envs: { CAIRN_ORB: '1', [ORB_RELAY_TOKEN_ENV]: request.token },
-      onStdout: (chunk) => stream.receive(chunk),
-      onStderr: (chunk) => {
-        stderr = (stderr + chunk).slice(-STDERR_TAIL_CHARS);
-      },
-    });
+    let command: E2bCommand;
+    try {
+      request.signal.throwIfAborted();
+      const release = orbReleaseKeySchema.parse(handle.expectedReleaseKey);
+      command = await live.sandbox.start(`node ${releaseEntry(release)} orb-step --stdio`, {
+        envs: { CAIRN_ORB: '1', [ORB_RELAY_TOKEN_ENV]: request.token },
+        onStdout: (chunk) => stream.receive(chunk),
+        onStderr: (chunk) => {
+          stderr = (stderr + chunk).slice(-STDERR_TAIL_CHARS);
+        },
+      });
+    } catch (error) {
+      if (this.live.get(handle.id) === live) await this.stop(handle).catch(() => {});
+      throw error;
+    }
     stream.bind(command);
     request.signal.addEventListener('abort', () => stream.destroy(), { once: true });
     void command.exited.then(async (exit) => {
@@ -254,13 +261,25 @@ export class E2bOrbProvider implements OrbProvider {
   async stop(handle: OrbHandle): Promise<void> {
     this.validate(handle);
     const live = this.live.get(handle.id);
-    if (live) {
-      await live.sandbox.kill();
-      this.live.delete(handle.id);
-    }
-    if (!handle.running) return;
+    const wasRunning = handle.running;
+    const targets = [...(live ? [live.sandbox] : []), ...(this.leaked.get(handle.id) ?? [])];
+    this.leaked.delete(handle.id);
+    this.live.delete(handle.id);
     handle.running = false;
-    handle.notes.push(orbNote('orb: stopped'));
+    const failures: unknown[] = [];
+    for (const sandbox of targets) {
+      try {
+        await sandbox.kill();
+      } catch (error) {
+        failures.push(error);
+        if (live && sandbox === live.sandbox && !this.live.has(handle.id)) {
+          this.live.set(handle.id, live);
+          handle.running = true;
+        } else this.leaked.set(handle.id, [...(this.leaked.get(handle.id) ?? []), sandbox]);
+      }
+    }
+    if (failures.length > 0) throw failures[0];
+    if (wasRunning) handle.notes.push(orbNote('orb: stopped'));
   }
 
   async destroy(handle: OrbHandle): Promise<void> {
