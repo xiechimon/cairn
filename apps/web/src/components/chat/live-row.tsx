@@ -27,7 +27,7 @@ const HEAD =
   'flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap text-ui leading-6 text-(--text-tertiary)';
 
 const HEAD_BTN =
-  "h-auto min-h-0 w-fit cursor-pointer justify-start rounded-md border-none bg-transparent px-0 py-0.5 text-left font-normal hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
+  "chat-interaction h-auto min-h-0 w-fit cursor-pointer justify-start rounded-md border-none bg-transparent px-0 py-0.5 text-left font-normal hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
 export function LivePulse({ className }: { className?: string }) {
   return (
@@ -52,6 +52,7 @@ export interface LiveRowProps {
   labelVars?: TVars;
   labelDetail?: { label: string; vars: TVars };
   quiet?: boolean;
+  waiting?: boolean;
   disclosure?: { expand: string; collapse: string } | null;
   children?: ReactNode;
 }
@@ -62,12 +63,15 @@ export function LiveRow({
   labelVars,
   labelDetail,
   quiet = false,
+  waiting = false,
   disclosure = null,
   children,
 }: LiveRowProps) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const labelCls = 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
+  const labelCls = waiting
+    ? 'chat-streaming-label truncate'
+    : 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
   const body = (
     <>
       <span
@@ -99,7 +103,7 @@ export function LiveRow({
         </Button>
       )}
       {disclosure != null && expanded && children}
-      <LivePulse className="mt-1 ml-0.5" />
+      {!waiting && <LivePulse className="mt-1 ml-0.5" />}
     </div>
   );
 }

@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
@@ -28,6 +27,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const TASK = {
   id: 't1',
@@ -231,7 +231,7 @@ async function runRecover(
   backend: AgentBackend,
   resume: { sessionId: string | null; prompt: string | null },
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-recover-degrade-'));
+  const home = testTempDir('cairn-runner-recover-degrade-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();
@@ -265,7 +265,7 @@ async function runExec(
     }) => void;
   },
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-exec-'));
+  const home = testTempDir('cairn-runner-exec-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();

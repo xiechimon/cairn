@@ -1,5 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -19,6 +18,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -192,7 +192,7 @@ function capturingBackend(captured: SessionOpts[]): AgentBackend {
 
 async function run(claimed: ClaimedStep, localConfig?: Record<string, unknown>) {
   const captured: SessionOpts[] = [];
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-mcp-'));
+  const home = testTempDir('cairn-runner-mcp-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

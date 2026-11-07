@@ -4,25 +4,39 @@ import { mockLive } from './chief-home-mock';
 const FLEET = '/app/resources/providers?scenario=providers-fleet';
 const NOW = Date.now();
 
-const scopeTabs = (page: Page) =>
-  page.getByRole('tablist', { name: '范围' }).getByRole('tab');
+const scopeSelect = (page: Page) => page.getByRole('combobox', { name: '设置作用于' });
+const pickScope = async (page: Page, text: string) => {
+  await scopeSelect(page).click();
+  await page.getByRole('option').filter({ hasText: text }).first().click();
+};
 const instance = (page: Page, id: string) =>
   page.locator(`[data-testid="provider-instance"][data-instance-id="${id}"]`);
 const editor = (page: Page) => page.getByTestId('provider-editor');
 
-test('scope tabs: team first, one tab per machine by machine name, offline and Orb marked', async ({
+test('scope menu: all machines first, one option per machine, offline and Orb marked', async ({
   page,
 }) => {
   await page.goto(FLEET);
-  await expect(scopeTabs(page)).toHaveText([
-    '团队',
+  await expect(scopeSelect(page)).toContainText('所有机器');
+  await expect(scopeSelect(page).locator('svg.lucide-server')).toBeVisible();
+  await scopeSelect(page).click();
+  await expect(page.getByRole('option')).toHaveText([
+    '所有机器',
     'xmonsMac-3574.local',
     'build-box',
     'build-box-orb · Orb',
     'old-laptop · 离线',
     'new-box',
   ]);
-  await expect(scopeTabs(page).first()).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('option').first().locator('svg.lucide-server')).toBeVisible();
+  const machineOptions = page.getByRole('option').filter({ has: page.locator('svg.lucide-monitor') });
+  await expect(machineOptions).toHaveCount(5);
+  for (const option of await machineOptions.all()) {
+    await expect(option.locator('svg.lucide-monitor')).toBeVisible();
+    expect(await option.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(scopeSelect(page)).toContainText('所有机器');
   await expect(page.getByText('DESKTOP-OLD')).toHaveCount(0);
 });
 
@@ -56,7 +70,7 @@ test('OAuth providers show no API key row; key providers show a write-only key r
   page,
 }) => {
   await page.goto(`${FLEET}&item=provider%3Aprov-copilot`);
-  await expect(editor(page)).toContainText('OAuth 登录');
+  await expect(editor(page)).toContainText('OAuth');
   await expect(editor(page).getByRole('button', { name: '更换 API key' })).toHaveCount(0);
   await page.goto(`${FLEET}&item=provider%3Aprov-anthropic`);
   await expect(editor(page)).toContainText('Anthropic Messages');
@@ -65,7 +79,7 @@ test('OAuth providers show no API key row; key providers show a write-only key r
 
 test('unknown scope and item fall back to the team tab and its first row', async ({ page }) => {
   await page.goto(`${FLEET}&scope=gone-machine&item=provider%3Agone`);
-  await expect(scopeTabs(page).first()).toHaveAttribute('aria-selected', 'true');
+  await expect(scopeSelect(page)).toContainText('所有机器');
   await expect(page.getByTestId('provider-instance').first()).toHaveAttribute(
     'aria-current',
     'true',
@@ -76,8 +90,9 @@ test('machine tab: Claude Code reports version, sign-in state and slots; runtime
   page,
 }) => {
   await page.goto(FLEET);
-  await scopeTabs(page).filter({ hasText: 'build-box-orb' }).click();
+  await pickScope(page, 'build-box-orb');
   await expect(page).toHaveURL(/scope=fleet-box-orb/);
+  await expect(scopeSelect(page).locator('svg.lucide-monitor')).toBeVisible();
   const cc = instance(page, 'claude-code');
   await expect(cc).toContainText('v2.1.316');
   await expect(cc).toContainText('未登录');
@@ -210,11 +225,11 @@ test('live: edits and runtime switches send the agreed requests', async ({ page 
     .poll(() => calls)
     .toContain('PATCH p1 {"models":[{"id":"claude-opus-5-5","name":"claude-opus-5-5"}]}');
 
-  await editor(page).getByRole('button', { name: '移除服务商' }).click();
+  await editor(page).getByRole('button', { name: '移除', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '移除', exact: true }).click();
   await expect.poll(() => calls).toContain('DELETE p1');
 
-  await scopeTabs(page).filter({ hasText: 'box' }).click();
+  await pickScope(page, 'box');
   await instance(page, 'claude-code').getByRole('switch').click();
   await expect
     .poll(() => calls)

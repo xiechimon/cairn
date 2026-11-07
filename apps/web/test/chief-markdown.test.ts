@@ -419,6 +419,15 @@ describe('mapChiefStream user-row markdown slot (#742 F-D1..D5)', () => {
     expect(users[0]?.markdown).toBe(steer);
   });
 
+  test('a composer message steered into a wake turn ends the event turn, so its answer shows', () => {
+    const items = mapChiefStream([
+      row('user-stepW', 'user', '[wake:settle] 任务 #5「修复」已合并完成', NOW),
+      row('u-steer', 'user', '顺便看下空列', NOW + 1000),
+      row('msg-r1', 'assistant', '空列没问题', NOW + 2000),
+    ]);
+    expect(robotItems(items).map((item) => item.markdown)).toEqual(['空列没问题']);
+  });
+
   test('F-D4 javascript: pseudo-links do not become mention segments (scheme whitelist, degradation negative case)', () => {
     const segs = inlineSegments('别点 [click](javascript:alert(1)) 这个');
     expect(segs.filter((s) => s.style === 'mention')).toHaveLength(0);

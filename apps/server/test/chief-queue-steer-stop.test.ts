@@ -4,10 +4,10 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   chiefMessage,
   machine as machineTable,
   provider as providerTable,
+  routingRule,
   steerPending,
   step as stepTable,
   stopPending,
@@ -15,9 +15,14 @@ import {
 } from '../src/db/schema.js';
 import { sendChiefMessage } from '../src/services/chief.js';
 import { providerHealth } from '../src/services/provider-health.js';
-import { bootServer, issueApiKey, subscriptionClaudeReport, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  seedRoute,
+  subscriptionClaudeReport,
+  type TestServer,
+} from './helpers.js';
 
-const AGENT_ID = 'agent-chief-queue';
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 
 async function call(
@@ -94,23 +99,14 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
     .set({ online: true, enabledRuntimes: ['pi'], maxConcurrent: 4 })
     .where(eq(machineTable.id, machineId))
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: 'queue-chief',
-      provider: 'relay-a',
-      modelId: 'model-a',
-      machineId,
-      fallbackModels,
-    })
-    .run();
+  seedRoute(s, 'coordinator', {
+    provider: 'relay-a',
+    modelId: 'model-a',
+    machineId,
+    fallbackModels,
+  });
   const projRes = await call(s.app, 'POST', '/api/projects', { body: { name: 'queue-proj' } });
   const projectId = ((await projRes.json()) as { id: string }).id;
-  await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: AGENT_ID } },
-  });
 
   let threadId: string | null = null;
   return {
@@ -252,7 +248,7 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     expect((await w.claim())?.instruction).toBe('第二句');
   });
 
-  test('a message typed during a wake turn waits for its own turn', async () => {
+  test('a message typed during a wake turn goes into that turn too', async () => {
     const w = await setupWorld();
     await w.send('第一句');
     const first = await w.claim();
@@ -261,9 +257,9 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
       .set({ prompt: '[wake:settle] 任务 #9 已合并完成' })
       .where(eq(stepTable.id, first!.step.id))
       .run();
-    const second = await w.send('第二句');
-    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'queued' }]);
-    expect(await w.fetchSteer(first!.step.id)).toBeNull();
+    await w.send('第二句');
+    expect((await w.thread()).pending).toEqual([]);
+    expect(await w.fetchSteer(first!.step.id)).toBe('第二句');
   });
 
   test('a message queued behind a running turn does not make the thread look queued for a machine', async () => {
@@ -282,6 +278,13 @@ describe('chief turn queue (T5): one turn per thread, oldest first', () => {
     const first = await w.send('第一句');
     await w.send('第二句');
     expect((await w.thread()).turnQueue).toMatchObject({ stepId: first });
+  });
+
+  test('a composer message sent before any turn started stays queued behind the waiting one', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const second = await w.send('第二句');
+    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'queued' }]);
   });
 
   test('sending never creates a task by itself', async () => {
@@ -631,9 +634,9 @@ describe('chief unavailable (T4)', () => {
   test('a backup model on a different backend runtime is skipped too', async () => {
     const w = await setupWorld([{ provider: 'gemini', modelId: 'gemini-pro' }]);
     w.s.db
-      .update(agentTable)
+      .update(routingRule)
       .set({ provider: 'claude-code', modelId: 'sonnet' })
-      .where(eq(agentTable.id, AGENT_ID))
+      .where(eq(routingRule.use, 'coordinator'))
       .run();
     w.s.db
       .update(machineTable)

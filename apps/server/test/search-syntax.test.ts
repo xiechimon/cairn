@@ -1,7 +1,7 @@
 import { type SearchResponse, searchResponseSchema } from '@cairn/shared';
 import type Database from 'better-sqlite3';
 import { describe, expect, test, vi } from 'vitest';
-import { agent, build, project, team, todo, tokenUsage, user } from '../src/db/schema.js';
+import { build, project, team, todo, tokenUsage, user } from '../src/db/schema.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const NOW = Date.now();
@@ -303,16 +303,13 @@ describe('search filters: cost:', () => {
 });
 
 describe('search filters: by:', () => {
-  test('matches threads started by a person or an agent by display name', async () => {
+  test('matches threads started by a person by display name', async () => {
     const { s, web } = corpus();
     s.db.insert(user).values({ id: 'u-ian', displayName: 'Ian' }).run();
-    s.db.insert(agent).values({ id: 'a-chief', teamId: s.team.id, displayName: 'Chief' }).run();
     addThread(s, web, 'by person', { createdBy: 'u-ian' });
-    addThread(s, web, 'by agent', { createdBy: 'a-chief' });
     addThread(s, web, 'by nobody');
     expect(titles(await run(s, 'by:ian'))).toEqual(['by person']);
-    expect(titles(await run(s, 'by:chief'))).toEqual(['by agent']);
-    expect(titles(await run(s, '-by:ian -by:chief project:web by'))).toEqual(['by nobody']);
+    expect(titles(await run(s, '-by:ian project:web by'))).toEqual(['by nobody']);
   });
 
   test('an unknown name is invalid with reason unknown_person', async () => {
@@ -320,13 +317,6 @@ describe('search filters: by:', () => {
     const hit = await run(s, 'by:ghost');
     expect(hit.todos).toEqual([]);
     expect(hit.filters?.[0]).toMatchObject({ valid: false, reason: 'unknown_person' });
-  });
-
-  test('an agent of another team is not a valid by: name', async () => {
-    const { s } = corpus();
-    s.db.insert(team).values({ id: 'other', name: 'Other', createdAt: 0 }).run();
-    s.db.insert(agent).values({ id: 'a-x', teamId: 'other', displayName: 'Stranger' }).run();
-    expect((await run(s, 'by:stranger')).filters?.[0]).toMatchObject({ valid: false });
   });
 });
 
@@ -352,11 +342,10 @@ describe('search syntax: combinations and legacy behaviour', () => {
     ]);
   });
 
-  test('filter queries return no projects or agents', async () => {
+  test('filter queries return no projects', async () => {
     const { s } = corpus();
     const hit = await run(s, 'project:web');
     expect(hit.projects).toEqual([]);
-    expect(hit.agents).toEqual([]);
   });
 
   test('queries with no recognised filter keep the legacy literal substring search and omit filters', async () => {
@@ -373,7 +362,7 @@ describe('search syntax: combinations and legacy behaviour', () => {
 
   test('empty query is unchanged', async () => {
     const { s } = corpus();
-    expect(await run(s, '')).toEqual({ todos: [], projects: [], agents: [] });
+    expect(await run(s, '')).toEqual({ todos: [], projects: [] });
   });
 
   test('a filter-only query never crosses teams', async () => {

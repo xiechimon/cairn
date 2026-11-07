@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { stripCodeComments as stripJsxComments } from './ui-normalize.mjs';
+import { shadowFindings } from './ui-shadow-rules.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_SRC = join(REPO_ROOT, 'apps/web/src');
@@ -228,6 +229,14 @@ for (const file of [...walk(WEB_SRC, '.tsx'), ...walk(WEB_SRC, '.ts')]) {
 for (const owner of SEGMENTED_ALLOWLIST.keys()) {
   if (!existsSync(join(WEB_SRC, owner)))
     failures.push(`G7 STALE allowlist entry ${owner}: file is gone — drop or re-point it.`);
+}
+
+for (const file of [...cssFiles, ...tsxFiles, ...walk(WEB_SRC, '.ts')]) {
+  for (const finding of shadowFindings(readFileSync(file, 'utf8'))) {
+    failures.push(
+      `G8 ${rel(file)}:${finding.line}: state shadow or box-shadow transition (${finding.text}); remove it or add deliberate-shadow with a reason on the preceding line`,
+    );
+  }
 }
 
 if (failures.length === 0) {

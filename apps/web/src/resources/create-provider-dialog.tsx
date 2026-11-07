@@ -30,7 +30,7 @@ import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
 const PICKER_ROW_CLS =
-  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border focus-visible:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
+  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
 
 const PICKER_TILE_CLS =
   'flex size-5.5 flex-none items-center justify-center rounded-(--radius-control) bg-card text-caption font-semibold text-content-secondary ring-1 ring-border';
@@ -131,6 +131,9 @@ const PRESET_LABELS: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
   'z-ai-coding-cn': 'Z.AI Coding CN',
 };
 
+const matchesQuery = (label: string, query: string) =>
+  query.trim() === '' || label.includes(query.trim().toLowerCase());
+
 const BASE_URL_PLACEHOLDER = /\{[A-Za-z_]+\}/;
 
 function connectionSummary(
@@ -176,6 +179,7 @@ interface CreateProviderDialogProps {
   onConnect?: (presetId: string) => void;
   connectPending?: boolean;
   connectError?: string | null;
+  onPickClaudeSubscription?: () => void;
 }
 
 export function CreateProviderDialog({
@@ -186,6 +190,7 @@ export function CreateProviderDialog({
   onConnect,
   connectPending,
   connectError,
+  onPickClaudeSubscription,
 }: CreateProviderDialogProps) {
   const { t } = useI18n();
   const [view, setView] = useState<'picker' | 'form'>('picker');
@@ -302,10 +307,28 @@ export function CreateProviderDialog({
           <div className="flex flex-col">
             {PRESET_GROUPS.map((group) => {
               const groupRows = rows.filter((row) => row.group === group);
-              if (groupRows.length === 0) return null;
+              const claudeRow =
+                group === '订阅登录' &&
+                onPickClaudeSubscription !== undefined &&
+                matchesQuery('claude', query);
+              if (groupRows.length === 0 && !claudeRow) return null;
               return (
                 <fieldset key={group} className={PICKER_GROUP_CLS}>
                   <legend className={PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
+                  {claudeRow && (
+                    <Button
+                      variant="ghost"
+                      data-preset-id="claude-subscription"
+                      className={PICKER_ROW_CLS}
+                      onClick={onPickClaudeSubscription}
+                    >
+                      <span aria-hidden className={PICKER_TILE_CLS}>
+                        C
+                      </span>
+                      <span className="min-w-0 truncate">Claude</span>
+                      <span className={PICKER_TAG_CLS}>{t('订阅')}</span>
+                    </Button>
+                  )}
                   {groupRows.map((row) => (
                     <Button
                       key={row.id}

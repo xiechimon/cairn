@@ -54,13 +54,13 @@ describe('parametersToShape (failure modes 2/3)', () => {
     });
   });
 
-  test('boolean/number slots (run_builds withPlan / set_wake at)', () => {
-    const builds = roundTrip(byName('run_builds').parameters);
-    const withPlan = must(
-      (builds.properties as Record<string, Record<string, unknown>>).withPlan,
-      'withPlan',
+  test('boolean/number slots (memories includeInvalid / set_wake at)', () => {
+    const threads = roundTrip(byName('memories').parameters);
+    const includeInvalid = must(
+      (threads.properties as Record<string, Record<string, unknown>>).includeInvalid,
+      'includeInvalid',
     );
-    expect(withPlan.type).toBe('boolean');
+    expect(includeInvalid.type).toBe('boolean');
     const wake = roundTrip(byName('set_wake').parameters);
     const at = must((wake.properties as Record<string, Record<string, unknown>>).at, 'at');
     expect(at.type).toBe('number');
@@ -124,7 +124,7 @@ describe('buildHostTools (failure modes 4/5/8)', () => {
 
   test('relay rejection → tool result text + isError (no throw, turn continues)', async () => {
     const tools = buildHostTools({
-      remoteTools: [byName('run_builds')],
+      remoteTools: [byName('create_todo')],
       relay: async () => {
         throw new Error('HTTP 403 not authorized');
       },
@@ -134,7 +134,7 @@ describe('buildHostTools (failure modes 4/5/8)', () => {
     const result = await first.handler({ todoIds: ['x'] }, undefined);
     expect(result.isError).toBe(true);
     expect(result.content).toEqual([
-      { type: 'text', text: 'run_builds rejected: HTTP 403 not authorized' },
+      { type: 'text', text: 'create_todo rejected: HTTP 403 not authorized' },
     ]);
   });
 

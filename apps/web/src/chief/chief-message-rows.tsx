@@ -1,4 +1,3 @@
-import type { AskUserAnswer } from '@cairn/shared';
 import { type CSSProperties, createContext, memo, type ReactNode, useContext } from 'react';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { ThreadLink } from '../board/thread-link.js';
@@ -24,8 +23,8 @@ import { Check, Copy, FileText, Restore } from '../icons/index.js';
 import { spiralAvatarUrl } from '../lib/spiral-avatar.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { ChiefDigestRow } from './chief-digest-row.js';
-import { ChiefQuestionCard } from './chief-question-card.js';
 import { ChiefReportRow } from './chief-report-row.js';
+import { QuestionAnsweredLine } from './question-answered-line.js';
 import type { ThreadActivity } from './thread-activity.js';
 import { ThreadActivityRow, ThreadEventLine } from './thread-activity-row.js';
 import { ThreadReportReply } from './thread-report-reply.js';
@@ -78,7 +77,7 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
-  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title break-words text-(--foreground)';
+  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
 const MARKER_CONTENT_CLS = 'max-w-[85%]';
@@ -231,8 +230,6 @@ interface ChiefStreamRowProps {
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
   onRewindRequest: (index: number, id: string | null) => void;
-  onAnswerQuestion?: ((input: { requestId: string; answers: AskUserAnswer[] }) => void) | undefined;
-  onCancelQuestion?: ((requestId: string) => void) | undefined;
 }
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -266,7 +263,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
 const messageToolsReveal = (latest: boolean) =>
   latest
     ? 'opacity-100'
-    : 'opacity-0 transition-opacity duration-(--dur-reveal) ease-(--ease-drawer) group-hover/message:opacity-100 group-hover/message:delay-100 focus-within:opacity-100';
+    : 'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 
 const messageToolsPlace = (side: 'left' | 'right') =>
   `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;
@@ -282,8 +279,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   toolsOpen,
   onToggleTools,
   onRewindRequest,
-  onAnswerQuestion,
-  onCancelQuestion,
 }: ChiefStreamRowProps) {
   const showElapsed = useContext(TurnElapsedContext);
   const { t } = useI18n();
@@ -407,12 +402,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ChiefQuestionCard
-              item={item}
-              numberKeys={false}
-              {...(onAnswerQuestion ? { onAnswer: onAnswerQuestion } : {})}
-              {...(onCancelQuestion ? { onCancel: onCancelQuestion } : {})}
-            />
+            <QuestionAnsweredLine item={item} />
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -444,6 +434,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               label={item.label}
               labelVars={item.labelVars}
               labelDetail={item.labelDetail}
+              waiting={item.waiting === true}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
               <div data-testid="chief-turn-tools">

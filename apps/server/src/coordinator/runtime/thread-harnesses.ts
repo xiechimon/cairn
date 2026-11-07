@@ -15,18 +15,28 @@ export function createThreadHarnesses(
   storageDir: string,
   models: Models,
   context: Context,
-  options: { extensions?: readonly Extension[]; settings?: () => HarnessSettings },
+  options: {
+    extensions?: readonly Extension[];
+    settings?: () => HarnessSettings;
+    beforeResume?: (threadId: string, harness: Harness) => Promise<void>;
+  },
 ) {
   const open = new Map<string, Promise<Harness>>();
   return {
     get(threadId: string): Promise<Harness> {
       const existing = open.get(threadId);
       if (existing !== undefined) return existing;
+      const { beforeResume, ...rest } = options;
       const opening = openCoordinatorHarness(
         threadStorePath(storageDir, threadId),
         models,
         context,
-        options,
+        {
+          ...rest,
+          ...(beforeResume === undefined
+            ? {}
+            : { beforeResume: (harness: Harness) => beforeResume(threadId, harness) }),
+        },
       );
       open.set(threadId, opening);
       opening.catch(() => open.delete(threadId));

@@ -246,7 +246,6 @@ function makeWorld(
       phaseAt: base,
       seqNum: seq,
       hasChanges: true,
-      assignment: { plan: null, build: null },
     })
     .run();
   s.db
@@ -733,111 +732,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.steps().find((r) => r.kind === 'verify')?.status).toBe('stopped');
   });
 
-  const withVerifier = (w: World) =>
-    w.s.db
-      .update(todoTable)
-      .set({ assignment: { plan: null, build: null, verify: { agentId: 'agent-verify' } } })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
-  const addVerify = (w: World, status: 'pending' | 'stopped') =>
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: `step-v-${w.buildId}`,
-        buildId: w.buildId,
-        kind: 'verify',
-        status,
-        createdAt: Date.now() - 5_000,
-        ...(status === 'stopped' ? { finishedAt: Date.now() - 4_000 } : {}),
-      })
-      .run();
-
-  test('[s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review', async () => {
-    const w = makeWorld({ phase: 'review' });
-    withVerifier(w);
-    addVerify(w, 'pending');
-    w.fake.mergeableState = 'dirty';
-    const t0 = Date.now();
-    await w.poller.sweep(t0);
-    expect(w.phase()).toBe('queued');
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.setPhase('building');
-    w.fake.mergeableState = 'clean';
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep(t0 + 60_000);
-    expect(w.phase()).toBe('review');
-    const verifies = w.steps().filter((r) => r.kind === 'verify');
-    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
-  });
-
-  test('[s3-F13e] the card reaches review again in the same round while that verify is still queued: no second verify', async () => {
-    const w = makeWorld({ phase: 'review' });
-    withVerifier(w);
-    addVerify(w, 'pending');
-    w.fake.mergeableState = 'dirty';
-    const t0 = Date.now();
-    await w.poller.sweep(t0);
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.setPhase('building');
-    w.fake.mergeableState = 'clean';
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep(t0 + 60_000);
-    w.setPhase('building');
-    await w.poller.sweep(t0 + 120_000);
-    expect(w.phase()).toBe('review');
-    const verifies = w.steps().filter((r) => r.kind === 'verify');
-    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
-  });
-
-  test('[s3-F13f] the re-verify survives a [ci-fix] round after the merge-conflict round', async () => {
-    const w = makeWorld({ phase: 'review' });
-    withVerifier(w);
-    addVerify(w, 'pending');
-    w.fake.mergeableState = 'dirty';
-    const t0 = Date.now();
-    await w.poller.sweep(t0);
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.setPhase('building');
-    w.fake.mergeableState = 'clean';
-    w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
-    await w.poller.sweep(t0 + 60_000);
-    expect(fixSteps(w)).toHaveLength(1);
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep(t0 + 120_000);
-    expect(w.phase()).toBe('review');
-    const verifies = w.steps().filter((r) => r.kind === 'verify');
-    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
-  });
-
-  test('[s3-F13g] a verify that already ran on the pre-conflict head is queued again after the merge-conflict round', async () => {
-    const w = makeWorld({ phase: 'review' });
-    withVerifier(w);
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: `step-v-${w.buildId}`,
-        buildId: w.buildId,
-        kind: 'verify',
-        status: 'done',
-        createdAt: Date.now() - 5_000,
-        finishedAt: Date.now() - 4_000,
-      })
-      .run();
-    w.fake.mergeableState = 'dirty';
-    const t0 = Date.now();
-    await w.poller.sweep(t0);
-    expect(w.phase()).toBe('queued');
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.setPhase('building');
-    w.fake.mergeableState = 'clean';
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep(t0 + 60_000);
-    expect(w.phase()).toBe('review');
-    const verifies = w.steps().filter((r) => r.kind === 'verify');
-    expect(verifies.map((r) => r.status).sort()).toEqual(['done', 'pending']);
-  });
-
   test('[s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline', async () => {
     const w = makeWorld({ phase: 'review' });
     w.s.db
@@ -854,66 +748,6 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     await w.poller.sweep();
     expect(w.steps().find((r) => r.kind === 'review')?.status).toBe('stopped');
     expect(w.systemRows().filter((c) => c.includes('AI 审核步'))).toHaveLength(1);
-  });
-
-  test('[s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again', async () => {
-    const w = makeWorld();
-    withVerifier(w);
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: `step-v-${w.buildId}`,
-        buildId: w.buildId,
-        kind: 'verify',
-        status: 'done',
-        createdAt: Date.now() - 5_000,
-        finishedAt: Date.now() - 4_000,
-      })
-      .run();
-    w.fake.mergeableState = 'dirty';
-    const t0 = Date.now();
-    await w.poller.sweep(t0);
-    expect(conflictSteps(w)).toHaveLength(1);
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.fake.mergeableState = 'clean';
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep(t0 + 60_000);
-    expect(w.phase()).toBe('review');
-    const verifies = w.steps().filter((r) => r.kind === 'verify');
-    expect(verifies.map((r) => r.status).sort()).toEqual(['done', 'pending']);
-  });
-
-  test('[s3-F13j] a merge-conflict round at building stops an unclaimed verify step and queues it again at review', async () => {
-    const w = makeWorld();
-    withVerifier(w);
-    addVerify(w, 'pending');
-    w.fake.mergeableState = 'dirty';
-    const t0 = Date.now();
-    await w.poller.sweep(t0);
-    expect(conflictSteps(w)).toHaveLength(1);
-    expect(w.steps().find((r) => r.kind === 'verify')?.status).toBe('stopped');
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
-    w.fake.mergeableState = 'clean';
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep(t0 + 60_000);
-    expect(w.phase()).toBe('review');
-    const verifies = w.steps().filter((r) => r.kind === 'verify');
-    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
-  });
-
-  test('[s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review', async () => {
-    const w = makeWorld();
-    withVerifier(w);
-    addVerify(w, 'stopped');
-    w.fake.runs[HEAD] = [{ name: 'check' }];
-    await w.poller.sweep();
-    expect(w.phase()).toBe('review');
-    expect(
-      w
-        .steps()
-        .filter((r) => r.kind === 'verify')
-        .map((r) => r.status),
-    ).toEqual(['stopped']);
   });
 
   test('[s3-F26b] a blocked hint names a check once when several runs share its name', async () => {

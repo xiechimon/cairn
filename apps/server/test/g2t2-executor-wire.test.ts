@@ -9,12 +9,11 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { agent as agentTable, apiKey as apiKeyTable, githubConnection } from '../src/db/schema.js';
+import { apiKey as apiKeyTable, githubConnection } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
 
-const AGENT_ID = 'agent-g2t2-1';
 const GH_TOKEN = 'ghp_connection_row_token_probe';
 
 async function call(
@@ -61,11 +60,7 @@ async function setupWorld(
     body: { teamId: s.team.id, name: 'g2t2-mbp', cliVersion: '0.1.0' },
   });
   const machineToken = ((await enrollRes.json()) as { token: string }).token;
-  s.db
-    .insert(agentTable)
-    .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'g2t2-builder', modelId: 'm' })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'p', modelId: 'm' });
 
   const projRes = await call(s.app, 'POST', '/api/projects', { body: projectBody });
   expect(projRes.status).toBe(201);
@@ -75,11 +70,7 @@ async function setupWorld(
   });
   const todoBody = (await todoRes.json()) as { id: string };
   const buildRes = await call(s.app, 'POST', `/api/projects/${project.id}/builds`, {
-    body: {
-      todoIds: [todoBody.id],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoBody.id] },
   });
   expect(buildRes.status).toBe(201);
   return {

@@ -21,7 +21,7 @@ import {
 } from '../src/services/needs-you.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -40,6 +40,7 @@ interface World {
 function openWorld(phase: 'building' | 'confirm' | 'review' = 'building'): World {
   const s = bootServer();
   disposables.push(() => s.dispose());
+  seedSessionRoute(s);
   const suffix = newRecordId(8);
   const projectId = `proj-${suffix}`;
   const todoId = `todo-${suffix}`;
@@ -79,7 +80,7 @@ function openWorld(phase: 'building' | 'confirm' | 'review' = 'building'): World
     .values({
       id: stepId,
       buildId,
-      kind: 'build',
+      kind: 'session',
       status: 'claimed',
       createdAt: nowMs() - 30_000,
     })
@@ -126,7 +127,7 @@ describe('needs you (#1800)', () => {
       .from(stepTable)
       .where(eq(stepTable.status, 'pending'))
       .all()
-      .find((row) => row.kind === 'build');
+      .find((row) => row.kind === 'session');
     if (retried === undefined) throw new Error('missing retry step');
     expect(retried.byPerson).toBe(false);
     setTodoPhase(w.deps, w.todoId, 'building');

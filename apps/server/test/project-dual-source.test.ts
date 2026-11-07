@@ -3,8 +3,8 @@ import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, project as projectTable } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, req, type TestServer } from './helpers.js';
+import { project as projectTable } from '../src/db/schema.js';
+import { bootServer, issueApiKey, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const s = bootServer({ claimHoldMs: 200 });
 afterAll(() => s.dispose());
@@ -179,8 +179,6 @@ describe('PATCH /api/projects/{id} -- the localPath accelerator write surface (#
   });
 });
 
-const AGENT_ID = 'agent-dual-1';
-
 const claimDisposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of claimDisposables) d();
@@ -211,11 +209,7 @@ async function claimGithubProject(s2: TestServer, localPath: string | null): Pro
     body: { teamId: s2.team.id, name: 'dual-src-mbp', cliVersion: '0.1.0' },
   });
   const machineToken = ((await enrollRes.json()) as { token: string }).token;
-  s2.db
-    .insert(agentTable)
-    .values({ id: AGENT_ID, teamId: s2.team.id, displayName: 'dual-builder', modelId: 'm' })
-    .run();
-  bindAllAgents(s2);
+  seedSessionRoute(s2, { provider: 'p', modelId: 'm' });
   const projBody: Record<string, unknown> = {
     name: 'dual-claim',
     kind: 'github',
@@ -230,11 +224,7 @@ async function claimGithubProject(s2: TestServer, localPath: string | null): Pro
   });
   const todo = (await todoRes.json()) as { id: string };
   const buildRes = await call(s2.app, 'POST', `/api/projects/${project.id}/builds`, {
-    body: {
-      todoIds: [todo.id],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false,
-    },
+    body: { todoIds: [todo.id] },
   });
   expect(buildRes.status).toBe(201);
   const claimRes = await call(s2.app, 'POST', '/api/machine/tasks/claim', {

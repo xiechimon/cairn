@@ -1,6 +1,6 @@
 import {
-  type AskUserAnswer,
   CHIEF_INPUT_PLACEHOLDER,
+  CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
 } from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
@@ -23,6 +23,7 @@ import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { machineSecondary } from '../components/machine-label.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -74,15 +75,17 @@ import {
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
+import { awaitingStream } from './question-lifecycle.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
-const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
-const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
-const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5';
+const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
+const SCROLLER_CONTENT_CLS = 'block min-w-0 max-w-full gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
+const SCROLLER_CONTENT_HOME_CLS =
+  'mx-auto block w-full max-w-190 min-w-0 gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
 
 const THREAD_COMPOSER = 'thread';
 
@@ -134,8 +137,6 @@ export interface ChiefConversationProps {
   onClose?: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
@@ -154,6 +155,7 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  tray?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -166,8 +168,6 @@ export function ChiefConversation({
   onClose,
   onSend,
   onRewind,
-  onAnswerQuestion,
-  onCancelQuestion,
   onWithdraw,
   onSteer,
   onStop,
@@ -186,6 +186,7 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  tray,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
@@ -196,13 +197,16 @@ export function ChiefConversation({
     targetPlaceholder ??
     (chief.outage != null
       ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-      : chief.running === true
-        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+      : chief.waitingTurn !== undefined
+        ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+        : chief.running === true
+          ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+          : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
-  const answerActive = answerHere && answerKey !== null;
+  const [threadOverride, setThreadOverride] = useState(false);
+  const answerActive = answerHere && answerKey !== null && !threadOverride;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -230,7 +234,11 @@ export function ChiefConversation({
       label: s.name,
       subtitle: s.description ?? undefined,
     })),
-    machine: (machinesQ.data ?? []).map((m) => ({ id: m.id, label: m.name })),
+    machine: (machinesQ.data ?? []).map((m) => ({
+      id: m.id,
+      label: m.name,
+      subtitle: machineSecondary(m, machinesQ.data ?? []) ?? undefined,
+    })),
   };
   const projectOptions = useMemo(
     () =>
@@ -313,16 +321,34 @@ export function ChiefConversation({
     focusedComposerRef.current = null;
   }, []);
   const shownComposerRef = useRef(activeComposer);
+  const threadFocusPendingRef = useRef(false);
   useLayoutEffect(() => {
     const previous = shownComposerRef.current;
     shownComposerRef.current = activeComposer;
+    if (activeComposer === THREAD_COMPOSER && threadFocusPendingRef.current) {
+      threadFocusPendingRef.current = false;
+      surfaceRef.current?.focus({ preventScroll: true });
+      return;
+    }
     if (previous === activeComposer || focusedComposerRef.current !== previous) return;
     const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
     incoming.current?.focus({ preventScroll: true });
   }, [activeComposer]);
+  const restoreToThread = (update: (current: string) => string) => {
+    setThreadOverride(true);
+    setLiveDraft(update);
+    if (shownComposerRef.current === THREAD_COMPOSER)
+      surfaceRef.current?.focus({ preventScroll: true });
+    else threadFocusPendingRef.current = true;
+  };
   const composerBinding = serverDraftBinding(
     onSend != null ? liveDraft : (chief.draft ?? ''),
-    onSend != null ? setLiveDraft : undefined,
+    onSend != null
+      ? (value: string) => {
+          setLiveDraft(value);
+          if (value === '') setThreadOverride(false);
+        }
+      : undefined,
   );
   const sendFromComposer =
     onSend == null
@@ -344,8 +370,7 @@ export function ChiefConversation({
   const prefillText = prefill?.text;
   useEffect(() => {
     if (prefillKey == null || prefillText == null) return;
-    setLiveDraft(prefillText);
-    surfaceRef.current?.focus({ preventScroll: true });
+    restoreToThread(() => prefillText);
   }, [prefillKey, prefillText]);
   const home = variant !== 'drawer';
   const ownHeader = variant !== 'global';
@@ -372,8 +397,9 @@ export function ChiefConversation({
       : undefined;
   const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed =
-    turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
+  const turnElapsed = questionAttached
+    ? null
+    : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -381,8 +407,7 @@ export function ChiefConversation({
           onWithdraw(messageId).then(
             () => {
               followSentRef.current = false;
-              setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
-              surfaceRef.current?.focus({ preventScroll: true });
+              restoreToThread((cur) => (cur === '' ? text : `${cur}\n${text}`));
             },
             () => {},
           );
@@ -393,7 +418,10 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
+    item,
+    i,
+  }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
   const latestMessage = rows.findLast(
     ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
@@ -492,8 +520,6 @@ export function ChiefConversation({
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
-      onAnswerQuestion={onAnswerQuestion}
-      onCancelQuestion={onCancelQuestion}
     />
   );
   const keepsOwnRow = (item: ChiefStreamItem) =>
@@ -636,7 +662,7 @@ export function ChiefConversation({
         <div
           ref={heroScrollRef}
           data-testid="chief-home-scroll"
-          className="scroll-fade min-h-0 flex-1 overflow-y-auto pb-6"
+          className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
           {hero}
           {intro}
@@ -698,7 +724,8 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} bound={answerHere} />
+        {tray}
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
         {composerReplacement ?? (
           <>
             {composerError != null && (

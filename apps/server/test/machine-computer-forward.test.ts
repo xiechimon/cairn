@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { computerMachineName as daemonComputerMachineName } from '../../daemon/src/orb/computer.js';
 import {
-  agent as agentTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   computerCall as computerCallTable,
@@ -27,7 +26,7 @@ import {
   stopStepComputer,
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -103,24 +102,7 @@ function boot(): { s: TestServer; deps: MachineDeps; chiefId: string } {
   const s = bootServer();
   server = s;
   addMachine(s, 'sidecar', {});
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-forward',
-      teamId: s.team.id,
-      displayName: 'Coordinator',
-      machineId: 'sidecar',
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId: 'sidecar' });
   const chiefId = `chief-${s.svc.user.id}-${s.team.id}`;
   s.db
     .insert(chiefTable)
@@ -128,11 +110,10 @@ function boot(): { s: TestServer; deps: MachineDeps; chiefId: string } {
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      agentId: 'agent-forward',
       charter: '',
       createdAt: 1,
     })
-    .onConflictDoUpdate({ target: chiefTable.id, set: { agentId: 'agent-forward' } })
+    .onConflictDoNothing()
     .run();
   s.db
     .insert(chiefThreadTable)

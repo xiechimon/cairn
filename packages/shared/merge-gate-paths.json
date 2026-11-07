@@ -45,6 +45,7 @@
     "apps/server/src/services/api-keys.ts",
     "apps/server/src/services/oauth.ts",
     "apps/server/src/coordinator/credentials.ts",
+    "apps/server/src/coordinator/codex-login.ts",
     "apps/server/src/routes-machine.ts",
     "apps/server/src/services/machine*.ts",
     "apps/daemon/src/credentials.ts",
@@ -73,6 +74,7 @@
       "apps/server/src/services/api-keys.ts",
       "apps/server/src/services/oauth.ts",
       "apps/server/src/coordinator/credentials.ts",
+      "apps/server/src/coordinator/codex-login.ts",
       "apps/daemon/src/credentials.ts",
       "apps/daemon/src/secret-channel.ts",
       "apps/daemon/src/machine-client.ts"

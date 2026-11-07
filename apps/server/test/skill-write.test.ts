@@ -10,13 +10,20 @@ import {
   machineSkillsManifestResponseSchema,
   skillRecordSchema,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { agent as agentTable, skillAudit } from '../src/db/schema.js';
+import { skillAudit } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedPolicy,
+  seedRoute,
+  seedSessionRoute,
+} from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
@@ -427,8 +434,6 @@ describe('the REST write surface (POST /api/skills + PUT teams/{id}/skills/{sid}
   });
 });
 
-const WORKER_AGENT_ID = 'agent-skill-writer';
-
 describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})', () => {
   async function workerWorld(opts: { tools: string[] }) {
     const skillsDir = makeRoot();
@@ -439,20 +444,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
       body: { teamId: s.team.id, name: 'skill-write', cliVersion: '0.1.0' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({
-        id: WORKER_AGENT_ID,
-        teamId: s.team.id,
-        displayName: '写技能的',
-        provider: 'p',
-        modelId: 'm',
-        tools: opts.tools,
-        defaultSkill: null,
-        skillsAllowlist: null,
-      })
-      .run();
-    bindAllAgents(s);
+    const routeId = seedSessionRoute(s, { provider: 'p', modelId: 'm', tools: opts.tools });
 
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -460,11 +452,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
     });
     const { id: todoId } = (await todoRes.json()) as { id: string };
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: null, build: { agentId: WORKER_AGENT_ID } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoId] },
     });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
@@ -472,7 +460,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
     });
     const { step } = (await claimRes.json()) as { step: ClaimedStep | null };
     if (!step) throw new Error('no step claimed');
-    return { s, skillsDir, token, step };
+    return { s, skillsDir, token, step, routeId };
   }
 
   const relay = (app: Hono, token: string, stepId: string, body: unknown) =>
@@ -491,7 +479,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
     }
   });
 
-  test('R2: without the create-skill toggle -> 403 with the toggle named (the Agent detail page permissions tab)', async () => {
+  test('R2: without the create-skill toggle -> 403 with the toggle named (the work policy tools)', async () => {
     const { s, token, step } = await workerWorld({ tools: [] });
     try {
       const res = await relay(s.app, token, step.step.id, createBody('denied', '无权'));
@@ -505,7 +493,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
   });
 
   test('R3: with the create_skill toggle -> 200 written to disk + an audit row', async () => {
-    const { s, skillsDir, token, step } = await workerWorld({
+    const { s, skillsDir, token, step, routeId } = await workerWorld({
       tools: [AGENT_TOOL_SKILL_CREATE],
     });
     try {
@@ -519,7 +507,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
       expect(rows[0]).toMatchObject({
         skillId: 'by-agent',
         actorType: 'agent',
-        actorId: WORKER_AGENT_ID,
+        actorId: routeId,
         action: 'create',
       });
     } finally {
@@ -528,7 +516,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
   });
 
   test('R4: update_skill follows the same rule -- without update-skill -> 403; with it -> 200 written to disk + audited', async () => {
-    const { s, skillsDir, token, step } = await workerWorld({ tools: [] });
+    const { s, skillsDir, token, step, routeId } = await workerWorld({ tools: [] });
     try {
       mkdirSync(join(skillsDir, 'seeded'));
       writeFileSync(join(skillsDir, 'seeded', 'SKILL.md'), skillMd('seeded', '旧'));
@@ -541,11 +529,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
       });
       expect(denied.status).toBe(403);
       expect(await errorText(denied)).toContain(AGENT_TOOL_SKILL_UPDATE);
-      s.db
-        .update(agentTable)
-        .set({ tools: [AGENT_TOOL_SKILL_UPDATE] })
-        .where(eq(agentTable.id, WORKER_AGENT_ID))
-        .run();
+      seedPolicy(s, 'session', { tools: [AGENT_TOOL_SKILL_UPDATE] });
       const ok = await call(s.app, 'POST', `/api/machine/tool/${step.step.id}`, {
         cred: token,
         body: {
@@ -560,7 +544,7 @@ describe('the worker relay skill-write verbs (POST /api/machine/tool/{stepId})',
       expect(rows[0]).toMatchObject({
         skillId: 'seeded',
         actorType: 'agent',
-        actorId: WORKER_AGENT_ID,
+        actorId: routeId,
         action: 'update',
       });
     } finally {
@@ -575,19 +559,6 @@ describe('the chief relay skill-write verbs (no toggle, actor = the bound agent)
   function setup() {
     const skillsDir = makeRoot();
     const s = bootServer({ skillsDir });
-    s.db
-      .insert(agentTable)
-      .values({
-        id: CHIEF_AGENT_ID,
-        teamId: s.team.id,
-        displayName: '总管绑定',
-        provider: 'p',
-        modelId: 'm',
-        tools: [],
-        defaultSkill: null,
-        skillsAllowlist: null,
-      })
-      .run();
     const ctx: ChiefToolCtx = {
       teamId: s.team.id,
       userId: s.user.id,
@@ -701,31 +672,19 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
       body: { teamId: s.team.id, name: 'skill-pkg', cliVersion: '0.1.0' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({
-        id: WORKER_AGENT_ID,
-        teamId: s.team.id,
-        displayName: '领技能包的',
-        provider: 'p',
-        modelId: 'm',
-        tools: [],
-        defaultSkill: opts.defaultSkill ?? null,
-        skillsAllowlist: opts.skillsAllowlist ?? null,
-      })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, {
+      provider: 'p',
+      modelId: 'm',
+      defaultSkill: opts.defaultSkill ?? null,
+      skillsAllowlist: opts.skillsAllowlist ?? null,
+    });
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: '', spec: '干活\n\n现在的情况：没技能' },
     });
     const { id: todoId } = (await todoRes.json()) as { id: string };
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: null, build: { agentId: WORKER_AGENT_ID } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoId] },
     });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
@@ -781,7 +740,6 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
         body: { teamId: s.team.id, name: 'other-machine', cliVersion: '0.1.0' },
       });
 
-      bindAllAgents(s);
       const { token: token2 } = (await enroll2.json()) as { token: string };
       const notYours = await pkg(s.app, token2, step.step.id);
       expect(notYours.status).toBe(404);
@@ -859,24 +817,7 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
       body: { teamId: s.team.id, name: 'chief-pkg', cliVersion: '0.1.0' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({
-        id: WORKER_AGENT_ID,
-        teamId: s.team.id,
-        displayName: '总管',
-        provider: 'p',
-        modelId: 'stub-model',
-        tools: [],
-        defaultSkill: null,
-        skillsAllowlist: null,
-      })
-      .run();
-    bindAllAgents(s);
-
-    await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {
-      body: { agent: { agentId: WORKER_AGENT_ID, thinkingLevel: null } },
-    });
+    seedRoute(s, 'coordinator', { provider: 'p', modelId: 'stub-model' });
     await call(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
       body: { content: '整理一下团队技能。' },
     });

@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
@@ -8,9 +7,10 @@ import {
   collectVisibleSkillNames,
   piWorktreeSkillDirs,
 } from '../src/backend/skills.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-skills-wt-${tag}-`));
+  return testTempDir(`cairn-skills-wt-${tag}-`);
 }
 
 function writeSkill(

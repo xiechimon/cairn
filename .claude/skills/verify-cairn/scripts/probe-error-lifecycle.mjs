@@ -146,8 +146,7 @@ try {
   });
   check('provider created', prov.status === 201 || prov.status === 200, `status=${prov.status}`);
   const providerRecordId = prov.body?.id;
-  const agent = await jreq('POST', `/api/teams/${teamId}/agents`, {
-    displayName: 'verify-708-builder',
+  const agent = await jreq('PATCH', `/api/teams/${teamId}/routing-rules/session`, {
     provider: providerId,
     modelId: 'stub-model',
   });
@@ -165,7 +164,6 @@ try {
     const todoId = t.body?.id;
     const b = await jreq('POST', `/api/projects/${projectId}/builds`, {
       todoIds: [todoId],
-      assignment: { plan: { agentId }, build: { agentId } },
       withPlan: true,
     });
     return { todoId, buildId: b.body?.builds?.[0]?.id, startedAt: Date.now() };

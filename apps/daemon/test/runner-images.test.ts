@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -17,6 +15,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 
@@ -167,7 +166,7 @@ function claimed(spec: string, opts: { kind?: 'build' | 'chief' } = {}): Claimed
 }
 
 async function setup(claim: ClaimedStep, client: FakeClient) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-img-'));
+  const home = testTempDir('cairn-runner-img-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const journal = new StepJournal(paths.outboxDir);

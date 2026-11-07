@@ -423,7 +423,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .chat-row-icons .chat-copy {
-    transition: opacity var(--dur-fast) var(--ease-standard);
+    transition-duration: 0s;
   }
   [data-slot="message-scroller-item"]:not(:hover, :focus-within) .chat-row-icons .chat-copy {
     opacity: 0;
@@ -469,4 +469,23 @@
 
 svg.lucide {
   stroke-width: 1.75;
+}
+
+:is([data-slot="message-scroller"], [data-trace-card], [data-slot="trace"], .chat-interactions)
+  :is(button, a, [role="button"]),
+.chat-interaction {
+  box-shadow: none;
+  transition-duration: 0s;
+}
+
+:is([data-slot="message-scroller"], [data-slot="trace"], .chat-interactions)
+  [data-slot="trace-line"] {
+  transition-duration: 0s;
+}
+
+html:has([data-testid="chief-body"]),
+body:has([data-testid="chief-body"]),
+#root:has([data-testid="chief-body"]),
+#root :has([data-testid="chief-body"]) {
+  overscroll-behavior: none;
 }

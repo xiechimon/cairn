@@ -206,7 +206,7 @@ test('a project chat links to that project home, files and settings', async ({ p
   await expect(page.getByTestId('home-c-project-links')).toHaveCount(0);
 });
 
-test('the home lands at the newest message, with the greeting and the pinned decision above it', async ({
+test('the home lands at the newest message, with the needs-you tray pinned above the composer', async ({
   page,
 }) => {
   await page.goto(home('home-c'));
@@ -215,7 +215,6 @@ test('the home lands at the newest message, with the greeting and the pinned dec
   await page.getByTestId('home-c').getByTestId('chief-body').evaluate((node) => {
     node.scrollTop = 0;
   });
-  await expect(page.getByTestId('home-c').getByRole('heading', { level: 2 }).first()).toBeInViewport();
   await expect(needsYou(page).getByRole('heading', { name: 'Needs you' })).toBeInViewport();
   await expect(needsYou(page).locator('[data-slot="needs-you-item"]').first()).toBeInViewport();
 });

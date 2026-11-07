@@ -10,7 +10,6 @@ import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { provider as providerTable, tokenUsage } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -57,11 +56,11 @@ beforeAll(async () => {
       toolCall: {
         name: 'bash',
         arguments: {
-          command: `cat > plan.md <<'EOF'\n# 方案\nKind: fix\n\nContext: 探针任务。\nChanges: 在 README.md 追加一行 policy probe。\nEdge cases: 无。\nVerification: 读回 README.md。\nEOF`,
+          command: 'printf "policy probe\\n" >> README.md',
         },
       },
     },
-    { content: '方案已就绪：Context / Changes / Edge cases / Verification 四段完整。' },
+    { content: '修改已完成：README.md 末行为 policy probe。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
   server.db
@@ -117,13 +116,11 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     );
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
     await waitFor(() => logLines().some((l) => l.includes('finished (0 running)')), 30_000);
     const lines = logLines();
 

@@ -51,6 +51,12 @@ export const CAIRN_ATTR = {
   rawStopReason: 'cairn.raw_stop_reason',
   threadId: 'cairn.thread_id',
   chiefTrigger: 'cairn.chief_trigger',
+  routeHarness: 'cairn.route.harness',
+  routeProvider: 'cairn.route.provider',
+  routeModel: 'cairn.route.model',
+  routeDifficulty: 'cairn.route.difficulty',
+  routeReason: 'cairn.route.reason',
+  routeRejected: 'cairn.route.rejected',
 } as const;
 
 export function otelErrorMessage(reason: string | null | undefined): string | undefined {
@@ -227,6 +233,14 @@ export function stepAttributes(step: {
   stepId: string;
   kind: string;
   checkpointCommit: string | null;
+  route?: {
+    harness: string | null;
+    provider: string | null;
+    modelId: string | null;
+    difficulty: string;
+    reason: string;
+    rejected: readonly unknown[];
+  } | null;
 }): Attributes {
   return compact({
     [CAIRN_ATTR.buildId]: step.buildId,
@@ -240,6 +254,15 @@ export function stepAttributes(step: {
     [CAIRN_ATTR.stepId]: step.stepId,
     [CAIRN_ATTR.stepKind]: step.kind,
     [CAIRN_ATTR.checkpointCommit]: step.checkpointCommit,
+    [CAIRN_ATTR.routeHarness]: step.route?.harness,
+    [CAIRN_ATTR.routeProvider]: step.route?.provider,
+    [CAIRN_ATTR.routeModel]: step.route?.modelId,
+    [CAIRN_ATTR.routeDifficulty]: step.route?.difficulty,
+    [CAIRN_ATTR.routeReason]: step.route?.reason,
+    [CAIRN_ATTR.routeRejected]:
+      step.route === undefined || step.route === null
+        ? undefined
+        : JSON.stringify(step.route.rejected),
   });
 }
 

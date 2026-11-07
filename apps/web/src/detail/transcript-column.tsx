@@ -14,9 +14,10 @@ import { openingAnchor } from './scroll-anchor.js';
 import { SpecBlock } from './spec-block.js';
 import { type LiveStep, Transcript } from './transcript.js';
 
-const ROOT_CLS = 'h-auto min-h-0 flex-1';
+const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const VIEWPORT_CLS = 'chat-col pt-5 pr-4 pb-(--chat-extra-space) pl-5';
-const CONTENT_CLS = 'mx-auto block w-full max-w-(--chat-max-w) gap-0';
+const CONTENT_CLS =
+  'mx-auto block w-full max-w-(--chat-max-w) min-w-0 gap-0 [overflow-wrap:anywhere]';
 
 export interface TranscriptColumnHandle {
   scrollToEnd: () => void;

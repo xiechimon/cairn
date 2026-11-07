@@ -303,7 +303,8 @@ export function isImageAttachmentKey(key: string): boolean {
 
 export const SPEC_CHIP =
   'inline-flex max-w-full items-center rounded-(--cds-radius-md) border border-(--border) bg-(--muted) px-2 py-1 text-meta text-(--text-secondary) no-underline transition-[color,border-color] duration-(--dur-fast) ease-(--ease-standard) hover:border-(--input) hover:text-(--foreground)';
-export const SPEC_CHIP_IMAGE = 'border-none bg-transparent p-0.5 hover:bg-transparent';
+export const SPEC_CHIP_IMAGE =
+  'border-none bg-transparent p-0.5 hover:bg-transparent dark:hover:bg-transparent';
 export const SPEC_CHIP_IMG = 'block max-h-40 max-w-full rounded-(--cds-radius-sm)';
 
 export const COMPOSER_CHIP_LABEL = 'block min-w-0 max-w-65 truncate';
@@ -522,7 +523,7 @@ export function ChatMarkdown({
             return (
               <pre
                 key={i}
-                className="chat-md-code my-2 max-h-80 overflow-auto rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+                className="chat-md-code my-2 max-h-80 min-w-0 max-w-full overflow-auto overscroll-contain rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-code whitespace-pre text-(--foreground)"
                 data-lang={block.lang ?? ''}
                 data-testid="md-code"
               >

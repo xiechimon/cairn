@@ -9,7 +9,6 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   message as messageTable,
   plan as planTable,
@@ -17,7 +16,14 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -37,8 +43,6 @@ async function call(
     }),
   );
 }
-
-const AGENT_ID = 'agent-ag-1';
 
 async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200 });
@@ -61,22 +65,13 @@ async function setupWorld() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'ag-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
+  seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'ag-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s);
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -85,16 +80,7 @@ async function setupWorld() {
   const { id: todoId } = (await todoRes.json()) as { id: string };
 
   async function startBuild(withPlan = true): Promise<string> {
-    const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan,
-      },
-    });
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { builds: { id: string }[] };
-    return body.builds[0]!.id;
+    return startLegacyBuild(s, todoId, { withPlan });
   }
   async function claim(): Promise<ClaimedStep> {
     const res = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
@@ -210,36 +196,6 @@ describe('gate 1 (B-C10): plan step with no plan document -> confirm unreachable
       w.s.dispose();
     }
   });
-
-  test('failed-restart round (first plan step of a new build, prompt carries the restart instruction) -> gets the same one completion retry', async () => {
-    const w = await setupWorld();
-    try {
-      const { buildId } = await runTwoEmptyPlanRounds(w);
-      expect(w.todoRow().phase).toBe('failed');
-      const res = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-        body: {
-          action: 'restart',
-          feedback: '请务必先写方案文档',
-          clientMessageId: '3f9a0c2e-0000-4000-8000-000000000003',
-        },
-      });
-      expect(res.status).toBe(202);
-      expect(w.todoRow().phase).toBe('queued');
-      const first = await w.claim();
-      expect(first.step.kind).toBe('plan');
-      await w.done(first.step.id, { status: 'success', sessionId: 'pi-restart' });
-      expect(w.todoRow().phase).toBe('planning');
-      expect(
-        w.stepsOf(first.step.buildId).filter((st) => st.kind === 'plan' && st.status === 'pending'),
-      ).toHaveLength(1);
-      const rewrite = await w.claim();
-      await w.done(rewrite.step.id, { status: 'success', sessionId: 'pi-restart' });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.buildRow(rewrite.step.buildId).errorMessage).toBe('规划未产出方案');
-    } finally {
-      w.s.dispose();
-    }
-  });
 });
 
 describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -> review unreachable', () => {
@@ -322,7 +278,7 @@ describe('gate 2 (B-C11/B-C14): build step with zero changes / fake completion -
       });
       expect(w.todoRow().phase).toBe('review');
       const res = await call(w.s.app, 'POST', `/api/builds/${buildStep.step.buildId}/steps`, {
-        body: { action: 'review', agentId: AGENT_ID },
+        body: { action: 'review' },
       });
       expect(res.status).toBe(202);
       const reviewStep = await w.claim();

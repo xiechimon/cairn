@@ -12,6 +12,7 @@ import {
   chiefDigestThreadId,
   ISSUE_FENCE_OPEN,
   isChiefDigestThreadId,
+  shortEvent,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import {
@@ -32,7 +33,7 @@ import {
 } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { agent, chief, chiefMessage, chiefThread, step } from '../db/schema.js';
+import { chief, chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { chiefToolDefHashes, extractText } from './chief.js';
@@ -53,7 +54,15 @@ import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { listMemoryEntries, saveMemoryEntry } from './memory.js';
+import {
+  applyMemoryPass,
+  MEMORY_PASS_MARK,
+  memoryPassDue,
+  memoryPassSection,
+  withMemoryPass,
+} from './memory-consolidation.js';
 import type { VapidKeys } from './push.js';
+import { coordinatorProfile } from './routing-rules.js';
 import { serverTimezone } from './schedules.js';
 
 export const CHIEF_DIGEST_THRESHOLD_CHARS = 40_000;
@@ -96,8 +105,6 @@ export interface DigestDeps {
 }
 
 type ThreadRow = typeof chiefThread.$inferSelect;
-
-const WAKE_MARKER_RE = /^\[wake:\w+\]\s*/;
 
 const DIGEST_PROMPT_HEAD = [
   '请把下面这段 Coordinator 和用户的对话整理成摘要。只输出一个 ```json 代码块，格式：',
@@ -253,8 +260,8 @@ export function chiefTranscriptLines(rows: readonly ChiefMessageRow[]): Coordina
     }
     if (row.role === 'assistant') push(`Coordinator：${text}`);
     if (row.role !== 'user') continue;
-    const wake = WAKE_MARKER_RE.exec(text);
-    if (wake) push(`系统通知：${text.slice(wake[0].length)}`);
+    const event = shortEvent(text, row.id);
+    if (event !== null) push(`系统通知：${event}`);
     else if (!row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) || !postedTexts.has(text))
       push(`用户：${text}`);
   }
@@ -268,11 +275,16 @@ function digestMeta(threadId: string, last: CoordinatorLine, reason: FoldCandida
 export function queueDigestStep(
   deps: DigestDeps,
   chiefRow: typeof chief.$inferSelect,
-  prompt: string,
+  basePrompt: string,
   now: number,
 ): string {
   const { db } = deps;
   const digestThreadId = chiefDigestThreadId(chiefRow.id);
+  const agentId = coordinatorProfile(db, chiefRow.teamId)?.id;
+  const prompt =
+    agentId !== undefined && memoryPassDue(db, chiefRow.id, chiefRow.teamId, agentId, now)
+      ? withMemoryPass(basePrompt, memoryPassSection(db, chiefRow.id, chiefRow.teamId, agentId))
+      : basePrompt;
   db.insert(chiefThread)
     .values({
       id: digestThreadId,
@@ -421,8 +433,7 @@ function queueReport(
 export function planChiefDigests(deps: DigestDeps, now: number): void {
   const { db } = deps;
   for (const chiefRow of db.select().from(chief).all()) {
-    if (chiefRow.agentId === null) continue;
-    if (!db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()?.modelId) continue;
+    if (!coordinatorProfile(db, chiefRow.teamId)?.modelId) continue;
     const digestThreadId = chiefDigestThreadId(chiefRow.id);
     const lastRun = db
       .select()
@@ -596,12 +607,27 @@ export function finishChiefDigest(
     if (report !== undefined) settleReportRun(deps, report, retroFound, now, effects);
   });
   for (const effect of effects) effect();
+  if (succeeded && prompt.includes(MEMORY_PASS_MARK)) {
+    const owner = db
+      .select({ teamId: chiefThread.teamId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, stepRow.buildId))
+      .get();
+    const agentId = owner === undefined ? undefined : coordinatorProfile(db, owner.teamId)?.id;
+    const memory =
+      parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as { memory?: unknown }).memory
+        : undefined;
+    if (owner !== undefined && agentId !== undefined && memory !== undefined) {
+      applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
+    }
+  }
   if (!ok) return;
   const until = Number(meta[2]);
   const rememberAs =
     prompt.includes(ISSUE_FENCE_OPEN) || prompt.includes(THREAD_FENCE_OPEN)
       ? null
-      : chiefRow.agentId;
+      : (coordinatorProfile(db, chiefRow.teamId)?.id ?? null);
   const content: ChiefDigestContent = {
     kind: CHIEF_DIGEST_KIND,
     reason: meta[4] === 'daily' ? 'daily' : 'threshold',

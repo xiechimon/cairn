@@ -11,7 +11,6 @@ import type {
   SecretRecord,
   SkillRecord,
   StepActivity,
-  TeamMember,
   TokenUsage,
   ToolCallRecord,
   UsageCost,
@@ -73,8 +72,6 @@ import type {
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
-  TeamAgentCard,
-  TeamContent,
   TokenUsageContent,
   TranscriptItem,
   UsageCostContent,
@@ -176,7 +173,6 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
 }
 
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
-  const agentId = w.assignment?.build?.agentId ?? w.assignment?.plan?.agentId ?? null;
   return {
     id: w.id,
     teamId: w.teamId,
@@ -191,8 +187,8 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,
-    assignment: agentId !== null ? { agentId } : null,
-    agent: w.agent,
+    assignment: null,
+    agent: null,
     latestBuildId: w.latestBuildId,
     lastRunAt: w.lastRunAt,
     hasChanges: w.hasChanges,
@@ -1137,7 +1133,7 @@ export function mapRunHistory(
     const b = byId.get(entry.buildId);
     const isCurrent = todo.latestBuildId === entry.buildId;
     const failed = b?.errorMessage != null && b.errorMessage !== '';
-    const parts = [relativeTime(entry.createdAt, now)];
+    const parts = [relativeTime(entry.createdAt, now)].filter((part) => part !== '');
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
     if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? ''));
@@ -1165,31 +1161,6 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     pausedReason: r.pausedReason,
     todo: r.todo,
   }));
-}
-
-export function mapTeam(members: TeamMember[]): TeamContent {
-  const agents = members.filter((m) => m.memberType === 'agent');
-  const cards: TeamAgentCard[] = agents.map((m) => {
-    const a = m.actor as {
-      displayName?: string;
-      avatarUrl?: string | null;
-      modelId?: string | null;
-      description?: string | null;
-      provider?: string | null;
-      machineId?: string | null;
-    };
-    return {
-      id: m.actorId,
-      displayName: a.displayName ?? '',
-      avatarUrl: a.avatarUrl ?? null,
-      model: a.modelId ?? '',
-      isDefault: Boolean(a.modelId),
-      role: a.description ?? null,
-      provider: a.provider ?? null,
-      machineId: a.machineId ?? null,
-    };
-  });
-  return { members: members.length, agents: cards };
 }
 
 export function mapApiKeys(rows: ApiKeyRow[]): DisplayApiKey[] {
@@ -1415,6 +1386,7 @@ function collectChiefStream(
       }
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
+    if (m.role === 'user' && pendingState === undefined) eventTurn = false;
     if (pendingState !== undefined) {
       const text = textOfContent(m.content).trim();
       pendingById.set(m.id, {
@@ -1636,11 +1608,6 @@ export function mapChief(
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
-        const asked = collected?.items.find(
-          (item) => item.kind === 'user' && item.id !== undefined && item.id === turnQueue.stepId,
-        );
-        if (asked?.kind === 'user' && asked.id !== undefined)
-          waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
         const queued = connectingLine(turnQueue);
         chiefStream.push({
           kind: 'streaming',
@@ -1660,6 +1627,15 @@ export function mapChief(
         });
       }
     }
+  }
+  const waitingQueue =
+    running && collected?.eventTurn !== true ? (active?.turnQueue ?? null) : null;
+  if (waitingQueue != null) {
+    const asked = collected?.items.find(
+      (item) => item.kind === 'user' && item.id !== undefined && item.id === waitingQueue.stepId,
+    );
+    if (asked?.kind === 'user' && asked.id !== undefined)
+      waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
   }
   chiefStream.push(...(collected?.pending ?? []));
   return {

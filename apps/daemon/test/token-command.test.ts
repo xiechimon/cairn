@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -9,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { runTokenCommand } from '../src/token-command.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const homes: string[] = [];
 afterEach(() => {
@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 function scratchHome(): string {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-token-cmd-'));
+  const home = testTempDir('cairn-token-cmd-');
   homes.push(home);
   return home;
 }
@@ -76,6 +76,28 @@ describe('cairn token (print)', () => {
     expect(code).toBe(0);
     expect(out).toContain('env-token-0123456789abcdef');
     expect(out).not.toContain('file-token-0123456789abcdef');
+  });
+
+  test.each([
+    ['127.0.0.1', '127.0.0.1'],
+    ['0.0.0.0', 'localhost'],
+    ['::', 'localhost'],
+    ['::1', '[::1]'],
+  ])('prints a login link for bind host %s', (host, display) => {
+    const home = scratchHome();
+    const token = 'synthetic-token+with/reserved=';
+    writeTokenFile(home, token);
+    const { code, out } = run(
+      { rotate: false },
+      { [ENV_VARS.home]: home, HOST: host, PORT: '9876' },
+    );
+    expect(code).toBe(0);
+    const link = out.match(/Login link: (.+)/)?.[1];
+    expect(link !== undefined).toBe(true);
+    const url = new URL(link ?? 'http://invalid');
+    expect(url.origin).toBe(`http://${display}:9876`);
+    expect(url.pathname).toBe('/app');
+    expect(new URLSearchParams(url.hash.slice(1)).get('token') === token).toBe(true);
   });
 
   test('failure mode 4: neither -> guidance, exit 0', () => {

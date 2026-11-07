@@ -1,7 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { serve } from '@hono/node-server';
-import pino from 'pino';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
 import {
@@ -16,24 +15,27 @@ import {
   warnIgnoredTailscaleUsers,
   warnInsecureBind,
 } from './config.js';
+import { warnTeamsWithoutCoordinatorRule } from './coordinator/boot-guard.js';
+import { migrateSidecarState } from './coordinator/boot-migration.js';
+import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
+import { createServerLogger } from './lib/logger.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
-  setCoordinatorMachineId,
+  setCoordinatorInServer,
   setCoordinatorServerContextEnabled,
+  setCoordinatorWake,
 } from './services/coordinator-context.js';
-import { setCoordinatorRouteLog } from './services/coordinator-route.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
-import { runRoutingMigration } from './services/routing-migration.js';
-import { setRoutingRulesEnabled } from './services/routing-rules.js';
+import { seedDefaultRouting } from './services/routing-migration.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -48,7 +50,8 @@ import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
-const logger = pino({
+const logSecrets = [loadedConfig.authToken ?? ''];
+const logger = createServerLogger(logSecrets, {
   level: process.env.LOG_LEVEL ?? 'info',
   // pino-pretty cannot load its transport worker from a single-file bundle.
   ...(process.env.NODE_ENV === 'production' || BUNDLED_FORM
@@ -62,8 +65,23 @@ if (refusal !== null) {
   process.exit(1);
 }
 const config = ensureAccessToken(loadedConfig);
+logSecrets.push(config.authToken ?? '');
 
-const { db, close } = openDbWithHandle(config.dbPath, { legacyExportDir: config.homeDir });
+const opened = (() => {
+  try {
+    return openDbWithHandle(config.dbPath, {
+      legacyExportDir: config.homeDir,
+      migrationLogger: logger,
+    });
+  } catch (error) {
+    logger.fatal(
+      { err: error },
+      error instanceof Error ? error.message : 'database migration failed',
+    );
+    process.exit(1);
+  }
+})();
+const { db, close } = opened;
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
 const vapidKeys = loadOrCreateVapidKeys(
   config.vapidKeysPath,
@@ -73,19 +91,9 @@ const vapidKeys = loadOrCreateVapidKeys(
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
-setRoutingRulesEnabled(config.routingRules);
-setCoordinatorServerContextEnabled(config.coordinatorServerContext);
-setCoordinatorMachineId(config.coordinatorMachineId);
-setCoordinatorRouteLog((teamId, reason) =>
-  logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
-);
-if (config.routingRules) {
-  const { withheldSecrets, ...inserted } = runRoutingMigration(db);
-  logger.info(inserted, 'routing rules migration');
-  for (const row of withheldSecrets) {
-    logger.warn(row, 'routing rules migration: agent secrets not granted to the session policy');
-  }
-}
+setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
+setCoordinatorInServer(config.coordinatorInServer);
+logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {
@@ -138,7 +146,6 @@ const app = createApp(
     webDir: config.webDir,
     authToken: config.authToken,
     mcpConfigPath: config.mcpConfigPath,
-    intakeAgentAllowlist: config.intakeAgentAllowlist,
     logger,
   },
   logger,
@@ -157,7 +164,6 @@ const scheduler = createScheduler(
     vapidKeys,
     convHub,
     box: secretBox,
-    intakeAgentAllowlist: config.intakeAgentAllowlist,
     reposDir,
     githubFetch,
     oauthClient: config.githubOauth,
@@ -183,6 +189,38 @@ const scheduler = createScheduler(
   }),
   schedulingRunOf(config, { githubFetch, logger }),
 );
+if (config.coordinatorInServer) {
+  migrateSidecarState({
+    machine: { db, hub, machineHub },
+    homeDir: config.homeDir,
+    storageDir: coordinatorStoreDir(config.dataDir),
+    sidecarMachineId: config.coordinatorMachineId,
+    logger,
+  });
+  warnTeamsWithoutCoordinatorRule(db, logger);
+}
+const coordinator = config.coordinatorInServer
+  ? startCoordinator({
+      machine: {
+        db,
+        hub,
+        machineHub,
+        box: secretBox,
+        user: seeded.user,
+        vapidKeys,
+        reposDir,
+        attachmentsDir,
+        skillsDir: config.skillsDir,
+        mcpConfigPath: config.mcpConfigPath,
+        convHub,
+        githubFetch,
+        oauthClient: config.githubOauth,
+      },
+      storageDir: coordinatorStoreDir(config.dataDir),
+      logger,
+    })
+  : null;
+if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));
 scheduler.start();
 
 const server = serve(
@@ -214,11 +252,16 @@ const tsnetStarting = startTsnetRemote({
   return started;
 });
 
+const COORDINATOR_CLOSE_MS = 5_000;
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   scheduler.stop();
+  await Promise.race([
+    coordinator?.close(),
+    new Promise((resolve) => setTimeout(resolve, COORDINATOR_CLOSE_MS)),
+  ]);
   killInFlightPick();
   computerScreens.close();
   server.close();

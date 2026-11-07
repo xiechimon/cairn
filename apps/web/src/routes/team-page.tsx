@@ -1,73 +1,27 @@
-import { Grid2x2, Network, Plus } from 'lucide-react';
-import { useCallback, useState } from 'react';
-import { Link, useLocation } from 'react-router';
-import {
-  useApiMutations,
-  useChief,
-  useMachines,
-  useMembers,
-  useModelSources,
-  useTeams,
-  useTodos,
-} from '../api/hooks.js';
-import { mapMachines, mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
+import { Route } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { useTeams, useTodos } from '../api/hooks.js';
+import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
-import { QueryBoundary } from '../components/query-state.js';
-import { SegmentedTabs } from '../components/segmented.js';
-import { Button, buttonVariants } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
-import { isDeleted } from '../fixtures/deletions.js';
-import { TEAM_NAME, TEAM_R7 } from '../fixtures/fixtures.js';
+import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
+import { EmptyState } from '../components/empty-state.js';
+import { buttonVariants } from '../components/ui/button.js';
+import { TEAM_NAME } from '../fixtures/fixtures.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
-import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { CreateAgentDialog } from './create-agent-dialog.js';
-import { TeamAgentGrid } from './team-agent-grid.js';
-import { TeamChart } from './team-chart.js';
-
-export const TEAM_LAYOUT_STORAGE_KEY = 'cairn.teamMembersLayout';
-
-type TeamLayout = 'grid' | 'chart';
-
-function readStoredLayout(storage: Storage | null): TeamLayout {
-  try {
-    return storage?.getItem(TEAM_LAYOUT_STORAGE_KEY) === 'chart' ? 'chart' : 'grid';
-  } catch {
-    return 'grid';
-  }
-}
+import { ROUTING_SETTINGS_HREF } from '../resources/routing-settings-page.js';
 
 export function TeamPage() {
   const { t } = useI18n();
   const { search } = useLocation();
+  const navigate = useNavigate();
   const fixture = resolveScenario(new URLSearchParams(search));
   const { live, teamId } = useLiveData();
-  const membersQ = useMembers(teamId, live);
   const teamsQ = useTeams(live);
   const todosQ = useTodos(teamId, live);
-  const team = live ? mapTeam(membersQ.data ?? []) : (fixture.team ?? TEAM_R7);
-  const teamName = live ? (teamsQ.data?.[0]?.name ?? t('团队')) : TEAM_NAME;
-  const chiefQ = useChief(teamId, live);
-  const chiefAgentId = live
-    ? (chiefQ.data?.chief.agent?.agentId ?? null)
-    : (fixture.chief?.agent?.id ?? null);
-  const [layout, setLayout] = useState<TeamLayout>(() => readStoredLayout(safeLocalStorage()));
-  const switchLayout = useCallback((next: TeamLayout) => {
-    setLayout(next);
-    safeSetItem(TEAM_LAYOUT_STORAGE_KEY, next);
-  }, []);
-  const mutations = useApiMutations(teamId);
-  const [createOpen, setCreateOpen] = useState(false);
-  const modelSourcesQ = useModelSources(teamId, live);
-  const modelOptions = live
-    ? toModelOptions(modelSourcesQ.data?.sources ?? [])
-    : toModelOptions(fixture.resources?.providerSources ?? []);
-  const machinesQ = useMachines(teamId, live);
-  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
-  const cardMachines = live && machinesQ.data === undefined ? undefined : machines;
+  const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
   return (
     <PageShell
       route="team"
@@ -80,77 +34,21 @@ export function TeamPage() {
         </span>
       }
       actions={
-        <>
-          <SegmentedTabs
-            className="mr-1"
-            value={layout}
-            onChange={switchLayout}
-            options={[
-              {
-                value: 'grid',
-                ariaLabel: 'grid',
-                icon: <Grid2x2 aria-hidden strokeWidth={1.75} />,
-              },
-              {
-                value: 'chart',
-                ariaLabel: 'chart',
-                icon: <Network aria-hidden strokeWidth={1.75} />,
-              },
-            ]}
-          />
-          <Link
-            className={buttonVariants({ variant: 'ghost', className: TOPBAR_TEXT_BUTTON })}
-            to={{ pathname: '/app/account', search }}
-            aria-label={t('设置')}
-          >
-            {t('设置')}
-          </Link>
-          <Button className={TOPBAR_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
-            <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
-            {t('创建 Agent')}
-          </Button>
-        </>
+        <Link
+          className={buttonVariants({ variant: 'ghost', className: TOPBAR_TEXT_BUTTON })}
+          to={{ pathname: '/app/account', search }}
+          aria-label={t('设置')}
+        >
+          {t('设置')}
+        </Link>
       }
     >
-      <QueryBoundary
-        query={live ? membersQ : undefined}
-        isEmpty={live && membersQ.data === undefined}
-        loadingLabel={t('正在加载团队')}
-        errorTitle={t('团队没能加载')}
-        empty={null}
-      >
-        {layout === 'grid' ? (
-          <>
-            {team.agents.length > 0 && (
-              <p className="m-0 mb-3 text-meta text-content-tertiary">
-                {t('{n} 个成员', { n: team.members })}
-              </p>
-            )}
-            <TeamAgentGrid
-              agents={team.agents}
-              machines={cardMachines}
-              search={search}
-              isDeleted={isDeleted}
-            />
-          </>
-        ) : (
-          <TeamChart agents={team.agents} chiefAgentId={chiefAgentId} />
-        )}
-      </QueryBoundary>
-      <CreateAgentDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        modelOptions={modelOptions}
-        machines={machines}
-        onCreate={
-          live
-            ? (input) =>
-                mutations.createAgent.mutate(input, {
-                  onSuccess: () => setCreateOpen(false),
-                  onError: (error) => toastError(t('创建 Agent 失败，请重试。'), error),
-                })
-            : undefined
-        }
+      <EmptyState
+        icon={Route}
+        title={t('Agent 已由路由规则取代')}
+        description={t('模型、机器和权限现在由工作路由规则与工作策略决定。')}
+        action={{ label: t('打开工作路由'), onClick: () => navigate(ROUTING_SETTINGS_HREF) }}
+        testId="team-agents-removed"
       />
     </PageShell>
   );

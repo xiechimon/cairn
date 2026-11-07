@@ -1,13 +1,18 @@
 import { rm } from 'node:fs/promises';
-import { conversationBranch, type Phase, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
+import {
+  conversationBranch,
+  type Phase,
+  parseVerifyPromptMeta,
+  RESEARCH_STUCK_SOURCE_KIND,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
+  plan as planTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -30,7 +35,13 @@ import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
 import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+  withVerification,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 let throttleHome: string;
@@ -192,7 +203,6 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
       phaseAt: base,
       seqNum: 1,
       latestBuildId: buildId,
-      assignment: { plan: null, build: { agentId: `agent-ci-${rnd}` } },
     })
     .run();
   s.db
@@ -791,33 +801,16 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     expect(w.mock.requests.length).toBe(before);
   });
 
-  function addResearchAgents(w: PrWorld) {
-    w.s.db
-      .insert(agentTable)
-      .values([
-        {
-          id: `agent-research-${w.buildId}`,
-          teamId: w.teamId,
-          displayName: 'Research',
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5-5',
-        },
-        {
-          id: `agent-checker-${w.buildId}`,
-          teamId: w.teamId,
-          displayName: 'Checker',
-          provider: 'openai-codex',
-          modelId: 'gpt-6.1-sol',
-        },
-      ])
-      .run();
+  function addResearchRoutes(w: PrWorld) {
+    seedSessionRoute(w.s);
+    seedRoute(w.s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
   }
 
   test('an earlier red CI round still appends a fix step and does not open research', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(1);
     expect(
@@ -834,7 +827,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX - 1);
     expect(w.todoRow().phase).toBe('building');
@@ -861,7 +854,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     const requested = w.s.db
       .select()
@@ -891,7 +884,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     const research = w.s.db
       .select()
@@ -956,7 +949,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     w.s.db
       .update(buildTable)
       .set({ errorMessage: 'monthly usage limit' })
@@ -1039,6 +1032,66 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(w.todoRow().phase).toBe('review');
     expect(w.fixRoundSteps()).toHaveLength(0);
     expect(w.todoRow().hasChanges).toBe(true);
+  });
+
+  test('green queues one verify step bound to the delivered head; a CI fix round is verified again on its own head', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    seedSessionRoute(w.s);
+    w.s.db
+      .insert(planTable)
+      .values({
+        id: 'plan-verify-ci',
+        buildId: w.buildId,
+        version: 1,
+        content: withVerification('## Changes\n- touch a.ts'),
+        createdAt: w.base,
+      })
+      .run();
+    const delivered = 'ab'.repeat(20);
+    const fixed = headOf(w.prNumber);
+    w.s.db
+      .update(stepTable)
+      .set({ checkpointCommit: delivered })
+      .where(eq(stepTable.buildId, w.buildId))
+      .run();
+    await w.poller.sweep();
+    const verifies = () => w.allSteps().filter((row) => row.kind === 'verify');
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(1);
+    expect(parseVerifyPromptMeta(verifies()[0]?.prompt ?? null)?.expectedHeadSha).toBe(delivered);
+
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: w.base + 1 })
+      .where(eq(stepTable.id, verifies()[0]?.id ?? ''))
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-ci-fix-after-verify',
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: fixed,
+        finishedAt: w.base + 3_000,
+        createdAt: w.base + 2_000,
+      })
+      .run();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
+    const restarted = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.fetch },
+    );
+    await restarted.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(2);
+    expect(verifies().map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha)).toEqual(
+      expect.arrayContaining([delivered, fixed]),
+    );
+    await w.poller.sweep();
+    expect(verifies()).toHaveLength(2);
   });
 
   test('after green the candidate leaves the grind-green set: another sweep no longer reads checks (moves to the #1403 reconcile surface)', async () => {

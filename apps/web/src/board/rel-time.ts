@@ -13,7 +13,8 @@ function dayIndex(ts: number): number {
   return Math.floor((ts + TZ_OFFSET) / DAY);
 }
 
-export function relativeTime(ts: number, now: number, t: TFunc = zhT): string {
+export function relativeTime(ts: number | null | undefined, now: number, t: TFunc = zhT): string {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return '';
   const diff = now - ts;
   if (diff < MINUTE) return t('刚刚');
   const minutes = Math.floor(diff / MINUTE);
@@ -29,4 +30,8 @@ export function relativeTime(ts: number, now: number, t: TFunc = zhT): string {
 
 export function isUsableTimestamp(ts: number | null | undefined, now: number): ts is number {
   return typeof ts === 'number' && Number.isFinite(ts) && ts > 0 && ts <= now + CLOCK_SKEW;
+}
+
+export function joinMeta(parts: readonly (string | null | undefined)[]): string {
+  return parts.filter((part) => part != null && part !== '').join(' · ');
 }

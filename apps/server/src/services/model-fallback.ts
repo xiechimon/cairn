@@ -9,12 +9,13 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { type agent, machine, type StepFallbackRow, type step } from '../db/schema.js';
+import { machine, type StepFallbackRow, type step } from '../db/schema.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import { getModelLiveness } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
+import type { RouteProfile } from './routing-rules.js';
 
-type AgentRow = typeof agent.$inferSelect;
+type AgentRow = RouteProfile;
 type StepRow = typeof step.$inferSelect;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build', 'session'];
@@ -116,9 +117,17 @@ export function planModelFallback(
   if (trigger === null) return null;
   const chain = agentRow?.fallbackModels ?? [];
   if (agentRow === null || chain.length === 0) return null;
-  if (!agentRow.provider || !agentRow.modelId || agentRow.machineId === null) return null;
-  const machineRow = db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
-  if (machineRow === undefined) return null;
+  if (!agentRow.provider || !agentRow.modelId) return null;
+  const hosts = db
+    .select()
+    .from(machine)
+    .where(
+      agentRow.machineId === null
+        ? eq(machine.teamId, agentRow.teamId)
+        : eq(machine.id, agentRow.machineId),
+    )
+    .all();
+  if (hosts.length === 0) return null;
   const primary: ModelRef = { provider: agentRow.provider, modelId: agentRow.modelId };
   const from = stepRow.fallback?.model ?? primary;
   const tried = new Set(stepRow.fallback?.tried ?? [modelKey(primary)]);
@@ -130,7 +139,7 @@ export function planModelFallback(
         (isBackendRuntimeId(m.provider) || isBackendRuntimeId(primary.provider)
           ? m.provider === primary.provider
           : true)) &&
-      runtimeGatePasses(machineRow, m.provider) &&
+      hosts.some((host) => runtimeGatePasses(host, m.provider)) &&
       getModelLiveness(m.provider, m.modelId) !== 'dead' &&
       providerHealth.tryAcquire(m.provider),
   );
