@@ -8,6 +8,7 @@ import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
 import type { ConversationGate, StepGate } from './tools.js';
+import { emitTurnSpans } from './turn-spans.js';
 import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
@@ -182,6 +183,11 @@ export async function runCoordinatorTurn(
         ? []
         : (await root.entries({ minEntryId: settled.entry }, 500, undefined, context)).items;
     await mirror.flush(turnEntries);
+    emitTurnSpans(
+      { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
+      turnEntries,
+      deps.now,
+    );
     clearInterval(stopPoll);
     if (stopping !== null) {
       await stopping;
