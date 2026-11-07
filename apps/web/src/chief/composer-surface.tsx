@@ -302,6 +302,7 @@ export function ComposerSurface({
           listboxId={slashListboxId}
         />
       </div>
+      {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
       <input
         ref={fileInputRef}
         type="file"
