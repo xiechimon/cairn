@@ -301,7 +301,7 @@ test.describe('chief unavailable (T4)', () => {
 });
 
 test.describe('queue, steer and stop while the Coordinator is replying (T5)', () => {
-  test('messages sent while busy are queued after the live reply, in server order', async ({
+  test('messages queued from outside the composer wait after the live reply, in server order', async ({
     page,
   }) => {
     await mockLive(page, busyState());
@@ -396,6 +396,39 @@ test.describe('queue, steer and stop while the Coordinator is replying (T5)', ()
     await expect(home.getByTestId('chief-composer-input')).toHaveValue(FIRST.content);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
     await evidenceShot(page, 'stop-queued-turn.png');
+  });
+
+  test('while the turn still waits for a machine the composer says new messages queue behind it', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      activeRun: { phase: 'chief' },
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [FIRST],
+      turnQueue: {
+        stepId: 'm1',
+        position: 1,
+        waitingFor: { machineId: 'mac-1', name: 'studio-mac.local', running: 0, capacity: 8 },
+      },
+    });
+    await page.goto('/app');
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await expect(input).toHaveAttribute('placeholder', '还没开始处理，新发的话会排在这条后面');
+  });
+
+  test('a running turn takes new messages into itself and the composer says so', async ({
+    page,
+  }) => {
+    await mockLive(page, { ...busyState(), pending: [], messages: [FIRST] });
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
+      'placeholder',
+      '发出的话会直接插进 Coordinator 这一轮',
+    );
+    await expect(home.getByTestId('queued-message')).toHaveCount(0);
   });
 
   test('a running turn leaves the answered turn above it alone: its tools show once, under the reply header', async ({

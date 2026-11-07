@@ -1624,11 +1624,6 @@ export function mapChief(
       const turnStartedAt = lastUser >= 0 ? collected?.itemsAt[lastUser] : undefined;
       const turnQueue = active?.turnQueue ?? null;
       if (turnQueue != null) {
-        const asked = collected?.items.find(
-          (item) => item.kind === 'user' && item.id !== undefined && item.id === turnQueue.stepId,
-        );
-        if (asked?.kind === 'user' && asked.id !== undefined)
-          waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
         const queued = queueLabel(turnQueue);
         chiefStream.push({
           kind: 'streaming',
@@ -1647,6 +1642,15 @@ export function mapChief(
         });
       }
     }
+  }
+  const waitingQueue =
+    running && collected?.eventTurn !== true ? (active?.turnQueue ?? null) : null;
+  if (waitingQueue != null) {
+    const asked = collected?.items.find(
+      (item) => item.kind === 'user' && item.id !== undefined && item.id === waitingQueue.stepId,
+    );
+    if (asked?.kind === 'user' && asked.id !== undefined)
+      waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
   }
   chiefStream.push(...(collected?.pending ?? []));
   return {
