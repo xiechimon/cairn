@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive, type Row, THREAD, toolRow } from './chief-home-mock';
-import { evidenceShot } from './evidence';
+import { evidenceJson, evidenceShot } from './evidence';
 import { openChiefWindow } from './helpers.js';
 
 const historyOf = (total: number): Row[] =>
@@ -180,6 +180,15 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await emit(page, { type: 'text_delta', text: `${paragraph(4)}\n\n` });
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await expect(jump).toHaveAttribute('data-active', 'false');
+
+  await viewport(page).hover();
+  await page.mouse.wheel(0, -700);
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
+  const parkedAfterJump = await gapToBottom(page);
+  await emit(page, { type: 'text_delta', text: `${paragraph(5)}\n\n` });
+  await expect(home(page).getByText(paragraph(5).trim(), { exact: false })).toBeAttached();
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThanOrEqual(parkedAfterJump);
+  await expect(jump).toHaveAttribute('data-active', 'true');
 });
 
 test('the drawer follows a send and its streaming growth too', async ({ page }) => {
@@ -206,3 +215,131 @@ test('the drawer follows a send and its streaming growth too', async ({ page }) 
     await expect.poll(gap).toBeLessThanOrEqual(2);
   }
 });
+
+for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-light'] as const) {
+  test(`jump to latest is instant with ${activation} through a long lazy history`, async ({
+    page,
+  }) => {
+    if (activation === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' });
+    if (activation === 'phone-light') {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: 'light' });
+    }
+    const history = historyOf(100);
+    for (const [index, message] of history.entries()) {
+      message.content = `${index === 99 ? 'Latest delivery report' : `Delivery review ${index}`}\n\n${'The deployment checks passed and the change is ready for review. '.repeat((index % 7) + 1)}`;
+    }
+    await mockLive(page, { threads: [THREAD], messages: history });
+    await page.goto('/app');
+    const body = viewport(page);
+    const jump = home(page).getByTestId('jump-to-latest');
+    await expect(row(page, 'Latest delivery report')).toBeAttached();
+    await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    await body.evaluate((node) => {
+      node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+      for (const item of node.querySelectorAll<HTMLElement>(
+        '[data-slot="message-scroller-item"]',
+      )) {
+        item.style.contentVisibility = 'auto';
+      }
+      node.scrollTop = 0;
+    });
+    await expect(jump).toHaveAttribute('data-active', 'true');
+    expect(await body.evaluate((node) => node.scrollHeight / node.clientHeight)).toBeGreaterThan(5);
+    expect(
+      await body
+        .locator('[data-slot="message-scroller-item"]')
+        .first()
+        .evaluate((node) => getComputedStyle(node).contentVisibility),
+    ).toBe('auto');
+    await jump.hover();
+    const resting = await jump.evaluate((node) => ({
+      property: getComputedStyle(node).transitionProperty,
+      duration: getComputedStyle(node).transitionDuration,
+      background: getComputedStyle(node).backgroundColor,
+    }));
+    await jump.evaluate((button) => {
+      button.addEventListener(
+        'click',
+        () => {
+          const started = performance.now();
+          const root = button.closest('[data-slot="message-scroller"]');
+          const viewport = root?.querySelector('[data-slot="message-scroller-viewport"]');
+          if (!(viewport instanceof HTMLElement)) throw new Error('Missing conversation viewport');
+          const frames: { t: number; top: number; gap: number; opacity: number }[] = [];
+          const sample = () => {
+            const t = performance.now() - started;
+            frames.push({
+              t: Math.round(t * 10) / 10,
+              top: Math.round(viewport.scrollTop),
+              gap: Math.round(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight),
+              opacity: Number(getComputedStyle(button).opacity),
+            });
+            if (t < 500) return requestAnimationFrame(sample);
+            const latest = [...viewport.querySelectorAll('[data-slot="message-scroller-item"]')].at(
+              -1,
+            );
+            const bounds = viewport.getBoundingClientRect();
+            const rect = latest?.getBoundingClientRect();
+            button.setAttribute(
+              'data-jump-measurement',
+              JSON.stringify({
+                frames,
+                latestVisible:
+                  rect != null && rect.bottom <= bounds.bottom + 2 && rect.bottom > bounds.top,
+              }),
+            );
+          };
+          requestAnimationFrame(sample);
+        },
+        { once: true },
+      );
+    });
+    if (activation === 'Enter' || activation === 'Space') {
+      await jump.focus();
+      await jump.press(activation === 'Space' ? 'Space' : 'Enter');
+    } else {
+      await page.mouse.down();
+      const pressed = await jump.evaluate((node) => ({
+        duration: getComputedStyle(node).transitionDuration,
+        background: getComputedStyle(node).backgroundColor,
+      }));
+      expect.soft(pressed.duration).toBe('0s');
+      expect.soft(pressed.background).not.toBe(resting.background);
+      await page.mouse.up();
+    }
+    await jump.evaluate(async (node) => {
+      while (!node.hasAttribute('data-jump-measurement')) {
+        await new Promise(requestAnimationFrame);
+      }
+    });
+    const measurement = JSON.parse((await jump.getAttribute('data-jump-measurement')) ?? '{}') as {
+      frames: { t: number; top: number; gap: number; opacity: number }[];
+      latestVisible: boolean;
+    };
+    if (activation === 'click') {
+      await evidenceShot(page, `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-100ms.png`);
+    }
+    await evidenceJson(
+      `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-frames-${activation}.json`,
+      measurement.frames,
+    );
+    const landed = measurement.frames.findIndex((frame) => frame.gap <= 2);
+    const hidden = measurement.frames.findIndex((frame) => frame.opacity === 0);
+    expect(landed).toBeGreaterThanOrEqual(0);
+    expect(measurement.frames[landed]?.t).toBeLessThanOrEqual(150);
+    expect(measurement.frames.slice(landed).every((frame) => frame.gap <= 2)).toBe(true);
+    expect(hidden).toBeGreaterThanOrEqual(0);
+    expect(measurement.frames[hidden]?.t).toBeLessThanOrEqual(
+      activation === 'phone-light' ? 300 : 150,
+    );
+    expect(measurement.latestVisible).toBe(true);
+    expect(resting.property === 'none' || resting.duration.split(',').every((v) => parseFloat(v) === 0)).toBe(true);
+    await page.waitForTimeout(250);
+    await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    await expect(jump).toHaveAttribute('data-active', 'false');
+    expect(await body.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  });
+}
