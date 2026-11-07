@@ -58,25 +58,92 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 
-  test(`machine ${theme}: keyboard focus is an outline without a band`, async ({ page }) => {
+  test(`machine ${theme}: focus-visible and active paint only the full row or a compact control`, async ({ page }) => {
     await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
     await page.goto('/app/settings/machines?scenario=machines-master-detail');
-    const toggle = page.getByTestId('machine-toggle').first();
-    await expect(toggle).toBeVisible();
+    const item = page.getByTestId('machine-item').first();
+    await expect(item).toBeVisible();
     await page.mouse.move(0, 0);
-    const resting = await toggle.evaluate((el) => ({
-      background: getComputedStyle(el).backgroundColor,
-      shadow: getComputedStyle(el).boxShadow,
-    }));
+
+    const resting = (await painted(item)).map((entry) => entry.index);
+    const stops: string[] = [];
+    await item.getByTestId('machine-toggle').focus();
+    await page.keyboard.press('Shift+Tab');
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press('Tab');
+      const inside = await item.evaluate((root) => root.contains(document.activeElement));
+      if (!inside) continue;
+      stops.push(await item.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? ''));
+      expect(await shapes(item, resting), `focus-visible on ${stops.at(-1)}`).toEqual([]);
+    }
+    expect(stops).toContain('machine-toggle');
+    expect(stops).toContain('machine-menu');
+
+    const toggle = item.getByTestId('machine-toggle');
+    await toggle.focus();
     await page.keyboard.press('Tab');
     await toggle.focus();
-    await expect(toggle).toHaveCSS('outline-style', 'solid');
-    await expect(toggle).toHaveCSS('outline-width', '2px');
-    await expect(toggle).toHaveCSS('background-color', resting.background);
-    const shadow = await toggle.evaluate((el) => getComputedStyle(el).boxShadow);
-    expect(
-      shadow === 'none' ||
-        shadow.replaceAll(/rgba\(0, 0, 0, 0\) 0px 0px 0px 0px/g, '').replaceAll(/[, ]/g, '') === '',
-    ).toBe(true);
+    expect((await fresh(item, resting)).filter((entry) => entry.outline), 'keyboard focus on the toggle must be painted').toHaveLength(1);
+
+    for (const testid of ['machine-toggle', 'machine-accept-toggle', 'machine-menu']) {
+      const target = item.getByTestId(testid);
+      await target.hover();
+      await page.mouse.down();
+      await page.waitForTimeout(120);
+      expect(await shapes(item, resting), `:active on ${testid}`).toEqual([]);
+      await page.mouse.move(0, 0);
+      await page.mouse.up();
+    }
+
+    await page.mouse.move(0, 0);
+    await item.getByTestId('machine-toggle').click();
+    await page.waitForTimeout(150);
+    expect(await fresh(item, resting), 'a mouse click must not leave a focus ring').toEqual([]);
+    const expanded = await item.getAttribute('data-expanded');
+    await item.getByTestId('machine-item-status').click({ force: true });
+    await expect(item).not.toHaveAttribute('data-expanded', expanded ?? '');
   });
+}
+
+async function painted(item: Locator) {
+  return item.evaluate((root) => {
+    const header = root.firstElementChild;
+    if (header === null) throw new Error('machine item has no header');
+    const row = header.getBoundingClientRect();
+    const near = (a: number, b: number) => Math.abs(a - b) <= 1;
+    const out: { index: number; name: string; outline: boolean; shadow: boolean; sameAsRow: boolean; compact: boolean }[] = [];
+    for (const [index, el] of [header, ...header.querySelectorAll('*')].entries()) {
+      const cs = getComputedStyle(el);
+      const box = el.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      const outline =
+        cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && cs.outlineColor !== 'rgba(0, 0, 0, 0)';
+      const fill = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
+      const shadow =
+        cs.boxShadow !== 'none' &&
+        cs.boxShadow.replaceAll(/rgba\(0, 0, 0, 0\) 0px 0px 0px 0px/g, '').replaceAll(/[, ]/g, '') !== '';
+      if (!outline && !fill && !shadow) continue;
+      const grow = outline ? parseFloat(cs.outlineWidth) + parseFloat(cs.outlineOffset) : 0;
+      const [x, y, w, h] = [box.x - grow, box.y - grow, box.width + 2 * grow, box.height + 2 * grow];
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      out.push({
+        index,
+        name: el.getAttribute('data-testid') ?? el.tagName,
+        outline,
+        shadow,
+        sameAsRow: near(x, row.x) && near(y, row.y) && near(w, row.width) && near(h, row.height),
+        compact: w <= Math.max(range.getBoundingClientRect().width + 16, 44) && w < row.width * 0.5,
+      });
+    }
+    return out;
+  });
+}
+
+async function fresh(item: Locator, resting: number[]) {
+  return (await painted(item)).filter((entry) => !resting.includes(entry.index));
+}
+
+async function shapes(item: Locator, resting: number[]) {
+  return (await fresh(item, resting)).filter((entry) => entry.shadow || !(entry.sameAsRow || entry.compact));
 }
