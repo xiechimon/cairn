@@ -184,7 +184,12 @@ export function MachineRowView({
       data-expanded={expanded}
       className="flex min-w-0 flex-col border-b border-border last:border-b-0"
     >
-      <div className="flex min-w-0 items-center gap-3 px-4 py-2.5">
+      <div
+        className={cn(
+          'relative flex min-w-0 items-center gap-3 px-4 py-2.5',
+          'has-[[data-testid=machine-toggle]:focus-visible]:outline-2 has-[[data-testid=machine-toggle]:focus-visible]:-outline-offset-2 has-[[data-testid=machine-toggle]:focus-visible]:outline-(--focus-ring)',
+        )}
+      >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <Button
             variant="link"
@@ -192,7 +197,7 @@ export function MachineRowView({
             aria-expanded={expanded}
             aria-controls={bodyId}
             onClick={onToggle}
-            className="h-auto min-w-0 justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground no-underline focus-visible:ring-0"
+            className="h-auto min-w-0 cursor-pointer justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground no-underline outline-hidden after:absolute after:inset-0 focus-visible:ring-0"
           >
             <ChevronRight
               aria-hidden
@@ -242,7 +247,7 @@ export function MachineRowView({
               variant="link"
               data-testid="machine-open-runtime"
               onClick={() => onOpenSection('runtime')}
-              className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
+              className="relative z-10 h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
             >
               {t('运行时')} ›
             </Button>
@@ -255,7 +260,7 @@ export function MachineRowView({
                   variant="link"
                   data-testid="machine-open-capabilities"
                   onClick={() => onOpenSection('capabilities')}
-                  className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
+                  className="relative z-10 h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
                 >
                   {t('能力')} ›
                 </Button>
@@ -266,6 +271,7 @@ export function MachineRowView({
         <ToggleSwitch
           data-testid="machine-accept-toggle"
           aria-label={t('{name} 接任务', { name: machine.name })}
+          className="relative z-10"
           checked={enabled}
           disabled={!canMutate || mutations.patchMachine.isPending}
           title={
@@ -280,7 +286,7 @@ export function MachineRowView({
                 variant="ghost"
                 size="icon-sm"
                 data-testid="machine-menu"
-                className="hover:bg-transparent dark:hover:bg-transparent"
+                className="relative z-10 hover:bg-transparent dark:hover:bg-transparent"
                 aria-label={t('{name} 的菜单', { name: machine.name })}
               />
             }
