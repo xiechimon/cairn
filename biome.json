@@ -269,7 +269,7 @@
                       "**/github-connection.js",
                       "**/github-connection.ts"
                     ],
-                    "importNamePattern": "(githubTokenOrNull|teamGithubToken|openGithubToken|\\*)",
+                    "importNamePattern": "(githubTokenOrNull|openGithubToken|\\*)",
                     "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are private to github-connection.ts."
                   }
                 ],
@@ -306,7 +306,7 @@
                       "**/github-connection.js",
                       "**/github-connection.ts"
                     ],
-                    "importNamePattern": "(githubTokenOrNull|teamGithubToken|openGithubToken|\\*)",
+                    "importNamePattern": "(githubTokenOrNull|openGithubToken|\\*)",
                     "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are private to github-connection.ts."
                   }
                 ],

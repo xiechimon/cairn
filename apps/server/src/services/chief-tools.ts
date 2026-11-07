@@ -69,10 +69,18 @@ import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { snoozeTodo } from './snooze.js';
 import { seedFixedTags } from './tags.js';
-import { createTodo, deleteTodo, getTodo, listTodos, setTodoPhase, updateTodo } from './todos.js';
+import {
+  createAutonomousTodo,
+  deleteTodo,
+  getTodo,
+  listTodos,
+  setTodoPhase,
+  updateAutonomousTodo,
+} from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
 export interface ChiefToolDeps {
+  githubAppTokenSocket?: string | null | undefined;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -286,6 +294,7 @@ export async function executeChiefTool(
     user: deps.user,
     vapidKeys: deps.vapidKeys,
     box: deps.box,
+    githubAppTokenSocket: deps.githubAppTokenSocket,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
   const chiefActor: TransitionActor = { kind: 'agent', name: 'Coordinator' };
@@ -481,7 +490,7 @@ export async function executeChiefTool(
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId);
       const output = optTodoOutput(params, 'output');
-      const record = createTodo(svc, {
+      const record = createAutonomousTodo(svc, {
         teamId: ctx.teamId,
         projectId,
         title: str(params, 'title'),
@@ -500,7 +509,7 @@ export async function executeChiefTool(
     case 'update_todo': {
       const todoId = str(params, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId);
-      const record = updateTodo(svc, todoId, {
+      const record = updateAutonomousTodo(svc, todoId, {
         ...(optStr(params, 'title') !== undefined ? { title: optStr(params, 'title') } : {}),
         ...(optStr(params, 'spec') !== undefined ? { spec: optStr(params, 'spec') } : {}),
         ...(params.tagIds !== undefined ? { tagIds: strArr(params, 'tagIds') } : {}),
@@ -972,6 +981,7 @@ function buildDeps(deps: ChiefToolDeps) {
     convHub: deps.convHub,
     reposDir: deps.reposDir,
     box: deps.box,
+    githubAppTokenSocket: deps.githubAppTokenSocket,
     githubFetch: deps.githubFetch,
     oauthClient: deps.oauthClient,
   };

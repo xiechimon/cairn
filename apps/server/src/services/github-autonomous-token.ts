@@ -8,13 +8,14 @@ export async function autonomousToken(
   teamId: string,
   repo: { owner: string; repo: string },
   force = false,
+  minimumValidityMs = 300_000,
 ): Promise<AutonomousToken | null> {
   let reason: AppTokenReason = 'app-token-unavailable';
   const app = await appTokenOrNull(
     {
       config: {
         githubAppTokenSocket:
-          deps.githubAppTokenSocket ?? process.env.CAIRN_APP_TOKEN_SOCKET ?? null,
+          deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
       },
       ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
       onReason: (failure) => {
@@ -23,6 +24,7 @@ export async function autonomousToken(
     },
     repo,
     force,
+    minimumValidityMs,
   );
   if (app !== null) return app;
   const user = await userTokenOrNull(deps, teamId);
@@ -44,7 +46,7 @@ export async function githubReadToken(
       {
         config: {
           githubAppTokenSocket:
-            deps.githubAppTokenSocket ?? process.env.CAIRN_APP_TOKEN_SOCKET ?? null,
+            deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
         },
         ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
       },

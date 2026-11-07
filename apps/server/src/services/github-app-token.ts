@@ -150,12 +150,22 @@ async function loadInstallation(deps: GithubAppTokenDeps, path: string, force: b
   return null;
 }
 
-async function repoToken(deps: GithubAppTokenDeps, repo: Repository, force: boolean) {
+async function repoToken(
+  deps: GithubAppTokenDeps,
+  repo: Repository,
+  force: boolean,
+  minimumValidityMs = 300_000,
+) {
   let reason: AppTokenReason;
   if (!deps.config.githubAppTokenSocket) reason = 'app-token-unconfigured';
   else {
     try {
-      const value = await installation(deps, force);
+      let value = await installation(deps, force);
+      if (value && value.expiresAt - Date.now() < minimumValidityMs) {
+        value = await installation(deps, true);
+        if (value && value.expiresAt - Date.now() < minimumValidityMs)
+          throw new Error('mint token expiring');
+      }
       if (value?.repositories.has(`${repo.owner}/${repo.repo}`.toLowerCase())) {
         return value.token;
       }
@@ -176,8 +186,9 @@ export function appTokenOrNull(
   deps: GithubAppTokenDeps,
   repo: Repository,
   force = false,
+  minimumValidityMs = 300_000,
 ): Promise<AppToken | null> {
-  return repoToken(deps, repo, force);
+  return repoToken(deps, repo, force, minimumValidityMs);
 }
 
 export async function appGithubFetch(

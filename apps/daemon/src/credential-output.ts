@@ -35,14 +35,19 @@ export function guardCredentialOutputs<T extends object>(target: T, redact: <V>(
 
 export async function* credentialSafeEvents(
   events: AsyncIterable<StepEvent>,
-  token: string | undefined,
+  token: string | undefined | (() => readonly (string | undefined)[]),
 ): AsyncGenerator<StepEvent> {
-  const redact = credentialRedactor(token);
+  const values = () =>
+    (typeof token === 'function' ? token() : [token]).filter((value): value is string =>
+      Boolean(value),
+    );
+  const redact = <T>(value: T): T => credentialRedactor(...values())(value);
   let pending = '';
   let type: 'text_delta' | 'thinking_delta' | null = null;
   try {
     for await (const event of events) {
-      if (!token) {
+      const tokens = values();
+      if (tokens.length === 0) {
         yield event;
         continue;
       }
@@ -53,9 +58,14 @@ export async function* credentialSafeEvents(
         }
         type = event.type;
         pending += event.text;
-        let cut = Math.max(0, pending.length - token.length + 1);
-        const start = pending.lastIndexOf(token, cut);
-        if (start >= 0 && start + token.length > cut) cut = start;
+        let cut = Math.max(
+          0,
+          pending.length - Math.max(...tokens.map((value) => value.length)) + 1,
+        );
+        for (const value of tokens) {
+          const start = pending.lastIndexOf(value, cut);
+          if (start >= 0 && start + value.length > cut) cut = start;
+        }
         if (cut > 0) {
           yield { type, text: redact(pending.slice(0, cut)) };
           pending = pending.slice(cut);

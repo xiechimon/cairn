@@ -18,6 +18,7 @@ export function isChiefConversation(id: string): boolean {
 }
 
 export interface MachineDeps {
+  githubAppTokenSocket?: string | null | undefined;
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;

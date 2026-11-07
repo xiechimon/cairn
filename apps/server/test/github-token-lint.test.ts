@@ -30,7 +30,6 @@ function lintFixture(input: string) {
 test('new write files cannot import legacy getters, aliases or namespace imports', () => {
   for (const input of [
     "import { githubTokenOrNull } from './github-connection.js';",
-    "import { teamGithubToken as token } from '../services/github-connection.js';",
     "import * as connection from './github-connection.js';",
   ]) {
     const result = lintFixture(input);
@@ -41,6 +40,7 @@ test('new write files cannot import legacy getters, aliases or namespace imports
 
 test('current importers and new branded providers remain importable without disabling other seams', () => {
   expect(lint('apps/server/src/services/builds.ts').status).toBe(0);
+  expect(lint('apps/server/src/routes-resources.ts').status).toBe(0);
   expect(lint('apps/server/src/services/mcp-face.ts').status).toBe(0);
   expect(lint('apps/server/src/services/schedules.ts').status).toBe(0);
   expect(lintFixture("import { userTokenOrNull } from './github-connection.js';").status).toBe(0);

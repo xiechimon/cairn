@@ -14,7 +14,7 @@ import { autonomousMergePolicy } from './autonomous-merge.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
-import { pauseTeamGithubRepos } from './github-autonomy-brake.js';
+import { pauseTeamGithubReposAutonomously } from './github-autonomy-brake.js';
 import { localGateFacts } from './local-merge-facts.js';
 import { upsertMessage } from './machine-deps.js';
 import { evaluateMergeGate } from './merge-gate-run.js';
@@ -139,7 +139,7 @@ async function raiseUnjudgedLanding(
   teamId: string,
   reason: string,
 ): Promise<void> {
-  await pauseTeamGithubRepos(deps, teamId).catch(() => undefined);
+  await pauseTeamGithubReposAutonomously(deps, teamId).catch(() => undefined);
   upsertMessage(deps, {
     id: `ship-unjudged-${stepRow.id}`,
     conversationId: stepRow.buildId,

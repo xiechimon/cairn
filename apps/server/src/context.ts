@@ -21,6 +21,7 @@ export interface RemoteAccessContext {
 }
 
 export interface AppContext {
+  githubAppTokenSocket?: string | null | undefined;
   remote?: RemoteAccessContext;
   db: Db;
   hub: TeamStreamHub;

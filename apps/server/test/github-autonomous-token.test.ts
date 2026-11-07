@@ -1,4 +1,6 @@
 import { afterEach, expect, expectTypeOf, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { loadConfig } from '../src/config.js';
 import { openMemoryDb } from '../src/db/client.js';
 import { project } from '../src/db/schema.js';
 import type {
@@ -19,9 +21,11 @@ import {
   type UserToken,
 } from '../src/lib/github-token.js';
 import * as app from '../src/services/github-app-token.js';
-import { autonomousToken } from '../src/services/github-autonomous-token.js';
+import { autonomousToken, githubReadToken } from '../src/services/github-autonomous-token.js';
+import { pauseTeamGithubRepos } from '../src/services/github-autonomy-brake.js';
 import * as connection from '../src/services/github-connection.js';
 import { githubGatePort } from '../src/services/merge-gate-github.js';
+import { createTodo, flushSelfIssueWrites } from '../src/services/todos.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, req } from './helpers.js';
 
@@ -126,5 +130,72 @@ test('human pause click keeps the user token while App is available', async () =
     expect(writes.every(Boolean)).toBe(true);
   } finally {
     s.dispose();
+  }
+});
+
+test.each([autonomousToken, githubReadToken])(
+  'resolved config socket is used and explicit null overrides environment: %s',
+  async (resolve) => {
+    const db = openMemoryDb();
+    vi.stubEnv('CAIRN_APP_TOKEN_SOCKET', '/environment.sock');
+    const provider = vi.spyOn(app, 'appTokenOrNull').mockResolvedValue('fake-app' as AppToken);
+    try {
+      const config = loadConfig({ authToken: null, githubAppTokenSocket: '/config.sock' });
+      await resolve({ db, githubAppTokenSocket: config.githubAppTokenSocket }, 'team', repo);
+      expect(provider.mock.calls.at(-1)?.[0].config.githubAppTokenSocket).toBe('/config.sock');
+      await resolve({ db, githubAppTokenSocket: null }, 'team', repo);
+      expect(provider.mock.calls.at(-1)?.[0].config.githubAppTokenSocket).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  },
+);
+
+test('human service entry points resolve UserToken internally with App available', async () => {
+  const writes: boolean[] = [];
+  const githubFetch: typeof fetch = async (input, init) => {
+    if (init?.method === 'POST')
+      writes.push(
+        new Headers(init.headers).get('authorization') === 'Bearer service-human-fixture',
+      );
+    return Response.json(String(input).includes('/issues?') ? [] : { number: 1 });
+  };
+  const home = makeTestTempDir('human-identity-');
+  vi.stubEnv('CAIRN_HOME', home);
+  vi.stubEnv('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS', '0');
+  const s = bootServer({ githubFetch });
+  try {
+    s.db
+      .insert(project)
+      .values({
+        id: 'human-service-project',
+        teamId: s.team.id,
+        name: 'project',
+        repoKind: 'github',
+        githubRepo: 'octo/alpha',
+      })
+      .run();
+    connection.upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, login: 'human', accessToken: 'service-human-fixture', scope: 'repo' },
+    );
+    stubGithubApp(null);
+    const deps = { ...s.svc, box: s.secretBox, githubFetch };
+    createTodo(deps, {
+      teamId: s.team.id,
+      projectId: 'human-service-project',
+      title: 'human task',
+      spec: 'spec',
+      createdBy: s.user.id,
+      ownerId: s.user.id,
+    });
+    await flushSelfIssueWrites();
+    await pauseTeamGithubRepos(deps, s.team.id);
+    expect(writes.length).toBeGreaterThan(1);
+    expect(writes.every(Boolean)).toBe(true);
+  } finally {
+    s.dispose();
+    vi.unstubAllEnvs();
+    releaseTestTempDir(home);
   }
 });

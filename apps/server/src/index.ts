@@ -136,6 +136,7 @@ const app = createApp(
     enrollments: new Map(),
     oauthStates: new Map(),
     oauthClient: config.githubOauth,
+    githubAppTokenSocket: config.githubAppTokenSocket,
     githubFetch,
     reposDir,
     attachmentsDir,
@@ -167,6 +168,7 @@ const scheduler = createScheduler(
     reposDir,
     githubFetch,
     oauthClient: config.githubOauth,
+    githubAppTokenSocket: config.githubAppTokenSocket,
   },
   {
     tickMs: config.schedulerTickMs,
@@ -215,6 +217,7 @@ const coordinator = config.coordinatorInServer
         convHub,
         githubFetch,
         oauthClient: config.githubOauth,
+        githubAppTokenSocket: config.githubAppTokenSocket,
       },
       storageDir: coordinatorStoreDir(config.dataDir),
       logger,

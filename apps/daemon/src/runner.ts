@@ -111,6 +111,7 @@ import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js'
 import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
+import { StepAppCredential } from './step-app-credential.js';
 import { resolveStepImages } from './step-attachments.js';
 import { ensureStepCoauthor } from './step-attribution.js';
 import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
@@ -559,16 +560,33 @@ async function runClaimedStep(
   const credentialValues = [creds.claudeSubscriptionToken, creds.git?.password];
   const redactors = [credentialRedactor(...credentialValues)];
   const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
-  let credentialIssuedAt = now();
+  const appCredential =
+    creds.git?.kind === 'app'
+      ? new StepAppCredential(
+          join(deps.paths.agentRuntimeDir, `step-${stepId}-github`),
+          creds.git,
+          async () => {
+            const fresh = (await client.token(stepId)).git;
+            if (fresh?.password) {
+              credentialValues.push(fresh.password);
+              redactors.push(credentialRedactor(fresh.password));
+            }
+            if (fresh?.kind !== 'app' || creds.git === null)
+              throw new Error('App credential refresh unavailable');
+            return { ...fresh, url: creds.git.url };
+          },
+          (value) => {
+            credentialValues.push(value);
+            redactors.push(credentialRedactor(value));
+          },
+          now,
+          () => logger.step('App credential timer refresh failed; retrying next minute'),
+        )
+      : null;
+  if (appCredential !== null) credentialCleanups.push(() => appCredential.dispose());
   const refreshGit = async () => {
-    const fresh = (await client.token(stepId)).git;
-    if (fresh?.kind !== 'app' || creds.git === null)
-      throw new Error('App credential refresh unavailable');
-    credentialValues.push(fresh.password);
-    redactors.push(credentialRedactor(fresh.password));
-    creds.git = { ...fresh, url: creds.git.url };
-    credentialIssuedAt = now();
-    return creds.git;
+    if (appCredential === null) throw new Error('App credential refresh unavailable');
+    return appCredential.refresh();
   };
   client = guardCredentialOutputs(client, redact);
   journal = guardCredentialOutputs(journal, redact);
@@ -819,7 +837,7 @@ async function runClaimedStep(
       refreshed = true;
       return refreshGit();
     };
-    if (creds.git?.kind === 'app' && now() - credentialIssuedAt >= 50 * 60_000) await refresh();
+    if (appCredential?.needsRefresh()) await refreshGit();
     return withGitCredentialFallback(operation, creds.git, {
       what: 'push',
       allowMachineFallback: repo?.kind === 'github',
@@ -933,7 +951,7 @@ async function runClaimedStep(
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
   const stepGitEnv: Record<string, string> =
     repo?.kind === 'github' && creds.git !== null
-      ? {
+      ? (appCredential?.env() ?? {
           ...Object.fromEntries(
             Object.entries(gitCredentialEnv(creds.git)).filter(
               (entry): entry is [string, string] => entry[1] !== undefined,
@@ -941,7 +959,7 @@ async function runClaimedStep(
           ),
           GH_TOKEN: creds.git.password,
           GITHUB_TOKEN: creds.git.password,
-        }
+        })
       : {};
   const stepEnv: Record<string, string> = {
     ...opts.env,
@@ -954,6 +972,11 @@ async function runClaimedStep(
       delete stepGitEnv[key];
     }
   });
+  if (appCredential !== null) {
+    delete stepEnv.GH_TOKEN;
+    delete stepEnv.GITHUB_TOKEN;
+    delete stepEnv.CAIRN_GIT_CRED_PASSWORD;
+  }
   delete stepEnv.CLAUDE_CODE_OAUTH_TOKEN;
   if (runtimeId === 'claude-code' && creds.claudeSubscriptionToken !== undefined) {
     stepEnv.CLAUDE_CODE_OAUTH_TOKEN = creds.claudeSubscriptionToken;
@@ -1558,10 +1581,7 @@ async function runClaimedStep(
     armBodyTimeout();
     if (pass === 0) armDurationCap();
     try {
-      for await (const ev of credentialSafeEvents(
-        credentialSafeEvents(handle.events, creds.git?.password),
-        creds.claudeSubscriptionToken,
-      )) {
+      for await (const ev of credentialSafeEvents(handle.events, () => credentialValues)) {
         if (ev.type === 'toolcall_end') {
           if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
           else runningToolCalls.delete(ev.call.id);
@@ -2108,6 +2128,10 @@ async function runClaimedStep(
           branch: head,
           baseBranch: ws.defaultBranch,
           token: creds.git?.password ?? null,
+          tokenKind: creds.git?.kind,
+          ...(appCredential !== null
+            ? { refreshToken: async () => (await refreshGit()).password }
+            : {}),
         }).catch((err: unknown) => {
           logger.step(
             `pr probe failed: ${err instanceof Error ? err.message : String(err)} (panel will show branch without PR)`,

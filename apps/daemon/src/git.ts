@@ -69,7 +69,6 @@ const CREDENTIAL_HELPER =
   '{ test "$p" = "$CAIRN_GIT_CRED_PROTOCOL" || { test "$p" = https && test "$CAIRN_GIT_CRED_PROTOCOL" = http; }; }; then ' +
   `printf 'username=%s\\npassword=%s\\n' "$CAIRN_GIT_CRED_USERNAME" "$CAIRN_GIT_CRED_PASSWORD"; fi; }; f`;
 
-// Empty credential.helper clears stacked helpers (e.g. osxkeychain) so step cred does not persist.
 export function gitCredentialEnv(
   cred: BoundGitCredentials,
   parent: NodeJS.ProcessEnv = process.env,
@@ -87,11 +86,18 @@ export function gitCredentialEnv(
       ? {}
       : {
           [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
-          [`GIT_CONFIG_VALUE_${n + 1}`]: CREDENTIAL_HELPER,
+          [`GIT_CONFIG_VALUE_${n + 1}`]: cred.passwordFile
+            ? CREDENTIAL_HELPER.replace(
+                '"$CAIRN_GIT_CRED_PASSWORD"',
+                '"$(cat -- "$CAIRN_GIT_CRED_FILE")"',
+              )
+            : CREDENTIAL_HELPER,
           CAIRN_GIT_CRED_PROTOCOL: target.protocol,
           CAIRN_GIT_CRED_HOST: target.host,
           CAIRN_GIT_CRED_USERNAME: cred.username,
-          CAIRN_GIT_CRED_PASSWORD: cred.password,
+          ...(cred.passwordFile
+            ? { CAIRN_GIT_CRED_FILE: cred.passwordFile }
+            : { CAIRN_GIT_CRED_PASSWORD: cred.password }),
         }),
     GIT_TERMINAL_PROMPT: '0',
   };

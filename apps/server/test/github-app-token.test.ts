@@ -358,3 +358,16 @@ test('step credential refresh explicitly bypasses the mint cache', async () => {
   await appTokenOrNull(deps, repo, true);
   expect(refreshes).toEqual([false, true]);
 });
+
+test('step minimum validity forces the mint to replace a near-expiry cached installation', async () => {
+  const { deps, refreshes } = await mint();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => installed()),
+  );
+  await appTokenOrNull(deps, repo);
+  const clock = Date.now();
+  vi.spyOn(Date, 'now').mockReturnValue(clock + 45 * 60000);
+  expect(await appTokenOrNull(deps, repo, false, 50 * 60000)).not.toBeNull();
+  expect(refreshes).toEqual([false, true]);
+});

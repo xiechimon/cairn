@@ -35,6 +35,8 @@ interface ProbeOpts {
   branch: string;
   baseBranch?: string;
   token?: string | null;
+  tokenKind?: 'app' | 'unattributed' | undefined;
+  refreshToken?: () => Promise<string>;
   fetchImpl?: ProbeFetch;
   ghPath?: string;
 }
@@ -90,17 +92,25 @@ async function probeViaApi(opts: ProbeOpts, fetchImpl: ProbeFetch): Promise<Gith
     `${opts.owner}:${opts.branch}`,
   )}&state=all${opts.baseBranch === undefined ? '' : `&base=${encodeURIComponent(opts.baseBranch)}`}`;
   let data: unknown;
+  let token = opts.token;
   try {
-    const res = await fetchImpl(url, {
-      headers: {
-        accept: 'application/vnd.github+json',
-        'user-agent': 'cairn-daemon',
-        ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
-      },
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    data = await res.json();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetchImpl(url, {
+        headers: {
+          accept: 'application/vnd.github+json',
+          'user-agent': 'cairn-daemon',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      });
+      if (res.status === 401 && attempt === 0 && opts.tokenKind === 'app' && opts.refreshToken) {
+        token = await opts.refreshToken();
+        continue;
+      }
+      if (!res.ok) return null;
+      data = await res.json();
+      break;
+    }
   } catch {
     return null;
   }
@@ -131,6 +141,7 @@ function pickPr(
 }
 
 export async function probeGithubPr(opts: ProbeOpts): Promise<GithubPrProbe | null> {
+  if (opts.tokenKind === 'app') return probeViaApi(opts, opts.fetchImpl ?? fetch).catch(() => null);
   const gh = opts.ghPath ?? 'gh';
   const viaGh = await probeViaGh(opts, gh).catch(() => null);
   if (viaGh !== null) return viaGh;

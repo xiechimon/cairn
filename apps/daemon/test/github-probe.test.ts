@@ -189,3 +189,38 @@ test('gh lookup filters by the configured base', async () => {
     }),
   ).toEqual({ number: 12, url: 'right' });
 });
+
+test.each([false, true])(
+  'App PR probe refreshes once without consulting machine gh credentials: second failure %s',
+  async (failAgain) => {
+    let attempts = 0;
+    let refreshes = 0;
+    const identities: boolean[] = [];
+    const result = await probeGithubPr({
+      owner: 'o',
+      repo: 'r',
+      branch: 'work',
+      token: 'fixture-old',
+      tokenKind: 'app',
+      ghPath: fakeGh('[{"number":999,"url":"machine","state":"open"}]'),
+      refreshToken: async () => {
+        refreshes++;
+        return 'fixture-fresh';
+      },
+      fetchImpl: async (_url, init) => {
+        attempts++;
+        identities.push(
+          init?.headers?.authorization ===
+            `Bearer ${attempts === 1 ? 'fixture-old' : 'fixture-fresh'}`,
+        );
+        return attempts === 1 || failAgain ? fetchJson({}, 401)() : fetchJson(GITHUB_API_ROWS)();
+      },
+    });
+    expect(attempts).toBe(2);
+    expect(refreshes).toBe(1);
+    expect(identities).toEqual([true, true]);
+    expect(result).toEqual(
+      failAgain ? null : { number: 14, url: 'https://github.com/o/r/pull/14' },
+    );
+  },
+);

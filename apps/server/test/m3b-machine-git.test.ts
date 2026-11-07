@@ -542,6 +542,9 @@ test.each([null, 'app-token-unconfigured', 'repo-not-installed'] as const)(
         email: '12+human@users.noreply.github.com',
       });
       expect(result.git?.kind).toBe(reason === null ? 'app' : 'unattributed');
+      if (reason === null)
+        expect((result.git?.expiresAt ?? 0) - Date.now()).toBeGreaterThan(50 * 60000);
+      else expect(result.git?.expiresAt).toBeUndefined();
       expect(info).toHaveBeenCalledWith(
         'github step credential',
         expect.objectContaining({ kind: reason === null ? 'app' : 'unattributed' }),

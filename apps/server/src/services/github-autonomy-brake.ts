@@ -6,7 +6,7 @@ import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { type GithubWriteToken, githubTokenFetch } from '../lib/github-token.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
-import type { GithubTokenDeps } from './github-connection.js';
+import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
 import type { GateReadCache } from './merge-gate/github-facts.js';
 
 export function brakeRequest(
@@ -90,7 +90,14 @@ export async function pauseGithubRepo(
   if (!issue.ok) throw new Error('Autonomy marker creation failed');
 }
 
-export async function pauseTeamGithubRepos(
+export function pauseTeamGithubRepos(deps: GithubTokenDeps, teamId: string): Promise<void> {
+  return pauseTeamGithubReposAutonomously(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    teamId,
+  );
+}
+
+export async function pauseTeamGithubReposAutonomously(
   deps: GithubTokenDeps & {
     db: Db;
     githubWriteTokenForRepo?: (

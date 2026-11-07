@@ -46,7 +46,7 @@ import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
-import { hasGithubConnection } from './github-connection.js';
+import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { isNotifiedPhase, notifyTodoPhase } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -63,6 +63,7 @@ import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 type TodoRow = typeof todo.$inferSelect;
 
 export interface TodoDeps {
+  githubAppTokenSocket?: string | null | undefined;
   githubWriteTokenForRepo?: (
     teamId: string,
     repo: GithubRepoRef,
@@ -280,6 +281,16 @@ function assertTagsInProject(db: Db, projectId: string, tagIds: readonly string[
 
 export function createTodo(
   deps: TodoDeps,
+  input: Parameters<typeof createAutonomousTodo>[1],
+): TodoRecord {
+  return createAutonomousTodo(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    input,
+  );
+}
+
+export function createAutonomousTodo(
+  deps: TodoDeps,
   input: {
     teamId: string;
     projectId: string;
@@ -365,6 +376,20 @@ export function createTodo(
 }
 
 export function updateTodo(
+  deps: TodoDeps,
+  id: string,
+  patch: Parameters<typeof updateAutonomousTodo>[2],
+  opts: Parameters<typeof updateAutonomousTodo>[3] = {},
+): TodoRecord | null {
+  return updateAutonomousTodo(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    id,
+    patch,
+    opts,
+  );
+}
+
+export function updateAutonomousTodo(
   deps: TodoDeps,
   id: string,
   patch: {
@@ -814,7 +839,10 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   if (selfIssueInFlight.has(todoId)) {
     throw new HttpError(409, 'github issue creation already in flight');
   }
-  const raw = runSelfIssueCreate(deps, todoId);
+  const raw = runSelfIssueCreate(
+    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
+    todoId,
+  );
   const guarded = raw
     .catch(() => undefined)
     .finally(() => {

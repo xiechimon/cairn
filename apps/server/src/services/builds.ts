@@ -176,6 +176,7 @@ import { blockingWorkerQuestions, cancelPendingWorkerQuestions } from './worker-
 import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
+  githubAppTokenSocket?: string | null | undefined;
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;

@@ -134,10 +134,7 @@ export function openGithubToken(deps: GithubConnectionDeps, teamId: string): str
 
 const refreshChains = new Map<string, Promise<GithubTokenAccess>>();
 
-export async function teamGithubToken(
-  deps: GithubTokenDeps,
-  teamId: string,
-): Promise<GithubTokenAccess> {
+async function connectionToken(deps: GithubTokenDeps, teamId: string): Promise<GithubTokenAccess> {
   const box = deps.box;
   if (box === undefined) return { reason: 'no-secret-box' };
   const connectionDeps = { db: deps.db, box };
@@ -246,7 +243,7 @@ export async function githubTokenOrNull(
   deps: GithubTokenDeps,
   teamId: string,
 ): Promise<string | null> {
-  const access = await teamGithubToken(deps, teamId);
+  const access = await connectionToken(deps, teamId);
   return 'token' in access ? access.token : null;
 }
 
@@ -275,7 +272,7 @@ export async function teamUserToken(
   deps: GithubTokenDeps,
   teamId: string,
 ): Promise<{ token: UserToken; box: SecretBox } | { reason: GithubTokenReason }> {
-  const access = await teamGithubToken(deps, teamId);
+  const access = await connectionToken(deps, teamId);
   return 'token' in access ? { ...access, token: access.token as UserToken } : access;
 }
 
@@ -286,3 +283,5 @@ export async function userTokenOrNull(
   const access = await teamUserToken(deps, teamId);
   return 'token' in access ? access.token : null;
 }
+
+export { teamUserToken as teamGithubToken };

@@ -88,3 +88,7 @@ export function githubAppBotLogin(token: string): string | null {
   const slug = appFetches.get(token)?.appSlug;
   return slug ? `${slug}[bot]`.toLowerCase() : null;
 }
+
+export function githubAppTokenExpiry(token: AppToken): number | undefined {
+  return appFetches.get(token)?.expiresAt;
+}

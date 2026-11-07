@@ -42,7 +42,7 @@ import { planDocumentDiff } from './services/documents.js';
 import {
   deleteGithubConnection,
   readGithubConnectionStatus,
-  teamUserToken,
+  teamGithubToken,
 } from './services/github-connection.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
@@ -527,7 +527,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/github/repos', async (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     requireTeam(ctx, teamId);
-    const access = await teamUserToken(
+    const access = await teamGithubToken(
       {
         db: ctx.db,
         box: ctx.secretBox,

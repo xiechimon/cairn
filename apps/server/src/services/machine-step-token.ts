@@ -2,7 +2,7 @@ import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@cair
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, chiefThread, step, todo } from '../db/schema.js';
-import { isAppToken } from '../lib/github-token.js';
+import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
@@ -45,7 +45,7 @@ export async function stepToken(
   } else if (projectRow?.repoKind === 'github' && todoRow) {
     const ref = githubRepoOfProject(projectRow);
     const githubToken =
-      ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true);
+      ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000);
     console.info('github step credential', {
       stepId,
       kind: githubToken === null ? 'none' : isAppToken(githubToken) ? 'app' : 'unattributed',
@@ -56,6 +56,7 @@ export async function stepToken(
             username: GITHUB_ACCESS_TOKEN_USERNAME,
             password: githubToken,
             kind: isAppToken(githubToken) ? 'app' : 'unattributed',
+            ...(isAppToken(githubToken) ? { expiresAt: githubAppTokenExpiry(githubToken) } : {}),
           }
         : null;
   }
