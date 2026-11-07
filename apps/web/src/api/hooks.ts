@@ -1,11 +1,7 @@
 import type {
-  AgentMachineFitResponse,
-  AgentRecord,
-  AgentTask,
   ApiKeyRow,
   AskUserAnswer,
   AskUserQuestionContent,
-  Assignment,
   AutonomyRecord,
   BuildRecord,
   CapabilitiesResponse,
@@ -14,7 +10,6 @@ import type {
   ComputerCommandsResponse,
   ComputerRecord,
   ConversationMessagesResponse,
-  CreateAgentBody,
   CreateProjectBody,
   CreateProviderBody,
   CreateScheduleBody,
@@ -40,7 +35,6 @@ import type {
   OAuthAuthorizeResponse,
   PairedDevice,
   PairingCodeResponse,
-  PatchAgentBody,
   PatchAutonomyBody,
   PatchChiefBody,
   PatchMachineBody,
@@ -408,50 +402,11 @@ export const useProviders = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
   });
 
-export const useAgent = (
-  teamId: string | undefined,
-  agentId: string | undefined,
-  enabled: boolean,
-) =>
+export const useMemories = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
-    queryKey: ['agent', teamId, agentId],
-    queryFn: () => api.get<AgentRecord>(`/api/teams/${teamId}/agents/${agentId}`),
-    enabled: enabled && teamId !== undefined && agentId !== undefined,
-  });
-
-export const useMemories = (
-  teamId: string | undefined,
-  agentId: string | undefined,
-  enabled: boolean,
-) =>
-  useQuery({
-    queryKey: ['memories', teamId, agentId],
-    queryFn: () => api.get<MemoryRecord[]>(`/api/teams/${teamId}/agents/${agentId}/memories`),
-    enabled: enabled && teamId !== undefined && agentId !== undefined,
-  });
-
-export const useAgentTasks = (
-  teamId: string | undefined,
-  agentId: string | undefined,
-  enabled: boolean,
-) =>
-  useQuery({
-    queryKey: ['agentTasks', teamId, agentId],
-    queryFn: () => api.get<AgentTask[]>(`/api/teams/${teamId}/agents/${agentId}/tasks`),
-    enabled: enabled && teamId !== undefined && agentId !== undefined,
-  });
-
-export const useAgentMachineFit = (
-  teamId: string | undefined,
-  agentId: string | undefined,
-  enabled: boolean,
-) =>
-  useQuery({
-    queryKey: ['agentMachineFit', teamId, agentId],
-    queryFn: () =>
-      api.get<AgentMachineFitResponse>(`/api/teams/${teamId}/agents/${agentId}/machine-fit`),
-    enabled: enabled && teamId !== undefined && agentId !== undefined,
-    staleTime: 0,
+    queryKey: ['memories', teamId],
+    queryFn: () => api.get<MemoryRecord[]>(`/api/teams/${teamId}/memories`),
+    enabled: enabled && teamId !== undefined,
   });
 
 export const useModelSources = (teamId: string | undefined, enabled: boolean) =>
@@ -745,10 +700,6 @@ export function useApiMutations(teamId: string | undefined) {
           orderIndex?: number;
           tagIds?: string[];
           projectId?: string;
-          assignment?: {
-            plan?: NonNullable<Assignment['plan']>;
-            build?: NonNullable<Assignment['build']>;
-          };
           routeOverride?: {
             machineId?: string;
             requiredCapabilities?: {
@@ -819,29 +770,6 @@ export function useApiMutations(teamId: string | undefined) {
       onSettled: () => {
         void qc.invalidateQueries({ queryKey: ['notifications', teamId] });
       },
-    }),
-    startBuilds: useMutation({
-      mutationFn: (input: {
-        projectId: string;
-        todoIds: string[];
-        assignment: Assignment;
-        withPlan: boolean;
-        routeOverride?: {
-          machineId?: string;
-          requiredCapabilities?: {
-            mcpServers?: string[];
-            models?: string[];
-            executor?: 'orb';
-          };
-        };
-      }) =>
-        api.post<{ builds: BuildRecord[] }>(`/api/projects/${input.projectId}/builds`, {
-          todoIds: input.todoIds,
-          assignment: input.assignment,
-          withPlan: input.withPlan,
-          ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
-        }),
-      onSuccess: invalidateAll,
     }),
     orchestrateTodo: useMutation({
       mutationFn: (id: string) =>
@@ -1099,20 +1027,6 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
       onSuccess: invalidateAll,
     }),
-    createAgent: useMutation({
-      mutationFn: (body: CreateAgentBody) =>
-        api.post<{ id: string }>(`/api/teams/${teamId}/agents`, body),
-      onSuccess: invalidateAll,
-    }),
-    patchAgent: useMutation({
-      mutationFn: (input: { id: string; body: PatchAgentBody }) =>
-        api.patch<AgentRecord>(`/api/teams/${teamId}/agents/${input.id}`, input.body),
-      onSuccess: invalidateAll,
-    }),
-    deleteAgent: useMutation({
-      mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/agents/${id}`),
-      onSuccess: invalidateAll,
-    }),
     decideRetroProposal: useMutation({
       mutationFn: (input: { proposalId: string; decision: 'accept' | 'dismiss' }) =>
         api.post<RetroProposal>(
@@ -1122,8 +1036,8 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({
-      mutationFn: (input: { agentId: string; memoryId: string }) =>
-        api.del<void>(`/api/teams/${teamId}/agents/${input.agentId}/memories/${input.memoryId}`),
+      mutationFn: (input: { memoryId: string }) =>
+        api.del<void>(`/api/teams/${teamId}/memories/${input.memoryId}`),
       onSuccess: invalidateAll,
     }),
     sendSteer: useMutation({

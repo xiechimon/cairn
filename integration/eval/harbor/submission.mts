@@ -14,7 +14,6 @@ export class HarborSubmission {
   private readonly projectId: string;
   private readonly teamId: string;
   private readonly machineId: string;
-  private readonly agentId: string;
   private readonly fetcher: typeof fetch;
 
   constructor(env: NodeJS.ProcessEnv, fetcher: typeof fetch = fetch) {
@@ -28,7 +27,6 @@ export class HarborSubmission {
     this.projectId = required('CAIRN_PROJECT_ID');
     this.teamId = required('CAIRN_TEAM_ID');
     this.machineId = required('CAIRN_MACHINE_ID');
-    this.agentId = required('CAIRN_AGENT_ID');
     const url = new URL(required('CAIRN_SERVER_URL'));
     if (
       !['http:', 'https:'].includes(url.protocol) ||
@@ -95,7 +93,6 @@ export class HarborSubmission {
     this.created.todoId = todo.id;
     const result = await this.request<{ builds: BuildRecord[] }>(`${route}/builds`, {
       todoIds: [todo.id],
-      assignment: { plan: null, build: { agentId: this.agentId }, review: null, verify: null },
       withPlan: false,
     });
     const build = result.builds[0];

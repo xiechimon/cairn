@@ -3,14 +3,19 @@ import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { agent as agentTable } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import {
   deleteGithubConnection,
   upsertGithubConnection,
 } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 let throttleHome: string;
 beforeAll(async () => {
@@ -386,8 +391,6 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
 });
 
 describe('title write-back and claim meta (B family)', () => {
-  const AGENT_ID = 'agent-452';
-
   async function world(
     mock: GhMock,
     opts: { buildIssue: boolean },
@@ -400,17 +403,7 @@ describe('title write-back and claim meta (B family)', () => {
       body: { teamId: s.team.id, name: 'l452', cliVersion: '0.1.0' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({
-        id: AGENT_ID,
-        teamId: s.team.id,
-        displayName: 'meta',
-        provider: 'p',
-        modelId: 'm',
-      })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, { provider: 'p', modelId: 'm' });
 
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
@@ -418,7 +411,6 @@ describe('title write-back and claim meta (B family)', () => {
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: {
         todoIds: [created.id],
-        assignment: { plan: null, build: { agentId: AGENT_ID } },
         withPlan: false,
       },
     });

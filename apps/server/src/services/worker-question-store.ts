@@ -8,7 +8,6 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { message } from '../db/schema.js';
 import type { ConversationStreamHub } from './events.js';
-import { routingRulesEnabled } from './routing-rules.js';
 
 interface StoreDeps {
   db: Db;
@@ -143,7 +142,7 @@ export function pendingWorkerQuestions(db: Db, buildId: string): AskUserQuestion
 }
 
 export function blockingWorkerQuestions(db: Db, buildId: string): AskUserQuestionContent[] {
-  return routingRulesEnabled() ? pendingWorkerQuestions(db, buildId) : [];
+  return pendingWorkerQuestions(db, buildId);
 }
 
 export function answerPendingWorkerQuestions(

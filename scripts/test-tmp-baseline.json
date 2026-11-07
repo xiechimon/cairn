@@ -1,11 +1,9 @@
 {
   "apps/server/test/coordinator/compaction.test.ts": 1,
-  "apps/coordinator/test/config.test.ts": 1,
   "apps/server/test/coordinator/harness.test.ts": 1,
   "apps/server/test/coordinator/mirror.test.ts": 1,
   "apps/server/test/coordinator/model-switch.test.ts": 1,
   "apps/server/test/coordinator/seed.test.ts": 1,
-  "apps/coordinator/test/store-lock.test.ts": 1,
   "apps/server/test/coordinator/thread-stores.test.ts": 1,
   "apps/server/test/coordinator/tools.test.ts": 1,
   "apps/server/test/coordinator/turn.test.ts": 1,

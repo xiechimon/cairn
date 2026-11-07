@@ -1,10 +1,62 @@
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const allocations = new Map();
 const removal = { recursive: true, force: true, maxRetries: 5, retryDelay: 50 };
+
+function reapProcessesUnder(path) {
+  let names;
+  try {
+    names = readdirSync('/proc');
+  } catch {
+    return;
+  }
+  const inside = (candidate) => candidate === path || candidate.startsWith(`${path}/`);
+  for (const name of names) {
+    if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
+    let located = false;
+    try {
+      located = inside(readlinkSync(`/proc/${name}/cwd`).replace(/ \(deleted\)$/, ''));
+      if (!located) {
+        located = readFileSync(`/proc/${name}/cmdline`, 'utf8')
+          .split('\0')
+          .some((argument) => inside(argument));
+      }
+    } catch {
+      continue;
+    }
+    if (!located) continue;
+    try {
+      process.kill(Number(name), 'SIGKILL');
+    } catch {}
+  }
+}
+
+function removeTree(path) {
+  for (let attempt = 0; ; attempt += 1) {
+    reapProcessesUnder(path);
+    let failure;
+    try {
+      rmSync(path, removal);
+    } catch (error) {
+      failure = error;
+    }
+    if (!failure && !existsSync(path)) return;
+    if (attempt >= 3) {
+      throw failure ?? new Error(`Temporary directory ${path} reappeared after removal`);
+    }
+  }
+}
 
 export function testTempPrefix(runId) {
   return `ct-${runId.slice(0, 8)}-`;
@@ -21,7 +73,7 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
   const owned = new Set();
   const release = (path) => {
     if (!owned.has(path)) return false;
-    rmSync(path, removal);
+    removeTree(path);
     owned.delete(path);
     allocations.delete(path);
     return true;
@@ -42,7 +94,7 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
           );
         }
       } catch (error) {
-        rmSync(path, removal);
+        removeTree(path);
         throw error;
       }
       owned.add(path);
@@ -85,7 +137,7 @@ process.once('exit', () => {
           );
         }
       }
-      rmSync(path, removal);
+      removeTree(path);
     } catch (error) {
       console.error(error);
       process.exitCode = 1;

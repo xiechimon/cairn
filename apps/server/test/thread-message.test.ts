@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { build, chiefMessage, message, steerPending, step, todo } from '../src/db/schema.js';
 import { pickedProjectIdOf } from '../src/services/picked-project.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
-import { AGENT_ID, H, registerChiefHarness, toolDeps } from './chief-harness.js';
+import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
 import { req } from './helpers.js';
 
 registerChiefHarness();
@@ -23,7 +23,6 @@ function seedThread(phase: Phase, stepStatus: 'claimed' | 'done' | 'pending' = '
       phaseAt: 1,
       seqNum: 7,
       latestBuildId: 'direct-build',
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
     })
     .run();
   H.s.db

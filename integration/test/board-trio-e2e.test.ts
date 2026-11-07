@@ -7,7 +7,7 @@ import { type Browser, chromium, type Page, expect as pexpect } from '@playwrigh
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { step as stepTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
-import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
 const WEB_DIST = join(ROOT, 'apps/web/dist');
@@ -74,22 +74,14 @@ async function claimStep(token: string): Promise<ClaimedStep | null> {
   return claimed?.id != null ? claimed : null;
 }
 
-async function relayRunBuilds(
-  stepId: string,
-  token: string,
-  input: { todoIds: string[]; withPlan: boolean },
-): Promise<void> {
-  const res = await machineFetch(token, 'POST', `/api/machine/tool/${stepId}`, {
-    name: 'run_builds',
-    params: {
-      todoIds: input.todoIds,
-      withPlan: input.withPlan,
-      dispatchReason: '#1216 集成探针派发',
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    },
-  });
+type ThreadTool =
+  | { name: 'open_thread'; params: { todoId: string } }
+  | { name: 'message_thread'; params: { todoId: string; content: string } };
+
+async function relayThreadTool(stepId: string, token: string, tool: ThreadTool): Promise<void> {
+  const res = await machineFetch(token, 'POST', `/api/machine/tool/${stepId}`, tool);
   if (res.status !== 200)
-    throw new Error(`relay run_builds → ${res.status} ${JSON.stringify(res.body).slice(0, 300)}`);
+    throw new Error(`relay ${tool.name} → ${res.status} ${JSON.stringify(res.body).slice(0, 300)}`);
 }
 
 async function doneStep(
@@ -129,13 +121,9 @@ async function waitForStep(
   }
 }
 
-async function runChiefDispatch(
-  token: string,
-  threadId: string,
-  input: { todoIds: string[]; withPlan: boolean },
-): Promise<void> {
+async function runChiefDispatch(token: string, threadId: string, tool: ThreadTool): Promise<void> {
   const claimed = await waitForStep(token, (s) => s.buildId === threadId && s.kind === 'chief');
-  await relayRunBuilds(claimed.id, token, input);
+  await relayThreadTool(claimed.id, token, tool);
   await doneStep(token, claimed.id, 'success');
 }
 
@@ -152,14 +140,12 @@ async function seedFailedTodo(
   const record = created.body as { id: string; seqNum: number };
   const started = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [record.id],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    withPlan: false,
   });
   expect(started.status).toBe(201);
   const buildId = (started.body as { builds: { id: string }[] }).builds[0]?.id;
   if (buildId == null)
     throw new Error(`startBuilds response has no build: ${JSON.stringify(started.body)}`);
-  const step = await waitForStep(claimToken, (s) => s.buildId === buildId && s.kind === 'build');
+  const step = await waitForStep(claimToken, (s) => s.buildId === buildId && s.kind === 'session');
   await doneStep(claimToken, step.id, 'failed', { errorMessage: '探针：让这一轮失败' });
   await waitFor(() => server.todoPhase(record.id) === 'failed', 15_000);
   return record;
@@ -188,10 +174,13 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     webDir: WEB_DIST,
   });
-  const patch = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-    agent: { agentId: AGENT_ID, thinkingLevel: null },
-  });
-  expect(patch.status).toBe(200);
+  const coordinator = await api(
+    server.url,
+    'PATCH',
+    `/api/teams/${server.teamId}/routing-rules/coordinator`,
+    { provider: 'stub-gw', modelId: 'stub-model' },
+  );
+  expect(coordinator.status).toBe(200);
   const project = await api(server.url, 'POST', '/api/projects', {
     name: 'trio-probe',
     repoKind: 'hosted',
@@ -266,22 +255,19 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
 
     const turn = orchestrationTurns(seqNum)[0];
     if (turn === undefined) throw new Error('orchestration turn missing');
-    await runChiefDispatch(tokens.m1, turn.buildId, {
-      todoIds: [todoId],
-      withPlan: true,
-    });
+    await runChiefDispatch(tokens.m1, turn.buildId, { name: 'open_thread', params: { todoId } });
     await waitFor(() => server.todoPhase(todoId) === 'queued', 15_000);
     const buildId = latestBuildIdOf(todoId);
     if (buildId == null) throw new Error('latestBuildId missing after run_builds');
 
-    const planStep = await waitForStep(
+    const sessionStep = await waitForStep(
       tokens.m1,
-      (s) => s.buildId === buildId && s.kind === 'plan',
+      (s) => s.buildId === buildId && s.kind === 'session',
     );
-    expect(planStep.kind).toBe('plan');
-    await waitFor(() => server.todoPhase(todoId) === 'planning', 15_000);
+    expect(sessionStep.kind).toBe('session');
+    await waitFor(() => server.todoPhase(todoId) === 'building', 15_000);
 
-    await pexpect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', 'planning', {
+    await pexpect(page.getByTestId('side-chat')).toHaveAttribute('data-phase', 'building', {
       timeout: 30_000,
     });
     expect(orchestrationTurns(seqNum).length).toBe(1);
@@ -307,8 +293,8 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
     const turn = orchestrationTurns(seeded.seqNum)[0];
     if (turn === undefined) throw new Error('rerun orchestration turn missing');
     await runChiefDispatch(tokens.m1, turn.buildId, {
-      todoIds: [seeded.id],
-      withPlan: false,
+      name: 'message_thread',
+      params: { todoId: seeded.id, content: '重跑这张失败的卡。' },
     });
     await waitFor(() => server.todoPhase(seeded.id) === 'queued', 15_000);
     const record = (await api(server.url, 'GET', `/api/todos/${seeded.id}`)).body as {
@@ -324,7 +310,7 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
     if (rerunBuildId == null) throw new Error('latestBuildId missing after rerun');
     const buildStep = await waitForStep(
       tokens.m1,
-      (s) => s.buildId === rerunBuildId && s.kind === 'build',
+      (s) => s.buildId === rerunBuildId && s.kind === 'session',
     );
     await doneStep(tokens.m1, buildStep.id, 'success', { hasChanges: false });
     await waitFor(() => server.todoPhase(seeded.id) === 'failed', 15_000);

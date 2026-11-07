@@ -1,25 +1,31 @@
 import type { ProviderConfig } from '@cairn/shared';
 import type { Api, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai';
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy';
+import { openAICodexResponsesApi } from '@earendil-works/pi-ai/api/openai-codex-responses.lazy';
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy';
 import { createProvider } from '@earendil-works/pi-ai/models';
+import { CODEX_API, CODEX_BASE_URL, CODEX_PROVIDER_ID } from '../codex-login.js';
 
 const STREAMS: Record<string, () => ProviderStreams> = {
   'anthropic-messages': anthropicMessagesApi,
   'openai-completions': openAICompletionsApi,
   'openai-responses': openAIResponsesApi,
+  'openai-codex-responses': openAICodexResponsesApi,
 };
 
 const DEFAULT_CONTEXT_WINDOW = 200_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
 
-export function stepProvider(config: ProviderConfig): Provider | null {
-  const api = config.api;
+export type KeyResolver = () => string | null | Promise<string | null>;
+
+export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): Provider | null {
+  const subscription = config.providerId === CODEX_PROVIDER_ID && !config.baseUrl;
+  const api = subscription ? CODEX_API : config.api;
   const streams = api === undefined ? undefined : STREAMS[api];
-  if (api === undefined || streams === undefined || config.baseUrl === undefined) return null;
-  const baseUrl = config.baseUrl;
+  const baseUrl = subscription ? CODEX_BASE_URL : config.baseUrl;
+  if (api === undefined || streams === undefined || baseUrl === undefined) return null;
   const models: Model<Api>[] = (config.models ?? []).map((m) => ({
     id: m.id,
     name: m.name,
@@ -28,7 +34,7 @@ export function stepProvider(config: ProviderConfig): Provider | null {
     baseUrl,
     input: m.input ?? ['text'],
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    reasoning: false,
+    reasoning: subscription,
     contextWindow: m.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: m.maxTokens ?? DEFAULT_MAX_TOKENS,
     ...(config.compat === undefined ? {} : { compat: config.compat }),
@@ -40,10 +46,12 @@ export function stepProvider(config: ProviderConfig): Provider | null {
     auth: {
       apiKey: {
         name: `${config.providerId} key from the claimed Coordinator step`,
-        resolve: async ({ credential }) =>
-          credential?.key
-            ? { auth: { apiKey: credential.key }, source: 'cairn step token' }
-            : { auth: { apiKey: KEYLESS_PLACEHOLDER }, source: 'no key on the provider' },
+        resolve: async ({ credential }) => {
+          const key = resolveKey === undefined ? credential?.key : await resolveKey();
+          return key
+            ? { auth: { apiKey: key }, source: 'cairn step token' }
+            : { auth: { apiKey: KEYLESS_PLACEHOLDER }, source: 'no key on the provider' };
+        },
       },
     },
     models,

@@ -15,11 +15,11 @@ async function jget(path) {
   const res = await fetch(`${SERVER}${path}`);
   return { status: res.status, body: await res.json() };
 }
-async function jpost(path, body, token) {
+async function jpost(path, body, token, method = 'POST') {
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(`${SERVER}${path}`, {
-    method: 'POST',
+    method,
     headers,
     body: JSON.stringify(body),
   });
@@ -50,11 +50,10 @@ if (prov.status !== 201 && prov.status !== 200 && prov.status !== 409) {
   throw new Error(`provider status=${prov.status} body=${JSON.stringify(prov.body)}`);
 }
 
-const agent = await jpost(`/api/teams/${teamId}/agents`, {
-  displayName: 'verify-builder',
+const agent = await jpost(`/api/teams/${teamId}/routing-rules/session`, {
   provider: providerId,
   modelId: 'stub-model',
-});
+}, undefined, 'PATCH');
 if (agent.status !== 201 && agent.status !== 200) {
   throw new Error(`agent status=${agent.status} body=${JSON.stringify(agent.body)}`);
 }
@@ -76,7 +75,6 @@ if (!todoId) throw new Error(`todo missing id in ${JSON.stringify(todo.body)}`);
 
 const build = await jpost(`/api/projects/${projectId}/builds`, {
   todoIds: [todoId],
-  assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
   withPlan: true,
 });
 if (build.status !== 201) throw new Error(`build status=${build.status} body=${JSON.stringify(build.body)}`);

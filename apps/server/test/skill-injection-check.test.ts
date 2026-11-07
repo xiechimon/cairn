@@ -3,7 +3,6 @@ import { SKILL_INJECTION_CHECK_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -13,7 +12,7 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { finishStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -38,7 +37,6 @@ function makeWorld(opts: {
   const suffix = Math.random().toString(36).slice(2);
   const base = nowMs();
   const projectId = `proj-${suffix}`;
-  const agentId = `agent-${suffix}`;
   const machineId = `machine-${suffix}`;
   const todoId = `todo-${suffix}`;
   const buildId = `build-${suffix}`;
@@ -62,19 +60,12 @@ function makeWorld(opts: {
       enabledRuntimes: ['pi'],
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: agentId,
-      teamId: s.team.id,
-      displayName: 'injection-probe',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId,
-      skillsAllowlist: opts.skillsAllowlist,
-      tools: [],
-    })
-    .run();
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId,
+    skillsAllowlist: opts.skillsAllowlist,
+  });
   s.db
     .insert(todoTable)
     .values({
@@ -86,7 +77,6 @@ function makeWorld(opts: {
       phase: 'building',
       phaseAt: base,
       seqNum: 1,
-      assignment: { plan: null, build: { agentId } },
       hasPlan: false,
       latestBuildId: buildId,
       v: 1,

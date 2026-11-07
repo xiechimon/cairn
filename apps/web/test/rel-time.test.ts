@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { relativeTime } from '../src/board/rel-time.js';
+import { isUsableTimestamp, joinMeta, relativeTime } from '../src/board/rel-time.js';
 import { EN } from '../src/i18n/en.js';
 import { translate, type TVars } from '../src/i18n/translate.js';
 
@@ -39,5 +39,37 @@ describe('relativeTime en (dict fallback)', () => {
     expect(relativeTime(NOW - 3 * HOUR, NOW, en)).toBe('3h ago');
     expect(relativeTime(NOW - 33 * HOUR, NOW, en)).toBe('yesterday');
     expect(relativeTime(NOW - 46 * HOUR, NOW, en)).toBe('2d ago');
+  });
+});
+
+describe('isUsableTimestamp', () => {
+  it('rejects epoch 0, null, undefined and NaN', () => {
+    expect(isUsableTimestamp(0, NOW)).toBe(false);
+    expect(isUsableTimestamp(null, NOW)).toBe(false);
+    expect(isUsableTimestamp(undefined, NOW)).toBe(false);
+    expect(isUsableTimestamp(Number.NaN, NOW)).toBe(false);
+  });
+
+  it('rejects a far-future value but tolerates clock skew', () => {
+    expect(isUsableTimestamp(NOW + 365 * 24 * HOUR, NOW)).toBe(false);
+    expect(isUsableTimestamp(NOW + MINUTE, NOW)).toBe(true);
+  });
+
+  it('accepts a past timestamp', () => {
+    expect(isUsableTimestamp(NOW - HOUR, NOW)).toBe(true);
+  });
+});
+
+describe('relativeTime without a usable start', () => {
+  it('returns nothing for null, undefined, 0 and non-finite times', () => {
+    for (const ts of [null, undefined, 0, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(relativeTime(ts, NOW)).toBe('');
+    }
+  });
+
+  it('joinMeta drops empty parts so no separator dangles', () => {
+    expect(joinMeta(['#9', relativeTime(0, NOW)])).toBe('#9');
+    expect(joinMeta(['#9', '2 小时前'])).toBe('#9 · 2 小时前');
+    expect(joinMeta([null, ''])).toBe('');
   });
 });

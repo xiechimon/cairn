@@ -1,18 +1,15 @@
 import { THREAD_REPORT_LINE_MAX, threadReportContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { build, chief, chiefMessage, step, todo } from '../src/db/schema.js';
 import { applyBuildStepAction, startBuilds } from '../src/services/builds.js';
 import { coordinatorThreadRow, ensureChief } from '../src/services/chief.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { recordThreadReportLine } from '../src/services/worker-questions.js';
-import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+import { H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
-beforeEach(() => setRoutingRulesEnabled(true));
-afterEach(() => setRoutingRulesEnabled(false));
 
 function deps() {
   return {
@@ -42,8 +39,6 @@ function startSession() {
   const [started] = startBuilds(deps(), {
     projectId: H.projectId,
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
-    withPlan: false,
   });
   const stepRow = H.s.db.select().from(step).where(eq(step.buildId, started!.id)).get()!;
   H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
@@ -138,13 +133,6 @@ describe('D65 report line on every thread', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.threadId).toBe(H.threadId);
     expect(rows[0]!.content.line).toBe('Done on my side.');
-  });
-
-  test('flag off writes no report for an unwatched thread', () => {
-    const { todoId } = startSession();
-    setRoutingRulesEnabled(false);
-    setTodoPhase(deps(), todoId, 'review');
-    expect(reports()).toHaveLength(0);
   });
 });
 

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { useBuildChangeFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { relativeTime } from '../board/rel-time.js';
+import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
@@ -292,9 +292,7 @@ function VersionMenu({
           className={i === 0 ? 'font-semibold' : undefined}
           onClick={() => onMenu(undefined)}
         >
-          <span className="flex-1">
-            {row.v} · {relativeTime(row.at, now, t)}
-          </span>
+          <span className="flex-1">{joinMeta([String(row.v), relativeTime(row.at, now, t)])}</span>
           <Restore width={13} height={13} className="text-(--text-tertiary)" />
         </KeyedMenuItem>
       ))}
@@ -394,7 +392,7 @@ export function DocPane({
   const { t } = useI18n();
   const versionLabel = (): string => {
     const latest = planVersions?.[0];
-    return latest == null ? 'v1' : `${latest.v} · ${relativeTime(latest.at, now, t)}`;
+    return latest == null ? 'v1' : joinMeta([String(latest.v), relativeTime(latest.at, now, t)]);
   };
   const headStart = (docLabel: DocTypeLabel) => (
     <PaneTitle docLabel={docLabel} onDocView={onDocView} />

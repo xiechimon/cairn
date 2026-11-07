@@ -50,21 +50,21 @@ test('Escape inside a text field is the field\'s; the window stays open', async 
   await expect(settings(page)).toHaveCount(0);
 });
 
-test('tab and scope changes inside a section keep the page settings will return to', async ({
+test('section and scope changes keep the page settings will return to', async ({
   page,
 }) => {
   await page.goto('/app/schedules?scenario=model-routing');
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'routing').click();
-  await settings(page).getByRole('tab', { name: '路由' }).click();
-  await expect(page).toHaveURL(/tab=routing/);
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing/);
   await settings(page).getByRole('button', { name: '关闭设置' }).click();
   await expect(page).toHaveURL(/\/app\/schedules\?scenario=model-routing$/);
 
   await page.goto(`/app/schedules?${FLEET}`);
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'providers').click();
-  await settings(page).getByRole('tab', { name: /build-box-orb/ }).click();
+  await settings(page).getByRole('combobox', { name: '设置作用于' }).click();
+  await page.getByRole('option', { name: /build-box-orb/ }).click();
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/\/app\/schedules\?scenario=providers-fleet$/);
 });
@@ -87,7 +87,6 @@ test('sections switch in place, keep their own params, and close goes back to wh
 test('old resource URLs land on their settings section with the query intact', async ({ page }) => {
   const cases = [
     ['/app/resources/providers', 'providers'],
-    ['/app/resources/model-routing', 'routing'],
     ['/app/resources/routing-settings', 'work-routing'],
     ['/app/resources/machines', 'machines'],
     ['/app/resources/skills', 'skills'],

@@ -1,7 +1,6 @@
 import type { ChiefDigestItem } from '@cairn/shared';
 import { CHIEF_DIGEST_GROUP_LABELS, CHIEF_DIGEST_GROUPS } from '@cairn/shared';
 import { useId, useState } from 'react';
-import { Link } from 'react-router';
 import { useApiMutations, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
@@ -9,8 +8,7 @@ import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError } from '../components/ui/toaster.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, ExternalLink, Trash2 } from '../icons/index.js';
-import { AGENTS_HREF } from '../routes/agent-detail-page.js';
+import { ChevronDown, Trash2 } from '../icons/index.js';
 
 const DIVIDER_CLS =
   "my-3 flex items-center gap-3 text-meta text-content-tertiary before:h-px before:flex-1 before:bg-border before:content-[''] after:h-px after:flex-1 after:bg-border after:content-['']";
@@ -38,8 +36,8 @@ export function ChiefDigestRow({
   const [open, setOpen] = useState(false);
   const [forgotten, setForgotten] = useState<ReadonlySet<string>>(new Set());
   const cardId = useId();
-  const memoryAgentId = items.find((item) => item.memory !== undefined)?.memory?.agentId;
-  const memoriesQ = useMemories(teamId, memoryAgentId, live && open && memoryAgentId !== undefined);
+  const hasMemory = items.some((item) => item.memory !== undefined);
+  const memoriesQ = useMemories(teamId, live && open && hasMemory);
   const mutations = useApiMutations(teamId);
   const known = memoriesQ.data === undefined ? null : new Set(memoriesQ.data.map((m) => m.id));
   const label =
@@ -104,43 +102,28 @@ export function ChiefDigestRow({
                         )}
                       </div>
                       {memory !== undefined && !gone && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={ICON_BTN_CLS}
-                            aria-label={t('查看这条记忆')}
-                            render={
-                              <Link
-                                to={`${AGENTS_HREF}/${memory.agentId}?tab=memory#memory-${memory.id}`}
-                              />
-                            }
-                          >
-                            <ExternalLink width={14} height={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={ICON_BTN_CLS}
-                            aria-label={t('让 Coordinator 忘掉这条')}
-                            onClick={() => {
-                              const markGone = () =>
-                                setForgotten((prev) => new Set(prev).add(memory.id));
-                              if (!live) markGone();
-                              else
-                                mutations.deleteMemory.mutate(
-                                  { agentId: memory.agentId, memoryId: memory.id },
-                                  {
-                                    onSuccess: markGone,
-                                    onError: (error) =>
-                                      toastError(t('删除记忆失败，请重试。'), error),
-                                  },
-                                );
-                            }}
-                          >
-                            <Trash2 width={14} height={14} />
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={ICON_BTN_CLS}
+                          aria-label={t('让 Coordinator 忘掉这条')}
+                          onClick={() => {
+                            const markGone = () =>
+                              setForgotten((prev) => new Set(prev).add(memory.id));
+                            if (!live) markGone();
+                            else
+                              mutations.deleteMemory.mutate(
+                                { memoryId: memory.id },
+                                {
+                                  onSuccess: markGone,
+                                  onError: (error) =>
+                                    toastError(t('删除记忆失败，请重试。'), error),
+                                },
+                              );
+                          }}
+                        >
+                          <Trash2 width={14} height={14} />
+                        </Button>
                       )}
                     </li>
                   );

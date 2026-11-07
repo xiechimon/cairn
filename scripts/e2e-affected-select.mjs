@@ -132,7 +132,6 @@ const AGENT = [
   'agent-',
   'team-create-agent',
   'registry-focus-ring',
-  'resource-back-spa',
   'task-panel',
   'chief-home-digest',
 ];
@@ -141,7 +140,6 @@ export const LIVE_SERVER = [
   'token-gate',
   'live-server-',
   'agent-fallback-models',
-  'split-autostart',
 ];
 const OVERLAY = [
   'menu-keys',
@@ -193,7 +191,6 @@ const PAGES = [
   'accent-typo',
   'page-scroll',
   'registry-focus-ring',
-  'resource-back-spa',
   'mobile-narrow',
   'task-panel',
 ];
@@ -212,7 +209,6 @@ const RESOURCES = [
   'dialog-',
   'checkbox-unified',
   'registry-focus-ring',
-  'resource-back-spa',
   'skill-import',
   'task-panel',
   'first-pr-report',
@@ -246,10 +242,6 @@ export const FILE_RULES = new Map([
     ['menu-keys', 'sidebar-', 'cds-sidebar', 'paper-sidebar'],
   ],
   ['apps/web/src/overlay/status-menu.tsx', [...OVERLAYS, ...DETAIL]],
-  [
-    'apps/web/src/components/agent-picker.tsx',
-    ['detail-', 'chip-', 'live-agent-model-line', 'avatar-spiral'],
-  ],
   ['apps/web/src/overlay/gesture-machine.ts', [...OVERLAYS, 'chief-toggle-flash']],
   ['apps/web/src/overlay/hotkeys.ts', OVERLAYS],
   ['apps/web/src/overlay/plan-dropdown.tsx', OVERLAYS],
@@ -265,14 +257,10 @@ export const FILE_RULES = new Map([
   ],
   ['apps/web/src/routes/feishu-settings.tsx', ['account-feishu']],
   ['apps/web/src/routes/feature-releases.tsx', ['account-feature-releases']],
-  ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
-  ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'focus-ring-clip', 'api-key-']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-', 'api-key-']],
-  ['apps/web/src/routes/create-agent-dialog.tsx', AGENT],
   ['apps/web/src/routes/machine-authorize-page.tsx', ['machine-']],
-  ['apps/web/src/routes/team-chart.tsx', ['team-', 'account-team-cleanse']],
   ['apps/web/src/routes/team-page.tsx', ['team-', 'account-team-cleanse']],
   [
     'apps/web/src/components/model-select-core.tsx',

@@ -5,7 +5,7 @@
   "format": "auto",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "ignore": ["@cairn/coordinator", "@cairn/integration", "@cairn/shared", "@cairn/site", "@cairn/web"],
+  "ignore": ["@cairn/integration", "@cairn/shared", "@cairn/site", "@cairn/web"],
   "fixed": [],
   "linked": [],
   "updateInternalDependencies": "patch"

@@ -94,6 +94,12 @@ test('a snoozed thread leaves needs-you and sinks to the bottom of running', () 
   expect(nums(groups.running)).toEqual([2, 1]);
 });
 
+test('a missing or zero start time renders no duration', () => {
+  expect(elapsedSince(0, NOW)).toBeNull();
+  expect(elapsedSince(null, NOW)).toBeNull();
+  expect(elapsedSince(undefined, NOW)).toBeNull();
+});
+
 test('a done thread is never marked done by age: an old running thread stays running', () => {
   const old = { ...inProject(1, 'building'), phaseAt: NOW - 30 * 86_400_000 };
   expect(nums(groupThreads([old], null).running)).toEqual([1]);

@@ -2,14 +2,13 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
-import { ChiefQuestionEntry, ChiefQuestionPanel } from '../chief/chief-question-panel.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
 export const SHEET_PANEL =
-  'relative isolate my-2 mr-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) bg-background shadow-(--e1) max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:shadow-none';
+  'relative isolate m-2 flex min-w-0 flex-1 overflow-hidden rounded-(--radius-card) border border-border bg-background max-[640px]:m-0 max-[640px]:rounded-none max-[640px]:border-0';
 
 export const EmbeddedShell = createContext(false);
 
@@ -85,28 +84,37 @@ export function PageShell({
       {!embedded && <AppSidebar fixture={fixture} selected={selected} />}
       <div className={embedded ? 'relative flex min-w-0 flex-1' : `page-main ${SHEET_PANEL}`}>
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
-          <header
-            data-testid="page-topbar"
-            className="flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
-          >
-            {back != null && (
-              <Link
-                className="-mr-1 -ml-2 flex size-7 flex-none items-center justify-center rounded-md text-content-tertiary"
-                to={back}
-                aria-label={t('返回')}
-              >
-                <ChevronLeft width={16} height={16} />
-              </Link>
-            )}
-            <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
-              {title}
-            </h1>
-            {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
-            <div className="ml-auto flex flex-none items-center gap-0.5">
-              <ChiefQuestionEntry />
-              {actions}
+          {embedded ? (
+            <div
+              data-testid="page-toolbar"
+              className="mx-auto flex w-192 max-w-full flex-none items-center gap-3 px-4 pt-4 empty:hidden"
+            >
+              {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
+              <div className="ml-auto flex flex-none items-center gap-0.5 empty:hidden">
+                {actions}
+              </div>
             </div>
-          </header>
+          ) : (
+            <header
+              data-testid="page-topbar"
+              className="flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
+            >
+              {back != null && (
+                <Link
+                  className="-mr-1 -ml-2 flex size-7 flex-none items-center justify-center rounded-md text-content-tertiary"
+                  to={back}
+                  aria-label={t('返回')}
+                >
+                  <ChevronLeft width={16} height={16} />
+                </Link>
+              )}
+              <h1 className="min-w-0 truncate font-serif text-page font-semibold text-foreground">
+                {title}
+              </h1>
+              {tabs != null && tab != null && <TabGroup tabs={tabs} tab={tab} onTab={onTab} />}
+              <div className="ml-auto flex flex-none items-center gap-0.5">{actions}</div>
+            </header>
+          )}
           <div
             className={`flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto${bleed ? '' : ' px-4'}`}
           >
@@ -119,7 +127,6 @@ export function PageShell({
             )}
           </div>
         </div>
-        <ChiefQuestionPanel />
       </div>
     </div>
   );

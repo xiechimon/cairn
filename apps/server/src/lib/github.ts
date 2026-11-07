@@ -4,6 +4,7 @@ import {
   GithubCreateGateNotWritableError,
   parseGithubCreateRateLimit,
 } from '@cairn/shared/github-create-gate';
+import { RULESETS_NOT_ON_PLAN } from '../services/merge-gate/github-rules.js';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 import { githubApiBaseUrl, isGithubApiUrl } from './github-api-base.js';
@@ -708,6 +709,96 @@ function projectArray<T>(
     if (typeof raw !== 'object' || raw === null) continue;
     const projected = project(raw as Record<string, unknown>);
     if (projected !== null) items.push(projected);
+  }
+  return { ok: true, items, hasMore: page.hasMore };
+}
+
+export interface GithubOverlapEntry {
+  number: number;
+  title: string;
+}
+
+export type GithubSearchResult =
+  | {
+      ok: true;
+      items: GithubOverlapEntry[];
+      totalCount: number;
+      incompleteResults: boolean;
+      hasMore: boolean;
+    }
+  | { ok: false; failure: GithubListFailure };
+
+export async function githubSearchIssues(
+  fetchImpl: FetchLike,
+  token: string,
+  query: string,
+  timeoutMs: number,
+): Promise<GithubSearchResult> {
+  const url = `${githubApiBaseUrl()}/search/issues?${new URLSearchParams({ q: query, per_page: '100' })}`;
+  const page = await getListPage(fetchImpl, url, token, timeoutMs);
+  if (!page.ok) return page;
+  const data = page.data as {
+    total_count?: unknown;
+    incomplete_results?: unknown;
+    items?: unknown;
+  } | null;
+  if (
+    !data ||
+    !Number.isSafeInteger(data.total_count) ||
+    Number(data.total_count) < 0 ||
+    typeof data.incomplete_results !== 'boolean' ||
+    !Array.isArray(data.items)
+  ) {
+    return { ok: false, failure: { kind: 'malformed' } };
+  }
+  const items: GithubOverlapEntry[] = [];
+  for (const raw of data.items as unknown[]) {
+    const item = raw as { number?: unknown; title?: unknown } | null;
+    if (
+      !item ||
+      !Number.isSafeInteger(item.number) ||
+      Number(item.number) < 1 ||
+      typeof item.title !== 'string'
+    ) {
+      return { ok: false, failure: { kind: 'malformed' } };
+    }
+    items.push({ number: Number(item.number), title: item.title });
+  }
+  return {
+    ok: true,
+    items,
+    totalCount: Number(data.total_count),
+    incompleteResults: data.incomplete_results,
+    hasMore: page.hasMore,
+  };
+}
+
+export async function githubListPullFiles(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  number: number,
+  opts: { page: number; perPage: number; timeoutMs: number },
+): Promise<GithubListResult<{ filename: string; previousFilename: string | null }>> {
+  const url = listUrl(owner, repo, `pulls/${number}/files`, {
+    page: opts.page,
+    per_page: opts.perPage,
+  });
+  const page = await getListPage(fetchImpl, url, token, opts.timeoutMs);
+  if (!page.ok) return page;
+  if (!Array.isArray(page.data)) return { ok: false, failure: { kind: 'malformed' } };
+  const items: { filename: string; previousFilename: string | null }[] = [];
+  for (const raw of page.data as unknown[]) {
+    const file = raw as { filename?: unknown; previous_filename?: unknown } | null;
+    if (
+      !file ||
+      typeof file.filename !== 'string' ||
+      (file.previous_filename !== undefined && typeof file.previous_filename !== 'string')
+    ) {
+      return { ok: false, failure: { kind: 'malformed' } };
+    }
+    items.push({ filename: file.filename, previousFilename: optString(file.previous_filename) });
   }
   return { ok: true, items, hasMore: page.hasMore };
 }
@@ -1505,8 +1596,6 @@ export async function githubCommitCheckRuns(
   }
   return { notModified: false, etag: got.etag, checkRuns };
 }
-
-const RULESETS_NOT_ON_PLAN = /upgrade to github|enable this feature/i;
 
 export async function githubRequiredChecks(
   fetchImpl: FetchLike,

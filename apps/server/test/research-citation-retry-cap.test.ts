@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as dbClient from '../src/db/client.js';
-import { agent, build, todo, tokenUsage } from '../src/db/schema.js';
+import { build, todo, tokenUsage } from '../src/db/schema.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { failureNeedsHuman, sweepFailedRetries } from '../src/services/needs-you.js';
 import {
@@ -13,7 +13,7 @@ import {
   planResearchCitationChecks,
 } from '../src/services/research-citations.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, postProject, seedRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -31,25 +31,8 @@ async function world() {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'citations');
-  s.db
-    .insert(agent)
-    .values([
-      {
-        id: 'researcher',
-        teamId: s.team.id,
-        displayName: 'Researcher',
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-      },
-      {
-        id: 'checker',
-        teamId: s.team.id,
-        displayName: 'Checker',
-        provider: 'openai-codex',
-        modelId: 'gpt-6.1-sol',
-      },
-    ])
-    .run();
+  seedRoute(s, 'session', { provider: 'claude-code', modelId: 'claude-sonnet-5-5' });
+  seedRoute(s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
   const opened = openResearchThread(s.svc, {
     teamId: s.team.id,
     projectId,

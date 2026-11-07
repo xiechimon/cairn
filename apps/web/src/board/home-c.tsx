@@ -10,8 +10,6 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
-import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -31,10 +29,10 @@ import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
-import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
-import { NeedsYouThreadCard } from './needs-you-thread-card.js';
+import { needsYouThreads } from './needs-you.js';
+import { NeedsYouTray } from './needs-you-tray.js';
 import { composeRequest } from './open-composer.js';
-import { THREAD_PARAM, threadCopy, threadStatus, threadTone, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, threadStatus, VIEW_PARAM } from './thread-copy.js';
 import { useOpenThread } from './thread-link.js';
 import { PANE_PARAM, paneOf, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -50,11 +48,7 @@ export function greetingFor(hour: number): string {
   return GREETINGS.find(([until]) => hour < until)?.[1] ?? '晚上好';
 }
 
-const NEEDS_YOU_PINNED = 3;
-
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
-
-type NeedsYouEntry = { kind: 'thread'; key: string; todo: TodoRecord; status: string };
 
 export function streamForProject(
   stream: readonly ChiefStreamItem[],
@@ -73,25 +67,6 @@ export function streamForProject(
       (project === null && item.kind === 'question' && item.status === 'pending')
     );
   });
-}
-
-function SectionHead({
-  children,
-  count,
-  countTestId,
-}: {
-  children: ReactNode;
-  count: number;
-  countTestId?: string;
-}) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <h3 className="m-0 font-heading text-ui font-semibold text-foreground">{children}</h3>
-      <span data-testid={countTestId} className="text-meta text-content-tertiary tabular-nums">
-        {count}
-      </span>
-    </div>
-  );
 }
 
 interface HomeCProps {
@@ -134,7 +109,6 @@ export function HomeC({
   const navigate = useNavigate();
   const location = useLocation();
   const composeAt = composeRequest(location.state);
-  const [allOpen, setAllOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const pane = paneOf(searchParams.get(PANE_PARAM));
   const computers = useMemo(
@@ -147,7 +121,6 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
-  const questions = useOptionalChiefRoot();
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
@@ -157,15 +130,8 @@ export function HomeC({
     setSearchParams(params, { replace: true, state: location.state });
   };
   const togglePane = (next: WorkPane) => {
-    questions?.setQuestionsOpen(false);
     showPane(pane === next && threadId === null ? null : next);
   };
-  useEffect(() => {
-    if (questions?.questionsOpen !== true || pane === null) return;
-    const params = new URLSearchParams(searchParams);
-    params.delete(PANE_PARAM);
-    setSearchParams(params, { replace: true, state: location.state });
-  }, [questions?.questionsOpen, pane, searchParams, setSearchParams, location.state]);
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState('');
@@ -196,17 +162,11 @@ export function HomeC({
   const conversation = stream.filter(
     (item) => !(item.kind === 'question' && item.status === 'pending'),
   );
-  const entries: NeedsYouEntry[] = needsYouThreads(scoped).map((todo) => ({
-    kind: 'thread' as const,
-    key: todo.id,
-    todo,
-    status: ACT_ORDER[actRank(todo)] ?? 'needs-you',
-  }));
+  const entries = needsYouThreads(scoped);
   const thread = useComposerThreadTarget(scoped);
   const running = scoped.filter(
     (todo) => threadStatus(todo) === 'running' && todo.archivedAt == null,
   );
-  const shown = allOpen ? entries : entries.slice(0, NEEDS_YOU_PINNED);
 
   const greeting = (
     <Greeting as="h2">
@@ -266,47 +226,6 @@ export function HomeC({
     </nav>
   );
 
-  const needsYou = entries.length > 0 && (
-    <section
-      data-testid="needs-you"
-      aria-label={t('待你决定')}
-      className="mt-6 flex flex-col gap-3"
-    >
-      <SectionHead count={entries.length} countTestId="needs-you-count">
-        {t('待你决定')}
-      </SectionHead>
-      {shown.map((entry) => (
-        <div key={entry.key} data-slot="needs-you-item" data-status={entry.status}>
-          <NeedsYouThreadCard
-            todo={entry.todo}
-            title={entry.todo.title}
-            tone={threadTone(entry.todo)}
-            stateLabel={t(threadCopy(entry.todo).state)}
-            reason={t(threadCopy(entry.todo).reason)}
-            {...(threadCopy(entry.todo).primary != null
-              ? {
-                  primaryLabel: t(threadCopy(entry.todo).primary ?? ''),
-                  onPrimary: () => openThread(entry.todo.id),
-                }
-              : {})}
-            viewLabel={t('查看 thread')}
-            onView={() => openThread(entry.todo.id)}
-          />
-        </div>
-      ))}
-      {entries.length > NEEDS_YOU_PINNED && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setAllOpen(!allOpen)}
-          className="-ml-2.5 self-start text-meta text-content-tertiary hover:text-foreground"
-        >
-          {allOpen ? t('收起其余') : t('还有 {n} 件', { n: entries.length - NEEDS_YOU_PINNED })}
-        </Button>
-      )}
-    </section>
-  );
-
   const hero = (
     <header
       data-testid="home-c-hero"
@@ -315,7 +234,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      {needsYou}
       {entries.length === 0 && (
         <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
           {STARTERS.map((label) => (
@@ -336,7 +254,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      {needsYou}
       {chiefData.hasEarlier === true && (
         <p
           data-testid="home-c-earlier"
@@ -356,7 +273,6 @@ export function HomeC({
       <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
         {projectName ?? t('Coordinator')}
       </h1>
-      <ChiefQuestionEntry />
       <MachineChip
         machines={computers}
         open={pane === 'machines' && threadId === null}
@@ -445,7 +361,10 @@ export function HomeC({
   if (load !== 'ready') {
     return (
       <div className="relative flex min-h-0 min-w-0 flex-1">
-        <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <section
+          data-testid="home-c"
+          className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
+        >
           {paneButtons}
           {load === 'loading' ? (
             <>
@@ -487,7 +406,7 @@ export function HomeC({
       <section
         data-testid="home-c"
         aria-label={t('与 Coordinator 的对话')}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+        className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
       >
         {paneButtons}
         {banner != null && (
@@ -509,8 +428,6 @@ export function HomeC({
                     : () => Promise.resolve()
             }
             onRewind={surface.onRewind}
-            onAnswerQuestion={surface.onAnswerQuestion}
-            onCancelQuestion={surface.onCancelQuestion}
             onWithdraw={surface.onWithdraw}
             onSteer={surface.onSteer}
             onStop={surface.onStop}
@@ -527,6 +444,7 @@ export function HomeC({
             }
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
+            tray={<NeedsYouTray threads={entries} />}
             composerTools={
               <>
                 <ComposerThreadTarget

@@ -1,6 +1,7 @@
 import type { TokenUsage } from '@cairn/shared';
 import { formatUsd, mapTokenUsage } from '../api/mappers.js';
 import type { TodoRecord } from '../fixtures/records.js';
+import type { TFunc } from '../i18n/translate.js';
 
 export interface ThreadUsageSummary {
   cost: string;
@@ -34,4 +35,19 @@ export function threadUsageSummary(
     models: [...new Set(knownUsage?.map((row) => row.model) ?? [])],
     machines: [...new Set(machines)],
   };
+}
+
+const UNKNOWN = '—';
+
+export function threadUsageCaption(summary: ThreadUsageSummary, t: TFunc): string {
+  const parts = [
+    summary.cost === UNKNOWN ? null : summary.cost,
+    summary.tokens === UNKNOWN ? null : t('Token 数：{tokens}', { tokens: summary.tokens }),
+    summary.models.length === 0
+      ? null
+      : summary.models.length === 1
+        ? summary.models[0]
+        : t('{n} 个模型', { n: summary.models.length }),
+  ].filter((part): part is string => part !== null && part !== undefined);
+  return parts.length === 0 ? t('用量暂不可用') : parts.join(' · ');
 }

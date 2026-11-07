@@ -8,7 +8,6 @@ import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   notification as notificationTable,
   provider as providerTable,
@@ -17,14 +16,13 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
-
-const AGENT_ID = 'agent-stop-1';
 
 async function call(
   app: Hono,
@@ -66,24 +64,16 @@ async function setupWorld() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      tools: ['合并分支', '推送分支'],
-    })
-    .run();
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    tools: ['合并分支', '推送分支'],
+  });
   async function enroll(name: string, cred: string): Promise<string> {
     const res = await call(s.app, 'POST', '/api/machine/enroll', {
       cred,
       body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
     });
-
-    bindAllAgents(s);
     expect(res.status).toBe(200);
     return ((await res.json()) as { token: string }).token;
   }
@@ -95,16 +85,8 @@ async function setupWorld() {
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
 
-  async function startBuild(withPlan = true): Promise<string> {
-    const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan,
-      },
-    });
-    expect(res.status).toBe(201);
-    return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
+  async function startBuild(): Promise<string> {
+    return startLegacyBuild(s, todoId, { withPlan: true });
   }
   async function claim(): Promise<ClaimedStep> {
     const res = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
@@ -180,7 +162,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 1: no active step 409; an unknown build 404; missing discard 400', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const unknown = await call(w.s.app, 'POST', '/api/builds/does-not-exist/stop', {
       body: { discard: true },
     });
@@ -196,7 +178,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 2: a pending step -> canceled by the server at once (step stopped + prevPhase falls back + canceled)', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const res = await w.stop(buildId, true);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ delegated: false });
@@ -209,7 +191,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 3: a claimed step -> single-slot pending + an SSE stop signal + 202 delegated', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const claimed = await w.claim();
     const events: unknown[] = [];
     const unsubscribe = w.s.machineHub.subscribe(w.s.team.id, (ev) => events.push(ev));
@@ -230,7 +212,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 4: fetch-acknowledge (first fetch / second fetch / 401 / another machine does not consume)', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const claimed = await w.claim();
     await w.stop(buildId, false);
     const stepId = claimed.step.id;
@@ -252,7 +234,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 5: the old step pending -> the new step fetch gets null + discard', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const first = await w.claim();
     await w.uploadPlan(first.step.id, withVerification('# plan v1'));
     await w.stop(buildId, true);
@@ -269,7 +251,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 6a: stopping the first-round plan step (claimed -> done(stopped)) -> prevPhase falls back', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const claimed = await w.claim();
     await w.stop(buildId, true);
     await w.done(claimed.step.id, { status: 'stopped', sessionId: 'pi-s-1' });
@@ -283,7 +265,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure modes 6b/7: stopping the build step -> confirm falls back (plan v1 kept) and no notification', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
     await w.done(planStep.step.id, { status: 'success' });
@@ -304,7 +286,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 6c: stopping the merge step -> review unchanged', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
     await w.done(planStep.step.id, { status: 'success' });
@@ -323,7 +305,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 8: a double stop overwrites the single slot (the later discard wins); after stopped 409', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const claimed = await w.claim();
     await w.stop(buildId, true);
     await w.stop(buildId, false);
@@ -336,7 +318,7 @@ describe('the stop server write surface (M7 #308)', () => {
   });
 
   test('failure mode 9: after stop is booked, the steer fetch -> null (the step is not claimed)', async () => {
-    const buildId = await w.startBuild(true);
+    const buildId = await w.startBuild();
     const claimed = await w.claim();
     await call(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
       body: { content: '顺便补一句' },

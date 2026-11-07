@@ -3,7 +3,6 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   provider as providerTable,
   step as stepTable,
@@ -11,11 +10,11 @@ import {
 } from '../src/db/schema.js';
 import { backfillTokenUsageCost } from '../src/services/token-usage-cost.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
   req,
+  seedSessionRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -71,22 +70,12 @@ async function world() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-cost',
-      teamId: s.team.id,
-      displayName: 'cost-builder',
-      provider: 'stub-gw',
-      modelId: 'org/stub-model',
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'cost-mbp', cliVersion: '0.1.0' },
   });
   expect(enrollRes.status).toBe(200);
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'org/stub-model' });
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app);
   return { s, token, projectId };
@@ -104,7 +93,6 @@ async function startBuild(s: TestServer, projectId: string, todoId: string): Pro
   const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     body: {
       todoIds: [todoId],
-      assignment: { plan: null, build: { agentId: 'agent-cost' } },
       withPlan: false,
     },
   });

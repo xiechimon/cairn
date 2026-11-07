@@ -57,7 +57,6 @@ Supply configuration through the calling process environment:
   `/api/machine/me`; it cannot replace the server token.
 - `CAIRN_TEAM_ID` and `CAIRN_MACHINE_ID`: expected authenticated machine identity.
 - `CAIRN_PROJECT_ID`: required explicit project belonging to that team.
-- `CAIRN_AGENT_ID`: agent assigned to the build.
 
 Load credentials from the environment using your existing secret provisioning.
 Do not interpolate them into shell commands, benchmark instructions, command-line

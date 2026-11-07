@@ -1,11 +1,18 @@
 import { notificationRecordSchema } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agent, build, notification, schedule, step, todo } from '../src/db/schema.js';
+import { build, notification, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
 import { createSchedule } from '../src/services/schedules.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, insertMachine, openStream, postProject, req } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  openStream,
+  postProject,
+  req,
+  seedSessionRoute,
+} from './helpers.js';
 
 async function world() {
   const s = bootServer();
@@ -16,8 +23,6 @@ async function world() {
   builds.startBuilds(s.svc, {
     projectId,
     todoIds: [created.id],
-    assignment: { plan: null, build: null },
-    withPlan: false,
   });
   return { ...s, projectId, todoId: created.id };
 }
@@ -117,17 +122,7 @@ describe('a scheduled run finishing upserts an unread notification', () => {
   async function scheduled(kind: 'cron' | 'once' = 'cron') {
     const w = await world();
     const machineId = insertMachine(w);
-    w.db
-      .insert(agent)
-      .values({
-        id: 'sched-agent',
-        teamId: w.team.id,
-        displayName: 'Worker',
-        provider: 'p',
-        modelId: 'm',
-        machineId,
-      })
-      .run();
+    seedSessionRoute(w, { provider: 'p', modelId: 'm', machineId });
     const buildRow = w.db.select().from(build).where(eq(build.todoId, w.todoId)).get()!;
     const stepRow = w.db.select().from(step).where(eq(step.buildId, buildRow.id)).get()!;
     w.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, w.todoId)).run();

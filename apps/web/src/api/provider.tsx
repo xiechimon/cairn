@@ -6,7 +6,7 @@ import { DEMO_MODE } from '../demo/demo-gate.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
 import { SCENARIO_PARAM, SCENARIOS_ENABLED } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { useMembers, useSession, useTeams } from './hooks.js';
+import { useSession, useTeams } from './hooks.js';
 import { isFixtureMode } from './mode.js';
 import { useTeamStream } from './sse.js';
 
@@ -35,19 +35,6 @@ const LiveDataContext = createContext<LiveData>({
 
 export function useLiveData(): LiveData {
   return useContext(LiveDataContext);
-}
-
-export function useAgentAvatarUrlById(): Map<string, string | null> {
-  const { live, teamId } = useLiveData();
-  const members = useMembers(teamId, live);
-  return useMemo(() => {
-    const map = new Map<string, string | null>();
-    for (const m of members.data ?? []) {
-      if (m.memberType !== 'agent') continue;
-      map.set(m.actorId, (m.actor as { avatarUrl?: string | null } | undefined)?.avatarUrl ?? null);
-    }
-    return map;
-  }, [members.data]);
 }
 
 const queryClient = new QueryClient({
@@ -110,7 +97,7 @@ export function LiveDataBridge() {
 function FixtureModeChip({ id }: { id: string }) {
   const { t } = useI18n();
   return (
-    <div className="fixture-mode-chip pointer-events-none fixed top-2 right-3 z-40 rounded-full bg-popover px-3 py-1 text-xs text-muted-foreground ring-1 ring-foreground/10">
+    <div className="fixture-mode-chip pointer-events-none fixed hidden md:block top-2 right-3 z-40 rounded-full bg-popover px-3 py-1 text-xs text-muted-foreground ring-1 ring-foreground/10">
       {t('示例数据（scenario {id}）', { id })}
     </div>
   );

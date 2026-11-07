@@ -27,10 +27,7 @@ export function ListRow({ icon, title, subtitle, trailing, className }: ListRowP
   return (
     <div
       data-slot="list-row"
-      className={cn(
-        'flex items-center gap-3 px-3.5 py-3 text-ui hover:bg-sidebar-hover',
-        className,
-      )}
+      className={cn('flex items-center gap-3 px-3.5 py-3 text-ui', className)}
     >
       {icon != null && <span className="flex-none text-content-secondary">{icon}</span>}
       <div className="min-w-0 flex-1">

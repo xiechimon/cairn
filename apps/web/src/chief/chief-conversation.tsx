@@ -1,8 +1,4 @@
-import {
-  type AskUserAnswer,
-  CHIEF_INPUT_PLACEHOLDER,
-  CHIEF_INPUT_PLACEHOLDER_STEERING,
-} from '@cairn/shared';
+import { CHIEF_INPUT_PLACEHOLDER, CHIEF_INPUT_PLACEHOLDER_STEERING } from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type ReactNode,
@@ -12,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
@@ -22,6 +19,7 @@ import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { machineSecondary } from '../components/machine-label.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -55,6 +53,7 @@ import {
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { AnswerComposer } from './answer-composer.js';
 import { ChiefEarlierLoader } from './chief-earlier-loader.js';
 import { ChiefStreamRow, chiefStreamRowKey, TurnElapsedContext } from './chief-message-rows.js';
 import {
@@ -62,6 +61,7 @@ import {
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
+import { ChiefQuestionDock, useAnswerKey, useQuestionDockVisible } from './chief-question-dock.js';
 import { serverDraftBinding } from './composer-binding.js';
 import {
   ComposerSurface,
@@ -70,14 +70,19 @@ import {
 } from './composer-surface.js';
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
+import { questionDockState } from './question-dock-state.js';
+import { awaitingStream } from './question-lifecycle.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
   "size-6 cursor-pointer justify-center rounded-none border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
-const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
-const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
-const SCROLLER_CONTENT_HOME_CLS = 'mx-auto block w-full max-w-190 gap-0 px-4 pt-3.5';
+const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
+const SCROLLER_CONTENT_CLS = 'block min-w-0 max-w-full gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
+const SCROLLER_CONTENT_HOME_CLS =
+  'mx-auto block w-full max-w-190 min-w-0 gap-0 px-4 pt-3.5 [overflow-wrap:anywhere]';
+
+const THREAD_COMPOSER = 'thread';
 
 const EXAMPLE_ICONS = {
   'user-plus': ChiefUserPlus,
@@ -127,8 +132,6 @@ export interface ChiefConversationProps {
   onClose?: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
@@ -147,6 +150,7 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  tray?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -159,8 +163,6 @@ export function ChiefConversation({
   onClose,
   onSend,
   onRewind,
-  onAnswerQuestion,
-  onCancelQuestion,
   onWithdraw,
   onSteer,
   onStop,
@@ -179,11 +181,25 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  tray,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
+  const questionAttached = useQuestionDockVisible();
   const projectMark = useProjectMark();
   const { t } = useI18n();
+  const composerPlaceholder =
+    targetPlaceholder ??
+    (chief.outage != null
+      ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
+      : chief.running === true
+        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const answerHere = targetPlaceholder === null;
+  const answerKey = useAnswerKey();
+  const [threadOverride, setThreadOverride] = useState(false);
+  const answerActive = answerHere && answerKey !== null && !threadOverride;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -211,7 +227,11 @@ export function ChiefConversation({
       label: s.name,
       subtitle: s.description ?? undefined,
     })),
-    machine: (machinesQ.data ?? []).map((m) => ({ id: m.id, label: m.name })),
+    machine: (machinesQ.data ?? []).map((m) => ({
+      id: m.id,
+      label: m.name,
+      subtitle: machineSecondary(m, machinesQ.data ?? []) ?? undefined,
+    })),
   };
   const projectOptions = useMemo(
     () =>
@@ -287,9 +307,41 @@ export function ChiefConversation({
   });
   const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const surfaceRef = useRef<ComposerSurfaceHandle | null>(null);
+  const answerSurfaceRef = useRef<ComposerSurfaceHandle | null>(null);
+  const activeComposer = answerActive ? answerKey : THREAD_COMPOSER;
+  const focusedComposerRef = useRef<string | null>(null);
+  const leaveComposer = useCallback(() => {
+    focusedComposerRef.current = null;
+  }, []);
+  const shownComposerRef = useRef(activeComposer);
+  const threadFocusPendingRef = useRef(false);
+  useLayoutEffect(() => {
+    const previous = shownComposerRef.current;
+    shownComposerRef.current = activeComposer;
+    if (activeComposer === THREAD_COMPOSER && threadFocusPendingRef.current) {
+      threadFocusPendingRef.current = false;
+      surfaceRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    if (previous === activeComposer || focusedComposerRef.current !== previous) return;
+    const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
+    incoming.current?.focus({ preventScroll: true });
+  }, [activeComposer]);
+  const restoreToThread = (update: (current: string) => string) => {
+    setThreadOverride(true);
+    setLiveDraft(update);
+    if (shownComposerRef.current === THREAD_COMPOSER)
+      surfaceRef.current?.focus({ preventScroll: true });
+    else threadFocusPendingRef.current = true;
+  };
   const composerBinding = serverDraftBinding(
     onSend != null ? liveDraft : (chief.draft ?? ''),
-    onSend != null ? setLiveDraft : undefined,
+    onSend != null
+      ? (value: string) => {
+          setLiveDraft(value);
+          if (value === '') setThreadOverride(false);
+        }
+      : undefined,
   );
   const sendFromComposer =
     onSend == null
@@ -311,8 +363,7 @@ export function ChiefConversation({
   const prefillText = prefill?.text;
   useEffect(() => {
     if (prefillKey == null || prefillText == null) return;
-    setLiveDraft(prefillText);
-    surfaceRef.current?.focus({ preventScroll: true });
+    restoreToThread(() => prefillText);
   }, [prefillKey, prefillText]);
   const home = variant !== 'drawer';
   const ownHeader = variant !== 'global';
@@ -339,8 +390,9 @@ export function ChiefConversation({
       : undefined;
   const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed =
-    turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
+  const turnElapsed = questionAttached
+    ? null
+    : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -348,8 +400,7 @@ export function ChiefConversation({
           onWithdraw(messageId).then(
             () => {
               followSentRef.current = false;
-              setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
-              surfaceRef.current?.focus({ preventScroll: true });
+              restoreToThread((cur) => (cur === '' ? text : `${cur}\n${text}`));
             },
             () => {},
           );
@@ -360,7 +411,10 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
+    item,
+    i,
+  }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
   const latestMessage = rows.findLast(
     ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
@@ -398,6 +452,54 @@ export function ChiefConversation({
       : [],
   );
   const outstandingReports = outstandingReportIds(chief.stream ?? []);
+  const capsules = (
+    <QueuedCapsules
+      messages={queuedCapsules}
+      onSendNow={onSteer ? (id) => onSteer(id) : undefined}
+      onRemove={withdraw}
+      removeLabel={t('撤回')}
+    />
+  );
+  const tools = (
+    <>
+      {composerTools}
+      {chipVisible && (
+        <ProjectMenu
+          title="发给哪个项目"
+          projects={projectOptions}
+          value={pickedProject?.id ?? null}
+          withAuto
+          side="top"
+          onPick={pickProject}
+          trigger={
+            <Button
+              variant="ghost"
+              data-testid="chief-project-chip"
+              data-set={pickedProject != null ? '' : undefined}
+              aria-label={t('发给哪个项目：{name}', {
+                name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
+              })}
+              className={PROJECT_CHIP_CLS}
+            />
+          }
+        >
+          {pickedProject != null ? (
+            <ProjectAvatar
+              name={pickedProject.name}
+              tone={projectOptions.indexOf(pickedProject)}
+              icon={projectMark(pickedProject.id).icon}
+              color={projectMark(pickedProject.id).color}
+              bare
+            />
+          ) : (
+            <CircleDashed className="size-4 flex-none" />
+          )}
+          <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
+          <ChevronDown width={12} height={12} />
+        </ProjectMenu>
+      )}
+    </>
+  );
   const streamRow = ({ item, i }: { item: ChiefStreamItem; i: number }) => (
     <ChiefStreamRow
       key={chiefStreamRowKey(item, i)}
@@ -405,16 +507,12 @@ export function ChiefConversation({
       index={i}
       latest={i === latestMessage?.i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
-      bound={chief.bound}
-      agent={chief.agent}
       runningTool={chief.runningTool}
       copiedKey={copiedKey}
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
-      onAnswerQuestion={onAnswerQuestion}
-      onCancelQuestion={onCancelQuestion}
     />
   );
   const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
@@ -555,7 +653,7 @@ export function ChiefConversation({
         <div
           ref={heroScrollRef}
           data-testid="chief-home-scroll"
-          className="scroll-fade min-h-0 flex-1 overflow-y-auto pb-6"
+          className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
           {hero}
           {intro}
@@ -613,98 +711,81 @@ export function ChiefConversation({
           <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
         )
       )}
-      {composerReplacement ?? (
-        <>
-          {composerError != null && (
-            <p
-              role="alert"
-              data-testid="chief-composer-error"
-              className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex items-center gap-1.5 text-meta text-destructive`}
-            >
-              <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
-              {composerError}
-            </p>
-          )}
-          <ComposerSurface
-            handleRef={surfaceRef}
-            binding={composerBinding}
-            editable={onSend != null}
-            onSend={sendFromComposer}
-            onAttachment={onAttachment}
-            mentionGroups={mentionGroups}
-            onPickProject={chipVisible ? (p) => pickProject(p.id) : undefined}
-            slash={{
-              reviewAvailable: false,
-              stopAvailable: targetPlaceholder === null && chief.running === true && onStop != null,
-              onStop: () => stopTurnRef.current?.(),
-            }}
-            placeholder={
-              targetPlaceholder ??
-              (chief.outage != null
-                ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-                : chief.running === true
-                  ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-                  : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)))
-            }
-            invalid={composerError != null}
-            home={home}
-            open={open}
-            composerRef={composerRef}
-            above={
-              <QueuedCapsules
-                messages={queuedCapsules}
-                onSendNow={onSteer ? (id) => onSteer(id) : undefined}
-                onRemove={withdraw}
-                removeLabel={t('撤回')}
+      <div
+        data-testid="chief-composer-block"
+        className="flex max-h-[65%] min-h-0 flex-none flex-col"
+      >
+        {tray}
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
+        {composerReplacement ?? (
+          <>
+            {composerError != null && (
+              <p
+                role="alert"
+                data-testid="chief-composer-error"
+                className={`${home ? 'mx-auto w-[calc(100%-2rem)] max-w-182' : 'mx-4'} mt-2 mb-0 flex max-h-12 items-start gap-1.5 overflow-y-auto text-meta text-destructive`}
+              >
+                <TriangleAlert aria-hidden="true" className="size-3.5 flex-none" />
+                {composerError}
+              </p>
+            )}
+            <ComposerSurface
+              key="thread"
+              handleRef={surfaceRef}
+              binding={composerBinding}
+              editable={onSend != null}
+              onSend={sendFromComposer}
+              onAttachment={onAttachment}
+              mentionGroups={mentionGroups}
+              onPickProject={chipVisible ? (p) => pickProject(p.id) : undefined}
+              slash={{
+                reviewAvailable: false,
+                stopAvailable: canStop,
+                onStop: () => stopTurnRef.current?.(),
+              }}
+              active={!answerActive}
+              attached={questionAttached}
+              onFocusEnter={() => {
+                focusedComposerRef.current = THREAD_COMPOSER;
+              }}
+              onFocusLeave={leaveComposer}
+              placeholder={composerPlaceholder}
+              invalid={composerError != null}
+              home={home}
+              open={open}
+              composerRef={answerActive ? undefined : composerRef}
+              above={answerActive ? null : capsules}
+              tools={answerActive ? null : tools}
+              canStop={canStop}
+              onStop={stopTurn}
+              running={chief.running === true}
+              turnElapsed={turnElapsed}
+            />
+            {answerKey !== null && (
+              <AnswerComposer
+                key={answerKey}
+                answerKey={answerKey}
+                handleRef={answerSurfaceRef}
+                active={answerActive}
+                attached={questionAttached}
+                onFocusEnter={() => {
+                  focusedComposerRef.current = answerKey;
+                }}
+                onFocusLeave={leaveComposer}
+                invalid={composerError != null}
+                home={home}
+                open={open}
+                onAttachment={onAttachment}
+                composerRef={answerActive ? composerRef : undefined}
+                above={answerActive ? capsules : null}
+                tools={answerActive ? tools : null}
+                running={chief.running === true}
+                turnElapsed={turnElapsed}
               />
-            }
-            tools={
-              <>
-                {composerTools}
-                {chipVisible && (
-                  <ProjectMenu
-                    title="发给哪个项目"
-                    projects={projectOptions}
-                    value={pickedProject?.id ?? null}
-                    withAuto
-                    side="top"
-                    onPick={pickProject}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        data-testid="chief-project-chip"
-                        data-set={pickedProject != null ? '' : undefined}
-                        aria-label={t('发给哪个项目：{name}', {
-                          name: pickedProject?.name ?? t('自动，由 Coordinator 判断'),
-                        })}
-                        className={PROJECT_CHIP_CLS}
-                      />
-                    }
-                  >
-                    {pickedProject != null ? (
-                      <ProjectAvatar
-                        name={pickedProject.name}
-                        tone={projectOptions.indexOf(pickedProject)}
-                        icon={projectMark(pickedProject.id).icon}
-                        color={projectMark(pickedProject.id).color}
-                        bare
-                      />
-                    ) : (
-                      <CircleDashed className="size-4 flex-none" />
-                    )}
-                    <span className="truncate">{pickedProject?.name ?? t('自动')}</span>
-                    <ChevronDown width={12} height={12} />
-                  </ProjectMenu>
-                )}
-              </>
-            }
-            canStop={canStop}
-            onStop={stopTurn}
-            running={chief.running === true}
-            turnElapsed={turnElapsed}
-          />
-        </>
-      )}
+            )}
+          </>
+        )}
+      </div>
       <DialogShell
         title={t('恢复到此处')}
         open={rewindConfirm !== null}

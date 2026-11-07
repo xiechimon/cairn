@@ -1,17 +1,16 @@
 import { createHash } from 'node:crypto';
 import {
+  estimateTokens,
   ISSUE_FENCE_OPEN,
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_QUOTA_PER_TEAM,
   type MemoryLayer,
-  REVIEW_FANOUT_ROLES,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, agent as agentTable, memorySaveConflict, routingRule } from '../db/schema.js';
+import { agentMemory, memorySaveConflict } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { routingRulesEnabled } from './routing-rules.js';
 
 function validateMemoryText(title: string, content: string): void {
   if (title.includes(ISSUE_FENCE_OPEN) || content.includes(ISSUE_FENCE_OPEN)) {
@@ -50,56 +49,17 @@ function notAdoptedDuplicate() {
   return isNull(agentMemory.adoptedFrom);
 }
 
-const INDEPENDENT_PERSONAS = [...REVIEW_FANOUT_ROLES, 'verifier'] as const;
-
-function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] {
-  if (!routingRulesEnabled()) return [];
-  const ids = new Set<string>();
-  for (const rule of db
-    .select({
-      id: routingRule.id,
-      seededFromAgentId: routingRule.seededFromAgentId,
-      adoptedAgentIds: routingRule.adoptedAgentIds,
-    })
-    .from(routingRule)
-    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'review')))
-    .all()) {
-    ids.add(rule.id);
-    if (rule.seededFromAgentId) ids.add(rule.seededFromAgentId);
-    for (const id of rule.adoptedAgentIds ?? []) ids.add(id);
-  }
-  for (const row of db
-    .select({ id: agentTable.id })
-    .from(agentTable)
-    .where(and(eq(agentTable.teamId, teamId), inArray(agentTable.persona, INDEPENDENT_PERSONAS)))
-    .all()) {
-    ids.add(row.id);
-  }
-  return [...ids];
-}
-
-function ownerWhere(
-  db: Db | MemoryTx,
-  scope: { agentId: string; teamId: string; teamScoped?: boolean },
-) {
-  const independentAgentIds =
-    routingRulesEnabled() && scope.teamScoped !== false
-      ? independentMemoryAgentIds(db, scope.teamId)
-      : [];
-  return routingRulesEnabled() && scope.teamScoped !== false
+function ownerWhere(scope: { agentId: string; teamId: string; teamScoped?: boolean }) {
+  return scope.teamScoped !== false
     ? and(
         eq(agentMemory.teamId, scope.teamId),
         notAdoptedDuplicate(),
         eq(agentMemory.independent, false),
-        independentAgentIds.length > 0
-          ? notInArray(agentMemory.agentId, independentAgentIds)
-          : undefined,
       )
     : and(eq(agentMemory.agentId, scope.agentId), eq(agentMemory.teamId, scope.teamId));
 }
 
 function layerWhere(scope: { layer?: MemoryLayer; threadId?: string | null }) {
-  if (!routingRulesEnabled()) return undefined;
   const layer = scope.layer ?? 'core';
   if (layer !== 'scratchpad') return eq(agentMemory.layer, layer);
   return and(
@@ -111,14 +71,12 @@ function layerWhere(scope: { layer?: MemoryLayer; threadId?: string | null }) {
 }
 
 function scratchpadVisible(threadId?: string) {
-  if (!routingRulesEnabled()) return undefined;
   return threadId === undefined
     ? ne(agentMemory.layer, 'scratchpad')
     : or(ne(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId));
 }
 
 function injectLayerWhere(threadId?: string) {
-  if (!routingRulesEnabled()) return undefined;
   return threadId === undefined
     ? eq(agentMemory.layer, 'core')
     : or(
@@ -137,7 +95,7 @@ export function listMemoryEntries(
     .from(agentMemory)
     .where(
       and(
-        ownerWhere(db, scope),
+        ownerWhere(scope),
         includeInvalid ? undefined : stillValid,
         scratchpadVisible(scope.threadId),
       ),
@@ -146,26 +104,66 @@ export function listMemoryEntries(
     .all();
 }
 
-export function injectMemories(
+export const MEMORY_INJECT_TOKEN_CAP = 3_000;
+
+export interface InjectedMemory {
+  id: string;
+  title: string;
+  content: string;
+}
+
+interface InjectScope {
+  agentId: string;
+  projectId?: string | null;
+  projectOnly?: boolean;
+  recordUse?: boolean;
+  teamId?: string;
+  threadId?: string;
+}
+
+export function capMemories<T extends InjectedMemory & { updatedAt: number }>(
+  rows: readonly T[],
+  capTokens: number,
+): { shown: T[]; omitted: number } {
+  const byRecency = [...rows].sort((a, b) => b.updatedAt - a.updatedAt);
+  const keep = new Set<string>();
+  let used = 0;
+  for (const row of byRecency) {
+    const cost = estimateTokens(`- ${row.title}: ${row.content}`);
+    if (used + cost > capTokens) continue;
+    used += cost;
+    keep.add(row.id);
+  }
+  const shown = rows.filter((row) => keep.has(row.id));
+  const newest = byRecency[0];
+  if (shown.length === 0 && newest !== undefined && Number.isFinite(capTokens)) {
+    const room = Math.max(1, Math.floor(capTokens / 1.25) - newest.title.length);
+    const content = `${newest.content.slice(0, room)} …`;
+    return { shown: [{ ...newest, content }], omitted: rows.length - 1 };
+  }
+  return { shown, omitted: rows.length - shown.length };
+}
+
+export function injectMemoriesCapped(
   db: Db,
-  scope: {
-    agentId: string;
-    projectId?: string | null;
-    projectOnly?: boolean;
-    teamId?: string;
-    threadId?: string;
-  },
-) {
+  scope: InjectScope,
+  capTokens: number,
+): { memories: InjectedMemory[]; omitted: number } {
   return db.transaction((tx) => {
     const teamId = scope.teamId;
-    const teamScoped = routingRulesEnabled() && teamId !== undefined;
+    const teamScoped = teamId !== undefined;
     const rows = tx
-      .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
+      .select({
+        id: agentMemory.id,
+        title: agentMemory.title,
+        content: agentMemory.content,
+        updatedAt: agentMemory.updatedAt,
+      })
       .from(agentMemory)
       .where(
         and(
           teamScoped
-            ? ownerWhere(tx, { agentId: scope.agentId, teamId, teamScoped: true })
+            ? ownerWhere({ agentId: scope.agentId, teamId, teamScoped: true })
             : eq(agentMemory.agentId, scope.agentId),
           injectLayerWhere(scope.threadId),
           stillValid,
@@ -180,19 +178,45 @@ export function injectMemories(
       )
       .orderBy(asc(agentMemory.createdAt), sql`${agentMemory}.rowid`)
       .all();
-    if (rows.length > 0) {
+    const { shown, omitted } = capMemories(rows, capTokens);
+    if (shown.length > 0 && scope.recordUse !== false) {
       tx.update(agentMemory)
         .set({ lastInjectedAt: nowMs() })
         .where(
           inArray(
             agentMemory.id,
-            rows.map((row) => row.id),
+            shown.map((row) => row.id),
           ),
         )
         .run();
     }
-    return rows.map(({ title, content }) => ({ title, content }));
+    return {
+      memories: shown.map(({ id, title, content }) => ({ id, title, content })),
+      omitted,
+    };
   });
+}
+
+export function searchMemoryEntries<T extends { title: string; content: string }>(
+  entries: readonly T[],
+  query: string,
+): T[] {
+  const fold = (text: string) => text.normalize('NFKC').toLowerCase();
+  const terms = query
+    .split(/\s+/)
+    .filter((term) => term !== '')
+    .map(fold);
+  if (terms.length === 0) return [...entries];
+  return entries.filter((entry) => {
+    const text = fold(`${entry.title}\n${entry.content}`);
+    return terms.every((term) => text.includes(term));
+  });
+}
+
+export function injectMemories(db: Db, scope: InjectScope) {
+  return injectMemoriesCapped(db, scope, Number.POSITIVE_INFINITY).memories.map(
+    ({ title, content }) => ({ title, content }),
+  );
 }
 
 export function memoriesInScope(
@@ -212,7 +236,7 @@ export function memoriesInScope(
     .from(agentMemory)
     .where(
       and(
-        ownerWhere(tx, scope),
+        ownerWhere(scope),
         stillValid,
         layerWhere(scope),
         everyProject
@@ -245,13 +269,13 @@ export function saveMemoryEntry(
 ) {
   validateMemoryText(input.title, input.content);
   return db.transaction((tx) => {
-    const teamQuota = routingRulesEnabled() && input.teamScoped !== false;
+    const teamQuota = input.teamScoped !== false;
     const quota = teamQuota ? MEMORY_QUOTA_PER_TEAM : MEMORY_QUOTA_PER_AGENT;
     const quotaLabel = teamQuota ? 'team' : 'agent';
     const used = tx
       .select({ id: agentMemory.id })
       .from(agentMemory)
-      .where(and(ownerWhere(tx, input), stillValid))
+      .where(and(ownerWhere(input), stillValid))
       .all().length;
     if (used >= quota) {
       throw new HttpError(409, `memory quota exceeded (${quota}/${quotaLabel})`);
@@ -262,17 +286,13 @@ export function saveMemoryEntry(
     }
     const id = createHash('sha256')
       .update(
-        JSON.stringify(
-          routingRulesEnabled()
-            ? [
-                input.teamId,
-                input.projectId,
-                input.layer ?? 'core',
-                input.threadId ?? null,
-                input.content,
-              ]
-            : [input.agentId, input.teamId, input.projectId, input.content],
-        ),
+        JSON.stringify([
+          input.teamId,
+          input.projectId,
+          input.layer ?? 'core',
+          input.threadId ?? null,
+          input.content,
+        ]),
       )
       .digest('hex');
     const candidates = rows.filter(
@@ -317,7 +337,7 @@ export function saveMemoryEntry(
         source: source ?? null,
         layer: layer ?? 'core',
         threadId: threadId ?? null,
-        independent: routingRulesEnabled() && input.teamScoped === false,
+        independent: input.teamScoped === false,
         createdAt: now,
         updatedAt: now,
       })
@@ -335,6 +355,7 @@ export function updateMemoryEntry(
     content: string;
     threadId?: string;
     teamScoped?: boolean;
+    absorb?: { ids: readonly string[]; at: number };
   },
 ) {
   return db.transaction((tx) => {
@@ -344,12 +365,20 @@ export function updateMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere(tx, input),
+          ownerWhere(input),
           scratchpadVisible(input.threadId),
         ),
       )
       .get();
     if (!row) throw new HttpError(404, `memory ${input.memoryId}`);
+    const absorbed = input.absorb?.ids ?? [];
+    const absorb = (successorId: string) => {
+      if (input.absorb === undefined || absorbed.length === 0) return;
+      tx.update(agentMemory)
+        .set({ invalidAt: input.absorb.at, supersededBy: successorId })
+        .where(inArray(agentMemory.id, [...absorbed]))
+        .run();
+    };
     if (row.invalidAt !== null) {
       throw new HttpError(
         409,
@@ -359,12 +388,18 @@ export function updateMemoryEntry(
       );
     }
     validateMemoryText(row.title, input.content);
-    if (row.content === input.content) return row;
+    if (row.content === input.content) {
+      absorb(row.id);
+      return row;
+    }
     const duplicate = memoriesInScope(
       tx,
       { ...row, teamScoped: input.teamScoped },
       row.projectId === null,
-    ).find((other) => other.id !== row.id && other.content === input.content);
+    ).find(
+      (other) =>
+        other.id !== row.id && !absorbed.includes(other.id) && other.content === input.content,
+    );
     if (duplicate) {
       throw new HttpError(409, `memory ${duplicate.id} already has this content`);
     }
@@ -398,6 +433,7 @@ export function updateMemoryEntry(
       .set({ invalidAt: now, supersededBy: successor.id })
       .where(eq(agentMemory.id, row.id))
       .run();
+    absorb(successor.id);
     return successor;
   });
 }
@@ -414,7 +450,7 @@ export function promoteMemoryEntry(
 ): typeof agentMemory.$inferSelect | null {
   const where = and(
     eq(agentMemory.id, input.memoryId),
-    ownerWhere(db, input),
+    ownerWhere(input),
     scratchpadVisible(input.threadId),
   );
   const row = db.select().from(agentMemory).where(where).get();
@@ -441,7 +477,7 @@ export function deleteMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere(tx, input),
+          ownerWhere(input),
           scratchpadVisible(input.threadId),
         ),
       )

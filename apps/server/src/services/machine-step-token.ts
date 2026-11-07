@@ -1,8 +1,7 @@
 import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@cairn/shared';
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
-import { routedChiefAgent } from './coordinator-route.js';
+import { build, chiefThread, step, todo } from '../db/schema.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
@@ -11,7 +10,13 @@ import {
 } from './credentials.js';
 import { projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
-import { agentForStep, isChiefConversation, type MachineDeps, ownedStep } from './machine-deps.js';
+import {
+  isChiefConversation,
+  type MachineDeps,
+  ownedStep,
+  profileForStep,
+} from './machine-deps.js';
+import { coordinatorProfile } from './routing-rules.js';
 
 export async function stepToken(
   deps: MachineDeps,
@@ -30,7 +35,7 @@ export async function stepToken(
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
   const agentRow =
-    stepRow && todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : null;
+    stepRow && todoRow ? profileForStep(deps, todoRow, stepRow.kind, stepRow.id) : null;
   const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   let git: GitCredentials | null = null;
   if (projectRow?.repoKind === 'hosted' && todoRow) {
@@ -90,14 +95,7 @@ function chiefStepToken(
     stepRow?.fallback?.model?.provider,
   );
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
-  const chiefRow = threadRow
-    ? deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get()
-    : undefined;
-  const boundAgent = chiefRow?.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-    : undefined;
-  const agentRow =
-    boundAgent && threadRow ? routedChiefAgent(deps.db, threadRow.teamId, boundAgent) : boundAgent;
+  const agentRow = threadRow ? coordinatorProfile(deps.db, threadRow.teamId) : null;
   return {
     provider: toProviderConfig(bundle.provider, agentRow?.provider),
     secrets: bundle.secrets,

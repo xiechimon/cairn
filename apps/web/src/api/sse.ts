@@ -236,7 +236,7 @@ export function startConversationStream(
         case 'step': {
           const step = (ev as ConversationStepEvent).step;
           if (step.status === 'done' || step.status === 'failed' || step.status === 'stopped') {
-            liveTextStore.clear(conversationId);
+            liveTextStore.clearUnlessSettling(conversationId);
             liveThinkingStore.clear(conversationId);
             activityStore.clear(conversationId);
             agentTodoStore.clear(conversationId);
@@ -247,6 +247,9 @@ export function startConversationStream(
           void invalidateConverged(qc, { queryKey: ['plans'] });
           if (isChiefConversationId(conversationId)) {
             void invalidateConverged(qc, { queryKey: ['chiefThreads'] });
+            if (step.status === 'failed' || step.status === 'stopped') {
+              void invalidateConverged(qc, { queryKey: ['chief'] });
+            }
           }
           onStep?.(step);
           break;

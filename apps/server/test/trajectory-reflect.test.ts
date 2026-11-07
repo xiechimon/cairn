@@ -8,15 +8,7 @@ import { applyPatch } from 'diff';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
-import {
-  agent,
-  agentMemory,
-  build,
-  memoryCandidate,
-  project,
-  team,
-  todo,
-} from '../src/db/schema.js';
+import { agentMemory, build, memoryCandidate, project, team, todo } from '../src/db/schema.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -300,9 +292,6 @@ function home(builds: string[]) {
   const db = opened.db;
   db.insert(team).values({ id: 'team-1', name: 'Test', createdAt: 1 }).run();
   db.insert(project).values({ id: 'project-1', teamId: 'team-1', name: 'Test' }).run();
-  db.insert(agent)
-    .values({ id: 'agent-1', teamId: 'team-1', displayName: 'B', provider: 'p', modelId: 'm' })
-    .run();
   db.insert(todo)
     .values({
       id: 'todo-1',
@@ -394,7 +383,7 @@ test('memory candidates land as pending, deduplicated, and never in agent memory
   expect(memories).toEqual([]);
   expect(candidates).toHaveLength(1);
   expect(candidates[0]).toMatchObject({
-    agentId: 'agent-1',
+    agentId: 'team-1',
     teamId: 'team-1',
     projectId: 'project-1',
     status: 'pending',
@@ -456,7 +445,7 @@ test('needs evidence from two different builds, then a successful recurrence pro
   const { candidates, memories } = readDb(h);
   expect(memories).toMatchObject([
     {
-      agentId: 'agent-1',
+      agentId: 'team-1',
       teamId: 'team-1',
       projectId: 'project-1',
       title: '本仓测试命令',

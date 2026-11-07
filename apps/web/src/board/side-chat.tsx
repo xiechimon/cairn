@@ -18,7 +18,7 @@ import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { relativeTime } from './rel-time.js';
+import { joinMeta, relativeTime } from './rel-time.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
@@ -42,7 +42,7 @@ function StatusLine({
   now: number;
 }) {
   const { t } = useI18n();
-  const meta = [machineName, relativeTime(todo.phaseAt, now, t)].filter((part) => part != null);
+  const meta = joinMeta([machineName, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
@@ -51,8 +51,12 @@ function StatusLine({
       <span className="flex-none font-medium text-content-secondary">
         {todo.quotaWait != null ? t('等额度') : t(threadCopy(todo).state)}
       </span>
-      <span aria-hidden="true">·</span>
-      <span className="min-w-0 truncate">{meta.join(' · ')}</span>
+      {meta !== '' && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="min-w-0 truncate">{meta}</span>
+        </>
+      )}
     </p>
   );
 }
