@@ -23,7 +23,13 @@ export function FadeScrollerViewport({ className, reserveEnd, ref, ...props }: P
   return (
     <MessageScrollerViewport
       ref={setRefs}
-      className={['scroll-fade', reserveEnd && 'pb-(--chat-end-space)', FOCUS_RING_INSET, className]
+      className={[
+        'scroll-fade',
+        'overflow-x-hidden overscroll-none',
+        reserveEnd && 'pb-(--chat-end-space)',
+        FOCUS_RING_INSET,
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
       {...props}

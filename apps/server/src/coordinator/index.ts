@@ -34,6 +34,7 @@ import {
   type ServerRuntimeConfig,
 } from './runtime/server-runtime.js';
 import { createCoordinatorServerApi } from './server-api.js';
+import { parseWatermark } from './watermark.js';
 
 const HEARTBEAT_MS = 15_000;
 const TICK_MS = 5_000;
@@ -150,7 +151,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           .from(chiefSummary)
           .where(eq(chiefSummary.threadId, threadId))
           .get();
+        const watermark = parseWatermark(row?.lastMirroredEntryId ?? null);
         const pendingUsers = new Set(live.map((r) => r.id));
+        if (watermark?.kind === 'rewind') pendingUsers.add(watermark.anchorMessageId);
         const rows = db
           .select()
           .from(chiefMessage)
@@ -221,6 +224,12 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
       ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
       factsFor,
+      recordConversation: (threadId, conversationId, entryId) => {
+        db.update(coordinatorConversation)
+          .set({ conversationId, lastMirroredEntryId: String(entryId), updatedAt: nowMs() })
+          .where(eq(coordinatorConversation.threadId, threadId))
+          .run();
+      },
       onReconciled: (threadId, outcome, stale) => {
         logger.info({ threadId, outcome, stale }, 'coordinator store reconciled');
       },
