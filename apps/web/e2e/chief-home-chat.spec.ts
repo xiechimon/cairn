@@ -60,6 +60,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       );
     });
     await page.goto('/app');
+    await expect(page.getByTestId('home-c-hero')).toBeVisible();
     await page.evaluate(() => {
       (window as unknown as { skeletonSeen: number }).skeletonSeen = 0;
       new MutationObserver(() => {

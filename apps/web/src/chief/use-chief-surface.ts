@@ -371,8 +371,9 @@ export function useChiefSurface(
         wasReady: wasReadyRef.current,
       })
     : 'ready';
-  if (load === 'ready' && activeThread === null) wasReadyRef.current = true;
-  else if (!chiefMessagesQ.isLoading) wasReadyRef.current = false;
+  if (activeThread === null && chiefQ.isSuccess && chiefThreadsQ.isSuccess)
+    wasReadyRef.current = true;
+  else if (activeThread !== null && !chiefMessagesQ.isPending) wasReadyRef.current = false;
   const retry = () => {
     void chiefQ.refetch();
     void chiefThreadsQ.refetch();
