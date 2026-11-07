@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, CircleDashed, Copy } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleDashed } from 'lucide-react';
 import { useState } from 'react';
 import {
   EMPTY_TRACE_COUNTS,
@@ -212,28 +212,6 @@ export function WorkTrace({
           running={running}
           onClick={() => setDisclosure({ defaultExpanded, open: !expanded })}
         />
-        {expanded && (
-          <Button
-            variant="ghost"
-            className="size-6 flex-none border-0 p-1 text-(--text-tertiary)"
-            aria-label={t('复制')}
-            onClick={() => {
-              void navigator.clipboard.writeText(
-                item.steps
-                  .map((step) =>
-                    step.kind === 'think'
-                      ? step.text
-                      : [step.label, step.target, step.command, step.output]
-                          .filter(Boolean)
-                          .join('\n'),
-                  )
-                  .join('\n'),
-              );
-            }}
-          >
-            <Copy aria-hidden="true" />
-          </Button>
-        )}
       </div>
       {expanded && (
         <TraceCard>

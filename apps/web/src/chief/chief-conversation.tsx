@@ -652,7 +652,7 @@ export function ChiefConversation({
         <div
           ref={heroScrollRef}
           data-testid="chief-home-scroll"
-          className="scroll-fade min-h-0 flex-1 overflow-y-auto pb-6"
+          className="scroll-fade min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
         >
           {hero}
           {intro}
