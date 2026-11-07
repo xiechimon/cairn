@@ -1,8 +1,7 @@
-import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, expectTypeOf, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../src/config.js';
 import { type AppToken, tokenValue, type UserToken } from '../src/lib/github-token.js';
 import { appGithubFetch, appTokenOrNull } from '../src/services/github-app-token.js';
@@ -18,8 +17,8 @@ afterEach(async () => {
 });
 
 async function mint(options: { status?: number; payload?: unknown } = {}) {
-  const dir = await mkdtemp(join(tmpdir(), 'app-provider-'));
-  disposals.push(() => rm(dir, { recursive: true, force: true }));
+  const dir = makeTestTempDir('app-provider-');
+  disposals.push(async () => releaseTestTempDir(dir));
   const socketPath = join(dir, 'mint.sock');
   const refreshes: boolean[] = [];
   const server = createServer((req, res) => {
@@ -210,4 +209,74 @@ test('401 never writes when refreshed installation no longer covers the repo', a
   ).toBeNull();
   expect(writes).toBe(1);
   expect(refreshes).toEqual([false, true]);
+});
+
+test('distinct deps on one socket share concurrent and cached installation work', async () => {
+  const { deps, refreshes } = await mint();
+  let resolveListing!: (response: Response) => void;
+  const listing = new Promise<Response>((resolve) => {
+    resolveListing = resolve;
+  });
+  let resolveStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    resolveStarted = resolve;
+  });
+  const fetch = vi.fn(() => {
+    resolveStarted();
+    return listing;
+  });
+  vi.stubGlobal('fetch', fetch);
+  const first = appTokenOrNull({ ...deps }, repo);
+  await started;
+  const second = appTokenOrNull({ ...deps, config: { ...deps.config } }, repo);
+  resolveListing(installed());
+  const tokens = await Promise.all([first, second]);
+  expect(tokens.every((token) => token !== null)).toBe(true);
+  expect(tokens[0] === tokens[1]).toBe(true);
+  expect((await appTokenOrNull({ ...deps }, repo)) === tokens[0]).toBe(true);
+  expect(refreshes).toEqual([false]);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+test('failed mint is evicted so the next call on the same socket retries', async () => {
+  const options = { status: 502 };
+  const { deps, refreshes } = await mint(options);
+  const fetch = vi.fn(async () => installed());
+  vi.stubGlobal('fetch', fetch);
+  expect(
+    await Promise.all([appTokenOrNull({ ...deps }, repo), appTokenOrNull({ ...deps }, repo)]),
+  ).toEqual([null, null]);
+  options.status = 200;
+  expect((await appTokenOrNull({ ...deps }, repo)) !== null).toBe(true);
+  expect(refreshes).toEqual([false, false]);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+test('injected fetch handles listing and App requests with redirects disabled', async () => {
+  const { deps, refreshes } = await mint();
+  const globalFetch = vi.fn(async () => {
+    throw new Error('global fetch must not be used');
+  });
+  vi.stubGlobal('fetch', globalFetch);
+  const fetchImpl = vi.fn(async (input: string | URL, _init?: RequestInit) =>
+    String(input).includes('/installation/repositories')
+      ? installed()
+      : new Response(null, { status: 204 }),
+  );
+  const injected = { ...deps, fetchImpl };
+  await expect(appGithubFetch(injected, repo, 'https://example.com/steal')).rejects.toThrow(
+    'GitHub API',
+  );
+  expect(refreshes).toEqual([]);
+  expect(fetchImpl).not.toHaveBeenCalled();
+  const response = await appGithubFetch(
+    injected,
+    repo,
+    'https://api.github.com/repos/octo/alpha/issues',
+    { method: 'POST', headers: { accept: 'application/vnd.github+json' }, redirect: 'follow' },
+  );
+  expect(response?.status).toBe(204);
+  expect(fetchImpl).toHaveBeenCalledTimes(2);
+  for (const call of fetchImpl.mock.calls) expect(call[1]).toMatchObject({ redirect: 'error' });
+  expect(globalFetch).not.toHaveBeenCalled();
 });

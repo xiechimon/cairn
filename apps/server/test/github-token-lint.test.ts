@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 function lint(path: string) {
@@ -13,13 +14,16 @@ function lint(path: string) {
 }
 
 function lintFixture(input: string) {
-  const directory = mkdtempSync(join(root, 'apps/server/src/services/identity-fixture-'));
+  const directory = makeTestTempDir('identity-fixture-');
+  const fixture = join(root, 'apps/server/src/services', basename(directory));
+  symlinkSync(directory, fixture, 'dir');
   try {
     const path = join(directory, 'write.ts');
     writeFileSync(path, `${input}\n`);
-    return lint(path);
+    return lint(join(fixture, 'write.ts'));
   } finally {
-    rmSync(directory, { recursive: true });
+    unlinkSync(fixture);
+    releaseTestTempDir(directory);
   }
 }
 

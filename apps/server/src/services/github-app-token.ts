@@ -1,6 +1,7 @@
 import { request } from 'node:http';
 import { z } from 'zod';
 import type { ServerConfig } from '../config.js';
+import type { FetchLike } from '../lib/github.js';
 import { githubApiBaseUrl, isGithubApiUrl } from '../lib/github-api-base.js';
 import { type AppToken, tokenValue } from '../lib/github-token.js';
 
@@ -13,6 +14,7 @@ type Repository = { owner: string; repo: string };
 
 export interface GithubAppTokenDeps {
   config: Pick<ServerConfig, 'githubAppTokenSocket'>;
+  fetchImpl?: FetchLike;
   onReason?: (failure: Repository & { reason: AppTokenReason }) => void;
 }
 
@@ -33,7 +35,8 @@ type CachedInstallation = {
   repositories: Set<string>;
 };
 
-const installations = new WeakMap<GithubAppTokenDeps, CachedInstallation>();
+const installations = new Map<string, CachedInstallation>();
+const pendingInstallations = new Map<string, Promise<CachedInstallation | null>>();
 
 async function mintToken(socketPath: string, force: boolean) {
   const payload = await new Promise<unknown>((resolve, reject) => {
@@ -75,17 +78,30 @@ async function mintToken(socketPath: string, force: boolean) {
 }
 
 async function installation(deps: GithubAppTokenDeps, force: boolean) {
-  const cached = installations.get(deps);
-  if (!force && cached && Date.now() < cached.expiresAt - 300_000) return cached;
-  installations.delete(deps);
   const path = deps.config.githubAppTokenSocket;
   if (!path) return null;
+  const pending = pendingInstallations.get(path);
+  if (pending) return pending;
+  const cached = installations.get(path);
+  if (!force && cached && Date.now() < cached.expiresAt - 300_000) return cached;
+  installations.delete(path);
+  const loading = loadInstallation(deps, path, force);
+  pendingInstallations.set(path, loading);
+  try {
+    return await loading;
+  } finally {
+    pendingInstallations.delete(path);
+  }
+}
+
+async function loadInstallation(deps: GithubAppTokenDeps, path: string, force: boolean) {
+  const fetchImpl = deps.fetchImpl ?? fetch;
   for (let attempt = 0; attempt < 2; attempt++) {
     const minted = await mintToken(path, force || attempt > 0);
     const repositories = new Set<string>();
     let retry = false;
     for (let page = 1; ; page++) {
-      const response = await fetch(
+      const response = await fetchImpl(
         `${githubApiBaseUrl()}/installation/repositories?per_page=100&page=${page}`,
         {
           headers: {
@@ -112,7 +128,7 @@ async function installation(deps: GithubAppTokenDeps, force: boolean) {
     }
     if (retry) continue;
     const value = { ...minted, repositories };
-    installations.set(deps, value);
+    installations.set(path, value);
     return value;
   }
   return null;
@@ -149,22 +165,23 @@ export async function appGithubFetch(
   deps: GithubAppTokenDeps,
   repo: Repository,
   input: string | URL,
-  init: RequestInit = {},
-): Promise<Response | null> {
+  init: NonNullable<Parameters<FetchLike>[1]> & Pick<RequestInit, 'redirect'> = {},
+): Promise<Awaited<ReturnType<FetchLike>> | null> {
   if (!isGithubApiUrl(String(input))) throw new Error('App tokens require a GitHub API URL');
+  const fetchImpl = deps.fetchImpl ?? fetch;
   for (let attempt = 0; attempt < 2; attempt++) {
     const token = await repoToken(deps, repo, attempt > 0);
     if (token === null) return null;
     const headers = new Headers(init.headers);
     headers.set('authorization', `Bearer ${tokenValue(token)}`);
-    const response = await fetch(input, {
+    const response = await fetchImpl(input, {
       ...init,
-      headers,
+      headers: Object.fromEntries(headers),
       redirect: 'error',
       signal: init.signal ?? AbortSignal.timeout(15_000),
     });
     if (response.status !== 401 || attempt === 1) return response;
-    await response.body?.cancel();
+    if (response instanceof Response) await response.body?.cancel();
   }
   return null;
 }
