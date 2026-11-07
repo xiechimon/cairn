@@ -72,6 +72,26 @@ test('touch devices keep the actions of older messages visible', async ({ browse
   await context.close();
 });
 
+test('the reveal is instant: no transition, no delay and no scale', async ({ page }) => {
+  await mockHistory(page);
+  await page.goto('/app');
+  const older = messageOf(page, 'first question');
+  await page.mouse.move(0, 0);
+  const face = () =>
+    tools(older).evaluate((node) => {
+      const style = getComputedStyle(node);
+      return {
+        duration: style.transitionDuration,
+        delay: style.transitionDelay,
+        property: style.transitionProperty,
+        transform: style.transform,
+      };
+    });
+  expect(await face()).toMatchObject({ duration: '0s', delay: '0s', transform: 'none' });
+  await older.hover();
+  expect(await face()).toMatchObject({ duration: '0s', delay: '0s', transform: 'none' });
+});
+
 test('each message shows a relative time with the absolute time in its title', async ({ page }) => {
   await mockHistory(page);
   await page.goto('/app');
