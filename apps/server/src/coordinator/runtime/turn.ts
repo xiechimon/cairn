@@ -1,8 +1,13 @@
-import type { ClaimedStep, MachineDoneBody, ModelUsage } from '@cairn/shared';
+import {
+  type ClaimedStep,
+  estimateTokens,
+  type MachineDoneBody,
+  type ModelUsage,
+} from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai';
 import { AssistantEntry, type EntryRecord, type Harness } from '@earendil-works/pi-durable';
-import { compactionWindow, estimateTokens, type ModelRef } from './compaction.js';
+import { compactionWindow, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';

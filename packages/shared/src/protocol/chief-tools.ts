@@ -646,8 +646,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'memories',
     description:
-      'List the currently valid memory entries of the agent running the chief, including history. Set includeInvalid:true to also list superseded entries.',
+      'List the currently valid memory entries of the agent running the chief, including history. Set query to search them (every space-separated term must appear in the title or content); entries the prompt could not show are found this way. Set includeInvalid:true to also list superseded entries.',
     parameters: obj({
+      query: str('Search terms; only matching entries are returned.'),
       includeInvalid: {
         type: 'boolean',
         description: 'Also list invalidated entries; default false.',
