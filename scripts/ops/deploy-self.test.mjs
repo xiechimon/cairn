@@ -316,6 +316,39 @@ test('refuses a target that changes install-script permissions or hooks', () => 
   assert.equal(f.log('pnpm.log'), '');
 });
 
+test('refuses the same postinstall added to two manifests', () => {
+  const f = fixture();
+  for (const rel of ['package.json', 'apps/a/package.json']) {
+    mkdirSync(join(f.work, rel, '..'), { recursive: true });
+    writeFileSync(join(f.work, rel), '{"scripts":{"postinstall":"node x.js"}}\n');
+  }
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /install hooks/);
+});
+
+test('ignores a trailing comma added after an unchanged prepare hook', () => {
+  const f = fixture();
+  writeFileSync(
+    join(f.work, 'package.json'),
+    '{\n  "scripts": {\n    "prepare": "husky"\n  }\n}\n',
+  );
+  git(f.work, 'add', 'package.json');
+  git(f.work, 'commit', '-q', '-m', 'prepare hook');
+  git(f.work, 'push', '-q', 'origin', 'main');
+  const base = git(f.work, 'rev-parse', 'HEAD');
+  git(f.checkout, 'fetch', '-q', 'origin', 'main');
+  git(f.checkout, 'checkout', '-q', base);
+  writeFileSync(
+    join(f.work, 'package.json'),
+    '{\n  "scripts": {\n    "prepare": "husky",\n    "other": "true"\n  }\n}\n',
+  );
+  const target = pushTarget(f);
+  const result = f.run(DEPLOY, [target]);
+  assert.doesNotMatch(result.stderr, /install hooks/);
+});
+
 test('waits while a step is running or a deploy hold is set', () => {
   const busy = fixture({ claimed: 1 });
   const target = pushTarget(busy);
