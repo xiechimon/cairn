@@ -3,6 +3,7 @@ import {
   type ChiefOutage,
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import { and, asc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -287,6 +288,7 @@ export function steeredMessageScopes(db: Db, running: StepRow): (string | null)[
       ),
     )
     .all()
+    .filter((message) => !message.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
     .filter((message) => {
       const queued = db
         .select({ holdReason: step.holdReason })
