@@ -58,7 +58,7 @@ async function stubStack(page: Page, rows: StubMachine[]) {
 
 test('C1+C2+C4: concurrency selector — reads annotation truth, PATCHes a single field, persists across reload', async ({ page }) => {
   const state = await stubStack(page, [{ ...LOCAL, maxConcurrent: 2, runningSteps: 1 }]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-local');
 
   await expect(page.locator('[data-machine-running="1"]')).toHaveText('执行中 1/2');
 
@@ -78,7 +78,7 @@ test('C1+C2+C4: concurrency selector — reads annotation truth, PATCHes a singl
 
 test('C3: old server shape (no maxConcurrent field) → the whole control + annotation group retires', async ({ page }) => {
   await stubStack(page, [LOCAL]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-local');
   await expect(page.locator('button[aria-label^="并发上限"]')).toHaveCount(0);
   await expect(page.locator('[data-machine-running]')).toHaveCount(0);
 

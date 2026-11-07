@@ -64,7 +64,8 @@ test('tab and scope changes inside a section keep the page settings will return 
   await page.goto(`/app/schedules?${FLEET}`);
   await page.getByTestId('sidebar-settings').click();
   await navItem(page, 'providers').click();
-  await settings(page).getByRole('tab', { name: /build-box-orb/ }).click();
+  await settings(page).getByRole('combobox', { name: '设置作用于' }).click();
+  await page.getByRole('option', { name: /build-box-orb/ }).click();
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/\/app\/schedules\?scenario=providers-fleet$/);
 });

@@ -4,6 +4,7 @@ import type { Db } from '../db/client.js';
 import { provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
+import { isClaudeModel } from './model-routing.js';
 
 export type CoordinatorRouteFallback =
   | 'no-api-key-provider'
@@ -88,12 +89,27 @@ function coordinatorRule(db: Db, teamId: string) {
     .get();
 }
 
+export function paidClaudeAllowed(
+  db: Db,
+  teamId: string,
+  providerId: string,
+  modelId: string,
+): boolean {
+  if (!isClaudeModel(providerId, modelId)) return true;
+  const usage = db
+    .select({ claudeUsage: team.claudeUsage })
+    .from(team)
+    .where(eq(team.id, teamId))
+    .get();
+  return usage?.claudeUsage === 'allow-paid';
+}
+
 export function coordinatorRoute(db: Db, teamId: string) {
   if (!coordinatorRunsOnPi()) return null;
   const rule = coordinatorRule(db, teamId) ?? seedCoordinatorRule(db, teamId);
   if (rule === undefined) return fallback(teamId, 'no-api-key-provider');
   const keyed = db
-    .select({ id: provider.id, api: provider.api })
+    .select({ id: provider.id })
     .from(provider)
     .where(
       and(
@@ -114,13 +130,7 @@ export function coordinatorRoute(db: Db, teamId: string) {
       codexLoginAvailable();
     return subscription ? rule : fallback(teamId, 'rule-provider-has-no-key');
   }
-  if (keyed.api !== 'anthropic-messages') return rule;
-  const usage = db
-    .select({ claudeUsage: team.claudeUsage })
-    .from(team)
-    .where(eq(team.id, teamId))
-    .get();
-  if (usage?.claudeUsage !== 'allow-paid') {
+  if (!paidClaudeAllowed(db, teamId, rule.provider, rule.modelId)) {
     return fallback(teamId, 'paid-claude-not-allowed');
   }
   return rule;

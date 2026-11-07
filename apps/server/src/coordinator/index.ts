@@ -377,10 +377,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     leases.delete(threadId);
   };
 
-  const wake = (threadId: string): void => {
-    if (closing) return;
-    dirty.add(threadId);
-    if (draining.has(threadId)) return;
+  const startDrain = (threadId: string): void => {
+    if (closing || draining.has(threadId)) return;
     const running = drain(threadId)
       .catch((error: unknown) => {
         logger.error({ threadId, error: String(error) }, 'coordinator drain failed');
@@ -390,6 +388,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         releaseLeaseIfUnused(threadId);
       });
     draining.set(threadId, running);
+  };
+
+  const wake = (threadId: string): void => {
+    if (closing) return;
+    dirty.add(threadId);
+    if (draining.has(threadId)) return;
+    queueMicrotask(() => startDrain(threadId));
   };
 
   const liveThreads = (): string[] => {
@@ -433,6 +438,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     wake,
     tick,
     idle: async () => {
+      await Promise.resolve();
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
     },
     close: async () => {

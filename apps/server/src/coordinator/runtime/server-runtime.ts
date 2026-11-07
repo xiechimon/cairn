@@ -69,6 +69,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const open = new Map<string, ThreadState>();
   const busy = new Map<string, number>();
   const lastUsed = new Map<string, number>();
+  const closing = new Map<string, Promise<void>>();
 
   const stateOf = (threadId: string, forceReseed = false): ThreadState => {
     const existing = open.get(threadId);
@@ -102,15 +103,34 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     return state;
   };
 
-  const openThread = (threadId: string): Promise<Harness> => stateOf(threadId).harness;
+  const settleClosing = async (threadId: string): Promise<void> => {
+    while (closing.has(threadId)) await closing.get(threadId);
+  };
+
+  const openThread = async (threadId: string): Promise<Harness> => {
+    await settleClosing(threadId);
+    return stateOf(threadId).harness;
+  };
 
   const closeThread = async (threadId: string): Promise<void> => {
+    await settleClosing(threadId);
     const state = open.get(threadId);
     if (state === undefined) return;
     open.delete(threadId);
     lastUsed.delete(threadId);
-    const harness = await state.harness.catch(() => null);
-    await harness?.close(context);
+    const shutdown = (async () => {
+      const harness = await state.harness.catch(() => null);
+      await harness?.close(context);
+    })();
+    closing.set(
+      threadId,
+      shutdown.catch(() => undefined),
+    );
+    try {
+      await shutdown;
+    } finally {
+      closing.delete(threadId);
+    }
   };
 
   return {
@@ -120,6 +140,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     runTurn: async (turn: ServerTurn): Promise<MachineDoneBody> => {
       const { claimed } = turn;
       const threadId = claimed.chief?.threadId ?? '';
+      await settleClosing(threadId);
       const prepare = (target: ThreadState): ThreadState => {
         target.models.useProvider(turn.router.config, turn.router.resolveKey);
         target.models.useProvider(turn.summary.config, turn.summary.resolveKey);

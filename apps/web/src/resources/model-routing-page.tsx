@@ -1,5 +1,6 @@
 import type { ClaudeUsage, ProviderRecord } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../api/claude-subscriptions.js';
 import { api } from '../api/client.js';
 import { useApiMutations, useMachines, useProviders } from '../api/hooks.js';
+import { mapMachines } from '../api/mappers.js';
 import {
   MODEL_ROUTING_KEY,
   type ModelRouting,
@@ -26,10 +28,23 @@ import {
   useModelRouting,
 } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { VENDORS } from '../components/accounts/account-parts.js';
+import { machineLabel } from '../components/machine-label.js';
+import { QueryBoundary } from '../components/query-state.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
-import { SettingsCard, SettingsRow, SettingsSegmented } from '../components/settings-list.js';
+import {
+  SettingsCard,
+  SettingsPanel,
+  SettingsRow,
+  SettingsSection,
+  SettingsSegmented,
+} from '../components/settings-list.js';
+import { SettingsScopeSentence, useSettingsScope } from '../components/settings-scope.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
+import { Button } from '../components/ui/button.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
@@ -58,15 +73,6 @@ function providerAccount(record: ProviderRecord, vendor: AccountVendor): Subscri
     lastUsedAt: null,
     stepsLast24h: null,
   };
-}
-
-function SectionHead({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-1">
-      <h2 className="m-0 text-card-title font-medium text-foreground">{title}</h2>
-      {hint !== undefined && <span className="text-meta text-content-tertiary">{hint}</span>}
-    </div>
-  );
 }
 
 export function ModelRoutingPage() {
@@ -131,10 +137,18 @@ export function ModelRoutingPage() {
       ? routingQ.data
       : undefined
     : fixtureAccounts?.routing;
+  const scopeMachines: MachineRow[] = live
+    ? mapMachines(machinesQ.data ?? [])
+    : (fixture.resources?.machines ??
+      (fixtureAccounts?.machines ?? []).map((m) => ({ id: m.id, name: m.name })));
+  const { scope, machine: scopeMachine, setScope } = useSettingsScope(scopeMachines);
   const machineNames = new Map<string, string>(
     live
-      ? (machinesQ.data ?? []).map((m) => [m.id, m.name])
-      : (fixtureAccounts?.machines ?? []).map((m) => [m.id, m.name]),
+      ? (machinesQ.data ?? []).map((m) => [m.id, machineLabel(m, machinesQ.data ?? [])])
+      : (fixtureAccounts?.machines ?? []).map((m) => [
+          m.id,
+          machineLabel(m, fixtureAccounts?.machines ?? []),
+        ]),
   );
   const graph =
     routing === undefined
@@ -174,128 +188,194 @@ export function ModelRoutingPage() {
     );
   };
 
+  const addAccount = (target: AccountVendor) => {
+    if (target === 'claude') {
+      createSubscription.reset();
+      setAdding(true);
+      return;
+    }
+    const params = new URLSearchParams({ add: VENDOR_PRESETS[target] });
+    const scenario = searchParams.get('scenario');
+    if (scenario !== null) params.set('scenario', scenario);
+    navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
+  };
+
   return (
     <PageShell
       route={MODEL_ROUTING_HREF}
       title={t('模型路由')}
       selected={MODEL_ROUTING_HREF}
       fixture={fixture}
-      tabs={[
-        { id: 'accounts', label: '账户' },
-        { id: 'routing', label: '路由' },
-      ]}
-      tab={tab}
-      onTab={(next) => {
-        const params = new URLSearchParams(searchParams);
-        if (next === 'routing') params.set('tab', 'routing');
-        else params.delete('tab');
-        setSearchParams(params, { replace: true });
-      }}
     >
-      {tab === 'accounts' ? (
-        <SubscriptionAccounts
-          accounts={accounts}
-          stepsByAccount={stepsByAccount}
-          stickiness={stickiness}
-          now={now}
-          vendor={vendor}
-          onVendorChange={(next) => {
-            const params = new URLSearchParams(searchParams);
-            params.set('vendor', next);
-            setSearchParams(params, { replace: true });
-          }}
-          onAdd={(vendor) => {
-            if (vendor === 'claude') {
-              createSubscription.reset();
-              setAdding(true);
-              return;
-            }
-            const params = new URLSearchParams({ add: VENDOR_PRESETS[vendor] });
-            const scenario = searchParams.get('scenario');
-            if (scenario !== null) params.set('scenario', scenario);
-            navigate({ pathname: PROVIDERS_HREF, search: params.toString() });
-          }}
-          statusFor={(account) =>
-            verifying === account.id ? (
-              <span role="status" className="text-meta text-content-tertiary">
-                {t('验证中…')}
-              </span>
-            ) : null
-          }
-          actionsFor={(account) => {
-            const onRemove = () => setRemoving(account);
-            if (account.vendor !== 'claude') {
-              return {
-                onRemove,
-                ...(live
-                  ? {
-                      onRename: (label: string) =>
-                        mutations.patchProvider.mutate(
-                          { id: account.id, body: { label } },
-                          { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
-                        ),
-                    }
-                  : {}),
-              };
-            }
-            return {
-              onRemove,
-              onVerify: () => void verify(account),
-              ...(accountApiIds.includes(account.id)
-                ? {
-                    onRename: (label: string) =>
-                      renameSubscription.mutate(
-                        { id: account.id, label },
-                        { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
-                      ),
-                  }
-                : {}),
-            };
-          }}
-        />
-      ) : (
-        <div className="flex flex-col gap-8 pb-16">
-          <section className="flex flex-col gap-2">
-            <SectionHead title={t('Claude 用量')} />
-            <SettingsCard>
-              <SettingsRow label={t('付费方式')} className="flex-wrap gap-y-2 py-2.5">
-                <SettingsSegmented
-                  label={t('Claude 用量')}
-                  value={claudeUsage}
-                  onChange={setClaudeUsage}
-                  options={[
-                    { value: 'subscription-only', label: t('只用订阅') },
-                    { value: 'allow-paid', label: t('允许按量付费') },
-                  ]}
-                />
-              </SettingsRow>
-            </SettingsCard>
-            <p data-testid="claude-usage-hint" className="m-0 px-1 text-meta text-content-tertiary">
-              {claudeUsage === 'subscription-only'
-                ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
-                : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
-            </p>
-          </section>
-          <section data-testid="routing-section" className="flex flex-col gap-2">
-            <p className="m-0 px-1 text-meta text-content-tertiary">
-              {t('每种用途用哪个模型、走哪个连接')}
-            </p>
-            <div className="overflow-x-auto rounded-(--radius-card) bg-card px-4 py-4 shadow-(--e1)">
-              {graph === null ? (
-                <p className="m-0 text-meta text-content-tertiary">{t('正在读取路由…')}</p>
-              ) : graph.jobs.length === 0 ? (
-                <p data-testid="routing-empty" className="m-0 text-meta text-content-tertiary">
-                  {t('还没有路由，添加一个订阅账户后这里会画出每种用途走哪个连接。')}
-                </p>
-              ) : (
-                <div className="min-w-160">
-                  <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
-                </div>
+      <div className="flex min-w-0 flex-col gap-3">
+        <SettingsScopeSentence machines={scopeMachines} scope={scope} onChange={setScope} />
+        {scopeMachine !== undefined && (
+          <p data-testid="settings-scope-note" className="m-0 px-1 text-meta text-content-tertiary">
+            {t('订阅账户和工作路由按团队生效，{name} 沿用团队设置。', { name: scopeMachine.name })}
+          </p>
+        )}
+        <SettingsPanel
+          header={
+            <>
+              <SegmentedTabs
+                label={t('视图')}
+                value={tab}
+                onChange={(next) => {
+                  const params = new URLSearchParams(searchParams);
+                  if (next === 'routing') params.set('tab', 'routing');
+                  else params.delete('tab');
+                  setSearchParams(params, { replace: true });
+                }}
+                options={[
+                  { value: 'accounts', label: t('账户') },
+                  { value: 'routing', label: t('路由') },
+                ]}
+              />
+              {tab === 'accounts' && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('添加 {vendor} 账户', { vendor: VENDORS[vendor].label })}
+                  title={t('添加账户')}
+                  onClick={() => addAccount(vendor)}
+                >
+                  <Plus aria-hidden strokeWidth={1.75} />
+                </Button>
               )}
-            </div>
-          </section>
-        </div>
-      )}
+            </>
+          }
+        >
+          <div className={tab === 'routing' ? 'p-4' : undefined}>
+            {tab === 'accounts' ? (
+              <SubscriptionAccounts
+                gate={(forVendor, section) => (
+                  <QueryBoundary
+                    query={
+                      live ? (forVendor === 'claude' ? subscriptionsQ : providersQ) : undefined
+                    }
+                    isEmpty={
+                      live &&
+                      (forVendor === 'claude' ? subscriptionsQ.data : providersQ.data) === undefined
+                    }
+                    loadingLabel={t('正在加载账户')}
+                    errorTitle={t('账户没能加载')}
+                    empty={null}
+                  >
+                    {section}
+                  </QueryBoundary>
+                )}
+                accounts={accounts}
+                stepsByAccount={stepsByAccount}
+                stickiness={stickiness}
+                now={now}
+                vendor={vendor}
+                onVendorChange={(next) => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set('vendor', next);
+                  setSearchParams(params, { replace: true });
+                }}
+                statusFor={(account) =>
+                  verifying === account.id ? (
+                    <span role="status" className="text-meta text-content-tertiary">
+                      {t('验证中…')}
+                    </span>
+                  ) : null
+                }
+                actionsFor={(account) => {
+                  const onRemove = () => setRemoving(account);
+                  if (account.vendor !== 'claude') {
+                    return {
+                      onRemove,
+                      ...(live
+                        ? {
+                            onRename: (label: string) =>
+                              mutations.patchProvider.mutate(
+                                { id: account.id, body: { label } },
+                                {
+                                  onError: (error) => toastError(t('重命名失败，请重试。'), error),
+                                },
+                              ),
+                          }
+                        : {}),
+                    };
+                  }
+                  return {
+                    onRemove,
+                    onVerify: () => void verify(account),
+                    ...(accountApiIds.includes(account.id)
+                      ? {
+                          onRename: (label: string) =>
+                            renameSubscription.mutate(
+                              { id: account.id, label },
+                              { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
+                            ),
+                        }
+                      : {}),
+                  };
+                }}
+              />
+            ) : (
+              <QueryBoundary
+                query={live ? routingQ : undefined}
+                isEmpty={live && routingQ.data === undefined}
+                loadingLabel={t('正在加载工作路由')}
+                errorTitle={t('工作路由没能加载')}
+                empty={null}
+              >
+                <div className="flex flex-col gap-8 pb-16">
+                  <SettingsSection title={t('Claude 用量')}>
+                    <SettingsCard>
+                      <SettingsRow
+                        label={t('付费方式')}
+                        hint={
+                          <span data-testid="claude-usage-hint">
+                            {claudeUsage === 'subscription-only'
+                              ? t('只用订阅，按 token 付费的 Claude 调用一律拦下，包括后台任务。')
+                              : t('订阅不够时，可以改用按 token 付费的 Claude API key。')}
+                          </span>
+                        }
+                        className="flex-wrap gap-y-2 py-2.5"
+                      >
+                        <SettingsSegmented
+                          label={t('Claude 用量')}
+                          value={claudeUsage}
+                          onChange={setClaudeUsage}
+                          options={[
+                            { value: 'subscription-only', label: t('只用订阅') },
+                            { value: 'allow-paid', label: t('允许按量付费') },
+                          ]}
+                        />
+                      </SettingsRow>
+                    </SettingsCard>
+                  </SettingsSection>
+                  <SettingsSection
+                    testId="routing-section"
+                    title={t('用途与连接')}
+                    description={t('每种用途用哪个模型、走哪个连接')}
+                  >
+                    <div className="overflow-x-auto rounded-(--radius-card) bg-card px-4 py-4 shadow-(--e1)">
+                      {graph === null ? (
+                        <p className="m-0 text-meta text-content-tertiary">{t('正在读取路由…')}</p>
+                      ) : graph.jobs.length === 0 ? (
+                        <p
+                          data-testid="routing-empty"
+                          className="m-0 text-meta text-content-tertiary"
+                        >
+                          {t('还没有路由，添加一个订阅账户后这里会画出每种用途走哪个连接。')}
+                        </p>
+                      ) : (
+                        <div className="min-w-160">
+                          <RoutingGraph jobs={graph.jobs} connections={graph.connections} />
+                        </div>
+                      )}
+                    </div>
+                  </SettingsSection>
+                </div>
+              </QueryBoundary>
+            )}
+          </div>
+        </SettingsPanel>
+      </div>
       {adding && (
         <AddClaudeSubscriptionDialog
           onClose={() => {

@@ -97,7 +97,7 @@ for (const width of [360, 390]) {
         '/app/account?scenario=13',
         '/app/resources/skills?scenario=skills-list',
         '/app/resources/mcp-servers?scenario=07',
-        '/app/resources/machines?scenario=06',
+        '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_',
         '/app/resources/providers?scenario=10',
         '/app/team?scenario=12',
         '/app?scenario=101',

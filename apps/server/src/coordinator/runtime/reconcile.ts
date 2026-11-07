@@ -41,6 +41,7 @@ export type ReconcileOutcome =
   | 'adopted-store'
   | 'reseeded-missing-conversation'
   | 'reseeded-ahead'
+  | 'reseeded-behind'
   | 'reseeded-rewound'
   | 'unchanged';
 
@@ -113,6 +114,11 @@ export async function openReconciledHarness(
     outcome = 'adopted-store';
   } else if (recorded === undefined) {
     reseed = 'reseeded-missing-conversation';
+  } else if (
+    watermark?.kind === 'mirrored' &&
+    ((await newestEntryId(recorded, context)) ?? 0) < watermark.entryId
+  ) {
+    reseed = 'reseeded-behind';
   } else if (
     watermark?.kind === 'mirrored' &&
     !facts.hasClaimedStep &&

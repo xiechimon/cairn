@@ -79,11 +79,15 @@ export const PAGES: AuditPage[] = [
     ready: (p) => p.locator('.prj-set-avatar'),
   },
   { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agents-removed') },
-  { name: 'machines', url: '/app/resources/machines?scenario=06', ready: row },
+  {
+    name: 'machines',
+    url: '/app/settings/machines?scenario=06',
+    ready: (p) => p.getByTestId('machine-item').first(),
+  },
   {
     name: 'machine detail',
-    url: '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
-    ready: (p) => p.getByTestId('machine-detail-online'),
+    url: '/app/settings/machines?scenario=06&machine=Kd8fG2hJ4mN9pQ1rStUvWx3',
+    ready: (p) => p.getByTestId('machine-detail'),
   },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {

@@ -70,61 +70,57 @@ export function ApiKeysPage() {
           />
         }
       >
-        <>
-          {live && (
-            <div className="mt-6 flex justify-end">
-              <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
-                {t('新建密钥')}
-              </Button>
-            </div>
-          )}
-          {keys
-            .filter((key) => key.plaintext != null)
-            .map((key) => (
-              <Card
-                key={`once-${key.id}`}
-                className={cn('mt-6 gap-2 px-4 py-3 shadow-none ring-border', CARD_RADIUS_CLS)}
-              >
-                <div className="flex items-center gap-3">
-                  <code className="min-w-0 flex-1 font-mono text-ui break-all text-foreground">
-                    {key.plaintext}
-                  </code>
-                  <Button
-                    variant="outline"
-                    className={DIALOG_PRIMARY_BUTTON}
-                    onClick={
-                      live
-                        ? () => void navigator.clipboard?.writeText(key.plaintext ?? '')
-                        : undefined
-                    }
-                  >
-                    {t('复制')}
-                  </Button>
-                </div>
-                <p className="m-0 text-meta text-content-tertiary">
-                  {t('请立即复制密钥，它仅显示一次。')}
-                </p>
-              </Card>
-            ))}
-          {listed.length > 0 && (
-            <SettingsCard className="mt-4">
-              {listed.map((key) => (
-                <div key={key.id} className={SETTINGS_ROW_CLS}>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-ui text-foreground">
-                      {key.name ?? key.masked}
+        {live && (
+          <div className="mt-6 flex justify-end">
+            <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
+              {t('新建密钥')}
+            </Button>
+          </div>
+        )}
+        {keys
+          .filter((key) => key.plaintext != null)
+          .map((key) => (
+            <Card
+              key={`once-${key.id}`}
+              className={cn('mt-6 gap-2 px-4 py-3 shadow-none ring-border', CARD_RADIUS_CLS)}
+            >
+              <div className="flex items-center gap-3">
+                <code className="min-w-0 flex-1 font-mono text-ui break-all text-foreground">
+                  {key.plaintext}
+                </code>
+                <Button
+                  variant="outline"
+                  className={DIALOG_PRIMARY_BUTTON}
+                  onClick={
+                    live
+                      ? () => void navigator.clipboard?.writeText(key.plaintext ?? '')
+                      : undefined
+                  }
+                >
+                  {t('复制')}
+                </Button>
+              </div>
+              <p className="m-0 text-meta text-content-tertiary">
+                {t('请立即复制密钥，它仅显示一次。')}
+              </p>
+            </Card>
+          ))}
+        {listed.length > 0 && (
+          <SettingsCard className="mt-4">
+            {listed.map((key) => (
+              <div key={key.id} className={SETTINGS_ROW_CLS}>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-ui text-foreground">{key.name ?? key.masked}</span>
+                  {key.name != null && (
+                    <span className="truncate font-mono text-meta text-content-tertiary">
+                      {key.masked}
                     </span>
-                    {key.name != null && (
-                      <span className="truncate font-mono text-meta text-content-tertiary">
-                        {key.masked}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </SettingsCard>
-          )}
-        </>
+                  )}
+                </span>
+              </div>
+            ))}
+          </SettingsCard>
+        )}
       </QueryBoundary>
       <ApiKeyCreateDialog
         open={createOpen}
