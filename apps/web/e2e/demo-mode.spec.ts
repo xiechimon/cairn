@@ -142,8 +142,8 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await expect(home(page).getByText('购物车').first()).toBeVisible();
 
   await page.goto(`${demo.base}/app/resources/machines`);
-  await expect(page.getByRole('link', { name: 'dev-mac' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'build-box' })).toBeVisible();
+  await expect(page.getByTestId('machine-item').filter({ hasText: 'dev-mac' })).toBeVisible();
+  await expect(page.getByTestId('machine-item').filter({ hasText: 'build-box' })).toBeVisible();
 
   await page.goto(`${demo.base}/app/schedules`);
   await expect(page.getByRole('heading', { name: /定时/ }).first()).toBeVisible();

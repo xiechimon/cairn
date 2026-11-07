@@ -114,6 +114,8 @@ export {
 export {
   machinesChiefState,
   machinesClaudeLogin,
+  machinesDuplicateNames,
+  machinesMasterDetail,
   providersEmpty,
   providersFleet,
   resourcesCcBinGone,

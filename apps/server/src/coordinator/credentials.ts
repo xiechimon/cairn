@@ -2,7 +2,7 @@ import { type ProviderConfig, redactSecrets, type SecretBox } from '@cairn/share
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { routingRule } from '../db/schema.js';
-import { coordinatorRoute } from '../services/coordinator-route.js';
+import { coordinatorRoute, paidClaudeAllowed } from '../services/coordinator-route.js';
 import { openProviderKey } from '../services/providers.js';
 
 export interface CoordinatorModelRoute {
@@ -58,10 +58,12 @@ export function coordinatorProviders(
     .from(routingRule)
     .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'compaction')))
     .get();
-  const summary =
-    compaction === undefined
-      ? router
-      : (routeOf(deps, teamId, compaction.provider, compaction.modelId) ?? router);
+  const compactionRoute =
+    compaction !== undefined &&
+    paidClaudeAllowed(deps.db, teamId, compaction.provider, compaction.modelId)
+      ? routeOf(deps, teamId, compaction.provider, compaction.modelId)
+      : null;
+  const summary = compactionRoute ?? router;
   return { router, summary };
 }
 

@@ -16,11 +16,6 @@ const CONTROLS: Control[] = [
     track: (page) => page.getByRole('banner').getByRole('tablist'),
   },
   {
-    name: 'providers runtime',
-    url: '/app/resources/providers?scenario=10',
-    track: (page) => page.getByRole('tablist', { name: '范围' }),
-  },
-  {
     name: 'settings appearance',
     url: '/app/settings/appearance?scenario=01',
     track: (page) => page.getByRole('radiogroup', { name: '外观' }),

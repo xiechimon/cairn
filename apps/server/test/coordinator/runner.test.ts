@@ -7,7 +7,10 @@ import {
   coordinatorEntry,
   step,
 } from '../../src/db/schema.js';
-import { setCoordinatorInServer } from '../../src/services/coordinator-context.js';
+import {
+  setCoordinatorInServer,
+  setCoordinatorWake,
+} from '../../src/services/coordinator-context.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -62,6 +65,31 @@ describe('in-server Coordinator runner', () => {
     await coordinator.idle();
     const done = w.s.db.select().from(step).all();
     expect(done.map((r) => r.status)).toEqual(['done', 'done']);
+    expect(seen).toHaveLength(2);
+  });
+
+  it('answers a composer send on an idle Coordinator without a steering conflict', async () => {
+    const w = await world('one');
+    const { faux, seen } = stub('ok');
+    const coordinator = boot(w, faux);
+    setCoordinatorWake((threadId) => coordinator.wake(threadId));
+    await coordinator.idle();
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+
+    const sent = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      content: 'two',
+    });
+    expect(sent.status).toBe(201);
+    await coordinator.idle();
+
+    expect(
+      w.s.db
+        .select()
+        .from(step)
+        .all()
+        .map((r) => r.status),
+    ).toEqual(['done', 'done']);
     expect(seen).toHaveLength(2);
   });
 });

@@ -105,7 +105,7 @@ const trigger = (page: Page, id: string) =>
 
 test('picking a number marks manual: while the PATCH is in flight the source is already manual, still manual after receipt', async ({ page }) => {
   const { pending, state } = await stubStack(page, [machine({ id: 'm-1' })]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
 
   await trigger(page, 'm-1').click();
@@ -126,7 +126,7 @@ test('`恢复推荐` (with fingerprint): while the PATCH is in flight the source
   const { pending } = await stubStack(page, [
     machine({ id: 'm-1', maxConcurrent: 5, maxConcurrentOverridden: true, concurrencySource: 'manual' }),
   ]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
 
   await trigger(page, 'm-1').click();
@@ -148,7 +148,7 @@ test('`恢复推荐` (no fingerprint): while the PATCH is in flight the source i
       capabilities: null,
     }),
   ]);
-  await page.goto('/app/resources/machines');
+  await page.goto('/app/resources/machines?machine=m-1');
 
   await trigger(page, 'm-1').click();
   await page.getByTestId('machine-concurrency-reset').click();

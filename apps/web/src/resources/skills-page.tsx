@@ -91,62 +91,60 @@ export function SkillsPage() {
           />
         }
       >
-        <>
-          <div className={RES_SEARCH_ROW_CLS}>
-            <InputGroup className="flex-1">
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupInput
-                type="text"
-                placeholder={t('搜索技能...')}
-                aria-label={t('搜索技能...')}
-              />
-            </InputGroup>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="outline" />}>
-                <ArrowUpDown />
-                <span>{t('排序')}</span>
-                <ChevronDown />
-              </DropdownMenuTrigger>
-              <KeyedMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
-                <DropdownMenuRadioGroup
-                  value={sort}
-                  onValueChange={(next) => setSort(next as SortKind)}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <KeyedMenuRadioItem
-                      key={option}
-                      value={option}
-                      shortcut={SORT_KEYS[option]}
-                      closeOnClick
-                    >
-                      <span>{t(option)}</span>
-                    </KeyedMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </KeyedMenuContent>
-            </DropdownMenu>
-          </div>
-          <ResourceList>
-            {skills.map((skill) => (
-              <ResourceRow
-                key={skill.name}
-                onOpen={() =>
-                  setDialog({
-                    skill: { id: skill.name, name: skill.name, description: skill.description },
-                  })
-                }
+        <div className={RES_SEARCH_ROW_CLS}>
+          <InputGroup className="flex-1">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="text"
+              placeholder={t('搜索技能...')}
+              aria-label={t('搜索技能...')}
+            />
+          </InputGroup>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+              <ArrowUpDown />
+              <span>{t('排序')}</span>
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <KeyedMenuContent align="end" side="bottom" sideOffset={8} aria-label={t('排序')}>
+              <DropdownMenuRadioGroup
+                value={sort}
+                onValueChange={(next) => setSort(next as SortKind)}
               >
-                <RowText>
-                  <RowTitle>{skill.name}</RowTitle>
-                  <RowDesc>{skill.description}</RowDesc>
-                </RowText>
-                <RowChevron />
-              </ResourceRow>
-            ))}
-          </ResourceList>
-        </>
+                {SORT_OPTIONS.map((option) => (
+                  <KeyedMenuRadioItem
+                    key={option}
+                    value={option}
+                    shortcut={SORT_KEYS[option]}
+                    closeOnClick
+                  >
+                    <span>{t(option)}</span>
+                  </KeyedMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </KeyedMenuContent>
+          </DropdownMenu>
+        </div>
+        <ResourceList>
+          {skills.map((skill) => (
+            <ResourceRow
+              key={skill.name}
+              onOpen={() =>
+                setDialog({
+                  skill: { id: skill.name, name: skill.name, description: skill.description },
+                })
+              }
+            >
+              <RowText>
+                <RowTitle>{skill.name}</RowTitle>
+                <RowDesc>{skill.description}</RowDesc>
+              </RowText>
+              <RowChevron />
+            </ResourceRow>
+          ))}
+        </ResourceList>
       </QueryBoundary>
       <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
