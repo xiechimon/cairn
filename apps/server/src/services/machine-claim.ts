@@ -476,18 +476,6 @@ async function tryClaim(
       won = db.transaction((tx) => {
         if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
-        const currentStep = tx
-          .select({ status: step.status })
-          .from(step)
-          .where(eq(step.id, cand.stepRow.id))
-          .get();
-        if (currentStep?.status !== 'pending') return false;
-        if (
-          cand.stepRow.kind !== 'review' &&
-          cand.todoRow.sourceKind !== 'research-citation-check'
-        ) {
-          recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
-        }
         const res = tx
           .update(step)
           .set({
@@ -503,6 +491,12 @@ async function tryClaim(
           .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
           .run();
         if (res.changes === 0) return false;
+        if (
+          cand.stepRow.kind !== 'review' &&
+          cand.todoRow.sourceKind !== 'research-citation-check'
+        ) {
+          recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
+        }
         if (skillInjection.hits.length > 0) {
           tx.insert(skillAudit)
             .values(

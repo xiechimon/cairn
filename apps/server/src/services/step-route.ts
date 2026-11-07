@@ -177,8 +177,8 @@ export function recordStepRoute(
   const existing = storedStepRoute(db, stepRow.id);
   if (
     existing !== null &&
-    ((existing.provider === effective.provider && existing.modelId === effective.modelId) ||
-      !routeIsReleasable(db, stepRow.id))
+    existing.provider === effective.provider &&
+    existing.modelId === effective.modelId
   ) {
     return existing;
   }

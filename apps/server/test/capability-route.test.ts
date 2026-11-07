@@ -294,6 +294,7 @@ describe('the router agrees with what dispatch can execute', () => {
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
     equipMachine(w, { claude: false, codex: true });
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const row = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
@@ -367,6 +368,7 @@ describe('claim validation and recording follow the router rules', () => {
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const row = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'gemini',
       modelId: 'gemini-pro',
@@ -487,6 +489,7 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
@@ -502,22 +505,22 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
   });
 
-  test('recording twice keeps the first decision for a started session', async () => {
+  test('recording the same accepted model on a claimed step leaves the row unchanged', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const first = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
       machineId: null,
       requiredCapabilities: null,
     });
-    w.s.db.update(step).set({ sessionId: 'started-session' }).where(eq(step.id, stepRow.id)).run();
     equipMachine(w, { claude: false, codex: true });
     const second = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
+      provider: 'claude-code',
+      modelId: 'claude-haiku-5-5',
       machineId: null,
       requiredCapabilities: null,
     });
@@ -552,16 +555,6 @@ describe('claim-time routes are reconsidered only while pending without continui
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
     });
-    expect
-      .soft(
-        recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
-          provider: 'openai-codex',
-          modelId: 'gpt-6.1-sol',
-          machineId: null,
-          requiredCapabilities: null,
-        }),
-      )
-      .toEqual(recorded);
     expect(w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()).toEqual(
       recorded,
     );
@@ -573,6 +566,7 @@ describe('claim-time routes are reconsidered only while pending without continui
     const todoRow = await buildTodo(w, 'difficulty:standard');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
     expect(stepRow).toMatchObject({ status: 'pending', sessionId: null, checkpointCommit: null });
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const recorded = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
@@ -580,6 +574,7 @@ describe('claim-time routes are reconsidered only while pending without continui
       requiredCapabilities: null,
     });
     expect(recorded.reason).toBe('rule default (standard: no available candidate)');
+    w.s.db.update(step).set({ status: 'pending' }).where(eq(step.id, stepRow.id)).run();
     equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
     const decision = decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
       machineId: null,
@@ -614,6 +609,8 @@ describe('claim-time routes are reconsidered only while pending without continui
     equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
     const second = await claim(w);
     expect(second?.agent?.modelId).toBe('gpt-6.1-sol');
+    expect(second?.step.id).toBe(stepId);
+    expect(w.s.db.select().from(step).where(eq(step.id, stepId)).get()?.status).toBe('claimed');
     const recorded = w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepId)).get()!;
     expect(recorded).toMatchObject({
       provider: 'openai-codex',
@@ -646,13 +643,18 @@ describe('claim-time routes are reconsidered only while pending without continui
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'difficulty:standard');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
-    const recorded = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
       machineId: null,
       requiredCapabilities: null,
     });
-    w.s.db.update(step).set(continuity).where(eq(step.id, stepRow.id)).run();
+    w.s.db
+      .update(step)
+      .set({ status: 'pending', ...continuity })
+      .where(eq(step.id, stepRow.id))
+      .run();
     equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
     expect(
       decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
@@ -664,14 +666,10 @@ describe('claim-time routes are reconsidered only while pending without continui
       reason: 'in-flight: keeps recorded model',
       rejected: [],
     });
-    expect(
-      recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
-        provider: 'openai-codex',
-        modelId: 'gpt-6.1-sol',
-        machineId: null,
-        requiredCapabilities: null,
-      }),
-    ).toEqual(recorded);
+    expect(profileForStep(w.s.db, todoRow, stepRow.kind, stepRow.id)).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
   });
 
   test('a runnable recorded model without a session is chosen again without rewriting the row', async () => {
@@ -679,6 +677,7 @@ describe('claim-time routes are reconsidered only while pending without continui
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'difficulty:standard');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
@@ -687,6 +686,7 @@ describe('claim-time routes are reconsidered only while pending without continui
     });
     w.s.db.update(stepRoute).set({ decidedAt: 1 }).where(eq(stepRoute.stepId, stepRow.id)).run();
     const recorded = w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()!;
+    w.s.db.update(step).set({ status: 'pending' }).where(eq(step.id, stepRow.id)).run();
     expect(
       decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
         machineId: null,
