@@ -73,6 +73,26 @@ test('search shows one ring on the whole pill while focused, and Esc clears and 
   expect(idleInput.shadow).toBe('none');
 });
 
+test('Esc during IME composition leaves the search query and focus alone', async ({ page }) => {
+  await page.goto(MACHINES);
+  const search = settings(page).getByLabel('搜索设置');
+  await page.keyboard.press('/');
+  await page.keyboard.type('机');
+  await search.evaluate((el) => {
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await expect(search).toHaveValue('机');
+  await expect(search).toBeFocused();
+  await expect(settings(page)).toBeVisible();
+});
+
 test('typing a slash inside another field does not steal focus', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   const name = settings(page).getByLabel('名称');

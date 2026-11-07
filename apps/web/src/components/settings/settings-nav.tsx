@@ -63,6 +63,7 @@ export function SettingsNav({
           onChange={(event) => onQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return;
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
             event.stopPropagation();
             onQuery('');
             event.currentTarget.blur();
