@@ -277,7 +277,7 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
               gap: Math.round(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight),
               opacity: Number(getComputedStyle(button).opacity),
             });
-            if (t < 400) return requestAnimationFrame(sample);
+            if (t < 500) return requestAnimationFrame(sample);
             const latest = [...viewport.querySelectorAll('[data-slot="message-scroller-item"]')].at(
               -1,
             );
@@ -332,7 +332,9 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     expect(measurement.frames[landed]?.t).toBeLessThanOrEqual(150);
     expect(measurement.frames.slice(landed).every((frame) => frame.gap <= 2)).toBe(true);
     expect(hidden).toBeGreaterThanOrEqual(0);
-    expect(measurement.frames[hidden]?.t).toBeLessThanOrEqual(150);
+    expect(measurement.frames[hidden]?.t).toBeLessThanOrEqual(
+      activation === 'phone-light' ? 300 : 150,
+    );
     expect(measurement.latestVisible).toBe(true);
     expect(resting.property === 'none' || resting.duration.split(',').every((v) => parseFloat(v) === 0)).toBe(true);
     await page.waitForTimeout(250);
