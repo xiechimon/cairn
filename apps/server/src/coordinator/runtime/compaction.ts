@@ -4,6 +4,7 @@ import {
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
 } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
+import type { Models } from '@earendil-works/pi-ai/models';
 import {
   type CompactionSettings,
   CompactionTask,
@@ -22,6 +23,8 @@ export interface ModelRef {
   provider: string;
   modelId: string;
 }
+
+export type Summarize = (prompt: string) => Promise<string>;
 
 export interface CompactionWindow {
   blockingAt: number;
@@ -142,6 +145,26 @@ export async function foldSummary(
   return summary ?? '';
 }
 
+export function summarizerFor(
+  models: Pick<Models, 'getModel' | 'completeSimple'>,
+  ref: ModelRef | null,
+): Summarize {
+  const model = ref === null ? undefined : models.getModel(ref.provider, ref.modelId);
+  if (model === undefined) {
+    throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
+  }
+  return async (prompt) => {
+    const reply = await models.completeSimple(model, {
+      systemPrompt: SUMMARY_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+    });
+    if (reply.stopReason !== 'stop') {
+      throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
+    }
+    return textOf(reply.content);
+  };
+}
+
 export function coordinatorCompactionExtension(summaryModel: () => ModelRef | null) {
   return defineExtension({
     name: 'cairn-coordinator-compaction',
@@ -150,27 +173,12 @@ export function coordinatorCompactionExtension(summaryModel: () => ModelRef | nu
         beforeCompact: async (compaction, api, context) => {
           const cached = await api.memo<string>(SUMMARY_MEMO, context);
           if (cached !== undefined) return { summary: cached };
-          const ref = summaryModel();
-          const model = ref === null ? undefined : api.models.getModel(ref.provider, ref.modelId);
-          if (model === undefined) {
-            throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
-          }
+          const summarize = summarizerFor(api.models, summaryModel());
           const { previous, rest } = splitPreviousSummary(compaction.messages);
           const summary = await foldSummary(
             previous,
             summaryBatches(transcriptLines(rest)),
-            async (prompt) => {
-              const reply = await api.models.completeSimple(model, {
-                systemPrompt: SUMMARY_SYSTEM_PROMPT,
-                messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-              });
-              if (reply.stopReason !== 'stop') {
-                throw new Error(
-                  `summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`,
-                );
-              }
-              return textOf(reply.content);
-            },
+            summarize,
           );
           return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
         },

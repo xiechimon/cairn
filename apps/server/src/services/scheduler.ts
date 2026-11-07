@@ -37,7 +37,6 @@ import {
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { planChiefDigests } from './chief-digest.js';
-import { planChiefSummaries } from './chief-summary.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import { sweepIdleComposerDrafts } from './composer-drafts.js';
@@ -507,7 +506,6 @@ export function createScheduler(
       }
     }
     planChiefDigests(deps, now);
-    planChiefSummaries(deps, now);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);
