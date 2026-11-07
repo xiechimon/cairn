@@ -1212,6 +1212,7 @@ export const EN: Record<string, string> = {
   '可以继续说，Coordinator 恢复后会按顺序处理…':
     'Keep typing; the Coordinator handles messages in order once it is back…',
   '发出的话会直接插进 Coordinator 这一轮': 'Steer the current reply',
+  '还没开始处理，新发的话会排在这条后面': 'Not started yet. New messages queue behind it',
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——

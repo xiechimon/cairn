@@ -1,4 +1,8 @@
-import { CHIEF_INPUT_PLACEHOLDER, CHIEF_INPUT_PLACEHOLDER_STEERING } from '@cairn/shared';
+import {
+  CHIEF_INPUT_PLACEHOLDER,
+  CHIEF_INPUT_PLACEHOLDER_QUEUED,
+  CHIEF_INPUT_PLACEHOLDER_STEERING,
+} from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type ReactNode,
@@ -192,9 +196,11 @@ export function ChiefConversation({
     targetPlaceholder ??
     (chief.outage != null
       ? t('可以继续说，Coordinator 恢复后会按顺序处理…')
-      : chief.running === true
-        ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-        : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+      : chief.waitingTurn !== undefined
+        ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+        : chief.running === true
+          ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+          : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
