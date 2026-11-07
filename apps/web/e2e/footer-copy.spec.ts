@@ -26,10 +26,12 @@ test('C2: plan card copy puts title + preview on the clipboard', async ({ page }
   expect(clip).toContain('Context: 仓库根目录');
 });
 
-test('C3: work blocks have no copy action while assistant copy remains', async ({ page }) => {
+test('C3: work block copy puts calls and outputs on the clipboard', async ({ page }) => {
   await page.goto(REVIEW);
-  await expect(page.getByTestId('work-block').last().getByRole('button', { name: '复制' })).toHaveCount(0);
-  await expect(page.locator('.chat-row--agent .chat-copy').first()).toBeAttached();
+  await readClipboard(page);
+  await page.getByTestId('work-block').last().getByRole('button', { name: '复制' }).click();
+  const clip = await readClipboard(page);
+  expect(clip).toContain('README.md');
 });
 
 test('C4: no footer chevron on agent rows; the work summary carries the only disclosure', async ({

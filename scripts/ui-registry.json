@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "131fc081fc757bcb4c348e9831a6ddf296f5ef17",
-    "date": "2026-11-07"
+    "sha": "2defb94fff14a296c1213bc9b7984051d406705a",
+    "date": "2026-11-06"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -135,9 +135,8 @@
     "message-scroller.tsx": {
       "kind": "registry",
       "upstreamItem": "message-scroller",
-      "status": "deviated",
-      "reason": "Chat scroll containment: root and viewport use overscroll-none to suppress scroll chaining and boundary overscroll; min-w-0, max-w-full, overflow-x-hidden and overflow-wrap:anywhere keep wide messages within the conversation while retaining vertical scrolling. Removes the upstream scroll-fade-b token because the compiled app CSS defines no rule for it.",
-      "hash": "0a85406d487d7b86ae58a0457945fec814cfa7a721cbc1b1aaf63630fb0b38a7"
+      "status": "pristine",
+      "hash": "ed1dd557a9b8eda743c01077f35ea7d608595aef46461d1551cb88d2262de4bd"
     },
     "message.tsx": {
       "kind": "registry",
