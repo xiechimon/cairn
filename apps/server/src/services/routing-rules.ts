@@ -156,16 +156,29 @@ export function routeProfile(
   };
 }
 
+export function ruleProfileForStep(
+  db: Pick<Db, 'select'>,
+  todoRow: RoutedTodo,
+  kind: StepKind,
+): RouteProfile | null {
+  const route = routeForStep(db, todoRow, kind);
+  if (route === null) return null;
+  return routeProfile(route, policyForStep(db, todoRow, kind), todoRow.routeOverride ?? null);
+}
+
+const ROUTED_PROVIDERS = ['claude-code', REVIEW_MODEL.provider];
+
 export function profileForStep(
   db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
   kind: StepKind,
   stepId: string | null = null,
 ): RouteProfile | null {
+  const base = ruleProfileForStep(db, todoRow, kind);
+  if (base === null) return null;
   const route = routeForStep(db, todoRow, kind);
-  if (route === null) return null;
-  const base = routeProfile(route, policyForStep(db, todoRow, kind), todoRow.routeOverride ?? null);
-  if (route.use !== 'session' && route.use !== 'review') return base;
+  if (route?.use !== 'session' && route?.use !== 'review') return base;
+  if (base.provider === null || !ROUTED_PROVIDERS.includes(base.provider)) return base;
   const decision = decideStepRoute(db, todoRow, kind, stepId, {
     machineId: base.machineId,
     required: base.requiredCapabilities,

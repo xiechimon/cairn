@@ -137,8 +137,10 @@ import { storeInfoReport } from './info-handoff.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
+import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
+import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
@@ -1174,6 +1176,20 @@ export function maybeEnqueueVerifyStep(
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
 
+function authorModelOf(deps: BuildDeps, todoRow: TodoRow, buildId: string): string | null {
+  const authorStep = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.status, 'done')))
+    .all()
+    .filter((row) => isBuildStepKind(row.kind))
+    .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt))
+    .at(-1);
+  if (authorStep === undefined) return null;
+  const authorAgent = profileForStep(deps.db, todoRow, authorStep.kind, authorStep.id);
+  return authorAgent === null ? null : effectiveModel(authorAgent, authorStep).modelId;
+}
+
 export function maybeEnqueueIndependentReview(
   deps: BuildDeps,
   todoRow: TodoRow,
@@ -1200,6 +1216,8 @@ export function maybeEnqueueIndependentReview(
     return;
   const reviewRoute = routeForStep(deps.db, todoRow, 'review');
   if (reviewRoute === null) return;
+  const authorModel = authorModelOf(deps, todoRow, buildId);
+  if (authorModel === null || !modelsAreIndependent(authorModel, reviewRoute.modelId)) return;
   const agentId = reviewRoute.id;
   const plan = latestPlanRow(deps, buildId);
   const reviewInstruction = reviewInstructionOf(deps, todoRow.teamId, 'review');

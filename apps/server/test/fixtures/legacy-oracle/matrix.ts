@@ -26,7 +26,7 @@ import {
   coordinatorProfile,
   memoryOpsAreTeamScoped,
   memoryOwnerOf,
-  profileForStep,
+  ruleProfileForStep as profileForStep,
 } from '../../../src/services/routing-rules.js';
 import { migrateUpTo } from '../../migrate-helpers.js';
 import type { Cell } from './cells.js';
