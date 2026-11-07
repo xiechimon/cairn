@@ -86,7 +86,7 @@ import {
 import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { injectMemories } from './memory.js';
+import { injectMemoriesCapped, MEMORY_INJECT_TOKEN_CAP } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
 import { chiefRemoteTools, coordinatorProfile, type RouteProfile } from './routing-rules.js';
@@ -1327,6 +1327,8 @@ const ROUTER_DISPATCH_LINES: readonly string[] = [
 export interface ChiefSystemPrompt {
   sections: { name: string; text: string; hash: string }[];
   text: string;
+  memoryIds: string[];
+  memoriesOmitted: number;
 }
 
 export function buildChiefSystemPrompt(
@@ -1338,14 +1340,19 @@ export function buildChiefSystemPrompt(
   const coordinator = coordinatorProfile(deps.db, teamId);
   const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
-  const memories = coordinator
-    ? injectMemories(deps.db, {
-        agentId: coordinator.id,
-        teamId,
-        threadId: threadId ?? undefined,
-        projectId: null,
-      })
-    : [];
+  const injected = coordinator
+    ? injectMemoriesCapped(
+        deps.db,
+        {
+          agentId: coordinator.id,
+          teamId,
+          threadId: threadId ?? undefined,
+          projectId: null,
+        },
+        MEMORY_INJECT_TOKEN_CAP,
+      )
+    : { memories: [], omitted: 0 };
+  const memories = injected.memories;
 
   const digestRows = deps.db
     .select({ content: chiefMessage.content })
@@ -1423,6 +1430,9 @@ export function buildChiefSystemPrompt(
     memories.length > 0
       ? memories.map((m) => `- ${m.title}：${m.content}`).join('\n')
       : '（尚无记忆）',
+    ...(injected.omitted > 0
+      ? [`（另有 ${injected.omitted} 条团队记忆因篇幅未显示；用 memories 工具带 query 搜索）`]
+      : []),
     '',
   ];
   const digestSectionLines: string[] =
@@ -1442,6 +1452,8 @@ export function buildChiefSystemPrompt(
       .filter((text) => text !== '')
       .join('\n')
       .trimEnd(),
+    memoryIds: memories.map((m) => m.id),
+    memoriesOmitted: injected.omitted,
   };
 }
 
@@ -1458,13 +1470,18 @@ export function chiefClaimContext(
   threadId: string,
 ): {
   systemPrompt: string;
+  memoryIds: string[];
+  memoriesOmitted: number;
   trigger: 'user' | ChiefWakeKind | 'wake';
   sessionId: string | null;
 } | null {
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return null;
+  const prompt = buildChiefSystemPrompt(deps, threadRow.teamId, threadId);
   return {
-    systemPrompt: composeChiefSystemPrompt(deps, threadRow.teamId, threadId),
+    systemPrompt: prompt.text,
+    memoryIds: prompt.memoryIds,
+    memoriesOmitted: prompt.memoriesOmitted,
     sessionId: threadRow.sessionId !== '' ? threadRow.sessionId : null,
     trigger: 'user',
   };

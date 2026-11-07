@@ -26,9 +26,9 @@ import {
   stepTeamId,
   upsertChiefRow,
 } from './machine-deps.js';
-import { injectMemories } from './memory.js';
+import { injectMemoriesCapped, MEMORY_INJECT_TOKEN_CAP } from './memory.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { projectTurnContext } from './project-instructions.js';
+import { projectTurnContextTraced } from './project-instructions.js';
 import { scanLocalSkills } from './skills.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
 
@@ -78,26 +78,31 @@ export function chiefTurnContext(
     );
     if (hint) routeSection = formatSkillRouteSection(hint);
   }
-  const memories = injectMemories(deps.db, {
-    agentId,
-    teamId: threadRow.teamId,
-    threadId: threadRow.id,
-    projectId: null,
-  });
-  const projectSection = digest
+  const memories = injectMemoriesCapped(
+    deps.db,
+    { agentId, teamId: threadRow.teamId, threadId: threadRow.id, projectId: null },
+    MEMORY_INJECT_TOKEN_CAP,
+  ).memories.map(({ title, content }) => ({ title, content }));
+  const project = digest
     ? null
-    : projectTurnContext(deps.db, {
+    : projectTurnContextTraced(deps.db, {
         teamId: threadRow.teamId,
         agentId,
         projectId: stepScopeProjectId(stepRow),
         threadId: threadRow.id,
       });
-  const sections = [projectSection, routeSection].filter((part): part is string => !!part);
+  const sections = [project?.text, routeSection].filter((part): part is string => !!part);
+  const memoryTrace = {
+    teamMemoryIds: ctx?.memoryIds ?? [],
+    teamMemoriesOmitted: ctx?.memoriesOmitted ?? 0,
+    projectMemoryIds: project?.memoryIds ?? [],
+    projectMemoriesOmitted: project?.memoriesOmitted ?? 0,
+  };
   const instruction =
     stepRow.prompt === null
       ? null
       : [stepRow.prompt, ...sections].filter((part) => part).join('\n\n');
-  return { digest, trigger, systemPrompt, memories, instruction, sections };
+  return { digest, trigger, systemPrompt, memories, instruction, sections, memoryTrace };
 }
 
 export function finishCoordinatorTurn(
