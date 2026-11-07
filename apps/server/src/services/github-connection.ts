@@ -7,6 +7,7 @@ import { eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { githubConnection } from '../db/schema.js';
 import { type FetchLike, refreshOAuthAccessToken } from '../lib/github.js';
+import type { UserToken } from '../lib/github-token.js';
 import { nowMs } from '../lib/ids.js';
 import { SecretBoxError } from '../lib/secret-box.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -260,4 +261,20 @@ export function readGithubConnectionStatus(
     return { connected: false, disconnectReason: row.disconnectedReason };
   }
   return { connected: true, login: row.login, scope: row.scope };
+}
+
+export async function teamUserToken(
+  deps: GithubTokenDeps,
+  teamId: string,
+): Promise<{ token: UserToken; box: SecretBox } | { reason: GithubTokenReason }> {
+  const access = await teamGithubToken(deps, teamId);
+  return 'token' in access ? { ...access, token: access.token as UserToken } : access;
+}
+
+export async function userTokenOrNull(
+  deps: GithubTokenDeps,
+  teamId: string,
+): Promise<UserToken | null> {
+  const access = await teamUserToken(deps, teamId);
+  return 'token' in access ? access.token : null;
 }

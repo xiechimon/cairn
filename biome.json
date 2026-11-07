@@ -75,7 +75,7 @@
                   "@modelcontextprotocol/sdk/*",
                   "@modelcontextprotocol/sdk/*/*"
                 ],
-                "message": "缝纪律（00/D4、01 §7.3）：MCP sdk 只许自建薄桥模块消费（server /api/mcp 面 = services/mcp-face.ts；daemon per-turn client 桥 = src/backend/）。"
+                "message": "Seam discipline (00/D4, 01 §7.3): the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
               },
               {
                 "group": [
@@ -83,7 +83,7 @@
                   "@anthropic-ai/claude-agent-sdk/*",
                   "@anthropic-ai/claude-agent-sdk/*/*"
                 ],
-                "message": "缝纪律（spec 17 T1/01 §5）：claude-agent-sdk 只许经 AgentBackend 缝消费——实现唯一落点 apps/daemon/src/backend/claude-code.ts（与 @earendil-works/* 同律，backend/ 目录覆写豁免）。"
+                "message": "Seam discipline (spec 17 T1, 01 §5): claude-agent-sdk is consumed only through AgentBackend in apps/daemon/src/backend/claude-code.ts; the backend override also covers @earendil-works/*."
               },
               {
                 "group": [
@@ -109,9 +109,9 @@
               }
             ],
             "paths": {
-              "cron-parser": "缝纪律（01 §3/§7.3）：cron-parser 只许 Scheduler 缝实现消费（02 §9.2 词表的自建调度循环内）。",
-              "simple-git": "缝纪律（01 §3/S10、§7.3）：GitOps 缝 = spawn 系统 git 自建薄 wrapper，simple-git 明文不引入。",
-              "isomorphic-git": "缝纪律（01 §3/S10、§7.3）：GitOps 缝 = spawn 系统 git 自建薄 wrapper，isomorphic-git 明文不引入（无 http-backend/worktree 面）。",
+              "cron-parser": "Seam discipline (01 §3/§7.3): cron-parser is consumed only through the Scheduler seam (the scheduling loop in 02 §9.2).",
+              "simple-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; simple-git is prohibited.",
+              "isomorphic-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; isomorphic-git is prohibited (no http-backend/worktree support).",
               "e2b": "Seam discipline (D101): the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
             }
           }
@@ -201,6 +201,140 @@
           "a11y": {
             "useSemanticElements": "off",
             "useKeyWithClickEvents": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/server/src/**",
+        "!apps/server/src/routes-resources.ts",
+        "!apps/server/src/services/autonomous-merge.ts",
+        "!apps/server/src/services/blocker-handoff.ts",
+        "!apps/server/src/services/builds.ts",
+        "!apps/server/src/services/ci-corrections.ts",
+        "!apps/server/src/services/ci-loop.ts",
+        "!apps/server/src/services/git.ts",
+        "!apps/server/src/services/github-autonomy-brake.ts",
+        "!apps/server/src/services/github-issues.ts",
+        "!apps/server/src/services/github-reads.ts",
+        "!apps/server/src/services/github-recovery.ts",
+        "!apps/server/src/services/issue-intake.ts",
+        "!apps/server/src/services/machine-finish-step.ts",
+        "!apps/server/src/services/machine-step-token.ts",
+        "!apps/server/src/services/merge-gate-run.ts",
+        "!apps/server/src/services/pr-feedback.ts",
+        "!apps/server/src/services/pr-watch.ts",
+        "!apps/server/src/services/projects.ts",
+        "!apps/server/src/services/scheduler.ts",
+        "!apps/server/src/services/scheduling/sweep.ts",
+        "!apps/server/src/services/ship-gate.ts",
+        "!apps/server/src/services/todos.ts",
+        "!apps/server/src/coordinator/runtime/**",
+        "!apps/server/src/db/client.ts",
+        "!apps/server/src/legacy/**",
+        "!apps/server/src/services/mcp-face.ts",
+        "!apps/server/src/services/schedules.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@earendil-works/*", "@earendil-works/*/*"],
+                    "message": "Seam discipline (01 §5/§7.3): pi packages are consumed only in apps/daemon/src/backend/ (behind the AgentBackend seam) and apps/server/src/coordinator/runtime/ (the in-server Coordinator, D114); other modules import the seam interface from @cairn/shared."
+                  },
+                  {
+                    "group": [
+                      "@modelcontextprotocol/sdk",
+                      "@modelcontextprotocol/sdk/*",
+                      "@modelcontextprotocol/sdk/*/*"
+                    ],
+                    "message": "Seam discipline (00/D4, 01 §7.3): the MCP SDK is consumed only by services/mcp-face.ts on the server and src/backend/ on the daemon."
+                  },
+                  {
+                    "group": [
+                      "@anthropic-ai/claude-agent-sdk",
+                      "@anthropic-ai/claude-agent-sdk/*",
+                      "@anthropic-ai/claude-agent-sdk/*/*"
+                    ],
+                    "message": "Seam discipline (spec 17 T1, 01 §5): claude-agent-sdk is consumed only through AgentBackend in apps/daemon/src/backend/claude-code.ts; the backend override also covers @earendil-works/*."
+                  },
+                  {
+                    "group": [
+                      "@agentclientprotocol/sdk",
+                      "@agentclientprotocol/sdk/*",
+                      "@agentclientprotocol/sdk/*/*",
+                      "@agentclientprotocol/claude-agent-acp",
+                      "@agentclientprotocol/claude-agent-acp/*",
+                      "@agentclientprotocol/claude-agent-acp/*/*",
+                      "@zed-industries/codex-acp",
+                      "@zed-industries/codex-acp/*",
+                      "@zed-industries/codex-acp/*/*"
+                    ],
+                    "message": "Seam discipline (ACP): ACP SDK and adapters may only be consumed through apps/daemon/src/backend/."
+                  },
+                  {
+                    "group": ["**/legacy/agent-layer/*"],
+                    "message": "Seam discipline (D60): the legacy agent-layer resolver is imported only by the boot migration in apps/server/src/db/client.ts and by its tests; delete the module once 0116 has been live for a release."
+                  },
+                  {
+                    "group": ["@opentelemetry/*", "@opentelemetry/*/*"],
+                    "message": "Seam discipline (observability-4): OpenTelemetry packages may only be consumed through the thin bridge module apps/daemon/src/backend/otel.ts, and only when CAIRN_OTEL_ENDPOINT is configured."
+                  },
+                  {
+                    "group": [
+                      "**/github-connection",
+                      "**/github-connection.js",
+                      "**/github-connection.ts"
+                    ],
+                    "importNamePattern": "(githubTokenOrNull|teamGithubToken|openGithubToken|\\*)",
+                    "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are frozen to existing importers until segment 2."
+                  }
+                ],
+                "paths": {
+                  "cron-parser": "Seam discipline (01 §3/§7.3): cron-parser is consumed only through the Scheduler seam (the scheduling loop in 02 §9.2).",
+                  "simple-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; simple-git is prohibited.",
+                  "isomorphic-git": "Seam discipline (01 §3/S10, §7.3): GitOps uses a thin wrapper around system git; isomorphic-git is prohibited (no http-backend/worktree support).",
+                  "e2b": "Seam discipline (D101): the E2B SDK is consumed only through the thin bridge module apps/daemon/src/orb/e2b-client.ts."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/server/src/coordinator/runtime/**",
+        "apps/server/src/db/client.ts",
+        "apps/server/src/legacy/**",
+        "apps/server/src/services/mcp-face.ts",
+        "apps/server/src/services/schedules.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/github-connection",
+                      "**/github-connection.js",
+                      "**/github-connection.ts"
+                    ],
+                    "importNamePattern": "(githubTokenOrNull|teamGithubToken|openGithubToken|\\*)",
+                    "message": "Identity seam: use branded App/User token providers. Legacy untyped getters are frozen to existing importers until segment 2."
+                  }
+                ],
+                "paths": {}
+              }
+            }
           }
         }
       }
