@@ -187,12 +187,12 @@ export function MachineRowView({
       <div className="flex min-w-0 items-center gap-3 px-4 py-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <Button
-            variant="ghost"
+            variant="link"
             data-testid="machine-toggle"
             aria-expanded={expanded}
             aria-controls={bodyId}
             onClick={onToggle}
-            className="h-auto min-w-0 justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground hover:bg-transparent aria-expanded:bg-transparent"
+            className="h-auto min-w-0 justify-start gap-1.5 rounded-sm p-0 text-left text-ui font-medium text-foreground no-underline focus-visible:ring-0"
           >
             <ChevronRight
               aria-hidden
@@ -239,10 +239,10 @@ export function MachineRowView({
               ·
             </span>
             <Button
-              variant="ghost"
+              variant="link"
               data-testid="machine-open-runtime"
               onClick={() => onOpenSection('runtime')}
-              className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary hover:bg-transparent hover:text-foreground"
+              className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
             >
               {t('运行时')} ›
             </Button>
@@ -252,10 +252,10 @@ export function MachineRowView({
                   ·
                 </span>
                 <Button
-                  variant="ghost"
+                  variant="link"
                   data-testid="machine-open-capabilities"
                   onClick={() => onOpenSection('capabilities')}
-                  className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary hover:bg-transparent hover:text-foreground"
+                  className="h-auto rounded-sm p-0 text-meta font-normal text-content-tertiary no-underline hover:text-foreground"
                 >
                   {t('能力')} ›
                 </Button>
@@ -280,6 +280,7 @@ export function MachineRowView({
                 variant="ghost"
                 size="icon-sm"
                 data-testid="machine-menu"
+                className="hover:bg-transparent dark:hover:bg-transparent"
                 aria-label={t('{name} 的菜单', { name: machine.name })}
               />
             }
