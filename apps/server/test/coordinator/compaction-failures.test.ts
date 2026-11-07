@@ -344,26 +344,36 @@ describe('compaction failures are never silent', () => {
     expect(parseFlushOutput('{"memories":[]}')).toEqual([]);
   });
 
-  it('removes the resolved provider key from the log and the span even when it has no known prefix', async () => {
-    const credential = 'custom-provider-credential-1234567890';
-    const w = await world('hi', credential);
-    const { faux } = stub('unused');
-    boot(w, faux, {
-      logger: {
-        info: () => {},
-        warn: () => {},
-        error: (fields: object, message: string) =>
-          logs.push({ fields: fields as Record<string, unknown>, message }),
-      },
-    });
-    reportCompactionFailure(
-      { threadId: w.threadId },
-      'memory-flush',
-      new Error(`401 incorrect API key provided: ${credential}`),
-    );
-    await flushSpans();
-    expect(failureLogs()).toHaveLength(1);
-    expect(JSON.stringify(logs)).not.toContain(credential);
-    expect(JSON.stringify(spans)).not.toContain(credential);
-  });
+  it.each([
+    'memory-flush',
+    'model-switch-fold',
+    'summary-fold',
+    'summary-model',
+    'seed-summary',
+    'background-compaction',
+  ] as const)(
+    'removes the resolved provider key from the %s report even when it has no known prefix',
+    async (stage) => {
+      const credential = 'custom-provider-credential-1234567890';
+      const w = await world('hi', credential);
+      const { faux } = stub('unused');
+      boot(w, faux, {
+        logger: {
+          info: () => {},
+          warn: () => {},
+          error: (fields: object, message: string) =>
+            logs.push({ fields: fields as Record<string, unknown>, message }),
+        },
+      });
+      reportCompactionFailure(
+        { threadId: w.threadId },
+        stage,
+        new Error(`401 incorrect API key provided: ${credential}`),
+      );
+      await flushSpans();
+      expect(failureLogs()).toHaveLength(1);
+      expect(JSON.stringify(logs)).not.toContain(credential);
+      expect(JSON.stringify(spans)).not.toContain(credential);
+    },
+  );
 });
