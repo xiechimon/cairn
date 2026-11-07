@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive } from './chief-home-mock';
 
 const DUPLICATES = '/app/settings/machines?scenario=machines-duplicate-names';
 
@@ -155,4 +156,40 @@ test('the accept switch is derived: off clears runtimes, on only opens the runti
   await settings(page).getByTestId('provider-toggle').first().click();
   await expect.poll(() => patches.length).toBe(2);
   expect(patches[1]).toEqual({ enabledRuntimes: ['pi'] });
+});
+
+test('scope menu keeps long machine names and the selection indicator inside a phone viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const machineName = 'm'.repeat(60);
+  await mockLive(
+    page,
+    {
+      threads: [],
+      messages: [],
+      machines: [{ id: 'm-long', name: machineName, online: false }],
+    },
+    (path, _route, json) => {
+      if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+      if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+      return undefined;
+    },
+  );
+  await page.goto('/app/settings/providers');
+  await scope(page).click();
+  const menu = page.locator('[data-slot=select-content]');
+  await expect(menu).toBeVisible();
+  await expect
+    .poll(() => menu.evaluate((element) => element.getBoundingClientRect().right))
+    .toBeLessThanOrEqual(390);
+  await page.getByRole('option', { name: new RegExp(machineName) }).click();
+  await scope(page).click();
+  const selected = page.getByRole('option', { name: new RegExp(machineName), selected: true });
+  const indicator = selected.locator('svg.lucide-check');
+  await expect(indicator).toBeVisible();
+  await expect(indicator).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(() => menu.evaluate((element) => element.getBoundingClientRect().right))
+    .toBeLessThanOrEqual(390);
 });

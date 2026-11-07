@@ -56,14 +56,21 @@ export function SettingsScopeSentence({
               {current === undefined ? t('所有机器') : machineLabel(current, machines)}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent aria-label={t('设置作用于')} className="min-w-max">
+          <SelectContent
+            aria-label={t('设置作用于')}
+            className="w-max min-w-0 max-w-(--available-width)"
+          >
             <SelectItem value={TEAM_SCOPE}>
               <Server aria-hidden />
               {t('所有机器')}
             </SelectItem>
             {machines.map((m) =>
               m.id === undefined ? null : (
-                <SelectItem key={m.id} value={m.id}>
+                <SelectItem
+                  key={m.id}
+                  value={m.id}
+                  className="[&>span:first-child]:min-w-0 [&>span:first-child]:shrink [&>span:first-child]:whitespace-normal [&>span:first-child]:[overflow-wrap:anywhere]"
+                >
                   <Monitor aria-hidden />
                   <MachineName machine={m} all={machines} />
                   {m.online === false && (
