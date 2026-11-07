@@ -18,26 +18,6 @@ const pullSchema = z.object({
     nodes: z.array(z.object({ name: z.string() })),
     pageInfo: z.object({ hasNextPage: z.literal(false) }),
   }),
-  timelineItems: z.object({
-    nodes: z
-      .array(
-        z.discriminatedUnion('__typename', [
-          z.object({
-            __typename: z.literal('PullRequestCommit'),
-            commit: z.object({ oid: z.string().min(1) }),
-          }),
-          z.object({
-            __typename: z.literal('HeadRefForcePushedEvent'),
-            afterCommit: z.object({ oid: z.string().min(1) }),
-          }),
-          z.object({
-            __typename: z.literal('UnlabeledEvent'),
-            label: z.object({ name: z.string() }),
-          }),
-        ]),
-      )
-      .max(50),
-  }),
   reviewThreads: z.object({
     pageInfo,
     nodes: z.array(
@@ -60,7 +40,7 @@ const pullSchema = z.object({
   }),
 });
 
-const query = `query($owner:String!,$name:String!,$number:Int!,$after:String,$label:String!){repository(owner:$owner,name:$name){label(name:$label){id} pullRequest(number:$number){id state isDraft headRefOid timelineItems(itemTypes:[PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT,UNLABELED_EVENT],last:50){nodes{__typename ... on PullRequestCommit{commit{oid}} ... on HeadRefForcePushedEvent{afterCommit{oid}} ... on UnlabeledEvent{label{name}}}} labels(first:100){nodes{name} pageInfo{hasNextPage}} reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line comments(first:1){nodes{author{__typename login} body url}}}}}}}`;
+const query = `query($owner:String!,$name:String!,$number:Int!,$after:String,$label:String!){repository(owner:$owner,name:$name){label(name:$label){id} pullRequest(number:$number){id state isDraft headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}} reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line comments(first:1){nodes{author{__typename login} body url}}}}}}}`;
 
 export async function githubPrReviewFindings(
   fetch: FetchLike,
@@ -80,8 +60,6 @@ export async function githubPrReviewFindings(
         head: string;
         labels: string[];
         labelId: string | null;
-        timeline: z.infer<typeof pullSchema>['timelineItems']['nodes'];
-        overridden: boolean;
         cairnHolds: boolean;
       }
     | undefined;
@@ -108,19 +86,6 @@ export async function githubPrReviewFindings(
       pull.labels.nodes.some((label) => label.name === CAIRN_REVIEW_HOLD_LABEL)
     )
       throw new Error('GitHub review hold label inconsistent');
-    const timeline = pull.timelineItems.nodes;
-    const headIndex = timeline.findLastIndex((event) =>
-      event.__typename === 'PullRequestCommit'
-        ? event.commit.oid === pull.headRefOid
-        : event.__typename === 'HeadRefForcePushedEvent' &&
-          event.afterCommit.oid === pull.headRefOid,
-    );
-    const overridden = timeline
-      .slice(headIndex + 1)
-      .some(
-        (event) =>
-          event.__typename === 'UnlabeledEvent' && event.label.name === CAIRN_REVIEW_HOLD_LABEL,
-      );
     const current = {
       id: pull.id,
       state: pull.state,
@@ -128,8 +93,6 @@ export async function githubPrReviewFindings(
       head: pull.headRefOid,
       labels: pull.labels.nodes.map((label) => label.name),
       labelId: data.repository.label?.id ?? null,
-      timeline,
-      overridden,
       cairnHolds:
         pull.isDraft && pull.labels.nodes.some((label) => label.name === CAIRN_REVIEW_HOLD_LABEL),
     };

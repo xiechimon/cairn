@@ -16,7 +16,6 @@ export function desiredAction(
   snapshot: {
     state: string;
     isDraft: boolean;
-    overridden: boolean;
     labels: readonly string[];
     findings: readonly PrReviewFinding[];
   },
@@ -25,7 +24,7 @@ export function desiredAction(
   if (local.dismissed || snapshot.state !== 'OPEN') return null;
   const labelPresent = snapshot.labels.includes(CAIRN_REVIEW_HOLD_LABEL);
   if (snapshot.findings.length > 0) {
-    if (snapshot.overridden || snapshot.isDraft) return null;
+    if (snapshot.isDraft) return null;
     return labelPresent ? 'convertToDraft' : 'addLabel';
   }
   if (
