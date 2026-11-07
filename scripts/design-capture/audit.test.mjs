@@ -31,7 +31,14 @@ const textImage = (file) =>
     file,
   ]);
 
-const run = (dir) => spawnSync(process.execPath, [audit, dir], { encoding: 'utf8' });
+const fixtureDeny = join(makeTestTempDir('audit-deny-'), 'deny-list.json');
+writeFileSync(fixtureDeny, JSON.stringify(['Secret Project', 'Quarterly plan']));
+
+const run = (dir) =>
+  spawnSync(process.execPath, [audit, dir], {
+    encoding: 'utf8',
+    env: { ...process.env, AUDIT_DENY_LIST: fixtureDeny },
+  });
 
 const fresh = () => makeTestTempDir('audit-test-');
 
@@ -151,4 +158,36 @@ test('a video with a readable region fails', () => {
   const r = run(dir);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /looks readable/);
+});
+
+test('an aria title in a claude.ai dump key fails', () => {
+  const dir = fresh();
+  writeFileSync(
+    join(dir, 'claude-ai-dumps.json'),
+    JSON.stringify({
+      initial: { els: [{ key: 'button[aria=Hide Unlisted thing ~]#4', text: '' }] },
+    }),
+  );
+  const r = run(dir);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /visible text/);
+});
+
+test('a deny-listed title fails in any text file, even one not named claude-ai', () => {
+  const dir = fresh();
+  writeFileSync(join(dir, 'motion-compare.md'), '| a[role=link] | opens Secret Project |');
+  const r = run(dir);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /deny-listed/);
+  assert.doesNotMatch(r.stderr, /Secret Project/);
+});
+
+test('a missing deny list fails', () => {
+  const dir = fresh();
+  const r = spawnSync(process.execPath, [audit, dir], {
+    encoding: 'utf8',
+    env: { ...process.env, AUDIT_DENY_LIST: join(dir, 'none.json') },
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /deny list/);
 });

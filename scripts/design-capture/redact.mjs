@@ -16,26 +16,105 @@ if (!runDir) {
   process.exit(2);
 }
 
-const scrubKey = (s) =>
-  s
-    .replace(/"(?:[^"\\]|\\.)*"(?=#\d)/g, '"~"')
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '~')
-    .replace(
-      /\[aria=([^\]]*)\]/g,
-      (_, v) =>
-        `[aria=${v.split(' ').slice(0, 3).join(' ')}${v.split(' ').length > 3 ? ' ~' : ''}]`,
-    );
+const keyShape = /^([a-z][a-z0-9-]*)((?:\[[^\]]*\])*)("(?:[^"\\]|\\.)*")?(#\d+)?$/i;
+const safeToken = /^[a-z][a-z0-9-]*$/i;
+const stateWords =
+  /^(true|false|open|closed|checked|unchecked|on|off|active|inactive|horizontal|vertical|delayed-open|instant-open|hidden|visible|\d+)$/i;
 
-const scrubDeep = (v) => {
-  if (typeof v === 'string') return scrubKey(v);
-  if (Array.isArray(v)) return v.map(scrubDeep);
-  if (v && typeof v === 'object') {
-    const out = {};
-    for (const [k, x] of Object.entries(v)) out[scrubKey(k)] = k === 'text' ? '' : scrubDeep(x);
-    return out;
-  }
-  return v;
+const scrubKey = (k) => {
+  if (typeof k !== 'string') return k;
+  const m = k.match(keyShape);
+  if (!m) return '~';
+  const kept = [...m[2].matchAll(/\[(role|tid)=([^\]]*)\]/g)]
+    .filter(([, , v]) => safeToken.test(v))
+    .map(([x]) => x)
+    .join('');
+  return `${m[1]}${kept}${m[3] ? '"~"' : ''}${m[4] ?? ''}`;
 };
+
+const scrubUrl = (u) =>
+  typeof u === 'string'
+    ? u
+        .split('?')[0]
+        .replace(/\/[^/]*[0-9][^/]*/g, '/~')
+        .replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, '~')
+    : u;
+
+const scrubProbe = (p) => ({
+  product: p.product,
+  journey: p.journey,
+  width: p.width,
+  scheme: p.scheme,
+  viewport: p.viewport,
+  probeInfo: { scrollers: (p.probeInfo?.scrollers ?? []).map(scrubKey) },
+  steps: (p.steps ?? []).map((s) => ({
+    label: s.label,
+    nodeStart: s.nodeStart,
+    nodeEnd: s.nodeEnd,
+    error: s.error ? 'step failed' : undefined,
+  })),
+  frames: (p.frames ?? []).map((f) => ({
+    t: f.t,
+    ...(f.d
+      ? { d: Object.fromEntries(Object.entries(f.d).map(([k, v]) => [scrubKey(k), v])) }
+      : {}),
+    ...(f.s ? { s: f.s } : {}),
+    ...(f.tl ? { tl: f.tl } : {}),
+  })),
+  events: (p.events ?? []).map((e) => ({
+    t: e.t,
+    type: e.type,
+    target: scrubKey(e.target),
+    ...(e.dy !== undefined ? { dy: e.dy } : {}),
+    ...(e.xy ? { xy: e.xy } : {}),
+  })),
+  mutations: (p.mutations ?? []).map((m) => ({
+    t: m.t,
+    target: scrubKey(m.target),
+    ...(m.add ? { add: m.add.map(scrubKey) } : {}),
+    ...(m.addN !== undefined ? { addN: m.addN, rmN: m.rmN, rm: m.rm } : {}),
+    ...(m.chars !== undefined ? { chars: m.chars } : {}),
+    ...(m.attr ? { attr: m.attr, v: stateWords.test(m.v ?? '') ? m.v : '~' } : {}),
+  })),
+  marks: p.marks,
+  cast: p.cast,
+});
+
+const scrubDump = (d) =>
+  d?.els
+    ? {
+        url: scrubUrl(d.url),
+        t: d.t,
+        viewport: d.viewport,
+        htmlAttrs: Object.fromEntries(
+          Object.entries(d.htmlAttrs ?? {}).filter(([k]) =>
+            ['lang', 'data-mode', 'data-theme'].includes(k),
+          ),
+        ),
+        vars: d.vars,
+        els: d.els.map((e) => ({
+          key: scrubKey(e.key),
+          path: e.path,
+          rect: e.rect,
+          cls: e.cls,
+          s: e.s,
+          roles: e.roles,
+          ...(e.pseudo
+            ? {
+                pseudo: Object.fromEntries(
+                  Object.entries(e.pseudo).map(([k, v]) => [
+                    k,
+                    { ...v, content: v.content && v.content !== '""' ? '~' : v.content },
+                  ]),
+                ),
+              }
+            : {}),
+        })),
+      }
+    : d;
+
+const scrubDumps = (dumps) =>
+  Object.fromEntries(Object.entries(dumps).map(([k, v]) => [k, scrubDump(v)]));
 
 const run = promisify(execFile);
 const jobs = [];
@@ -130,7 +209,7 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
     let lastT = null;
     for (const f of probe.frames) {
       for (const [k, v] of Object.entries(f.d ?? {})) {
-        if (!k.startsWith('div[role=dialog][aria=Sidebar') || !v.rect) continue;
+        if (!k.startsWith('div[role=dialog]') || !k.includes('[tid=sidebar]') || !v.rect) continue;
         const x = Number(v.rect.split(',')[0]);
         if (x > -370 && openAt === null) openAt = f.t;
         if (x <= -370 && openAt !== null) {
@@ -177,7 +256,7 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
       Object.entries(f.d ?? {}).some(
         ([k, v]) =>
           k.startsWith('div[role=dialog]') &&
-          !k.includes('aria=Sidebar') &&
+          !k.includes('[tid=sidebar]') &&
           v.opacity !== undefined &&
           Number(v.opacity) < 0.5 &&
           f.t > (probe.marks[0]?.t ?? 0) + 500,
@@ -203,6 +282,24 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
       box: [0, top, vw0, vh0 - top],
       from: after,
       to: sendLabel ? mark(`start:${sendLabel}`) : null,
+    });
+  }
+  if (probe.journey === 'settings' && mark('start:nav-page-2')) {
+    const dlg = Object.values(dumps)
+      .flatMap((d) => d?.els ?? [])
+      .find((e) => (e.roles ?? []).includes('dialog') && e.rect[2] > 200);
+    const box = dlg ? dlg.rect : [0, 0, vw0, vh0];
+    const colX = mobile ? box[0] : Math.round(box[0] + box[2] * 0.6);
+    specs.push({
+      name: 'capabilities-values',
+      box: [
+        colX,
+        Math.round(box[1] + 40),
+        Math.round(box[0] + box[2] - colX),
+        Math.round(box[3] - 40),
+      ],
+      from: mark('start:nav-page-2') - 100,
+      to: (mark('start:nav-appearance') ?? mark('end:nav-page-2')) + 300,
     });
   }
   if (probe.journey === 'projects')
@@ -274,7 +371,7 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
       JSON.stringify({ regions, reviewedClean: false }, null, 1),
     );
   }
-  writeFileSync(probeFile, JSON.stringify({ ...scrubDeep(probe), redacted: true }));
-  if (existsSync(dumpsFile)) writeFileSync(dumpsFile, JSON.stringify(scrubDeep(dumps)));
+  writeFileSync(probeFile, JSON.stringify({ ...scrubProbe(probe), redacted: true }));
+  if (existsSync(dumpsFile)) writeFileSync(dumpsFile, JSON.stringify(scrubDumps(dumps)));
   console.log(`${entry.name}: redacted ${cast.length} frames`);
 }

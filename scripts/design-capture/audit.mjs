@@ -66,6 +66,13 @@ const textLeak = (json) => {
         hits.push('uuid');
       for (const m of v.matchAll(/"((?:[^"\\]|\\.)*)"(?=#\d)/g))
         if (m[1] !== '~') hits.push(m[1].slice(0, 30));
+      for (const m of v.matchAll(/\[(aria|title|alt|href|placeholder|name|label)=([^\]]*)\]/g))
+        hits.push(`${m[1]}=${m[2].slice(0, 30)}`);
+      if (
+        ['title', 'alt', 'href', 'placeholder', 'aria-label', 'ariaLabel', 'value'].includes(k) &&
+        v.length
+      )
+        hits.push(`${k}:${v.slice(0, 30)}`);
     } else if (Array.isArray(v)) {
       for (const x of v) visit(x);
     } else if (v && typeof v === 'object')
@@ -78,7 +85,37 @@ const textLeak = (json) => {
   return hits;
 };
 
+const denyPath =
+  process.env.AUDIT_DENY_LIST ??
+  join(homedir(), '.cache', 'cairn-design-capture', 'deny-list.json');
+if (!existsSync(denyPath)) {
+  console.error(
+    `capture audit FAILED: deny list ${denyPath} is missing; build it from the unredacted local capture`,
+  );
+  process.exit(1);
+}
+const deny = JSON.parse(readFileSync(denyPath, 'utf8')).filter(
+  (t) => typeof t === 'string' && t.length >= 3,
+);
+const denyHit = (text) =>
+  deny.filter((t) =>
+    /^[A-Za-z]+$/.test(t)
+      ? new RegExp(`(^|[^A-Za-z])${t}($|[^A-Za-z])`).test(text)
+      : text.includes(t),
+  );
+const textual = new Set(['.json', '.md', '.txt', '.html', '.csv']);
+
 for (const file of roots.flatMap(walk)) {
+  const isGz = file.endsWith('.gz');
+  if (textual.has(extname(isGz ? file.slice(0, -3) : file).toLowerCase())) {
+    const body = (isGz ? gunzipSync(readFileSync(file)) : readFileSync(file)).toString('utf8');
+    const hits = denyHit(body);
+    checked++;
+    if (hits.length)
+      failures.push(
+        `${file}: contains ${hits.length} deny-listed string(s), e.g. ${JSON.stringify(hits.slice(0, 2).map((h) => `${h.slice(0, 2)}…`))}`,
+      );
+  }
   const isJson = file.endsWith('.json') || file.endsWith('.json.gz');
   if (isJson && isReference(file) && !file.endsWith('.redaction.json')) {
     const raw = readFileSync(file);
