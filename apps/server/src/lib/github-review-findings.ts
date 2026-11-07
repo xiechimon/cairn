@@ -12,6 +12,19 @@ const pullSchema = z.object({
     nodes: z.array(z.object({ name: z.string() })),
     pageInfo: z.object({ hasNextPage: z.literal(false) }),
   }),
+  timelineItems: z.object({
+    nodes: z
+      .array(
+        z.discriminatedUnion('__typename', [
+          z.object({
+            __typename: z.literal('ConvertToDraftEvent'),
+            actor: z.object({ login: z.string().min(1) }).nullable(),
+          }),
+          z.object({ __typename: z.literal('ReadyForReviewEvent') }),
+        ]),
+      )
+      .max(1),
+  }),
   reviewThreads: z.object({
     pageInfo,
     nodes: z.array(
@@ -34,7 +47,7 @@ const pullSchema = z.object({
   }),
 });
 
-const query = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){id state isDraft headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}} reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line comments(first:1){nodes{author{__typename login} body url}}}}}}}`;
+const query = `query($owner:String!,$name:String!,$number:Int!,$after:String){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$number){id state isDraft headRefOid timelineItems(itemTypes:[CONVERT_TO_DRAFT_EVENT,READY_FOR_REVIEW_EVENT],last:1){nodes{__typename ... on ConvertToDraftEvent{actor{login}}}} labels(first:100){nodes{name} pageInfo{hasNextPage}} reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line comments(first:1){nodes{author{__typename login} body url}}}}}}}`;
 
 export async function githubPrReviewFindings(
   fetch: FetchLike,
@@ -47,19 +60,43 @@ export async function githubPrReviewFindings(
   const cursors = new Set<string>();
   let after: string | null = null;
   let snapshot:
-    | { id: string; state: string; isDraft: boolean; head: string; labels: string[] }
+    | {
+        id: string;
+        state: string;
+        isDraft: boolean;
+        head: string;
+        labels: string[];
+        viewer: string;
+        transition: z.infer<typeof pullSchema>['timelineItems']['nodes'][number] | null;
+        cairnHolds: boolean;
+      }
     | undefined;
   for (;;) {
     const data = z
-      .object({ repository: z.object({ pullRequest: pullSchema }) })
+      .object({
+        viewer: z.object({ login: z.string().min(1) }),
+        repository: z.object({ pullRequest: pullSchema }),
+      })
       .parse(await githubGraphql(fetch, token, query, { owner, name: repo, number, after }));
     const pull = data.repository.pullRequest;
+    const transition = pull.timelineItems.nodes[0] ?? null;
+    const [viewer, actor] = [
+      data.viewer.login,
+      transition?.__typename === 'ConvertToDraftEvent' ? transition.actor?.login : undefined,
+    ].map((login) => login?.toLowerCase().replace(/\[bot\]$/, ''));
     const current = {
       id: pull.id,
       state: pull.state,
       isDraft: pull.isDraft,
       head: pull.headRefOid,
       labels: pull.labels.nodes.map((label) => label.name),
+      viewer: data.viewer.login,
+      transition,
+      cairnHolds:
+        pull.isDraft &&
+        transition?.__typename === 'ConvertToDraftEvent' &&
+        actor !== undefined &&
+        actor === viewer,
     };
     if (snapshot && JSON.stringify(snapshot) !== JSON.stringify(current))
       throw new Error('GitHub PR changed during review pagination');
@@ -104,11 +141,4 @@ export async function githubSetPullDraft(
   z.object({ changed: z.object({ pullRequest: z.object({ isDraft: z.literal(draft) }) }) }).parse(
     data,
   );
-  const read = await githubGraphql(
-    fetch,
-    token,
-    'query($id:ID!){node(id:$id){... on PullRequest{isDraft}}}',
-    { id },
-  );
-  z.object({ node: z.object({ isDraft: z.literal(draft) }) }).parse(read);
 }

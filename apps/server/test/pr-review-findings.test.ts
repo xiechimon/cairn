@@ -12,7 +12,7 @@ import { build, message, project, step, threadPr, todo } from '../src/db/schema.
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
+import { desiredDraft, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
 import { createPrWakes } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import {
@@ -76,6 +76,9 @@ function fixture() {
     .run();
   const state = {
     draft: false,
+    viewer: 'cairnwright[bot]',
+    transition: null as null | { __typename: string; actor?: { login: string } | null },
+    failure: null as null | { operation: string; kind: string },
     resolved: false,
     outdated: false,
     login: 'chatgpt-codex-connector[bot]',
@@ -109,9 +112,22 @@ function fixture() {
       };
     const { query } = JSON.parse(init.body) as { query: string };
     queries.push(query);
-    if (query.includes('mutation') && state.apply)
-      state.draft = query.includes('convertPullRequestToDraft');
+    const operation = query.includes('mutation')
+      ? query.includes('convertPullRequestToDraft')
+        ? 'convert'
+        : 'ready'
+      : 'snapshot';
+    const failure = state.failure?.operation === operation ? state.failure.kind : null;
+    if (failure) state.failure = null;
+    if (query.includes('mutation') && state.apply && (!failure || failure === 'lost')) {
+      state.draft = operation === 'convert';
+      state.transition = state.draft
+        ? { __typename: 'ConvertToDraftEvent', actor: { login: state.viewer } }
+        : { __typename: 'ReadyForReviewEvent' };
+    }
+    if (failure === 'lost') throw new Error('response lost');
     const pull = {
+      timelineItems: { nodes: state.transition ? [state.transition] : [] },
       id: 'PR_node',
       state: 'OPEN',
       isDraft: state.draft,
@@ -140,11 +156,11 @@ function fixture() {
       },
     };
     return {
-      ok: state.error !== 'http',
-      status: state.error === 'http' ? 500 : 200,
+      ok: state.error !== 'http' && failure !== 'http',
+      status: state.error === 'http' || failure === 'http' ? 500 : 200,
       headers: { get: () => null },
       json: async () =>
-        state.error === 'graphql'
+        state.error === 'graphql' || failure === 'graphql'
           ? { errors: [{ message: 'bad' }] }
           : state.error === 'rate'
             ? { errors: [{ type: 'RATE_LIMITED' }] }
@@ -152,10 +168,10 @@ function fixture() {
                 data: query.includes('mutation')
                   ? {
                       changed: {
-                        pullRequest: { isDraft: query.includes('convertPullRequestToDraft') },
+                        pullRequest: { isDraft: state.draft },
                       },
                     }
-                  : { repository: { pullRequest: pull }, node: pull },
+                  : { viewer: { login: state.viewer }, repository: { pullRequest: pull } },
               },
       text: async () => '',
     };
@@ -180,13 +196,7 @@ function fixture() {
       },
       runs: [],
     });
-  const hold = () =>
-    s.db
-      .select()
-      .from(message)
-      .all()
-      .find((m) => m.id.startsWith('pr-review-findings:'))?.content;
-  return { s, state, queries, fetch, row, reconcile, wake, hold };
+  return { s, state, queries, fetch, row, reconcile, wake };
 }
 
 test.each(['P2', 'P3'])(
@@ -198,7 +208,6 @@ test.each(['P2', 'P3'])(
     await f.wake();
     await f.wake();
     expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(1);
-    expect(f.hold()).toMatchObject({ head: 'abc' });
     expect(f.s.db.select().from(step).all()).toHaveLength(1);
     expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
     expect(f.s.db.select().from(step).get()?.prompt).toContain('a.ts:7');
@@ -240,8 +249,7 @@ test('dismissed cairn-held draft with zero findings stays draft', async () => {
   ).toBe(false);
   expect(f.fetch).not.toHaveBeenCalled();
   expect(f.state.draft).toBe(true);
-  expect(f.hold()).toMatchObject({ head: 'abc' });
-  expect(f.s.db.select().from(message).all()).toHaveLength(1);
+  expect(f.s.db.select().from(message).all()).toHaveLength(0);
   expect(f.s.db.select().from(step).all()).toEqual([]);
 });
 
@@ -251,7 +259,6 @@ test.each(['http', 'graphql', 'cursor'])('unreadable threads fail closed: %s', a
   f.state.page = error === 'cursor';
   await expect(f.reconcile()).rejects.toThrow();
   expect(f.queries.some((q) => q.includes('mutation'))).toBe(false);
-  expect(f.hold()).toBeUndefined();
 });
 
 test('rate limits propagate', async () => {
@@ -260,14 +267,16 @@ test('rate limits propagate', async () => {
   await expect(f.reconcile()).rejects.toBeInstanceOf(GithubRateLimitedError);
 });
 
-test('held draft releases only after fresh clean read and verified ready mutation', async () => {
+test('cairn draft releases from a fresh clean snapshot without read-back', async () => {
   const f = fixture();
   await f.reconcile();
   f.state.resolved = true;
   await f.reconcile();
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(true);
   expect(f.state.draft).toBe(false);
-  expect(f.hold()).toBeUndefined();
+  expect(f.queries).toHaveLength(4);
+  expect(f.queries.every((q) => !q.includes('node(id:'))).toBe(true);
+  expect(f.s.db.select().from(message).all()).toEqual([]);
 });
 
 test.each(['pending', 'claimed', 'waiting_quota'] as const)(
@@ -333,61 +342,6 @@ test('autoFix off still holds, notifies and later releases', async () => {
   expect(f.state.draft).toBe(false);
 });
 
-test('unverified draft mutation retains hold intent and retries', async () => {
-  const f = fixture();
-  f.state.apply = false;
-  await expect(f.reconcile()).rejects.toThrow();
-  expect(f.hold()).toMatchObject({ head: 'abc' });
-  await expect(f.reconcile()).rejects.toThrow();
-  expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(2);
-});
-
-test('successful draft mutation with failed read-back retains ownership and later releases', async () => {
-  const f = fixture();
-  const implementation = f.fetch.getMockImplementation()!;
-  f.fetch.mockImplementation(async (url, init) => {
-    if (init?.body && JSON.parse(init.body).query.includes('node(id:'))
-      throw new Error('read-back failed');
-    return implementation(url, init);
-  });
-  await expect(f.reconcile()).rejects.toThrow('GitHub GraphQL unavailable');
-  expect(f.state.draft).toBe(true);
-  expect(f.hold()).toMatchObject({ head: 'abc' });
-  f.fetch.mockImplementation(implementation);
-  f.state.resolved = true;
-  await f.reconcile();
-  expect(f.state.draft).toBe(false);
-  expect(f.hold()).toBeUndefined();
-  expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);
-});
-
-test('failed draft mutation retains intent and retries without duplicate holds', async () => {
-  const f = fixture();
-  let holdAtMutation: unknown;
-  const implementation = f.fetch.getMockImplementation()!;
-  f.fetch.mockImplementation(async (url, init) => {
-    if (init?.body && JSON.parse(init.body).query.includes('convertPullRequestToDraft')) {
-      holdAtMutation = f.hold();
-      throw new Error('mutation failed');
-    }
-    return implementation(url, init);
-  });
-  await expect(f.reconcile()).rejects.toThrow('GitHub GraphQL unavailable');
-  expect(f.state.draft).toBe(false);
-  expect(holdAtMutation).toMatchObject({ head: 'abc' });
-  expect(f.hold()).toMatchObject({ head: 'abc' });
-  f.fetch.mockImplementation(implementation);
-  await f.reconcile();
-  expect(f.state.draft).toBe(true);
-  expect(f.s.db.select().from(message).all()).toHaveLength(1);
-  expect(f.hold()).toMatchObject({ head: 'abc' });
-  expect(
-    f.fetch.mock.calls.filter(
-      ([, init]) => init?.body && JSON.parse(init.body).query.includes('convertPullRequestToDraft'),
-    ),
-  ).toHaveLength(2);
-});
-
 test('pending blocking worker question prevents release until answered', async () => {
   const f = fixture();
   await f.reconcile();
@@ -408,24 +362,11 @@ test('pending blocking worker question prevents release until answered', async (
   expect(f.s.db.select().from(step).all()).toEqual([]);
   await f.reconcile();
   expect(f.state.draft).toBe(true);
-  expect(f.hold()).toMatchObject({ head: 'abc' });
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(false);
   expect(answerPendingWorkerQuestions({ db: f.s.db }, 'b', 'Proceed')).toBe(true);
   await f.reconcile();
   expect(f.state.draft).toBe(false);
-  expect(f.hold()).toBeUndefined();
   expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(1);
-});
-
-test('unverified ready mutation retains the hold and retries', async () => {
-  const f = fixture();
-  await f.reconcile();
-  f.state.resolved = true;
-  f.state.apply = false;
-  await expect(f.reconcile()).rejects.toThrow();
-  expect(f.hold()).toMatchObject({ head: 'abc' });
-  await expect(f.reconcile()).rejects.toThrow();
-  expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(2);
 });
 
 test.each([
@@ -504,7 +445,6 @@ test('poller runtime witness holds PR 3377 and exposes the durable wake through 
   const body: unknown = await response.json();
   expect(body).toMatchObject([{ wakeRounds: 1 }]);
   expect(f.state.draft).toBe(true);
-  expect(f.hold()).toMatchObject({ head: 'abc' });
   const evidence = process.env.CAIRN_REVIEW_FINDINGS_EVIDENCE;
   if (evidence)
     writeFileSync(
@@ -517,7 +457,8 @@ test('poller runtime witness holds PR 3377 and exposes the durable wake through 
           status: response.status,
           body,
           githubQueries: f.queries,
-          hold: f.hold(),
+          githubDraft: f.state.draft,
+          latestDraftTransition: f.state.transition,
           steps: f.s.db.select().from(step).all(),
         },
         null,
@@ -555,3 +496,201 @@ test('Codex findings bypass permission while a human without write access is ign
     ),
   ).toBe(false);
 });
+
+const cleanSnapshot = {
+  state: 'OPEN',
+  isDraft: true,
+  cairnHolds: true,
+  labels: [] as string[],
+  findings: [] as {
+    id: string;
+    path: string;
+    line: number;
+    badge: null;
+    body: string;
+    url: string;
+  }[],
+};
+const idleLocal = { dismissed: false, activeStep: false, blockingQuestion: false };
+
+test('desiredDraft covers conversion, release and every release blocker', () => {
+  const finding = {
+    id: 'r',
+    path: 'a',
+    line: 1,
+    badge: null,
+    body: 'fix',
+    url: 'https://github.com',
+  };
+  for (const [snapshot, local, expected] of [
+    [cleanSnapshot, idleLocal, false],
+    [{ ...cleanSnapshot, isDraft: false, findings: [finding] }, idleLocal, true],
+    [{ ...cleanSnapshot, findings: [finding] }, idleLocal, null],
+    [{ ...cleanSnapshot, isDraft: false }, idleLocal, null],
+    [{ ...cleanSnapshot, cairnHolds: false }, idleLocal, null],
+    [{ ...cleanSnapshot, labels: ['coordinator-hold'] }, idleLocal, null],
+    [{ ...cleanSnapshot, labels: ['needs-decision'] }, idleLocal, null],
+    [cleanSnapshot, { ...idleLocal, activeStep: true }, null],
+    [cleanSnapshot, { ...idleLocal, blockingQuestion: true }, null],
+    [cleanSnapshot, { ...idleLocal, dismissed: true }, null],
+    [
+      { ...cleanSnapshot, isDraft: false, findings: [finding] },
+      { ...idleLocal, dismissed: true },
+      null,
+    ],
+    [{ ...cleanSnapshot, state: 'CLOSED' }, idleLocal, null],
+    [{ ...cleanSnapshot, state: 'MERGED' }, idleLocal, null],
+  ] as const)
+    expect(desiredDraft(snapshot, local)).toBe(expected);
+});
+
+test.each([
+  null,
+  { __typename: 'ConvertToDraftEvent', actor: { login: 'human' } },
+  { __typename: 'ConvertToDraftEvent', actor: null },
+  { __typename: 'ReadyForReviewEvent' },
+])('draft ownership requires the latest conversion by the viewer: %j', async (transition) => {
+  const f = fixture();
+  f.state.draft = true;
+  f.state.resolved = true;
+  f.state.transition = transition;
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.queries.some((q) => q.includes('mutation'))).toBe(false);
+});
+
+test.each([
+  ['CAIRNWRIGHT', 'cairnwright[bot]'],
+  ['Cairnwright[bot]', 'cairnwright'],
+])('ownership normalizes viewer %s and actor %s', async (viewer, actor) => {
+  const f = fixture();
+  f.state.draft = true;
+  f.state.resolved = true;
+  f.state.viewer = viewer;
+  f.state.transition = { __typename: 'ConvertToDraftEvent', actor: { login: actor } };
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+});
+
+test('reconciles within two clean polls after each single GitHub failure', async () => {
+  for (const operation of ['snapshot', 'convert', 'ready']) {
+    for (const kind of ['http', 'graphql', 'lost']) {
+      for (const humanDraft of [false, true]) {
+        const f = fixture();
+        const poll = async (injected = false) => {
+          const before = f.queries.length;
+          if (injected && operation === 'snapshot') await expect(f.reconcile()).rejects.toThrow();
+          else await expect(f.reconcile()).resolves.toBeInstanceOf(Array);
+          expect(
+            f.queries.slice(before).filter((q) => q.includes('mutation')).length,
+          ).toBeLessThanOrEqual(1);
+          if (humanDraft) expect(f.state.draft).toBe(true);
+        };
+        if (humanDraft) {
+          f.state.draft = true;
+          f.state.transition = { __typename: 'ConvertToDraftEvent', actor: { login: 'human' } };
+        }
+        if (operation === 'ready') {
+          await poll();
+          f.state.resolved = true;
+        }
+        f.state.failure = { operation, kind };
+        await poll(true);
+        if (!humanDraft || operation === 'snapshot') expect(f.state.failure).toBeNull();
+        f.state.failure = null;
+        await poll();
+        await poll();
+        expect(f.state.draft).toBe(humanDraft || !f.state.resolved);
+        f.state.resolved = true;
+        await poll();
+        await poll();
+        expect(f.state.draft).toBe(humanDraft);
+        expect(f.s.db.select().from(message).all()).toEqual([]);
+        f.s.dispose();
+        servers.splice(servers.indexOf(f.s), 1);
+      }
+    }
+  }
+});
+
+test.each(['http', 'graphql', 'lost', 'unverified'])(
+  'failed conversion preserves review wake: %s',
+  async (kind) => {
+    const f = fixture();
+    if (kind === 'unverified') f.state.apply = false;
+    else f.state.failure = { operation: 'convert', kind };
+    await f.wake();
+    expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+  },
+);
+
+test('direct reconciliation of a dismissed PR performs no reads or writes', async () => {
+  const f = fixture();
+  f.s.db.update(threadPr).set({ dismissed: true }).where(eq(threadPr.id, 'pr')).run();
+  expect(await f.reconcile()).toEqual([]);
+  expect(f.fetch).not.toHaveBeenCalled();
+  expect(f.s.db.select().from(message).all()).toEqual([]);
+});
+
+test('unconfirmed ready response retries from GitHub truth', async () => {
+  const f = fixture();
+  await f.reconcile();
+  f.state.resolved = true;
+  f.state.apply = false;
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  f.state.apply = true;
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  expect(f.queries.filter((q) => q.includes('markPullRequestReadyForReview'))).toHaveLength(2);
+});
+
+test('mutation rate limits propagate through the wake', async () => {
+  const f = fixture();
+  const implementation = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (url, init) => {
+    if (init?.body && JSON.parse(init.body).query.includes('mutation')) f.state.error = 'rate';
+    return implementation(url, init);
+  });
+  await expect(f.wake()).rejects.toBeInstanceOf(GithubRateLimitedError);
+  expect(f.s.db.select().from(step).all()).toEqual([]);
+});
+
+test.each(['viewer', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])(
+  'incomplete or inconsistent snapshot fails closed: %s',
+  async (failure) => {
+    const f = fixture();
+    const implementation = f.fetch.getMockImplementation()!;
+    let page = 0;
+    f.fetch.mockImplementation(async (url, init) => {
+      const response = await implementation(url, init);
+      const result = (await response.json()) as {
+        data: {
+          viewer?: { login: string };
+          repository: {
+            pullRequest: {
+              isDraft: boolean;
+              timelineItems?: unknown;
+              labels: { pageInfo: { hasNextPage: boolean } };
+              reviewThreads: { pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+            };
+          };
+        };
+      };
+      const pull = result.data.repository.pullRequest;
+      page += 1;
+      if (failure === 'viewer') delete result.data.viewer;
+      if (failure === 'timeline') delete pull.timelineItems;
+      if (failure === 'labels') pull.labels.pageInfo.hasNextPage = true;
+      if (['changed', 'repeated', 'later-error'].includes(failure)) {
+        if (page === 1 || failure === 'repeated')
+          pull.reviewThreads.pageInfo = { hasNextPage: true, endCursor: 'same' };
+        else if (failure === 'changed') pull.isDraft = true;
+        else return { ...response, json: async () => ({ errors: [{ message: 'page failed' }] }) };
+      }
+      return { ...response, json: async () => result };
+    });
+    await expect(f.reconcile()).rejects.toThrow();
+    expect(f.queries.some((q) => q.includes('mutation'))).toBe(false);
+  },
+);
