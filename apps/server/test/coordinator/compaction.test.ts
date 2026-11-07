@@ -197,3 +197,40 @@ describe('a normal-sized Coordinator thread', () => {
     await harness.close(ctx);
   }, 60_000);
 });
+
+describe('summary input keeps events and tool results out', () => {
+  it('writes a wake event as a short line with a pointer and drops tool results', () => {
+    const lines = transcriptLines([
+      user(
+        `[wake:settle] provenance=watch:t1\n${'report line '.repeat(4_000)}\n\n[history id: step-7]`,
+      ),
+      {
+        role: 'assistant',
+        content: [{ type: 'toolCall', id: 'c1', name: 'todos', arguments: { q: 1 } }],
+        api: 'x',
+        provider: 'p',
+        model: 'm',
+        usage: {} as never,
+        stopReason: 'toolUse',
+        timestamp: 2,
+      },
+      {
+        role: 'toolResult',
+        toolCallId: 'c1',
+        toolName: 'todos',
+        content: [{ type: 'text', text: 'TOOL-RESULT-SECRET '.repeat(1_000) }],
+        isError: false,
+        timestamp: 3,
+      },
+    ]);
+    const joined = lines.join('\n');
+    expect(lines[0]?.startsWith('事件：[event settle]')).toBe(true);
+    expect(lines[0]?.length).toBeLessThan(600);
+    expect(lines[0]).toContain('read_history ids ["step-7"]');
+    expect(joined).not.toContain('TOOL-RESULT-SECRET');
+  });
+
+  it('still writes a real user message in full', () => {
+    expect(transcriptLines([user('ship #12 on Friday')])).toEqual(['用户：ship #12 on Friday']);
+  });
+});

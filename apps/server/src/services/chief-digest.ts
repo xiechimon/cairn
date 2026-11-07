@@ -12,6 +12,7 @@ import {
   chiefDigestThreadId,
   ISSUE_FENCE_OPEN,
   isChiefDigestThreadId,
+  shortEvent,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import {
@@ -97,8 +98,6 @@ export interface DigestDeps {
 }
 
 type ThreadRow = typeof chiefThread.$inferSelect;
-
-const WAKE_MARKER_RE = /^\[wake:\w+\]\s*/;
 
 const DIGEST_PROMPT_HEAD = [
   '请把下面这段 Coordinator 和用户的对话整理成摘要。只输出一个 ```json 代码块，格式：',
@@ -254,8 +253,8 @@ export function chiefTranscriptLines(rows: readonly ChiefMessageRow[]): Coordina
     }
     if (row.role === 'assistant') push(`Coordinator：${text}`);
     if (row.role !== 'user') continue;
-    const wake = WAKE_MARKER_RE.exec(text);
-    if (wake) push(`系统通知：${text.slice(wake[0].length)}`);
+    const event = shortEvent(text, row.id);
+    if (event !== null) push(`系统通知：${event}`);
     else if (!row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) || !postedTexts.has(text))
       push(`用户：${text}`);
   }
