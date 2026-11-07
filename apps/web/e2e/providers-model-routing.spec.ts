@@ -1,46 +1,28 @@
 import { expect, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 
-const FIXTURE = '/app/resources/model-routing?scenario=model-routing';
 const NOW = Date.now();
 const HOUR = 3_600_000;
 
-test('fixture: vendor sections pool quota per window and the graph routes every use', async ({
+test('fixture: subscriptions sit in the provider list and the routing page keeps only the graph', async ({
   page,
 }) => {
-  await page.goto(FIXTURE);
-  const claude = page.locator('[data-testid="vendor-section"][data-vendor="claude"]');
-  await expect(claude.getByTestId('pool-window')).toHaveCount(2);
-  await expect(claude.getByTestId('account-row')).toHaveCount(3);
-  await expect(claude.locator('[data-window="five_hour"]')).toContainText('29%');
-  await expect(claude.locator('[data-window="five_hour"]')).toContainText('未上报');
-  await expect(page.getByTestId('vendor-section')).toHaveCount(1);
+  await page.goto('/app/settings/providers?scenario=model-routing');
+  const rows = page.getByTestId('provider-instance');
+  await expect(rows.filter({ hasText: '订阅' })).toHaveCount(3);
+  const work = page.locator('[data-instance-id^="subscription:"]', { hasText: '冷却至' });
+  await expect(work).toHaveCount(1);
+  await work.click();
+  await expect(page.getByTestId('subscription-detail')).toHaveAttribute('data-account-id', 'sub-work');
+  await page.locator('[data-instance-id^="subscription:"]', { hasText: 'Personal' }).first().click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail).toContainText('Fix flaky merge-gate test');
+  await expect(detail).toContainText('Daemon claim loop rework');
+  await expect(detail.locator('[data-window]')).toHaveCount(0);
+  await expect(detail.getByRole('progressbar')).toHaveCount(2);
 
-  const work = claude.locator('[data-testid="account-row"][data-state="cooling"]');
-  await expect(work).toContainText('冷却至');
-  await claude.getByRole('button', { name: '展开 Personal' }).click();
-  await expect(claude.getByTestId('account-detail')).toContainText('Fix flaky merge-gate test');
-  await expect(claude.getByTestId('account-detail')).toContainText('Daemon claim loop rework');
-
-  await page.getByRole('button', { name: /Grok 1/ }).click();
-  await expect(page).toHaveURL(/vendor=grok/);
-  await expect(
-    page.locator('[data-testid="vendor-section"][data-vendor="grok"] [data-window="billing_period"]'),
-  ).toContainText('88%');
-  await expect(page.getByRole('button', { name: '添加 Grok 账户' })).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('button', { name: /Grok 1/ })).toHaveAttribute('aria-current', 'true');
-
-  await page.getByRole('button', { name: /Codex 1/ }).click();
-  await page.getByRole('button', { name: '添加 ChatGPT · Codex 账户' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  const added = new URL(page.url()).searchParams;
-  expect(added.has('vendor') || added.has('tab')).toBe(false);
-  await page.goBack();
-
-  await expect(page.getByTestId('routing-section')).toHaveCount(0);
-  await page.getByRole('tab', { name: '路由' }).click();
-  await expect(page).toHaveURL(/tab=routing/);
+  await page.goto('/app/settings/routing?scenario=model-routing');
+  await expect(page.getByRole('tab')).toHaveCount(0);
   await expect(page.getByTestId('subscription-accounts')).toHaveCount(0);
   const graph = page.getByTestId('routing-section');
   await expect(graph.locator('[data-slot="routing-node"]')).toHaveCount(11);
@@ -50,26 +32,31 @@ test('fixture: vendor sections pool quota per window and the graph routes every 
   await expect(graph.locator('svg path')).toHaveCount(5);
 });
 
-test('fixture: empty team shows every vendor with an add action and no quota', async ({ page }) => {
-  await page.goto('/app/resources/model-routing?scenario=model-routing-empty');
-  await expect(page.getByTestId('vendor-list').getByRole('button')).toHaveText([
-    /Claude\s*0 个账户/,
-    /Codex\s*0 个账户/,
-    /Grok\s*0 个账户/,
-  ]);
-  await expect(page.getByTestId('pool-window')).toHaveCount(0);
-  await expect(page.getByText('还没有 Claude 账户')).toBeVisible();
-  await page.getByRole('button', { name: /Grok 0/ }).click();
-  await expect(page.getByText('还没有 Grok 账户')).toBeVisible();
-  await page.getByRole('tab', { name: '路由' }).click();
+test('old subscription links land on the provider list, old routing links on the routing page', async ({
+  page,
+}) => {
+  await page.goto('/app/resources/model-routing?scenario=model-routing');
+  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await page.goto('/app/resources/model-routing?scenario=model-routing&vendor=grok');
+  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await page.goto('/app/resources/model-routing?scenario=model-routing&tab=routing');
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
+  await page.goto('/app/settings/routing?scenario=model-routing&vendor=codex');
+  await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+});
+
+test('fixture: empty team routing page says there is nothing to route yet', async ({ page }) => {
+  await page.goto('/app/settings/routing?scenario=model-routing-empty');
   await expect(page.getByTestId('routing-empty')).toBeVisible();
 });
 
-test('settings opens model routing from the providers section', async ({ page }) => {
+test('the settings nav lists Providers and Routing', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=10');
-  await page.getByRole('dialog', { name: '设置' }).getByRole('link', { name: '订阅与路由' }).click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByRole('link', { name: '订阅与路由' })).toHaveCount(0);
+  await settings.getByRole('link', { name: '路由', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=10/);
-  await expect(page.getByRole('heading', { name: '订阅与路由' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '路由', exact: true })).toBeVisible();
 });
 
 test('live: rename, verify, remove and the Claude usage switch hit the agreed routes', async ({
@@ -157,45 +144,36 @@ test('live: rename, verify, remove and the Claude usage switch hit the agreed ro
     }
     return undefined;
   });
-  await page.goto('/app/resources/model-routing');
+  await page.goto('/app/resources/providers');
 
-  const claude = page.locator('[data-testid="vendor-section"][data-vendor="claude"]');
-  await expect(claude.getByTestId('account-row')).toHaveCount(2);
-  await expect(claude.locator('[data-window="seven_day"]')).toContainText('10%');
-  await expect(claude.getByRole('button', { name: /^展开/ })).toHaveCount(0);
-  const personal = claude.locator('[data-account-id="s1"]');
-  await personal.getByTestId('account-more').click();
-  await page.getByRole('menuitem', { name: /重命名/ }).click();
-  await personal.getByTestId('account-rename-input').fill('Main');
-  await personal.getByTestId('account-rename-input').press('Enter');
+  const rows = page.locator('[data-testid="provider-instance"][data-instance-id^="subscription:"]');
+  await expect(rows).toHaveCount(2);
+  const personal = page.locator('[data-instance-id="subscription:s1"]');
+  await personal.click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByRole('progressbar')).toHaveCount(2);
+  await expect(detail.getByRole('progressbar').nth(1)).toHaveAttribute('aria-valuenow', '10');
+  await detail.getByLabel('名称', { exact: true }).fill('Main');
+  await detail.getByLabel('名称', { exact: true }).press('Enter');
   await expect.poll(() => calls).toContain('PATCH s1 Main');
 
-  await personal.getByTestId('account-more').click();
-  await page.getByRole('menuitem', { name: /验证/ }).click();
+  await detail.getByTestId('subscription-verify').click();
   await expect.poll(() => calls).toContain('verify s1');
 
-  await page.getByRole('button', { name: /Codex 1/ }).click();
-  const codexRow = page.locator('[data-account-id="p1"]');
-  await expect(codexRow).toContainText('ChatGPT Pro');
-  await codexRow.getByTestId('account-more').click();
-  const codexMenu = page.getByRole('menu', { name: 'ChatGPT Pro 的操作' });
-  await expect(codexMenu.getByRole('menuitem', { name: /重命名/ })).toBeVisible();
-  await expect(codexMenu.getByRole('menuitem', { name: /验证/ })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(codexMenu).toHaveCount(0);
-  await page.getByRole('button', { name: /Claude 2/ }).click();
+  const codex = page.locator('[data-instance-id="provider:p1"]');
+  await expect(codex).toContainText('订阅');
+  await codex.click();
+  await expect(page.getByTestId('subscription-detail')).toHaveCount(0);
 
-  await claude.locator('[data-account-id="s2"]').getByTestId('account-more').click();
-  const legacyMenu = page.getByRole('menu', { name: 'Legacy 的操作' });
-  await expect(legacyMenu.getByRole('menuitem', { name: /移除/ })).toBeVisible();
-  await expect(legacyMenu.getByRole('menuitem', { name: /重命名/ })).toHaveCount(0);
-  await legacyMenu.getByRole('menuitem', { name: /移除/ }).click();
+  await page.locator('[data-instance-id="subscription:s2"]').click();
+  await expect(detail.getByLabel('名称', { exact: true })).toHaveCount(0);
+  await detail.getByRole('button', { name: '移除', exact: true }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('Legacy');
   await confirm.getByRole('button', { name: '移除', exact: true }).click();
   await expect.poll(() => calls).toContain('DELETE s2');
 
-  await page.getByRole('tab', { name: '路由' }).click();
+  await page.goto('/app/settings/routing');
   await expect(page.getByTestId('claude-usage-hint')).toContainText('只用订阅');
   await page.getByRole('radio', { name: '允许按量付费' }).click();
   await expect.poll(() => calls).toContain('PATCH team allow-paid');

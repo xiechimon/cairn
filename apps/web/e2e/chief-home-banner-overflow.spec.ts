@@ -40,7 +40,7 @@ test('five expired machines and three expired subscriptions stay one banner and 
   );
   await expect(banner.getByRole('link', { name: '查看订阅' })).toHaveAttribute(
     'href',
-    '/app/resources/model-routing',
+    '/app/resources/providers',
   );
   const composer = home.getByTestId('chief-composer-input');
   await expect(composer).toBeVisible();

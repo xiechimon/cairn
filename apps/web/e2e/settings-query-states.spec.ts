@@ -3,7 +3,12 @@ import { expect, type Page, test } from '@playwright/test';
 const PANES = [
   { section: 'machines', endpoint: 'machines', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'providers', endpoint: 'providers', empty: '[data-testid="providers-empty"]', ok: { providers: [] } },
-  { section: 'routing', endpoint: 'claude-subscriptions', empty: '[data-testid="vendor-section"]', ok: [] },
+  {
+    section: 'routing',
+    endpoint: 'model-routing',
+    empty: '[data-testid="routing-section"]',
+    ok: { edges: [], connections: [], quota: [], settings: { claudeUsage: 'subscription-only' } },
+  },
   { section: 'mcp', endpoint: 'mcp-servers', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'api-keys', endpoint: 'api-keys', empty: '[data-testid="keys-empty"]', ok: [] },
@@ -62,7 +67,7 @@ test('machines: a slow list fetch shows a skeleton, not the empty state', async 
   await expect(settings.getByTestId('resource-empty')).toBeVisible();
 });
 
-test('routing: a failed Claude subscriptions fetch still lets the Codex tab show its own accounts', async ({
+test('providers: a failed Claude subscriptions fetch still lists the API providers', async ({
   page,
 }) => {
   const state = { fail: true, ok: [] as unknown };
@@ -85,13 +90,13 @@ test('routing: a failed Claude subscriptions fetch still lets the Codex tab show
       },
     }),
   );
-  await page.goto('/app/settings/routing');
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
   const settings = page.getByRole('dialog', { name: '设置' });
-  await expect(settings.getByTestId('query-error')).toBeVisible();
-  await expect(settings.getByTestId('vendor-list').getByRole('button', { name: /Codex/ })).toBeVisible();
-  await settings.getByTestId('vendor-list').getByRole('button', { name: /Codex/ }).click();
-  await expect(settings.getByTestId('query-error')).toHaveCount(0);
-  await expect(settings.getByTestId('account-row')).toContainText('Codex main');
+  await expect(settings.getByTestId('provider-instance')).toContainText('Codex main');
+  await expect(settings.getByTestId('provider-instance')).toContainText('订阅');
 });
 
 test('providers: a failed team providers fetch does not hide the machine scope editors', async ({
