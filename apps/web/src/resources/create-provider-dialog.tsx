@@ -30,7 +30,7 @@ import { PROVIDER_PRESET_DEFAULTS } from './provider-preset-data.js';
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
 const PICKER_ROW_CLS =
-  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border focus-visible:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
+  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
 
 const PICKER_TILE_CLS =
   'flex size-5.5 flex-none items-center justify-center rounded-(--radius-control) bg-card text-caption font-semibold text-content-secondary ring-1 ring-border';
