@@ -29,7 +29,7 @@ import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
-import { QueryBoundary } from '../components/query-state.js';
+import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsScopeSentence, useSettingsScope } from '../components/settings-scope.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
@@ -308,10 +308,16 @@ export function ProvidersPage() {
 
   const { scope, machine, setScope } = useSettingsScope(machines);
   const [mountedAt] = useState(() => Date.now());
-  const checkedAt = Math.max(sourcesQ.dataUpdatedAt, providersQ.dataUpdatedAt, mountedAt);
+  const checkedAt = Math.max(
+    sourcesQ.dataUpdatedAt,
+    providersQ.dataUpdatedAt,
+    subscriptionsQ.dataUpdatedAt,
+    mountedAt,
+  );
   const refreshChecks = () => {
     void sourcesQ.refetch();
     void providersQ.refetch();
+    void subscriptionsQ.refetch();
   };
 
   const setParams = (patch: Record<string, string | null>, replace = false) => {
@@ -418,11 +424,23 @@ export function ProvidersPage() {
           trailing={
             <CheckedButton
               updatedAt={checkedAt}
-              fetching={sourcesQ.isFetching || providersQ.isFetching}
+              fetching={sourcesQ.isFetching || providersQ.isFetching || subscriptionsQ.isFetching}
               onRefresh={live ? refreshChecks : undefined}
             />
           }
         />
+        {live && machine === undefined && subscriptionsQ.isError && entries.length > 0 && (
+          <p
+            data-testid="subscriptions-error"
+            role="alert"
+            className="m-0 flex items-center gap-2 px-1 text-meta text-content-tertiary"
+          >
+            {t('订阅账户没能加载')}
+            <Button variant="ghost" size="sm" onClick={() => void subscriptionsQ.refetch()}>
+              {t('重试')}
+            </Button>
+          </p>
+        )}
         <ProviderPanel
           header={
             <div className="flex items-center gap-1">
@@ -446,7 +464,13 @@ export function ProvidersPage() {
           onSelect={(id) => setParams({ item: id })}
           empty={
             <QueryBoundary
-              query={live ? (machine === undefined ? providersQ : sourcesQ) : undefined}
+              query={
+                live
+                  ? machine === undefined
+                    ? mergeQueries(providersQ, subscriptionsQ)
+                    : sourcesQ
+                  : undefined
+              }
               isEmpty
               loadingLabel={t('正在加载模型服务')}
               errorTitle={t('模型服务没能加载')}

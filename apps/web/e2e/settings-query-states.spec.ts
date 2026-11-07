@@ -97,6 +97,27 @@ test('providers: a failed Claude subscriptions fetch still lists the API provide
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('provider-instance')).toContainText('Codex main');
   await expect(settings.getByTestId('provider-instance')).toContainText('订阅');
+  await expect(settings.getByTestId('subscriptions-error')).toContainText('订阅账户没能加载');
+  state.fail = false;
+  await settings.getByTestId('subscriptions-error').getByRole('button', { name: '重试' }).click();
+  await expect(settings.getByTestId('subscriptions-error')).toHaveCount(0);
+});
+
+test('providers: a team whose only data is a failed subscriptions fetch sees an error, not the empty state', async ({
+  page,
+}) => {
+  const state = { fail: true, ok: [] as unknown };
+  await stub(page, 'claude-subscriptions', state);
+  await page.route('**/api/teams/team-1/providers', (route) =>
+    route.fulfill({ json: { providers: [] } }),
+  );
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('query-error')).toBeVisible();
+  await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
 });
 
 test('providers: a failed team providers fetch does not hide the machine scope editors', async ({

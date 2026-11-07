@@ -9,6 +9,7 @@ export function SettingsRedirect({ section }: { section: SettingsSectionId }) {
 }
 
 export function opensLegacyAccounts(params: URLSearchParams): boolean {
+  if (params.get('tab') === 'routing') return false;
   return params.has('vendor') || params.get('tab') === 'accounts';
 }
 

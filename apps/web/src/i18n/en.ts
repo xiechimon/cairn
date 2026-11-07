@@ -21,6 +21,7 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js';
 
 export const EN: Record<string, string> = {
+  订阅账户没能加载: 'Subscriptions could not be loaded',
   '路由按团队生效，{name} 沿用团队设置。': 'Routing is set for the whole team, including {name}.',
   移除订阅: 'Remove subscription',
   '移除后，后续步骤不再使用这个订阅。':

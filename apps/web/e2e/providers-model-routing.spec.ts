@@ -43,6 +43,9 @@ test('old subscription links land on the provider list, old routing links on the
   await expect(page).toHaveURL(/\/app\/settings\/routing\?scenario=model-routing$/);
   await page.goto('/app/settings/routing?scenario=model-routing&vendor=codex');
   await expect(page).toHaveURL(/\/app\/settings\/providers\?scenario=model-routing$/);
+  await page.goto('/app/settings/routing?scenario=model-routing&tab=routing&vendor=codex');
+  await expect(page).toHaveURL(/\/app\/settings\/routing\?/);
+  await expect(page.getByTestId('routing-section')).toBeVisible();
 });
 
 test('fixture: empty team routing page says there is nothing to route yet', async ({ page }) => {
