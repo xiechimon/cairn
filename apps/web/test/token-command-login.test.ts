@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ACCESS_TOKEN_FILE_NAME, ENV_VARS, formatAccessTokenFile } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { runTokenCommand } from '../../daemon/src/token-command.js';
 import { consumeLoginFragment, TOKEN_STORAGE_KEY } from '../src/api/auth.js';
 
@@ -10,13 +10,13 @@ const homes: string[] = [];
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+  for (const home of homes.splice(0)) releaseTestTempDir(home);
 });
 
 test.each(['environment', 'file'])(
   'login links round-trip reserved characters from %s',
   async (source) => {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-login-roundtrip-'));
+    const home = makeTestTempDir('cairn-login-roundtrip-');
     homes.push(home);
     const token = 'synthetic token+&=%#';
     const env: NodeJS.ProcessEnv = { [ENV_VARS.home]: home };
