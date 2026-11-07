@@ -57,7 +57,7 @@ export function profileForStep(
   return profileForStepRoute(deps.db, todoRow, kind);
 }
 
-export function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {
+export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: string) {
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) throw new NotFoundError(`step ${stepId}`);
   if (row.machineId !== machineId) throw new NotFoundError(`step ${stepId} (not yours)`);
