@@ -67,4 +67,16 @@ describe('stop on a turn waiting for a machine targets that turn', () => {
     });
     expect(chief.waitingTurn).toBeUndefined();
   });
+
+  test('a waiting turn is found even when the newest stream row is a reply', () => {
+    const chief = mapChief(ENV, {
+      threads: [thread('u-asked')],
+      activeThreadId: 'chief-ttt',
+      messages: [
+        { id: 'u-asked', role: 'user', content: '插一句', createdAt: 1 },
+        { id: 'a-new', role: 'assistant', content: '答完了', createdAt: 2 },
+      ],
+    });
+    expect(chief.waitingTurn).toEqual({ messageId: 'u-asked', text: '插一句' });
+  });
 });
