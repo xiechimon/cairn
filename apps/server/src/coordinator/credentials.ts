@@ -4,10 +4,12 @@ import type { Db } from '../db/client.js';
 import { routingRule } from '../db/schema.js';
 import { coordinatorRoute, paidClaudeAllowed } from '../services/coordinator-route.js';
 import { openProviderKey } from '../services/providers.js';
+import { readCodexLogin, usesHostCodexLogin } from './codex-login.js';
 
 export interface CoordinatorModelRoute {
   provider: string;
   modelId: string;
+  thinkingLevel: string | null;
   config: ProviderConfig;
 }
 
@@ -26,12 +28,14 @@ function routeOf(
   teamId: string,
   provider: string,
   modelId: string,
+  thinkingLevel: string | null,
 ): CoordinatorModelRoute | null {
   const opened = openProviderKey(deps, teamId, provider);
   if (opened === null) return null;
   return {
     provider,
     modelId,
+    thinkingLevel,
     config: {
       kind: 'http',
       providerId: opened.row.providerId,
@@ -51,7 +55,7 @@ export function coordinatorProviders(
 ): CoordinatorProviders | null {
   const rule = coordinatorRoute(deps.db, teamId);
   if (rule === null) return null;
-  const router = routeOf(deps, teamId, rule.provider, rule.modelId);
+  const router = routeOf(deps, teamId, rule.provider, rule.modelId, rule.thinkingLevel ?? null);
   if (router === null) return null;
   const compaction = deps.db
     .select()
@@ -61,7 +65,13 @@ export function coordinatorProviders(
   const compactionRoute =
     compaction !== undefined &&
     paidClaudeAllowed(deps.db, teamId, compaction.provider, compaction.modelId)
-      ? routeOf(deps, teamId, compaction.provider, compaction.modelId)
+      ? routeOf(
+          deps,
+          teamId,
+          compaction.provider,
+          compaction.modelId,
+          compaction.thinkingLevel ?? null,
+        )
       : null;
   const summary = compactionRoute ?? router;
   return { router, summary };
@@ -72,7 +82,12 @@ export function coordinatorApiKey(
   teamId: string,
   providerId: string,
 ): string | null {
-  return openProviderKey(deps, teamId, providerId)?.apiKey ?? null;
+  const opened = openProviderKey(deps, teamId, providerId);
+  if (opened === null) return null;
+  if (opened.apiKey === null && usesHostCodexLogin(providerId, opened.row.baseUrl)) {
+    return readCodexLogin();
+  }
+  return opened.apiKey;
 }
 
 export function scrubProviderError(

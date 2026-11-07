@@ -12,6 +12,7 @@ import {
   parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, type QuotaWaitRow, step, team, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
@@ -28,7 +29,7 @@ type StepRow = typeof step.$inferSelect;
 type AgentRow = RouteProfile;
 
 export function claudeUsageGatePasses(
-  deps: Pick<MachineDeps, 'db'>,
+  deps: { db: Pick<Db, 'select'> },
   machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'claudeCodeReport'>,
   model: Pick<AgentRow, 'provider' | 'modelId'>,
 ): boolean {
@@ -234,7 +235,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     )
     .all();
   for (const row of workers) {
-    const agentRow = profileForStep(deps.db, row.todo, row.step.kind);
+    const agentRow = profileForStep(deps.db, row.todo, row.step.kind, row.step.id);
     if (agentRow) consider(row.step, agentRow, row.todo);
   }
   const coordinator = coordinatorProfile(deps.db, teamId);
@@ -302,7 +303,7 @@ export function recoverClaudeRateLimitFailure(
     const todoRow = linked
       ? deps.db.select().from(todo).where(eq(todo.id, linked.todoId)).get()
       : undefined;
-    agentPick = todoRow ? profileForStep(deps.db, todoRow, stepRow.kind) : null;
+    agentPick = todoRow ? profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id) : null;
   }
   const claude = agentPick !== null && usesClaudeCode(agentPick, stepRow);
   const teamId = stepTeamId(deps, stepRow);

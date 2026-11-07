@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { type ClaimedStep, type MachineDoneBody, redactSecrets } from '@cairn/shared';
+import {
+  type ClaimedStep,
+  type MachineDoneBody,
+  redactSecrets,
+  type ThinkingLevel,
+  thinkingLevelSchema,
+} from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   chief,
@@ -68,6 +74,11 @@ export interface Coordinator {
 }
 
 type StepRow = typeof step.$inferSelect;
+
+function thinkingLevelOf(value: string | null): ThinkingLevel | null {
+  const parsed = thinkingLevelSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 function memoriesSection(memories: readonly { title: string; content: string }[]): string | null {
   if (memories.length === 0) return null;
@@ -300,7 +311,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           description: null,
           provider: providers.router.provider,
           modelId: providers.router.modelId,
-          thinkingLevel: null,
+          thinkingLevel: thinkingLevelOf(providers.router.thinkingLevel),
           memories: context.memories,
         },
         chief: {

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 
 const NODE_MAJOR = readFileSync(new URL('../../.nvmrc', import.meta.url), 'utf8').trim();
 const NODE_24 = '%h/.local/share/mise/installs/node/24/bin/node';
-const UNIT_NAMES = ['cairn-server', 'cairn-daemon', 'cairn-coordinator'];
+const UNIT_NAMES = ['cairn-server', 'cairn-daemon'];
 
 function parseUnit(name) {
   const text = readFileSync(new URL(`./systemd/${name}.service`, import.meta.url), 'utf8');
@@ -99,18 +99,12 @@ test('the server caps its heap and memory', () => {
   assert.ok(entries.get('MemoryMax')?.[0]);
 });
 
-test('daemon and coordinator reach the server on loopback', () => {
+test('the daemon reaches the server on loopback', () => {
   assert.match(
     units['cairn-daemon'].entries.get('ExecStart')[0],
     /dist\/cli\.mjs start -f --server http:\/\/127\.0\.0\.1:8787$/,
   );
-  assert.equal(
-    units['cairn-coordinator'].env.CAIRN_COORDINATOR_SERVER_URL,
-    'http://127.0.0.1:8787',
-  );
-  for (const name of ['cairn-daemon', 'cairn-coordinator']) {
-    assert.deepEqual(units[name].entries.get('After'), ['cairn-server.service'], name);
-  }
+  assert.deepEqual(units['cairn-daemon'].entries.get('After'), ['cairn-server.service']);
 });
 
 test('units are private and restart on failure', () => {

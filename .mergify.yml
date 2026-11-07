@@ -143,7 +143,6 @@ scopes:
         include:
           - apps/server/**/*
           - apps/daemon/**/*
-          - apps/coordinator/**/*
           - integration/**/*
   barrier_files:
     include:

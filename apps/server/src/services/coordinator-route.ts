@@ -1,4 +1,5 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
+import { codexLoginAvailable, usesHostCodexLogin } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -118,7 +119,16 @@ export function coordinatorRoute(db: Db, teamId: string) {
       ),
     )
     .get();
-  if (keyed === undefined) return fallback(teamId, 'rule-provider-has-no-key');
+  if (keyed === undefined) {
+    const row = db
+      .select({ baseUrl: provider.baseUrl })
+      .from(provider)
+      .where(and(eq(provider.teamId, teamId), eq(provider.providerId, rule.provider)))
+      .get();
+    const subscription =
+      row !== undefined && usesHostCodexLogin(rule.provider, row.baseUrl) && codexLoginAvailable();
+    return subscription ? rule : fallback(teamId, 'rule-provider-has-no-key');
+  }
   if (!paidClaudeAllowed(db, teamId, rule.provider, rule.modelId)) {
     return fallback(teamId, 'paid-claude-not-allowed');
   }
