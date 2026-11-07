@@ -184,6 +184,30 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
     expect(liveTextStore.get(CONV)).toBe('');
   });
 
+  test('F-H7 a final step event right after the final text row keeps the streamed text until the stored row is known', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'text_delta', text: '最终结论' });
+    es.push({ type: 'message', message: textRow('m1', '最终结论') });
+    es.push(stepEvent('done'));
+
+    expect(visible([USER])).toContain('最终结论');
+
+    const knownIds = new Set([USER.id, 'm1']);
+    expect(liveTextStore.getVisible(CONV, knownIds)).toBe('');
+    liveTextStore.prune(CONV, knownIds);
+    expect(liveTextStore.get(CONV)).toBe('');
+  });
+
+  test('F-H8 a failed or stopped step refetches the Coordinator record so the outage banner appears', () => {
+    const qc = freshClient();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    const es = startStream(qc);
+    es.push(stepEvent('failed'));
+
+    const keys = spy.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).toContainEqual(['chief']);
+  });
+
   test('F-H6 resubscribe still clears first (#740 unchanged)', () => {
     const qc = freshClient();
     const es = startStream(qc);

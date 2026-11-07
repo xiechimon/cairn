@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { HISTORY, mockLive, THREAD } from './chief-home-mock';
+import { HISTORY, mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidenceShot } from './evidence';
 import { openChiefWindow } from './helpers.js';
 
@@ -46,6 +46,36 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     expect(composer).not.toBeNull();
     expect(viewport).not.toBeNull();
     if (composer && viewport) expect(composer.y + composer.height).toBeGreaterThan(viewport.height - 40);
+  });
+
+  test('the first send from home never brings the loading skeleton back, even when the messages arrive late', async ({
+    page,
+  }) => {
+    const state = { threads: [] as (typeof THREAD)[], messages: [] as Row[] };
+    await mockLive(page, state, (path, route, json) => {
+      if (path !== `/api/conversations/${THREAD.id}/messages` || route.request().method() !== 'GET')
+        return undefined;
+      return new Promise<void>((resolve) =>
+        setTimeout(() => void json({ messages: state.messages }).then(resolve), 400),
+      );
+    });
+    await page.goto('/app');
+    await page.evaluate(() => {
+      (window as unknown as { skeletonSeen: number }).skeletonSeen = 0;
+      new MutationObserver(() => {
+        if (document.querySelector('[data-testid="conversation-skeleton"]') !== null)
+          (window as unknown as { skeletonSeen: number }).skeletonSeen += 1;
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+    await input.fill('看板拖完卡片计数不对');
+    await input.press('Enter');
+    await expect(page.getByTestId('home-c').getByTestId('chief-stream')).toContainText(
+      '看板拖完卡片计数不对',
+    );
+    expect(
+      await page.evaluate(() => (window as unknown as { skeletonSeen: number }).skeletonSeen),
+    ).toBe(0);
   });
 
   test('a first send that fails brings the greeting back and keeps the text', async ({ page }) => {
