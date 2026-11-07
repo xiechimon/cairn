@@ -1,6 +1,12 @@
 import type { TokenUsage } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { threadUsageBuildIds, threadUsageSummary } from '../src/board/thread-usage-model.js';
+import {
+  type ThreadUsageSummary,
+  threadUsageBuildIds,
+  threadUsageCaption,
+  threadUsageSummary,
+} from '../src/board/thread-usage-model.js';
+import type { TFunc, TVars } from '../src/i18n/translate.js';
 
 function usage(overrides: Partial<TokenUsage> = {}): TokenUsage {
   return {
@@ -80,5 +86,36 @@ describe('threadUsageSummary', () => {
 
   test('zero input tokens has no invented cache hit percentage', () => {
     expect(threadUsageSummary([usage({ input: 0, cacheRead: 0 })], []).cached).toBe('—');
+  });
+});
+
+describe('threadUsageCaption', () => {
+  const t: TFunc = (key: string, vars?: TVars) =>
+    key.replace(/\{(\w+)\}/g, (_, name: string) => String(vars?.[name]));
+  const summary = (patch: Partial<ThreadUsageSummary> = {}): ThreadUsageSummary => ({
+    cost: '$1.25',
+    tokens: '2.5k',
+    cached: '90%',
+    models: ['provider/model-a'],
+    machines: [],
+    ...patch,
+  });
+
+  test('joins only the facts that are known, with no dash placeholders', () => {
+    expect(threadUsageCaption(summary(), t)).toBe('$1.25 · Token 数：2.5k · provider/model-a');
+    expect(threadUsageCaption(summary({ cost: '—' }), t)).toBe('Token 数：2.5k · provider/model-a');
+    expect(threadUsageCaption(summary({ tokens: '—', models: [] }), t)).toBe('$1.25');
+  });
+
+  test('says the usage is unavailable instead of printing placeholders', () => {
+    const caption = threadUsageCaption(summary({ cost: '—', tokens: '—', models: [] }), t);
+    expect(caption).toBe('用量暂不可用');
+    expect(caption).not.toContain('—');
+  });
+
+  test('counts several models instead of listing them', () => {
+    expect(threadUsageCaption(summary({ models: ['a', 'b'] }), t)).toBe(
+      '$1.25 · Token 数：2.5k · 2 个模型',
+    );
   });
 });

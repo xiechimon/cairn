@@ -2226,13 +2226,17 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
   });
 
-  test('building-phase builds stay with the CI grind path (its PR read gives the head SHA; not reconciled)', async () => {
+  test('building-phase merged PRs move to review before the next sweep reconciles them', async () => {
     const w = makeWorld({ phase: 'building' });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
-    await pollerFor(w, mock).sweep();
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
     expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(1);
-    expect(w.todoRow().phase).toBe('building');
+    expect(w.todoRow().phase).toBe('review');
     expect(w.systemRows()).toEqual([]);
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.systemRows()).toContain(DONE_ROW);
   });
 });
 
