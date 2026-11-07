@@ -63,6 +63,16 @@ export function memoryPassDue(
   return !done.some((row) => now - (row.finishedAt ?? row.createdAt) < MEMORY_PASS_INTERVAL_MS);
 }
 
+type CoreRow = ReturnType<typeof validCore>[number];
+
+function memoryLine(m: CoreRow) {
+  return `${m.id} | ${m.projectId ?? 'team'} | 更新 ${DAY(m.updatedAt)} | 最近注入 ${
+    m.lastInjectedAt === null ? '从未' : DAY(m.lastInjectedAt)
+  } | ${m.title}：${m.content}`;
+}
+
+const shownInFull = (m: CoreRow) => memoryLine(m).length <= LINE_MAX_CHARS;
+
 function unvisitedFirst(db: Db, chiefId: string, rows: ReturnType<typeof validCore>) {
   const prompts = db
     .select({ prompt: step.prompt })
@@ -92,9 +102,9 @@ export function memoryPassSection(
     0,
     LIST_MAX_ENTRIES,
   )) {
-    const line = `${m.id} | ${m.projectId ?? 'team'} | 更新 ${DAY(m.updatedAt)} | 最近注入 ${
-      m.lastInjectedAt === null ? '从未' : DAY(m.lastInjectedAt)
-    } | ${m.title}：${m.content}`.slice(0, LINE_MAX_CHARS);
+    const full = memoryLine(m);
+    const line =
+      full.length > LINE_MAX_CHARS ? `${full.slice(0, LINE_MAX_CHARS)} …[已截断，不可合并]` : full;
     if (used + line.length > LIST_MAX_CHARS) break;
     lines.push(line);
     used += line.length + 1;
@@ -133,7 +143,8 @@ export function applyMemoryPass(
       keep === undefined ||
       merge.drop.length === 0 ||
       merge.drop.includes(merge.keep) ||
-      drops.some((m) => m === undefined || m.projectId !== keep.projectId) ||
+      !shownInFull(keep) ||
+      drops.some((m) => m === undefined || m.projectId !== keep.projectId || !shownInFull(m)) ||
       content === '' ||
       content.length > CONTENT_MAX ||
       content.includes(ISSUE_FENCE_OPEN)

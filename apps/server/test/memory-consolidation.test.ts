@@ -88,6 +88,26 @@ describe('applyMemoryPass', () => {
     expect(row('b')?.supersededBy).toBe(valid()[0]?.id);
   });
 
+  test('refuses to merge entries whose text the listing had to cut', () => {
+    const long = 'p'.repeat(700);
+    put('a', `${long} one`);
+    put('b', `${long} two`);
+    put('c', 'short');
+    const out = applyMemoryPass(
+      H.s.db,
+      scope(),
+      {
+        merge: [
+          { keep: 'a', drop: ['b'], content: 'both' },
+          { keep: 'c', drop: ['b'], content: 'into short' },
+        ],
+      },
+      NOW,
+    );
+    expect(out).toEqual({ merged: 0, expired: 0, skipped: 2 });
+    expect(valid()).toHaveLength(3);
+  });
+
   test('refuses to merge across projects, with unknown ids, with itself, or with fenced text', () => {
     put('a', 'one');
     put('b', 'two', { projectId: H.projectId });
