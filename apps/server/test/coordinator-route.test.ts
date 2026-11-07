@@ -2,6 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
+import { coordinatorProviders } from '../src/coordinator/credentials.js';
 import { machine as machineTable, routingRule, team as teamTable } from '../src/db/schema.js';
 import { setCoordinatorServerContextEnabled } from '../src/services/coordinator-context.js';
 import { coordinatorRoute } from '../src/services/coordinator-route.js';
@@ -257,6 +258,71 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     expect(coordinatorRoute(w.s.db, w.teamId)).toBeNull();
     allowPaidClaude(w);
     expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
+    setCoordinatorServerContextEnabled(false);
+  });
+
+  test('coordinatorRoute: a Claude model behind an OpenAI-compatible gateway needs allow-paid', async () => {
+    const w = await world();
+    setCoordinatorServerContextEnabled(true);
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'claude-gateway',
+          label: 'Gateway',
+          baseUrl: 'https://gw.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'gw-key',
+          models: [{ id: 'claude-sonnet-5-5', name: 'sonnet' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    seedRoute(w.s, 'coordinator', {
+      provider: 'claude-gateway',
+      modelId: 'claude-sonnet-5-5',
+      machineId: w.machineId,
+    });
+    expect(coordinatorRoute(w.s.db, w.teamId)).toBeNull();
+    allowPaidClaude(w);
+    expect(coordinatorRoute(w.s.db, w.teamId)).not.toBeNull();
+    setCoordinatorServerContextEnabled(false);
+  });
+
+  test('coordinatorProviders: a paid Claude compaction rule falls back to the router without allow-paid', async () => {
+    const w = await world();
+    setCoordinatorServerContextEnabled(true);
+    addAnthropicKey(w);
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        body: {
+          providerId: 'vani',
+          label: 'Vani',
+          baseUrl: 'https://vani.example.com/v1',
+          api: 'openai-completions',
+          apiKey: 'vani-key',
+          models: [{ id: 'deepseek/deepseek-v4.1-flash', name: 'flash' }],
+        },
+        createdBy: w.s.user.id,
+      },
+    );
+    seedRoute(w.s, 'coordinator', {
+      provider: 'vani',
+      modelId: 'deepseek/deepseek-v4.1-flash',
+      machineId: w.machineId,
+    });
+    seedRoute(w.s, 'compaction', {
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      machineId: w.machineId,
+    });
+    const deps = { db: w.s.db, box: w.s.secretBox };
+    expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('vani');
+    allowPaidClaude(w);
+    expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('anthropic');
     setCoordinatorServerContextEnabled(false);
   });
 });

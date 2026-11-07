@@ -146,4 +146,32 @@ describe('Coordinator reconcile at open', () => {
 
     expect(outcomes).toEqual(['reseeded-ahead']);
   });
+
+  it('re-seeds a newly claimed step when the store is behind the mirrored watermark', async () => {
+    const w = await world('before the old backup');
+    const { faux } = stub('ok');
+    const first = boot(w, faux);
+    first.wake(w.threadId);
+    await first.idle();
+    await first.close();
+    w.s.db.update(coordinatorConversation).set({ lastMirroredEntryId: '9999' }).run();
+    await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      content: 'after the old backup',
+    });
+
+    const outcomes: string[] = [];
+    const second = boot(w, faux, {
+      logger: {
+        info: (obj: { outcome?: string }) => {
+          if (obj.outcome !== undefined) outcomes.push(obj.outcome);
+        },
+        warn: () => {},
+        error: () => {},
+      },
+    });
+    second.wake(w.threadId);
+    await second.idle();
+
+    expect(outcomes).toEqual(['reseeded-behind']);
+  });
 });

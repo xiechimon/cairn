@@ -38,6 +38,7 @@ export type ReconcileOutcome =
   | 'adopted-store'
   | 'reseeded-missing-conversation'
   | 'reseeded-ahead'
+  | 'reseeded-behind'
   | 'unchanged';
 
 export interface ReconcileOptions {
@@ -108,6 +109,8 @@ export async function openReconciledHarness(
     outcome = 'adopted-store';
   } else if (facts.conversationId !== String(root.id)) {
     reseed = 'reseeded-missing-conversation';
+  } else if (facts.lastMirroredEntryId !== null && newest < Number(facts.lastMirroredEntryId)) {
+    reseed = 'reseeded-behind';
   } else if (
     facts.lastMirroredEntryId !== null &&
     !facts.hasClaimedStep &&
