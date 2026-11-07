@@ -124,12 +124,11 @@ if (enroll.status !== 200 || !machineToken || !machineId) {
   throw new Error('enroll → ' + enroll.status + ' ' + JSON.stringify(enroll.body).slice(0, 300));
 }
 
-const agent = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
-  displayName: '验证员 1242',
+const agent = await sendJson(SERVER + '/api/teams/' + teamId + '/routing-rules/session', {
   provider: 'stub-gw',
   modelId: 'stub-model',
   machineId,
-});
+}, 'PATCH');
 if (![200, 201].includes(agent.status)) {
   throw new Error('agent → ' + agent.status + ' ' + JSON.stringify(agent.body));
 }
@@ -174,7 +173,6 @@ async function doneStep(stepId) {
 async function startBuild(todoId) {
   const res = await sendJson(SERVER + '/api/projects/' + PROJECT_ID + '/builds', {
     todoIds: [todoId],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
     withPlan: false,
   });
   if (res.status !== 201) {

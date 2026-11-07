@@ -1,10 +1,8 @@
 import { type ClaimedStep, claimedStepSchema, LOCAL_TOOL_CREATE_TAG } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agent as agentTable } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
-
-const AGENT_ID = 'agent-local-tools-1';
+import { machine as machineTable } from '../src/db/schema.js';
+import { bootServer, issueApiKey, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -24,26 +22,20 @@ async function call(
   );
 }
 
-async function claimWith(agentTools: string[]): Promise<ClaimedStep> {
+async function claimWith(tools: string[]): Promise<ClaimedStep> {
   const s = bootServer({ claimHoldMs: 200 });
   const key = await issueApiKey(s);
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-local-tools-agent',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      tools: agentTools,
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'tools-mbp', cliVersion: '0.1.0' },
   });
-  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: s.db.select().from(machineTable).get()!.id,
+    tools,
+  });
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -51,11 +43,7 @@ async function claimWith(agentTools: string[]): Promise<ClaimedStep> {
   });
   const todoId = ((await todoRes.json()) as { id: string }).id;
   const buildRes = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoId] },
   });
   expect(buildRes.status).toBe(201);
   const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
@@ -73,7 +61,7 @@ async function claimWith(agentTools: string[]): Promise<ClaimedStep> {
 }
 
 describe('claim payload local tools after remote shell retirement (#1796)', () => {
-  test('create_tag is offered when the agent holds the create-tag switch', async () => {
+  test('create_tag is offered when the session policy holds the create-tag switch', async () => {
     const step = await claimWith(['创建标签']);
     expect(step.localTools).toEqual([LOCAL_TOOL_CREATE_TAG]);
   });
@@ -84,7 +72,7 @@ describe('claim payload local tools after remote shell retirement (#1796)', () =
     expect(step.localTools).not.toContain('remote_shell');
   });
 
-  test('an agent with no local-tool switches claims an empty list', async () => {
+  test('a session policy with no local-tool switches claims an empty list', async () => {
     const step = await claimWith([]);
     expect(step.localTools).toEqual([]);
   });
@@ -94,26 +82,16 @@ describe('chief steps still omit local tools', () => {
   test('a chief claim has no localTools and the retired shell route is gone', async () => {
     const s = bootServer({ claimHoldMs: 200 });
     const key = await issueApiKey(s);
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'chief-agent-1',
-        teamId: s.team.id,
-        displayName: 'chief-agent',
-        modelId: 'stub-model',
-        provider: 'stub-gw',
-      })
-      .run();
     const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
       cred: key,
       body: { teamId: s.team.id, name: 'chief-mbp', cliVersion: '0.1.0' },
     });
-    bindAllAgents(s);
-    const { token } = (await enrollRes.json()) as { token: string };
-    const patchRes = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {
-      body: { agent: { agentId: 'chief-agent-1', thinkingLevel: null } },
+    seedRoute(s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: s.db.select().from(machineTable).get()!.id,
     });
-    expect(patchRes.status).toBe(200);
+    const { token } = (await enrollRes.json()) as { token: string };
     const msgRes = await call(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
       body: { content: 'Look at this repository.' },
     });

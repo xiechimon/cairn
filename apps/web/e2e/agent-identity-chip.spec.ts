@@ -33,16 +33,15 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
     await stubDicebear(page);
   });
 
-  test('F-E5: drawer-face agent mention chips form links with click navigation (same recipe as F-R13)', async ({ page }) => {
+  test('F-E5: drawer-face agent mention chips stay lazy spans', async ({ page }) => {
     await page.goto(SCENARIO);
     await expect(page.locator('.chief-drawer')).toBeVisible();
     const chip = page.getByTestId('chief-stream').locator('.mention-chip--agent');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('r5-scribe');
 
-    await expect(chip).toHaveAttribute('href', '/app/resources/agents/a1');
-    await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/resources/agents/a1');
+    expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
+    await expect(chip).not.toHaveAttribute('href', /.*/);
   });
 
   test('F-E6: side chat transcript face follows the same law (second consumer of the single-source segments)', async ({ page }) => {
@@ -50,9 +49,8 @@ test.describe('agent mention chip (fixture, #741 gap 2)', () => {
 
     const chip = page.locator('.side-panel .mention-chip--agent');
     await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveAttribute('href', '/app/resources/agents/a1');
-    await chip.click();
-    await page.waitForURL((u) => u.pathname === '/app/resources/agents/a1');
+    expect(await chip.evaluate((el) => el.tagName)).toBe('SPAN');
+    await expect(chip).not.toHaveAttribute('href', /.*/);
   });
 
   test('F-E7: skill/project/machine mentions stay lazy spans (literal negative cases)', async ({ page }) => {

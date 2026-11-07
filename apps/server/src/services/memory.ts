@@ -4,14 +4,12 @@ import {
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_QUOTA_PER_TEAM,
   type MemoryLayer,
-  REVIEW_FANOUT_ROLES,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, agent as agentTable, memorySaveConflict, routingRule } from '../db/schema.js';
+import { agentMemory, memorySaveConflict } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { routingRulesEnabled } from './routing-rules.js';
 
 function validateMemoryText(title: string, content: string): void {
   if (title.includes(ISSUE_FENCE_OPEN) || content.includes(ISSUE_FENCE_OPEN)) {
@@ -50,56 +48,17 @@ function notAdoptedDuplicate() {
   return isNull(agentMemory.adoptedFrom);
 }
 
-const INDEPENDENT_PERSONAS = [...REVIEW_FANOUT_ROLES, 'verifier'] as const;
-
-function independentMemoryAgentIds(db: Db | MemoryTx, teamId: string): string[] {
-  if (!routingRulesEnabled()) return [];
-  const ids = new Set<string>();
-  for (const rule of db
-    .select({
-      id: routingRule.id,
-      seededFromAgentId: routingRule.seededFromAgentId,
-      adoptedAgentIds: routingRule.adoptedAgentIds,
-    })
-    .from(routingRule)
-    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'review')))
-    .all()) {
-    ids.add(rule.id);
-    if (rule.seededFromAgentId) ids.add(rule.seededFromAgentId);
-    for (const id of rule.adoptedAgentIds ?? []) ids.add(id);
-  }
-  for (const row of db
-    .select({ id: agentTable.id })
-    .from(agentTable)
-    .where(and(eq(agentTable.teamId, teamId), inArray(agentTable.persona, INDEPENDENT_PERSONAS)))
-    .all()) {
-    ids.add(row.id);
-  }
-  return [...ids];
-}
-
-function ownerWhere(
-  db: Db | MemoryTx,
-  scope: { agentId: string; teamId: string; teamScoped?: boolean },
-) {
-  const independentAgentIds =
-    routingRulesEnabled() && scope.teamScoped !== false
-      ? independentMemoryAgentIds(db, scope.teamId)
-      : [];
-  return routingRulesEnabled() && scope.teamScoped !== false
+function ownerWhere(scope: { agentId: string; teamId: string; teamScoped?: boolean }) {
+  return scope.teamScoped !== false
     ? and(
         eq(agentMemory.teamId, scope.teamId),
         notAdoptedDuplicate(),
         eq(agentMemory.independent, false),
-        independentAgentIds.length > 0
-          ? notInArray(agentMemory.agentId, independentAgentIds)
-          : undefined,
       )
     : and(eq(agentMemory.agentId, scope.agentId), eq(agentMemory.teamId, scope.teamId));
 }
 
 function layerWhere(scope: { layer?: MemoryLayer; threadId?: string | null }) {
-  if (!routingRulesEnabled()) return undefined;
   const layer = scope.layer ?? 'core';
   if (layer !== 'scratchpad') return eq(agentMemory.layer, layer);
   return and(
@@ -111,14 +70,12 @@ function layerWhere(scope: { layer?: MemoryLayer; threadId?: string | null }) {
 }
 
 function scratchpadVisible(threadId?: string) {
-  if (!routingRulesEnabled()) return undefined;
   return threadId === undefined
     ? ne(agentMemory.layer, 'scratchpad')
     : or(ne(agentMemory.layer, 'scratchpad'), eq(agentMemory.threadId, threadId));
 }
 
 function injectLayerWhere(threadId?: string) {
-  if (!routingRulesEnabled()) return undefined;
   return threadId === undefined
     ? eq(agentMemory.layer, 'core')
     : or(
@@ -137,7 +94,7 @@ export function listMemoryEntries(
     .from(agentMemory)
     .where(
       and(
-        ownerWhere(db, scope),
+        ownerWhere(scope),
         includeInvalid ? undefined : stillValid,
         scratchpadVisible(scope.threadId),
       ),
@@ -158,14 +115,14 @@ export function injectMemories(
 ) {
   return db.transaction((tx) => {
     const teamId = scope.teamId;
-    const teamScoped = routingRulesEnabled() && teamId !== undefined;
+    const teamScoped = teamId !== undefined;
     const rows = tx
       .select({ id: agentMemory.id, title: agentMemory.title, content: agentMemory.content })
       .from(agentMemory)
       .where(
         and(
           teamScoped
-            ? ownerWhere(tx, { agentId: scope.agentId, teamId, teamScoped: true })
+            ? ownerWhere({ agentId: scope.agentId, teamId, teamScoped: true })
             : eq(agentMemory.agentId, scope.agentId),
           injectLayerWhere(scope.threadId),
           stillValid,
@@ -212,7 +169,7 @@ export function memoriesInScope(
     .from(agentMemory)
     .where(
       and(
-        ownerWhere(tx, scope),
+        ownerWhere(scope),
         stillValid,
         layerWhere(scope),
         everyProject
@@ -245,13 +202,13 @@ export function saveMemoryEntry(
 ) {
   validateMemoryText(input.title, input.content);
   return db.transaction((tx) => {
-    const teamQuota = routingRulesEnabled() && input.teamScoped !== false;
+    const teamQuota = input.teamScoped !== false;
     const quota = teamQuota ? MEMORY_QUOTA_PER_TEAM : MEMORY_QUOTA_PER_AGENT;
     const quotaLabel = teamQuota ? 'team' : 'agent';
     const used = tx
       .select({ id: agentMemory.id })
       .from(agentMemory)
-      .where(and(ownerWhere(tx, input), stillValid))
+      .where(and(ownerWhere(input), stillValid))
       .all().length;
     if (used >= quota) {
       throw new HttpError(409, `memory quota exceeded (${quota}/${quotaLabel})`);
@@ -262,17 +219,13 @@ export function saveMemoryEntry(
     }
     const id = createHash('sha256')
       .update(
-        JSON.stringify(
-          routingRulesEnabled()
-            ? [
-                input.teamId,
-                input.projectId,
-                input.layer ?? 'core',
-                input.threadId ?? null,
-                input.content,
-              ]
-            : [input.agentId, input.teamId, input.projectId, input.content],
-        ),
+        JSON.stringify([
+          input.teamId,
+          input.projectId,
+          input.layer ?? 'core',
+          input.threadId ?? null,
+          input.content,
+        ]),
       )
       .digest('hex');
     const candidates = rows.filter(
@@ -317,7 +270,7 @@ export function saveMemoryEntry(
         source: source ?? null,
         layer: layer ?? 'core',
         threadId: threadId ?? null,
-        independent: routingRulesEnabled() && input.teamScoped === false,
+        independent: input.teamScoped === false,
         createdAt: now,
         updatedAt: now,
       })
@@ -344,7 +297,7 @@ export function updateMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere(tx, input),
+          ownerWhere(input),
           scratchpadVisible(input.threadId),
         ),
       )
@@ -414,7 +367,7 @@ export function promoteMemoryEntry(
 ): typeof agentMemory.$inferSelect | null {
   const where = and(
     eq(agentMemory.id, input.memoryId),
-    ownerWhere(db, input),
+    ownerWhere(input),
     scratchpadVisible(input.threadId),
   );
   const row = db.select().from(agentMemory).where(where).get();
@@ -441,7 +394,7 @@ export function deleteMemoryEntry(
       .where(
         and(
           eq(agentMemory.id, input.memoryId),
-          ownerWhere(tx, input),
+          ownerWhere(input),
           scratchpadVisible(input.threadId),
         ),
       )

@@ -133,19 +133,15 @@ try {
     throw new Error(`enroll → ${enroll.status} ${JSON.stringify(enroll.body)}`);
   }
 
-  const agent = await sendJson(`${SERVER}/api/teams/${teamId}/agents`, {
-    displayName: '未读探针',
+  const agent = await sendJson(`${SERVER}/api/teams/${teamId}/routing-rules/coordinator`, {
     provider: 'stub-gw',
     modelId: 'stub-model',
     machineId,
-  });
+  }, 'PATCH');
   const agentId = agent.body?.id;
   if (![200, 201].includes(agent.status) || !agentId) {
     throw new Error(`agent → ${agent.status} ${JSON.stringify(agent.body)}`);
   }
-  const bind = await sendJson(`${SERVER}/api/teams/${teamId}/chief`, { agent: { agentId } }, 'PATCH');
-  if (bind.status !== 200) throw new Error(`chief bind → ${bind.status} ${JSON.stringify(bind.body)}`);
-
   async function openThread(content) {
     const thread = await sendJson(`${SERVER}/api/teams/${teamId}/chief/threads`, { content });
     if (thread.status !== 201) throw new Error(`threads → ${thread.status} ${JSON.stringify(thread.body)}`);

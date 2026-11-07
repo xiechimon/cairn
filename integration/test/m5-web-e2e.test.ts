@@ -10,24 +10,13 @@ import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { plan as planTable, step as stepTable } from '../../apps/server/src/db/schema.js';
+import { step as stepTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
 const WEB_DIST = join(ROOT, 'apps/web/dist');
-
-const PLAN_MD = (marker: string) =>
-  [
-    '# 方案',
-    'Kind: fix',
-    '',
-    `Context: ${marker} 探针任务。`,
-    'Changes: 在 README.md 追加一行探针。',
-    'Edge cases: 无。',
-    'Verification: 读回 README.md 确认。',
-  ].join('\n');
 
 let stub: StubLlm;
 let server: RealServer;
@@ -52,13 +41,6 @@ beforeAll(async () => {
   }
   stub = await startStubLlm([
     {
-      toolCall: {
-        name: 'bash',
-        arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD('spine')}\nEOF` },
-      },
-    },
-    { content: '方案已就绪：Context / Changes / Edge cases / Verification 四段完整。' },
-    {
       toolCall: { name: 'bash', arguments: { command: 'printf "m5 spine probe\\n" >> README.md' } },
     },
     { content: '修改已完成并验证通过：README.md 末行为 m5 spine probe。' },
@@ -66,19 +48,10 @@ beforeAll(async () => {
     {
       toolCall: {
         name: 'bash',
-        arguments: { command: `cat > plan.md <<'EOF'\n${PLAN_MD('reject-v1')}\nEOF` },
+        arguments: { command: 'printf "m5 reject first\\n" >> README.md' },
       },
     },
-    { content: '方案 v1 已就绪。', delayMs: 500 },
-    {
-      toolCall: {
-        name: 'bash',
-        arguments: {
-          command: `cat > plan.md <<'EOF'\n${PLAN_MD('标题去掉项目名后缀-adjusted')}\nEOF`,
-        },
-      },
-    },
-    { content: '已按驳回反馈调整方案：标题去掉项目名后缀。' },
+    { content: '驳回探针首轮修改已完成。', delayMs: 500 },
     {
       toolCall: {
         name: 'bash',
@@ -206,8 +179,6 @@ async function createAndStart(title: string): Promise<void> {
   }
   const started = await api(server.url, 'POST', `/api/projects/${created.projectId}/builds`, {
     todoIds: [created.id],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    withPlan: true,
   });
   if (started.status !== 201) throw new Error(`createAndStart: startBuilds ${started.status}`);
 }
@@ -242,16 +213,6 @@ async function dumpSpineDiagnostics(label: string): Promise<void> {
   }
   try {
     if (probeConvId !== '') {
-      const plans = server.db
-        .select()
-        .from(planTable)
-        .where(eq(planTable.buildId, probeConvId))
-        .all();
-      out.push(
-        `DB plans rows: ${plans.length}: ${plans
-          .map((p) => `v${p.version}@${p.createdAt}(${String(p.content).slice(0, 40)}…)`)
-          .join(' | ')}`,
-      );
       const steps = server.db
         .select()
         .from(stepTable)
@@ -314,7 +275,7 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
   let buildId = '';
   let stream: { types: Set<string>; stop(): void };
 
-  test('create → plan → confirm → build → review → merge → done (main-sequence spine)', async () => {
+  test('create → session → review → merge → done (main-sequence spine)', async () => {
     await createAndStart('M5 脊柱探针');
 
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
@@ -332,14 +293,6 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     stream = collectConvStream(buildId);
 
     await openDetail('M5 脊柱探针');
-    await waitChip('confirm');
-    await withDiagnostics('plan card v1 on screen', () =>
-      pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v1', {
-        timeout: 30_000,
-      }),
-    );
-
-    await page.getByTestId('side-chat-action').getByRole('button').last().click();
     await waitChip('review');
 
     expect(
@@ -380,7 +333,7 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     expect(server.todoPhase(spine!.id)).toBe('done');
   }, 300_000);
 
-  test('reject branch: request changes at the confirm gate → replanning → plan v2 → confirm → review (r5 §4)', async () => {
+  test('reject branch: feedback at the review gate → rework session → back to review', async () => {
     await createAndStart('M5 驳回探针');
     const todos = (await api(server.url, 'GET', '/api/todos')).body as {
       id: string;
@@ -392,48 +345,10 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
     const rejectBuildId = target!.latestBuildId!;
     probeConvId = rejectBuildId;
 
-    const stepsUrl = `**/api/builds/${rejectBuildId}/steps`;
-    let markPendingRoute = () => {};
-    let releasePendingRoute = () => {};
-    const pendingRoute = new Promise<void>((resolve) => {
-      markPendingRoute = resolve;
-    });
-    const resumeRoute = new Promise<void>((resolve) => {
-      releasePendingRoute = resolve;
-    });
-    let rewriteSteps = true;
-    let pendingResponses = 0;
-    await page.route(stepsUrl, async (route) => {
-      if (!rewriteSteps || route.request().method() !== 'GET') {
-        await route.continue();
-        return;
-      }
-      pendingResponses++;
-      try {
-        const response = await route.fetch();
-        const steps = (await response.json()) as { kind: string; status: string }[];
-        if (route.request().headers()['x-cairn-route-drain'] === 'true') {
-          markPendingRoute();
-          await resumeRoute;
-        }
-        await route.fulfill({
-          response,
-          json: steps.map((step) => (step.kind === 'plan' ? { ...step, status: 'claimed' } : step)),
-        });
-      } finally {
-        pendingResponses--;
-      }
-    });
     await openDetail('M5 驳回探针');
-    await waitChip('confirm');
-    await pexpect(
-      page
-        .locator('.side-panel')
-        .getByTestId('composer-card')
-        .getByRole('button', { name: '停止', exact: true }),
-    ).toBeVisible();
+    await waitChip('review');
 
-    await withDiagnostics('confirm feedback requests a plan revision', async () => {
+    await withDiagnostics('review feedback requests a rework session', async () => {
       await page
         .locator('.side-panel .composer-input')
         .fill('Drop the project suffix from the title');
@@ -452,47 +367,32 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       });
       expect(await revision.json()).toMatchObject({ delivered: 'revision' });
     });
-    const pendingSteps = page.evaluate<{ kind: string; status: string }[]>(
-      `fetch('/api/builds/${rejectBuildId}/steps', { headers: { 'x-cairn-route-drain': 'true' } }).then(response => response.json())`,
-    );
-    await pendingRoute;
-    rewriteSteps = false;
-    releasePendingRoute();
-    const drainedSteps = await pendingSteps;
-    await waitFor(() => pendingResponses === 0, 10_000);
-    await page.unrouteAll({ behavior: 'wait' });
-    expect(drainedSteps.filter((step) => step.kind === 'plan')).toEqual(
-      expect.arrayContaining([expect.objectContaining({ status: 'claimed' })]),
-    );
     await withDiagnostics('accepted feedback appears in the transcript', () =>
       pexpect(
         page.locator('.chat-bubble', { hasText: 'Drop the project suffix from the title' }),
       ).toBeVisible({ timeout: 30_000 }),
     );
-    await withDiagnostics('plan card v2 on screen', () =>
-      pexpect(page.locator('.chat-plan-title').last()).toHaveText('方案 · v2', {
-        timeout: 30_000,
-      }),
+    await withDiagnostics('rework session returns the card to review', () =>
+      waitFor(
+        () =>
+          server.db
+            .select()
+            .from(stepTable)
+            .where(eq(stepTable.buildId, rejectBuildId))
+            .all()
+            .filter((s) => s.kind === 'session' && s.status === 'done').length === 2 &&
+          server.todoPhase(target!.id) === 'review',
+        150_000,
+      ),
     );
-
-    const plans = server.db
-      .select()
-      .from(planTable)
-      .where(eq(planTable.buildId, rejectBuildId))
-      .all();
-    expect(plans).toHaveLength(2);
-    expect(plans[1]!.version).toBe(2);
-    expect(plans[1]!.content).toContain('标题去掉项目名后缀-adjusted');
     const rejectSteps = server.db
       .select()
       .from(stepTable)
       .where(eq(stepTable.buildId, rejectBuildId))
       .all();
-    expect(rejectSteps.filter((s) => s.kind === 'plan')).toHaveLength(2);
-
-    await page.getByTestId('side-chat-action').getByRole('button').last().click();
+    expect(rejectSteps.filter((s) => s.kind === 'session')).toHaveLength(2);
+    expect(rejectSteps.filter((s) => s.kind === 'plan')).toHaveLength(0);
     await waitChip('review');
-    expect(server.todoPhase(target!.id)).toBe('review');
   }, 300_000);
 
   test('scheduled run parks at review: create once schedule in UI → tick trigger → continues the latest build → parks at review + started-by-schedule marker (r3 §9)', async () => {
@@ -547,7 +447,7 @@ describe('M5 web E2E: main sequence full chain (01 §7.4 spine, zero UI reload)'
       .where(eq(stepTable.buildId, after.latestBuildId!))
       .all()
       .filter((s) => s.scheduleId === schedules[0]!.id);
-    expect(scheduledSteps.map((s) => s.kind)).toEqual(['build']);
+    expect(scheduledSteps.map((s) => s.kind)).toEqual(['session']);
     expect((await api(server.url, 'GET', '/api/schedules')).body as unknown[]).toHaveLength(0);
 
     const spineProject = (await api(server.url, 'GET', `/api/todos/${spine!.id}`)).body as {

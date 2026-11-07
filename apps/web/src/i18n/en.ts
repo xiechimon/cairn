@@ -341,13 +341,11 @@ export const EN: Record<string, string> = {
   深色: 'Dark',
 
   // —— account / agent settings list ——
-  头像与名称: 'Avatar and name',
   编辑名称: 'Edit name',
   '任务需要你处理时，在系统通知中心提醒':
     'Notify you in the system notification center when a task needs you',
 
   // —— chip popover / plan dropdown (r7 19/20/29) ——
-  未指派: 'Unassigned',
   确认方案: 'Confirm plan',
   构建中: 'Building',
   移回待开始: 'Move back to To start',
@@ -363,8 +361,6 @@ export const EN: Record<string, string> = {
   '这次运行失败了，可以重跑，或移回待开始。':
     'This run failed. Rerun it, or move it back to To start.',
   '任务已取消。': 'The task was cancelled.',
-  '执行 Agent': 'Executing agent',
-  '分配给…': 'Assign to…',
   面板视图: 'Pane view',
 
   // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
@@ -444,14 +440,9 @@ export const EN: Record<string, string> = {
 
   // —— team route (r7 12) ——
   设置: 'Settings',
-  '{n} 个成员': '{n## member|# members}',
   // team empty state, grid and chart (r2 §8.1 17c title)
-  暂无成员: 'No members yet',
-  '创建 Agent 后，它会出现在这里。': 'Create an agent and it shows up here.',
   ' · 默认': ' · Default',
   未配置模型: 'No model configured',
-  未设置职责: 'No role set',
-  '创建 Agent': 'Create Agent',
 
   // —— api-keys route (r2 19, 02 §8 canon note) ——
   '尚无 API 密钥。': 'No API keys yet.',
@@ -573,11 +564,8 @@ export const EN: Record<string, string> = {
   模型与归属机: 'Model & home machine',
   '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
     'Follows the bound Agent: model {model} · home {machine}',
-  '跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。':
-    "Follows the bound Agent's own configuration; adjust it in the Agent's settings.",
 
   未设归属机: 'no home machine',
-  还没有接入机器: 'No machines connected yet',
   接入机器: 'Connect a machine',
   在线: 'Online',
   '无 runtime 开启': 'No runtimes enabled',
@@ -586,11 +574,7 @@ export const EN: Record<string, string> = {
   迁移到: 'Migrate to',
   整机迁移: 'Migrate all agents',
   状态: 'Status',
-  '把归属这台机器的 agent 一起迁到另一台机器。':
-    'Move every agent homed on this machine to another one.',
   删除机器: 'Delete machine',
-  '先迁走归属这台机器的 {n} 个 agent 才能删除。':
-    'Move the {n## agent|# agents} homed on this machine first, then delete it.',
   '删除后，这台机器要重新注册才能再接任务。':
     'Once deleted, the machine has to enroll again before it takes work.',
   '确定删除这台机器？此操作不可撤销。': 'Delete this machine? This cannot be undone.',
@@ -600,7 +584,6 @@ export const EN: Record<string, string> = {
   机器不存在或已移除: 'Machine missing or removed',
   '整机迁移失败，请重试。': 'Migration failed. Try again.',
   '删除机器失败，请重试。': 'Could not delete the machine. Try again.',
-  '{n} 个 agent 未过校验留在原机': '{n## agent|# agents} failed validation and stayed put',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
@@ -750,9 +733,6 @@ export const EN: Record<string, string> = {
   // #182 设置面接线：选择总管 Agent dialog + 章程编辑弹窗；换绑二次确认
   // copy 走 shared CHIEF_REBIND_CONFIRM_COPY canon（<agent> 占位，显示层替换，
   // i18n-coverage COMPUTED_KEYS 登记）。
-  '选择 Coordinator Agent': "Choose the Coordinator's Agent",
-  '搜索 Agent…': 'Search Agents…',
-  '没有匹配的 Agent': 'No matching Agents',
   // #615 总管抽屉主模型闭环文案（模型行 aria + 覆盖 dialog 默认行/搜索/空态）。
   // #615 返工：恢复钮（参考站 live aria 正词）+ 过程折叠 + 确认层 + 工具行失败徽标。
   恢复到此处: 'Restore to here',
@@ -800,9 +780,6 @@ export const EN: Record<string, string> = {
   // #209 编辑分配接线：chip-popover「编辑分配」→ agent 选择弹层（#182 家族
   // 形态复用）；弹层内容 r2 C.18 从未捕获，文案 [设计]，<agent> 占位显示层
   // 替换。
-  '选择执行 Agent': 'Choose the executing Agent',
-  '更换执行 Agent？后续运行将改由 <agent> 执行。':
-    'Change the executing Agent? Future runs will be executed by <agent>.',
 
   // —— chrome carried inside fixture records (exact-value keys; user and
   // agent content is deliberately absent — it falls back to the zh
@@ -882,10 +859,6 @@ export const EN: Record<string, string> = {
   '确定删除该定时？此操作不可撤销。': 'Delete this schedule? This cannot be undone.',
   // XMON-19/B2 删除 Agent：三串 = 原版产线 bundle 的 en 语料原文
   // （agent_modal.remove / remove_title / remove_confirm），非回译。
-  '删除 Agent': 'Delete agent',
-  '删除 Agent？': 'Delete agent?',
-  '将「{name}」移出团队？该 Agent 进行中的任务将被停止。':
-    'Remove "{name}" from this team? Active tasks for this agent will be stopped.',
   复制链接: 'Copy link',
   暂停: 'Snooze',
   撤销: 'Undo',
@@ -906,8 +879,6 @@ export const EN: Record<string, string> = {
   // 固定兜底句（4xx 的 server 原文不翻译：它逐字点名拒因，翻一遍反而对不
   // 上）。#1236：完成弹层的勾选分流反馈四串（合并委派回执 / 不合并完成回
   // 执 / 目标缺位报错 / 不合并腿兜底句）＋ failed 卡勾选锁定行。
-  '缺少「{tools}」授权，无法合并。请在该 Agent 的权限里开启。':
-    'Missing the “{tools}” permission, so this merge cannot go through. Turn it on in the agent’s permissions.',
   '合并请求未送出，请重试。': 'The merge request was not sent. Try again.',
   '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
   '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
@@ -925,10 +896,8 @@ export const EN: Record<string, string> = {
     'No price source: the model declares no rates, or the run reported no cost',
   当前: 'Current',
   重跑: 'Rerun',
-  构建分支: 'Build branch',
   同步: 'Sync',
   // #319 分支对话框「同步到机器」结果卡四态 + 机器选择占位
-  选择机器: 'Choose a machine',
   // run-history rows: fixture-carried chrome (exact-value keys)
   '第 1 次运行': 'Run 1',
   '第 2 次运行': 'Run 2',
@@ -964,10 +933,6 @@ export const EN: Record<string, string> = {
   失败: 'Failed',
   默认: 'Default',
   // #170 create-agent dialog family
-  '创建 agent': 'Create agent',
-  '输入 Agent 名称': 'Enter an agent name',
-  尚未配置模型服务商: 'No model provider configured yet',
-  配置服务商: 'Configure providers',
   创建: 'Create',
   // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
   '名称（可选）': 'Name (optional)',
@@ -1114,39 +1079,20 @@ export const EN: Record<string, string> = {
 
   // —— #485 Agent 详情编辑面（三 tab + 概览字段 + 记忆/权限面）——
   // 含空格/标点的键一律引号形（对象字面量的键不是标识符）。
-  概览: 'Overview',
   权限: 'Permissions',
-  职责: 'Responsibility',
   工具: 'Tools',
   // 模型 已在 #476 段登记，本段不重复。
   思考强度: 'Thinking level',
   // 「状态」键随 XMON-18 撤行一并摘除（概览不再摆状态行，en-coverage gate 也不
   // 容许死键）。
   未设置模型: 'No model',
-  '默认 skill': 'Default skill',
-  '找不到该 Agent。它可能已被删除。': 'Agent not found. It may have been deleted.',
   // 概览「进行中」段空态（原文 = 参考产品 web 包 agent_modal.no_active_tasks）。
-  暂无进行中的任务: 'No active tasks',
-  '暂无团队密钥。': 'No team secrets yet.',
   // XMON-80/P3：零密钥空态旁的出口（落到侧栏密钥页）。
-  去添加密钥: 'Add a secret',
   // XMON-80/P2：权限 tab 保存失败的可见反馈。
   '保存失败，请重试。': 'Save failed. Try again.',
   // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
-  机器匹配: 'Machine fit',
-  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。':
-    'Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); machines that never reported a snapshot are let through.',
-  '要求执行机已安装该 MCP 服务器': 'Require this MCP server installed on the executing machine',
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
-  '未开启该 Agent 所需的 runtime': 'Required runtime not enabled for this agent',
-  '缺 {missing}（在该机装齐即解锁）': 'Missing {missing} (install on that machine to unlock)',
-  '能力快照未上报——按可跑放行': 'Capability snapshot not reported — treated as runnable',
-  '可跑；声明的 MCP 缺 {gaps}（执行时跳过）':
-    'Runnable; declared MCP missing {gaps} (skipped at runtime)',
-  可跑: 'Runnable',
-  不可跑: 'Not runnable',
-  '暂无机器。': 'No machines yet.',
   '{name} 上的 Claude Code 登录将在 {days} 天后过期。在该机器上运行 `claude auth login` 重新登录。':
     'Claude Code login on {name} expires in {days## day|# days}. On that machine run `claude auth login`.',
   '{name} 上的 Claude Code 登录将在 1 天后过期。在该机器上运行 `claude auth login` 重新登录。':
@@ -1179,8 +1125,6 @@ export const EN: Record<string, string> = {
   团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
   // 全拒）两态互转；逐技能勾选行只在限制态渲染。
-  授权技能: 'Skill access',
-  不限制: 'Unrestricted',
   '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。':
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',
   // shared canon（packages/shared/src/records/agent.ts、memory.ts），经 t()
@@ -1221,13 +1165,7 @@ export const EN: Record<string, string> = {
   '记忆 · {n} / {max}': 'Memory · {n} / {max}',
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
-  添加时间: 'Added',
   // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
-  尚无记忆: 'No memories yet',
-  'Agent 会在工作中将值得沉淀的经验存入此处。':
-    'The Agent stores experience worth keeping here as it works.',
-  没有匹配的记忆: 'No memories match',
-  '换个关键词再试。': 'Try another search term.',
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   'Coordinator 本轮执行失败': 'The Coordinator turn failed',
   '撤回失败，Coordinator 可能已经开始处理这条了。':
@@ -1322,8 +1260,6 @@ export const EN: Record<string, string> = {
   '添加模型服务失败，请重试。': 'Could not add the provider. Try again.',
   '添加密钥失败，请重试。': 'Could not add the secret. Try again.',
   '新建 API 密钥失败，请重试。': 'Could not create the API key. Try again.',
-  '创建 Agent 失败，请重试。': 'Could not create the agent. Try again.',
-  '删除 Agent 失败，请重试。': 'Could not delete the agent. Try again.',
   '删除记忆失败，请重试。': 'Could not delete the memory. Try again.',
   'Coordinator 提问': 'Coordinator question',
   待回答的提问: 'Pending questions',
@@ -1353,23 +1289,8 @@ export const EN: Record<string, string> = {
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
   备用模型: 'Fallback models',
-  '主模型额度用完、服务 5xx、账号耗尽、限流、模型 404 或认证失败时，按顺序换到下一个可用备选。规划和执行步会换，Coordinator 只换同一运行时的备选；审核、验证、合并不换。备选用尽后，限流和额度继续等待，其他服务故障则该步失败。':
-    'When the primary model runs out of quota, hits a provider 5xx or account exhaustion, is rate limited, returns 404, or fails authentication, the next usable fallback takes over in order. Plan and build steps switch; the Coordinator uses backups within the same runtime. Review, verify and merge steps never switch. After the fallback list is exhausted, rate limits and quota keep waiting; other provider failures fail the step.',
-  '备用 {n}': 'Fallback {n}',
-  '备用 {n} 运行时': 'Fallback {n} runtime',
-  '备用 {n} 模型': 'Fallback {n} model',
-  '上移备用 {n}': 'Move fallback {n} up',
-  '下移备用 {n}': 'Move fallback {n} down',
-  '删除备用 {n}': 'Remove fallback {n}',
-  添加备用模型: 'Add fallback model',
   选择运行时: 'Choose runtime',
-  选完模型后才会保存: 'Saved once a model is chosen',
-  当前可选列表里没有该模型: 'This model is not in the current list',
-  '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
-  '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
-    'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
   已忘掉: 'Forgotten',
-  查看这条记忆: 'View this memory',
   '让 Coordinator 忘掉这条': 'Make the Coordinator forget this',
   决定: 'Decided',
   还开着: 'Still open',
@@ -1614,26 +1535,29 @@ export const EN: Record<string, string> = {
   工作路由: 'Work routing',
   路由规则: 'Routing rules',
   工作策略: 'Work policies',
-  路由规则开关: 'Routing rules switch',
-  'CAIRN_ROUTING_RULES 已开启；调度走规则与策略。':
-    'CAIRN_ROUTING_RULES is on; dispatch uses rules and policies.',
-  'CAIRN_ROUTING_RULES=0 已关闭规则路由；调度仍走 Agent。':
-    'CAIRN_ROUTING_RULES=0 turned rules off; dispatch still uses agents.',
-  规则已启用: 'Enabled',
-  规则未启用: 'Disabled',
   '还没有路由规则。': 'No routing rules yet.',
-  '从现有 Agent 生成 session / review 规则与工作策略，或重启服务器由启动迁移写入。':
-    'Seed session/review rules and work policies from agents, or restart the server so the startup migration writes them.',
-  '从 Agent 生成': 'Seed from agents',
-  '已从 Agent 生成规则与策略': 'Seeded rules and policies from agents',
-  '生成失败，请重试。': 'Seeding failed. Try again.',
+  '先创建 Coordinator 规则，它才能回答你的消息。':
+    'Create the Coordinator rule first so it can answer your messages.',
+  '这条路由还没有规则，选好运行时与模型后创建。':
+    'This route has no rule yet; pick a runtime and model, then create it.',
+  不填则沿用规则的机器: 'Leave empty to keep the rule machine',
+  '跟随 coordinator 路由规则，在路由设置里调整。':
+    'Follows the coordinator routing rules; adjust them in routing settings.',
+  '{n} 条路由规则未过校验留在原机':
+    '{n#1 routing rule|# routing rules} failed validation and stayed put',
+  '把固定在这台机器上的路由规则一起迁到另一台机器。':
+    'Move the routing rules pinned to this machine to another machine.',
+  引文检查: 'Citation check',
+  'Agent 已由路由规则取代': 'Agents are replaced by routing rules',
+  '模型、机器和权限现在由工作路由规则与工作策略决定。':
+    'Models, machines and permissions are now set by work routing rules and work policies.',
+  打开工作路由: 'Open work routing',
   模型与首选机器: 'Model and preferred machine',
   首选机器: 'Preferred machine',
   不固定: 'Any machine',
   路由覆盖: 'Route override',
   '本任务的机器与执行要求；调度在规则开启后生效。':
     'Per-task machine and capability requirements; applied when routing rules are on.',
-  '不填则沿用规则或 Agent 的机器': 'Leave empty to keep the rule or Agent machine',
   '要求 Orb': 'Require Orb',
   '执行机须上报 Orb 沙箱执行器': 'Executor must report the Orb sandbox',
   '要求的 MCP': 'Required MCP',
@@ -1837,8 +1761,6 @@ export const EN: Record<string, string> = {
   模型服务没能加载: 'Providers did not load',
   正在加载工作路由: 'Loading work routing',
   工作路由没能加载: 'Work routing did not load',
-  正在加载团队: 'Loading the team',
-  团队没能加载: 'The team did not load',
   正在加载命令记录: 'Loading command history',
   命令记录没能加载: 'Command history did not load',
   '正在加载 Coordinator 的电脑': "Loading the Coordinator's computer",

@@ -5,7 +5,7 @@ const SCHEDULES = '/app/schedules?scenario=01';
 
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=r2-24b&tab=tasks';
 
-const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
+const MACHINE_DETAIL = '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const AUTHORIZE = '/app/machines/authorize';
 
 const MACHINES = '/app/resources/machines?scenario=06';
@@ -209,12 +209,12 @@ test('with the drawer closed, N stays retired — neither drawer nor dialog open
 // ---- #1141: suppression retired — the chief surface is site-wide ---------
 
 test.describe('#1141 suppression retired', () => {
-  test('agent detail: ⌘J wakes the drawer in place', async ({ page }) => {
-    await page.goto(AGENT_DETAIL);
-    await expect(page.locator('.agent-detail')).toBeVisible();
+  test('machine detail: ⌘J wakes the drawer in place', async ({ page }) => {
+    await page.goto(MACHINE_DETAIL);
+    await expect(page.getByTestId('machine-detail-online')).toBeVisible();
     await pressAndExpect(page, 'Meta+j', drawer(page));
     await expect(page.getByTestId('chief-composer-input')).toBeFocused();
-    await expect(page).toHaveURL(/\/app\/resources\/agents\/r3-builder/);
+    await expect(page).toHaveURL(/\/app\/resources\/machines\/Kd8fG2hJ4mN9pQ1rStUvWx3/);
     await pressAndExpect(page, 'Meta+j', drawer(page), 'hidden');
     await expect(drawer(page)).toBeHidden();
   });

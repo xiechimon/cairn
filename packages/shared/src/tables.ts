@@ -15,7 +15,6 @@ export const DB_TABLES = [
   'schedule',
   'schedule_report',
   'notification',
-  'agent',
   'agent_memory',
   'provider',
   'secret',
@@ -64,6 +63,7 @@ export const DB_TABLES = [
   'coordinator_conversation',
   'coordinator_entry',
   'coordinator_lease',
+  'data_migration',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -114,4 +114,5 @@ export const INTERNAL_ONLY_TABLES = [
   'coordinator_conversation',
   'coordinator_entry',
   'coordinator_lease',
+  'data_migration',
 ] as const;

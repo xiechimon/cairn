@@ -4,7 +4,6 @@ import {
   AGENT_TOOL_DEFAULTS,
   AGENT_TOOL_SWITCHES,
   agentRecordSchema,
-  assignmentSchema,
   buildRecordSchema,
   buildStepActionBodySchema,
   chiefGetResponseSchema,
@@ -47,8 +46,6 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     seqNum: 11,
     orderIndex: 0,
     tagIds: [],
-    assignment: { plan: null, build: { agentId: 'SPn3bR8GalngsJm1ge-Sh' } },
-    agent: { id: 'SPn3bR8GalngsJm1ge-Sh', displayName: 'r5-scribe' },
     latestBuildId: '01a0b86f-04f9-72a8-bba4-75c5cfd6598f',
     lastRunAt: 1758531600000,
     hasChanges: true,
@@ -107,14 +104,6 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
       spec: 's',
     });
   });
-
-  it('assignment is the dual-slot shape (02 §6.2/r5 §3.4)', () => {
-    expect(assignmentSchema.parse({ plan: { agentId: 'a1' }, build: { agentId: 'a2' } })).toEqual({
-      plan: { agentId: 'a1' },
-      build: { agentId: 'a2' },
-    });
-    expect(assignmentSchema.safeParse({ agentId: 'a1' }).success).toBe(false);
-  });
 });
 
 describe('build record (02 §6.2, r5 §3.4/§7.2 SSE measured)', () => {
@@ -149,14 +138,15 @@ describe('build record (02 §6.2, r5 §3.4/§7.2 SSE measured)', () => {
     );
   });
 
-  it('start body = {todoIds[], assignment, withPlan} (r5 §3.4 capture)', () => {
+  it('start body = {todoIds[], routeOverride?}; a legacy assignment is still parsed so the server can refuse it', () => {
+    expect(startBuildsBodySchema.parse({ todoIds: ['todo_01'] })).toEqual({ todoIds: ['todo_01'] });
     expect(
       startBuildsBodySchema.parse({
         todoIds: ['todo_01'],
         assignment: { build: { agentId: 'a1' }, plan: { agentId: 'a2' } },
         withPlan: true,
-      }),
-    ).toMatchObject({ todoIds: ['todo_01'], withPlan: true });
+      }).assignment,
+    ).toBeDefined();
   });
 
   it('merge responds 202 {"delegated":true} (r3 §3.6)', () => {
@@ -661,8 +651,6 @@ describe('team stream SSE events (02 §1.2, r5 §7.2 measured extension)', () =>
     seqNum: 1,
     orderIndex: 0,
     tagIds: [],
-    assignment: null,
-    agent: null,
     latestBuildId: null,
     lastRunAt: null,
     hasChanges: false,

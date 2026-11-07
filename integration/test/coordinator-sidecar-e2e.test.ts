@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, step as stepTable } from '../../apps/server/src/db/schema.js';
 import { setCoordinatorMachineId } from '../../apps/server/src/services/coordinator-context.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const COORDINATOR_DIR = resolve(import.meta.dirname, '../../apps/coordinator');
@@ -82,9 +82,15 @@ beforeAll(async () => {
   home = makeTestTempDir('cairn-sidecar-home-');
   mkdirSync(join(home, 'coordinator'), { mode: 0o700 });
   writeFileSync(join(home, 'coordinator', 'machine-token'), token, { mode: 0o600 });
-  const bound = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-    agent: { agentId: AGENT_ID, thinkingLevel: null },
-  });
+  const bound = await api(
+    server.url,
+    'PATCH',
+    `/api/teams/${server.teamId}/routing-rules/coordinator`,
+    {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+    },
+  );
   expect(bound.status).toBe(200);
   sidecar = startSidecar();
 }, 120_000);

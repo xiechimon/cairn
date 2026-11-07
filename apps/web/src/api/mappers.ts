@@ -11,7 +11,6 @@ import type {
   SecretRecord,
   SkillRecord,
   StepActivity,
-  TeamMember,
   TokenUsage,
   ToolCallRecord,
   UsageCost,
@@ -73,8 +72,6 @@ import type {
   ReviewFinding,
   RunHistoryRow,
   SkillRow,
-  TeamAgentCard,
-  TeamContent,
   TokenUsageContent,
   TranscriptItem,
   UsageCostContent,
@@ -164,7 +161,6 @@ function rowProject(row: MessageRow): { projectId?: string | null } {
 }
 
 export function toDisplayTodo(w: WireTodo): DisplayTodo {
-  const agentId = w.assignment?.build?.agentId ?? w.assignment?.plan?.agentId ?? null;
   return {
     id: w.id,
     teamId: w.teamId,
@@ -179,8 +175,8 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     seqNum: w.seqNum,
     orderIndex: w.orderIndex,
     tagIds: w.tagIds,
-    assignment: agentId !== null ? { agentId } : null,
-    agent: w.agent,
+    assignment: null,
+    agent: null,
     latestBuildId: w.latestBuildId,
     lastRunAt: w.lastRunAt,
     hasChanges: w.hasChanges,
@@ -1153,31 +1149,6 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     pausedReason: r.pausedReason,
     todo: r.todo,
   }));
-}
-
-export function mapTeam(members: TeamMember[]): TeamContent {
-  const agents = members.filter((m) => m.memberType === 'agent');
-  const cards: TeamAgentCard[] = agents.map((m) => {
-    const a = m.actor as {
-      displayName?: string;
-      avatarUrl?: string | null;
-      modelId?: string | null;
-      description?: string | null;
-      provider?: string | null;
-      machineId?: string | null;
-    };
-    return {
-      id: m.actorId,
-      displayName: a.displayName ?? '',
-      avatarUrl: a.avatarUrl ?? null,
-      model: a.modelId ?? '',
-      isDefault: Boolean(a.modelId),
-      role: a.description ?? null,
-      provider: a.provider ?? null,
-      machineId: a.machineId ?? null,
-    };
-  });
-  return { members: members.length, agents: cards };
 }
 
 export function mapApiKeys(rows: ApiKeyRow[]): DisplayApiKey[] {

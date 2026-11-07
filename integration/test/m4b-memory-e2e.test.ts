@@ -111,8 +111,6 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     );
     const started = await api(server.url, 'POST', `/api/projects/${world1.projectId}/builds`, {
       todoIds: [world1.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     build1 = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -155,8 +153,6 @@ describe('M4b memory E2E: instruction-triggered + mid-step write + provenance + 
     world2 = { projectId: world1.projectId, todoId: (todo2Res.body as { id: string }).id };
     const started = await api(server.url, 'POST', `/api/projects/${world2.projectId}/builds`, {
       todoIds: [world2.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
 

@@ -3,17 +3,17 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   chiefMessage,
   chiefThread,
   machine as machineTable,
+  routingRule,
   step as stepTable,
 } from '../src/db/schema.js';
 import { CHIEF_ABANDONED_STEP_MS, sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, seedRoute, type TestServer } from './helpers.js';
 
-const AGENT_ID = 'agent-chief-sweep';
+const COORDINATOR_RULE = 'route-chief-sweep';
 
 async function call(
   app: Hono,
@@ -50,21 +50,7 @@ async function sendChiefTurn(content = '你好', provider = 'stub-gw'): Promise<
   const s = bootServer();
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: 'sweep-agent',
-      description: '调度',
-      modelId: 'stub-model',
-      provider,
-    })
-    .run();
-  const patchRes = await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-  });
-  expect(patchRes.status).toBe(200);
+  seedRoute(s, 'coordinator', { id: COORDINATOR_RULE, provider, modelId: 'stub-model' });
   const sentAt = Date.now();
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content },
@@ -97,11 +83,11 @@ function setMachineOnline(s: TestServer, machineId: string, online: boolean): vo
 }
 
 function bindChiefAgent(s: TestServer, machineId: string): void {
-  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
+  s.db.update(routingRule).set({ machineId }).where(eq(routingRule.id, COORDINATOR_RULE)).run();
 }
 
 function chiefAgentRowOf(s: TestServer) {
-  return s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!;
+  return s.db.select().from(routingRule).where(eq(routingRule.id, COORDINATOR_RULE)).get()!;
 }
 
 function tapConvStream(s: TestServer, conversationId: string): { events: object[] } {

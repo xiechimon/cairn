@@ -2,7 +2,6 @@ import { RESEARCH_INJECT_MAX_BYTES } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
-  agent,
   attachment,
   build,
   buildFeedback,
@@ -25,39 +24,26 @@ import {
   stuckResearchWaitState,
 } from '../src/services/research-stuck.js';
 import { retryLessonsOf } from '../src/services/retry-lessons.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  postProject,
+  req,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const dispose of disposables.splice(0)) dispose();
 });
 
-async function world(opts: { withAgent?: boolean } = {}) {
+async function world(opts: { withSessionRoute?: boolean } = {}) {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'stuck');
-  if (opts.withAgent !== false) {
-    s.db
-      .insert(agent)
-      .values({
-        id: 'agent-sonnet',
-        teamId: s.team.id,
-        displayName: 'sonnet',
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-      })
-      .run();
-  }
-  s.db
-    .insert(agent)
-    .values({
-      id: 'checker',
-      teamId: s.team.id,
-      displayName: 'Checker',
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
-    })
-    .run();
+  if (opts.withSessionRoute !== false) seedSessionRoute(s);
+  seedRoute(s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
   const buildId = newUuidv7();
   s.db
     .insert(todo)
@@ -192,9 +178,9 @@ describe('openStuckResearch', () => {
     expect(systemKinds(w.s, w.buildId, 'research-requested')).toHaveLength(1);
   });
 
-  test('with no Claude Code agent it throws a clear error and appends nothing', async () => {
-    const w = await world({ withAgent: false });
-    expect(() => openStuckResearch(w.deps, w.buildId)).toThrow(/Claude Code agent/);
+  test('with no session routing rule it throws a clear error and appends nothing', async () => {
+    const w = await world({ withSessionRoute: false });
+    expect(() => openStuckResearch(w.deps, w.buildId)).toThrow(/session routing rule/);
     expect(systemKinds(w.s, w.buildId, 'research-requested')).toHaveLength(0);
     expect(
       w.s.db.select().from(todo).where(eq(todo.sourceKind, 'research-stuck')).all(),

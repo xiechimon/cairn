@@ -193,7 +193,6 @@ export async function mockLive(
       return json({ thread: THREAD }, 201);
     }
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
-    if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);

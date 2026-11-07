@@ -2,8 +2,8 @@ import { MACHINE_RUNTIMES, type MachineRuntime, PUBLISHED_PACKAGES } from '@cair
 import { Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { useApiMutations, useMachines, useMembers, useModelSources } from '../api/hooks.js';
-import { mapMachines, mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/mappers.js';
+import { useApiMutations, useMachines } from '../api/hooks.js';
+import { mapMachines, RUNTIME_LABELS } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ProviderRow } from '../components/accounts/account-parts.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -23,8 +23,6 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
-import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
-import { TeamAgentGrid } from '../routes/team-agent-grid.js';
 import { offlineGuidance } from './machine-offline.js';
 import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
 import { OnlineStatus } from './parts.js';
@@ -43,17 +41,7 @@ export function MachineDetailPage() {
   const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
   const machine = machines.find((m) => m.id === machineId) ?? null;
 
-  const membersQ = useMembers(teamId, live);
-  const agents = live ? mapTeam(membersQ.data ?? []).agents : (fixture.team?.agents ?? []);
-  const homeAgents = agents.filter((a) => a.machineId === machineId);
-
-  const modelSourcesQ = useModelSources(teamId, live);
-  const modelOptions = live
-    ? toModelOptions(modelSourcesQ.data?.sources ?? [])
-    : toModelOptions(fixture.resources?.providerSources ?? []);
-
   const mutations = useApiMutations(teamId);
-  const [createOpen, setCreateOpen] = useState(false);
   const [evacuateTarget, setEvacuateTarget] = useState<string | null>(null);
   const [evacuating, setEvacuating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -78,7 +66,7 @@ export function MachineDetailPage() {
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       if ((body.rejected?.length ?? 0) > 0) {
         toastError(
-          t('{n} 个 agent 未过校验留在原机', { n: body.rejected?.length ?? 0 }),
+          t('{n} 条路由规则未过校验留在原机', { n: body.rejected?.length ?? 0 }),
           new Error(body.rejected?.map((r) => r.reason).join('；')),
         );
       }
@@ -180,7 +168,7 @@ export function MachineDetailPage() {
           )}
           <SettingsRow
             label={t('整机迁移')}
-            hint={t('把归属这台机器的 agent 一起迁到另一台机器。')}
+            hint={t('把固定在这台机器上的路由规则一起迁到另一台机器。')}
           >
             <Select value={evacuateTarget} onValueChange={(v) => setEvacuateTarget(v as string)}>
               <SettingsSelectTrigger
@@ -203,7 +191,7 @@ export function MachineDetailPage() {
             <Button
               variant="outline"
               className={DIALOG_PRIMARY_BUTTON}
-              disabled={evacuateTarget === null || evacuating || homeAgents.length === 0}
+              disabled={evacuateTarget === null || evacuating}
               onClick={evacuate}
               data-testid="machine-evacuate-btn"
             >
@@ -250,22 +238,11 @@ export function MachineDetailPage() {
           </section>
         )}
 
-        <TeamAgentGrid
-          agents={homeAgents}
-          machines={machines}
-          onCreate={() => setCreateOpen(true)}
-          search={search}
-        />
-
         <SettingsDangerZone
           label={t('删除机器')}
-          description={
-            homeAgents.length > 0
-              ? t('先迁走归属这台机器的 {n} 个 agent 才能删除。', { n: homeAgents.length })
-              : t('删除后，这台机器要重新注册才能再接任务。')
-          }
+          description={t('删除后，这台机器要重新注册才能再接任务。')}
           actionLabel={t('删除')}
-          disabled={deleting || homeAgents.length > 0}
+          disabled={deleting}
           onAction={() => setConfirmOpen(true)}
         />
       </div>
@@ -276,22 +253,6 @@ export function MachineDetailPage() {
         ariaLabel={t('删除机器')}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void remove()}
-      />
-      <CreateAgentDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        modelOptions={modelOptions}
-        machines={machines}
-        defaultMachineId={machineId}
-        onCreate={
-          live
-            ? (input) =>
-                mutations.createAgent.mutate(input, {
-                  onSuccess: () => setCreateOpen(false),
-                  onError: (error) => toastError(t('创建 Agent 失败，请重试。'), error),
-                })
-            : undefined
-        }
       />
     </PageShell>
   );

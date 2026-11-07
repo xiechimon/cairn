@@ -9,6 +9,8 @@ const COMPONENTS = join(SRC, 'components');
 const NOT_IN_GALLERY: Record<string, string> = {
   'ui/alert-dialog.tsx':
     'Registry copy with no consumer; confirm surfaces use alert-dialog-shell.tsx, shown in the Dialog section.',
+  'model-select-core.tsx':
+    'Gap: rendered only through src/routes/agent-model-select.tsx on the routing settings page; no specimen yet.',
   'conversation-skeleton.tsx':
     'Gap: rendered only by src/board/home-c.tsx while the Coordinator data loads; no specimen yet.',
   'query-state.tsx':

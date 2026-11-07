@@ -21,11 +21,11 @@ async function jget(path) {
   const res = await fetch(`${SERVER}${path}`);
   return { status: res.status, body: await res.json() };
 }
-async function jpost(path, body, token) {
+async function jpost(path, body, token, method = 'POST') {
   const headers = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(`${SERVER}${path}`, {
-    method: 'POST',
+    method,
     headers,
     body: JSON.stringify(body),
   });
@@ -59,11 +59,10 @@ if (![201, 200, 409].includes(prov.status)) {
   throw new Error(`provider status=${prov.status} body=${JSON.stringify(prov.body)}`);
 }
 
-const agent = await jpost(`/api/teams/${teamId}/agents`, {
-  displayName: 'verify-sync-builder',
+const agent = await jpost(`/api/teams/${teamId}/routing-rules/session`, {
   provider: providerId,
   modelId: 'stub-model',
-});
+}, undefined, 'PATCH');
 if (![201, 200].includes(agent.status)) {
   throw new Error(`agent status=${agent.status} body=${JSON.stringify(agent.body)}`);
 }
@@ -83,7 +82,6 @@ const todoId = todo.body.id ?? todo.body.record?.id;
 
 const build = await jpost(`/api/projects/${projectId}/builds`, {
   todoIds: [todoId],
-  assignment: { plan: { agentId }, build: { agentId } },
   withPlan: true,
 });
 if (build.status !== 201) throw new Error(`build status=${build.status}`);

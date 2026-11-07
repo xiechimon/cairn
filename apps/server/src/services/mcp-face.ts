@@ -1,5 +1,4 @@
 import {
-  type Assignment,
   BRAND,
   CHIEF_REMOTE_TOOLS,
   githubReadToolParamsSchemas,
@@ -12,16 +11,15 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { agent, build, chiefThread, machine, project, schedule, todo } from '../db/schema.js';
+import { build, chiefThread, machine, project, schedule, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { verifyApiKey } from './api-keys.js';
 import { readAttachmentMeta } from './attachments.js';
-import { cancelBuild, messageTodo, startBuilds } from './builds.js';
+import { cancelBuild, messageTodo } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, transitionTodos } from './chief-tools.js';
 import { readConversationPage } from './conversation-page.js';
 import { executeGithubReadTool } from './github-reads.js';
-import { requireIntakeAssignment } from './intake-assignment.js';
 import { isChiefConversation } from './machines.js';
 import {
   executeThreadMcpTool,
@@ -46,7 +44,6 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   todos: { projectId: s.optional(), phase: s.optional() },
   projects: {},
   conversation: { conversationId: s, before: s.optional() },
-  agents: {},
   schedules: {},
   attachment: { attachmentId: s },
   skills: {},
@@ -57,17 +54,6 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   create_todo: { projectId: s, title: s, spec: s },
   update_todo: { todoId: s, title: s.optional(), spec: s.optional(), tagIds: sArr.optional() },
   message_todo: { todoId: s, content: s },
-  run_builds: {
-    todoIds: sArr,
-    withPlan: z.boolean().optional(),
-    assignment: z
-      .object({
-        plan: z.object({ agentId: s }).nullable().optional(),
-        build: z.object({ agentId: s }).nullable().optional(),
-      })
-      .optional(),
-  },
-  run_review: { buildId: s },
   confirm_builds: { buildIds: sArr },
   merge_builds: { buildIds: sArr },
   cancel_builds: { buildIds: sArr },
@@ -96,15 +82,6 @@ function requireProjectRow(db: Db, projectId: string, teamId: string) {
     .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
-}
-
-function requireTeamAgent(db: Db, agentId: string, teamId: string) {
-  const row = db
-    .select({ id: agent.id })
-    .from(agent)
-    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId), eq(agent.status, 'active')))
-    .get();
-  if (!row) throw new HttpError(404, `agent ${agentId}`);
 }
 
 function requireTeamTodo(db: Db, todoId: string, teamId: string) {
@@ -154,7 +131,6 @@ export async function executeMcpTool(
 ): Promise<string> {
   const { db } = deps;
   const svc = {
-    intakeAgentAllowlist: deps.intakeAgentAllowlist,
     db,
     hub: deps.hub,
     machineHub: deps.machineHub,
@@ -208,19 +184,6 @@ export async function executeMcpTool(
         requireTeamBuild(db, conversationId, ctx.teamId);
       }
       return json(readConversationPage(db, conversationId, optStr(args, 'before')));
-    }
-    case 'agents': {
-      const rows = db.select().from(agent).where(eq(agent.teamId, ctx.teamId)).all();
-      return json(
-        rows.map((a) => ({
-          id: a.id,
-          displayName: a.displayName,
-          description: a.description,
-          provider: a.provider,
-          modelId: a.modelId,
-          thinkingLevel: a.thinkingLevel,
-        })),
-      );
     }
     case 'schedules':
       return json(listSchedules({ db, hub: deps.hub }, ctx.teamId));
@@ -281,62 +244,6 @@ export async function executeMcpTool(
     }
     case 'message_todo': {
       return json(await messageTodo(deps, ctx.teamId, str(args, 'todoId'), str(args, 'content')));
-    }
-    case 'run_builds': {
-      const todoIds = strArrOf(args, 'todoIds');
-      const withPlan = args.withPlan === true;
-      const assignmentIn = args.assignment as
-        | { plan?: { agentId?: string } | null; build?: { agentId?: string } | null }
-        | undefined;
-      const assignment = {
-        plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
-        build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
-      };
-      const rows = todoIds.map((todoId) => {
-        const row = requireTeamTodo(db, todoId, ctx.teamId);
-        requireProjectRow(db, row.projectId, ctx.teamId);
-        return row;
-      });
-      const targets = rows.map((row) => {
-        const effectiveAssignment: Assignment =
-          row.assignment?.source === 'intake-label'
-            ? {
-                ...assignment,
-                source: row.assignment.source,
-                plan: row.assignment.plan,
-                build: row.assignment.build,
-              }
-            : assignment;
-        return { row, assignment: effectiveAssignment };
-      });
-      for (const target of targets) {
-        requireIntakeAssignment(deps, ctx.teamId, target.assignment);
-        for (const slot of [
-          target.assignment.plan,
-          target.assignment.build,
-          target.assignment.review,
-          target.assignment.verify,
-        ]) {
-          if (slot != null) requireTeamAgent(db, slot.agentId, ctx.teamId);
-        }
-      }
-      const started: unknown[] = [];
-      for (const { row, assignment } of targets) {
-        started.push(
-          ...startBuilds(svc, {
-            projectId: row.projectId,
-            todoIds: [row.id],
-            assignment,
-            withPlan,
-            triggerSource: 'user',
-          }),
-        );
-      }
-      return json({ builds: started, withPlan, triggerSource: 'user' });
-    }
-    case 'run_review': {
-      const buildId = str(args, 'buildId');
-      return json({ buildId, note: 'independent review run not wired [推断]' });
     }
     case 'confirm_builds': {
       const buildIds = strArrOf(args, 'buildIds');

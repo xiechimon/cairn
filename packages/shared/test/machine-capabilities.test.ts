@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  agentMachineFitResponseSchema,
   agentRecordSchema,
   capabilityMissingLabels,
-  createAgentBodySchema,
   machineCapabilitiesSchema,
   machineEnrollBodySchema,
   machineHardwareSchema,
@@ -119,34 +117,6 @@ describe('record additive contract (old server / old daemon parse both ways)', (
     expect(parsed.requiredCapabilities).toEqual({ mcpServers: ['figma'] });
   });
 
-  it('createAgentBodySchema: requiredCapabilities writable, optional, null = clear', () => {
-    expect(
-      createAgentBodySchema.parse({
-        displayName: 'a',
-        machineId: 'machine-1',
-        requiredCapabilities: { models: ['m'] },
-      }).requiredCapabilities,
-    ).toEqual({ models: ['m'] });
-    expect(
-      createAgentBodySchema.parse({ displayName: 'a', machineId: 'machine-1' })
-        .requiredCapabilities,
-    ).toBeUndefined();
-    expect(
-      createAgentBodySchema.parse({
-        displayName: 'a',
-        machineId: 'machine-1',
-        requiredCapabilities: null,
-      }).requiredCapabilities,
-    ).toBeNull();
-    expect(
-      createAgentBodySchema.safeParse({
-        displayName: 'a',
-        machineId: 'machine-1',
-        requiredCapabilities: { mcpServers: 1 },
-      }).success,
-    ).toBe(false);
-  });
-
   const machineBase = {
     id: 'machine-1',
     name: 'mbp',
@@ -220,43 +190,6 @@ describe('queue projection blocked bit (#1251 visible pending reason)', () => {
         ...rowBase,
         queue: { position: 1, waitingFor: null, blocked: { kind: 'vibes', missing: [] } },
       }).success,
-    ).toBe(false);
-  });
-});
-
-describe('agentMachineFitResponseSchema (agent-facing "which machines can run it")', () => {
-  it('row shape: canRun verdict + missing/mcpGaps three states (null = no snapshot reported)', () => {
-    const parsed = agentMachineFitResponseSchema.parse({
-      machines: [
-        {
-          machineId: 'm1',
-          name: 'mbp',
-          online: true,
-          runtimeOk: true,
-          missing: [],
-          mcpGaps: ['figma'],
-          canRun: true,
-        },
-        {
-          machineId: 'm2',
-          name: 'mea',
-          online: false,
-          runtimeOk: true,
-          missing: null,
-          mcpGaps: null,
-          canRun: true,
-        },
-      ],
-    });
-    expect(parsed.machines).toHaveLength(2);
-    expect(parsed.machines[0]?.mcpGaps).toEqual(['figma']);
-    expect(parsed.machines[1]?.missing).toBeNull();
-  });
-
-  it('missing machines / row missing fields = reject (read surface always sends the full block)', () => {
-    expect(agentMachineFitResponseSchema.safeParse({}).success).toBe(false);
-    expect(
-      agentMachineFitResponseSchema.safeParse({ machines: [{ machineId: 'm1' }] }).success,
     ).toBe(false);
   });
 });

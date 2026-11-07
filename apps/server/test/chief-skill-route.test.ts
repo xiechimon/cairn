@@ -3,24 +3,17 @@ import { join } from 'node:path';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
-import {
-  agent as agentTable,
-  chief as chiefTable,
-  chiefThread,
-  step as stepTable,
-} from '../src/db/schema.js';
+import { chief as chiefTable, chiefThread, step as stepTable } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
 import {
-  bindAgentHome,
   bootServer,
   issueApiKey,
   machineIdByName,
   req,
+  seedRoute,
   type TestServer,
 } from './helpers.js';
-
-const AGENT_ID = 'agent-route-1';
 
 let s: TestServer;
 let teamId: string;
@@ -37,32 +30,13 @@ function seedSkill(dirName: string, name: string, description: string): void {
 
 function seedAgentAndChief(): void {
   const now = nowMs();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: AGENT_ID,
-      description: '负责调度',
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });
   s.db
     .insert(chiefTable)
     .values({
       id: chiefId,
       userId,
       teamId,
-      agentId: AGENT_ID,
       charter: '',
       watches: [],
       wakes: [],
@@ -79,7 +53,11 @@ async function claimToken(): Promise<string> {
     body: JSON.stringify({ teamId, name: 'route-probe', cliVersion: '0.1.0' }),
   });
   expect(enroll.status).toBe(200);
-  bindAgentHome(s, AGENT_ID, machineIdByName(s, 'route-probe'));
+  seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: machineIdByName(s, 'route-probe'),
+  });
   return ((await enroll.json()) as { token: string }).token;
 }
 

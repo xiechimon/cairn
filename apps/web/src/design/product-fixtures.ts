@@ -9,7 +9,6 @@ import {
   type TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/chief-question-card.js';
-import type { AgentPickerOption } from '../components/agent-picker.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type {
   ChangesContent,
@@ -38,27 +37,6 @@ const tagById = new Map(TAGS.map((tag) => [tag.id, tag]));
 export const tagOf = (id: string): TagChipData | null => tagById.get(id) ?? null;
 
 const BUILDER = { id: 'builder', displayName: 'builder' };
-
-export const GALLERY_AGENTS: AgentPickerOption[] = [
-  {
-    id: 'builder',
-    name: 'builder',
-    detail: 'Claude Code · claude-sonnet-5-5 · high',
-    summary: 'claude-sonnet-5-5 · high',
-  },
-  {
-    id: 'reviewer',
-    name: 'reviewer',
-    detail: 'Codex · gpt-6.1-sol · medium',
-    summary: 'gpt-6.1-sol · medium',
-  },
-  {
-    id: 'coordinator',
-    name: 'coordinator',
-    detail: 'Claude Code · claude-haiku-5-5 · Default',
-    summary: 'claude-haiku-5-5 · Default',
-  },
-];
 
 let seq = 40;
 
@@ -548,7 +526,6 @@ export function sharedTodo(patch: {
 }): SharedTodoRecord {
   return {
     ...todo({ title: patch.title, phase: 'todo', ...(patch.id != null ? { id: patch.id } : {}) }),
-    assignment: null,
     sourceKind: patch.sourceKind,
     sourceRef: patch.sourceRef,
     createdBy: null,

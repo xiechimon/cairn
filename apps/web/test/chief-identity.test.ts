@@ -23,9 +23,9 @@ const WITH_ID: BoundAgent = { id: 'r3-builder', displayName: 'r3-builder', avata
 const NO_ID: BoundAgent = { displayName: 'r3-builder', avatarUrl: null };
 
 describe('chief robot row identity chip (#741)', () => {
-  test('F-U6: agent.id present → anchor, href = /app/resources/agents/<id>', () => {
+  test('F-U6: agent.id present → anchor, href = routing settings', () => {
     const markup = render(WITH_ID);
-    expect(markup).toMatch(/<a [^>]*href="\/app\/resources\/agents\/r3-builder"/);
+    expect(markup).toMatch(/<a [^>]*href="\/app\/resources\/routing-settings"/);
 
     expect(markup).toMatch(/<a [^>]*class="[^"]*inline-flex items-center gap-1\.5/);
   });
@@ -47,7 +47,7 @@ describe('chief robot row identity chip (#741)', () => {
 
   test('F-U9: scenario search rides along (#121 Link law)', () => {
     const markup = render(WITH_ID, '/app?scenario=chief-agent-chip');
-    expect(markup).toContain('href="/app/resources/agents/r3-builder?scenario=chief-agent-chip"');
+    expect(markup).toContain('href="/app/resources/routing-settings?scenario=chief-agent-chip"');
   });
 
   test('F-U10: avatar slot keeps the XMON-105 single source (AVATAR_IMG_CLS + SeededAvatar img)', () => {

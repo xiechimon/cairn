@@ -3,13 +3,11 @@ import {
   type ClaimedStep,
   claimedStepSchema,
   DEFAULT_AUTONOMY_SETTINGS,
-  parseVerifyPromptMeta,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   autonomousMergeAdmission,
   build,
   message,
@@ -20,16 +18,18 @@ import {
   todo,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import {
-  enqueueStep,
-  maybeEnqueueIndependentReview,
-  maybeEnqueueVerifyStep,
-} from '../src/services/builds.js';
+import { enqueueStep, maybeEnqueueIndependentReview } from '../src/services/builds.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { TestServer } from './helpers.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
-
-const AGENT_ID = 'agent-stub-steer';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -85,22 +85,11 @@ async function setupWorld(
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
   });
-
-  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const machineJson = (await enrollRes.json()) as { token: string; machineId: string };
   const projectId = await postProject(s.app);
@@ -114,12 +103,9 @@ async function setupWorld(
     machineId: machineJson.machineId,
     todoId: todoBody.id,
     async startBuild(withPlan = true) {
+      if (withPlan) return { buildId: startLegacyBuild(s, todoBody.id, { withPlan: true }) };
       const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: {
-          todoIds: [todoBody.id],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-          withPlan,
-        },
+        body: { todoIds: [todoBody.id] },
       });
       expect(res.status).toBe(201);
       const body = (await res.json()) as { builds: { id: string }[] };
@@ -156,91 +142,6 @@ describe('the steer server write surface (W3 #278)', () => {
     w = await setupWorld();
   });
 
-  test.each(['done', 'stopped'] as const)(
-    'continuation schedules fresh verification after a %s verify step',
-    async (priorStatus) => {
-      const { buildId } = await w.startBuild(false);
-      const assignment = {
-        plan: { agentId: AGENT_ID },
-        build: { agentId: AGENT_ID },
-        verify: { agentId: AGENT_ID },
-      };
-      w.s.db.update(todo).set({ assignment }).where(eq(todo.id, w.todoId)).run();
-      const initial = (await w.claim()).step!;
-      const firstDone = await call(w.s.app, 'POST', `/api/machine/done/${initial.step.id}`, {
-        cred: w.token,
-        body: {
-          status: 'success',
-          hasChanges: true,
-          commit: 'a'.repeat(40),
-          sessionId: 'builder-session',
-        },
-      });
-      expect(firstDone.status).toBe(200);
-      if (priorStatus === 'done') {
-        const verifier = (await w.claim()).step!;
-        expect(verifier.step.kind).toBe('verify');
-        const verified = await call(w.s.app, 'POST', `/api/machine/done/${verifier.step.id}`, {
-          cred: w.token,
-          body: {
-            status: 'success',
-            verifyVerdict: { passed: true, conclusion: 'Verified', evidence: [] },
-          },
-        });
-        expect(verified.status).toBe(200);
-      } else {
-        const stopped = await req(w.s.app, 'POST', `/api/builds/${buildId}/stop`, {
-          discard: false,
-        });
-        expect(stopped.status).toBe(200);
-      }
-      const finished = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'done' });
-      expect(finished.status).toBe(200);
-      const prior = w.s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, buildId))
-        .all()
-        .find((row) => row.kind === 'verify')!;
-      expect(prior.status).toBe(priorStatus);
-      w.s.db.update(step).set({ createdAt: 1 }).where(eq(step.id, initial.step.id)).run();
-      w.s.db.update(step).set({ createdAt: 2 }).where(eq(step.id, prior.id)).run();
-      const continued = await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
-        content: 'Continue with another change',
-      });
-      expect(continued.status).toBe(201);
-      const next = (await w.claim()).step!;
-      expect(next.step.kind).toBe('build');
-      const completed = await call(w.s.app, 'POST', `/api/machine/done/${next.step.id}`, {
-        cred: w.token,
-        body: { status: 'success', hasChanges: true, commit: 'b'.repeat(40) },
-      });
-      expect(completed.status).toBe(200);
-      const verifies = w.s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, buildId))
-        .all()
-        .filter((row) => row.kind === 'verify');
-      expect(verifies).toHaveLength(2);
-      const fresh = verifies.find((row) => row.id !== prior.id)!;
-      expect(fresh.status).toBe('pending');
-      expect(parseVerifyPromptMeta(fresh.prompt)?.expectedHeadSha).toBe('b'.repeat(40));
-      const current = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
-      maybeEnqueueVerifyStep(w.s.svc, current, buildId);
-      w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, fresh.id)).run();
-      maybeEnqueueVerifyStep(w.s.svc, current, buildId);
-      expect(
-        w.s.db
-          .select()
-          .from(step)
-          .where(eq(step.buildId, buildId))
-          .all()
-          .filter((row) => row.kind === 'verify'),
-      ).toHaveLength(2);
-    },
-  );
-
   test('a previous round review does not deduplicate the current round review', async () => {
     const buildId = await finishBuild(w);
     const current = w.s.db.select().from(todo).where(eq(todo.id, w.todoId)).get()!;
@@ -255,8 +156,13 @@ describe('the steer server write surface (W3 #278)', () => {
       .set({ checkpointCommit: 'a'.repeat(40), createdAt: 1 })
       .where(eq(step.buildId, buildId))
       .run();
+    seedRoute(w.s, 'session', { provider: 'stub-gw', modelId: 'claude-sonnet-5-5' });
+    const reviewRuleId = seedRoute(w.s, 'review', {
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
+    });
     const prompt = buildReviewStepPrompt({
-      agentId: AGENT_ID,
+      agentId: reviewRuleId,
       gate: 'review',
       planText: '',
       changes: [],
@@ -275,16 +181,8 @@ describe('the steer server write surface (W3 #278)', () => {
       })
       .run();
     enqueueStep(w.s.svc, buildId, 'build', w.s.team.id, 'Continue this round');
-    const task = {
-      ...current,
-      assignment: {
-        plan: { agentId: AGENT_ID },
-        build: { agentId: AGENT_ID },
-        review: { agentId: AGENT_ID },
-      },
-    };
-    maybeEnqueueIndependentReview(w.s.svc, task, buildId);
-    maybeEnqueueIndependentReview(w.s.svc, task, buildId);
+    maybeEnqueueIndependentReview(w.s.svc, current, buildId);
+    maybeEnqueueIndependentReview(w.s.svc, current, buildId);
     expect(
       w.s.db
         .select()
@@ -366,7 +264,7 @@ describe('the steer server write surface (W3 #278)', () => {
         .all()
         .filter((row) => row.status === 'pending');
       expect(pending).toHaveLength(1);
-      expect(pending[0]).toMatchObject({ kind: 'build', prompt: 'Continue delivery' });
+      expect(pending[0]).toMatchObject({ kind: 'session', prompt: 'Continue delivery' });
       const transcript = await req(w.s.app, 'GET', `/api/conversations/${target.id}/messages`);
       expect(await transcript.json()).toMatchObject({
         messages: expect.arrayContaining([
@@ -511,7 +409,7 @@ describe('the steer server write surface (W3 #278)', () => {
     const steps = w.s.db.select().from(step).where(eq(step.buildId, buildId)).all();
     expect(steps).toHaveLength(before.length + 1);
     expect(steps.find((row) => !before.some((old) => old.id === row.id))).toMatchObject({
-      kind: 'build',
+      kind: 'session',
       status: 'pending',
       prompt: sent.message.content,
       freshSession: false,
@@ -522,7 +420,7 @@ describe('the steer server write surface (W3 #278)', () => {
     const { step: claimed } = await w.claim();
     expect(claimed).toMatchObject({
       conversationId: buildId,
-      step: { kind: 'build', buildId },
+      step: { kind: 'session', buildId },
       session: { action: 'continue', sessionId: 'previous-session' },
       instruction: sent.message.content,
     });

@@ -8,14 +8,7 @@ import { parseOrchestrationSourceRef, redactSecrets } from '@cairn/shared';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../apps/server/src/db/schema.js';
-import {
-  agent,
-  build,
-  chiefMessage,
-  project,
-  step,
-  todo,
-} from '../../../apps/server/src/db/schema.js';
+import { build, chiefMessage, project, step, todo } from '../../../apps/server/src/db/schema.js';
 import { extractText } from '../../../apps/server/src/services/chief.js';
 import type { DispatchOutcome, ExportedDispatchCase, SnapshotProject } from './types.mts';
 
@@ -33,14 +26,6 @@ type SqliteDatabaseCtor = new (
 const Database = createRequire(
   join(fileURLToPath(new URL('../../..', import.meta.url)), 'apps/server/package.json'),
 )('better-sqlite3') as SqliteDatabaseCtor;
-
-function agentKey(displayName: string, id: string): string {
-  const slug = displayName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-  return slug.length > 0 ? slug : id.slice(0, 8);
-}
 
 export function selectTriggeringUserPrompt(
   messages: Array<{ role: string; content: unknown; createdAt: number }>,
@@ -131,27 +116,17 @@ export function exportDispatchFailures(dbPath: string): ExportedDispatchCase[] {
       teamIds.length === 0
         ? []
         : db.select().from(project).where(inArray(project.teamId, teamIds)).all();
-    const agents =
-      teamIds.length === 0
-        ? []
-        : db.select().from(agent).where(inArray(agent.teamId, teamIds)).all();
 
     const snapshotByTeam = new Map<string, SnapshotProject[]>();
     for (const teamId of teamIds) {
       const teamProjects = projects.filter((p) => p.teamId === teamId);
-      const teamAgents = agents.filter((a) => a.teamId === teamId);
       snapshotByTeam.set(
         teamId,
         teamProjects.map((p) => ({
           id: p.id,
           name: p.name,
           description: p.description ?? p.githubRepo ?? '',
-          agents: teamAgents.map((a) => ({
-            id: a.id,
-            key: agentKey(a.displayName, a.id),
-            displayName: a.displayName,
-            description: a.description ?? '',
-          })),
+          agents: [],
         })),
       );
     }
@@ -179,20 +154,11 @@ export function exportDispatchFailures(dbPath: string): ExportedDispatchCase[] {
       }
       if (prompt === null || prompt === '') continue;
 
-      const assignedId = task.assignment?.build?.agentId ?? task.assignment?.plan?.agentId ?? null;
-      const assigned = assignedId === null ? null : agents.find((a) => a.id === assignedId);
       out.push({
         caseId: task.id,
         prompt,
         projectsSnapshot: snapshotByTeam.get(task.teamId) ?? [],
-        dispatchedTo:
-          assigned === undefined || assigned === null
-            ? null
-            : {
-                agentId: assigned.id,
-                displayName: assigned.displayName,
-                key: agentKey(assigned.displayName, assigned.id),
-              },
+        dispatchedTo: null,
         outcome,
       });
     }

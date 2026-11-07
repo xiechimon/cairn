@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 test('focused w-full input: focus ring is not clipped by the dialog (ring-room invariant)', async ({ page }) => {
-  await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-  const dlg = page.getByRole('dialog', { name: '创建 agent' });
+  await page.goto('/app/resources/skills?scenario=01');
+  await page.getByTestId('resource-empty').getByRole('button', { name: '新建技能' }).click();
+  const dlg = page.getByRole('dialog', { name: '新建技能' });
   await expect(dlg).toBeVisible();
-  const input = dlg.locator('#dlg-agent-name');
-
+  const input = dlg.locator('#dlg-skill-name');
+  await input.focus();
   await expect(input).toBeFocused();
   const m = await page.evaluate(() => {
-    const el = document.querySelector('#dlg-agent-name');
+    const el = document.querySelector('#dlg-skill-name');
     const body = document.querySelector('[data-testid="dialog-body"]');
     if (!el || !body) return null;
     const ir = el.getBoundingClientRect();

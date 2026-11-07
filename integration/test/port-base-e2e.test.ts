@@ -16,7 +16,6 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -125,8 +124,6 @@ async function startBuild(
   });
   const started = await api(stack.server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
     todoIds: [world.todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
-    withPlan: false,
   });
   expect(started.status).toBe(201);
   const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -192,9 +189,15 @@ describe('#1260 E2E: chief occupies the machine concurrency slot (cap 1)', () =>
       .set({ maxConcurrent: 1 })
       .where(eq(machineTable.id, stack.machineId))
       .run();
-    const patch = await api(stack.server.url, 'PATCH', `/api/teams/${stack.server.teamId}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
-    });
+    const patch = await api(
+      stack.server.url,
+      'PATCH',
+      `/api/teams/${stack.server.teamId}/routing-rules/coordinator`,
+      {
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+      },
+    );
     expect(patch.status).toBe(200);
 
     const w1 = await startBuild(stack, '并发探针一');

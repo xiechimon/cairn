@@ -8,16 +8,22 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
+  machine as machineTable,
   message as messageTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { bindAllAgents, bootServer, issueApiKey, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  req,
+  seedSessionRoute,
+  startLegacyBuild,
+  type TestServer,
+} from './helpers.js';
 
-const AGENT_ID = 'agent-bh-1';
 const HEAD_B = 'b'.repeat(40);
 
 const disposables: (() => void)[] = [];
@@ -75,25 +81,11 @@ async function setupWorld(
     body: JSON.stringify({ teamId: s.team.id, name: 'bh-mbp', cliVersion: '0.1.0' }),
   });
   const token = ((await enroll.json()) as { token: string }).token;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: AGENT_ID,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: s.db.select().from(machineTable).get()!.id,
+  });
   const project = await req(
     s.app,
     'POST',
@@ -180,10 +172,12 @@ async function startChild(
   if (blockedBy.length > 0) {
     w.s.db.update(todoTable).set({ blockedBy }).where(eq(todoTable.id, id)).run();
   }
+  if (withPlan) {
+    startLegacyBuild(w.s, id, { withPlan: true });
+    return id;
+  }
   const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
     todoIds: [id],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    withPlan,
   });
   expect(res.status).toBe(201);
   return id;
