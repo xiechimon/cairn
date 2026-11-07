@@ -10,6 +10,7 @@ import {
 import type { MachineApi } from './machine-api.js';
 import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
+import { syncToRewind } from './rewind-sync.js';
 import { threadStorePath } from './thread-harnesses.js';
 import {
   type ConversationGate,
@@ -30,6 +31,7 @@ export interface ServerRuntimeConfig {
   fixedProviders?: readonly Provider[];
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
+  recordConversation?(threadId: string, conversationId: string, entryId: number): void;
   onReconciled?(threadId: string, outcome: ReconcileOutcome, stale: string[]): void;
 }
 
@@ -69,9 +71,10 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const lastUsed = new Map<string, number>();
   const closing = new Map<string, Promise<void>>();
 
-  const stateOf = (threadId: string): ThreadState => {
+  const stateOf = (threadId: string, forceReseed = false): ThreadState => {
     const existing = open.get(threadId);
     if (existing !== undefined) return existing;
+    const facts = config.factsFor(threadId);
     const models = createCoordinatorModels(config.fixedProviders);
     const gate = createConversationGate();
     const volatile = createVolatileContext();
@@ -89,7 +92,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       models.models,
       context,
       { extensions, settings: settings(models) },
-      config.factsFor(threadId),
+      forceReseed ? { ...facts, forceReseed: true, hasClaimedStep: false } : facts,
     ).then((result) => {
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
@@ -138,27 +141,43 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       const { claimed } = turn;
       const threadId = claimed.chief?.threadId ?? '';
       await settleClosing(threadId);
-      const state = stateOf(threadId);
-      state.models.useProvider(turn.router.config, turn.router.resolveKey);
-      state.models.useProvider(turn.summary.config, turn.summary.resolveKey);
-      state.summary.ref = {
-        provider: turn.summary.config.providerId,
-        modelId: turn.summary.modelId,
+      const prepare = (target: ThreadState): ThreadState => {
+        target.models.useProvider(turn.router.config, turn.router.resolveKey);
+        target.models.useProvider(turn.summary.config, turn.summary.resolveKey);
+        target.summary.ref = {
+          provider: turn.summary.config.providerId,
+          modelId: turn.summary.modelId,
+        };
+        return target;
       };
+      const state = prepare(stateOf(threadId));
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
       try {
-        const harness = await state.harness;
+        let current = state;
+        const synced = await syncToRewind(
+          await current.harness,
+          context,
+          config.factsFor(threadId),
+        );
+        if (synced.action === 'reseed') {
+          await closeThread(threadId);
+          current = prepare(stateOf(threadId, true));
+          await current.harness;
+        } else if (synced.action === 'forked') {
+          config.recordConversation?.(threadId, synced.conversationId, synced.entryId);
+        }
         return await runCoordinatorTurn(
           {
-            harness,
-            models: state.models,
+            harness: await current.harness,
+            conversationId: config.factsFor(threadId).conversationId,
+            models: current.models,
             api,
             context,
             heartbeatMs: config.heartbeatMs,
             ...(config.stopPollMs === undefined ? {} : { stopPollMs: config.stopPollMs }),
             now: Date.now,
-            conversationGate: state.gate,
-            volatile: state.volatile,
+            conversationGate: current.gate,
+            volatile: current.volatile,
             volatileText: turn.volatileText,
           },
           claimed,

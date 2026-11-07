@@ -1,17 +1,27 @@
 import { eq } from 'drizzle-orm';
-import { coordinatorConversation, coordinatorEntry, step, stopPending } from '../db/schema.js';
+import {
+  chiefThread,
+  coordinatorConversation,
+  coordinatorEntry,
+  steerPending,
+  step,
+  stopPending,
+} from '../db/schema.js';
 import { NotFoundError } from '../services/builds.js';
 import { releaseUnconsumedSteer } from '../services/chief-turns.js';
 import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
 import { isChiefConversation, type MachineDeps } from '../services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from '../services/machine-relay.js';
 import {
+  ackSteer,
+  fetchSteer,
   fetchStop,
   heartbeatStep,
   reportTranscriptDelta,
   reportTranscriptRow,
 } from '../services/machines.js';
 import type { MachineApi } from './runtime/machine-api.js';
+import { parseWatermark } from './watermark.js';
 
 const ASK_HOLD_MS = 24 * 60 * 60 * 1000;
 
@@ -50,6 +60,27 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       heartbeatStep(deps, null, stepId);
     },
     stop: async (stepId) => fetchStop(deps, { id: null }, stepId).discard,
+    steer: async (stepId) => {
+      const owned = stepRow(stepId);
+      const pending = deps.db
+        .select()
+        .from(steerPending)
+        .where(eq(steerPending.conversationId, owned.buildId))
+        .get();
+      const { content } = fetchSteer(deps, { id: null }, stepId);
+      return content === null || pending === undefined
+        ? null
+        : { content, key: String(pending.createdAt) };
+    },
+    ackSteer: async (stepId) => {
+      const owned = stepRow(stepId);
+      const thread = deps.db
+        .select({ teamId: chiefThread.teamId })
+        .from(chiefThread)
+        .where(eq(chiefThread.id, owned.buildId))
+        .get();
+      if (thread !== undefined) ackSteer(deps, { id: null, teamId: thread.teamId }, stepId);
+    },
     relayTool: (stepId, name, params) => executeRelayToolCall(deps, null, stepId, name, params),
     askUser: (stepId, body, signal) =>
       machineAsk(deps, null, stepId, body, {
@@ -72,7 +103,25 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     },
     mapUserEntry: async (stepId, entryId) => {
       const owned = stepRow(stepId);
-      if (isChiefConversation(owned.buildId)) mapEntry(stepId, owned.buildId, entryId);
+      if (!isChiefConversation(owned.buildId)) return;
+      mapEntry(stepId, owned.buildId, entryId);
+      const conversation = deps.db
+        .select()
+        .from(coordinatorConversation)
+        .where(eq(coordinatorConversation.threadId, owned.buildId))
+        .get();
+      const mirrored = parseWatermark(conversation?.lastMirroredEntryId ?? null);
+      if (
+        conversation === undefined ||
+        (mirrored?.kind === 'mirrored' && mirrored.entryId >= Number(entryId))
+      ) {
+        return;
+      }
+      deps.db
+        .update(coordinatorConversation)
+        .set({ lastMirroredEntryId: entryId, updatedAt: Date.now() })
+        .where(eq(coordinatorConversation.threadId, owned.buildId))
+        .run();
     },
     transcriptDelta: async (stepId, text) => {
       reportTranscriptDelta(deps, null, stepId, text);

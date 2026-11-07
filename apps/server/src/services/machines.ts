@@ -56,7 +56,7 @@ export { stepToken, toProviderConfig } from './machine-step-token.js';
 
 export function fetchSteer(
   deps: { db: Db },
-  machine: { id: string },
+  machine: { id: string | null },
   stepId: string,
 ): { content: string | null } {
   const { db } = deps;
@@ -86,7 +86,7 @@ export function fetchSteer(
 
 export function ackSteer(
   deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },
-  machine: { id: string; teamId: string },
+  machine: { id: string | null; teamId: string },
   stepId: string,
 ): { ok: true } {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
