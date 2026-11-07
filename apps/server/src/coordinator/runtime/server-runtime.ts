@@ -5,6 +5,7 @@ import type { Harness } from '@earendil-works/pi-durable';
 import {
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
+  type MemoryFlush,
   type ModelRef,
   type Summarize,
   summarizerFor,
@@ -34,6 +35,7 @@ export interface ServerRuntimeConfig {
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
   recordConversation?(threadId: string, conversationId: string, entryId: number): void;
+  memoryFlush?(threadId: string): MemoryFlush | null;
   onReconciled?(threadId: string, outcome: ReconcileOutcome, stale: string[]): void;
 }
 
@@ -87,7 +89,10 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         shuttingDown: () => shuttingDown,
       }),
       volatileContextExtension(volatile),
-      coordinatorCompactionExtension(() => summary.ref),
+      coordinatorCompactionExtension(
+        () => summary.ref,
+        () => config.memoryFlush?.(threadId) ?? null,
+      ),
     ];
     const summarize = (): Summarize | null => {
       try {
