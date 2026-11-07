@@ -354,6 +354,7 @@ export function updateMemoryEntry(
     content: string;
     threadId?: string;
     teamScoped?: boolean;
+    absorb?: { ids: readonly string[]; at: number };
   },
 ) {
   return db.transaction((tx) => {
@@ -369,6 +370,14 @@ export function updateMemoryEntry(
       )
       .get();
     if (!row) throw new HttpError(404, `memory ${input.memoryId}`);
+    const absorbed = input.absorb?.ids ?? [];
+    const absorb = (successorId: string) => {
+      if (input.absorb === undefined || absorbed.length === 0) return;
+      tx.update(agentMemory)
+        .set({ invalidAt: input.absorb.at, supersededBy: successorId })
+        .where(inArray(agentMemory.id, [...absorbed]))
+        .run();
+    };
     if (row.invalidAt !== null) {
       throw new HttpError(
         409,
@@ -378,12 +387,18 @@ export function updateMemoryEntry(
       );
     }
     validateMemoryText(row.title, input.content);
-    if (row.content === input.content) return row;
+    if (row.content === input.content) {
+      absorb(row.id);
+      return row;
+    }
     const duplicate = memoriesInScope(
       tx,
       { ...row, teamScoped: input.teamScoped },
       row.projectId === null,
-    ).find((other) => other.id !== row.id && other.content === input.content);
+    ).find(
+      (other) =>
+        other.id !== row.id && !absorbed.includes(other.id) && other.content === input.content,
+    );
     if (duplicate) {
       throw new HttpError(409, `memory ${duplicate.id} already has this content`);
     }
@@ -417,6 +432,7 @@ export function updateMemoryEntry(
       .set({ invalidAt: now, supersededBy: successor.id })
       .where(eq(agentMemory.id, row.id))
       .run();
+    absorb(successor.id);
     return successor;
   });
 }
