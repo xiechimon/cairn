@@ -31,7 +31,13 @@ interface World {
 
 function equipMachine(
   w: World,
-  options: { claude: boolean; codex: boolean; weeklyUtilization?: number },
+  options: {
+    claude: boolean;
+    codex: boolean;
+    weeklyUtilization?: number;
+    weeklyResetsAt?: number;
+    fiveHourRejected?: boolean;
+  },
 ): void {
   w.s.db
     .update(machineTable)
@@ -49,18 +55,30 @@ function equipMachine(
             auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
           }
         : null,
-      claudeRateLimits:
-        options.weeklyUtilization === undefined
-          ? null
+      claudeRateLimits: [
+        ...(options.weeklyUtilization === undefined
+          ? []
           : [
               {
-                subscription: 'seven_day',
-                status: 'allowed',
+                subscription: 'seven_day' as const,
+                status: 'allowed' as const,
                 utilization: options.weeklyUtilization,
-                resetsAt: Math.floor(nowMs() / 1000) + 86_400,
+                resetsAt: options.weeklyResetsAt ?? nowMs() + 86_400_000,
                 reportedAt: nowMs(),
               },
-            ],
+            ]),
+        ...(options.fiveHourRejected === true
+          ? [
+              {
+                subscription: 'five_hour' as const,
+                status: 'rejected' as const,
+                utilization: 1,
+                resetsAt: nowMs() + HOUR_MS,
+                reportedAt: nowMs(),
+              },
+            ]
+          : []),
+      ],
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -128,7 +146,7 @@ async function claim(w: World): Promise<ClaimedStep | null> {
 }
 
 describe('one path decides what a dispatched step runs on', () => {
-  test('easy work goes to Haiku, hard work to Codex, on the same rule row', async () => {
+  test('easy work goes to Haiku, hard work to Opus, on the same rule row', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const easy = await buildTodo(w, 'rename one label');
@@ -138,8 +156,8 @@ describe('one path decides what a dispatched step runs on', () => {
     });
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
+      provider: 'claude-code',
+      modelId: 'claude-opus-5-5',
     });
   });
 
@@ -187,6 +205,45 @@ describe('one path decides what a dispatched step runs on', () => {
     equipMachine(w, { claude: false, codex: true });
     const todoRow = await buildTodo(w, 'x'.repeat(800));
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
+  });
+});
+
+describe('the router agrees with what dispatch can execute', () => {
+  test('an expired weekly window no longer rejects Claude', async () => {
+    const w = await setupWorld();
+    equipMachine(w, {
+      claude: true,
+      codex: true,
+      weeklyUtilization: 0.9,
+      weeklyResetsAt: nowMs() - 60_000,
+    });
+    const todoRow = await buildTodo(w, 'x'.repeat(800));
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
+      modelId: 'claude-sonnet-5-5',
+    });
+  });
+
+  test('a rejected five-hour window moves work to Codex before ranking', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true, fiveHourRejected: true });
+    const todoRow = await buildTodo(w, 'x'.repeat(800));
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
+  });
+
+  test('the recorded route is the accepted one even if availability changed during the claim', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'rename one label');
+    const stepRow = w.s.db.select().from(step).all().at(0)!;
+    equipMachine(w, { claude: false, codex: true });
+    const row = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+      provider: 'claude-code',
+      modelId: 'claude-haiku-5-5',
+      machineId: null,
+      requiredCapabilities: null,
+    });
+    expect(row).toMatchObject({ provider: 'claude-code', modelId: 'claude-haiku-5-5' });
+    expect(row.reason).toContain('availability changed during the claim');
   });
 });
 

@@ -49,8 +49,8 @@ export const REVIEW_MODEL = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' }
 export const QUOTA_REJECT_PERCENT = 70;
 
 const RANKING: Record<Difficulty, readonly string[]> = {
-  hard: ['gpt-6.1-sol', 'claude-opus-5-5', 'claude-sonnet-5-5'],
-  standard: ['claude-sonnet-5-5', 'gpt-6.1-sol'],
+  hard: ['claude-opus-5-5', 'claude-sonnet-5-5', 'gpt-6.1-sol'],
+  standard: ['claude-sonnet-5-5', 'claude-opus-5-5', 'gpt-6.1-sol'],
   easy: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-6.1-sol'],
 };
 
