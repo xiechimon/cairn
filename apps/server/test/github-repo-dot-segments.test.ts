@@ -410,31 +410,22 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
 });
 
 describe('#1466 builds.ts delivery gate: legacy invalid githubRepo treated as "no GitHub repo" (R9)', () => {
-  const assignment = {
-    plan: null,
-    build: { agentId: 'agent-build-1466' },
-    verify: { agentId: 'agent-verify-1466' },
-  };
-
   test.each(STORED_BAD_REFS)(
-    'R9 completeStep execution step delivering a PR -> review + the verify step queued (%s)',
+    'R9 completeStep execution step delivering a PR -> review with no further step queued (%s)',
     (bad) => {
       const s = boot(recorder());
       const projectId = insertGithubProject(s, bad);
-      const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });
+      const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId);
       completeStep(s.svc, stepId, { hasChanges: true });
       expect(phaseOf(s, todoId)).toBe('review');
-      expect(stepsOf(s, buildId)).toEqual([
-        { kind: 'build', status: 'done' },
-        { kind: 'verify', status: 'pending' },
-      ]);
+      expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
     },
   );
 
-  test('R9 control: a legal githubRepo PR delivery still stays building waiting for CI, no verify step enqueued', () => {
+  test('R9 control: a legal githubRepo PR delivery still stays building waiting for CI, no further step enqueued', () => {
     const s = boot(recorder());
     const projectId = insertGithubProject(s, VALID_REPO);
-    const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });
+    const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId);
     completeStep(s.svc, stepId, { hasChanges: true });
     expect(phaseOf(s, todoId)).toBe('building');
     expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);

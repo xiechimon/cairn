@@ -21,10 +21,10 @@ import {
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import type { FixtureSet, MachineRow } from '../fixtures/records.js';
+import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { type ChiefState, MachineDetailPane, useHomeAgents } from './machine-detail-pane.js';
+import { type ChiefState, MachineDetailPane } from './machine-detail-pane.js';
 
 export type RowSection = 'runtime' | 'capabilities';
 
@@ -44,8 +44,6 @@ export function MachineRowView({
   machine,
   machines,
   chief,
-  fixture,
-  search,
   status,
   expanded,
   section,
@@ -56,8 +54,6 @@ export function MachineRowView({
   machine: MachineRow;
   machines: MachineRow[];
   chief: ChiefState;
-  fixture: FixtureSet;
-  search: string;
   status: ItemStatus;
   expanded: boolean;
   section: RowSection | null;
@@ -69,7 +65,6 @@ export function MachineRowView({
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const queryClient = useQueryClient();
-  const { membersQ, homeAgents } = useHomeAgents(machine, fixture);
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
   const others = machines.filter((m) => m.id !== machine.id);
@@ -141,7 +136,7 @@ export function MachineRowView({
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       if ((body.rejected?.length ?? 0) > 0) {
         toastError(
-          t('{n} 个 agent 未过校验留在原机', { n: body.rejected?.length ?? 0 }),
+          t('{n} 条路由规则未过校验留在原机', { n: body.rejected?.length ?? 0 }),
           new Error(body.rejected?.map((r) => r.reason).join('；')),
         );
       }
@@ -301,12 +296,8 @@ export function MachineRowView({
             </DropdownMenuItem>
             <DropdownMenuItem
               data-testid="machine-menu-delete"
-              disabled={deleting || homeAgents.length > 0}
-              title={
-                homeAgents.length > 0
-                  ? t('先迁走归属这台机器的 {n} 个 agent 才能删除。', { n: homeAgents.length })
-                  : t('删除后，这台机器要重新注册才能再接任务。')
-              }
+              disabled={deleting}
+              title={t('删除后，这台机器要重新注册才能再接任务。')}
               onClick={() => setConfirmOpen(true)}
             >
               {t('删除机器')}
@@ -318,20 +309,15 @@ export function MachineRowView({
         <div id={bodyId} ref={bodyRef}>
           <MachineDetailPane
             machine={shown}
-            machines={machines}
             chief={chief}
-            fixture={fixture}
-            search={search}
             pending={mutations.patchMachine.isPending}
             onToggleRuntime={toggleRuntime}
-            membersQ={membersQ}
-            homeAgents={homeAgents}
           />
         </div>
       )}
       <AlertDialogShell
         title={t('整机迁移')}
-        subtitle={t('把归属这台机器的 agent 一起迁到另一台机器。')}
+        subtitle={t('把固定在这台机器上的路由规则一起迁到另一台机器。')}
         ariaLabel={t('整机迁移')}
         open={evacuateOpen}
         onClose={() => setEvacuateOpen(false)}
@@ -347,7 +333,7 @@ export function MachineRowView({
             <Button
               variant="outline"
               className={DIALOG_PRIMARY_BUTTON}
-              disabled={evacuateTarget === null || evacuating || homeAgents.length === 0}
+              disabled={evacuateTarget === null || evacuating}
               onClick={() => void evacuate()}
               data-testid="machine-evacuate-btn"
             >

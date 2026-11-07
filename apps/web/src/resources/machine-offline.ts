@@ -15,7 +15,7 @@ export function offlineGuidance(
   if (machine.online !== false) return null;
   return {
     lastSeen:
-      machine.lastSeenAt == null
+      relativeTime(machine.lastSeenAt, now, t) === ''
         ? null
         : t('最后在线 {time}', { time: relativeTime(machine.lastSeenAt, now, t) }),
     recovery: t(

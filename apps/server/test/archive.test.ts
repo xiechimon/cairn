@@ -12,7 +12,6 @@ import { eq, sql } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent,
   autonomousMergeAdmission,
   build,
   plan,
@@ -38,7 +37,7 @@ import { claimStep, fetchStop, finishStep } from '../src/services/machines.js';
 import { deleteProject } from '../src/services/projects.js';
 import { inFlightIssues } from '../src/services/scheduling/sweep.js';
 import { deleteTodo, resetTodo } from '../src/services/todos.js';
-import { bootServer, insertMachine, req } from './helpers.js';
+import { bootServer, insertMachine, req, seedSessionRoute } from './helpers.js';
 
 const files: DocumentDiffFile[] = [{ path: 'retained.ts', additions: 1, deletions: 0, hunks: [] }];
 
@@ -50,17 +49,7 @@ function world(
   const machineId = insertMachine(s);
   const now = Date.now();
   s.db.insert(project).values({ id: 'project-archive', teamId: s.team.id, name: 'Archive' }).run();
-  s.db
-    .insert(agent)
-    .values({
-      id: 'agent-archive',
-      teamId: s.team.id,
-      displayName: 'Builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   s.db
     .insert(todo)
     .values({
@@ -73,7 +62,6 @@ function world(
       seqNum: 1,
       latestBuildId: 'build-archive',
       hasChanges: true,
-      assignment: { plan: null, build: { agentId: 'agent-archive' } },
     })
     .run();
   s.db
@@ -310,8 +298,6 @@ test('archived tasks reject execution until unarchived', async () => {
   await action(s, 'archive');
   const start = await req(s.app, 'POST', '/api/projects/project-archive/builds', {
     todoIds: ['todo-archive'],
-    assignment: { plan: null, build: { agentId: 'agent-archive' } },
-    withPlan: false,
   });
   expect(start.status).toBe(409);
   expect((await req(s.app, 'POST', '/api/todos/todo-archive/orchestrate')).status).toBe(409);
@@ -320,8 +306,6 @@ test('archived tasks reject execution until unarchived', async () => {
     (
       await req(s.app, 'POST', '/api/projects/project-archive/builds', {
         todoIds: ['todo-archive'],
-        assignment: { plan: null, build: { agentId: 'agent-archive' } },
-        withPlan: false,
       })
     ).status,
   ).toBe(201);
@@ -488,19 +472,13 @@ test.each(['confirm', 'review', 'failed'] as const)(
     ).json()) as { todos: { total: number; byPhase: Record<Phase, number> } };
     expect(progress.todos.total).toBe(0);
     expect(progress.todos.byPhase[phase]).toBe(0);
-    const tasks = await (
-      await req(s.app, 'GET', `/api/teams/${s.team.id}/agents/agent-archive/tasks`)
-    ).json();
-    expect(tasks).toEqual([]);
   },
 );
 
-test('archive removes running tasks from agent and phase-filtered lists', async () => {
+test('archive removes running tasks from phase-filtered lists', async () => {
   const { s } = world('building', 'done');
-  const path = `/api/teams/${s.team.id}/agents/agent-archive/tasks`;
-  expect(await (await req(s.app, 'GET', path)).json()).toHaveLength(1);
+  expect(await (await req(s.app, 'GET', '/api/todos')).json()).toHaveLength(1);
   await action(s, 'archive');
-  expect(await (await req(s.app, 'GET', path)).json()).toEqual([]);
   expect(await (await req(s.app, 'GET', '/api/todos')).json()).toEqual([]);
 });
 

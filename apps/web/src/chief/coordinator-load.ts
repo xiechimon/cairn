@@ -13,12 +13,13 @@ export function coordinatorLoad(input: {
   coordinator: QueryState;
   messages: QueryState;
   hasThread: boolean;
+  wasReady?: boolean;
 }): CoordinatorLoad {
   const needed = input.hasThread
     ? [input.chief, input.coordinator, input.messages]
     : [input.chief, input.coordinator];
   if (needed.some((q) => q.isError && q.data === undefined)) return 'error';
-  if (needed.some((q) => q.isLoading)) return 'loading';
+  if (!input.wasReady && needed.some((q) => q.isLoading)) return 'loading';
   return 'ready';
 }
 

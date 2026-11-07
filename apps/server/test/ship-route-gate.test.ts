@@ -63,8 +63,6 @@ async function reviewBuild(route: 'custom' | 'local-merge', withPr = true): Prom
   startBuilds(s.svc, {
     projectId,
     todoIds: [created.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
   });
   setTodoPhase(s.svc, created.id, 'planning');
   setTodoPhase(s.svc, created.id, 'confirm');

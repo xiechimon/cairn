@@ -10,7 +10,7 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
-import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
 
@@ -159,19 +159,14 @@ describe('#1466 the chief tool surface: a cross-team project id = 404 (same shap
     expect(chiefWatchIds()).toEqual([]);
   });
 
-  test('T9 run_builds: an own-team todo pointing at another team project -> 404, no build created, the phase unchanged, no watch added', async () => {
+  test('T9 open_thread: an own-team todo pointing at another team project -> 404, no build created, the phase unchanged, no watch added', async () => {
     insertCrossTodo();
     const own = await createOwnTodo();
-    const runBuilds = (todoIds: string[]) =>
-      chiefError('run_builds', { todoIds, assignment: { build: { agentId: AGENT_ID } } });
-    const single = await runBuilds([CROSS]);
+    const single = await chiefError('open_thread', { todoId: CROSS });
     expect(single.status).toBe(404);
     expect(single.message).toBe(`project ${PROJ_B}`);
     expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
-    const mixed = await runBuilds([own, CROSS]);
-    expect(mixed.status).toBe(404);
     expect(todoState(own)).toEqual({ phase: 'todo', builds: 0 });
-    expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
     expect(chiefWatchIds()).toEqual([]);
   });
 

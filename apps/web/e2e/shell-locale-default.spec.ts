@@ -43,7 +43,7 @@ test.describe('English count grammar', () => {
 
   for (const theme of ['light', 'dark'] as const) {
     for (const width of [1440, 390]) {
-      test(`one member and one running task at ${width}px in ${theme}`, async ({ page }) => {
+      test(`one running task at ${width}px in ${theme}`, async ({ page }) => {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
         await page.emulateMedia({ colorScheme: theme });
         await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
@@ -51,9 +51,6 @@ test.describe('English count grammar', () => {
         await page.goto('/app');
         await expect(page.getByTestId('home-c-since')).toContainText('1 in progress');
         await evidenceShot(page, `after-home-${width}-${theme}.png`);
-        await page.goto('/app/team?scenario=team-org-chart-single');
-        await expect(page.getByText('1 member', { exact: true })).toBeVisible();
-        await evidenceShot(page, `after-team-${width}-${theme}.png`);
       });
     }
   }
@@ -66,8 +63,6 @@ test.describe('English count grammar', () => {
     });
     await page.goto('/app');
     await expect(page.getByTestId('home-c-since')).toContainText('2 in progress');
-    await page.goto('/app/team?scenario=team-org-chart-pair');
-    await expect(page.getByText('2 members', { exact: true })).toBeVisible();
   });
 
   test('retains Chinese count rendering', async ({ page }) => {
@@ -75,7 +70,5 @@ test.describe('English count grammar', () => {
     await mockLive(page, { threads: [], messages: [], todos: [TASK] });
     await page.goto('/app');
     await expect(page.getByTestId('home-c-since')).toContainText('1 件在进行');
-    await page.goto('/app/team?scenario=team-org-chart-single');
-    await expect(page.getByText('1 个成员', { exact: true })).toBeVisible();
   });
 });

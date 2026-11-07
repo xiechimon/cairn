@@ -78,12 +78,7 @@ export const PAGES: AuditPage[] = [
     url: '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
     ready: (p) => p.locator('.prj-set-avatar'),
   },
-  { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agent-card').first() },
-  {
-    name: 'agent detail',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
-    ready: (p) => p.locator('.agent-skill-select'),
-  },
+  { name: 'team', url: '/app/team?scenario=12', ready: (p) => p.getByTestId('team-agents-removed') },
   {
     name: 'machines',
     url: '/app/settings/machines?scenario=06',
@@ -92,7 +87,7 @@ export const PAGES: AuditPage[] = [
   {
     name: 'machine detail',
     url: '/app/settings/machines?scenario=06&machine=Kd8fG2hJ4mN9pQ1rStUvWx3',
-    ready: (p) => p.getByTestId('team-agent-grid'),
+    ready: (p) => p.getByTestId('machine-detail'),
   },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {

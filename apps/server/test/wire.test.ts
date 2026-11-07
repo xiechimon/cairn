@@ -19,11 +19,10 @@ import {
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
-import { agent as agentTable, plan as planTable } from '../src/db/schema.js';
-import { newRecordId } from '../src/lib/ids.js';
+import { plan as planTable } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, postProject, req, startLegacyBuild } from './helpers.js';
 
 const INFERRED_ROUTES = [
   'GET /api/teams/{id}/claude-subscriptions',
@@ -83,10 +82,9 @@ const INFERRED_ROUTES = [
   'DELETE /api/machines/{id}',
   'POST /api/machines/{id}/evacuate',
   'POST /api/machines/{id}/revoke',
-  'DELETE /api/teams/{id}/agents/{aid}/memories/{mid}',
-  'POST /api/teams/{id}/agents/{aid}/memories/{mid}/promote',
-  'DELETE /api/teams/{id}/agents/{aid}',
-  'GET /api/teams/{id}/agents/{aid}/machine-fit',
+  'GET /api/teams/{id}/memories',
+  'DELETE /api/teams/{id}/memories/{mid}',
+  'POST /api/teams/{id}/memories/{mid}/promote',
   'GET /api/projects/{id}/commits',
   'GET /api/projects/{id}/commits/{sha}',
   'GET /api/builds/{id}/plans',
@@ -167,7 +165,6 @@ const M5_ROUTES = [
   'GET /api/teams/{id}/progress',
   'GET /api/teams/{id}/skills/{sid}',
   'GET /api/teams/{id}/skills/{sid}/file',
-  'GET /api/teams/{id}/agents/{aid}/tasks',
   'GET /api/skills',
   'POST /api/analytics/first-touch',
   'GET /api/conversations/{id}/stream',
@@ -383,70 +380,6 @@ describe('todo CRUD (the demo surface: curl create/read/update/delete)', () => {
     expect(reordered.orderIndex).toBe(5);
   });
 
-  test('update: PATCH todos/{id} assignment dual slots -- slot-level merge + the derived agent projection follows (#208)', async () => {
-    const s = await setup();
-    const created = todoRecordSchema.parse(
-      await (
-        await req(s.app, 'POST', `/api/projects/${s.projectId}/todos`, { title: 'a', spec: '' })
-      ).json(),
-    );
-    expect(created.assignment).toBeNull();
-    expect(created.agent).toBeNull();
-    const planAgentId = newRecordId();
-    const buildAgentId = newRecordId();
-    for (const [id, displayName] of [
-      [planAgentId, '规划小林'],
-      [buildAgentId, '执行小林'],
-    ] as const) {
-      s.db
-        .insert(agentTable)
-        .values({
-          id,
-          teamId: s.team.id,
-          displayName,
-          description: null,
-          status: 'active',
-          avatarUrl: null,
-          provider: null,
-          modelId: null,
-          thinkingLevel: null,
-          tools: [],
-          secrets: [],
-          defaultSkill: null,
-          skillsAllowlist: null,
-          mcpServers: [],
-        })
-        .run();
-    }
-    const planOnly = todoRecordSchema.parse(
-      await (
-        await req(s.app, 'PATCH', `/api/todos/${created.id}`, {
-          assignment: { plan: { agentId: planAgentId } },
-        })
-      ).json(),
-    );
-    expect(planOnly.assignment).toEqual({ plan: { agentId: planAgentId }, build: null });
-    expect(planOnly.agent).toBeNull();
-    expect(planOnly.v).toBe(created.v + 1);
-    const both = todoRecordSchema.parse(
-      await (
-        await req(s.app, 'PATCH', `/api/todos/${created.id}`, {
-          assignment: { build: { agentId: buildAgentId } },
-        })
-      ).json(),
-    );
-    expect(both.assignment).toEqual({
-      plan: { agentId: planAgentId },
-      build: { agentId: buildAgentId },
-    });
-    expect(both.agent).toEqual({ id: buildAgentId, displayName: '执行小林' });
-    const got = todoRecordSchema.parse(
-      await (await req(s.app, 'GET', `/api/todos/${created.id}`)).json(),
-    );
-    expect(got.assignment).toEqual(both.assignment);
-    expect(got.agent).toEqual(both.agent);
-  });
-
   test('delete: DELETE todos/{id} -> 204; read again 404; delete again 404', async () => {
     const s = await setup();
     const created = todoRecordSchema.parse(
@@ -596,11 +529,7 @@ describe('the build surface + the nine-value phase transitions (the server-side 
 
   test('POST builds body = startBuildsBodySchema (the r5 §3.4 captured shape)', async () => {
     const s = await withTodo();
-    const body = {
-      todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: true,
-    };
+    const body = { todoIds: [s.todoDoc.id] };
     expect(startBuildsBodySchema.safeParse(body).success).toBe(true);
     const res = await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, body);
     expect(res.status).toBe(201);
@@ -610,7 +539,7 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     expect(b.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(b.prevPhase).toBe('todo');
     expect(b.triggerSource).toBe('user');
-    expect(b.withPlan).toBe(true);
+    expect(b.withPlan).toBe(false);
     const t = todoRecordSchema.parse(
       await (await req(s.app, 'GET', `/api/todos/${s.todoDoc.id}`)).json(),
     );
@@ -622,7 +551,7 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     ).json()) as unknown[];
     expect(steps).toHaveLength(1);
     const st = stepRecordSchema.parse(steps[0]);
-    expect(st.kind).toBe('plan');
+    expect(st.kind).toBe('session');
     expect(st.machineId).toBeNull();
     const projectBuilds = (await (
       await req(s.app, 'GET', `/api/projects/${s.projectId}/builds`)
@@ -630,28 +559,12 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     expect(projectBuilds).toHaveLength(1);
   });
 
-  test('direct execution queues the execution step (the two branches of the 02 §4.2 start dialog)', async () => {
-    const s = await withTodo();
-    const res = await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
-      todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: false,
-    });
-    const b = buildRecordSchema.parse(((await res.json()) as { builds: unknown[] }).builds[0]);
-    const steps = (await (
-      await req(s.app, 'GET', `/api/builds/${b.id}/steps`)
-    ).json()) as unknown[];
-    expect(stepRecordSchema.parse(steps[0]).kind).toBe('build');
-  });
-
   test('the full main timeline: queued->planning->confirm->(the reject v2 loop)->building->review->merge 202->done', async () => {
     const s = await withTodo();
-    const started = await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
-      todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: true,
-    });
-    const b = buildRecordSchema.parse(((await started.json()) as { builds: unknown[] }).builds[0]);
+    const legacyBuildId = startLegacyBuild(s, s.todoDoc.id, { withPlan: true });
+    const b = buildRecordSchema.parse(
+      await (await req(s.app, 'GET', `/api/builds/${legacyBuildId}`)).json(),
+    );
     const stepsOf = async () =>
       ((await (await req(s.app, 'GET', `/api/builds/${b.id}/steps`)).json()) as unknown[]).map(
         (r) => stepRecordSchema.parse(r),
@@ -706,8 +619,6 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     expect(await phaseOf()).toBe('done');
     const rerun = await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
       todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: false,
     });
     expect(rerun.status).toBe(201);
     const rerunBuild = buildRecordSchema.parse(
@@ -721,15 +632,11 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     const s = await withTodo();
     await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
       todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: false,
     });
     setTodoPhase(s.svc, s.todoDoc.id, 'building');
     setTodoPhase(s.svc, s.todoDoc.id, 'failed');
     const rerun = await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
       todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: false,
     });
     expect(rerun.status).toBe(201);
     const t = todoRecordSchema.parse(
@@ -745,8 +652,6 @@ describe('the build surface + the nine-value phase transitions (the server-side 
     await expectErrorShape(await req(s.app, 'GET', '/api/builds/nope/steps'), 404);
     const started = await req(s.app, 'POST', `/api/projects/${s.projectId}/builds`, {
       todoIds: [s.todoDoc.id],
-      assignment: { plan: null, build: null },
-      withPlan: true,
     });
     const b = buildRecordSchema.parse(((await started.json()) as { builds: unknown[] }).builds[0]);
     await expectErrorShape(

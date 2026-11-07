@@ -152,18 +152,11 @@ try {
 
   if (teamId != null) {
     await postJson(SERVER + '/api/teams/' + teamId + '/providers', prov);
-    const agentEnv = await postJson(SERVER + '/api/teams/' + teamId + '/agents', {
-      displayName: 'verify-chief-agent-' + stamp,
-      description: '验证总管绑定。',
+    const agentEnv = await postJson(SERVER + '/api/teams/' + teamId + '/routing-rules/coordinator', {
       provider: prov.providerId,
       modelId: prov.models[0].id,
-    });
+    }, 'PATCH');
     extra.agentId = agentEnv.id ?? agentEnv.agent?.id ?? null;
-    await postJson(
-      SERVER + '/api/teams/' + teamId + '/chief',
-      { agent: { agentId: extra.agentId, thinkingLevel: null } },
-      'PATCH',
-    );
   }
   check('seed-bound', extra.agentId != null, extra.agentId != null ? 'agent=' + extra.agentId : '铺底绑定失败');
 

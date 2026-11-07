@@ -7,11 +7,10 @@ import {
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
 import { Fragment, type ReactNode, useRef, useState } from 'react';
-import { useApiMutations, useMembers, useModelSources } from '../api/hooks.js';
-import { mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/mappers.js';
+import { useApiMutations } from '../api/hooks.js';
+import { RUNTIME_LABELS } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
-import { QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_ROW_CLS,
   SettingsCard,
@@ -19,12 +18,9 @@ import {
   SettingsSection,
 } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
-import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import type { FixtureSet, MachineRow, TeamAgentCard } from '../fixtures/records.js';
+import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
-import { TeamAgentGrid } from '../routes/team-agent-grid.js';
 import { CONCURRENCY_SOURCE_LABEL, MachineConcurrencySelect } from './machine-concurrency.js';
 import { offlineGuidance } from './machine-offline.js';
 
@@ -142,46 +138,22 @@ function RuntimeRow({
   );
 }
 
-export function useHomeAgents(machine: MachineRow, fixture: FixtureSet) {
-  const { live, teamId } = useLiveData();
-  const membersQ = useMembers(teamId, live);
-  const agents = live ? mapTeam(membersQ.data ?? []).agents : (fixture.team?.agents ?? []);
-  return { membersQ, homeAgents: agents.filter((a) => a.machineId === (machine.id ?? '')) };
-}
-
 export function MachineDetailPane({
   machine,
-  machines,
   chief,
-  fixture,
-  search,
   pending,
   onToggleRuntime,
-  membersQ,
-  homeAgents,
 }: {
   machine: MachineRow;
-  machines: MachineRow[];
   chief: ChiefState;
-  fixture: FixtureSet;
-  search: string;
   pending: boolean;
   onToggleRuntime: (runtime: MachineRuntime, next: boolean) => void;
-  membersQ: ReturnType<typeof useMembers>;
-  homeAgents: TeamAgentCard[];
 }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
   const mutations = useApiMutations(teamId);
-
-  const modelSourcesQ = useModelSources(teamId, live);
-  const modelOptions = live
-    ? toModelOptions(modelSourcesQ.data?.sources ?? [])
-    : toModelOptions(fixture.resources?.providerSources ?? []);
-
-  const [createOpen, setCreateOpen] = useState(false);
 
   const [capDraft, setCapDraft] = useState<number | null>(null);
   const capOn = capDraft ?? machine.maxConcurrent ?? FALLBACK_CAP;
@@ -382,41 +354,6 @@ export function MachineDetailPane({
           )}
         </SettingsSection>
       )}
-
-      <SettingsSection title={t('归属的 Agent')}>
-        <QueryBoundary
-          query={live ? membersQ : undefined}
-          isEmpty={live && membersQ.data === undefined}
-          loadingLabel={t('正在加载团队')}
-          errorTitle={t('团队没能加载')}
-          empty={null}
-        >
-          <TeamAgentGrid
-            rows
-            agents={homeAgents}
-            machines={machines}
-            onCreate={() => setCreateOpen(true)}
-            search={search}
-          />
-        </QueryBoundary>
-      </SettingsSection>
-
-      <CreateAgentDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        modelOptions={modelOptions}
-        machines={machines}
-        defaultMachineId={machineId}
-        onCreate={
-          live
-            ? (input) =>
-                mutations.createAgent.mutate(input, {
-                  onSuccess: () => setCreateOpen(false),
-                  onError: (error) => toastError(t('创建 Agent 失败，请重试。'), error),
-                })
-            : undefined
-        }
-      />
     </div>
   );
 }

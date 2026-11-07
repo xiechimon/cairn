@@ -8,6 +8,25 @@ import { postProject } from './helpers.js';
 registerChiefHarness();
 afterEach(() => H.s.dispose());
 
+const saveIndependent = async (params: Record<string, unknown>) =>
+  JSON.parse(
+    await executeWorkerMemoryTool(
+      H.s.db,
+      {
+        teamId: H.teamId,
+        agentId: AGENT2_ID,
+        sourceName: null,
+        todoId: 'source',
+        projectId: H.projectId,
+        buildId: 'build',
+        attachmentsDir: H.s.attachmentsDir,
+        teamScoped: false,
+      },
+      'save_memory',
+      params,
+    ),
+  ) as { id: string };
+
 for (const mode of ['chief', 'worker'] as const) {
   const invoke = async (name: string, params: Record<string, unknown>) => {
     if (mode === 'chief') return relay(name, params);
@@ -17,6 +36,7 @@ for (const mode of ['chief', 'worker'] as const) {
         {
           teamId: H.teamId,
           agentId: AGENT_ID,
+          sourceName: null,
           todoId: 'source',
           projectId: H.projectId,
           buildId: 'build',
@@ -51,7 +71,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories', {})).toHaveLength(1);
     });
 
-    test('candidates only include same-Agent same-project and global, explicit project wins', async () => {
+    test('candidates only include same-project and global team memories, independent agents excluded, explicit project wins', async () => {
       const otherProject = await postProject(H.s.app, 'other');
       const global = (await relay('save_memory', {
         title: '包管理器',
@@ -66,11 +86,7 @@ for (const mode of ['chief', 'worker'] as const) {
         projectId: otherProject,
         force: true,
       });
-      await relay(
-        'save_memory',
-        { title: '包管理器', content: '别人使用 bun', projectId: H.projectId },
-        { chiefAgentId: AGENT2_ID },
-      );
+      await saveIndependent({ title: '包管理器', content: '别人使用 bun', projectId: H.projectId });
       const result = (await save({ title: '包管理器', content: '本仓使用 pnpm' })) as {
         candidates: { id: string }[];
       };
@@ -169,7 +185,7 @@ for (const mode of ['chief', 'worker'] as const) {
       });
     });
 
-    test('a global memory changed to the body of a same-Agent same-team project memory returns 409, another person does not count', async () => {
+    test('a global memory changed to the body of a team project memory returns 409, an independent agent does not count', async () => {
       const global = (await relay('save_memory', {
         title: '全局约定',
         content: '全局使用 npm',
@@ -183,11 +199,7 @@ for (const mode of ['chief', 'worker'] as const) {
       })) as {
         id: string;
       };
-      await relay(
-        'save_memory',
-        { title: '他人', content: '他人使用 bun', projectId: H.projectId },
-        { chiefAgentId: AGENT2_ID },
-      );
+      await saveIndependent({ title: '他人', content: '他人使用 bun', projectId: H.projectId });
       const rejected = invoke('update_memory', { memoryId: global.id, content: '本仓使用 pnpm' });
       await expect(rejected).rejects.toMatchObject({ status: 409 });
       await expect(rejected).rejects.toThrow(project.id);
@@ -232,7 +244,7 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(await invoke('memories', { includeInvalid: true })).toHaveLength(3);
     });
 
-    test('update_memory changed to the body of another same-criteria entry returns 409 and names that id, cross-project or another person does not count', async () => {
+    test('update_memory changed to the body of another same-criteria entry returns 409 and names that id, cross-project or an independent agent does not count', async () => {
       const otherProject = await postProject(H.s.app, 'other');
       const local = (await save({ title: '包管理器', content: '使用 npm' })) as { id: string };
       const global = (await relay('save_memory', {
@@ -248,11 +260,7 @@ for (const mode of ['chief', 'worker'] as const) {
         projectId: otherProject,
         force: true,
       });
-      await relay(
-        'save_memory',
-        { title: '他人', content: '他人使用 bun', projectId: H.projectId },
-        { chiefAgentId: AGENT2_ID },
-      );
+      await saveIndependent({ title: '他人', content: '他人使用 bun', projectId: H.projectId });
       for (const [content, id] of [
         ['使用 npm', local.id],
         ['按钮采用蓝色', global.id],
@@ -275,12 +283,8 @@ for (const mode of ['chief', 'worker'] as const) {
       expect(new Set(contents).size).toBe(contents.length);
     });
 
-    test('updating a nonexistent or another Agent memory returns 404', async () => {
-      const other = (await relay(
-        'save_memory',
-        { title: '他人', content: '不可改' },
-        { chiefAgentId: AGENT2_ID },
-      )) as { id: string };
+    test('updating a nonexistent or an independent agent memory returns 404', async () => {
+      const other = await saveIndependent({ title: '他人', content: '不可改' });
       for (const memoryId of [other.id, 'missing']) {
         await expect(invoke('update_memory', { memoryId, content: '覆盖' })).rejects.toMatchObject({
           status: 404,

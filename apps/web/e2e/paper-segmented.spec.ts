@@ -11,16 +11,6 @@ interface Control {
 
 const CONTROLS: Control[] = [
   {
-    name: 'agent tabs',
-    url: '/app/resources/agents/r3-builder?scenario=agent-detail',
-    track: (page) => page.getByRole('tablist', { name: 'Agent' }),
-  },
-  {
-    name: 'team switch',
-    url: '/app/team?scenario=12',
-    track: (page) => page.getByTestId('page-toolbar').getByRole('tablist'),
-  },
-  {
     name: 'project tabs',
     url: `${PROJ}?scenario=r2-24b`,
     track: (page) => page.getByRole('banner').getByRole('tablist'),
@@ -162,12 +152,6 @@ test('pointer click leaves no focus ring', async ({ page }) => {
   const info = await ring(weekly);
   expect(info.focusVisible).toBe(false);
   expect(info.style).toBe('none');
-
-  await themed(page, 'light', '/app/resources/agents/r3-builder?scenario=agent-detail');
-  const memory = page.getByRole('tab', { name: '记忆' });
-  await memory.click();
-  await expect(memory).toHaveAttribute('aria-selected', 'true');
-  expect((await ring(memory)).style).toBe('none');
 });
 
 test('radio group: arrow keys move focus and select, roving tabindex follows', async ({ page }) => {

@@ -6,21 +6,6 @@ import { routeOverrideSchema } from './routing-rule.js';
 import { snoozeModeSchema } from './snooze.js';
 import { quotaWaitSchema } from './step.js';
 
-export const assignmentSlotSchema = z.object({ agentId: recordId });
-export const assignmentSchema = z.object({
-  source: z.literal('intake-label').optional(),
-  plan: assignmentSlotSchema.nullable(),
-  build: assignmentSlotSchema.nullable(),
-  review: assignmentSlotSchema.nullish(),
-  verify: assignmentSlotSchema.nullish(),
-});
-export type Assignment = z.infer<typeof assignmentSchema>;
-
-export const todoAgentRefSchema = z.object({
-  id: recordId,
-  displayName: z.string(),
-});
-
 export const buildHistoryEntrySchema = z.object({
   buildId: recordId,
   createdAt: epochMs,
@@ -98,8 +83,6 @@ export const todoRecordSchema = z.object({
   seqNum: z.number().int(),
   orderIndex: z.number(),
   tagIds: z.array(recordId),
-  assignment: assignmentSchema.nullable(),
-  agent: todoAgentRefSchema.nullable(),
   latestBuildId: recordId.nullable(),
   lastRunAt: epochMs.nullable(),
   hasChanges: z.boolean(),

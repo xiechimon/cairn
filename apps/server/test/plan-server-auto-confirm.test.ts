@@ -9,9 +9,8 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
+  machine as machineTable,
   message as messageTable,
-  plan as planTable,
   project as projectTable,
   provider as providerTable,
   step as stepTable,
@@ -20,15 +19,19 @@ import {
 import { addChiefWatch } from '../src/services/chief.js';
 import { answerQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { confirmBuild } from '../src/services/chief-tools.js';
-import { ensurePersonasSeeded } from '../src/services/personas.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { createSplitTodo } from '../src/services/todo-split.js';
 import { getTodo } from '../src/services/todos.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
+} from './helpers.js';
 
 afterEach(() => vi.useRealTimers());
 
-const AGENT_ID = 'agent-psac-1';
 const GOOD_PLAN =
   '# Plan\nKind: fix\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` passes\n';
 
@@ -72,21 +75,13 @@ async function setupWorld() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'psac-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'psac-mbp', cliVersion: '0.1.0' },
   });
-  bindAllAgents(s);
+  const machineId = s.db.select().from(machineTable).get()!.id;
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app, 'demo', { mergePolicy: 'autonomous' });
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -98,17 +93,8 @@ async function setupWorld() {
     s,
     projectId,
     todoId,
-    async startBuild(withPlan = true): Promise<string> {
-      const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: {
-          todoIds: [todoId],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-          withPlan,
-        },
-      });
-      expect(res.status).toBe(201);
-      const body = (await res.json()) as { builds: { id: string }[] };
-      return body.builds[0]!.id;
+    startBuild(): string {
+      return startLegacyBuild(s, todoId, { withPlan: true });
     },
 
     async claim() {
@@ -160,7 +146,7 @@ describe('#1791 server auto-confirm after plan step', () => {
   test('autonomous clean plan waits ten minutes before scheduler confirmation', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
       await w.done(planStep.step.id, { status: 'success', sessionId: 'psac-1' });
@@ -220,7 +206,7 @@ describe('#1791 server auto-confirm after plan step', () => {
   ])('%s with content waits for a person', async (heading) => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild();
+      const buildId = w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(
         planStep.step.id,
@@ -238,7 +224,7 @@ describe('#1791 server auto-confirm after plan step', () => {
   test('an empty Open questions heading confirms after the grace window', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild();
+      w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(
         planStep.step.id,
@@ -260,7 +246,7 @@ describe('#1791 server auto-confirm after plan step', () => {
   test('an Open questions heading inside a code fence still holds the plan (conservative: fences are not parsed)', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild();
+      w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(
         planStep.step.id,
@@ -281,14 +267,10 @@ describe('#1791 server auto-confirm after plan step', () => {
   test('a pending chief question on the watched todo holds confirmation', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild();
+      w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
       await w.done(planStep.step.id, { status: 'success' });
-      const chiefResponse = await call(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-        body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-      });
-      expect(chiefResponse.status).toBe(200);
       const response = await call(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
         body: { content: 'Review this plan' },
       });
@@ -322,15 +304,11 @@ describe('#1791 server auto-confirm after plan step', () => {
   test('a pending chief question on an unwatched thread does not hold the plan', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild();
+      w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
       await w.done(planStep.step.id, { status: 'success' });
       expect(w.todoRow().phase).toBe('confirm');
-      const chiefResponse = await call(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-        body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-      });
-      expect(chiefResponse.status).toBe(200);
       const response = await call(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
         body: { content: 'Unrelated thread' },
       });
@@ -351,11 +329,11 @@ describe('#1791 server auto-confirm after plan step', () => {
     }
   });
 
-  test('human mergePolicy, split parent, and user plan revision stay at confirm', async () => {
+  test('human mergePolicy and user plan revision stay at confirm', async () => {
     const w = await setupWorld();
     try {
       w.setMergePolicy('human');
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
       await w.done(planStep.step.id, { status: 'success', sessionId: 'psac-2a' });
@@ -382,45 +360,6 @@ describe('#1791 server auto-confirm after plan step', () => {
       expect(w.messagesOf(buildId).filter((m) => m.content === CONFIRM_ANNOUNCEMENT)).toHaveLength(
         0,
       );
-
-      const splitWorld = await setupWorld();
-      try {
-        ensurePersonasSeeded(splitWorld.s.db, splitWorld.s.team.id);
-        const implementerId = AGENT_ID;
-        const splitDeps = {
-          db: splitWorld.s.db,
-          hub: splitWorld.s.hub,
-          machineHub: splitWorld.s.machineHub,
-          user: splitWorld.s.user,
-        };
-        const split = createSplitTodo(splitDeps, {
-          parentId: splitWorld.todoId,
-          subtodos: [
-            { title: 'Child A', spec: 'child a', agentId: implementerId },
-            { title: 'Child B', spec: 'child b', agentId: implementerId },
-          ],
-          chiefAgentId: null,
-          chiefId: 'chief-psac',
-          threadId: 'chief-thread-1',
-          actorName: 'Chief',
-        });
-        splitWorld.s.db
-          .update(planTable)
-          .set({ content: GOOD_PLAN })
-          .where(eq(planTable.buildId, split.parentBuildId))
-          .run();
-        createScheduler(splitWorld.s.svc, { tickMs: 15_000 }).tick(
-          splitWorld.todoRow().phaseAt + 600_000,
-        );
-        expect(splitWorld.todoRow().phase).toBe('confirm');
-        expect(
-          splitWorld
-            .messagesOf(split.parentBuildId)
-            .some((m) => m.content === CONFIRM_ANNOUNCEMENT),
-        ).toBe(false);
-      } finally {
-        splitWorld.s.dispose();
-      }
     } finally {
       w.s.dispose();
     }

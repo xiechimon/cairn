@@ -96,7 +96,6 @@ const build = await (
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       todoIds: [todo.id],
-      assignment: { plan: null, build: { agentId: agent.id } },
       withPlan: false,
     }),
   })

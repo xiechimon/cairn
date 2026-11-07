@@ -179,9 +179,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(waiting, 'Q1').toHaveCSS('color', accent);
     await pending.getByTestId('chief-question-collapse').click();
 
-    const answered = win.locator('[data-testid="chief-question-card"][data-status="answered"]');
-    const done = answered.getByTestId('chief-question-status');
-    await expect(done, 'Q1').toHaveText('已回答');
+    const done = win.locator('[data-testid="chief-question-line"][data-status="answered"]');
+    await expect(done, 'Q1').toContainText('已回答');
     await expect(done.locator('svg'), 'Q1').toHaveCount(1);
     await expect(done, 'Q1').toHaveCSS('color', ink3);
 

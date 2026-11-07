@@ -1,16 +1,10 @@
 import { type ClaimedStep, WORKER_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { agent as agentTable, build as buildTable, step as stepTable } from '../src/db/schema.js';
+import { describe, expect, test } from 'vitest';
+import { build as buildTable, step as stepTable } from '../src/db/schema.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
-
-beforeEach(() => setRoutingRulesEnabled(true));
-afterEach(() => setRoutingRulesEnabled(false));
-
-const AGENT_ID = 'agent-report-line';
+import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -38,22 +32,14 @@ async function world() {
     body: { teamId: s.team.id, name: 'report-line', cliVersion: '0.1.0' },
   });
   const { token } = (await enroll.json()) as { token: string };
-  s.db
-    .insert(agentTable)
-    .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'scribe', provider: 'p', modelId: 'm' })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'p', modelId: 'm' });
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: 'Report line task', spec: 'Do the work' },
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
   await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoId] },
   });
   const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
   const { step } = (await claimRes.json()) as { step: ClaimedStep | null };
@@ -69,15 +55,13 @@ function relay(app: Hono, token: string, stepId: string, params: Record<string, 
 }
 
 describe('thread_report relay tool', () => {
-  test('only session steps with routing rules on carry the tool, for both repo types', () => {
+  test('only session steps carry the tool, for both repo types', () => {
     for (const github of [false, true]) {
       expect(workerRemoteTools('session', github).map((t) => t.name)).toContain('thread_report');
       for (const kind of ['plan', 'build', 'merge', 'review', 'verify'] as const) {
         expect(workerRemoteTools(kind, github).map((t) => t.name)).not.toContain('thread_report');
       }
     }
-    setRoutingRulesEnabled(false);
-    expect(workerRemoteTools('session', false).map((t) => t.name)).not.toContain('thread_report');
     expect(WORKER_REMOTE_TOOLS.map((t) => t.name)).not.toContain('thread_report');
   });
 
@@ -109,19 +93,6 @@ describe('thread_report relay tool', () => {
     const res = await relay(s.app, token, step.step.id, { line: 'late word' });
     expect(res.status).toBe(409);
     expect(await res.text()).toContain('thread_report requires a currently claimed step');
-    expect(
-      s.db.select().from(buildTable).where(eq(buildTable.id, step.step.buildId)).get()!.reportLine,
-    ).toBeNull();
-    s.dispose();
-  });
-
-  test('with routing rules off the build step has no thread_report and the relay refuses it', async () => {
-    setRoutingRulesEnabled(false);
-    const { s, token, step } = await world();
-    expect(step.step.kind).toBe('build');
-    expect(step.remoteTools?.map((t) => t.name)).not.toContain('thread_report');
-    const res = await relay(s.app, token, step.step.id, { line: 'sneaky' });
-    expect(res.ok).toBe(false);
     expect(
       s.db.select().from(buildTable).where(eq(buildTable.id, step.step.buildId)).get()!.reportLine,
     ).toBeNull();

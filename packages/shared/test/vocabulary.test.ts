@@ -306,14 +306,13 @@ describe('SSE channels (02 §1.2, all SSE, no WS)', () => {
 });
 
 describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
-  it('server-face whitelist = 16 read groups + 16 write tools = 32', () => {
-    expect(MCP_TOOLS_READ).toHaveLength(16);
-    expect(MCP_TOOLS_WRITE).toHaveLength(16);
+  it('server-face whitelist = 15 read groups + 14 write tools = 29', () => {
+    expect(MCP_TOOLS_READ).toHaveLength(15);
+    expect(MCP_TOOLS_WRITE).toHaveLength(14);
     expect(MCP_TOOLS_READ).toEqual([
       'Todos',
       'Projects',
       'Conversation',
-      'Agents',
       'Schedules',
       'Attachment',
       'Skills',
@@ -331,8 +330,6 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
       'Create Todo',
       'Update Todo',
       'Message Todo',
-      'Run Builds',
-      'Run Review',
       'Confirm Builds',
       'Merge Builds',
       'Cancel Builds',
@@ -358,16 +355,16 @@ describe('MCP vocabulary (02 §7.2, r3 §6 matrix 1:1)', () => {
     ]);
   });
 
-  it('tool registry = 32 grant-to-name pairs, whitelist labels remain one-to-one', () => {
+  it('tool registry = 29 grant-to-name pairs, whitelist labels remain one-to-one', () => {
     const read = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read');
     const write = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write');
     expect(read.map((t) => t.grant)).toEqual([...MCP_TOOLS_READ]);
     expect(write.map((t) => t.grant)).toEqual([...MCP_TOOLS_WRITE]);
-    expect(MCP_TOOL_REGISTRY).toHaveLength(32);
+    expect(MCP_TOOL_REGISTRY).toHaveLength(29);
     const names = MCP_TOOL_REGISTRY.map((t) => t.name);
-    expect(new Set(names).size).toBe(32);
+    expect(new Set(names).size).toBe(29);
     for (const name of names) expect(name).toMatch(/^[a-z][a-z0-9_]*$/);
-    expect(MCP_REGISTRY_BY_NAME.size).toBe(32);
+    expect(MCP_REGISTRY_BY_NAME.size).toBe(29);
   });
 
   it('executor minimum-version gate shape (02 §7.1: value self-determined per replica version line [design])', () => {
@@ -464,9 +461,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       piCacheRetention,
       hookTimeoutMs,
       issueIntake,
-      intakeAgentAllowlist,
       scheduling,
-      routingRules,
       coordinatorServerContext,
       coordinatorMachineId,
       trajectoryOutcomeBackfill,
@@ -502,9 +497,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
     expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
-    expect(intakeAgentAllowlist).toBe('CAIRN_INTAKE_AGENT_ALLOWLIST');
     expect(scheduling).toBe('CAIRN_SCHEDULING');
-    expect(routingRules).toBe('CAIRN_ROUTING_RULES');
     expect(coordinatorServerContext).toBe('CAIRN_COORDINATOR_SERVER_CONTEXT');
     expect(coordinatorMachineId).toBe('CAIRN_COORDINATOR_MACHINE_ID');
     expect(trajectoryOutcomeBackfill).toBe('CAIRN_TRAJ_OUTCOME_BACKFILL');
@@ -599,8 +592,8 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     }
   });
 
-  it('record shapes cover exactly the 21 wire tables (todo_tag join + internal tables have none; skill and mcp_server are projections with no table slot)', () => {
-    expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(21);
+  it('record shapes cover exactly the 20 wire tables (todo_tag join + internal tables have none; skill and mcp_server are projections with no table slot)', () => {
+    expect(Object.keys(RECORD_SCHEMAS)).toHaveLength(20);
     expect(Object.keys(RECORD_SCHEMAS)).toEqual(
       DB_TABLES.filter(
         (t) =>

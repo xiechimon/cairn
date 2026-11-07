@@ -1,8 +1,13 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'react-router';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChiefQuestionCard, type QuestionPager, recommendedFirst } from './chief-question-card.js';
+import {
+  ChiefQuestionCard,
+  type ChiefQuestionItem,
+  type QuestionPager,
+  recommendedFirst,
+} from './chief-question-card.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import { clampQuestionIndex } from './question-dock-index.js';
 import { answerKeyOf, questionDockState } from './question-dock-state.js';
@@ -13,6 +18,7 @@ import {
   questionDraftStore,
   questionSubmitStore,
 } from './question-drafts.js';
+import { leavingQuestion, QUESTION_FADE_MS } from './question-lifecycle.js';
 import type { OriginChiefQuestion } from './question-origin.js';
 
 const DOCK_CLS = 'flex min-h-0 flex-col gap-1.5';
@@ -51,11 +57,13 @@ function DockQuestion({
   numberKeys,
   pager,
   bound,
+  ownFooter,
 }: {
   request: OriginChiefQuestion;
   numberKeys: boolean;
   pager: QuestionPager | undefined;
   bound: boolean;
+  ownFooter: boolean;
 }) {
   const root = useOptionalChiefRoot();
   const key = draftKeyOf(request);
@@ -81,6 +89,7 @@ function DockQuestion({
         numberKeys={numberKeys}
         {...(pager !== undefined ? { pager } : {})}
         bound={bound}
+        ownFooter={ownFooter}
         onAnswer={(input) =>
           root?.surface.onAnswerQuestion?.({ ...input, threadId: request.conversationId })
         }
@@ -116,9 +125,38 @@ export function useAnswerKey(): string | null {
   return answerKeyOf(draftKeyOf(shown), stepOf(shown));
 }
 
-export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boolean }) {
+function useLeavingQuestion(shownId: string | undefined): ChiefQuestionItem | null {
+  const root = useOptionalChiefRoot();
+  const streamRef = useRef(root?.surface.chiefData.stream ?? []);
+  streamRef.current = root?.surface.chiefData.stream ?? [];
+  const lastId = useRef<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [leaving, setLeaving] = useState<ChiefQuestionItem | null>(null);
+  useEffect(() => {
+    const previous = lastId.current;
+    lastId.current = shownId ?? null;
+    if (shownId !== undefined) setLeaving(null);
+    if (previous === null || previous === shownId) return;
+    const done = leavingQuestion(previous, streamRef.current);
+    if (done === null) return;
+    setLeaving(done);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setLeaving(null), QUESTION_FADE_MS);
+  }, [shownId]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return leaving;
+}
+
+export function ChiefQuestionDock({
+  home,
+  bound,
+  ownFooter,
+}: {
+  home: boolean;
+  bound: boolean;
+  ownFooter: boolean;
+}) {
   const { t } = useI18n();
-  const _root = useOptionalChiefRoot();
   const [searchParams] = useSearchParams();
   const numberKeys = bound && searchParams.get(THREAD_PARAM) === null;
   const pending = useShownQuestions();
@@ -131,7 +169,21 @@ export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boole
   );
   const at = clampQuestionIndex(index, pending.length);
   const shown = pending[at];
-  if (shown === undefined) return null;
+  const leaving = useLeavingQuestion(shown?.item.requestId);
+  const wrapCls = `${DOCK_CLS} ${home ? 'mx-auto mt-2 w-[calc(100%-2rem)] max-w-182' : 'mx-4 mt-2'}`;
+  if (shown === undefined) {
+    if (leaving === null) return null;
+    return (
+      <section
+        inert
+        data-testid="chief-question-leaving"
+        aria-hidden="true"
+        className={`${wrapCls} question-leaving pointer-events-none`}
+      >
+        <ChiefQuestionCard item={leaving} />
+      </section>
+    );
+  }
   const counts = pending.map((request) => request.item.questions.length);
   const total = counts.reduce((sum, count) => sum + count, 0);
   const step = stepOf(shown);
@@ -174,17 +226,14 @@ export function ChiefQuestionDock({ home, bound }: { home: boolean; bound: boole
         }
       : undefined;
   return (
-    <section
-      data-testid="chief-question-dock"
-      aria-label={t('待回答的提问')}
-      className={`${DOCK_CLS} ${home ? 'mx-auto mt-2 w-[calc(100%-2rem)] max-w-182' : 'mx-4 mt-2'}`}
-    >
+    <section data-testid="chief-question-dock" aria-label={t('待回答的提问')} className={wrapCls}>
       <DockQuestion
         key={shown.item.requestId}
         request={shown}
         numberKeys={numberKeys}
         pager={pager}
         bound={bound}
+        ownFooter={ownFooter}
       />
     </section>
   );

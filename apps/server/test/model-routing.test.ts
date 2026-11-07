@@ -1,23 +1,20 @@
 import type { RoutingConnection, RoutingEdge, RoutingQuota } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import {
-  agent,
-  build,
-  chief,
-  chiefThread,
-  machine,
-  project,
-  step,
-  team,
-  todo,
-} from '../src/db/schema.js';
+import { build, chief, chiefThread, machine, project, step, team, todo } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { createProvider } from '../src/services/providers.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
-import { bootServer, insertMachine, issueApiKey, req } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  issueApiKey,
+  req,
+  seedRoute,
+  seedSessionRoute,
+} from './helpers.js';
 
 test.each([
   { report: 'empty', models: [] },
@@ -121,17 +118,7 @@ test('a non-Claude model using Anthropic messages stays runnable under subscript
   ).json()) as { connections: RoutingConnection[] };
   expect(body.connections.some((entry) => entry.models.includes('kimi-k2'))).toBe(true);
   expect.soft(body.connections.filter((entry) => entry.vendor === 'anthropic')).toEqual([]);
-  s.db
-    .insert(agent)
-    .values({
-      id: 'worker',
-      teamId: s.team.id,
-      displayName: 'Worker',
-      provider: 'kimi',
-      modelId: 'kimi-k2',
-      machineId: mid,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'kimi', modelId: 'kimi-k2', machineId: mid });
   s.db.insert(project).values({ id: 'project', teamId: s.team.id, name: 'Project' }).run();
   s.db
     .insert(todo)
@@ -142,7 +129,6 @@ test('a non-Claude model using Anthropic messages stays runnable under subscript
       title: 'Task',
       phaseAt: 1,
       seqNum: 1,
-      assignment: { plan: null, build: { agentId: 'worker' } },
     })
     .run();
   s.db
@@ -282,22 +268,18 @@ test.each([
         },
       },
     );
-    s.db
-      .insert(agent)
-      .values({
-        id: 'worker',
-        teamId: s.team.id,
-        displayName: 'Worker',
-        provider:
-          mode === 'native' || mode === 'takeover'
-            ? 'claude-code'
-            : mode === 'fallback'
-              ? 'openai'
-              : 'anthropic',
-        modelId: mode === 'fallback' ? 'gpt-6.1-sol' : 'claude-sonnet-5-5',
-        machineId: mid,
-      })
-      .run();
+    const workerRoute = {
+      provider:
+        mode === 'native' || mode === 'takeover'
+          ? 'claude-code'
+          : mode === 'fallback'
+            ? 'openai'
+            : 'anthropic',
+      modelId: mode === 'fallback' ? 'gpt-6.1-sol' : 'claude-sonnet-5-5',
+      machineId: mid,
+    };
+    seedSessionRoute(s, workerRoute);
+    seedRoute(s, 'coordinator', workerRoute);
     s.db.insert(project).values({ id: 'project', teamId: s.team.id, name: 'Project' }).run();
     s.db
       .insert(todo)
@@ -308,7 +290,6 @@ test.each([
         title: 'Task',
         phaseAt: 1,
         seqNum: 1,
-        assignment: { plan: null, build: { agentId: 'worker' } },
       })
       .run();
     s.db
@@ -344,7 +325,6 @@ test.each([
         id: 'coordinator',
         userId: s.user.id,
         teamId: s.team.id,
-        agentId: 'worker',
         createdAt: 1,
       })
       .run();

@@ -123,8 +123,6 @@ export function MachinesPage() {
                   machine={machine}
                   machines={machines}
                   chief={chiefState(machine)}
-                  fixture={fixture}
-                  search={`?${searchParams.toString()}`}
                   status={statusOf(machine)}
                   expanded={expandedKey === rowKey(machine)}
                   section={expandedKey === rowKey(machine) ? section : null}

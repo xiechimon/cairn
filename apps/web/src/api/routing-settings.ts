@@ -25,12 +25,6 @@ export function useRoutingSettingsMutations(teamId: string | undefined) {
   const key = [ROUTING_SETTINGS_KEY, teamId] as const;
   const invalidate = () => client.invalidateQueries({ queryKey: key });
   return {
-    seed: useMutation({
-      mutationFn: () => api.post<TeamRoutingSettings>(`/api/teams/${teamId}/routing-settings/seed`),
-      onSuccess: (data) => {
-        client.setQueryData(key, data);
-      },
-    }),
     patchRule: useMutation({
       mutationFn: ({ use, body }: { use: RouteUse; body: PatchRoutingRuleBody }) =>
         api.patch<RoutingRuleRecord>(`/api/teams/${teamId}/routing-rules/${use}`, body),

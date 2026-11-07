@@ -6,11 +6,11 @@ import { build, chiefThread, message, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { NotFoundError } from './builds.js';
 import { upsertChiefMessage } from './chief.js';
-import { agentForStep as agentForStepEligibility } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { OAuthClientConfig } from './oauth.js';
 import type { VapidKeys } from './push.js';
+import { profileForStep as profileForStepRoute } from './routing-rules.js';
 import { pendingWorkerQuestion, pushWorkerQuestion } from './thread-push.js';
 
 export function isChiefConversation(id: string): boolean {
@@ -18,7 +18,6 @@ export function isChiefConversation(id: string): boolean {
 }
 
 export interface MachineDeps {
-  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;
@@ -50,13 +49,12 @@ export function publishStepStatus(deps: MachineDeps, stepId: string): void {
   });
 }
 
-export function agentForStep(
+export function profileForStep(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
   kind: StepRecord['kind'],
-  prompt: string | null = null,
 ) {
-  return agentForStepEligibility(deps.db, todoRow, kind, prompt);
+  return profileForStepRoute(deps.db, todoRow, kind);
 }
 
 export function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {

@@ -7,7 +7,6 @@ const PANES = [
   { section: 'mcp', endpoint: 'mcp-servers', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'secrets', endpoint: 'secrets', empty: '[data-testid="resource-empty"]', ok: [] },
   { section: 'api-keys', endpoint: 'api-keys', empty: '[data-testid="keys-empty"]', ok: [] },
-  { section: 'team', endpoint: 'members', empty: '[data-testid="team-agents-empty"]', ok: [] },
 ] as const;
 
 async function stub(page: Page, endpoint: string, state: { fail: boolean; ok: unknown }) {

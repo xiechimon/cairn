@@ -31,7 +31,7 @@ for (const [name, url] of [
 for (const [name, url, rows] of [
   ['skills', '/app/resources/skills?scenario=06', 1],
   ['mcp', '/app/resources/mcp-servers?scenario=07', 1],
-  ['secrets', '/app/resources/secrets?scenario=agent-detail-secrets', 2],
+  ['secrets', '/app/resources/secrets?scenario=secrets-list', 2],
 ] as const) {
   test(`${name} list: one settings card of 52px rows, 14px corner`, async ({ page }) => {
     await light(page, url);

@@ -11,20 +11,19 @@ import { eq, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import {
-  agent as agentTable,
   build as buildTable,
   chiefMessage as chiefMessageTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   githubConnection as githubConnectionTable,
   project as projectTable,
+  routingRule as routingRuleTable,
   step as stepTable,
   todo as todoTable,
   tokenUsage as tokenUsageTable,
 } from '../src/db/schema.js';
 import { type FetchLike, githubIssueEvents } from '../src/lib/github.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
-import { executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
 import {
@@ -37,8 +36,6 @@ import {
   ISSUE_INTAKE_PERMISSION_TTL_MS,
 } from '../src/services/issue-intake.js';
 import { createScheduler, issueIntakeRunOf } from '../src/services/scheduler.js';
-import { createSplitTodo } from '../src/services/todo-split.js';
-import * as todosService from '../src/services/todos.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import {
   type ClosingPullNode,
@@ -52,7 +49,7 @@ import {
   githubFake as sharedGithubFake,
   type TimelineEvent,
 } from './fakes/github.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, req, seedRoute, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
 const REPO = 'xiechimon/cairn';
@@ -180,23 +177,19 @@ type ChiefMode = 'bound' | 'unbound' | 'no-model' | 'none';
 
 function seedChief(s: TestServer, mode: ChiefMode): void {
   if (mode === 'none') return;
-  s.db
-    .insert(agentTable)
-    .values({
+  if (mode !== 'unbound') {
+    seedRoute(s, 'coordinator', {
       id: CHIEF_AGENT_ID,
-      teamId: s.team.id,
-      displayName: CHIEF_AGENT_ID,
       provider: 'stub-gw',
-      modelId: mode === 'no-model' ? null : 'stub-model',
-    })
-    .run();
+      modelId: mode === 'no-model' ? '' : 'stub-model',
+    });
+  }
   s.db
     .insert(chiefTable)
     .values({
       id: `chief-${s.user.id}-${s.team.id}`,
       userId: s.user.id,
       teamId: s.team.id,
-      agentId: mode === 'unbound' ? null : CHIEF_AGENT_ID,
       charter: '',
       watches: [],
       wakes: [],
@@ -206,13 +199,18 @@ function seedChief(s: TestServer, mode: ChiefMode): void {
 }
 
 function bindChief(s: TestServer): void {
-  const agentRow = s.db.select().from(agentTable).where(eq(agentTable.id, CHIEF_AGENT_ID)).get();
-  if (agentRow === undefined) {
-    seedChief(s, 'bound');
-    return;
-  }
-  s.db.update(agentTable).set({ modelId: 'stub-model' }).run();
-  s.db.update(chiefTable).set({ agentId: CHIEF_AGENT_ID }).run();
+  seedRoute(s, 'coordinator', { id: CHIEF_AGENT_ID, provider: 'stub-gw', modelId: 'stub-model' });
+  const hasChief = s.db.select().from(chiefTable).get() !== undefined;
+  if (!hasChief) seedChief(s, 'bound');
+}
+
+function unbindChief(s: TestServer): void {
+  s.db.delete(routingRuleTable).where(eq(routingRuleTable.use, 'coordinator')).run();
+}
+
+function rebindChief(s: TestServer, id: string): void {
+  s.db.delete(routingRuleTable).where(eq(routingRuleTable.use, 'coordinator')).run();
+  seedRoute(s, 'coordinator', { id, provider: 'stub-gw', modelId: 'stub-model' });
 }
 
 const GATES_OFF: AutonomySettings = {
@@ -244,12 +242,7 @@ interface World {
 }
 
 async function makeWorld(
-  opts: {
-    chief?: ChiefMode;
-    connection?: boolean;
-    list?: number[];
-    intakeAgentAllowlist?: string[];
-  } = {},
+  opts: { chief?: ChiefMode; connection?: boolean; list?: number[] } = {},
 ): Promise<World> {
   const gh = githubFake(REPO);
   if (opts.list !== undefined) {
@@ -270,7 +263,6 @@ async function makeWorld(
   const intake = createIssueIntake(
     { ...s.svc, box: s.secretBox },
     {
-      intakeAgentAllowlist: opts.intakeAgentAllowlist ?? ['orb-builder'],
       githubFetch: gh.impl,
       logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
     },
@@ -911,8 +903,8 @@ describe('7 project in-flight cap', () => {
 describe('8 chief unbound: skipped before import', () => {
   test.each([
     ['chief 行不存在', 'none'],
-    ['chief 未绑 Agent', 'unbound'],
-    ['绑定的 Agent 没有模型', 'no-model'],
+    ['chief 未绑 coordinator 路由规则', 'unbound'],
+    ['coordinator 路由规则没有模型', 'no-model'],
   ] as const)('%s → 不读列表、不建卡；绑好后下一轮导入并编排', async (_name, mode) => {
     const w = await makeWorld({ chief: mode, list: [1406] });
     const tally = await w.intake.sweep();
@@ -1410,16 +1402,6 @@ describe('opt-in: CAIRN_ISSUE_INTAKE', () => {
     vi.unstubAllEnvs();
   });
 
-  test.each([undefined, '', ' , , '])('empty agent allowlist %j defaults to deny', (value) => {
-    vi.stubEnv('CAIRN_INTAKE_AGENT_ALLOWLIST', value);
-    expect(loadConfig().intakeAgentAllowlist).toEqual([]);
-  });
-
-  test('agent allowlist trims names and ignores empty entries without folding case', () => {
-    vi.stubEnv('CAIRN_INTAKE_AGENT_ALLOWLIST', ' Builder, ,Reviewer , builder,,');
-    expect(loadConfig().intakeAgentAllowlist).toEqual(['Builder', 'Reviewer', 'builder']);
-  });
-
   test('the variable name takes the brand slot', () => {
     expect(ENV_VARS.issueIntake).toBe('CAIRN_ISSUE_INTAKE');
   });
@@ -1632,11 +1614,9 @@ describe('opt-in wiring: index.ts takes the intake run slot via issueIntakeRunOf
     expect(lines[0]?.msg).toContain('CAIRN_ISSUE_INTAKE=1');
   });
 
-  test('on -> the run slot carries the configured agent allowlist and logs on', () => {
+  test('on -> the run slot is the stub run and logs on', () => {
     const { run, lines } = stubRun();
-    expect(
-      issueIntakeRunOf({ issueIntake: true, intakeAgentAllowlist: ['orb-builder'] }, run),
-    ).toEqual({ ...run, intakeAgentAllowlist: ['orb-builder'] });
+    expect(issueIntakeRunOf({ issueIntake: true }, run)).toEqual(run);
     expect(lines).toHaveLength(1);
     expect(lines[0]?.obj.issueIntake).toBe(true);
     expect(lines[0]?.msg).toContain(' on ');
@@ -1964,17 +1944,7 @@ describe('16 orchestration fails after import: retried over later rounds, with a
     const { intake, logs, flaky } = flakyIntake(w);
     await intake.sweep();
     flaky.failing = false;
-    w.s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-intake-b',
-        teamId: w.s.team.id,
-        displayName: 'agent-intake-b',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
-    w.s.db.update(chiefTable).set({ agentId: 'agent-intake-b' }).run();
+    rebindChief(w.s, 'agent-intake-b');
     const second = await intake.sweep();
     expect(second?.orchestrated).toBe(0);
     expect(chiefThreads(w.s)).toHaveLength(0);
@@ -2100,7 +2070,7 @@ describe('18 pins of the existing criteria', () => {
   });
 });
 
-describe('20 the close reconcile only touches poller-claimed cards (createdBy = the agent bound to the chief)', () => {
+describe('20 the close reconcile only touches poller-claimed cards (createdBy = the coordinator routing rule id)', () => {
   async function pollerAndManual() {
     const w = await makeWorld({ list: [1394, 1407] });
     const hand = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/github/issues/import`, {
@@ -2150,7 +2120,7 @@ describe('20 the close reconcile only touches poller-claimed cards (createdBy = 
   test('the chief has no bound agent -> no reconcile for this team this round (issue states unread), one log line per round', async () => {
     const w = await makeWorld({ list: [1406] });
     await w.intake.sweep();
-    w.s.db.update(chiefTable).set({ agentId: null }).run();
+    unbindChief(w.s);
     closeOnGithub(w, 1406, OWNER);
     const reads = w.gh.issueReads(1406).length;
     await w.intake.sweep();
@@ -2167,7 +2137,7 @@ describe('20 the close reconcile only touches poller-claimed cards (createdBy = 
   test('rounds without a binding do not clear seen-open: the issue closes in between, and closes the card once the same agent is bound again', async () => {
     const w = await makeWorld({ list: [1406] });
     await w.intake.sweep();
-    w.s.db.update(chiefTable).set({ agentId: null }).run();
+    unbindChief(w.s);
     await w.intake.sweep();
     closeOnGithub(w, 1406, OWNER);
     await w.intake.sweep();
@@ -2181,14 +2151,18 @@ describe('20 the close reconcile only touches poller-claimed cards (createdBy = 
   test('the agent bound to the chief has no model (cannot orchestrate) -> no new issues claimed, but poller-claimed cards still reconcile', async () => {
     const w = await makeWorld({ list: [1406] });
     await w.intake.sweep();
-    w.s.db.update(agentTable).set({ modelId: null }).run();
+    w.s.db
+      .update(routingRuleTable)
+      .set({ modelId: '' })
+      .where(eq(routingRuleTable.use, 'coordinator'))
+      .run();
     closeOnGithub(w, 1406, OWNER);
     const tally = await w.intake.sweep();
     expect(tally?.closed).toBe(1);
     expect(todoOf(w.s, 1406)?.phase).toBe('closed');
   });
 
-  test('reading the chief row errors -> one team failure recorded (issue intake team failed), not a whole-round failure', async () => {
+  test('reading the coordinator rule errors -> one team failure recorded (issue intake team failed), not a whole-round failure', async () => {
     const w = await makeWorld({ list: [1406] });
     await w.intake.sweep();
     const db = new Proxy(w.s.db, {
@@ -2203,7 +2177,8 @@ describe('20 the close reconcile only touches poller-claimed cards (createdBy = 
               get(q, p, r) {
                 if (p === 'from') {
                   return (table: unknown) => {
-                    if (table === chiefTable) throw new Error('SQLITE_BUSY: database is locked');
+                    if (table === routingRuleTable)
+                      throw new Error('SQLITE_BUSY: database is locked');
                     return q.from(table as Parameters<typeof q.from>[0]);
                   };
                 }
@@ -2232,17 +2207,7 @@ describe('20 the close reconcile only touches poller-claimed cards (createdBy = 
   test('the chief is rebound to another agent -> cards claimed before the rebind no longer reconcile (untouched even if the owner closed the issue)', async () => {
     const w = await makeWorld({ list: [1406] });
     await w.intake.sweep();
-    w.s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-intake-b',
-        teamId: w.s.team.id,
-        displayName: 'agent-intake-b',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
-    w.s.db.update(chiefTable).set({ agentId: 'agent-intake-b' }).run();
+    rebindChief(w.s, 'agent-intake-b');
     closeOnGithub(w, 1406, OWNER);
     const tally = await w.intake.sweep();
     expect(tally?.closed).toBe(0);
@@ -2383,28 +2348,14 @@ function insertChild(w: World, parentId: string, phase: Phase): string {
 }
 
 describe('22 split parent cards: no close reconcile while children are unfinished', () => {
-  test('a poller-claimed card split by the chief with children running, the issue closed by the owner -> the parent is not closed and its state unread, children untouched; the last child done -> the parent done', async () => {
+  test('a poller-claimed card with children running, the issue closed by the owner -> the parent is not closed and its state unread, children untouched; the last child done -> the parent done', async () => {
     const w = await makeWorld({ list: [1406] });
     await w.intake.sweep();
     const parent = todoOf(w.s, 1406);
     if (parent === undefined) throw new Error('1406 not imported');
-    const thread = chiefThreads(w.s)[0];
-    if (thread === undefined) throw new Error('orchestrate thread missing');
-    const split = createSplitTodo(w.s.svc, {
-      parentId: parent.id,
-      subtodos: [
-        { title: 'part a', spec: 'a', agentId: CHIEF_AGENT_ID },
-        { title: 'part b', spec: 'b', agentId: CHIEF_AGENT_ID },
-      ],
-      chiefAgentId: CHIEF_AGENT_ID,
-      chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
-      threadId: thread.id,
-      actorName: 'Chief',
-    });
-    const [childA, childB] = split.children.map((c) => c.id) as [string, string];
+    const childA = insertChild(w, parent.id, 'review');
+    const childB = insertChild(w, parent.id, 'building');
     setPhase(w, parent.id, 'building');
-    setPhase(w, childA, 'review');
-    setPhase(w, childB, 'building');
     closeOnGithub(w, 1406, OWNER);
     const stateReads = w.gh.issueReads(1406).length;
     const tally = await w.intake.sweep();
@@ -3343,62 +3294,8 @@ describe('16 merged closing PR', () => {
   });
 });
 
-describe('agent label routing', () => {
-  test.each(
-    [[], ['other-agent'], ['ORB-BUILDER'], ['orb']].map((intakeAgentAllowlist) => ({
-      intakeAgentAllowlist,
-    })),
-  )(
-    'holds a label unless its exact display name is allowlisted: %j',
-    async ({ intakeAgentAllowlist }) => {
-      const w = await makeWorld({ list: [1406], intakeAgentAllowlist });
-      routeLabel(w);
-      builder(w, 'orb-agent');
-      const tally = await w.intake.sweep();
-      expect(tally?.held).toBe(1);
-      expect(takenNumbers(w.s)).toEqual([]);
-      expect(chiefThreads(w.s)).toHaveLength(0);
-      expect(w.logs.some((line) => line.obj.reason === 'agent-label-not-allowlisted')).toBe(true);
-    },
-  );
-
-  test.each(['ready-for-agent', 'correction'] as const)(
-    'scheduler forwards the configured allowlist to %s intake',
-    async (label) => {
-      const w = await makeWorld({ list: [1406] });
-      routeLabel(w);
-      builder(w, 'orb-agent');
-      if (label === 'correction') {
-        const issue = w.gh.state.open.find((item) => item.number === 1406);
-        if (!issue) throw new Error('issue missing');
-        issue.labels = issue.labels.filter((item) => item.name !== LABEL);
-        issue.labels.push({ name: label, color: 'ededed' });
-        w.gh.state.events
-          .get(1406)
-          ?.push(labelEvent('labeled', OWNER, '2026-10-23T00:00:00Z', 90001, label));
-      }
-      const scheduler = createScheduler(
-        { ...w.s.svc, box: w.s.secretBox },
-        { tickMs: 3_600_000 },
-        undefined,
-        undefined,
-        issueIntakeRunOf(loadConfig({ issueIntake: true, intakeAgentAllowlist: ['orb-builder'] }), {
-          githubFetch: w.gh.impl,
-          logger: { info: () => {} },
-        }),
-      );
-      try {
-        scheduler.start();
-        await vi.waitFor(() => {
-          expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
-        });
-      } finally {
-        scheduler.stop();
-      }
-    },
-  );
-
-  function routeLabel(w: World, labels: string[] = ['agent:orb-builder']): void {
+describe('agent labels are no longer a routing signal', () => {
+  function routeLabel(w: World, labels: string[]): void {
     const issue = w.gh.state.open.find((i) => i.number === 1406);
     if (!issue) throw new Error('issue missing');
     issue.labels.push(...labels.map((name) => ({ name, color: 'ededed' })));
@@ -3410,310 +3307,25 @@ describe('agent label routing', () => {
     ]);
   }
 
-  function builder(
-    w: World,
-    id: string,
-    status = 'active',
-    attached: { secrets?: string[]; mcpServers?: string[] } = {},
-  ): void {
-    w.s.db
-      .insert(agentTable)
-      .values({
-        id,
-        teamId: w.s.team.id,
-        displayName: 'orb-builder',
-        status,
-        provider: 'claude-code',
-        modelId: 'sonnet',
-        ...attached,
-      })
-      .run();
-  }
-
-  test.each<[string, { secrets?: string[]; mcpServers?: string[] }]>([
-    ['secrets', { secrets: ['deploy-key'] }],
-    ['MCP servers', { mcpServers: ['prod-db'] }],
-  ])('holds routing to an agent with %s attached', async (_kind, attached) => {
-    const w = await makeWorld({ list: [1406] });
-    routeLabel(w);
-    builder(w, 'privileged-agent', 'active', attached);
-    const tally = await w.intake.sweep();
-    expect(tally?.held).toBe(1);
-    expect(takenNumbers(w.s)).toEqual([]);
-    expect(chiefThreads(w.s)).toHaveLength(0);
-    expect(w.logs.some((line) => line.obj.reason === 'agent-label-privileged')).toBe(true);
-  });
-
-  test('a newer agent label that was removed again does not hold the present one', async () => {
-    const w = await makeWorld({ list: [1406] });
-    routeLabel(w);
-    builder(w, 'orb-agent');
-    w.gh.state.events
-      .get(1406)
-      ?.push(
-        labelEvent('labeled', OWNER, '2026-10-23T00:00:00Z', 90001, 'agent:other'),
-        labelEvent('unlabeled', OWNER, '2026-10-24T00:00:00Z', 90002, 'agent:other'),
-      );
-    const tally = await w.intake.sweep();
-    expect(tally?.imported).toBe(1);
-    expect(todoOf(w.s, 1406)?.assignment?.build).toEqual({ agentId: 'orb-agent' });
-  });
-
-  test('applies the unique active agent to plan and build before orchestration', async () => {
-    const w = await makeWorld({ list: [1406] });
-    routeLabel(w);
-    builder(w, 'orb-agent');
-    builder(w, 'retired-agent', 'inactive');
-    const tally = await w.intake.sweep();
-    expect(tally?.imported).toBe(1);
-    expect(tally?.orchestrated).toBe(1);
-    expect(todoOf(w.s, 1406)?.assignment).toEqual({
-      source: 'intake-label',
-      plan: { agentId: 'orb-agent' },
-      build: { agentId: 'orb-agent' },
-    });
-  });
-
-  test.each(['unknown', 'inactive', 'ambiguous', 'multiple-labels'] as const)(
-    'holds %s routing without importing or orchestrating',
-    async (kind) => {
+  test.each([['agent:orb-builder'], ['AGENT:orb-builder'], ['agent:orb-builder', 'agent:other']])(
+    'holds an issue carrying %j without importing or orchestrating',
+    async (...labels) => {
       const w = await makeWorld({ list: [1406] });
-      routeLabel(w, kind === 'multiple-labels' ? ['agent:orb-builder', 'agent:other'] : undefined);
-      if (kind === 'inactive') builder(w, 'inactive-agent', 'inactive');
-      if (kind === 'ambiguous') {
-        builder(w, 'first');
-        builder(w, 'second');
-      }
+      routeLabel(w, labels);
       const tally = await w.intake.sweep();
       expect(tally?.held).toBe(1);
       expect(takenNumbers(w.s)).toEqual([]);
       expect(chiefThreads(w.s)).toHaveLength(0);
-      expect(
-        w.logs.some(
-          (line) =>
-            line.obj.reason ===
-            (kind === 'ambiguous' || kind === 'multiple-labels'
-              ? 'agent-label-ambiguous'
-              : 'agent-label-unknown'),
-        ),
-      ).toBe(true);
+      expect(w.logs.some((line) => line.obj.reason === 'agent-label-removed')).toBe(true);
     },
   );
 
-  test.each([true, false])(
-    'Coordinator respects preset plan and build withPlan=%s',
-    async (withPlan) => {
-      const w = await makeWorld({ list: [1406] });
-      await w.intake.sweep();
-      builder(w, 'orb-agent');
-      const row = todoOf(w.s, 1406);
-      const thread = chiefThreads(w.s)[0];
-      if (!row || !thread) throw new Error('import missing');
-      w.s.db
-        .update(todoTable)
-        .set({
-          assignment: {
-            source: 'intake-label',
-            plan: { agentId: 'orb-agent' },
-            build: { agentId: 'orb-agent' },
-          },
-        })
-        .where(eq(todoTable.id, row.id))
-        .run();
-      await executeChiefTool(
-        {
-          ...w.s.svc,
-          intakeAgentAllowlist: ['orb-builder'],
-          box: w.s.secretBox,
-          reposDir: w.s.reposDir,
-          attachmentsDir: w.s.attachmentsDir,
-        },
-        {
-          teamId: w.s.team.id,
-          userId: w.s.user.id,
-          chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
-          threadId: thread.id,
-          conversationId: thread.id,
-          chiefAgentId: CHIEF_AGENT_ID,
-        },
-        'run_builds',
-        {
-          todoIds: [row.id],
-          withPlan,
-          assignment: { plan: { agentId: CHIEF_AGENT_ID }, build: { agentId: CHIEF_AGENT_ID } },
-        },
-      );
-      expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
-      expect(todoOf(w.s, 1406)?.assignment?.plan?.agentId).toBe('orb-agent');
-      const steps = w.s.db
-        .select()
-        .from(stepTable)
-        .all()
-        .filter((step) => step.kind !== 'chief');
-      expect(steps.map((step) => step.kind)).toEqual([withPlan ? 'plan' : 'build']);
-    },
-  );
-
-  test('matches the agent prefix case-insensitively', async () => {
+  test('an issue without an agent label is imported and orchestrated as usual', async () => {
     const w = await makeWorld({ list: [1406] });
-    routeLabel(w, ['AGENT:orb-builder']);
-    builder(w, 'orb-agent');
-    await w.intake.sweep();
-    expect(todoOf(w.s, 1406)?.assignment?.build?.agentId).toBe('orb-agent');
-  });
-
-  test.each(['outsider', 'app', 'bot', 'removed', 'missing', 'deleted', 'permission-unreadable'])(
-    'holds an untrusted agent label: %s',
-    async (kind) => {
-      const w = await makeWorld({ list: [1406] });
-      routeLabel(w);
-      builder(w, 'orb-agent');
-      const events: RawEvent[] = [...HUMAN_EVENTS_1406];
-      if (kind !== 'missing') {
-        events.push(
-          labelEvent('labeled', OWNER, '2026-10-22T00:00:00Z', 90000, 'agent:orb-builder'),
-        );
-        const latest = labelEvent(
-          kind === 'removed' ? 'unlabeled' : 'labeled',
-          kind === 'outsider'
-            ? 'outsider'
-            : kind === 'bot'
-              ? 'claude[bot]'
-              : kind === 'deleted'
-                ? null
-                : OWNER,
-          '2026-10-23T00:00:00Z',
-          90001,
-          'AGENT:orb-builder',
-        );
-        if (kind === 'app' || kind === 'bot')
-          latest.performed_via_github_app = { slug: kind === 'app' ? 'untrusted' : 'claude' };
-        events.push(latest);
-      }
-      w.gh.state.events.set(1406, events);
-      if (kind === 'permission-unreadable')
-        w.gh.overrides.set(`/repos/${REPO}/collaborators/${OWNER}/permission`, () => ({
-          status: 502,
-          body: {},
-        }));
-      const tally = await w.intake.sweep();
-      expect(takenNumbers(w.s)).toEqual([]);
-      expect(chiefThreads(w.s)).toHaveLength(0);
-      if (kind !== 'permission-unreadable') {
-        expect(tally?.held).toBe(1);
-        expect(w.logs.some((line) => String(line.obj.reason).startsWith('agent-label-'))).toBe(
-          true,
-        );
-      }
-    },
-  );
-
-  test('a newer different agent label event holds a stale issue list', async () => {
-    const w = await makeWorld({ list: [1406] });
-    routeLabel(w);
-    builder(w, 'orb-agent');
-    w.gh.state.events
-      .get(1406)
-      ?.push(labelEvent('labeled', 'outsider', '2026-10-23T00:00:00Z', 90001, 'agent:other'));
     const tally = await w.intake.sweep();
-    expect(tally?.held).toBe(1);
-    expect(takenNumbers(w.s)).toEqual([]);
-    expect(w.logs.some((line) => line.obj.reason === 'agent-label-label-changed')).toBe(true);
-  });
-
-  test('trusts a triager applying an agent label through the trusted app', async () => {
-    const w = await makeWorld({ list: [1406] });
-    routeLabel(w);
-    builder(w, 'orb-agent');
-    const event = labelEvent(
-      'labeled',
-      'triager',
-      '2026-10-23T00:00:00Z',
-      90001,
-      'agent:orb-builder',
-    );
-    event.performed_via_github_app = { slug: 'claude' };
-    w.gh.state.events.set(1406, [...HUMAN_EVENTS_1406, event]);
-    w.gh.state.permissions.set('triager', { body: permissionBody('triager', 'read', 'triage') });
-    expect((await w.intake.sweep())?.imported).toBe(1);
-  });
-
-  test.each(['before-write', 'after-write'])(
-    'assignment update failure holds the created todo and prevents Coordinator dispatch: %s',
-    async (failure) => {
-      const w = await makeWorld({ list: [1406] });
-      routeLabel(w);
-      builder(w, 'orb-agent');
-      const published = vi.spyOn(w.s.hub, 'publishTodoDoc');
-      const updateTodo = todosService.updateTodo;
-      const update = vi.spyOn(todosService, 'updateTodo').mockImplementationOnce((...args) => {
-        if (failure === 'after-write') updateTodo(...args);
-        throw new Error('assignment-write-failed');
-      });
-      try {
-        const tally = await w.intake.sweep();
-        expect(tally?.imported).toBe(1);
-        expect(tally?.orchestrated).toBe(0);
-        expect(tally?.held).toBe(1);
-        expect(tally?.errors).toBe(1);
-        expect(todoOf(w.s, 1406)).toBeDefined();
-        expect(chiefThreads(w.s)).toHaveLength(0);
-        const record = todoOf(w.s, 1406);
-        expect(published.mock.calls[0]?.[1].assignment).toEqual({
-          source: 'intake-label',
-          plan: null,
-          build: null,
-        });
-        expect(record?.assignment).toEqual({ source: 'intake-label', plan: null, build: null });
-        if (!record) throw new Error('import missing');
-        await expect(
-          executeChiefTool(
-            {
-              ...w.s.svc,
-              box: w.s.secretBox,
-              reposDir: w.s.reposDir,
-              attachmentsDir: w.s.attachmentsDir,
-            },
-            {
-              teamId: w.s.team.id,
-              userId: w.s.user.id,
-              chiefId: `chief-${w.s.user.id}-${w.s.team.id}`,
-              threadId: 'held-thread',
-              conversationId: 'held-thread',
-              chiefAgentId: CHIEF_AGENT_ID,
-            },
-            'run_builds',
-            { todoIds: [record.id], assignment: { build: { agentId: CHIEF_AGENT_ID } } },
-          ),
-        ).rejects.toThrow(/intake-label-assignment-failed/);
-        expect(w.s.db.select().from(buildTable).all()).toHaveLength(0);
-        await w.intake.sweep();
-        const restarted = createIssueIntake(
-          { ...w.s.svc, box: w.s.secretBox },
-          { githubFetch: w.gh.impl },
-        );
-        await restarted.sweep();
-        expect(chiefThreads(w.s)).toHaveLength(0);
-        expect(
-          w.logs.some(
-            (line) =>
-              line.msg === 'issue intake assignment failed' &&
-              line.obj.err === 'assignment-write-failed' &&
-              line.obj.reason === 'intake-label-assignment-failed',
-          ),
-        ).toBe(true);
-      } finally {
-        update.mockRestore();
-        published.mockRestore();
-      }
-    },
-  );
-
-  test('without an agent label intake leaves the assignment unset', async () => {
-    const w = await makeWorld({ list: [1406] });
-    builder(w, 'orb-agent');
-    await w.intake.sweep();
-    expect(todoOf(w.s, 1406)?.assignment).toBeNull();
+    expect(tally?.imported).toBe(1);
+    expect(tally?.orchestrated).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([1406]);
     expect(chiefThreads(w.s)).toHaveLength(1);
   });
 });

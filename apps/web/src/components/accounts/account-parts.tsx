@@ -510,7 +510,11 @@ export function StickyThreadRow({ thread, now }: { thread: StickyThread; now: nu
     <ListRow
       className="hover:bg-transparent"
       title={thread.title}
-      trailing={t('固定于 {ago}', { ago: relativeTime(thread.since, now, t) })}
+      trailing={
+        relativeTime(thread.since, now, t) === ''
+          ? undefined
+          : t('固定于 {ago}', { ago: relativeTime(thread.since, now, t) })
+      }
     />
   );
 }

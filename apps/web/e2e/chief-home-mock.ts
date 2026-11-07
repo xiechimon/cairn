@@ -45,7 +45,7 @@ export const TASK = {
   title: '修复看板拖拽后计数不刷新',
   spec: '',
   phase: 'building',
-  phaseAt: 0,
+  phaseAt: Date.now() - 12 * 60_000,
   seqNum: 9,
   orderIndex: 0,
   tagIds: [],
@@ -193,7 +193,6 @@ export async function mockLive(
       return json({ thread: THREAD }, 201);
     }
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
-    if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json(state.todos ?? [TASK]);
     if (p === '/api/projects') return json(state.projects ?? [PROJECT]);
     if (p === '/api/teams/t1/machines') return json(state.machines ?? [READY_MACHINE]);

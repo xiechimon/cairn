@@ -22,7 +22,6 @@ export interface RemoteAccessContext {
 
 export interface AppContext {
   remote?: RemoteAccessContext;
-  intakeAgentAllowlist?: readonly string[];
   db: Db;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;

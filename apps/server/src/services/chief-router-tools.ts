@@ -8,7 +8,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, project, todo } from '../db/schema.js';
+import { build, project, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
@@ -16,7 +16,6 @@ import { cancelBuild, stoppedBeforeFirstRun } from './builds.js';
 import type { ChiefToolCtx, ChiefToolDeps } from './chief-tools.js';
 import { listNeedsYou } from './needs-you.js';
 import { PhaseTransitionError } from './phase.js';
-import { routingRulesEnabled } from './routing-rules.js';
 import { messageThreadAsUser, startThreadBuild } from './thread-message.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -37,16 +36,10 @@ export function isRouterTool(name: string): boolean {
   return ROUTER_TOOLS.has(name);
 }
 
-export function assertToolAllowedUnderRouting(name: string): void {
-  if (routingRulesEnabled()) {
-    const replacement = REMOVED_TOOLS.get(name);
-    if (replacement !== undefined) {
-      throw new HttpError(410, `${name} was removed under D60. Use ${replacement}.`);
-    }
-    return;
-  }
-  if (isRouterTool(name)) {
-    throw new HttpError(409, `${name} is not available: routing rules are off for this server`);
+export function assertToolNotRemoved(name: string): void {
+  const replacement = REMOVED_TOOLS.get(name);
+  if (replacement !== undefined) {
+    throw new HttpError(410, `${name} was removed under D60. Use ${replacement}.`);
   }
 }
 
@@ -113,18 +106,10 @@ async function messageThread(
     { content: params.content, clientMessageId: newRecordId() },
     'params',
   );
-  const chiefName =
-    ctx.chiefAgentId === null
-      ? undefined
-      : deps.db
-          .select({ name: agent.displayName })
-          .from(agent)
-          .where(eq(agent.id, ctx.chiefAgentId))
-          .get()?.name;
   return json(
     await messageThreadAsUser(deps, ctx.teamId, str(params, 'todoId'), body, {
       origin: 'coordinator',
-      actor: chiefName ?? 'Coordinator',
+      actor: 'Coordinator',
     }),
   );
 }

@@ -2,10 +2,8 @@ import { CONFIRM_ANNOUNCEMENT, DONE_ANNOUNCEMENT, MERGE_ANNOUNCEMENT } from '@ca
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   message as messageTable,
-  plan as planTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -23,8 +21,6 @@ async function withConfirmTodo(): Promise<TestServer & { todoId: string; buildId
   startBuilds(s.svc, {
     projectId,
     todoIds: [todoDoc.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
   });
   setTodoPhase(s.svc, todoDoc.id, 'planning');
   setTodoPhase(s.svc, todoDoc.id, 'confirm');
@@ -42,12 +38,6 @@ async function withReviewTodo(): Promise<TestServer & { todoId: string; buildId:
   return s;
 }
 
-function seedChiefAgent(s: TestServer, displayName = '总管'): string {
-  const id = 'agent-chief-1';
-  s.db.insert(agentTable).values({ id, teamId: s.team.id, displayName, status: 'active' }).run();
-  return id;
-}
-
 function rowsOf(s: TestServer, conversationId: string) {
   return s.db
     .select()
@@ -56,13 +46,13 @@ function rowsOf(s: TestServer, conversationId: string) {
     .all();
 }
 
-function chiefCtx(s: TestServer, chiefAgentId: string | null) {
+function chiefCtx(s: TestServer) {
   return {
     teamId: s.team.id,
     userId: s.user.id,
     chiefId: 'chief-x',
     threadId: 'thread-x',
-    chiefAgentId,
+    chiefAgentId: null,
     conversationId: 'conv-x',
   };
 }
@@ -82,11 +72,10 @@ function chiefDeps(s: TestServer) {
 
 async function runChiefTool(
   s: TestServer,
-  chiefAgentId: string | null,
   name: string,
   params: Record<string, unknown>,
 ): Promise<unknown> {
-  const text = await executeChiefTool(chiefDeps(s), chiefCtx(s, chiefAgentId), name, params);
+  const text = await executeChiefTool(chiefDeps(s), chiefCtx(s), name, params);
   return JSON.parse(text);
 }
 
@@ -102,42 +91,6 @@ describe('#902 gate-passing action records the actor (announcement row)', () => 
       expect(row, 'confirm row must exist').toBeDefined();
       expect(row?.role).toBe('user');
       expect(row?.actor).toBe(s.user.displayName);
-    } finally {
-      s.dispose();
-    }
-  });
-
-  test('failure mode 3: chief confirm_builds -> confirm row actor = chief Agent displayName (not recorded as the user name)', async () => {
-    const s = await withConfirmTodo();
-    try {
-      const task = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()!;
-      expect(
-        (
-          await req(s.app, 'PATCH', `/api/projects/${task.projectId}/merge-policy`, {
-            mergePolicy: 'autonomous',
-          })
-        ).status,
-      ).toBe(200);
-      s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.buildId, s.buildId)).run();
-      s.db
-        .insert(planTable)
-        .values({
-          id: 'chief-confirm-plan',
-          buildId: s.buildId,
-          version: 1,
-          content: 'Kind: fix\n## Verification\n- `pnpm test` passes\n',
-          createdAt: Date.now(),
-        })
-        .run();
-      const agentId = seedChiefAgent(s, '总管甲');
-      const out = (await runChiefTool(s, agentId, 'confirm_builds', {
-        buildIds: [s.buildId],
-      })) as Record<string, unknown>;
-      expect(out).toBeDefined();
-      const row = rowsOf(s, s.buildId).find((m) => m.content === CONFIRM_ANNOUNCEMENT);
-      expect(row, 'confirm row must exist').toBeDefined();
-      expect(row?.actor).toBe('总管甲');
-      expect(row?.actor).not.toBe(s.user.displayName);
     } finally {
       s.dispose();
     }
@@ -189,8 +142,7 @@ describe('#900 chief may not self-pass the review gate (complete_todos)', () => 
   test('failure modes 6/7: chief complete_todos review->done refused -- phase unchanged, receipt carries the refusal reason', async () => {
     const s = await withReviewTodo();
     try {
-      const agentId = seedChiefAgent(s);
-      const out = (await runChiefTool(s, agentId, 'complete_todos', {
+      const out = (await runChiefTool(s, 'complete_todos', {
         todoIds: [s.todoId],
       })) as { transitioned: string[]; skipped: string[]; reasons?: Record<string, string> };
       expect(out.transitioned).not.toContain(s.todoId);
@@ -229,8 +181,7 @@ describe('#900 chief may not self-pass the review gate (complete_todos)', () => 
     const s = await withConfirmTodo();
     try {
       s.db.update(todoTable).set({ phase: 'todo' }).where(eq(todoTable.id, s.todoId)).run();
-      const agentId = seedChiefAgent(s);
-      const out = (await runChiefTool(s, agentId, 'close_todos', {
+      const out = (await runChiefTool(s, 'close_todos', {
         todoIds: [s.todoId],
       })) as { transitioned: string[]; skipped: string[] };
       expect(out.transitioned).toContain(s.todoId);
@@ -244,8 +195,7 @@ describe('#900 chief may not self-pass the review gate (complete_todos)', () => 
   test('chief complete_todos with a cross-team id still records skipped (existing defense-in-depth does not drift with the gate)', async () => {
     const s = await withReviewTodo();
     try {
-      const agentId = seedChiefAgent(s);
-      const out = (await runChiefTool(s, agentId, 'complete_todos', {
+      const out = (await runChiefTool(s, 'complete_todos', {
         todoIds: ['todo-other-team'],
       })) as { transitioned: string[]; skipped: string[] };
       expect(out.skipped).toContain('todo-other-team');
@@ -312,21 +262,6 @@ describe('#901 manual phase change confirm/review->done audit rows (server surfa
 });
 
 describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
-  test('G4 chief confirm_builds on a review build -> refused, no passed-confirm row, phase unchanged', async () => {
-    const s = await withReviewTodo();
-    try {
-      const agentId = seedChiefAgent(s);
-      await expect(
-        runChiefTool(s, agentId, 'confirm_builds', { buildIds: [s.buildId] }),
-      ).rejects.toThrow(/待确认（confirm）关口，当前相位 review/);
-      expect(rowsOf(s, s.buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
-      const row = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get();
-      expect(row?.phase).toBe('review');
-    } finally {
-      s.dispose();
-    }
-  });
-
   test('G6 a second confirm on a todo already in building → 409, no second row, no second build step', async () => {
     const s = await withConfirmTodo();
     try {

@@ -1,15 +1,19 @@
 import { expect, test } from '@playwright/test';
 
-test('settings work-routing shows the empty state and flag-off copy', async ({ page }) => {
+test('settings work-routing shows the empty state and the create-rule editors', async ({
+  page,
+}) => {
   await page.goto('/app/settings/work-routing?scenario=01');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.locator('[data-settings-section="work-routing"]')).toHaveAttribute(
     'aria-current',
     'page',
   );
-  await expect(settings.getByTestId('routing-rules-enabled')).toHaveText('规则未启用');
   await expect(settings.getByTestId('routing-settings-empty')).toBeVisible();
   await expect(settings.getByText('还没有路由规则。')).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-review')).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-citation_check')).toBeVisible();
 });
 
 test('settings work-routing renders seeded rules and policies from the fixture', async ({
@@ -17,9 +21,11 @@ test('settings work-routing renders seeded rules and policies from the fixture',
 }) => {
   await page.goto('/app/settings/work-routing?scenario=routing-settings');
   const settings = page.getByRole('dialog', { name: '设置' });
-  await expect(settings.getByTestId('routing-rules-enabled')).toHaveText('规则未启用');
+  await expect(settings.getByTestId('routing-settings-empty')).toHaveCount(0);
   await expect(settings.getByTestId('routing-rule-session')).toBeVisible();
   await expect(settings.getByTestId('routing-rule-review')).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
+  await expect(settings.getByTestId('routing-rule-new-review')).toHaveCount(0);
   await expect(settings.getByTestId('work-policy-session')).toBeVisible();
   await expect(settings.getByTestId('work-policy-review')).toBeVisible();
   const session = settings.getByTestId('routing-rule-session');

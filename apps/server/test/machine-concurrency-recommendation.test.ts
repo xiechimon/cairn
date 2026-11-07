@@ -1,7 +1,7 @@
 import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { agent as agentTable, machine as machineTable } from '../src/db/schema.js';
+import { machine as machineTable } from '../src/db/schema.js';
 import {
   CONCURRENCY_CEILING,
   CONCURRENCY_FLOOR,
@@ -115,8 +115,6 @@ interface World {
   projectId: string;
 }
 
-const AGENT_ID = 'agent-rec-1';
-
 async function setupWorld(): Promise<World> {
   const s = bootServer();
   disposables.push(() => s.dispose());
@@ -133,25 +131,6 @@ async function setupWorld(): Promise<World> {
     .from(machineTable)
     .where(eq(machineTable.name, 'rec-mbp'))
     .get()!.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'rec-agent',
-      machineId,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
   const projectId = await postProject(s.app, 'rec-proj');
   return { s, machineId, token, projectId };
 }

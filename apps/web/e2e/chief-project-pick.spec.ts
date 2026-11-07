@@ -160,7 +160,6 @@ async function mockLive(page: Page, opts: { projects?: typeof PROJECTS } = {}) {
         wakes: [],
       });
     if (p === `/api/conversations/${THREAD.id}/messages`) return json({ messages: state.messages });
-    if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json(state.todos);
     if (p === '/api/projects') return json(projects);
     if (p === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);

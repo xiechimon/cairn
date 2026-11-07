@@ -10,7 +10,6 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -23,11 +22,9 @@ import type { FetchLike } from '../src/lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, completeStep } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bindAllAgents, bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 
-const AGENT_ID = 'agent-rework-1';
 const PR_URL = 'https://github.com/demo-owner/demo-repo/pull/888';
 const PR_NUMBER = 888;
 
@@ -76,17 +73,6 @@ function makeWorld(opts: WorldOpts = {}): World {
     })
     .run();
   s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'rework-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .onConflictDoNothing()
-    .run();
-  s.db
     .insert(machineTable)
     .values({
       id: machineAId,
@@ -106,7 +92,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       enabledRuntimes: ['pi'],
     })
     .run();
-  bindAllAgents(s, machineAId);
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineAId });
   s.db
     .insert(todoTable)
     .values({
@@ -118,7 +104,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       phase: 'failed',
       phaseAt: base,
       seqNum: 18,
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
       hasPlan: true,
       latestBuildId: buildId,
       v: 1,
@@ -307,7 +292,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
       ),
     ).toBe(true);
     const steps = stepsOf(w, newId);
-    expect(steps[0]!.prompt).toBe(buildRestartPrompt('合并后再补一步'));
+    expect(steps[0]!.prompt).toBe(`${SESSION_BRIEF}\n\n${buildRestartPrompt('合并后再补一步')}`);
     expect(steps[0]!.freshSession).toBe(false);
   });
 
@@ -363,7 +348,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
       true,
     );
     const steps = stepsOf(w, newId);
-    expect(steps[0]!.prompt).toBe(buildRestartPrompt('普通重启'));
+    expect(steps[0]!.prompt).toBe(`${SESSION_BRIEF}\n\n${buildRestartPrompt('普通重启')}`);
     expect(steps[0]!.freshSession).toBe(false);
   });
 
@@ -386,18 +371,6 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     expect(steps[0]!.kind).toBe('session');
     expect(steps[0]!.prompt?.startsWith(SESSION_BRIEF)).toBe(true);
     expect(buildsOf(w).find((b) => b.id === newId)!.withPlan).toBe(false);
-  });
-
-  test('fresh restart with routing rules on -> a session step', async () => {
-    setRoutingRulesEnabled(true);
-    try {
-      const w = makeWorld({ prFields: false });
-      await restart(w, '规则开启重启');
-      const steps = stepsOf(w, todoRowOf(w).latestBuildId!);
-      expect(steps[0]!.kind).toBe('session');
-    } finally {
-      setRoutingRulesEnabled(false);
-    }
   });
 
   test('failure mode 7: legacy builds with several PRs -> rework lands on the latest PR build', async () => {

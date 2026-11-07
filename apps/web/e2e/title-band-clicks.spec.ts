@@ -67,7 +67,6 @@ for (const [route, scenario] of [
 }
 
 for (const [route, backTo] of [
-  ['/app/resources/agents/r3-builder?scenario=agent-detail', '/app/settings/team'],
   [
     '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c',
     /\/app\?scenario=r2-24c&project=ZAQczKCu0MOAzC1ZqcFlX$/,

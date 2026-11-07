@@ -49,7 +49,7 @@ export function SettingsHeader({
       {avatar != null && (
         <span
           className={cn(
-            'settings-avatar flex size-14 flex-none overflow-hidden rounded-full bg-card ring-1 ring-foreground/8 [&_img]:block [&_img]:size-14',
+            'flex size-14 flex-none overflow-hidden rounded-full bg-card ring-1 ring-foreground/8 [&_img]:block [&_img]:size-14',
             avatarClassName,
           )}
         >

@@ -63,7 +63,6 @@ async function driveToDeadlock(seed) {
 
   const build = await jpost(`/api/projects/${seed.projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: { agentId }, build: { agentId } },
     withPlan: true,
   });
   const buildId = build.body?.builds?.[0]?.id;
@@ -153,15 +152,14 @@ try {
     models: [{ id: 'stub-model', name: 'stub-model' }],
   });
   if (![200, 201, 409].includes(prov.status)) throw new Error(`provider ${prov.status}`);
-  const agent = await jpost(`/api/teams/${teamId}/agents`, {
-    displayName: 'verify-builder-702',
+  const agent = await jpost(`/api/teams/${teamId}/routing-rules/session`, {
     provider: 'stub-gw',
     modelId: 'stub-model',
-  });
+  }, undefined, 'PATCH');
   const agentId = agent.body?.id ?? agent.body?.agentId ?? agent.body?.record?.id;
   if (!agentId) throw new Error(`agent create: ${JSON.stringify(agent.body)}`);
   const grant = await jpost(
-    `/api/teams/${teamId}/agents/${agentId}`,
+    `/api/teams/${teamId}/work-policies/session`,
     { tools: ['合并分支', '推送分支'] },
     undefined,
     'PATCH',

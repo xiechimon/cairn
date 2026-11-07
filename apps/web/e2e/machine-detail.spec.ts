@@ -14,25 +14,7 @@ test('opening a machine row expands its detail in place', async ({ page }) => {
   await expect(row(page).getByTestId('machine-item-status')).toHaveText('在线');
 });
 
-test('detail shows only agents bound to this machine', async ({ page }) => {
-  await page.goto(DETAIL);
-  await expect(row(page).getByTestId('machine-item-status')).toHaveText('在线');
-  await expect(page.getByTestId('team-agent-grid')).toBeVisible();
-  await expect(page.getByTestId('team-agent-card')).toHaveCount(0);
-});
-
-test('create slot preselects this machine as the owner machine', async ({ page }) => {
-  await page.goto(DETAIL);
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-  const dialog = page.getByRole('dialog', { name: '创建 agent' });
-  await expect(dialog).toBeVisible();
-
-  await expect(dialog.locator('.dlg-agent-machine-select')).toContainText('mea-wsl');
-  await dialog.getByLabel('名称').fill('probe');
-  await expect(dialog.getByRole('button', { name: '创建', exact: true })).toBeEnabled();
-});
-
-test('menu gate: deletable with no bound agents; whole-machine migrate is disabled until a target is picked', async ({ page }) => {
+test('menu gate: deletable; whole-machine migrate is disabled until a target is picked', async ({ page }) => {
   await page.goto(DETAIL);
 
   await row(page).getByTestId('machine-menu').click();

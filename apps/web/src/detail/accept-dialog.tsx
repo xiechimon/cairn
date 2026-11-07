@@ -14,7 +14,6 @@ interface AcceptDialogProps {
   onConfirm?: (merge: boolean) => void;
   confirming?: boolean;
   mergeLocked?: boolean;
-  missingTools?: string[];
   rejectReason?: string | null;
   substantiveChanges?: boolean | null;
   infoOutput?: boolean;
@@ -26,7 +25,6 @@ export function AcceptDialog({
   onConfirm,
   confirming,
   mergeLocked,
-  missingTools,
   rejectReason,
   substantiveChanges,
   infoOutput,
@@ -38,7 +36,6 @@ export function AcceptDialog({
   }, [open]);
   const locked = mergeLocked === true;
   const skipMerge = infoOutput === true || (substantiveChanges === false && !locked);
-  const blocked = !skipMerge && (missingTools?.length ?? 0) > 0;
   const mergeChecked = locked || merge;
   return (
     <DialogShell
@@ -53,7 +50,7 @@ export function AcceptDialog({
           </Button>
           <Button
             className={DIALOG_PRIMARY_BUTTON}
-            disabled={blocked || confirming === true}
+            disabled={confirming === true}
             onClick={() => {
               if (onConfirm) onConfirm(skipMerge ? false : mergeChecked);
               else onClose();
@@ -89,13 +86,6 @@ export function AcceptDialog({
       {locked && !skipMerge && (
         <p className="mt-2 text-meta text-(--text-tertiary)">
           {t('失败任务只能经合并完成，不能跳过合并。')}
-        </p>
-      )}
-      {blocked && (
-        <p className="mt-2 text-meta text-(--text-tertiary)">
-          {t('缺少「{tools}」授权，无法合并。请在该 Agent 的权限里开启。', {
-            tools: (missingTools ?? []).map((tool) => t(tool)).join(t('、')),
-          })}
         </p>
       )}
       {rejectReason != null && (

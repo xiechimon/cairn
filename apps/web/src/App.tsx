@@ -19,7 +19,6 @@ import { ROUTING_SETTINGS_HREF } from './resources/routing-settings-page.js';
 import { SECRETS_HREF } from './resources/secrets-page.js';
 import { SKILLS_HREF } from './resources/skills-page.js';
 import { ActivityPage } from './routes/activity-page.js';
-import { AGENTS_HREF, AgentDetailPage } from './routes/agent-detail-page.js';
 import { BoardPage } from './routes/board-page.js';
 import { MachineAuthorizePage } from './routes/machine-authorize-page.js';
 import { TodoRedirect } from './routes/todo-redirect.js';
@@ -47,7 +46,6 @@ export const router = createBrowserRouter([
               { path: '/app/project/:id/files', element: <ProjectPage /> },
               { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
               { path: '/app/team', element: <SettingsRedirect section="team" /> },
-              { path: `${AGENTS_HREF}/:id`, element: <AgentDetailPage /> },
               { path: '/app/account', element: <SettingsRedirect section="account" /> },
               { path: '/app/api-keys', element: <SettingsRedirect section="api-keys" /> },
               { path: SKILLS_HREF, element: <SettingsRedirect section="skills" /> },

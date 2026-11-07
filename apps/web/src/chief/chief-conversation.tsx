@@ -1,8 +1,4 @@
-import {
-  type AskUserAnswer,
-  CHIEF_INPUT_PLACEHOLDER,
-  CHIEF_INPUT_PLACEHOLDER_STEERING,
-} from '@cairn/shared';
+import { CHIEF_INPUT_PLACEHOLDER, CHIEF_INPUT_PLACEHOLDER_STEERING } from '@cairn/shared';
 import { CircleDashed, TriangleAlert } from 'lucide-react';
 import {
   type ReactNode,
@@ -75,6 +71,7 @@ import {
 import { outstandingReportIds } from './outstanding-reports.js';
 import { ProjectMenu } from './project-menu.js';
 import { questionDockState } from './question-dock-state.js';
+import { awaitingStream } from './question-lifecycle.js';
 import type { ChiefEarlier } from './use-chief-surface.js';
 
 const HEAD_ICON_BTN_CLS =
@@ -134,8 +131,6 @@ export interface ChiefConversationProps {
   onClose?: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;
@@ -154,6 +149,7 @@ export interface ChiefConversationProps {
   composerError?: string | null;
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
+  tray?: ReactNode;
   targetPlaceholder?: string | null;
   showBindGate?: boolean;
 }
@@ -166,8 +162,6 @@ export function ChiefConversation({
   onClose,
   onSend,
   onRewind,
-  onAnswerQuestion,
-  onCancelQuestion,
   onWithdraw,
   onSteer,
   onStop,
@@ -186,6 +180,7 @@ export function ChiefConversation({
   composerError = null,
   composerReplacement,
   composerTools,
+  tray,
   targetPlaceholder = null,
   showBindGate = true,
 }: ChiefConversationProps) {
@@ -202,7 +197,8 @@ export function ChiefConversation({
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerHere = targetPlaceholder === null;
   const answerKey = useAnswerKey();
-  const answerActive = answerHere && answerKey !== null;
+  const [threadOverride, setThreadOverride] = useState(false);
+  const answerActive = answerHere && answerKey !== null && !threadOverride;
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const membersQ = useMembers(teamId, live);
@@ -317,16 +313,34 @@ export function ChiefConversation({
     focusedComposerRef.current = null;
   }, []);
   const shownComposerRef = useRef(activeComposer);
+  const threadFocusPendingRef = useRef(false);
   useLayoutEffect(() => {
     const previous = shownComposerRef.current;
     shownComposerRef.current = activeComposer;
+    if (activeComposer === THREAD_COMPOSER && threadFocusPendingRef.current) {
+      threadFocusPendingRef.current = false;
+      surfaceRef.current?.focus({ preventScroll: true });
+      return;
+    }
     if (previous === activeComposer || focusedComposerRef.current !== previous) return;
     const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
     incoming.current?.focus({ preventScroll: true });
   }, [activeComposer]);
+  const restoreToThread = (update: (current: string) => string) => {
+    setThreadOverride(true);
+    setLiveDraft(update);
+    if (shownComposerRef.current === THREAD_COMPOSER)
+      surfaceRef.current?.focus({ preventScroll: true });
+    else threadFocusPendingRef.current = true;
+  };
   const composerBinding = serverDraftBinding(
     onSend != null ? liveDraft : (chief.draft ?? ''),
-    onSend != null ? setLiveDraft : undefined,
+    onSend != null
+      ? (value: string) => {
+          setLiveDraft(value);
+          if (value === '') setThreadOverride(false);
+        }
+      : undefined,
   );
   const sendFromComposer =
     onSend == null
@@ -348,8 +362,7 @@ export function ChiefConversation({
   const prefillText = prefill?.text;
   useEffect(() => {
     if (prefillKey == null || prefillText == null) return;
-    setLiveDraft(prefillText);
-    surfaceRef.current?.focus({ preventScroll: true });
+    restoreToThread(() => prefillText);
   }, [prefillKey, prefillText]);
   const home = variant !== 'drawer';
   const ownHeader = variant !== 'global';
@@ -376,8 +389,9 @@ export function ChiefConversation({
       : undefined;
   const connected = useConnected();
   const turnTick = useLiveSeconds(liveTurn?.kind === 'streaming' ? liveTurn.startedAt : null);
-  const turnElapsed =
-    turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null;
+  const turnElapsed = questionAttached
+    ? null
+    : (turnTick ?? (liveTurn?.kind === 'streaming' ? liveTurn.seconds : undefined) ?? null);
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -385,8 +399,7 @@ export function ChiefConversation({
           onWithdraw(messageId).then(
             () => {
               followSentRef.current = false;
-              setLiveDraft((cur) => (cur === '' ? text : `${cur}\n${text}`));
-              surfaceRef.current?.focus({ preventScroll: true });
+              restoreToThread((cur) => (cur === '' ? text : `${cur}\n${text}`));
             },
             () => {},
           );
@@ -397,7 +410,10 @@ export function ChiefConversation({
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
       : onStop;
   stopTurnRef.current = stopTurn;
-  const allRows = (chief.stream ?? []).map((item, i) => ({ item, i }));
+  const allRows = awaitingStream(chief.stream ?? [], questionAttached).map((item, i) => ({
+    item,
+    i,
+  }));
   const rows = allRows.filter(({ item }) => item.kind !== 'user' || item.pending == null);
   const latestMessage = rows.findLast(
     ({ item }) => item.kind === 'user' || (item.kind === 'robot' && item.typing !== true),
@@ -490,16 +506,12 @@ export function ChiefConversation({
       index={i}
       latest={i === latestMessage?.i}
       replyable={item.kind === 'thread-report' && outstandingReports.has(item.id)}
-      bound={chief.bound}
-      agent={chief.agent}
       runningTool={chief.runningTool}
       copiedKey={copiedKey}
       onCopy={copyText}
       toolsOpen={toolsOpen}
       onToggleTools={toggleTools}
       onRewindRequest={requestRewind}
-      onAnswerQuestion={onAnswerQuestion}
-      onCancelQuestion={onCancelQuestion}
     />
   );
   const renderRows = (list: { item: ChiefStreamItem; i: number }[]) => list.map(streamRow);
@@ -702,7 +714,8 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="flex max-h-[65%] min-h-0 flex-none flex-col"
       >
-        <ChiefQuestionDock home={home} bound={answerHere} />
+        {tray}
+        <ChiefQuestionDock home={home} bound={answerHere} ownFooter={threadOverride} />
         {composerReplacement ?? (
           <>
             {composerError != null && (
