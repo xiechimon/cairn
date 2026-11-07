@@ -15,7 +15,9 @@ const DEFAULT_CONTEXT_WINDOW = 200_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const KEYLESS_PLACEHOLDER = 'cairn-keyless';
 
-export function stepProvider(config: ProviderConfig): Provider | null {
+export type KeyResolver = () => string | null | Promise<string | null>;
+
+export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): Provider | null {
   const api = config.api;
   const streams = api === undefined ? undefined : STREAMS[api];
   if (api === undefined || streams === undefined || config.baseUrl === undefined) return null;
@@ -40,10 +42,12 @@ export function stepProvider(config: ProviderConfig): Provider | null {
     auth: {
       apiKey: {
         name: `${config.providerId} key from the claimed Coordinator step`,
-        resolve: async ({ credential }) =>
-          credential?.key
-            ? { auth: { apiKey: credential.key }, source: 'cairn step token' }
-            : { auth: { apiKey: KEYLESS_PLACEHOLDER }, source: 'no key on the provider' },
+        resolve: async ({ credential }) => {
+          const key = resolveKey === undefined ? credential?.key : await resolveKey();
+          return key
+            ? { auth: { apiKey: key }, source: 'cairn step token' }
+            : { auth: { apiKey: KEYLESS_PLACEHOLDER }, source: 'no key on the provider' };
+        },
       },
     },
     models,

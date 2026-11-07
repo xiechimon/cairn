@@ -16,7 +16,16 @@ function textBlocks(message: AssistantMessage): string {
     .trim();
 }
 
+export interface EntryRow {
+  row: TranscriptRow;
+  entryId: string;
+}
+
 export function entryRows(stepId: string, entries: readonly EntryRecord[]): TranscriptRow[] {
+  return entryRowSources(stepId, entries).map((source) => source.row);
+}
+
+export function entryRowSources(stepId: string, entries: readonly EntryRecord[]): EntryRow[] {
   const results = new Map<string, ToolResultMessage>();
   for (const entry of entries) {
     const message = entry.model?.[0];
@@ -24,7 +33,7 @@ export function entryRows(stepId: string, entries: readonly EntryRecord[]): Tran
       results.set(message.toolCallId, message);
     }
   }
-  const rows: TranscriptRow[] = [];
+  const rows: EntryRow[] = [];
   for (const entry of entries) {
     const message = entry.model?.[0];
     if (
@@ -37,31 +46,37 @@ export function entryRows(stepId: string, entries: readonly EntryRecord[]): Tran
     const text = textBlocks(message);
     if (text !== '') {
       rows.push({
-        id: `${stepId}-e${entry.id}`,
-        role: 'assistant',
-        content: [{ type: 'text', text }],
-        createdAt: message.timestamp,
+        entryId: String(entry.id),
+        row: {
+          id: `${stepId}-e${entry.id}`,
+          role: 'assistant',
+          content: [{ type: 'text', text }],
+          createdAt: message.timestamp,
+        },
       });
     }
     for (const block of message.content) {
       if (block.type !== 'toolCall') continue;
       const result = results.get(block.id);
       rows.push({
-        id: block.id,
-        role: 'assistant',
-        content: {
-          kind: 'toolcall',
-          call: {
-            id: block.id,
-            name: block.name,
-            arguments: block.arguments,
-            startedAt: message.timestamp,
-            ...(result === undefined
-              ? {}
-              : { result: result.content, isError: result.isError, endedAt: result.timestamp }),
+        entryId: String(entry.id),
+        row: {
+          id: block.id,
+          role: 'assistant',
+          content: {
+            kind: 'toolcall',
+            call: {
+              id: block.id,
+              name: block.name,
+              arguments: block.arguments,
+              startedAt: message.timestamp,
+              ...(result === undefined
+                ? {}
+                : { result: result.content, isError: result.isError, endedAt: result.timestamp }),
+            },
           },
+          createdAt: message.timestamp,
         },
-        createdAt: message.timestamp,
       });
     }
   }
@@ -87,10 +102,10 @@ export function createTurnMirror(
   const posted = new Map<string, string>();
   let streamed = '';
   const post = async (entries: readonly EntryRecord[]) => {
-    for (const row of entryRows(stepId, entries)) {
+    for (const { row, entryId } of entryRowSources(stepId, entries)) {
       const body = JSON.stringify(row.content);
       if (posted.get(row.id) === body) continue;
-      await api.transcriptRow(stepId, row);
+      await api.transcriptRow(stepId, row, entryId);
       posted.set(row.id, body);
     }
   };

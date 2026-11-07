@@ -71,6 +71,7 @@ export const ENV_VARS = {
   scheduling: 'CAIRN_SCHEDULING',
   coordinatorServerContext: 'CAIRN_COORDINATOR_SERVER_CONTEXT',
   coordinatorMachineId: 'CAIRN_COORDINATOR_MACHINE_ID',
+  coordinatorInServer: 'CAIRN_COORDINATOR_IN_SERVER',
   trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
   trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
   trajectoryReflectOpenGuardIssues: 'CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES',

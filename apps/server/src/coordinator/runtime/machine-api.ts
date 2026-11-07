@@ -16,7 +16,8 @@ export interface MachineApi {
   stop(stepId: string): Promise<boolean | null>;
   relayTool(stepId: string, name: string, params: Record<string, unknown>): Promise<string>;
   askUser(stepId: string, body: MachineAskBody, signal?: AbortSignal): Promise<MachineAskResponse>;
-  transcriptRow(stepId: string, row: TranscriptRow): Promise<void>;
+  transcriptRow(stepId: string, row: TranscriptRow, entryId?: string): Promise<void>;
+  mapUserEntry?(stepId: string, entryId: string): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
 }
