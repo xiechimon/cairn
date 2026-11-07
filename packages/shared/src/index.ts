@@ -22,6 +22,7 @@ export * from './phase.js';
 export * from './protocol/index.js';
 export * from './records/index.js';
 export * from './remote-access.js';
+export * from './review-findings.js';
 export * from './scheduler.js';
 export * from './search-syntax.js';
 export * from './secret-box.js';
