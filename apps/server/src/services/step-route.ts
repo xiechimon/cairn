@@ -12,7 +12,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { machine, type step, stepRoute, type todo } from '../db/schema.js';
+import { machine, step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { claudeUsageGatePasses } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
@@ -113,6 +113,15 @@ export function storedStepRoute(db: Pick<Db, 'select'>, stepId: string): StepRou
   return db.select().from(stepRoute).where(eq(stepRoute.stepId, stepId)).get() ?? null;
 }
 
+function hasStartedSession(db: Pick<Db, 'select'>, stepId: string): boolean {
+  const row = db
+    .select({ sessionId: step.sessionId, checkpointCommit: step.checkpointCommit })
+    .from(step)
+    .where(eq(step.id, stepId))
+    .get();
+  return row !== undefined && (row.sessionId !== null || row.checkpointCommit !== null);
+}
+
 export function decideStepRoute(
   db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
@@ -122,7 +131,12 @@ export function decideStepRoute(
 ): RouteWorkDecision {
   const difficulty = classifyDifficulty({ title: todoRow.title ?? '', spec: todoRow.spec ?? null });
   const stored = stepId === null ? null : storedStepRoute(db, stepId);
-  if (stored !== null && stored.provider !== null && stored.modelId !== null) {
+  if (
+    stored !== null &&
+    stored.provider !== null &&
+    stored.modelId !== null &&
+    hasStartedSession(db, stored.stepId)
+  ) {
     return routeWork(
       {
         kind,
@@ -157,7 +171,13 @@ export function recordStepRoute(
   },
 ): StepRouteRow {
   const existing = storedStepRoute(db, stepRow.id);
-  if (existing !== null) return existing;
+  if (
+    existing !== null &&
+    ((existing.provider === effective.provider && existing.modelId === effective.modelId) ||
+      hasStartedSession(db, stepRow.id))
+  ) {
+    return existing;
+  }
   const decision = decideStepRoute(db, todoRow, stepRow.kind, null, {
     machineId: effective.machineId,
     required: effective.requiredCapabilities,
@@ -183,7 +203,16 @@ export function recordStepRoute(
     rejected: decision.rejected,
     decidedAt: nowMs(),
   };
-  db.insert(stepRoute).values(row).onConflictDoNothing().run();
+  if (existing === null) {
+    db.insert(stepRoute).values(row).onConflictDoNothing().run();
+  } else {
+    const rejection = decision.rejected.find(
+      (candidate) =>
+        candidate.modelId === existing.modelId && candidate.machineId === existing.machineId,
+    );
+    row.reason = `re-routed: ${existing.modelId}${rejection === undefined ? '' : ` no longer runnable (${rejection.why})`}; ${row.reason}`;
+    db.update(stepRoute).set(row).where(eq(stepRoute.stepId, stepRow.id)).run();
+  }
   return storedStepRoute(db, stepRow.id) ?? row;
 }
 
