@@ -405,16 +405,7 @@ const TRACE_DONE: { id: string; step: TraceStep }[] = [
 ];
 
 const TRACE_RUNNING: { id: string; step: TraceStep }[] = [
-  {
-    id: 'a',
-    step: {
-      kind: 'run',
-      command: `git diff -- ${'long-command'.repeat(30)}`,
-      exit: null,
-      output: [],
-      secs: 0,
-    },
-  },
+  { id: 'a', step: { kind: 'run', command: 'pnpm install', exit: null, output: [], secs: 0 } },
 ];
 
 const TRACE_FAILED: { id: string; step: TraceStep }[] = [
@@ -497,14 +488,9 @@ export function TraceSection() {
       <Specimen
         id="coordinator-turn-tools"
         title="Coordinator turn tools"
-        note="compact rows respond immediately without shadows; summary has no copy action"
+        note="the same group at compact density under a Coordinator reply"
       >
-        <TraceGroup
-          steps={TRACE_TOOLS}
-          density="compact"
-          defaultOpen
-          className="w-120 max-w-full"
-        />
+        <TraceGroup steps={TRACE_TOOLS} density="compact" defaultOpen className="w-120" />
       </Specimen>
       <Specimen
         id="thinking-rows"
