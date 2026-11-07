@@ -1,11 +1,11 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { commitEnv, gitPrim, runGit, runGitOk } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const TOKEN: BoundGitCredentials = {
@@ -91,10 +91,10 @@ function cloneSpyFailsForToken(): { calls: (BoundGitCredentials | null)[] } {
 
 beforeEach(async () => {
   vi.restoreAllMocks();
-  root = mkdtempSync(join(tmpdir(), 'cairn-ws-cred-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-cred-origin-')), 'repo.git');
+  root = testTempDir('cairn-ws-cred-root-');
+  originDir = join(testTempDir('cairn-ws-cred-origin-'), 'repo.git');
   seedDir = join(
-    tmpdir(),
+    testTempDir('daemon-cwd-'),
     `cairn-ws-cred-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   logger = fakeLogger();
