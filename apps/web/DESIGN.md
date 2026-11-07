@@ -3,92 +3,92 @@ name: Cairn
 direction: Cairn (stone trail) · dense · project-first
 reference: prototype A, the acceptance reference of the B-UI batch
 colors:
-  # Light (.light): cool limestone paper, lichen ink, three status hues; dark values live in colors-dark, rules in the "Colors" and "Dark" sections
-  canvas: '#e6e7e1'        # app background: the stone the sidebar sits on
-  sheet: '#f6f6f2'         # main surface (--background)
-  card: '#fdfdfb'          # cards, rows, composer
-  popover: '#fdfdfb'       # menus share the card color in light
-  hover: '#dcded7'         # sidebar row hover (--sidebar-hover)
-  line: '#dcdfd7'          # hairline ring and dividers (--border)
-  rule: '#dcdfd7'
-  divider: '#dcdfd7'
-  ink: '#1d231f'           # headings and body text
-  ink-2: '#4b534d'         # secondary text (nav, buttons, descriptions)
-  ink-3: '#5f665f'         # meta information (project, time, counts)
-  ink-4: '#a8aea6'         # decorative icons only, never text
-  icon: '#5f665f'          # icons with a text label
+  # Light (.light): claude.ai neutral layers (docs/design/claude-ai-spec.md, sections 5 and 6); dark values live in colors-dark, rules in the "Colors" and "Dark" sections
+  canvas: '#fafafa'        # sidebar and app background, one step off the page
+  sheet: '#ffffff'         # main surface (--background)
+  card: '#f7f7f7'          # cards: black 3% over the page
+  popover: '#ffffff'       # menus and raised surfaces
+  hover: 'rgb(0 0 0 / 0.05)'  # row hover (--sidebar-hover)
+  line: 'rgb(0 0 0 / 0.1)'          # hairline ring and dividers (--border)
+  rule: 'rgb(0 0 0 / 0.1)'
+  divider: 'rgb(0 0 0 / 0.1)'
+  ink: '#1a1a1a'           # headings and body text
+  ink-2: '#666666'         # secondary text (nav, buttons, descriptions)
+  ink-3: '#6b6b6b'         # meta information (project, time, counts)
+  ink-4: '#878787'         # decorative icons only, never text
+  icon: '#666666'          # icons with a text label
   accent: '#9a6500'        # ochre (--card-button): waiting on you, action links, count badges
-  primary: '#233127'       # primary button: deep lichen ink
-  on-primary: '#f4f6f1'
+  primary: '#1a1a1a'       # primary button: the ink
+  on-primary: '#ffffff'
   on-accent: '#ffffff'     # text on count badges
   accent-hover: '#f7ecd2'  # action link hover background
-  menu-hover: 'rgb(29 35 31 / 0.1)'  # menu row hover: 10% ink over any surface (Claude.ai's value)
-  backdrop: 'rgb(29 35 31 / 0.28)'  # dialog backdrop (ink dim, no blur)
+  menu-hover: 'rgb(0 0 0 / 0.05)'  # menu row hover, claude.ai's value
+  backdrop: 'rgb(0 0 0 / 0.4)'  # dialog backdrop, no blur
   running: '#5f8f4f'       # working: running icon, online dot
   running-text: '#3f6c35'  # working text
   running-bar: '#55833f'
-  running-track: '#e1e3dc'
+  running-track: '#ebebeb'
   pebble-waiting: '#d49a1c'   # palette: waiting on you
   pebble-review: '#5379a0'    # ready for review
   pebble-working: '#5f8f4f'   # working
-  pebble-idle: '#a8aea6'      # idle or snoozed
-  pebble-resolved: '#c3c7bf'  # merged or resolved
+  pebble-idle: '#878787'      # idle or snoozed
+  pebble-resolved: '#c7c7c7'  # merged or resolved
   danger-line: '#d98c7d'      # error ring and danger-zone outline
 colors-dark:
-  # Dark (:root default): the same ladder in deep stone, brighter with elevation
-  canvas: '#141715'
-  sheet: '#1b1f1c'
-  card: '#222723'
-  popover: '#262b27'       # menus: one step brighter than the card
-  hover: 'rgb(230 232 226 / 0.05)'
-  line: '#353b36'
-  rule: '#353b36'
-  divider: '#353b36'
-  ink: '#e6e8e2'
-  ink-2: '#b4bab3'
-  ink-3: '#959c96'
-  ink-4: '#5d655f'         # decorative icons only, never text
-  icon: '#959c96'
+  # Dark (:root default): page, sidebar one step lighter, raised surfaces lighter again
+  canvas: '#1f1f1f'
+  sheet: '#191919'
+  card: '#202020'
+  popover: '#303030'       # menus and raised surfaces
+  hover: 'rgb(255 255 255 / 0.075)'
+  line: 'rgb(255 255 255 / 0.1)'
+  rule: 'rgb(255 255 255 / 0.1)'
+  divider: 'rgb(255 255 255 / 0.1)'
+  ink: '#efefef'
+  ink-2: '#9c9c9c'
+  ink-3: '#999999'
+  ink-4: '#757575'         # decorative icons only, never text
+  icon: '#9c9c9c'
   accent: '#ebb550'        # ochre brightened; text on it is dark ochre, not white
-  primary: '#e6e8e2'       # primary button is limestone in dark
-  on-primary: '#161a17'
+  primary: '#efefef'       # primary button is the ink in dark
+  on-primary: '#191919'
   on-accent: '#1a1404'
   accent-hover: '#33290f'
-  menu-hover: 'rgb(230 232 226 / 0.1)'
-  backdrop: 'rgba(0, 0, 0, 0.5)'
+  menu-hover: 'rgb(255 255 255 / 0.075)'
+  backdrop: 'rgb(0 0 0 / 0.5)'
   running: '#82b46f'
   running-text: '#9cc78b'
   running-bar: '#6fa35c'
-  running-track: '#2e3430'
+  running-track: '#2a2a2a'
   pebble-waiting: '#e0a838'
   pebble-review: '#7fa3cc'
   pebble-working: '#82b46f'
-  pebble-idle: '#5d655f'
-  pebble-resolved: '#444b46'
+  pebble-idle: '#757575'
+  pebble-resolved: '#474747'
   danger-line: '#8c4a3e'
 typography:
-  greeting:     { fontFamily: serif, fontSize: 26px, fontWeight: '600' }
-  page-title:   { fontFamily: serif, fontSize: 20px, fontWeight: '600' }
-  heading:      { fontFamily: display, fontSize: 17px, fontWeight: '650' }
-  brand:        { fontFamily: display, fontSize: 20px, fontWeight: '650' }
-  card-title:   { fontFamily: sans, fontSize: 15px, fontWeight: '600', lineHeight: '1.5' }
-  ui:           { fontFamily: sans, fontSize: 14px, fontWeight: '450' }
-  meta:         { fontFamily: sans, fontSize: 13px, fontWeight: '450' }
+  greeting:     { fontFamily: serif, fontSize: 32px, fontWeight: '600' }
+  page-title:   { fontFamily: serif, fontSize: 24px, fontWeight: '600' }
+  heading:      { fontFamily: display, fontSize: 15px, fontWeight: '500' }
+  brand:        { fontFamily: display, fontSize: 20px, fontWeight: '500' }
+  card-title:   { fontFamily: sans, fontSize: 15px, fontWeight: '600', lineHeight: '21px' }
+  ui:           { fontFamily: sans, fontSize: 14px, fontWeight: '400' }
+  meta:         { fontFamily: sans, fontSize: 13px, fontWeight: '400' }
   caption:      { fontFamily: sans, fontSize: 12px, fontWeight: '500' }
   code:         { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
 fonts:
   serif: var(--font-source-serif) # Source Serif 4 → Songti SC: greeting and page titles
-  display: var(--font-display)   # Instrument Sans at 650 (the display role, same face as sans)
+  display: var(--font-display)   # Instrument Sans at 500 (the display role, same face as sans)
   sans: var(--font-sans)         # Instrument Sans → PingFang SC
   mono: var(--font-mono)         # JetBrains Mono
 rounded:
   field: 8px         # rounded-md: inputs, selects, segmented tracks, dialog and form primary buttons
   control: 8px       # --radius-control = rounded-lg: default Button, icon buttons, rows
-  menu-item: 8px     # --radius-menu-item = menu radius minus the 4px menu padding
-  card: 14px         # --radius-card = rounded-xl: one corner for every card-like surface
-  sheet: 18px        # --edge-radius: dialogs, ⌘K
-  menu: 12px         # --radius-popover: menus, floating surfaces, dropdowns
-  bubble: 14px       # --radius-bubble: user chat bubble
+  menu-item: 8px     # --radius-menu-item
+  card: 12px         # --radius-card: one corner for every card-like surface
+  sheet: 12px        # --edge-radius: dialogs
+  menu: 14px         # --radius-popover: menus, floating surfaces, dropdowns
+  bubble: 12px       # --radius-bubble: user chat bubble
   composer: 14px     # --radius-composer
   window: 18px       # --radius-window: Coordinator window
   full: 9999px
@@ -121,27 +121,27 @@ Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the n
 
 ## Colors
 
-- **Three stone layers**: `canvas` (app background; the sidebar sits directly on it) → `sheet` (main surface) → `card` (near-white cards, rows and the composer, `#fdfdfb` in light).
+- **Three neutral layers** (claude.ai, `docs/design/claude-ai-spec.md` section 5): `sheet` is the page (`#191919` dark, `#ffffff` light), `canvas` the sidebar one step off it (`#1f1f1f`, `#fafafa`), `popover` the raised layer for menus and the composer (`#303030`, `#ffffff`). `card` is a 3% tint over the page. Every hover, selection and hairline is an alpha of white (dark) or black (light) over these layers: hover 7.5% / 5%, selected 15% / 10%, `line` 10%.
 - **One theme file**: every token lives in `src/styles/shadcn.css` (the file `components.json` points the shadcn CLI at). Its first `:root` block holds theme-independent tokens (motion, z-index, type, radii, sizes, formulas over color slots) followed by the dark colors; `.light` overrides the colors only. A palette change touches one file.
 - **Borders are always 1 CSS pixel**: the main panel, task cards, the active nav item, and the new-task button stay 1px on high-density screens too (they do not follow `--hairline` down to 0.5px); borders must be visible.
-- **Three-tier shadow ladder** (#1428): `--e1` cards and rows, `--e2` menus and floating surfaces, `--e3` dialogs and floating windows. Each tier carries its own 1px ring at the end (`--e1` uses `line`; `--e2`/`--e3` use `--elevated-ring`, which is `line` in light and `--ring-inset-highlight` in dark, where `line` is invisible on the surface base). Light shadows are tinted ink (`rgb(29 35 31 / a)`) rather than neutral black so they sit in the paper, at the strength Claude.ai measures (`--e1` 0 1 2 .06 + 0 2 8 .06; `--e2` 0 2 6 .08 + 0 8 24 .12, its slash menu; `--e3` 0 4 12 .08 + 0 24 48 −12 .25, its ⌘K); dark uses neutral black at .3–.6. Tailwind's `shadow-xs` to `shadow-xl` resolve to the same tiers (`--cds-shadow-*`), so no surface carries an untinted default shadow; the composer rests on `--e1`'s pool, and no extra border is drawn on the surface; surfaces that draw their own `--edge-ring` (the notification strip, the Coordinator window) take the pool of the same tier: `--cds-shadow-sm` / `-md` / `-lg` — one ring per edge. Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases; the hover / focus slots are states, not tiers.
-- **Four ink steps**: `ink` headings and body text; `ink-2` nav, buttons, descriptions; `ink-3` meta information; `ink-4` decorative icons only. The lightest text ever uses is `ink-3`.
-- **Contrast (light, measured, WCAG 2.x)**: on the card, `ink` is 15.71, `ink-2` 7.80, `ink-3` 5.80, `accent` 4.87, `running-text` 6.05, `destructive` 6.45; `icon` is 5.80, the same step as `ink-3`, so labelled icons read as solid as their text; `ink-3` on canvas is 4.75 and on `--secondary` (`#eceee8`) 5.06, `ink-2` there 6.79. White text on the `accent` background is 4.96; `on-primary` on `primary` is 12.53. The running bar on its track is 3.45. Action links swap to `spot-text-on-tint` on the `accent-hover` background (6.84), because `accent` on it drops to 4.22. `ink-4` is decorative only.
-- **Focus ring**: `--focus-ring` is lichen `#3f6c35` in light (6.05 on the card) and `#9cc78b` in dark, so keyboard focus never reads as "waiting on you". Buttons, checkboxes, switches and badges draw it as a 2px outline 2px outside the box. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape, not a box inside a box. An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and, when focused, that border plus a 3px `--danger-halo` (destructive at 20%); it never stacks the green focus ring on top of the red border.
+- **Three-tier shadow ladder** (claude.ai values, spec section 5): `--e1` is a 1px `line` ring with no drop shadow (claude.ai cards carry none); `--e2` menus and floating surfaces (`0 2px 6px` 20% + `0 8px 24px` 32% black in dark, an inset `--elevated-ring` of white 4%); `--e3` dialogs (`0 1px 2px` 6% + `0 2px 8px` 24% and a `--dialog-ring` of white 5%). Light uses the same shapes at lower alpha with black rings. The composer has its own `--shadow-composer` (`0 4px 20px` 7.5% and an 8% inset ring) and the jump button `--shadow-jump`. Shadows never change on hover (V21). Old slot names like `--panel-shadow` / `--shadow-popover` / `--dialog-shadow` are aliases.
+- **Four ink steps**: `ink` headings and body text (white 93% / black 90%); `ink-2` nav, buttons, descriptions (57% / 60%); `ink-3` meta information; `ink-4` decorative icons and placeholders only (40% / 47%). claude.ai's 40% muted text fails AA on its own raised layers, so `ink-3` is clamped to the lowest value that keeps 4.5:1 on `popover` (`#999999` dark, `#6b6b6b` light, rule A3) and sits close to `ink-2`. The lightest text ever uses is `ink-3`.
+- **Contrast (measured, WCAG 2.x)**: light on the page, `ink` 17.4, `ink-2` 5.74, `ink-3` 5.33, `accent` 4.96, `running-text` 6.16, `destructive` 6.57; `ink-3` on `secondary` `#f2f2f2` 4.76. Dark on the page, `ink` 15.29, `ink-2` 6.4, `ink-3` 6.17, `accent` 9.43; on `popover` `ink-2` 4.81 and `ink-3` 4.63. White text on the light `accent` is 4.96; `on-primary` on `primary` is 17.4 light and 15.29 dark. `ink-4` is decorative only.
+- **Focus ring**: `--focus-ring` is the ochre accent (`#9a6500` light, 4.96 on the page; `#ebb550` dark, 9.43), where claude.ai uses its blue (spec section 3). Buttons, checkboxes, switches and badges draw it as a `--focus-width` (2.4px) outline at offset 0, hugging the control's radius; rows and segmented options draw it inset. Text fields (`Input`, `Textarea`, `SelectTrigger`, the `InputGroup` shell) turn their own border `--focus-ring` and add a 3px `--focus-halo` (the ring at 22%) instead, so the field reads as one shape. An invalid field (`aria-invalid`) shows one `destructive` 1px border at rest and, when focused, that border plus a 3px `--danger-halo` (destructive at 20%); it never stacks the focus ring on the red border.
 - **Brand marks**: the spiral disc (the Coordinator's face) uses `--fab-surface` `#2f5a2a` with the `--fab-mark` `#f4f6f1` spiral in both themes, the nearest stone-green to the Cairn app icon.
 - **Palette roles** (anti-slop batch 1, 2026-11-06): ochre is the one accent and means "waiting on you" (`--waiting-ink` for text and icons, `--badge-attention` for dots); green is a 6px dot for running or online and nothing else; rust (`--destructive`, `--danger-soft`) is failure and destructive actions only. Status chips are one neutral fill (`bg-secondary`) with the status in the text and icon colour; there are no tinted chip fills, no slate and no per-project hues.
 - **Accent discipline**: `accent` is used only for: needs-your-attention states and counts, action links on cards, icons of the active nav item, and count-badge backgrounds. It is never decorative and never a large-area background.
 - **Status is never color alone**: every status is a triple of "icon + color + text" (failed ⊗ failed / awaiting confirmation ☰ awaiting confirmation / awaiting review ⑂ awaiting review); color-blind users can tell them apart by icon and text.
-- **The primary button is `primary`**: the shadcn Button default tier. In light it is deep lichen ink `#233127` with `#f4f6f1` text; in dark it is limestone `#e6e8e2` with deep stone text. Ochre is never the primary-button background, so "do this" and "waiting on you" never look alike.
+- **The primary button is `primary`**: the shadcn Button default tier, the ink itself: `#1a1a1a` with white text in light, `#efefef` with `#191919` text in dark (claude.ai). Ochre is never the primary-button background, so "do this" and "waiting on you" never look alike; the enabled send button and a switch that is on are the accent roles (V5).
 - Colors live only in `src/styles/shadcn.css`; components write token names, never hex values (`scripts/ui-drift-gate.mjs` G2 already pins this).
 
 ## Typography
 
-- **One serif voice, one sans**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. The brand name, section and column headings, pane and dialog titles are Instrument Sans at 650 (`font-heading` with `font-title`; `font-heading` is the display role and resolves to the sans). Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
+- **One serif voice, one sans**: Source Serif 4 (`font-serif`, 600, -0.01em) for the Coordinator greeting and page titles (the board top bar, page shells, settings headers; the task detail header is a one-line sans bar, see below), so the top of every page has one quiet serif voice. The brand name, section and column headings, pane and dialog titles are Instrument Sans at 500 (`font-heading` with `font-title`; `font-heading` is the display role and resolves to the sans). Chinese falls back to Songti SC under the serif and PingFang SC under the sans.
 - **Everything else is Instrument Sans** (`--font-sans`): thread titles, rows, navigation, buttons, meta. Chinese falls back to PingFang SC. Code, times, ids and counters use JetBrains Mono (`--font-mono`) with tabular numbers.
 - Fonts are self-hosted latin subsets in `public/fonts` (SIL OFL 1.1, licenses next to the files), loaded with `font-display: swap` and preloaded in `index.html` and `design.html`; the metric-matched fallbacks keep the swap from shifting layout.
-- **Seven font sizes, measured against Claude Code**: 26 Coordinator greeting / 20 page title and brand / 17 column and section headings / 15 body text and card titles (messages, plans, composer) / 14 UI text / 13 meta and code (mono) / 12 badges and group labels. Body steps above UI text so reading text and chrome do not blur together. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` and `text-code` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
-- **Four font weights**: 450 body text (`font-normal` maps to 450, because Instrument Sans at 400 reads faint at 14px), 500 sidebar rows and captions, 600 card and row titles, the active nav row and count badges, 650 display titles (`font-title`, always paired with `font-heading`). 700 is not used.
+- **Seven font sizes, measured on claude.ai** (spec section 2): 32/38 Coordinator greeting / 24/32 page title / 15/20 section and dialog headings (headings grow by weight, not size) / 15/21 body text and card titles (messages, plans, composer) / 14/20 UI text / 13/18 meta and code (mono) / 12/18 badges and group labels. Body steps above UI text so reading text and chrome do not blur together. In code, use the corresponding Tailwind theme keys `text-greeting` / `text-page` / `text-heading` / `text-card-title` / `text-ui` / `text-meta` and `text-code` / `text-caption` (heading font `font-heading`), never arbitrary values like `text-[13px]`; `scripts/ui-debt-gate.mjs` D5 only allows the total count of arbitrary values to decrease.
+- **Four font weights** (claude.ai, spec section 2): 400 body text (`font-normal`), 500 titles, labels and section headings (`font-title`), 600 bold and card titles; controls use 450 where the primitive sets it. 650 and 700 are not used.
 - The title of a completed task drops to 400 + `ink-3`, meaning "no longer needs to be read".
 
 ## Layout and spacing
@@ -216,7 +216,7 @@ See "Page patterns · Settings list" below.
 - Markers between turns ("Plan approved", handoffs, origin notes) are a centred hairline rule in `--text-tertiary`; an error marker stays a soft `danger-soft` box. A turn longer than a minute ends with a "Worked for N minutes" rule.
 - Copy icons under a message stay hidden until its row is hovered or focused (`.chat-copy` in `app.css`); touch screens always show them.
 - The plan preview fades out at the bottom with a mask instead of a hard cut.
-- The composer is a white card (`--card`) with a 1px `--input` ring that turns lichen with a soft halo on focus (`--shadow-composer*`); it is the one white surface in the conversation because it is where you act. The empty send button has no fill; once there is a draft it fills with `primary` (ink, never the ochre accent, which means waiting on you). The stop button is a `secondary` square with an ink stop glyph.
+- The composer is a white card (`--card`) with an 8% inset ring that strengthens on focus (`--shadow-composer*`, claude.ai); it is the one white surface in the conversation because it is where you act. The empty send button has a quiet `secondary` fill; once there is a draft it fills with the ochre accent (`--card-button`, text `--text-on-accent`), as claude.ai fills its send button with its accent (spec section 13). The stop button is a `secondary` square with an ink stop glyph.
 
 ### Trace
 - The agent's narration stays body text. Tool activity folds into one grey summary line in `--text-tertiary` ("Ran 2 commands (1 failed)") ending in a small triangle, right when closed and down when open (`components/chat/trace-parts.tsx`, composed by `TraceGroup`, `TraceRows` and `WorkTrace`). Never hand-write tool rows.
@@ -259,16 +259,16 @@ All live in `src/components/` and are shown in the gallery under "Stone language
 Pages like settings, resources, team, and project share the pieces below. A new page composes these pieces first and does not build its own cards, empty states, or forms inside the page. All pieces live in `src/components/`; all values go through tokens and the six font sizes.
 
 ### Card radius: one corner
-- **Token**: `--radius-card` = 14px (`rounded.card`), the class `rounded-(--radius-card)`, or `CARD_RADIUS_CLS` exported by `settings-list.tsx`.
+- **Token**: `--radius-card` = 12px (`rounded.card`), the class `rounded-(--radius-card)`, or `CARD_RADIUS_CLS` exported by `settings-list.tsx`.
 - **Used on**: every card-like surface — task cards, cards being dragged, settings cards, team / agent cards, grouped resource-row cards, one-off notice cards.
-- **Not in this list**: dialogs and the ⌘K panel are the sheet tier at 18px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (12px, see "Dialogs and menus" below); buttons, icon buttons, rows, inputs and selects are 8px (`--radius-control`, `rounded-md`).
+- **Not in this list**: dialogs are the sheet tier at 12px (`--edge-radius`); menus and floating surfaces use `--radius-popover` (14px, see "Dialogs and menus" below); buttons, icon buttons, rows, inputs and selects are 8px (`--radius-control`, `rounded-md`).
 - The registry `Card` ships with `rounded-xl`, which equals `--radius-card` (14px).
 - Do: one corner for all cards on a page. Do not: write 10px / 18px cards into a page, or mix two card corners on one page.
 
 ### Empty state
 Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registry `Empty`).
 - **Icon**: a line icon, 32px, stroke 1.75, `icon` (`text-icon`), no background tile.
-- **Title**: `h2`, display `text-heading` 650 `ink`; the description below is `text-ui` `ink-2`.
+- **Title**: `h2`, display `text-heading` 500 `ink`; the description below is `text-ui` `ink-2`.
 - **Description**: `text-ui` `ink-2`, at most 320px wide (about 44ch), centered, `text-balance`.
 - **Primary action** (optional): shadcn Button default tier, `primary` background, 32px, 8px corner (`DIALOG_PRIMARY_BUTTON`). An empty state has at most one primary action.
 - **Hint line** (optional): one `text-meta` `ink-3` line below the primary action, optionally preceded by a 12px icon (`ink-4`), explaining read-only or permission reasons.
@@ -281,7 +281,7 @@ Pieces: `src/components/settings-list.tsx`. The account page's "edit name" heade
 - **One card** (`SettingsCard`): white background, `line` 1px outer ring, `--radius-card`; rows carry no background color (no two-tone cards).
 - **Row** (`SettingsRow`): minimum height 52px, 16px left and right; a `text-ui` `ink` label on the left (optionally with one `text-meta` `ink-3` description line), controls on the right. Rows with two-line content grow naturally. Custom rows that do not go through `SettingsRow` use `SETTINGS_ROW_CLS`.
 - **Dividers are drawn only between rendered rows**: `divide-y` on the card, rows rendered conditionally, never hidden with CSS. A hidden row is still a sibling node and would draw a second border at the top of the card.
-- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 8px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = `ToggleSwitch` (`components/toggle-switch.tsx`, never the bare registry `Switch`): a 36×20 track, a 16px white thumb inset 2px with a soft shadow, `--switch-on` green when on (`#55833f` light, `#6fa35c` dark) and `--switch-off` stone when off.
+- **Controls are framed, one kind each**: dropdown = white background + `line` 1px ring + 8px radius + 32px tall (`SETTINGS_SELECT_TRIGGER_CLS`, the same string as the form's `FORM_CONTROL_CLS`); single-choice segmented = `SettingsSegmented` (i.e. `SegmentedRadio`, see "Segmented control" below); switch = `ToggleSwitch` (`components/toggle-switch.tsx`, never the bare registry `Switch`): a 36×20 track, a 16px white thumb inset 2px with a soft shadow, `--switch-on` the ochre accent when on (claude.ai fills its switch with its accent, spec section 8) and `--switch-off` stone when off.
 - **Danger zone** (`SettingsDangerZone`): a separate card at the very end of the page, one row: label + description on the left, a Button with `variant="destructive"` on the right, 32px with the standard 8px button corner. Clicking opens a confirm layer first; it never deletes directly.
 - Do: header + one card + equal-height rows. Do not: a large avatar occupying a row, rows with background tints, a rounded-pill delete button, or danger actions mixed into ordinary settings cards.
 
@@ -305,8 +305,8 @@ Piece: `src/components/segmented.tsx`. One appearance, two semantics:
 
 ### Dialogs and menus
 Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIALOG_*` pieces, `DialogFootRow`, `dialogWidth`), `alert-dialog-shell.tsx` (confirm surfaces), `dropdown-menu.tsx` / `popover.tsx` (menus and floating surfaces). `dialog.tsx` / `alert-dialog.tsx` / `select.tsx` are pristine registry pieces; their skin lives in the `[data-slot=…]` rules and tokens of `styles/app.css`.
-- **Backdrop**: one layer of light-ink dim `--dialog-backdrop` (light `rgb(29 35 31 / 0.28)`), no blur. All dialogs, confirm surfaces, and ⌘K share this layer; there is no dark curtain.
-- **Surface**: `sheet` background (`--dialog-surface`), 18px radius (`--edge-radius`), `--dialog-shadow` (= `--e3`: two soft shadows + a 1px `line` ring).
+- **Backdrop**: one layer of black dim `--dialog-backdrop` (40% light, 50% dark, claude.ai), no blur. All dialogs, confirm surfaces, and ⌘K share this layer; there is no dark curtain.
+- **Surface**: `--dialog-surface` (the sidebar layer in dark, white in light), 12px radius (`--edge-radius`), `--dialog-shadow` (= `--e3`: two soft shadows and a 5% ring).
 - **Three widths** (`size`, `--dialog-w-*`, clamped with `min(100% - 2rem, …)` on narrow screens):
   - S 400: keys, API keys, delete and other confirmations, short forms.
   - M 480: skills, most new-entity forms (agent, schedule, charter, review, request changes).
@@ -315,7 +315,7 @@ Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIAL
 - **Body**: the single scrolling box (`min-h-0`), with 20px left/right padding that also serves as room for the focus ring. The panel is capped at `100vh - 64px`; in short viewports the body scrolls and the foot stays on screen.
 - **Foot (split)**: a 13px `ink-3` hint or status on the left (`text-meta`) (`hint`: doc links, shortcuts, waiting states, page numbers), the action group on the right. The primary action is the shadcn Button default (`primary` background, 32px, 8px corner, `DIALOG_PRIMARY_BUTTON`), the secondary action is a ghost text button (`DIALOG_TEXT_BUTTON`), and danger confirmations switch to `destructive`. With no hint the actions still align right. No background band, no divider line.
 - **Grouped selector** (providers): a search box on top, then groups under small headings (`text-caption` 500 `ink-3`); each row is 40px = a 22px first-letter tile (white background + `line` ring) + name + an `ink-3` tag on the right (OAuth / not yet enabled). Hover and keyboard focus = the selector's selected row (white card + hairline ring). Disabled rows drop the text to `ink-3` and show no hover. Search filters across groups and whole empty groups hide; "Other · custom endpoint" is always there.
-- **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 12px radius (`--radius-popover`), 4px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + 1px ring). Rows are 32px tall with a concentric 8px radius (`--radius-menu-item` = popover radius minus padding, the same 12/8 pair Linear and Amp use), 14px text, 15px `ink-3` icons, hover `menu-hover`; every row of an action menu ends in one key hint, right-aligned in `text-caption` `ink-3` (see Menu keys below); dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
+- **Menus** (one menu surface — `DropdownMenu` / `Popover` / the Select popup are the same surface, #1767): `popover` background, 14px radius (`--radius-popover`), 4px padding (`--menu-pad`), `--shadow-popover` (= `--e2`: soft shadow + inset ring). Rows are 32px tall with an 8px radius (`--radius-menu-item`, claude.ai's 14/8 pair), 14px text, 15px `ink-3` icons, hover `menu-hover`; every row of an action menu ends in one key hint, right-aligned in `text-caption` `ink-3` (see Menu keys below); dividers 1px, inset 6px left and right; group labels `text-caption` 500 `ink-3`. Danger rows use `destructive` for text and icon, hover `danger-soft`. Segmented controls inside menus use `SegmentedRadio` / `SegmentedTabs`; do not hand-roll them.
 - **Menu keys** (`components/menu-keys.tsx`, outside the pinned `components/ui`): every row of an action menu shows one letter on the right (`KeyedMenuItem`, `KeyedMenuRadioItem`, `KeyedMenuCheckboxItem`, `KeyedMenuSubTrigger` take a `shortcut`), and pressing it while the menu is open runs that row. One handler on the popup (`KeyedMenuContent` / `KeyedMenuSubContent`) does the matching, so no menu carries its own key code. The letter comes from the label, and a clash goes to the next letter that still reads well (Complete `C`, Request changes `R`, Stop `S`, Copy link `L`, Archive `A`, Close `X` because `C` is taken, Delete `D`; Mark as unread `U`, Snooze `S`). A row that opens a confirmation ends in an ellipsis (`Delete…`, passed as `confirms`). The hint is one quiet style everywhere: `text-caption`, `ink-3`, no box, right-aligned, tabular figures. Letters are not typeahead: while a keyed menu is open a letter that no row owns does nothing (it neither moves focus nor reaches the global keys), arrows, Enter, Escape and Tab behave as before, chords with Cmd, Ctrl or Alt and IME composition are left alone, and a text field inside the menu types normally. Menus of user data (project and model pickers, thread switchers) have no letters; version rows use digits. Never show a hint that does nothing.
 - **Global keys on controls** (`KeyHint`, `components/key-hint.tsx`): a key that works anywhere (`C` new task, `⌘K` search, `⌘J` Coordinator, `N` new thread) shows on the control it triggers, always and in the menu-key style, not only on hover (sidebar rows, the board new-task bar, the Save and start button). Icon-only controls name the key in their tooltip instead. The boxed `Kbd` stays for sentences and tooltips (`Press ⌘K to search`).
 - Do: one width tier per dialog, hints left and actions right, equal-height menu rows. Do not: a dark or blurred backdrop, full-width submit bars, a gray-background foot band, outline secondary buttons, or small gray 12px menus.
@@ -367,7 +367,7 @@ Rules:
 
 Dark is the `:root` default (`.light` is the light theme). Values live in the `colors-dark` frontmatter and in the `:root` block of `src/styles/shadcn.css`; the gallery's Doc check (`/design.html`) compares the two in both themes.
 
-- **The same ladder, direction reversed**: in dark, higher elevation is brighter — `canvas` #141715 → `sheet` #1b1f1c → `card` #222723 → `popover` #262b27. The steps share one green-grey hue: deep stone, not a neutral gray. In light, menus share the card color (#fdfdfb); in dark shadows are weak, so menus are one brightness step above the card.
+- **The same layers, alphas reversed**: in dark the page is `#191919`, the sidebar one step lighter (`#1f1f1f`), raised surfaces `#303030`; every hover, selection and hairline is an alpha of white. The neutrals carry no hue (claude.ai), so the ochre accent, the green dot and rust stand alone.
 - **Hairline rings stay drawn**: `line` #353b36 is 1.32 on the card and 1.45 on the sheet.
 - **The ink ladder inverts**: `ink` #e6e8e2, `ink-2` #b4bab3, `ink-3` #959c96, `icon` #959c96; `ink-4` #5d655f is decorative only.
 - **Contrast (measured, WCAG 2.x)**: on the card, `ink` 12.30, `ink-2` 7.68, `ink-3` 5.41, `icon` 5.41, `accent` 8.14, `running-text` 7.92, `destructive` 7.00; `ink-3` on canvas 6.43 and on a hovered menu row 4.53.
@@ -387,8 +387,8 @@ Read `DESIGN-RULES.md` (next to this file) first: it holds the short checkable r
 ```text
 Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: direction A, Cairn. Stone paper, dense, calm. Light (.light): canvas #e6e7e1 → sheet #f6f6f2 → card #fdfdfb, ink #1d231f. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow.
-- Dark (:root default): the same ladder in deep stone, lighter with elevation: canvas #141715 → sheet #1b1f1c → card #222723 → popover #262b27. Ink #e6e8e2 / #b4bab3 / #959c96. Accent #ebb550 with dark ochre text on it. Running #82b46f. All tokens live in src/styles/shadcn.css.
-- Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges; lichen green (running) = working/online; slate blue = ready for review. Status chips: idle neutral, plan slate, confirm ochre, done lichen, failed rust. Everything else is ink greys.
+- Dark (:root default): neutral layers from claude.ai: sheet #191919 → canvas (sidebar) #1f1f1f → popover #303030; hover, selection and hairlines are white alphas. Ink #efefef / #9c9c9c / #999999. Accent #ebb550 with dark ochre text on it; it is also the focus ring. Running #82b46f. All tokens live in src/styles/shadcn.css.
+- Three meaningful hues: ochre (--card-button: light #9a6500, dark #ebb550) = waiting on you: action links, count badges, plus the focus ring, a switch that is on and the enabled send button; green (running) = a working or online dot; rust = failure. Everything else is neutral ink.
 - Type: three families only. Source Serif 4 (font-serif, 600) for the Coordinator greeting and page titles; Instrument Sans for everything else, at 650 (font-heading font-title) for the brand, section and column headings, pane and dialog titles; JetBrains Mono for code, times, ids. Chinese falls back to Songti SC under the serif and PingFang SC under the sans. Sizes only 26/20/17/15/14/13/12 through text-greeting / text-page / text-heading / text-card-title / text-ui / text-meta and text-code / text-caption; body weight 450, row titles 600, display titles 650.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Every icon draws at stroke 1.75 and at 14, 16 or 18px: `svg.lucide` pins the stroke in `app.css`, and `test/icon-stroke.test.ts` scans every icon usage in `src`. The spiral mark is the brand and the Coordinator avatar.

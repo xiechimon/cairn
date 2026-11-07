@@ -8,8 +8,8 @@ import { expect, type Page, test } from '@playwright/test';
 
 const ROUTE = '/app?scenario=01';
 const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
-const LIGHT_CHROME = '#e6e7e1';
-const DARK_CHROME = '#141715';
+const LIGHT_CHROME = '#fafafa';
+const DARK_CHROME = '#1f1f1f';
 
 const themeColors = (page: Page) =>
   page.evaluate(() =>

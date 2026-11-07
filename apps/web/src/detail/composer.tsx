@@ -284,7 +284,7 @@ export function Composer({
               variant="ghost"
               className={`composer-send ${COMPOSER_SQUARE} transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
                 hasContent
-                  ? 'bg-foreground text-background hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90 dark:hover:text-background'
+                  ? 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button)/90 hover:text-(--text-on-accent) dark:hover:bg-(--card-button)/90 dark:hover:text-(--text-on-accent)'
                   : 'bg-secondary text-(--text-tertiary) hover:bg-secondary hover:text-(--text-tertiary) dark:hover:bg-secondary dark:hover:text-(--text-tertiary)'
               }`}
               aria-label={t('发送')}

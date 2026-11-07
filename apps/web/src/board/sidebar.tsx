@@ -105,7 +105,7 @@ export function BrandMark({ className = 'size-4' }: { className?: string }) {
 }
 
 const FOCUS =
-  'outline-none focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2';
+  'outline-none focus-visible:[outline:var(--focus-width)_solid_var(--focus-ring)] focus-visible:outline-offset-0';
 
 const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';

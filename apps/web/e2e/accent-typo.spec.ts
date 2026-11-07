@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`font baseline: body 450, var font really loaded (${theme})`, async ({
+  test(`font baseline: body 400, var font really loaded (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
@@ -15,7 +15,7 @@ for (const theme of ['light', 'dark'] as const) {
       };
     });
     expect(m.bodyFontLoaded).toBe(true);
-    expect(m.bodyWeight).toBe('450');
+    expect(m.bodyWeight).toBe('400');
   });
 
   test(`empty-state headline rides the Paper EmptyState title tier (${theme})`, async ({
@@ -26,7 +26,7 @@ for (const theme of ['light', 'dark'] as const) {
     const w = await page.evaluate(
       () => getComputedStyle(document.querySelector('.sched-empty h2')!).fontWeight,
     );
-    expect(w).toBe('650');
+    expect(w).toBe('500');
   });
 
   test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {
@@ -181,7 +181,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(ring.style).toBe('solid');
     expect(ring.w).toBe('2px');
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(156, 199, 139)' : 'rgb(63, 108, 53)');
+    expect(ring.color).toBe(theme === 'dark' ? 'rgb(235, 181, 80)' : 'rgb(154, 101, 0)');
   });
 }
 
@@ -238,7 +238,7 @@ for (const theme of ['light', 'dark'] as const) {
     const card = await resolveToken(page, '--card');
 
     expect(destructive).toBe(theme === 'dark' ? 'rgb(240, 154, 136)' : 'rgb(163, 58, 42)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(34, 39, 35)' : 'rgb(253, 253, 251)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(32, 32, 32)' : 'rgb(247, 247, 247)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 
