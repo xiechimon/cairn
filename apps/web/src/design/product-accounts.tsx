@@ -1,4 +1,4 @@
-import { Layers, Palette, Server, User } from 'lucide-react';
+import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import {
@@ -10,17 +10,21 @@ import { toRoutingGraph } from '../api/model-routing.js';
 import {
   AccountRow,
   MachineProvidersCard,
-  PoolWindowCard,
+  QuotaSection,
 } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
+import { CheckedButton } from '../components/checked-button.js';
+import { EmptyState } from '../components/empty-state.js';
 import {
   type ProviderItem,
   ProviderModelRow,
   ProviderPanel,
 } from '../components/providers/provider-panel.js';
+import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { RoutingGraph } from '../components/settings/routing-graph.js';
 import { SettingsNav } from '../components/settings/settings-nav.js';
 import { SettingsCard } from '../components/settings-list.js';
+import { SettingsScopeSentence, TEAM_SCOPE } from '../components/settings-scope.js';
 import {
   ACCOUNT_MACHINES,
   ACCOUNT_ROUTING,
@@ -39,6 +43,25 @@ import { Section, Specimen } from './specimen.js';
 
 const NOW = r7(13, 14);
 const TOGGLEABLE: readonly string[] = ['pi', 'claude-code', 'gemini'];
+
+const SCOPE_MACHINES = [
+  { id: 'scope-mac-a1b2', kind: 'local', name: 'studio', online: true },
+  { id: 'scope-mac-c3d4', kind: 'remote', name: 'build-box', online: true },
+  { id: 'scope-mac-e5f6', kind: 'remote', name: 'build-box', online: false },
+] as const;
+
+const settledQuery: QueryLike = {
+  isPending: false,
+  isError: false,
+  isFetching: false,
+  refetch: () => undefined,
+};
+
+const QUERY_PHASES = [
+  { phase: 'loading', query: { ...settledQuery, isPending: true, isFetching: true } },
+  { phase: 'error', query: { ...settledQuery, isError: true } },
+  { phase: 'empty', query: settledQuery },
+] as const;
 
 function useAccounts() {
   const [accounts, setAccounts] = useState<SubscriptionAccount[]>(() => [
@@ -87,7 +110,7 @@ function ProviderPanelSpecimen() {
       items={items}
       selectedId={selected}
       onSelect={setSelected}
-      onAdd={() => undefined}
+      header={<h2 className="m-0 text-card-title font-semibold text-foreground">Providers</h2>}
     >
       <SettingsCard>
         <ProviderModelRow
@@ -144,6 +167,8 @@ export function AccountsSection() {
   const { t } = useI18n();
   const { accounts, actionsFor } = useAccounts();
   const [machine, setMachine] = useState<MachineWithProviders | undefined>(PROVIDER_MACHINES[0]);
+  const [scopeValue, setScopeValue] = useState(TEAM_SCOPE);
+  const [scopeCheckedAt] = useState(() => Date.now());
   const claude = accounts.filter((a) => a.vendor === 'claude');
   const graph = toRoutingGraph(ACCOUNT_ROUTING, {
     accounts,
@@ -155,32 +180,33 @@ export function AccountsSection() {
     <Section
       id="accounts"
       title="Accounts"
-      lede="Subscription accounts per vendor, pooled the way T3 Code's Usage → Limits does: one card per quota window, one bar segment per account, the number is what is left. They sit on top of the model routing page, above the graph."
+      lede="Subscription accounts per vendor, pooled the way T3 Code's Usage → Limits does: one flat row per quota window with a combined bar, one sub-row per account with what is left. They sit on top of the model routing page, above the graph."
     >
       <Specimen
         id="pooled-window"
-        title="Pooled window"
+        title="Quota section"
         note="5-hour window over three Claude accounts: one over its limit, one never reported (dashed)"
         stage="sheet"
-        code={`<PoolWindowCard name="five_hour" accounts={claudeAccounts} now={now} />`}
+        code={`<QuotaSection windows={['five_hour']} accounts={claudeAccounts} now={now} />`}
       >
         <div className="w-full">
-          <PoolWindowCard name="five_hour" accounts={claude} now={NOW} />
+          <QuotaSection windows={['five_hour']} accounts={claude} now={NOW} />
         </div>
       </Specimen>
       <Specimen
         id="account-row"
         title="Account row"
-        note="ok, cooling, expired; the number matches the bar segment; ⋯ opens Rename R, Verify V, Remove D"
+        note="ok, cooling, expired; the meta line shows plan, priority and recent use; ⋯ opens Rename R, Verify V, Remove D"
         stage="sheet"
-        code={`<AccountRow account={account} now={now} actions={{ onRename, onVerify, onRemove }} />`}
+        code={`<AccountRow account={account} index={0} now={now} actions={{ onRename, onVerify, onRemove }} />`}
       >
         <div className="w-full">
           <SettingsCard>
-            {claude.map((account) => (
+            {claude.map((account, index) => (
               <AccountRow
                 key={account.id}
                 account={account}
+                index={index}
                 now={NOW}
                 actions={actionsFor(account)}
               />
@@ -201,7 +227,6 @@ export function AccountsSection() {
             stickiness={ACCOUNT_STICKINESS}
             now={NOW}
             actionsFor={actionsFor}
-            onAdd={() => undefined}
           />
         </div>
       </Specimen>
@@ -223,10 +248,26 @@ export function AccountsSection() {
         title="Provider panel"
         note="Providers page: list of instances (status dot ok, warn, off; optional runtime switch) beside the selected one's editor; model rows show name, id, retired, remove"
         stage="sheet"
-        code={`<ProviderPanel items={items} selectedId={id} onSelect={select} onAdd={add}>{editor}</ProviderPanel>`}
+        code={`<ProviderPanel items={items} selectedId={id} onSelect={select} header={title}>{editor}</ProviderPanel>`}
       >
         <div className="w-full">
           <ProviderPanelSpecimen />
+        </div>
+      </Specimen>
+      <Specimen
+        id="settings-scope"
+        title="Settings scope sentence"
+        note="Server-side settings pages: one sentence names what the page edits, the menu lists the team and each machine, same-name machines get an id suffix, offline machines are marked; device and personal pages do not show it"
+        stage="sheet"
+        code={`<SettingsScopeSentence machines={machines} scope={scope} onChange={setScope} trailing={<CheckedButton updatedAt={at} fetching={false} />} />`}
+      >
+        <div className="w-full">
+          <SettingsScopeSentence
+            machines={[...SCOPE_MACHINES]}
+            scope={scopeValue}
+            onChange={setScopeValue}
+            trailing={<CheckedButton updatedAt={scopeCheckedAt} fetching={false} />}
+          />
         </div>
       </Specimen>
       <Specimen
@@ -237,6 +278,36 @@ export function AccountsSection() {
         code={`<SettingsNav groups={groups} current={id} hrefFor={hrefFor} query={q} onQuery={setQ} />`}
       >
         <SettingsNavSpecimen />
+      </Specimen>
+      <Specimen
+        id="query-boundary"
+        title="Query boundary"
+        note="a live list pane: a quiet skeleton while the first fetch runs, an error with Retry when it fails, and the empty state only after a successful fetch"
+        stage="sheet"
+        code={`<QueryBoundary query={live ? listQuery : undefined} isEmpty={rows.length === 0} empty={<EmptyState />} loadingLabel={label} errorTitle={title}>{list}</QueryBoundary>`}
+      >
+        <div className="flex w-full flex-col gap-6">
+          {QUERY_PHASES.map(({ phase, query }) => (
+            <QueryBoundary
+              key={phase}
+              query={query}
+              isEmpty
+              loadingLabel={t('正在加载机器')}
+              errorTitle={t('机器没能加载')}
+              skeletonRows={2}
+              empty={
+                <EmptyState
+                  testId="resource-empty"
+                  icon={Monitor}
+                  title={t('尚无机器。')}
+                  description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+                />
+              }
+            >
+              {null}
+            </QueryBoundary>
+          ))}
+        </div>
       </Specimen>
       <Specimen
         id="providers-on-one-machine"

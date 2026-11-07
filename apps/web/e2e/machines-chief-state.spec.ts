@@ -1,58 +1,45 @@
 import { expect, test } from '@playwright/test';
 
-const CHIEF_STATE = '/app/resources/machines?scenario=machines-chief-state';
-const CANON = '/app/resources/machines?scenario=06';
-const SHELL = '[data-route="/app/resources/machines"]';
-const ROW = `${SHELL} div[data-kind]`;
-const HOST_ROW = `${ROW}[data-kind="local"]`;
-const ORCH = `${ROW} [data-orchestration]`;
+const CHIEF_STATE = '/app/settings/machines?scenario=machines-chief-state';
+const CANON = '/app/settings/machines?scenario=06';
+const SHELL = '[data-testid="settings-content"]';
+const ITEM = '[data-testid="machine-item"]';
+const PANE = '[data-testid="machine-detail"]';
 
-test('chief host badge: pinned on the host row (data-orchestration=host + copy)', async ({ page }) => {
+test('chief host tag: a quiet text tag on the host list item (data-orchestration=host + copy)', async ({ page }) => {
   await page.goto(CHIEF_STATE);
-  const host = page.locator(HOST_ROW).locator('[data-orchestration="host"]');
+  const host = page.locator(`${ITEM}[data-kind="local"]`).locator('[data-orchestration="host"]');
   await expect(host).toHaveText('Coordinator 主机');
-
-  await expect(page.locator(`${ROW} [data-orchestration="host"]`)).toHaveCount(1);
+  await expect(page.locator(`${SHELL} [data-orchestration="host"]`)).toHaveCount(1);
 });
 
-test('chief mid-turn: running status row on the online remote row', async ({ page }) => {
+test('chief mid-turn: running status in the detail of the online remote', async ({ page }) => {
   await page.goto(CHIEF_STATE);
-  const running = page.locator(ROW).filter({ hasText: 'mea-wsl' }).locator('[data-orchestration="running"]');
-  await expect(running).toHaveText('Coordinator 回合进行中');
+  await page.locator(ITEM).filter({ hasText: 'mea-wsl' }).getByTestId('machine-toggle').click();
+  await expect(page.locator(`${PANE} [data-orchestration="running"]`)).toHaveText(
+    'Coordinator 回合进行中',
+  );
 });
 
-test('chief waiting for a machine: waiting status row on the offline remote row (coexists orthogonally with the offline grey dot)', async ({ page }) => {
+test('chief waiting for a machine: waiting status in the detail of the offline remote, next to the offline state', async ({ page }) => {
   await page.goto(CHIEF_STATE);
-  const row = page.locator(ROW).filter({ hasText: 'vps-relay' });
-  const waiting = row.locator('[data-orchestration="waiting"]');
-  await expect(waiting).toHaveText('Coordinator 等待机器');
-
-  await expect(row.locator('[data-on]')).toHaveAttribute('data-on', 'false');
+  await page.locator(ITEM).filter({ hasText: 'vps-relay' }).getByTestId('machine-toggle').click();
+  await expect(page.locator(`${PANE} [data-orchestration="waiting"]`)).toHaveText(
+    'Coordinator 等待机器',
+  );
+  await expect(page.locator(ITEM).filter({ hasText: 'vps-relay' }).getByTestId('machine-item-status')).toHaveText('离线');
 });
 
-test('read state zero controls: zero button / zero menu semantics inside the annotation container (dead-button discipline holds)', async ({ page }) => {
+test('read state zero controls: the role annotations are plain text, no buttons or menus', async ({ page }) => {
   await page.goto(CHIEF_STATE);
-  await expect(page.locator(ORCH).first()).toBeVisible();
-  await expect(page.locator(`${ORCH} button`)).toHaveCount(0);
-  await expect(page.locator(`${ORCH} [role="menu"]`)).toHaveCount(0);
-
+  await expect(page.locator(`${SHELL} [data-orchestration]`).first()).toBeVisible();
+  await expect(page.locator(`${SHELL} [data-orchestration] button`)).toHaveCount(0);
+  await expect(page.locator(`${SHELL} [data-orchestration] [role="menu"]`)).toHaveCount(0);
   await expect(page.locator(`${SHELL} [data-orchestration][role="button"]`)).toHaveCount(0);
-
-  await expect(page.locator(`${ROW} [role="switch"]`)).toHaveCount(0);
 });
 
 test('legacy zero drift: no annotation data (06 canon face) grows no annotation nodes', async ({ page }) => {
   await page.goto(CANON);
-  await expect(page.locator(ROW).first()).toBeVisible();
+  await expect(page.locator(ITEM).first()).toBeVisible();
   await expect(page.locator(`${SHELL} [data-orchestration]`)).toHaveCount(0);
-});
-
-test('row-height contract holds: annotation rows do not break the Paper settings row height (52 per row, divider included)', async ({ page }) => {
-  await page.goto(CHIEF_STATE);
-  const rows = page.locator(ROW);
-  await expect(rows).toHaveCount(3);
-  const heights = await rows.evaluateAll((els) =>
-    els.map((el) => el.getBoundingClientRect().height),
-  );
-  expect(heights).toEqual([52, 52, 52]);
 });

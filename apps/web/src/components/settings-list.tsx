@@ -76,13 +76,57 @@ export function SettingsHeader({
   );
 }
 
+const SettingsFlatContext = createContext(false);
+
+export const SETTINGS_VALUE_COL_CLS = '@xl:w-56 @xl:flex-none justify-end';
+
+const SETTINGS_FLAT_CLS =
+  'rounded-none bg-transparent shadow-none ring-0 border-t border-border [&_.settings-row]:px-0 [&_.settings-flat-block]:px-0';
+
+export function SettingsFlat({ children }: { children: ReactNode }) {
+  return <SettingsFlatContext.Provider value>{children}</SettingsFlatContext.Provider>;
+}
+
 export function SettingsCard({ className, children }: { className?: string; children: ReactNode }) {
-  return <Card className={cn(SETTINGS_CARD_CLS, className)}>{children}</Card>;
+  const flat = useContext(SettingsFlatContext);
+  return (
+    <Card className={cn(SETTINGS_CARD_CLS, flat && SETTINGS_FLAT_CLS, className)}>{children}</Card>
+  );
+}
+
+export function SettingsPanel({
+  header,
+  children,
+  className,
+}: {
+  header?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <SettingsFlat>
+      <div
+        data-testid="settings-panel"
+        className={cn(
+          '@container flex min-w-0 flex-col overflow-hidden rounded-(--radius-card) bg-card ring-1 ring-border',
+          className,
+        )}
+      >
+        {header != null && (
+          <div className="flex min-h-11 flex-none items-center justify-between gap-3 border-b border-border px-4">
+            {header}
+          </div>
+        )}
+        {children}
+      </div>
+    </SettingsFlat>
+  );
 }
 
 interface SettingsRowProps {
   label: string;
   hint?: ReactNode;
+  labelTestId?: string;
   className?: string;
   labelClassName?: string;
   hintClassName?: string;
@@ -109,6 +153,7 @@ export function SettingsSelectTrigger({
 export function SettingsRow({
   label,
   hint,
+  labelTestId,
   className,
   labelClassName,
   hintClassName,
@@ -116,12 +161,14 @@ export function SettingsRow({
   children,
 }: SettingsRowProps) {
   const withHint = hint != null;
+  const flat = useContext(SettingsFlatContext);
   const labelId = useId();
   return (
     <div className={cn(SETTINGS_ROW_CLS, className)}>
       <span className={cn('flex min-w-0 flex-col', withHint && 'max-w-3/5 flex-auto')}>
         <span
           id={labelId}
+          data-testid={labelTestId}
           className={cn('settings-label-text text-ui text-foreground', labelClassName)}
         >
           {label}
@@ -133,6 +180,7 @@ export function SettingsRow({
           className={cn(
             'flex items-center gap-3 text-ui text-foreground',
             withHint && 'min-w-0 flex-auto justify-end',
+            flat && valueClassName === undefined && SETTINGS_VALUE_COL_CLS,
             valueClassName,
           )}
         >
@@ -140,6 +188,38 @@ export function SettingsRow({
         </span>
       </SettingsRowLabelContext.Provider>
     </div>
+  );
+}
+
+export function SettingsSection({
+  title,
+  description,
+  action,
+  className,
+  testId,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+  testId?: string;
+  children: ReactNode;
+}) {
+  const flat = useContext(SettingsFlatContext);
+  return (
+    <section data-testid={testId} className={cn('flex flex-col gap-2', className)}>
+      <div className={cn('flex min-h-7 items-center justify-between gap-3', !flat && 'px-1')}>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
+          {description != null && (
+            <p className="m-0 text-meta text-content-tertiary">{description}</p>
+          )}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 

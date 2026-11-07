@@ -19,6 +19,7 @@ import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { useLiveSeconds } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { machineSecondary } from '../components/machine-label.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -225,7 +226,11 @@ export function ChiefConversation({
       label: s.name,
       subtitle: s.description ?? undefined,
     })),
-    machine: (machinesQ.data ?? []).map((m) => ({ id: m.id, label: m.name })),
+    machine: (machinesQ.data ?? []).map((m) => ({
+      id: m.id,
+      label: m.name,
+      subtitle: machineSecondary(m, machinesQ.data ?? []) ?? undefined,
+    })),
   };
   const projectOptions = useMemo(
     () =>

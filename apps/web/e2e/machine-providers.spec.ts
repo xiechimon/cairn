@@ -42,8 +42,8 @@ test('live: machine detail toggles a runtime through enabledRuntimes', async ({ 
     }
     return undefined;
   });
-  await page.goto('/app/resources/machines/m1');
-  const section = page.getByTestId('machine-providers');
+  await page.goto('/app/settings/machines?machine=m1');
+  const section = page.getByTestId('machine-detail');
   const claudeCode = section.locator('[data-runtime="claude-code"]');
   const codex = section.locator('[data-runtime="codex"]');
   await expect(codex.getByTestId('provider-login-command')).toHaveText('codex login');
@@ -53,12 +53,12 @@ test('live: machine detail toggles a runtime through enabledRuntimes', async ({ 
 });
 
 test('fixture: machine detail lists providers with login command', async ({ page }) => {
-  await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=model-routing');
-  const section = page.getByTestId('machine-providers');
-  await expect(section.locator('[data-testid="provider-row"]')).toHaveCount(3);
+  await page.goto('/app/settings/machines?scenario=model-routing&machine=Kd8fG2hJ4mN9pQ1rStUvWx3');
+  const section = page.getByTestId('machine-detail');
+  await expect(section.locator('[data-testid="provider-row"]')).toHaveCount(4);
   await expect(section.locator('[data-runtime="codex"]')).toContainText('ChatGPT Pro');
-  await page.goto('/app/resources/machines/TlZ2sSD4EJCxjNJqVhdo_?scenario=model-routing');
+  await page.goto('/app/settings/machines?scenario=model-routing&machine=TlZ2sSD4EJCxjNJqVhdo_');
   await expect(
-    page.getByTestId('machine-providers').locator('[data-runtime="claude-code"]').getByTestId('provider-login-command'),
+    page.getByTestId('machine-detail').locator('[data-runtime="claude-code"]').getByTestId('provider-login-command'),
   ).toHaveText('claude /login');
 });

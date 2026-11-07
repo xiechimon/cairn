@@ -4,8 +4,11 @@ import { mockLive } from './chief-home-mock';
 const FLEET = '/app/resources/providers?scenario=providers-fleet';
 const NOW = Date.now();
 
-const scopeTabs = (page: Page) =>
-  page.getByRole('tablist', { name: '范围' }).getByRole('tab');
+const scopeSelect = (page: Page) => page.getByRole('combobox', { name: '设置作用于' });
+const pickScope = async (page: Page, text: string) => {
+  await scopeSelect(page).click();
+  await page.getByRole('option').filter({ hasText: text }).first().click();
+};
 const instance = (page: Page, id: string) =>
   page.locator(`[data-testid="provider-instance"][data-instance-id="${id}"]`);
 const editor = (page: Page) => page.getByTestId('provider-editor');
@@ -14,7 +17,8 @@ test('scope tabs: team first, one tab per machine by machine name, offline and O
   page,
 }) => {
   await page.goto(FLEET);
-  await expect(scopeTabs(page)).toHaveText([
+  await scopeSelect(page).click();
+  await expect(page.getByRole('option')).toHaveText([
     '团队',
     'xmonsMac-3574.local',
     'build-box',
@@ -22,7 +26,8 @@ test('scope tabs: team first, one tab per machine by machine name, offline and O
     'old-laptop · 离线',
     'new-box',
   ]);
-  await expect(scopeTabs(page).first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Escape');
+  await expect(scopeSelect(page)).toContainText('团队');
   await expect(page.getByText('DESKTOP-OLD')).toHaveCount(0);
 });
 
@@ -65,7 +70,7 @@ test('OAuth providers show no API key row; key providers show a write-only key r
 
 test('unknown scope and item fall back to the team tab and its first row', async ({ page }) => {
   await page.goto(`${FLEET}&scope=gone-machine&item=provider%3Agone`);
-  await expect(scopeTabs(page).first()).toHaveAttribute('aria-selected', 'true');
+  await expect(scopeSelect(page)).toContainText('团队');
   await expect(page.getByTestId('provider-instance').first()).toHaveAttribute(
     'aria-current',
     'true',
@@ -76,7 +81,7 @@ test('machine tab: Claude Code reports version, sign-in state and slots; runtime
   page,
 }) => {
   await page.goto(FLEET);
-  await scopeTabs(page).filter({ hasText: 'build-box-orb' }).click();
+  await pickScope(page, 'build-box-orb');
   await expect(page).toHaveURL(/scope=fleet-box-orb/);
   const cc = instance(page, 'claude-code');
   await expect(cc).toContainText('v2.1.316');
@@ -210,11 +215,11 @@ test('live: edits and runtime switches send the agreed requests', async ({ page 
     .poll(() => calls)
     .toContain('PATCH p1 {"models":[{"id":"claude-opus-5-5","name":"claude-opus-5-5"}]}');
 
-  await editor(page).getByRole('button', { name: '移除服务商' }).click();
+  await editor(page).getByRole('button', { name: '移除', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '移除', exact: true }).click();
   await expect.poll(() => calls).toContain('DELETE p1');
 
-  await scopeTabs(page).filter({ hasText: 'box' }).click();
+  await pickScope(page, 'box');
   await instance(page, 'claude-code').getByRole('switch').click();
   await expect
     .poll(() => calls)

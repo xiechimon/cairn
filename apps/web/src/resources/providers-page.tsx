@@ -1,16 +1,18 @@
 import type { MachineRuntime, ModelSource, ProviderRecord } from '@cairn/shared';
 import { MACHINE_RUNTIMES } from '@cairn/shared';
-import { Cpu } from 'lucide-react';
+import { Cpu, Plus } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useModelSources, useProviders } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
+import { CheckedButton } from '../components/checked-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import { type ProviderItem, ProviderPanel } from '../components/providers/provider-panel.js';
-import { mergeQueries, QueryBoundary } from '../components/query-state.js';
-import { SegmentedTabs } from '../components/segmented.js';
+import { QueryBoundary } from '../components/query-state.js';
+import { SettingsScopeSentence, useSettingsScope } from '../components/settings-scope.js';
+import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -20,7 +22,6 @@ import type { TFunc } from '../i18n/translate.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
 import { PROVIDERS_HREF } from './hrefs.js';
-import { ResourceNewButton } from './parts.js';
 import {
   ClaudeCodeEditor,
   claudeCodeStatus,
@@ -32,8 +33,6 @@ import {
   TeamProviderEditor,
 } from './provider-editors.js';
 
-const TEAM_SCOPE = 'team';
-
 interface Entry {
   item: ProviderItem;
   editor: ReactNode;
@@ -41,12 +40,6 @@ interface Entry {
 
 const isMachineRuntime = (value: string): value is MachineRuntime =>
   (MACHINE_RUNTIMES as readonly string[]).includes(value);
-
-function scopeLabel(machine: MachineRow, t: TFunc): string {
-  if (machine.online === false) return `${machine.name} · ${t('离线')}`;
-  if (machine.capabilities?.executor === 'orb') return `${machine.name} · Orb`;
-  return machine.name;
-}
 
 function sourceFor(machine: MachineRow, sources: readonly ModelSource[]): ModelSource | undefined {
   const claude = sources.filter((s) => s.runtime === 'claude-code');
@@ -200,6 +193,14 @@ export function ProvidersPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  const { scope, machine, setScope } = useSettingsScope(machines);
+  const [mountedAt] = useState(() => Date.now());
+  const checkedAt = Math.max(sourcesQ.dataUpdatedAt, providersQ.dataUpdatedAt, mountedAt);
+  const refreshChecks = () => {
+    void sourcesQ.refetch();
+    void providersQ.refetch();
+  };
+
   const setParams = (patch: Record<string, string | null>, replace = false) => {
     const params = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) {
@@ -208,10 +209,6 @@ export function ProvidersPage() {
     }
     setSearchParams(params, { replace });
   };
-
-  const scopeParam = searchParams.get('scope');
-  const machine = machines.find((m) => m.id !== undefined && m.id === scopeParam);
-  const scope = machine?.id ?? TEAM_SCOPE;
 
   const actionsFor = (record: ProviderRecord): ProviderEditActions =>
     live
@@ -263,31 +260,45 @@ export function ProvidersPage() {
       route={PROVIDERS_HREF}
       title={t('模型服务')}
       selected={PROVIDERS_HREF}
-      actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
-      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-2 pb-16">
-        <div className="overflow-x-auto pb-1">
-          <SegmentedTabs
-            label={t('范围')}
-            value={scope}
-            onChange={(next) => setParams({ scope: next === TEAM_SCOPE ? null : next, item: null })}
-            options={[
-              { value: TEAM_SCOPE, label: t('团队') },
-              ...machines.flatMap((m) =>
-                m.id === undefined ? [] : [{ value: m.id, label: scopeLabel(m, t) }],
-              ),
-            ]}
-          />
-        </div>
+      <div className="mx-auto flex w-full max-w-240 flex-col gap-3 pt-4 pb-16">
+        <SettingsScopeSentence
+          machines={machines}
+          scope={scope}
+          onChange={(next) => setScope(next, { item: null })}
+          trailing={
+            <CheckedButton
+              updatedAt={checkedAt}
+              fetching={sourcesQ.isFetching || providersQ.isFetching}
+              onRefresh={live ? refreshChecks : undefined}
+            />
+          }
+        />
         <ProviderPanel
+          header={
+            <div className="flex items-center gap-1">
+              <h2 className="m-0 text-card-title font-semibold text-foreground">{t('服务商')}</h2>
+              {machine === undefined && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('添加服务商')}
+                  title={t('添加服务商')}
+                  data-testid="resource-new"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus aria-hidden strokeWidth={1.75} />
+                </Button>
+              )}
+            </div>
+          }
           items={entries.map((e) => e.item)}
           selectedId={selected?.item.id ?? null}
           onSelect={(id) => setParams({ item: id })}
-          onAdd={machine === undefined ? () => setCreateOpen(true) : undefined}
           empty={
             <QueryBoundary
-              query={live ? mergeQueries(providersQ, sourcesQ) : undefined}
+              query={live ? (machine === undefined ? providersQ : sourcesQ) : undefined}
               isEmpty
               loadingLabel={t('正在加载模型服务')}
               errorTitle={t('模型服务没能加载')}
