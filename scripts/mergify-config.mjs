@@ -40,6 +40,7 @@ export function mergifyConfig(prGateSource, gatePaths) {
     '          - base = main',
     '          - "#depends-on > 0"',
     '      - -draft',
+    "      - '#review-threads-unresolved = 0'",
     '      - -label = coordinator-hold',
     '      - or:',
     `          - -head ~= ${batchHeadRe}`,
@@ -53,7 +54,7 @@ export function mergifyConfig(prGateSource, gatePaths) {
   const rule = (name, author, method) => `  - name: ${name}
     queue_conditions:
       - ${author}
-${name === 'bot' ? queueConditions.replace('      - -draft\n', "      - -draft\n      - '#review-threads-unresolved = 0'\n") : queueConditions}
+${queueConditions}
     merge_conditions:
 ${draftChecks.map(passedOrSkipped).join('\n')}
     merge_method: ${method}
