@@ -54,6 +54,13 @@ import { coordinatorServerContextEnabled } from './coordinator-context.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { listMemoryEntries, saveMemoryEntry } from './memory.js';
+import {
+  applyMemoryPass,
+  MEMORY_PASS_MARK,
+  memoryPassDue,
+  memoryPassSection,
+  withMemoryPass,
+} from './memory-consolidation.js';
 import type { VapidKeys } from './push.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { serverTimezone } from './schedules.js';
@@ -268,11 +275,16 @@ function digestMeta(threadId: string, last: CoordinatorLine, reason: FoldCandida
 export function queueDigestStep(
   deps: DigestDeps,
   chiefRow: typeof chief.$inferSelect,
-  prompt: string,
+  basePrompt: string,
   now: number,
 ): string {
   const { db } = deps;
   const digestThreadId = chiefDigestThreadId(chiefRow.id);
+  const agentId = coordinatorProfile(db, chiefRow.teamId)?.id;
+  const prompt =
+    agentId !== undefined && memoryPassDue(db, chiefRow.id, chiefRow.teamId, agentId, now)
+      ? withMemoryPass(basePrompt, memoryPassSection(db, chiefRow.id, chiefRow.teamId, agentId))
+      : basePrompt;
   db.insert(chiefThread)
     .values({
       id: digestThreadId,
@@ -595,6 +607,21 @@ export function finishChiefDigest(
     if (report !== undefined) settleReportRun(deps, report, retroFound, now, effects);
   });
   for (const effect of effects) effect();
+  if (succeeded && prompt.includes(MEMORY_PASS_MARK)) {
+    const owner = db
+      .select({ teamId: chiefThread.teamId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, stepRow.buildId))
+      .get();
+    const agentId = owner === undefined ? undefined : coordinatorProfile(db, owner.teamId)?.id;
+    const memory =
+      parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as { memory?: unknown }).memory
+        : undefined;
+    if (owner !== undefined && agentId !== undefined && memory !== undefined) {
+      applyMemoryPass(db, { teamId: owner.teamId, agentId }, memory, now);
+    }
+  }
   if (!ok) return;
   const until = Number(meta[2]);
   const rememberAs =
