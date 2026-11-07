@@ -4,7 +4,7 @@ import type { Db } from '../db/client.js';
 import { routingRule } from '../db/schema.js';
 import { coordinatorRoute, paidClaudeAllowed } from '../services/coordinator-route.js';
 import { openProviderKey } from '../services/providers.js';
-import { CODEX_PROVIDER_ID, readCodexLogin } from './codex-login.js';
+import { readCodexLogin, usesHostCodexLogin } from './codex-login.js';
 
 export interface CoordinatorModelRoute {
   provider: string;
@@ -84,7 +84,9 @@ export function coordinatorApiKey(
 ): string | null {
   const opened = openProviderKey(deps, teamId, providerId);
   if (opened === null) return null;
-  if (opened.apiKey === null && providerId === CODEX_PROVIDER_ID) return readCodexLogin();
+  if (opened.apiKey === null && usesHostCodexLogin(providerId, opened.row.baseUrl)) {
+    return readCodexLogin();
+  }
   return opened.apiKey;
 }
 

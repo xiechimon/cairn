@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { machine } from '../db/schema.js';
@@ -14,6 +14,20 @@ export interface SidecarMigrationInput {
   storageDir: string;
   sidecarMachineId: string | null;
   logger: CoordinatorLogger;
+}
+
+export function moveStoreFile(
+  source: string,
+  destination: string,
+  rename: typeof renameSync = renameSync,
+): void {
+  try {
+    rename(source, destination);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+    copyFileSync(source, destination);
+    unlinkSync(source);
+  }
 }
 
 export function migrateSidecarState(input: SidecarMigrationInput): {
@@ -43,7 +57,7 @@ export function migrateSidecarState(input: SidecarMigrationInput): {
     if (existsSync(destination)) continue;
     for (const suffix of STORE_SUFFIXES) {
       const source = join(legacyDir, `${name}${suffix}`);
-      if (existsSync(source)) renameSync(source, `${destination}${suffix}`);
+      if (existsSync(source)) moveStoreFile(source, `${destination}${suffix}`);
     }
     moved.push(name);
   }

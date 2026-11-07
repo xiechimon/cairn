@@ -461,6 +461,39 @@ test('coordinator stores are copied after the db, verified, gzipped and rotated 
   assert.equal(sqlite(restored, 'select v from t;').trim(), 'chief-b');
 });
 
+test('a missing coordinator store directory is an empty collection', () => {
+  const f = fixture();
+  const out = join(f.backups, 'coordinator');
+  const result = f.run([
+    ...f.full,
+    '--coordinator',
+    join(f.server, 'coordinator'),
+    '--coordinator-out',
+    out,
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /no coordinator stores yet/);
+  assert.match(result.stdout, /coordinator stores copied: 0/);
+});
+
+test('coordinator stores are pushed to the remote with the db', () => {
+  const f = fixture();
+  const stores = join(f.server, 'coordinator');
+  mkdirSync(stores, { recursive: true });
+  sqlite(join(stores, 'chief-a.sqlite'), "create table t(v text); insert into t values ('a');");
+  const result = f.run([
+    ...f.full,
+    '--coordinator',
+    stores,
+    '--coordinator-out',
+    join(f.backups, 'coordinator'),
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  const runs = readdirSync(join(f.receiver, 'coordinator'));
+  assert.equal(runs.length, 1);
+  assert.deepEqual(files(join(f.receiver, 'coordinator', runs[0])), ['chief-a.sqlite.gz']);
+});
+
 test('--coordinator and --coordinator-out go together', () => {
   const f = fixture();
   const result = f.run(['--db', f.db, '--out', join(f.backups, 'db'), '--coordinator', f.server]);

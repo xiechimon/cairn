@@ -43,3 +43,7 @@ export function readCodexLogin(
 export function codexLoginAvailable(): boolean {
   return readCodexLogin() !== null;
 }
+
+export function usesHostCodexLogin(providerId: string, baseUrl: string | null): boolean {
+  return providerId === CODEX_PROVIDER_ID && (baseUrl === null || baseUrl === '');
+}

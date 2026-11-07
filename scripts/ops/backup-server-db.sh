@@ -110,7 +110,7 @@ echo "[$ts] wrote $OUT/$name ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 ) || fail "rotate $OUT"
 
 if [ -n "$COORDINATOR" ]; then
-  [ -d "$COORDINATOR" ] || fail "coordinator stores not found: $COORDINATOR"
+  [ -d "$COORDINATOR" ] || echo "[$ts] no coordinator stores yet: $COORDINATOR"
   mkdir -p "$COORDINATOR_OUT/coordinator-$ts" || fail "create $COORDINATOR_OUT/coordinator-$ts"
   stores=0
   for src in "$COORDINATOR"/*.sqlite; do
@@ -196,6 +196,9 @@ if [ -n "$REMOTE" ]; then
   "${push[@]}" --include='server-db-*.db.gz' --include='server-db-*.db.gz.attachments.sha256' --exclude='*' "$OUT/" "${dest}db/" || fail "push db to ${dest}db/"
   if [ -n "$ATTACHMENTS" ]; then
     "${push[@]}" "${SECRETS[@]}" --exclude='*.partial' "$ATTACHMENTS_OUT/" "${dest}attachments/" || fail "push attachments to ${dest}attachments/"
+  fi
+  if [ -n "$COORDINATOR" ]; then
+    "${push[@]}" "$COORDINATOR_OUT/" "${dest}coordinator/" || fail "push coordinator stores to ${dest}coordinator/"
   fi
   echo "[$ts] pushed to $dest"
 fi

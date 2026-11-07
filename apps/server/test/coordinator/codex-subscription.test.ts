@@ -108,4 +108,40 @@ describe('Codex subscription credential for the in-server Coordinator', () => {
     expect(coordinatorApiKey({ db: s.db, box: s.secretBox }, s.team.id, 'openai-codex')).toBe(live);
     expect(JSON.stringify(s.db.select().from(routingRule).all())).not.toContain(live);
   });
+
+  it('never hands the host login to a keyless openai-codex provider with a custom endpoint', () => {
+    const live = jwt(Math.floor(Date.now() / 1000) + 3600);
+    process.env.CODEX_HOME = codexHome(live);
+    const s = bootServer();
+    disposers.push(() => s.dispose());
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        body: {
+          providerId: 'openai-codex',
+          label: 'Gateway',
+          baseUrl: 'https://gateway.example.com/v1',
+          api: 'openai-responses',
+          models: [{ id: 'gpt-6.1-sol', name: 'gpt-6.1-sol' }],
+        },
+        createdBy: s.user.id,
+      },
+    );
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-codex',
+        teamId: s.team.id,
+        use: 'coordinator',
+        provider: 'openai-codex',
+        modelId: 'gpt-6.1-sol',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+
+    expect(coordinatorProviders({ db: s.db, box: s.secretBox }, s.team.id)).toBeNull();
+    expect(coordinatorApiKey({ db: s.db, box: s.secretBox }, s.team.id, 'openai-codex')).toBeNull();
+  });
 });

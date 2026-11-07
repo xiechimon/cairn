@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../../src/config.js';
 import { warnTeamsWithoutCoordinatorRule } from '../../src/coordinator/boot-guard.js';
-import { migrateSidecarState } from '../../src/coordinator/boot-migration.js';
+import { migrateSidecarState, moveStoreFile } from '../../src/coordinator/boot-migration.js';
 import { machine, routingRule } from '../../src/db/schema.js';
 import { bootServer, issueApiKey } from '../helpers.js';
 
@@ -25,6 +25,29 @@ function dirsFor() {
 }
 
 describe('Coordinator sidecar boot migration', () => {
+  it('copies and removes a store file when the rename crosses filesystems', () => {
+    const { home } = dirsFor();
+    const source = join(home, 'chief-x.sqlite');
+    const destination = join(home, 'moved.sqlite');
+    writeFileSync(source, 'x');
+    const crossDevice = () => {
+      throw Object.assign(new Error('cross-device link'), { code: 'EXDEV' });
+    };
+
+    moveStoreFile(source, destination, crossDevice);
+
+    expect(existsSync(source)).toBe(false);
+    expect(readFileSync(destination, 'utf8')).toBe('x');
+  });
+
+  it('rethrows a rename failure that is not a cross-device move', () => {
+    const { home } = dirsFor();
+    const denied = () => {
+      throw Object.assign(new Error('denied'), { code: 'EACCES' });
+    };
+    expect(() => moveStoreFile(join(home, 'a'), join(home, 'b'), denied)).toThrow('denied');
+  });
+
   it('moves a sidecar store that has no destination and leaves an existing one alone', () => {
     const { home, storage } = dirsFor();
     const legacy = join(home, 'coordinator', 'threads');
