@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
 set -e
+node scripts/prepush-refuse-main.mjs
 pnpm prepush
