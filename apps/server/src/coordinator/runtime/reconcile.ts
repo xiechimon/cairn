@@ -11,6 +11,8 @@ import {
   ToolResultEntry,
   UserEntry,
 } from '@earendil-works/pi-durable';
+import { parseWatermark } from '../watermark.js';
+import { activeConversation, type Conversation, newestEntryId } from './conversations.js';
 import { openCoordinatorHarness } from './harness.js';
 import { type SeedRow, seedCoordinator } from './seed.js';
 import { settleStaleSubmissions } from './stale-runs.js';
@@ -28,6 +30,7 @@ export interface ReconcileFacts {
   lastMirroredEntryId: string | null;
   piVersion: string | null;
   hasClaimedStep: boolean;
+  forceReseed?: boolean;
   isLive(requestId: string): boolean;
   seed(): ReconcileSeed;
   record(state: { conversationId: string; piVersion: string; reseeded: boolean }): void;
@@ -39,6 +42,7 @@ export type ReconcileOutcome =
   | 'reseeded-missing-conversation'
   | 'reseeded-ahead'
   | 'reseeded-behind'
+  | 'reseeded-rewound'
   | 'unchanged';
 
 export interface ReconcileOptions {
@@ -67,7 +71,7 @@ function isContentEntry(entry: EntryRecord): boolean {
 }
 
 async function hasContentBeyond(
-  root: Awaited<ReturnType<Harness['root']>>,
+  root: Conversation,
   after: number,
   context: Context,
 ): Promise<boolean> {
@@ -78,12 +82,6 @@ async function hasContentBeyond(
     context,
   );
   return page.items.some(isContentEntry);
-}
-
-async function newestEntryId(harness: Harness, context: Context): Promise<number | undefined> {
-  const root = await harness.root(context);
-  const newest = (await root.entries({}, 1, undefined, context)).items[0]?.id;
-  return newest === undefined ? undefined : Number(newest);
 }
 
 export async function openReconciledHarness(
@@ -99,27 +97,37 @@ export async function openReconciledHarness(
   const open = () =>
     openCoordinatorHarness(storagePath, models, context, { ...options, resume: false });
   let harness = await open();
-  const newest = await newestEntryId(harness, context);
   const root = await harness.root(context);
+  const rootNewest = await newestEntryId(root, context);
+  const recorded =
+    facts.conversationId === null || rootNewest === undefined
+      ? root
+      : await activeConversation(harness, facts.conversationId, context);
+  const watermark = parseWatermark(facts.lastMirroredEntryId);
   let outcome: ReconcileOutcome = 'unchanged';
   let reseed: ReconcileOutcome | null = null;
-  if (newest === undefined) {
+  if (rootNewest === undefined) {
     reseed = 'seeded';
+  } else if (facts.forceReseed === true) {
+    reseed = 'reseeded-rewound';
   } else if (facts.conversationId === null) {
     outcome = 'adopted-store';
-  } else if (facts.conversationId !== String(root.id)) {
+  } else if (recorded === undefined) {
     reseed = 'reseeded-missing-conversation';
-  } else if (facts.lastMirroredEntryId !== null && newest < Number(facts.lastMirroredEntryId)) {
+  } else if (
+    watermark?.kind === 'mirrored' &&
+    ((await newestEntryId(recorded, context)) ?? 0) < watermark.entryId
+  ) {
     reseed = 'reseeded-behind';
   } else if (
-    facts.lastMirroredEntryId !== null &&
+    watermark?.kind === 'mirrored' &&
     !facts.hasClaimedStep &&
-    (await hasContentBeyond(root, Number(facts.lastMirroredEntryId), context))
+    (await hasContentBeyond(recorded, watermark.entryId, context))
   ) {
     reseed = 'reseeded-ahead';
   }
   if (reseed !== null) {
-    if (newest !== undefined) {
+    if (rootNewest !== undefined) {
       await harness.close(context);
       setAside(storagePath, `stale-${Date.now()}`);
       harness = await open();
@@ -129,14 +137,13 @@ export async function openReconciledHarness(
     outcome = reseed;
   }
   const settled = await settleStaleSubmissions(harness, context, facts.isLive);
+  const active = reseed === null && recorded !== undefined ? recorded : await harness.root(context);
   facts.record({
-    conversationId: String((await harness.root(context)).id),
+    conversationId: String(active.id),
     piVersion: PI_VERSION,
-    reseeded: reseed !== null && newest !== undefined,
+    reseeded: reseed !== null && rootNewest !== undefined,
   });
   harness.resume();
-  if (settled.placedStale && settled.adopted.length === 0) {
-    await (await harness.root(context)).abort(context);
-  }
+  if (settled.placedStale && settled.adopted.length === 0) await active.abort(context);
   return { harness, outcome, stale: settled.aborted };
 }
