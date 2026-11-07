@@ -60,7 +60,6 @@ export async function evidencePanelShot(
   await evidenceShot(page, name, { x, y, width: right - x, height: bottom - y });
 }
 
-/** Write `data` as JSON under CAIRN_E2E_EVIDENCE; silently skipped when unset. */
 export async function evidenceJson(name: string, data: unknown): Promise<void> {
   if (EVIDENCE_ROOT === null) return;
   mkdirSync(EVIDENCE_ROOT, { recursive: true });
