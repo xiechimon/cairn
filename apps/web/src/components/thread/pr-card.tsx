@@ -238,7 +238,7 @@ export function PrCard(props: PrCardProps) {
             aria-label={t('详情')}
             className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <ChevronDown className="size-3.5 transition-transform group-data-[open]/details:rotate-180" />
+            <ChevronDown className="size-3.5 group-data-[open]/details:rotate-180" />
           </CollapsibleTrigger>
           {githubHref != null && (
             <PrRowMenu

@@ -106,6 +106,22 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(card.locator('[data-slot="pr-card-state"]')).toHaveText(c.pill);
       await evidencePanelShot(page, `thread-pr-${c.name}-${theme}.png`, page.locator('.side-panel'));
       await card.getByRole('button', { name: 'Details' }).click();
+      const chevron = await card.getByRole('button', { name: 'Details' }).evaluate((button) => {
+        const svg = button.querySelector('svg');
+        if (svg === null) throw new Error('details chevron missing');
+        const box = svg.getBoundingClientRect();
+        const outer = button.getBoundingClientRect();
+        return {
+          rotate: getComputedStyle(svg).rotate,
+          transition: getComputedStyle(svg).transitionDuration,
+          inside: box.left >= outer.left && box.right <= outer.right && box.top >= outer.top && box.bottom <= outer.bottom,
+          square: Math.abs(box.width - box.height) < 0.5,
+        };
+      });
+      expect(chevron.rotate).toBe('180deg');
+      expect(chevron.transition).toBe('0s');
+      expect(chevron.inside).toBe(true);
+      expect(chevron.square).toBe(true);
       await expect(card.locator('[data-slot="pr-card-title"]')).toContainText('the thread-owned PR panel');
       if (c.name === 'ci-failed') {
         await expect(card.locator('[data-slot="pr-card-failures"]')).toHaveText('2 failed: lint, e2e (1)');
