@@ -82,6 +82,7 @@ function fixture() {
     timeline: [{ __typename: 'PullRequestCommit', commit: { oid: 'abc' } }] as unknown[],
     failure: null as null | { operation: string; kind: string },
     resolved: false,
+    findingId: 'RT_1',
     outdated: false,
     login: 'chatgpt-codex-connector[bot]',
     type: 'Bot',
@@ -160,7 +161,7 @@ function fixture() {
       reviewThreads: {
         nodes: [
           {
-            id: 'RT_1',
+            id: state.findingId,
             isResolved: state.resolved,
             isOutdated: state.outdated,
             path: 'a.ts',
@@ -538,7 +539,6 @@ test('Codex findings bypass permission while a human without write access is ign
 const cleanSnapshot = {
   state: 'OPEN',
   isDraft: true,
-  overridden: false,
   labels: [CAIRN_REVIEW_HOLD_LABEL] as string[],
   findings: [] as {
     id: string;
@@ -564,12 +564,6 @@ test('desiredAction covers every ordered rule and release blocker', () => {
     [cleanSnapshot, idleLocal, 'markReady'],
     [{ ...cleanSnapshot, isDraft: false, labels: [], findings: [finding] }, idleLocal, 'addLabel'],
     [{ ...cleanSnapshot, isDraft: false, findings: [finding] }, idleLocal, 'convertToDraft'],
-    [{ ...cleanSnapshot, overridden: true, findings: [finding] }, idleLocal, null],
-    [
-      { ...cleanSnapshot, overridden: true, isDraft: false, labels: [], findings: [finding] },
-      idleLocal,
-      null,
-    ],
     [{ ...cleanSnapshot, findings: [finding] }, idleLocal, null],
     [{ ...cleanSnapshot, isDraft: false }, idleLocal, 'removeLabel'],
     [{ ...cleanSnapshot, labels: [] }, idleLocal, null],
@@ -628,36 +622,56 @@ test('each failed transition converges in exactly the remaining clean polls', as
   }
 });
 
-test.each([false, true])(
-  'human removal overrides a held head, including ready=%s',
-  async (ready) => {
-    const f = fixture();
-    await f.reconcile();
-    await f.reconcile();
-    f.state.labels = [];
-    f.state.timeline.push({
-      __typename: 'UnlabeledEvent',
-      label: { name: CAIRN_REVIEW_HOLD_LABEL },
-    });
-    f.state.draft = !ready;
-    const before = f.queries.length;
-    await f.reconcile();
-    expect(f.queries.slice(before).some((q) => q.includes('mutation'))).toBe(false);
-    f.state.resolved = true;
-    await f.reconcile();
-    expect(f.state.draft).toBe(!ready);
-    f.state.resolved = false;
-    f.state.head = 'new';
-    f.state.timeline.push({ __typename: 'HeadRefForcePushedEvent', afterCommit: { oid: 'new' } });
-    f.state.draft = false;
-    await f.reconcile();
-    expect(f.state.labels).toContain(CAIRN_REVIEW_HOLD_LABEL);
-    await f.reconcile();
-    expect(f.state.draft).toBe(true);
-  },
-);
+test('human label removal on a ready PR with findings re-adds the label and converts to draft', async () => {
+  const f = fixture();
+  await f.reconcile();
+  await f.reconcile();
+  f.state.labels = [];
+  f.state.timeline.push({
+    __typename: 'UnlabeledEvent',
+    label: { name: CAIRN_REVIEW_HOLD_LABEL },
+  });
+  f.state.draft = false;
+  const before = f.queries.length;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([CAIRN_REVIEW_HOLD_LABEL]);
+  expect(f.state.draft).toBe(false);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.queries.slice(before).filter((q) => q.includes('mutation'))).toEqual([
+    expect.stringContaining('addLabelsToLabelable'),
+    expect.stringContaining('convertPullRequestToDraft'),
+  ]);
+});
 
-test('marking a held PR ready retains the hold until findings resolve', async () => {
+test('a new finding on the same head re-holds after cairn releases and removes the label', async () => {
+  const f = fixture();
+  const head = f.state.head;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([CAIRN_REVIEW_HOLD_LABEL]);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  f.state.resolved = true;
+  await f.reconcile();
+  expect(f.state.draft).toBe(false);
+  await f.reconcile();
+  expect(f.state.labels).toEqual([]);
+  f.state.resolved = false;
+  f.state.findingId = 'RT_2';
+  const before = f.queries.length;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([CAIRN_REVIEW_HOLD_LABEL]);
+  expect(f.state.draft).toBe(false);
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  expect(f.state.head).toBe(head);
+  expect(f.queries.slice(before).filter((q) => q.includes('mutation'))).toEqual([
+    expect.stringContaining('addLabelsToLabelable'),
+    expect.stringContaining('convertPullRequestToDraft'),
+  ]);
+});
+
+test('a human marking a held PR ready is converted back until findings resolve', async () => {
   const f = fixture();
   await f.reconcile();
   await f.reconcile();
@@ -670,23 +684,24 @@ test('marking a held PR ready retains the hold until findings resolve', async ()
   expect(f.state.labels).toEqual([]);
 });
 
-test.each([
-  [[], false],
-  [[{ __typename: 'UnlabeledEvent', label: { name: CAIRN_REVIEW_HOLD_LABEL } }], true],
-  [[{ __typename: 'UnlabeledEvent', label: { name: 'other' } }], false],
-  [
-    [
-      { __typename: 'UnlabeledEvent', label: { name: CAIRN_REVIEW_HOLD_LABEL } },
-      { __typename: 'PullRequestCommit', commit: { oid: 'abc' } },
-    ],
-    false,
-  ],
-])('timeline window derives head override from %j', async (timeline, overridden) => {
+test('review snapshots do not request or depend on timeline events', async () => {
   const f = fixture();
-  f.state.timeline = timeline;
+  const implementation = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (url, init) => {
+    const response = await implementation(url, init);
+    const data = (await response.json()) as {
+      data: { repository: { pullRequest: { timelineItems?: unknown } } };
+    };
+    delete data.data.repository.pullRequest.timelineItems;
+    return { ...response, json: async () => data };
+  });
   const snapshot = await githubPrReviewFindings(f.fetch, 'fake', 'o', 'r', 3377);
-  expect(snapshot.overridden).toBe(overridden);
-  expect(snapshot.cairnHolds).toBe(false);
+  expect(snapshot.findings).toHaveLength(1);
+  expect(snapshot).not.toHaveProperty('overridden');
+  expect(snapshot).not.toHaveProperty('timeline');
+  expect(f.queries[0]).not.toMatch(
+    /timelineItems|UNLABELED_EVENT|PULL_REQUEST_COMMIT|HEAD_REF_FORCE_PUSHED_EVENT/,
+  );
 });
 
 test('already-existing label creation is a successful one-write poll', async () => {
@@ -742,7 +757,7 @@ test('mutation rate limits propagate through the wake', async () => {
   expect(f.s.db.select().from(step).all()).toEqual([]);
 });
 
-test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])(
+test.each(['label', 'labels', 'changed', 'repeated', 'later-error'])(
   'incomplete or inconsistent snapshot fails closed: %s',
   async (failure) => {
     const f = fixture();
@@ -756,7 +771,6 @@ test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])
             label?: unknown;
             pullRequest: {
               isDraft: boolean;
-              timelineItems?: unknown;
               labels: { pageInfo: { hasNextPage: boolean } };
               reviewThreads: { pageInfo: { hasNextPage: boolean; endCursor: string | null } };
             };
@@ -766,7 +780,6 @@ test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])
       const pull = result.data.repository.pullRequest;
       page += 1;
       if (failure === 'label') delete result.data.repository.label;
-      if (failure === 'timeline') delete pull.timelineItems;
       if (failure === 'labels') pull.labels.pageInfo.hasNextPage = true;
       if (['changed', 'repeated', 'later-error'].includes(failure)) {
         if (page === 1 || failure === 'repeated')
