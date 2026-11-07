@@ -168,7 +168,7 @@ export function ProvidersPattern() {
                     variant="ghost"
                     aria-pressed={picked === p.id}
                     className={cn(
-                      'h-10 justify-start gap-3 rounded-(--radius-menu-item) px-2 text-ui font-normal text-foreground hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border dark:hover:bg-card',
+                      'h-10 justify-start gap-3 rounded-(--radius-menu-item) px-2 text-ui font-normal text-foreground hover:bg-card dark:hover:bg-card',
                       picked === p.id && PICKER_ROW_SELECTED,
                     )}
                     onClick={() => setPicked(p.id)}

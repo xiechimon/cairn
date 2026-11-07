@@ -60,10 +60,7 @@ export function ProviderInstanceRow({
       data-instance-id={item.id}
       data-tone={item.tone}
       aria-current={selected ? 'true' : undefined}
-      className={cn(
-        'flex items-start gap-3 px-3.5 py-3 transition-colors duration-(--dur-fast)',
-        selected ? 'bg-secondary' : 'hover:bg-menu-hover',
-      )}
+      className={cn('flex items-start gap-3 px-3.5 py-3', selected && 'bg-secondary')}
     >
       <Button
         variant="ghost"
