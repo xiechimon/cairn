@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -20,6 +18,7 @@ import { type MachineApi, MachineApiError } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { StepStops } from '../src/step-stops.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -229,7 +228,7 @@ async function waitFor(fn: () => boolean, timeoutMs = 3_000): Promise<void> {
 }
 
 async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean; recovered?: boolean }) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-stop-'));
+  const home = testTempDir('cairn-runner-stop-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -311,7 +310,7 @@ describe('runner stop close-out (M7 #308)', () => {
 
 describe('runner heartbeat answers 410 = this step no longer exists on the server → stop (#1488)', () => {
   async function heartbeatSetup(fail: () => Error) {
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-hb-'));
+    const home = testTempDir('cairn-runner-hb-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger, lines } = captureLogger();
     let beats = 0;

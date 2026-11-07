@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -21,6 +19,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function logger(): DaemonLogger {
   const push = () => {};
@@ -178,7 +177,7 @@ function backendOf(script: StepEvent[] | AsyncIterable<StepEvent>): AgentBackend
 }
 
 async function run(script: StepEvent[] | AsyncIterable<StepEvent>, now?: () => number) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-think-'));
+  const home = testTempDir('cairn-runner-think-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new RecordingClient();
   await runStep(
@@ -336,7 +335,7 @@ test('a tool call that finishes after a provider network retry keeps its start t
       );
     },
   } as AgentBackend;
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-retry-'));
+  const home = testTempDir('cairn-runner-retry-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new RecordingClient();
   await runStep(

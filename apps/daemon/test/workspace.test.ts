@@ -2,13 +2,11 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   BRAND,
@@ -21,6 +19,7 @@ import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 
@@ -84,9 +83,9 @@ function seedHook(name: 'setup' | 'resume', body: string): void {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'cairn-ws-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-origin-')), 'repo.git');
-  seedDir = join(tmpdir(), `cairn-ws-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  root = testTempDir('cairn-ws-root-');
+  originDir = join(testTempDir('cairn-ws-origin-'), 'repo.git');
+  seedDir = join(testTempDir('cairn-ws-seed-'), 'repo');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedOrigin();

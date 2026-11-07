@@ -1,12 +1,12 @@
 import * as childProcess from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MachineSyncCommand, MachineSyncResultBody } from '@cairn/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { performSync } from '../src/sync.js';
+import { testTempDir } from './test-temp-dir.js';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const real = await importOriginal<typeof childProcess>();
@@ -41,7 +41,7 @@ interface Fixture {
 }
 
 function makeFixture(): Fixture {
-  const root = mkdtempSync(join(tmpdir(), 'cairn-sync-'));
+  const root = testTempDir('cairn-sync-');
   const origin = join(root, 'origin.git');
   const seed = join(root, 'seed');
   const work = join(root, 'work');

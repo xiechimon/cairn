@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -11,7 +10,6 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MachineSkillsManifestResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
@@ -27,9 +25,10 @@ import {
   materializeTeamSkills,
   TEAM_SKILLS_PLUGIN_NAME,
 } from '../src/team-skills.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `cairn-native-plugin-${tag}-`));
+  return testTempDir(`cairn-native-plugin-${tag}-`);
 }
 
 function writeSkill(root: string, dirName: string, name?: string): string {
@@ -83,7 +82,9 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
   test('teamSkillsDir absent = empty set (zero change for pure-local steps)', () => {
     const local = fixtureRoot('local');
     writeSkill(local, 'local-a');
-    expect(collectTeamSkillEntries({ skillsDir: local, cwd: tmpdir() }, {})).toEqual([]);
+    expect(
+      collectTeamSkillEntries({ skillsDir: local, cwd: testTempDir('daemon-cwd-') }, {}),
+    ).toEqual([]);
   });
 
   test('skills config absent = empty set (no injection surface)', () => {
@@ -96,7 +97,7 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
     const local = join(root, 'local-skills');
     writeSkill(local, 'local-a');
     const entries = collectTeamSkillEntries(
-      { skillsDir: local, cwd: tmpdir() },
+      { skillsDir: local, cwd: testTempDir('daemon-cwd-') },
       { teamSkillsDir: view },
     );
     expect(entries.map((e) => e.dirName).sort()).toEqual(['team-a', 'team-b']);
@@ -107,7 +108,7 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
     const root = fixtureRoot('allow');
     const view = makeView(root, ['team-a', 'team-b', 'team-c']);
     const entries = collectTeamSkillEntries(
-      { skillsDir: join(root, 'empty-local'), cwd: tmpdir() },
+      { skillsDir: join(root, 'empty-local'), cwd: testTempDir('daemon-cwd-') },
       { teamSkillsDir: view, skillsAllowlist: ['team-a', 'team-c'] },
     );
     expect(entries.map((e) => e.dirName).sort()).toEqual(['team-a', 'team-c']);
@@ -118,7 +119,7 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
     const view = makeView(root, ['team-a']);
     expect(
       collectTeamSkillEntries(
-        { skillsDir: join(root, 'empty-local'), cwd: tmpdir() },
+        { skillsDir: join(root, 'empty-local'), cwd: testTempDir('daemon-cwd-') },
         { teamSkillsDir: view, skillsAllowlist: [] },
       ),
     ).toEqual([]);
@@ -130,7 +131,7 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
     const local = join(root, 'local-skills');
     writeSkill(local, 'dup');
     const entries = collectTeamSkillEntries(
-      { skillsDir: local, cwd: tmpdir() },
+      { skillsDir: local, cwd: testTempDir('daemon-cwd-') },
       { teamSkillsDir: view },
     );
     expect(entries).toHaveLength(1);
@@ -140,11 +141,14 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
   test('realpath drift: teamSkillsDir passed in symlink form is still recognized (P13, same macOS /tmp shape)', () => {
     const root = fixtureRoot('realpath');
     const view = makeView(root, ['team-a']);
-    const viaSymlink = join(tmpdir(), `cairn-sym-view-${sha256(root).slice(0, 8)}`);
+    const viaSymlink = join(
+      testTempDir('daemon-cwd-'),
+      `cairn-sym-view-${sha256(root).slice(0, 8)}`,
+    );
     symlinkSync(view, viaSymlink);
     try {
       const entries = collectTeamSkillEntries(
-        { skillsDir: join(root, 'empty-local'), cwd: tmpdir() },
+        { skillsDir: join(root, 'empty-local'), cwd: testTempDir('daemon-cwd-') },
         { teamSkillsDir: viaSymlink },
       );
       expect(entries.map((e) => e.dirName)).toEqual(['team-a']);
@@ -156,7 +160,7 @@ describe('collectTeamSkillEntries (team entry surface sharing the catalog/deny s
   test('scan failure (directory missing) = fail-open empty set (same rule as catalog, does not block the session)', () => {
     expect(
       collectTeamSkillEntries(
-        { skillsDir: '/no/such/local', cwd: tmpdir() },
+        { skillsDir: '/no/such/local', cwd: testTempDir('daemon-cwd-') },
         { teamSkillsDir: '/no/such/view' },
       ),
     ).toEqual([]);

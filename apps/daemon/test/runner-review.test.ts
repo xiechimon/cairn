@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -21,6 +19,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const HOSTED_REPO = { kind: 'hosted' as const, cloneUrl: 'http://localhost:9/git/t/r.git' };
 const PLAN_TEXT = '# plan v1\n\n## Changes\n- 加 parseInput\n';
@@ -252,7 +251,7 @@ async function setupWithBackend(
   opts: { rewindError?: string },
   backendFor: (captured: SessionOpts[]) => AgentBackend,
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-review-'));
+  const home = testTempDir('cairn-runner-review-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const calls: string[] = [];
   const client = new FakeClient();

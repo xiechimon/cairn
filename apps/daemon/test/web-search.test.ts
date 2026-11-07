@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   WEB_BRAVE_KEY_SECRET,
@@ -18,6 +17,7 @@ import {
 } from '../src/backend/web-search.js';
 import { pushCredential, type StepCredentials } from '../src/credentials.js';
 import { buildSecretTool } from '../src/secret-channel.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const EXA_KEY = 'exa-test-key-0000000000000000';
 const BRAVE_KEY = 'brave-test-key-111111111111111';
@@ -51,7 +51,7 @@ let calls: Call[];
 let logs: string[];
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), 'cairn-web-search-'));
+  home = testTempDir('cairn-web-search-');
   calls = [];
   logs = [];
 });
