@@ -6,6 +6,7 @@ import {
   redactSecrets,
   type ThinkingLevel,
   thinkingLevelSchema,
+  withHistoryMarker,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
@@ -319,7 +320,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         },
         conversationId: row.buildId,
         session: { action: 'new', sessionId: null },
-        instruction: row.prompt,
+        instruction:
+          row.prompt === null || context.trigger === 'user'
+            ? row.prompt
+            : withHistoryMarker(row.prompt, row.id),
         agent: {
           id: chiefRow.id,
           displayName: 'Coordinator',
