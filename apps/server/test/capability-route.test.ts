@@ -11,7 +11,7 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { profileForStep } from '../src/services/routing-rules.js';
-import { recordStepRoute, routedModelRunsOn } from '../src/services/step-route.js';
+import { decideStepRoute, recordStepRoute, routedModelRunsOn } from '../src/services/step-route.js';
 import {
   bootServer,
   issueApiKey,
@@ -294,6 +294,7 @@ describe('the router agrees with what dispatch can execute', () => {
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
     equipMachine(w, { claude: false, codex: true });
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const row = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
@@ -367,6 +368,7 @@ describe('claim validation and recording follow the router rules', () => {
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const row = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'gemini',
       modelId: 'gemini-pro',
@@ -482,17 +484,19 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     });
   });
 
-  test('a recorded step keeps its model after the machine loses the harness', async () => {
+  test('a recorded session keeps its model after the machine loses the harness', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
       machineId: null,
       requiredCapabilities: null,
     });
+    w.s.db.update(step).set({ sessionId: 'started-session' }).where(eq(step.id, stepRow.id)).run();
     equipMachine(w, { claude: false, codex: true });
     expect(profileForStep(w.s.db, todoRow, 'build', stepRow.id)).toMatchObject({
       provider: 'claude-code',
@@ -501,11 +505,12 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
   });
 
-  test('recording twice keeps the first decision', async () => {
+  test('recording the same accepted model on a claimed step leaves the row unchanged', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const todoRow = await buildTodo(w, 'rename one label');
     const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
     const first = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
@@ -514,11 +519,186 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     });
     equipMachine(w, { claude: false, codex: true });
     const second = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
+      provider: 'claude-code',
+      modelId: 'claude-haiku-5-5',
       machineId: null,
       requiredCapabilities: null,
     });
     expect(second).toEqual(first);
+  });
+});
+
+describe('claim-time routes are reconsidered only while pending without continuity', () => {
+  test('a claimed step without a session keeps its recorded over-quota Claude route', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'difficulty:standard');
+    const claimed = await claim(w);
+    expect(claimed?.agent?.modelId).toBe('claude-sonnet-5-5');
+    const stepRow = w.s.db.select().from(step).where(eq(step.id, claimed!.step.id)).get()!;
+    expect(stepRow).toMatchObject({ status: 'claimed', sessionId: null, checkpointCommit: null });
+    const recorded = w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()!;
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
+    expect
+      .soft(
+        decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
+          machineId: null,
+          required: null,
+        }),
+      )
+      .toMatchObject({
+        chosen: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+        reason: 'in-flight: keeps recorded model',
+        rejected: [],
+      });
+    expect.soft(profileForStep(w.s.db, todoRow, stepRow.kind, stepRow.id)).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+    expect(w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()).toEqual(
+      recorded,
+    );
+  });
+
+  test('a pending step without a session re-routes from over-quota Claude to Codex', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: false, codex: false });
+    const todoRow = await buildTodo(w, 'difficulty:standard');
+    const stepRow = w.s.db.select().from(step).all().at(0)!;
+    expect(stepRow).toMatchObject({ status: 'pending', sessionId: null, checkpointCommit: null });
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const recorded = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId: null,
+      requiredCapabilities: null,
+    });
+    expect(recorded.reason).toBe('rule default (standard: no available candidate)');
+    w.s.db.update(step).set({ status: 'pending' }).where(eq(step.id, stepRow.id)).run();
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
+    const decision = decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
+      machineId: null,
+      required: null,
+    });
+    expect(decision.chosen).toMatchObject({ provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    expect(decision.rejected).toContainEqual({
+      modelId: 'claude-sonnet-5-5',
+      machineId: w.machineId,
+      why: 'quota',
+    });
+    expect(profileForStep(w.s.db, todoRow, stepRow.kind, stepRow.id)).toMatchObject({
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
+      routed: true,
+    });
+  });
+
+  test('reclaiming updates the route to Codex and repeating the same model leaves it unchanged', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'difficulty:standard');
+    const first = await claim(w);
+    expect(first?.agent?.modelId).toBe('claude-sonnet-5-5');
+    const stepId = first!.step.id;
+    w.s.db
+      .update(step)
+      .set({ status: 'pending', machineId: null, claimedAt: null })
+      .where(eq(step.id, stepId))
+      .run();
+    w.s.db.update(stepRoute).set({ decidedAt: 1 }).where(eq(stepRoute.stepId, stepId)).run();
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
+    const second = await claim(w);
+    expect(second?.agent?.modelId).toBe('gpt-6.1-sol');
+    expect(second?.step.id).toBe(stepId);
+    expect(w.s.db.select().from(step).where(eq(step.id, stepId)).get()?.status).toBe('claimed');
+    const recorded = w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepId)).get()!;
+    expect(recorded).toMatchObject({
+      provider: 'openai-codex',
+      modelId: 'gpt-6.1-sol',
+      harness: 'pi',
+      machineId: w.machineId,
+      difficulty: 'standard',
+      reason:
+        're-routed: claude-sonnet-5-5 no longer runnable (quota); standard: gpt-6.1-sol ranked 2, higher ranks unavailable',
+      rejected: [{ modelId: 'claude-sonnet-5-5', machineId: w.machineId, why: 'quota' }],
+    });
+    expect(recorded.decidedAt).toBeGreaterThan(1);
+    w.s.db
+      .update(step)
+      .set({ status: 'pending', machineId: null, claimedAt: null })
+      .where(eq(step.id, stepId))
+      .run();
+    expect((await claim(w))?.agent?.modelId).toBe('gpt-6.1-sol');
+    expect(w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepId)).get()).toEqual(
+      recorded,
+    );
+    expect(todoRow.id).toBe(first!.todo?.id);
+  });
+
+  test.each([
+    { sessionId: 'started-session', checkpointCommit: null },
+    { sessionId: null, checkpointCommit: 'checkpoint-commit' },
+  ])('a started step keeps over-quota Claude with %j', async (continuity) => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'difficulty:standard');
+    const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId: null,
+      requiredCapabilities: null,
+    });
+    w.s.db
+      .update(step)
+      .set({ status: 'pending', ...continuity })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
+    expect(
+      decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
+        machineId: null,
+        required: null,
+      }),
+    ).toMatchObject({
+      chosen: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+      reason: 'in-flight: keeps recorded model',
+      rejected: [],
+    });
+    expect(profileForStep(w.s.db, todoRow, stepRow.kind, stepRow.id)).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+  });
+
+  test('a runnable recorded model without a session is chosen again without rewriting the row', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'difficulty:standard');
+    const stepRow = w.s.db.select().from(step).all().at(0)!;
+    w.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId: null,
+      requiredCapabilities: null,
+    });
+    w.s.db.update(stepRoute).set({ decidedAt: 1 }).where(eq(stepRoute.stepId, stepRow.id)).run();
+    const recorded = w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()!;
+    w.s.db.update(step).set({ status: 'pending' }).where(eq(step.id, stepRow.id)).run();
+    expect(
+      decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
+        machineId: null,
+        required: null,
+      }),
+    ).toMatchObject({
+      chosen: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+      reason: 'standard: claude-sonnet-5-5 ranked first',
+    });
+    expect((await claim(w))?.agent?.modelId).toBe('claude-sonnet-5-5');
+    expect(w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()).toEqual(
+      recorded,
+    );
   });
 });
