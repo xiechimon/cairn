@@ -739,20 +739,7 @@ export function sendChiefMessageFromComposer(
 ): { result: ChiefSendResult; replayed: boolean } {
   const sent = submitChiefMessage(deps, teamId, body);
   if (sent.replayed) return sent;
-  const replying = deps.db
-    .select({ prompt: step.prompt })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, sent.result.thread.id),
-        eq(step.kind, 'chief'),
-        eq(step.status, 'claimed'),
-      ),
-    )
-    .get();
-  if (replying !== undefined && parseChiefTrigger(replying.prompt) === 'user') {
-    steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);
-  }
+  steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);
   return sent;
 }
 
@@ -1573,8 +1560,9 @@ export function notifyChiefTurn(
   deps: ChiefDeps,
   threadId: string,
   stepPrompt?: string | null,
+  consumedUserMessage = false,
 ): void {
-  if (parseChiefTrigger(stepPrompt ?? null) !== 'user') return;
+  if (parseChiefTrigger(stepPrompt ?? null) !== 'user' && !consumedUserMessage) return;
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return;
   const last = deps.db
