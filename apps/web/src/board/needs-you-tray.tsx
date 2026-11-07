@@ -17,7 +17,7 @@ export function NeedsYouTray({ threads }: { threads: readonly TodoRecord[] }) {
     <section
       data-testid="needs-you"
       aria-label={t('待你决定')}
-      className="mx-auto mt-2 flex max-h-[32dvh] w-[calc(100%-2rem)] max-w-182 flex-none flex-col gap-1.5 overflow-y-auto"
+      className="mx-auto mt-2 flex max-h-[32dvh] w-[calc(100%-1rem)] max-w-186 flex-none flex-col gap-1.5 overflow-y-auto p-2"
     >
       <div className="flex items-baseline gap-2 px-1">
         <h3 className="m-0 font-heading text-meta font-semibold text-foreground">

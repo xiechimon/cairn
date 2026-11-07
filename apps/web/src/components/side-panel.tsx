@@ -135,7 +135,7 @@ export function SidePanel({
         ref={ref}
         aria-label={label}
         style={{ '--side-panel-w': `${width}px` } as CSSProperties}
-        className="side-panel relative flex w-(--side-panel-w) min-w-0 flex-none flex-col bg-background shadow-[inset_1px_0_0_var(--border)] max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-(--z-panel-low) max-[1100px]:w-[min(420px,100%)] max-[1100px]:shadow-(--floating-shadow) max-[640px]:w-full"
+        className="side-panel relative flex w-(--side-panel-w) min-w-0 flex-none flex-col bg-background max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-(--z-panel-low) max-[1100px]:w-[min(420px,100%)] max-[1100px]:shadow-(--floating-shadow) max-[640px]:w-full"
       >
         <ResizeHandle width={width} />
         {children}
