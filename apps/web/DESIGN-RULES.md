@@ -48,7 +48,7 @@ Each rule has an id. Put the ids you checked in the PR (Proof, reference row). T
 | V7 | Elevation is `--e1`, `--e2` or `--e3` only; no second ring and no raw `box-shadow`. | G `ui-drift-gate` |
 | V8 | Spacing is on the 4px grid. | G `ui-debt-gate`; M computed margins and paddings are multiples of 4 |
 | V9 | Icons are lucide from the project icon set; never invent an icon name, check that the import exists. Stroke and size are V14. | G `pnpm typecheck` |
-| V21 | No hover shadows or elevation; hover backgrounds cover the full click target, never a partial row or card band. | G `ui-drift-gate` G8; M `e2e/paper-hover-bands.spec.ts` |
+| V21 | No hover shadows or elevation; a hover background covers the whole row, or a whole standalone control, never a band over part of a row or card. | G `ui-drift-gate` G8; M `e2e/paper-hover-bands.spec.ts` |
 | V10 | Pages compose existing pieces (`EmptyState`, `SettingsHeader`, `SettingsCard`, `FormStack`, `DialogShell`, `SegmentedTabs`, `ThreadRow`, `SidePanel`) before building their own. | G `ui-page-style-gate`, `ui-drift-gate` |
 
 Anti-slop rules (audit `docs/research/ui-ux-audit-2026-11-06.md`, section on AI slop; batch 1 landed the foundations). Baselines come from `apps/web/.audit-slop.mjs` on the seeded verify stack (2 projects; the 7-project stack adds 5 projects), measured at `5f672eab9` (before) and on this change (after). Where a rule is marked M and a `G` gate is named, the gate already fails; the other M rows await the CI look-and-feel job and run non-blocking first (section 5).

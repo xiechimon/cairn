@@ -1,36 +1,30 @@
 # Flat hover feedback
 
-UI brief: settings lists and shared row/card controls. Remove partial background bands and hover elevation; preserve keyboard outlines and instant feedback. Reference: [t3code Environments](../../design/references/settings/t3code-environments.jpg). Rules: V7, V21, A2, R1. Existing behavior correction; no new page draft.
+UI brief: settings lists and shared row/card controls. Remove partial background bands and hover elevation; keep keyboard outlines, borders and dividers. Reference: [t3code Environments](../../design/references/settings/t3code-environments.jpg). Rules: V7, V21, A2, R1.
 
 ## Evidence
 
-The pointer was positioned over the omarchy name toggle for every machine screenshot. Playwright screenshots omit the cursor itself.
+Every image is a real Chromium capture at 1440 px, 2x scale, with the pointer (red dot, injected only for the capture) over the row. Before is the web source from origin/main built in fixture mode; after is this branch.
 
-| State | Before | After | Source |
-| --- | --- | --- | --- |
-| 1440 light | [Before](before-light-1440.png) | [After](after-light-1440.png) | Shipped components, fixture scenario `machines-master-detail` |
-| 1440 dark | [Before](before-dark-1440.png) | [After](after-dark-1440.png) | Same fixture; the old dark ghost variant paints only the name line |
-| 1440 light, isolated server | [Before](live-before-light-1440.png) | [After](live-after-light-1440.png) | Live API and SQLite, seeded local omarchy with a Coordinator route |
-| 1440 dark, isolated server | [Before](live-before-dark-1440.png) | [After](live-after-dark-1440.png) | Same isolated server |
-| 390 light | Not captured | [Fixture](after-light-390.png), [live](live-after-light-390.png) | No document horizontal overflow |
-| 390 dark | Not captured | [Fixture](after-dark-390.png), [live](live-after-dark-390.png) | No document horizontal overflow |
+| State | Light before | Light after | Dark before | Dark after |
+| --- | --- | --- | --- | --- |
+| Machines, name hovered | ![Machines, name hovered light before](machine-name-hover-light-before.png) | ![Machines, name hovered light after](machine-name-hover-light-after.png) | ![Machines, name hovered dark before](machine-name-hover-dark-before.png) | ![Machines, name hovered dark after](machine-name-hover-dark-after.png) |
+| Machines, menu hovered | ![Machines, menu hovered light before](machine-menu-hover-light-before.png) | ![Machines, menu hovered light after](machine-menu-hover-light-after.png) | ![Machines, menu hovered dark before](machine-menu-hover-dark-before.png) | ![Machines, menu hovered dark after](machine-menu-hover-dark-after.png) |
+| Machines, keyboard focus | n/a | ![Machines, keyboard focus light after](machine-focus-light-after.png) | n/a | ![Machines, keyboard focus dark after](machine-focus-dark-after.png) |
+| Providers | ![Providers light before](list-providers-hover-light-before.png) | ![Providers light after](list-providers-hover-light-after.png) | ![Providers dark before](list-providers-hover-dark-before.png) | ![Providers dark after](list-providers-hover-dark-after.png) |
+| MCP servers | ![MCP servers light before](list-mcp-hover-light-before.png) | ![MCP servers light after](list-mcp-hover-light-after.png) | ![MCP servers dark before](list-mcp-hover-dark-before.png) | ![MCP servers dark after](list-mcp-hover-dark-after.png) |
+| Skills | ![Skills light before](list-skills-hover-light-before.png) | ![Skills light after](list-skills-hover-light-after.png) | ![Skills dark before](list-skills-hover-dark-before.png) | ![Skills dark after](list-skills-hover-dark-after.png) |
+| API keys | ![API keys light before](list-apikeys-hover-light-before.png) | ![API keys light after](list-apikeys-hover-light-after.png) | ![API keys dark before](list-apikeys-hover-dark-before.png) | ![API keys dark after](list-apikeys-hover-dark-after.png) |
+| Secrets | ![Secrets light before](list-secrets-hover-light-before.png) | ![Secrets light after](list-secrets-hover-light-after.png) | ![Secrets dark before](list-secrets-hover-dark-before.png) | ![Secrets dark after](list-secrets-hover-dark-after.png) |
 
-The live before captures load the original `HEAD` machine-row module through a temporary Vite module, with the same isolated API and database as the after captures. The temporary file was removed immediately afterward. Shared Button pressed-state cleanup is present in both live captures; it does not affect hover backgrounds.
+Computed backgrounds under the omarchy row on main: dark name hover paints `machine-toggle` at 808x22 px (first line only); light menu hover paints `machine-menu` at 28x28 px. After: no descendant of the row changes background. Machine focus has no before image because focus rendering is unchanged by design (a 2px solid outline).
 
-The isolated server uses disposable data and auth off; no daemon or model turn is started. The machine and Coordinator routing rule were seeded in its SQLite database. Fixture evidence includes online, offline and expired-login rows. Empty/loading/error transitions and expanded machine bodies are outside this visual change.
+## Regression guard
 
-## Regression signal
-
-Before the fix, `paper-hover-bands.spec.ts` failed on the actual machine toggle in dark mode: its changed background occupied `[392,154,808,22]`, only the first line. It also caught the machine menu's partial fill in light mode. The browser guard compares every row descendant's computed background before and after hovering each row and each nested control, requiring changed boxes to equal the full row. Machines, providers, MCP, skills, secrets and API keys run in both themes. A separate keyboard assertion checks the machine toggle's outline and unchanged background, rejecting visible shadows.
-
-G8 in `ui-drift-gate.mjs` scans all web TS, TSX and CSS. It rejects hover/active shadow utilities, hover drop shadows, explicit box-shadow transition utilities, CSS transition declarations and inline transition declarations. A `deliberate-shadow: reason` annotation on the immediately preceding line permits an intentional exception. Its self-tests run with the existing UI page gate tests in CI. Static resting elevation and selected-tab shadows remain permitted.
-
-## Validation
-
-The targeted affected suite covers settings rows, provider choices, question cards, project cards, segmented controls, button presses, pressed contrast and immediate chat feedback. Gallery image baselines are left to CI; no baseline was rewritten. Results: `pnpm lint`, `pnpm typecheck`, `pnpm spec:parse` passed through `pnpm prepush` (24 checks). `pnpm exec vitest run --changed`: 17 files, 148 tests passed. `node --test scripts/ui-page-style-gate.test.mjs`: 10 tests passed. The affected runner on free port 19399 passed 119 tests in 11 specs, including all 14 new hover/focus checks. Its equivalent command is:
+`apps/web/e2e/paper-hover-bands.spec.ts` run against a fixture build of the old sources fails `machines light` and `machines dark` (`V21: machine-toggle changes background on only part of the row`, box `[392,154,808,22]`); the other 12 pass. Against this branch all 14 pass. Command, with a preview server for each build:
 
 ```sh
-E2E_PORT=19399 pnpm --filter @cairn/web e2e:affected apps/web/e2e/paper-hover-bands.spec.ts apps/web/e2e/settings-master-detail.spec.ts apps/web/e2e/provider-add-dialog.spec.ts apps/web/e2e/providers-account-rows.spec.ts apps/web/e2e/button-press.spec.ts apps/web/e2e/button-press-contrast.spec.ts apps/web/e2e/chief-home-questions.spec.ts apps/web/e2e/segmented-controls.spec.ts apps/web/e2e/pr-card.spec.ts apps/web/e2e/chat-instant-feel.spec.ts apps/web/e2e/paper-resource-pages.spec.ts
+E2E_PORT=<port> pnpm --filter @cairn/web exec playwright test e2e/paper-hover-bands.spec.ts
 ```
 
-The runner was invoked directly with Node after the package-runner wrapper queued behind stale PID tickets in this sandbox; it acquired the shared slot normally. No lock was removed manually and no other process was stopped. Local `origin/main` was used because the read-only git directory prevents prepush from fetching. CI and cloud review await the orchestrator's push.
+G8 in `scripts/ui-drift-gate.mjs` scans web TS, TSX and CSS for hover/active shadow utilities and box-shadow or `all` transitions; a `deliberate-shadow: reason` annotation on the preceding line permits an exception.
