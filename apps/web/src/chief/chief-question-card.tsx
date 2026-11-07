@@ -8,6 +8,7 @@ import {
   ChevronUp,
   CircleCheck,
   CircleHelp,
+  Ellipsis,
   type LucideIcon,
   X,
 } from 'lucide-react';
@@ -25,6 +26,12 @@ import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -67,7 +74,7 @@ const NUM_CLS =
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
 const ATTACHED_CARD_CLS =
-  '@container flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
+  '@container relative flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
 const OPTION_ROW_CLS =
   'h-auto w-full items-start justify-start gap-2.5 whitespace-normal rounded-md px-2 py-1.5 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
@@ -388,6 +395,12 @@ export function ChiefQuestionCard({
           onNext: () => setStep((s) => Math.min(lastStep, s + 1)),
         }
       : undefined);
+  const dismiss = () =>
+    questionDockState.dismissWithUndo(
+      item.requestId,
+      { title: t('已取消提问'), undo: t('撤销') },
+      () => onCancel?.(item.requestId),
+    );
   const pick = (optionIndex: number) => {
     if (question.multiSelect !== true) setTextAt(step, '');
     setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
@@ -401,14 +414,16 @@ export function ChiefQuestionCard({
       data-collapsed={collapsed ? '' : undefined}
       className={ATTACHED_CARD_CLS}
     >
-      <div className="flex flex-none items-center gap-1 px-3.5 pt-2 pb-1">
+      <div
+        className={`flex flex-none items-center gap-1 px-3.5 pt-2 pb-1${collapsed ? '' : ' max-[640px]:absolute max-[640px]:top-0.5 max-[640px]:right-1 max-[640px]:z-10 max-[640px]:p-0'}`}
+      >
         <QuestionStatus status={item.status} quiet={!collapsed} />
         <Button
           variant="ghost"
           data-testid="chief-question-collapse"
           aria-expanded={!collapsed}
           title={collapsed ? t('展开提问') : t('收起提问')}
-          className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent"
+          className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent${collapsed ? '' : ' max-[640px]:hidden'}`}
           onClick={toggleCollapsed}
         >
           <span className={collapsed ? 'max-w-1/2 truncate' : 'truncate'}>
@@ -423,7 +438,7 @@ export function ChiefQuestionCard({
         </Button>
         {shownPager !== undefined && (
           <div
-            className="flex flex-none items-center"
+            className="flex flex-none items-center max-[640px]:hidden"
             title={blockedByUpload ? t('附件上传中') : undefined}
           >
             <Button
@@ -454,10 +469,59 @@ export function ChiefQuestionCard({
             </Button>
           </div>
         )}
+        {!collapsed && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  data-testid="chief-question-more"
+                  aria-label={t('更多操作')}
+                  className="hidden max-[640px]:inline-flex"
+                />
+              }
+            >
+              <Ellipsis aria-hidden className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="bottom"
+              align="end"
+              sideOffset={4}
+              className="w-auto min-w-40"
+            >
+              {shownPager !== undefined && (
+                <>
+                  <DropdownMenuItem
+                    disabled={!pending || !shownPager.canPrev}
+                    onClick={shownPager.onPrev}
+                  >
+                    {t('上一步')} · {shownPager.label}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!pending || !shownPager.canNext}
+                    onClick={shownPager.onNext}
+                  >
+                    {t('下一步')}
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuItem onClick={toggleCollapsed}>{t('收起提问')}</DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={!pending || onCancel === undefined}
+                onClick={dismiss}
+              >
+                {t('取消提问')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         <Button
           variant="ghost"
           size="icon-xs"
           aria-label={collapsed ? t('展开提问') : t('收起提问')}
+          className={collapsed ? undefined : 'max-[640px]:hidden'}
           onClick={toggleCollapsed}
         >
           {collapsed ? (
@@ -472,14 +536,9 @@ export function ChiefQuestionCard({
           data-testid="chief-question-dismiss"
           aria-label={t('取消提问')}
           title={t('取消提问')}
+          className="max-[640px]:hidden"
           disabled={!pending || onCancel === undefined}
-          onClick={() =>
-            questionDockState.dismissWithUndo(
-              item.requestId,
-              { title: t('已取消提问'), undo: t('撤销') },
-              () => onCancel?.(item.requestId),
-            )
-          }
+          onClick={dismiss}
         >
           <X aria-hidden className="size-3.5" />
         </Button>
@@ -489,7 +548,7 @@ export function ChiefQuestionCard({
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <div
               data-testid="chief-question-text"
-              className="flex-none px-3.5 pb-1.5 text-ui break-words text-foreground"
+              className="flex-none px-3.5 pb-1.5 text-ui break-words text-foreground max-[640px]:pt-2.5 max-[640px]:pr-10"
             >
               {question.question}
             </div>
@@ -572,7 +631,7 @@ export function ChiefQuestionCard({
 
 function Keycap({ children }: { children: ReactNode }) {
   return (
-    <span className="grid h-5 min-w-5 flex-none place-items-center rounded-(--cds-radius-sm) bg-(--hover-1) px-1 text-caption tabular-nums text-content-tertiary">
+    <span className="grid h-5 min-w-5 flex-none place-items-center rounded-(--cds-radius-sm) bg-(--hover-1) px-1 max-[640px]:hidden pointer-coarse:hidden text-caption tabular-nums text-content-tertiary">
       {children}
     </span>
   );
