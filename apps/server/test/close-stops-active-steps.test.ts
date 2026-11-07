@@ -2,7 +2,6 @@ import { type MachineDoneBody, STOP_MESSAGE } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   plan as planTable,
@@ -18,7 +17,7 @@ import {
 } from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
 import { claimStep, finishStep } from '../src/services/machines.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -70,17 +69,7 @@ function makeWorld(opts: {
       enabledRuntimes: ['pi'],
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: `agent-${suffix}`,
-      teamId,
-      displayName: 'close-agent',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   s.db
     .insert(todoTable)
     .values({
@@ -91,7 +80,6 @@ function makeWorld(opts: {
       phase: opts.phase,
       phaseAt: base,
       seqNum: 1,
-      assignment: { plan: { agentId: `agent-${suffix}` }, build: { agentId: `agent-${suffix}` } },
       latestBuildId: buildId,
     })
     .run();

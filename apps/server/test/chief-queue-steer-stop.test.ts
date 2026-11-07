@@ -4,10 +4,10 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   chiefMessage,
   machine as machineTable,
   provider as providerTable,
+  routingRule,
   steerPending,
   step as stepTable,
   stopPending,
@@ -15,9 +15,14 @@ import {
 } from '../src/db/schema.js';
 import { sendChiefMessage } from '../src/services/chief.js';
 import { providerHealth } from '../src/services/provider-health.js';
-import { bootServer, issueApiKey, subscriptionClaudeReport, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  seedRoute,
+  subscriptionClaudeReport,
+  type TestServer,
+} from './helpers.js';
 
-const AGENT_ID = 'agent-chief-queue';
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 
 async function call(
@@ -94,23 +99,14 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
     .set({ online: true, enabledRuntimes: ['pi'], maxConcurrent: 4 })
     .where(eq(machineTable.id, machineId))
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: 'queue-chief',
-      provider: 'relay-a',
-      modelId: 'model-a',
-      machineId,
-      fallbackModels,
-    })
-    .run();
+  seedRoute(s, 'coordinator', {
+    provider: 'relay-a',
+    modelId: 'model-a',
+    machineId,
+    fallbackModels,
+  });
   const projRes = await call(s.app, 'POST', '/api/projects', { body: { name: 'queue-proj' } });
   const projectId = ((await projRes.json()) as { id: string }).id;
-  await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: AGENT_ID } },
-  });
 
   let threadId: string | null = null;
   return {
@@ -638,9 +634,9 @@ describe('chief unavailable (T4)', () => {
   test('a backup model on a different backend runtime is skipped too', async () => {
     const w = await setupWorld([{ provider: 'gemini', modelId: 'gemini-pro' }]);
     w.s.db
-      .update(agentTable)
+      .update(routingRule)
       .set({ provider: 'claude-code', modelId: 'sonnet' })
-      .where(eq(agentTable.id, AGENT_ID))
+      .where(eq(routingRule.use, 'coordinator'))
       .run();
     w.s.db
       .update(machineTable)

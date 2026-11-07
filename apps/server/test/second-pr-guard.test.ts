@@ -10,7 +10,6 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -23,9 +22,8 @@ import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { type BuildDeps, requestMerge } from '../src/services/builds.js';
 import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 
-const AGENT_ID = 'agent-1217-1';
 const PR1_URL = 'https://github.com/demo-owner/demo-repo/pull/888';
 const PR1_NUMBER = 888;
 const PR2_URL = 'https://github.com/demo-owner/demo-repo/pull/999';
@@ -78,18 +76,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       githubRepo: 'demo-owner/demo-repo',
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'second-pr-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      tools: ['合并分支', '推送分支'],
-    })
-    .onConflictDoNothing()
-    .run();
   for (const [id, name] of [
     [machineAId, `guard-a-${suffix}`],
     [machineBId, `guard-b-${suffix}`],
@@ -99,7 +85,12 @@ function makeWorld(opts: WorldOpts = {}): World {
       .values({ id, teamId: s.team.id, name, online: true, enabledRuntimes: ['pi'] })
       .run();
   }
-  s.db.update(agentTable).set({ machineId: machineBId }).where(eq(agentTable.id, AGENT_ID)).run();
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: machineBId,
+    tools: ['合并分支', '推送分支'],
+  });
   s.db
     .insert(todoTable)
     .values({
@@ -111,7 +102,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       phase: opts.todoPhase ?? 'queued',
       phaseAt: base,
       seqNum: 30,
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
       hasPlan: true,
       latestBuildId: b2Id,
       v: 1,

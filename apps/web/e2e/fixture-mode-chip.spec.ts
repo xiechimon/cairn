@@ -45,3 +45,9 @@ test('live face renders no fixture chip (#1037)', async ({ page }) => {
   await page.goto('/app/schedules');
   await expect(page.locator('.fixture-mode-chip')).toHaveCount(0);
 });
+
+test('the chip steps aside at narrow widths so it never covers the header', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto('/app/settings/machines?scenario=machines-master-detail');
+  await expect(page.locator('.fixture-mode-chip')).toBeHidden();
+});

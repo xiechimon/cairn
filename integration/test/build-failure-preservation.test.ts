@@ -15,10 +15,10 @@ import {
   FakeMachineApi,
   fakeBackend,
 } from '../../apps/daemon/test/machine-loop-harness.js';
-import { agent, build, machine, message, step, todo } from '../../apps/server/src/db/schema.js';
+import { build, machine, message, step, todo } from '../../apps/server/src/db/schema.js';
 import { applyBuildStepAction } from '../../apps/server/src/services/builds.js';
 import { claimStep, finishStep } from '../../apps/server/src/services/machines.js';
-import { bootServer, req } from '../../apps/server/test/helpers.js';
+import { bootServer, req, seedSessionRoute } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') {
@@ -50,16 +50,7 @@ async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') 
     .insert(machine)
     .values({ id: 'm1', teamId: s.team.id, name: 'probe', online: true, enabledRuntimes: ['pi'] })
     .run();
-  s.db
-    .insert(agent)
-    .values({
-      id: 'a1',
-      teamId: s.team.id,
-      displayName: 'probe',
-      modelId: 'stub-model',
-      machineId: 'm1',
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: 'm1' });
   s.db
     .insert(todo)
     .values({
@@ -71,7 +62,6 @@ async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') 
       phaseAt: 1,
       seqNum: 1,
       latestBuildId: 'b1',
-      assignment: { plan: null, build: { agentId: 'a1' } },
     })
     .run();
   s.db

@@ -545,7 +545,7 @@ describe('archived projects stay read-only for the Coordinator', () => {
     await expect(
       relay('update_project', { projectId: H.projectId, name: 'renamed' }),
     ).rejects.toThrow(/archived/);
-    await expect(relay('run_builds', { todoIds: [created.id] })).rejects.toThrow(/archived/);
+    await expect(relay('open_thread', { todoId: created.id })).rejects.toThrow(/archived/);
     await expect(
       relay('save_memory', { title: 't', content: 'c', sourceTodoId: created.id }),
     ).rejects.toThrow(/archived/);

@@ -97,14 +97,14 @@ for (const width of [360, 390]) {
         '/app/account?scenario=13',
         '/app/resources/skills?scenario=skills-list',
         '/app/resources/mcp-servers?scenario=07',
-        '/app/resources/machines?scenario=06',
+        '/app/resources/machines?scenario=06&machine=TlZ2sSD4EJCxjNJqVhdo_',
         '/app/resources/providers?scenario=10',
         '/app/team?scenario=12',
         '/app?scenario=101',
       ];
       for (const url of pages) {
         await page.goto(url);
-        await page.locator('.settings-card, [data-testid="team-agent-grid"], [data-testid="chief-settings-col"]').first().waitFor();
+        await page.locator('.settings-card, [data-testid="team-agents-removed"], [data-testid="chief-settings-col"]').first().waitFor();
         const report = await page.evaluate(() => {
           const rail = document.querySelector('.board-sidebar--collapsed')?.getBoundingClientRect();
           const railRight = rail?.right ?? 0;

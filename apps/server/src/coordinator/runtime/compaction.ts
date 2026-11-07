@@ -1,26 +1,37 @@
 import {
+  COORDINATOR_MEMORY_FLUSH_TRANSCRIPT_MAX_CHARS,
   COORDINATOR_SUMMARY_MAX_CHARS,
   COORDINATOR_SUMMARY_PROMPT_HEAD,
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
+  shortEvent,
 } from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
+import type { Models } from '@earendil-works/pi-ai/models';
 import {
   type CompactionSettings,
   CompactionTask,
   defineExtension,
   hook,
 } from '@earendil-works/pi-durable';
+import { reportCompactionFailure } from './failure-report.js';
 
 export const BACKGROUND_COMPACTION_AT = 70_000;
 export const COMPACTION_RESERVE_TOKENS = 16_384;
 export const KEEP_RECENT_TOKENS = 8_000;
 const TOOL_ARGS_CHARS = 200;
 const SUMMARY_MEMO = 'cairn-c2-summary';
+const FLUSH_MEMO = 'cairn-c4-memory-flush';
 const SUMMARY_SYSTEM_PROMPT = "You are Cairn's Coordinator summarization step.";
 
 export interface ModelRef {
   provider: string;
   modelId: string;
+}
+
+export type Summarize = (prompt: string) => Promise<string>;
+
+export interface MemoryFlush {
+  run(transcript: string, summarize: Summarize): Promise<void>;
 }
 
 export interface CompactionWindow {
@@ -54,15 +65,6 @@ export function coordinatorCompactionSettings(
   };
 }
 
-export function estimateTokens(text: string): number {
-  let total = 0;
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    total += code < 128 ? 0.3 : code < 0x0590 ? 0.6 : 1.25;
-  }
-  return Math.ceil(total);
-}
-
 function textOf(content: Message['content']): string {
   if (typeof content === 'string') return content;
   return content
@@ -88,7 +90,9 @@ export function transcriptLines(messages: readonly Message[]): string[] {
   for (const message of messages) {
     if (message.role === 'user') {
       const text = textOf(message.content);
-      if (text !== '') lines.push(`用户：${text}`);
+      const event = shortEvent(text);
+      if (event !== null) lines.push(`事件：${event}`);
+      else if (text !== '') lines.push(`用户：${text}`);
     } else if (message.role === 'assistant') {
       const text = textOf(message.content);
       if (text !== '') lines.push(`总管：${text}`);
@@ -102,6 +106,21 @@ export function transcriptLines(messages: readonly Message[]): string[] {
     }
   }
   return lines;
+}
+
+export function flushTranscript(
+  lines: readonly string[],
+  maxChars = COORDINATOR_MEMORY_FLUSH_TRANSCRIPT_MAX_CHARS,
+): string {
+  const kept: string[] = [];
+  let used = 0;
+  for (const line of [...lines].reverse()) {
+    const text = line.length > maxChars ? line.slice(0, maxChars) : line;
+    if (kept.length > 0 && used + text.length + 1 > maxChars) break;
+    kept.unshift(text);
+    used += text.length + 1;
+  }
+  return kept.join('\n');
 }
 
 export function summaryBatches(
@@ -142,37 +161,62 @@ export async function foldSummary(
   return summary ?? '';
 }
 
-export function coordinatorCompactionExtension(summaryModel: () => ModelRef | null) {
+export function summarizerFor(
+  models: Pick<Models, 'getModel' | 'completeSimple'>,
+  ref: ModelRef | null,
+): Summarize {
+  const model = ref === null ? undefined : models.getModel(ref.provider, ref.modelId);
+  if (model === undefined) {
+    throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
+  }
+  return async (prompt) => {
+    const reply = await models.completeSimple(
+      model,
+      {
+        systemPrompt: SUMMARY_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      },
+      { reasoning: 'low' },
+    );
+    if (reply.stopReason !== 'stop') {
+      throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
+    }
+    return textOf(reply.content);
+  };
+}
+
+export function coordinatorCompactionExtension(
+  summaryModel: () => ModelRef | null,
+  flush: () => MemoryFlush | null = () => null,
+  threadId?: string,
+) {
+  const scope = threadId === undefined ? {} : { threadId };
   return defineExtension({
     name: 'cairn-coordinator-compaction',
     hooks: [
       hook(CompactionTask, {
         beforeCompact: async (compaction, api, context) => {
-          const cached = await api.memo<string>(SUMMARY_MEMO, context);
-          if (cached !== undefined) return { summary: cached };
-          const ref = summaryModel();
-          const model = ref === null ? undefined : api.models.getModel(ref.provider, ref.modelId);
-          if (model === undefined) {
-            throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
-          }
-          const { previous, rest } = splitPreviousSummary(compaction.messages);
-          const summary = await foldSummary(
-            previous,
-            summaryBatches(transcriptLines(rest)),
-            async (prompt) => {
-              const reply = await api.models.completeSimple(model, {
-                systemPrompt: SUMMARY_SYSTEM_PROMPT,
-                messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-              });
-              if (reply.stopReason !== 'stop') {
-                throw new Error(
-                  `summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`,
-                );
+          try {
+            const cached = await api.memo<string>(SUMMARY_MEMO, context);
+            if (cached !== undefined) return { summary: cached };
+            const summarize = summarizerFor(api.models, summaryModel());
+            const { previous, rest } = splitPreviousSummary(compaction.messages);
+            const lines = transcriptLines(rest);
+            const flusher = flush();
+            if (flusher !== null && (await api.memo<boolean>(FLUSH_MEMO, context)) === undefined) {
+              try {
+                await flusher.run(flushTranscript(lines), summarize);
+              } catch (error) {
+                reportCompactionFailure(scope, 'memory-flush', error);
               }
-              return textOf(reply.content);
-            },
-          );
-          return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
+              await api.memo(FLUSH_MEMO, true, context);
+            }
+            const summary = await foldSummary(previous, summaryBatches(lines), summarize);
+            return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
+          } catch (error) {
+            reportCompactionFailure(scope, 'summary-fold', error);
+            throw error;
+          }
         },
       }),
     ],

@@ -1,13 +1,13 @@
 import { claimedStepSchema, conversationBranch } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { agent, build, message, project, step, todo } from '../src/db/schema.js';
+import { build, message, project, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { requestMerge } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
-import { bindAllAgents, bootServer, insertMachine, issueApiKey, req } from './helpers.js';
+import { bootServer, insertMachine, issueApiKey, req, seedSessionRoute } from './helpers.js';
 
 test('base branch survives PATCH, GET, unrelated edits and reset to the repo default', async () => {
   const s = bootServer();
@@ -38,16 +38,7 @@ test('the next claimed build carries the configured base branch through the wire
     body: JSON.stringify({ teamId: s.team.id, name: 'branch-builder' }),
   });
   const { token } = (await enrolled.json()) as { token: string };
-  s.db
-    .insert(agent)
-    .values({
-      id: 'branch-agent',
-      teamId: s.team.id,
-      displayName: 'Builder',
-      modelId: 'stub-model',
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
   const created = await req(s.app, 'POST', '/api/projects', {
     name: 'branches',
     kind: 'github',
@@ -67,7 +58,6 @@ test('the next claimed build carries the configured base branch through the wire
       await req(s.app, 'POST', `/api/projects/${id}/builds`, {
         todoIds: [task.id],
         withPlan: false,
-        assignment: { plan: null, build: { agentId: 'branch-agent' } },
       })
     ).status,
   ).toBe(201);
@@ -101,6 +91,22 @@ function githubWorld(baseRef = 'dev', mergeableState = 'clean') {
         head: { ref: conversationBranch('branch-build'), sha: head, repo: { id: 1 } },
         base: { ref: baseRef, repo: { id: 1, default_branch: 'main' } },
       };
+    if (url.endsWith(`/branches/${baseRef}`))
+      body = { protected: true, protection: { required_status_checks: { contexts: ['check'] } } };
+    if (url.includes('/check-runs?')) body = { total_count: 0, check_runs: [] };
+    if (url.includes('/status?'))
+      body = {
+        sha: head,
+        total_count: 1,
+        statuses: [
+          {
+            context: 'check',
+            state: 'success',
+            description: null,
+            updated_at: '2026-11-06T00:00:00Z',
+          },
+        ],
+      };
     if (method === 'PUT') body = { merged: true, sha: 'b'.repeat(40) };
     return {
       ok: true,
@@ -121,15 +127,7 @@ function githubWorld(baseRef = 'dev', mergeableState = 'clean') {
       githubRepo: 'octo/demo',
     })
     .run();
-  s.db
-    .insert(agent)
-    .values({
-      id: 'branch-agent',
-      teamId: s.team.id,
-      displayName: 'Builder',
-      tools: ['合并分支', '推送分支'],
-    })
-    .run();
+  seedSessionRoute(s, { tools: ['合并分支', '推送分支'] });
   s.db
     .insert(todo)
     .values({
@@ -142,7 +140,6 @@ function githubWorld(baseRef = 'dev', mergeableState = 'clean') {
       phaseAt: Date.now(),
       latestBuildId: 'branch-build',
       hasChanges: true,
-      assignment: { plan: null, build: { agentId: 'branch-agent' } },
     })
     .run();
   s.db
@@ -187,6 +184,9 @@ test('a GitHub PR targeting the configured dev branch passes the base check', as
     requestMerge({ ...s.svc, box: s.secretBox, githubFetch: fetch }, 'branch-build'),
   ).resolves.toEqual({ delegated: true });
   expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(1);
+  expect(requests.map((r) => r.url)).toContain(
+    'https://api.github.com/repos/octo/demo/branches/dev',
+  );
 });
 
 test('a GitHub PR targeting main is refused when the configured base is dev', async () => {

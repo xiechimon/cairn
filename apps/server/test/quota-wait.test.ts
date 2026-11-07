@@ -2,7 +2,6 @@ import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   notification as notificationTable,
@@ -11,9 +10,13 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
-import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
-
-const AGENT_ID = 'agent-quota-1';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -67,16 +70,6 @@ async function setupWorld(): Promise<QuotaWorld> {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'quota-builder',
-      provider: 'relay-186',
-      modelId: 'stub-model',
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'quota-box', cliVersion: '0.1.0' },
@@ -84,11 +77,7 @@ async function setupWorld(): Promise<QuotaWorld> {
   expect(enrollRes.status).toBe(200);
   const token = ((await enrollRes.json()) as { token: string }).token;
   const machineRow = s.db.select().from(machineTable).limit(1).all()[0]!;
-  s.db
-    .update(agentTable)
-    .set({ machineId: machineRow.id })
-    .where(eq(agentTable.id, AGENT_ID))
-    .run();
+  seedSessionRoute(s, { provider: 'relay-186', modelId: 'stub-model', machineId: machineRow.id });
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '配额挂起探针', spec: '写一行探针' },
@@ -101,7 +90,6 @@ async function startBuild(w: QuotaWorld): Promise<string> {
   const res = await call(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
     body: {
       todoIds: [w.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
       withPlan: false,
     },
   });

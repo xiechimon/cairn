@@ -3,7 +3,7 @@ import { Activity, CircleHelp, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
-import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
+import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
@@ -203,10 +203,8 @@ export function SearchPanel({
   const chipProblems = chips.map((chip) =>
     chipProblem(chip, useServer ? server.filters : localSearch?.filters),
   );
-  const agentAvatarById = useAgentAvatarUrlById();
-  const agents: AgentRowItem[] = useServer
-    ? server.agents.map((a) => ({ ...a, avatarUrl: agentAvatarById.get(a.id) ?? null }))
-    : q === '' || hasFilters
+  const agents: AgentRowItem[] =
+    useServer || q === '' || hasFilters
       ? []
       : [...new Set(fixture.todos.map((t) => t.agent))]
           .filter((agent): agent is AgentRef => agent != null)

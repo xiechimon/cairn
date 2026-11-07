@@ -29,10 +29,10 @@ import { recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
 import {
-  agentForStep,
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  profileForStep,
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
@@ -42,10 +42,10 @@ import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
-  agentForStep,
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  profileForStep,
   publishStepStatus,
   upsertChiefRow,
   upsertMessage,
@@ -56,7 +56,7 @@ export { stepToken, toProviderConfig } from './machine-step-token.js';
 
 export function fetchSteer(
   deps: { db: Db },
-  machine: { id: string },
+  machine: { id: string | null },
   stepId: string,
 ): { content: string | null } {
   const { db } = deps;
@@ -86,7 +86,7 @@ export function fetchSteer(
 
 export function ackSteer(
   deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },
-  machine: { id: string; teamId: string },
+  machine: { id: string | null; teamId: string },
   stepId: string,
 ): { ok: true } {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
@@ -102,7 +102,7 @@ export function ackSteer(
 
 export function fetchStop(
   deps: { db: Db },
-  machine: { id: string },
+  machine: { id: string | null },
   stepId: string,
 ): { discard: boolean | null } {
   const { db } = deps;
@@ -479,7 +479,7 @@ function toStepRecord(r: typeof step.$inferSelect): StepRecord {
   };
 }
 
-export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: string): void {
+export function heartbeatStep(deps: MachineDeps, machineId: string | null, stepId: string): void {
   if (!deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get()) {
     throw new HttpError(410, `step ${stepId} no longer exists`);
   }
@@ -509,7 +509,7 @@ export function reportTool(
 
 export function reportTranscriptDelta(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   text: string,
 ): void {
@@ -531,7 +531,7 @@ export function reportThinkingDelta(
 
 export function reportTranscriptRow(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   row: TranscriptRow,
 ): void {
@@ -616,7 +616,7 @@ function skillsSelection(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  const agentRow = agentForStep(deps, todoRow, row.kind, row.prompt);
+  const agentRow = profileForStep(deps, todoRow, row.kind, row.id);
   const allowlist = agentRow?.skillsAllowlist ?? null;
   if (allowlist === null) return { isChief: false, unrestricted: true, wanted: scanned };
   const whitelist = new Set(allowlist);

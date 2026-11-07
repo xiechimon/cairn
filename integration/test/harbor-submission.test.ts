@@ -2,17 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
-import {
-  agent,
-  build,
-  machine,
-  message,
-  project,
-  team,
-  todo,
-} from '../../apps/server/src/db/schema.js';
+import { build, machine, message, project, team, todo } from '../../apps/server/src/db/schema.js';
 import { sha256Hex } from '../../apps/server/src/lib/crypto.js';
-import { bootServer } from '../../apps/server/test/helpers.js';
+import { bootServer, seedSessionRoute } from '../../apps/server/test/helpers.js';
 import { HarborSubmission } from '../eval/harbor/submission.mts';
 
 const servers: ReturnType<typeof bootServer>[] = [];
@@ -46,15 +38,7 @@ function world() {
       online: true,
     })
     .run();
-  s.db
-    .insert(agent)
-    .values({
-      id: 'harbor-agent',
-      teamId: s.team.id,
-      displayName: 'Harbor',
-      machineId: 'harbor-machine',
-    })
-    .run();
+  seedSessionRoute(s, { machineId: 'harbor-machine' });
   const env: Record<string, string> = {
     CAIRN_SERVER_URL: 'http://harbor.test',
     CAIRN_SERVER_TOKEN: serverToken,

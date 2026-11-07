@@ -1,10 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
-import { agent, build, chief, machine, routingRule, step, team, todo } from '../src/db/schema.js';
+import { build, machine, step, team, todo } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { openResearchThread } from '../src/services/research-thread.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, postProject, seedSessionRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -18,57 +17,31 @@ async function world() {
   return { s, projectId, teamId: s.team.id };
 }
 
-function addAgent(
-  s: TestServer,
-  id: string,
-  fields: Partial<typeof agent.$inferInsert> = {},
-): void {
-  s.db
-    .insert(agent)
-    .values({
-      id,
-      teamId: s.team.id,
-      displayName: id,
-      provider: 'claude-code',
-      modelId: 'claude-sonnet-5-5',
-      ...fields,
-    })
-    .run();
-}
-
 const base = { title: 'Pick a queue library', question: 'Which queue library fits?' };
 
 describe('openResearchThread', () => {
   test('refuses, creating nothing, when the session route sends builds to a runtime other than Claude Code', async () => {
     const w = await world();
-    addAgent(w.s, 'agent-sonnet');
-    w.s.db
-      .insert(routingRule)
-      .values({
-        id: 'rule-session',
-        teamId: w.teamId,
-        use: 'session',
-        provider: 'openai-codex',
-        modelId: 'gpt-6.1-sol',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    setRoutingRulesEnabled(true);
-    try {
-      const before = w.s.db.select().from(todo).all().length;
-      expect(() =>
-        openResearchThread(w.s.svc, { teamId: w.teamId, projectId: w.projectId, tier: 1, ...base }),
-      ).toThrow(/Claude Code/);
-      expect(w.s.db.select().from(todo).all()).toHaveLength(before);
-    } finally {
-      setRoutingRulesEnabled(false);
-    }
+    seedSessionRoute(w.s, { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    const before = w.s.db.select().from(todo).all().length;
+    expect(() =>
+      openResearchThread(w.s.svc, { teamId: w.teamId, projectId: w.projectId, tier: 1, ...base }),
+    ).toThrow(/Claude Code/);
+    expect(w.s.db.select().from(todo).all()).toHaveLength(before);
   });
 
-  test('creates an info todo and starts only its build step on the chosen agent', async () => {
+  test('refuses, creating nothing, when the team has no session route', async () => {
     const w = await world();
-    addAgent(w.s, 'agent-sonnet');
+    expect(() =>
+      openResearchThread(w.s.svc, { teamId: w.teamId, projectId: w.projectId, tier: 1, ...base }),
+    ).toThrow(/session routing rule/);
+    expect(w.s.db.select().from(todo).all()).toHaveLength(0);
+    expect(w.s.db.select().from(build).all()).toHaveLength(0);
+  });
+
+  test('creates an info todo and starts only its session step', async () => {
+    const w = await world();
+    seedSessionRoute(w.s);
     const opened = openResearchThread(w.s.svc, {
       teamId: w.teamId,
       projectId: w.projectId,
@@ -81,7 +54,6 @@ describe('openResearchThread', () => {
     expect(row?.spec).toContain(base.question);
     expect(row?.spec).toContain('3 到 15 次工具调用');
     expect(row?.spec).toContain('1500');
-    expect(row?.assignment).toMatchObject({ plan: null, build: { agentId: 'agent-sonnet' } });
     const builds = w.s.db.select().from(build).all();
     expect(builds).toHaveLength(1);
     expect(builds[0]).toMatchObject({ withPlan: false, triggerSource: 'chief' });
@@ -92,12 +64,12 @@ describe('openResearchThread', () => {
         .from(step)
         .all()
         .map((r) => r.kind),
-    ).toEqual(['build']);
+    ).toEqual(['session']);
   });
 
   test('tier 2 prompt tells the lead to fan out sub-searches', async () => {
     const w = await world();
-    addAgent(w.s, 'agent-opus', { modelId: 'claude-opus-5-5' });
+    seedSessionRoute(w.s);
     const opened = openResearchThread(w.s.svc, {
       teamId: w.teamId,
       projectId: w.projectId,
@@ -109,200 +81,46 @@ describe('openResearchThread', () => {
     expect(row?.spec).toContain('子代理');
   });
 
-  test('defaults to opus for tier 2 and sonnet for tier 1', async () => {
+  test('the claimed step runs on the session route', async () => {
     const w = await world();
-    addAgent(w.s, 'agent-a-haiku', { modelId: 'claude-haiku-5-5' });
-    addAgent(w.s, 'agent-sonnet', { modelId: 'claude-sonnet-5-5' });
-    addAgent(w.s, 'agent-opus', { modelId: 'claude-opus-5-5' });
-    const pick = (tier: 1 | 2) =>
-      openResearchThread(w.s.svc, {
-        teamId: w.teamId,
-        projectId: w.projectId,
-        tier,
-        ...base,
-      }).agentId;
-    expect(pick(2)).toBe('agent-opus');
-    expect(pick(1)).toBe('agent-sonnet');
-  });
-
-  test.each([1, 2] as const)(
-    'tier %i prefers a persona-free agent over a preferred-model reviewer',
-    async (tier) => {
-      const w = await world();
-      addAgent(w.s, 'agent-a-reviewer', { persona: 'test_engineer', modelId: 'claude-opus-5-5' });
-      addAgent(w.s, 'agent-b-reviewer', { persona: 'code_reviewer' });
-      addAgent(w.s, 'agent-researcher');
-      const opened = openResearchThread(w.s.svc, {
-        teamId: w.teamId,
-        projectId: w.projectId,
-        tier,
-        ...base,
-      });
-      expect(opened.agentId).toBe('agent-researcher');
-    },
-  );
-
-  test.each([null, ''])(
-    'skips a persona-free candidate whose effective model is %j',
-    async (modelId) => {
-      const w = await world();
-      addAgent(w.s, 'agent-general', { modelId });
-      addAgent(w.s, 'agent-reviewer', { persona: 'test_engineer' });
-      const opened = openResearchThread(w.s.svc, {
-        teamId: w.teamId,
-        projectId: w.projectId,
-        tier: 1,
-        ...base,
-      });
-      expect(opened.agentId).toBe('agent-reviewer');
-    },
-  );
-
-  test('a session route supplies the effective model for a model-less agent', async () => {
-    const w = await world();
-    addAgent(w.s, 'agent-general', { modelId: null });
+    w.s.db.update(team).set({ claudeUsage: 'allow-paid' }).run();
     w.s.db
-      .insert(routingRule)
+      .insert(machine)
       .values({
-        id: 'session-rule',
+        id: 'research-host',
         teamId: w.teamId,
-        use: 'session',
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-        createdAt: 1,
-        updatedAt: 1,
+        name: 'Research host',
+        online: true,
+        enabledRuntimes: ['claude-code'],
+        capabilities: { mcpServers: [], skills: [], executor: 'host' },
       })
       .run();
-    setRoutingRulesEnabled(true);
-    try {
-      const opened = openResearchThread(w.s.svc, {
-        teamId: w.teamId,
-        projectId: w.projectId,
-        tier: 1,
-        ...base,
-      });
-      expect(opened.agentId).toBe('agent-general');
-    } finally {
-      setRoutingRulesEnabled(false);
-    }
-  });
-
-  test.each([
-    { executor: 'orb' as const },
-    { mcpServers: ['missing-search'] },
-    { models: ['unavailable-model'] },
-  ])(
-    'prefers a runnable persona agent when the general agent lacks %j',
-    async (requiredCapabilities) => {
-      const w = await world();
-      w.s.db.update(team).set({ claudeUsage: 'allow-paid' }).run();
-      w.s.db
-        .insert(machine)
-        .values({
-          id: 'research-host',
-          teamId: w.teamId,
-          name: 'Research host',
-          online: true,
-          enabledRuntimes: ['claude-code'],
-          capabilities: { mcpServers: [], skills: [], executor: 'host' },
-        })
-        .run();
-      addAgent(w.s, 'agent-general', { machineId: 'research-host', requiredCapabilities });
-      addAgent(w.s, 'agent-reviewer', { machineId: 'research-host', persona: 'test_engineer' });
-      const opened = openResearchThread(w.s.svc, {
-        teamId: w.teamId,
-        projectId: w.projectId,
-        tier: 1,
-        ...base,
-      });
-      expect(opened.agentId).toBe('agent-reviewer');
-      const claimed = await claimStep(
-        {
-          ...w.s.svc,
-          box: w.s.secretBox,
-          reposDir: w.s.reposDir,
-          attachmentsDir: w.s.attachmentsDir,
-        },
-        'research-host',
-        w.teamId,
-        0,
-        'http://localhost',
-      );
-      expect(claimed?.step.buildId).toBe(opened.buildId);
-      expect(claimed?.agent?.id).toBe('agent-reviewer');
-    },
-  );
-
-  test('without the tier model, a sonnet or opus agent beats a haiku agent', async () => {
-    const w = await world();
-    addAgent(w.s, 'agent-a-haiku', { modelId: 'claude-haiku-5-5' });
-    addAgent(w.s, 'agent-sonnet', { modelId: 'claude-sonnet-5-5' });
+    const routeId = seedSessionRoute(w.s, { machineId: 'research-host' });
     const opened = openResearchThread(w.s.svc, {
       teamId: w.teamId,
       projectId: w.projectId,
-      tier: 2,
+      tier: 1,
       ...base,
     });
-    expect(opened.agentId).toBe('agent-sonnet');
-  });
-
-  test('falls back to any active Claude Code agent and skips pi, inactive and Coordinator agents', async () => {
-    const w = await world();
-    addAgent(w.s, 'agent-pi', { provider: 'stub-gw', modelId: 'claude-opus-5-5' });
-    addAgent(w.s, 'agent-off', { status: 'archived', modelId: 'claude-opus-5-5' });
-    addAgent(w.s, 'agent-coordinator', { modelId: 'claude-opus-5-5' });
-    addAgent(w.s, 'agent-haiku', { modelId: 'claude-haiku-5-5' });
-    w.s.db
-      .insert(chief)
-      .values({
-        id: 'chief-1',
-        userId: w.s.user.id,
-        teamId: w.teamId,
-        agentId: 'agent-coordinator',
-        createdAt: 1,
-      })
-      .run();
-    const opened = openResearchThread(w.s.svc, {
-      teamId: w.teamId,
-      projectId: w.projectId,
-      tier: 2,
-      ...base,
-    });
-    expect(opened.agentId).toBe('agent-haiku');
-  });
-
-  test('an explicit agent wins', async () => {
-    const w = await world();
-    addAgent(w.s, 'agent-opus', { modelId: 'claude-opus-5-5' });
-    addAgent(w.s, 'agent-other', { modelId: 'claude-haiku-5-5' });
-    const opened = openResearchThread(w.s.svc, {
-      teamId: w.teamId,
-      projectId: w.projectId,
-      tier: 2,
-      agentId: 'agent-other',
-      ...base,
-    });
-    expect(opened.agentId).toBe('agent-other');
-  });
-
-  test('no Claude Code agent throws a clear error and creates nothing', async () => {
-    const w = await world();
-    addAgent(w.s, 'agent-pi', { provider: 'stub-gw' });
-    expect(() =>
-      openResearchThread(w.s.svc, {
-        teamId: w.teamId,
-        projectId: w.projectId,
-        tier: 1,
-        ...base,
-      }),
-    ).toThrow(/Claude Code agent/);
-    expect(w.s.db.select().from(todo).all()).toHaveLength(0);
-    expect(w.s.db.select().from(build).all()).toHaveLength(0);
+    const claimed = await claimStep(
+      {
+        ...w.s.svc,
+        box: w.s.secretBox,
+        reposDir: w.s.reposDir,
+        attachmentsDir: w.s.attachmentsDir,
+      },
+      'research-host',
+      w.teamId,
+      0,
+      'http://localhost',
+    );
+    expect(claimed?.step.buildId).toBe(opened.buildId);
+    expect(claimed?.agent?.id).toBe(routeId);
   });
 
   test('the same source opens one thread however often it is asked', async () => {
     const w = await world();
-    addAgent(w.s, 'agent-sonnet');
+    seedSessionRoute(w.s);
     const input = {
       teamId: w.teamId,
       projectId: w.projectId,
@@ -319,7 +137,7 @@ describe('openResearchThread', () => {
 
   test('a source todo whose build never started gets its build on the next call', async () => {
     const w = await world();
-    addAgent(w.s, 'agent-sonnet');
+    seedSessionRoute(w.s);
     const input = {
       teamId: w.teamId,
       projectId: w.projectId,

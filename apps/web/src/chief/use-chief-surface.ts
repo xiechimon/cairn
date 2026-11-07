@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -360,14 +361,19 @@ export function useChiefSurface(
         }
       : undefined;
 
+  const wasReadyRef = useRef(false);
   const load: CoordinatorLoad = live
     ? coordinatorLoad({
         chief: chiefQ,
         coordinator: chiefThreadsQ,
         messages: chiefMessagesQ,
         hasThread: activeThread !== null,
+        wasReady: wasReadyRef.current,
       })
     : 'ready';
+  if (activeThread === null && chiefQ.isSuccess && chiefThreadsQ.isSuccess)
+    wasReadyRef.current = true;
+  else if (activeThread !== null && !chiefMessagesQ.isPending) wasReadyRef.current = false;
   const retry = () => {
     void chiefQ.refetch();
     void chiefThreadsQ.refetch();

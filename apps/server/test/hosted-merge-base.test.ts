@@ -1,11 +1,11 @@
 import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
-import { agent, build, step, todo } from '../src/db/schema.js';
+import { build, step, todo } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { requestMerge } from '../src/services/builds.js';
 import { applyMergeLanding } from '../src/services/machine-merge-landing.js';
-import { bindAllAgents, bootServer, issueApiKey, req } from './helpers.js';
+import { bootServer, issueApiKey, req, seedSessionRoute } from './helpers.js';
 
 async function mergeWorld() {
   const s = bootServer();
@@ -19,15 +19,11 @@ async function mergeWorld() {
   if (main === null) throw new Error('main missing');
   await systemGitOps.updateBranchRef(dir, 'dev', main);
   await req(s.app, 'PATCH', `/api/projects/${project.id}`, { baseBranch: 'dev' });
-  s.db
-    .insert(agent)
-    .values({
-      id: 'builder',
-      teamId: s.team.id,
-      displayName: 'Builder',
-      tools: ['合并分支', '推送分支'],
-    })
-    .run();
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    tools: ['合并分支', '推送分支'],
+  });
   s.db
     .insert(todo)
     .values({
@@ -39,7 +35,6 @@ async function mergeWorld() {
       phase: 'review',
       phaseAt: Date.now(),
       latestBuildId: 'build',
-      assignment: { plan: null, build: { agentId: 'builder' } },
     })
     .run();
   s.db
@@ -145,8 +140,6 @@ test('claiming an enqueued merge keeps its pinned base in the daemon repository 
       body: JSON.stringify({ teamId: w.s.team.id, name: 'pinned-builder' }),
     });
     const { token } = (await enrolled.json()) as { token: string };
-    w.s.db.update(agent).set({ modelId: 'stub-model' }).where(eq(agent.id, 'builder')).run();
-    bindAllAgents(w.s);
     await req(w.s.app, 'PATCH', `/api/projects/${w.project.id}`, { baseBranch: 'main' });
     const response = await w.s.app.request('/api/machine/tasks/claim', {
       method: 'POST',

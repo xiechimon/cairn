@@ -6,7 +6,6 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { commitEnv, runGitOk } from '../../daemon/src/git.js';
 import { inspectLocalPatch } from '../../daemon/src/local-merge.js';
 import {
-  agent as agentTable,
   build as buildTable,
   gateState as gateStateTable,
   gateVerdict as gateVerdictTable,
@@ -15,7 +14,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposals: (() => void)[] = [];
 
@@ -56,19 +55,7 @@ function seededWorld(s: TestServer, localPath: string, base: string, head: strin
       autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'autonomous', localChecks: ['true'] },
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent',
-      teamId: s.team.id,
-      displayName: 'Local agent',
-      description: '',
-      provider: 'anthropic',
-      modelId: 'claude-x',
-      tools: ['merge', 'push'],
-      machineId: null,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'anthropic', modelId: 'claude-x', tools: ['merge', 'push'] });
   s.db
     .insert(todoTable)
     .values({
@@ -82,7 +69,6 @@ function seededWorld(s: TestServer, localPath: string, base: string, head: strin
       seqNum: 1,
       latestBuildId: 'build',
       sourceRef: 'github:xiechimon/cairn#1625',
-      assignment: { plan: null, build: { agentId: 'agent' } },
     })
     .run();
   s.db

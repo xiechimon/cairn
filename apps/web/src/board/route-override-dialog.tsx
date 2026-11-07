@@ -1,10 +1,10 @@
-import type { RequiredCapabilities, RouteOverride, TeamRoutingSettings } from '@cairn/shared';
+import type { RequiredCapabilities, RouteOverride } from '@cairn/shared';
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useMachines, useMcpServers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { useRoutingSettings } from '../api/routing-settings.js';
+import { MachineName, machineLabel } from '../components/machine-label.js';
 import {
   SETTINGS_HINT_CLS,
   SETTINGS_ROW_CLS,
@@ -29,12 +29,6 @@ import {
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-
-function fixtureRoutingEnabled(search: URLSearchParams): boolean {
-  const fixture = resolveScenario(search);
-  const settings = fixture.resources?.routingSettings as TeamRoutingSettings | undefined;
-  return settings?.enabled === true;
-}
 
 function buildOverride(
   machineId: string | null,
@@ -74,7 +68,6 @@ export function RouteOverrideDialog({
   const active = open === true;
   const machinesQ = useMachines(teamId, live && active);
   const mcpQ = useMcpServers(teamId, live && active);
-  const settingsQ = useRoutingSettings(teamId, live && active);
   const [machineId, setMachineId] = useState<string | null>(initial?.machineId ?? null);
   const [requireOrb, setRequireOrb] = useState(initial?.requiredCapabilities?.executor === 'orb');
   const [mcpServers, setMcpServers] = useState<string[]>(
@@ -93,12 +86,10 @@ export function RouteOverrideDialog({
     : (fixture.resources?.machines ?? [])
         .filter((machine): machine is typeof machine & { id: string } => machine.id != null)
         .map((machine) => ({ id: machine.id, name: machine.name }));
+  const pickedMachine = machines.find((machine) => machine.id === machineId);
   const mcpOptions = live
     ? (mcpQ.data ?? []).map((row) => ({ id: row.slug, name: row.label }))
     : (fixture.resources?.mcpServers ?? []).map((row) => ({ id: row.name, name: row.name }));
-  const routingEnabled = live
-    ? (settingsQ.data?.enabled ?? false)
-    : fixtureRoutingEnabled(searchParams);
 
   const toggleMcp = (id: string, on: boolean) => {
     setMcpServers((current) =>
@@ -153,17 +144,8 @@ export function RouteOverrideDialog({
       }
     >
       <div className="flex flex-col gap-4" data-testid="route-override-dialog">
-        <p
-          className={cn(SETTINGS_HINT_CLS, 'm-0')}
-          data-testid="route-override-flag-hint"
-          data-enabled={routingEnabled ? 'true' : 'false'}
-        >
-          {routingEnabled
-            ? t('CAIRN_ROUTING_RULES 已开启；调度走规则与策略。')
-            : t('CAIRN_ROUTING_RULES=0 已关闭规则路由；调度仍走 Agent。')}
-        </p>
         <SettingsCard>
-          <SettingsRow label={t('首选机器')} hint={t('不填则沿用规则或 Agent 的机器')}>
+          <SettingsRow label={t('首选机器')} hint={t('不填则沿用规则的机器')}>
             <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
               <SelectTrigger
                 aria-label={t('首选机器')}
@@ -173,14 +155,16 @@ export function RouteOverrideDialog({
                 <SelectValue>
                   {machineId === null
                     ? t('不固定')
-                    : (machines.find((machine) => machine.id === machineId)?.name ?? machineId)}
+                    : pickedMachine === undefined
+                      ? machineId
+                      : machineLabel(pickedMachine, machines)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={null}>{t('不固定')}</SelectItem>
                 {machines.map((machine) => (
                   <SelectItem key={machine.id} value={machine.id}>
-                    {machine.name}
+                    <MachineName machine={machine} all={machines} />
                   </SelectItem>
                 ))}
               </SelectContent>

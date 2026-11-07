@@ -4,7 +4,6 @@ import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   agentMemory,
-  agent as agentTable,
   build as buildTable,
   project as projectTable,
   schedule as scheduleTable,
@@ -19,11 +18,11 @@ import { readBuildChangeFile } from '../src/services/git.js';
 import { PhaseTransitionError } from '../src/services/phase.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
-import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
 
 const TEAM_B = 'team-b-1497';
 const PROJ_B = 'proj-b-1497';
-const AGENT_ID = 'agent-1497';
+const OWNER_ID = 'route-1497';
 
 const servers: TestServer[] = [];
 afterEach(() => {
@@ -60,11 +59,7 @@ async function world() {
     body: { teamId: s.team.id, name: 'm-1497', cliVersion: '0.1.0' },
   });
   const { token } = (await enroll.json()) as { token: string };
-  s.db
-    .insert(agentTable)
-    .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'a', provider: 'p', modelId: 'm' })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { id: OWNER_ID, provider: 'p', modelId: 'm' });
   const projectId = 'proj-a-1497';
   s.db
     .insert(projectTable)
@@ -93,16 +88,14 @@ function stateOf(s: TestServer, todoId: string) {
   return { phase: row?.phase, builds: builds.length };
 }
 
-const assignment = { plan: null, build: { agentId: AGENT_ID } };
-
 describe('#1497 startBuilds: the project must share the todo team', () => {
   test('V1 an own-team todo pointing at another team project -> NotFound project, no build created, the phase unchanged', async () => {
     const { s, todoId } = await world();
     pointAtTeamB(s, todoId);
     const before = stateOf(s, todoId);
-    expect(() =>
-      startBuilds(s.svc, { projectId: PROJ_B, todoIds: [todoId], assignment, withPlan: false }),
-    ).toThrow(new NotFoundError(`project ${PROJ_B}`));
+    expect(() => startBuilds(s.svc, { projectId: PROJ_B, todoIds: [todoId] })).toThrow(
+      new NotFoundError(`project ${PROJ_B}`),
+    );
     expect(stateOf(s, todoId)).toEqual(before);
   });
 
@@ -110,7 +103,7 @@ describe('#1497 startBuilds: the project must share the todo team', () => {
     const { s, todoId } = await world();
     pointAtTeamB(s, todoId);
     const res = await call(s.app, 'POST', `/api/projects/${PROJ_B}/builds`, {
-      body: { todoIds: [todoId], assignment, withPlan: false },
+      body: { todoIds: [todoId] },
     });
     expect(res.status).toBe(404);
     expect(stateOf(s, todoId).builds).toBe(0);
@@ -142,20 +135,15 @@ describe('#1497 startBuilds: the project must share the todo team', () => {
 
   test('V6 the same id twice: the second 409s, only one build', async () => {
     const { s, projectId, todoId } = await world();
-    expect(() =>
-      startBuilds(s.svc, { projectId, todoIds: [todoId, todoId], assignment, withPlan: false }),
-    ).toThrow(PhaseTransitionError);
+    expect(() => startBuilds(s.svc, { projectId, todoIds: [todoId, todoId] })).toThrow(
+      PhaseTransitionError,
+    );
     expect(stateOf(s, todoId).builds).toBe(1);
   });
 
   test('V7 the changes read surface: a todo pointing at another team hosted project -> 404, the other team repo unread', async () => {
     const { s, projectId, todoId } = await world();
-    const [created] = startBuilds(s.svc, {
-      projectId,
-      todoIds: [todoId],
-      assignment,
-      withPlan: false,
-    });
+    const [created] = startBuilds(s.svc, { projectId, todoIds: [todoId] });
     pointAtTeamB(s, todoId);
     const err = await readBuildChangeFile(
       { db: s.db, reposDir: s.reposDir },
@@ -171,12 +159,7 @@ describe('#1497 startBuilds: the project must share the todo team', () => {
 
   test('V5 own-team projects create builds as usual', async () => {
     const { s, projectId, todoId } = await world();
-    const created = startBuilds(s.svc, {
-      projectId,
-      todoIds: [todoId],
-      assignment,
-      withPlan: false,
-    });
+    const created = startBuilds(s.svc, { projectId, todoIds: [todoId] });
     expect(created).toHaveLength(1);
     expect(stateOf(s, todoId)).toEqual({ phase: 'queued', builds: 1 });
   });
@@ -185,7 +168,7 @@ describe('#1497 startBuilds: the project must share the todo team', () => {
 describe('#1497 claim: another team project stays out of the payload, no credentials issued', () => {
   async function claimed(cross: boolean) {
     const { s, projectId, todoId, token } = await world();
-    startBuilds(s.svc, { projectId, todoIds: [todoId], assignment, withPlan: false });
+    startBuilds(s.svc, { projectId, todoIds: [todoId] });
     if (cross) pointAtTeamB(s, todoId);
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
@@ -214,8 +197,13 @@ describe('#1497 claim: another team project stays out of the payload, no credent
   });
 });
 
-describe('#1497 chief delete_memory: deletes only this agent own-team entries', () => {
-  function insertMemory(s: TestServer, agentId: string, teamId: string): string {
+describe('#1497 delete_memory: deletes only own-team entries', () => {
+  function insertMemory(
+    s: TestServer,
+    agentId: string,
+    teamId: string,
+    independent = false,
+  ): string {
     const id = newRecordId();
     s.db
       .insert(agentMemory)
@@ -228,6 +216,7 @@ describe('#1497 chief delete_memory: deletes only this agent own-team entries', 
         projectId: null,
         sourceTodoId: null,
         sourceBuildId: null,
+        independent,
         createdAt: nowMs(),
         updatedAt: nowMs(),
       })
@@ -243,7 +232,7 @@ describe('#1497 chief delete_memory: deletes only this agent own-team entries', 
         userId: s.user.id,
         chiefId: `chief-${s.user.id}-${s.team.id}`,
         threadId: 'chief-1497',
-        chiefAgentId: AGENT_ID,
+        chiefAgentId: OWNER_ID,
         conversationId: 'chief-1497',
       },
       'delete_memory',
@@ -251,15 +240,41 @@ describe('#1497 chief delete_memory: deletes only this agent own-team entries', 
     );
   }
 
+  async function workerDelete(
+    s: TestServer,
+    todoId: string,
+    memoryId: string,
+    teamScoped: boolean,
+  ): Promise<unknown> {
+    return executeWorkerMemoryTool(
+      s.db,
+      {
+        teamId: s.team.id,
+        agentId: OWNER_ID,
+        sourceName: 'Session',
+        teamScoped,
+        todoId,
+        projectId: null,
+        buildId: 'build-1497',
+        attachmentsDir: s.attachmentsDir,
+      },
+      'delete_memory',
+      { memoryId },
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+  }
+
   function exists(s: TestServer, id: string): boolean {
     return s.db.select().from(agentMemory).where(eq(agentMemory.id, id)).get() !== undefined;
   }
 
-  test('V4 another agent / another team memories are not deleted', async () => {
+  test('V4 another team and independent memories are not deleted by the chief', async () => {
     const { s } = await world();
-    const otherAgent = insertMemory(s, 'agent-other-1497', s.team.id);
-    const otherTeam = insertMemory(s, AGENT_ID, TEAM_B);
-    for (const id of [otherAgent, otherTeam]) {
+    const independent = insertMemory(s, 'reviewer-1497', s.team.id, true);
+    const otherTeam = insertMemory(s, OWNER_ID, TEAM_B);
+    for (const id of [independent, otherTeam]) {
       const err = await chiefDelete(s, id).then(
         () => null,
         (e: unknown) => e,
@@ -267,36 +282,29 @@ describe('#1497 chief delete_memory: deletes only this agent own-team entries', 
       expect(err).toBeInstanceOf(HttpError);
       expect((err as HttpError).status).toBe(404);
     }
-    expect(exists(s, otherAgent)).toBe(true);
+    expect(exists(s, independent)).toBe(true);
     expect(exists(s, otherTeam)).toBe(true);
   });
 
-  test('V4 worker delete_memory: another agent memories -> 404, not deleted', async () => {
+  test('V4 an independent worker step: another owner memories -> 404, not deleted', async () => {
     const { s, todoId } = await world();
-    const otherAgent = insertMemory(s, 'agent-other-1497', s.team.id);
-    const err = await executeWorkerMemoryTool(
-      s.db,
-      {
-        teamId: s.team.id,
-        agentId: AGENT_ID,
-        todoId,
-        projectId: null,
-        buildId: 'build-1497',
-        attachmentsDir: s.attachmentsDir,
-      },
-      'delete_memory',
-      { memoryId: otherAgent },
-    ).then(
-      () => null,
-      (e: unknown) => e,
-    );
+    const otherOwner = insertMemory(s, 'agent-other-1497', s.team.id);
+    const err = await workerDelete(s, todoId, otherOwner, false);
     expect((err as HttpError).status).toBe(404);
-    expect(exists(s, otherAgent)).toBe(true);
+    expect(exists(s, otherOwner)).toBe(true);
   });
 
-  test('V5 this agent own-team memories are deleted as usual', async () => {
+  test('V4 a team-scoped worker step: another team memories -> 404, not deleted', async () => {
+    const { s, todoId } = await world();
+    const otherTeam = insertMemory(s, OWNER_ID, TEAM_B);
+    const err = await workerDelete(s, todoId, otherTeam, true);
+    expect((err as HttpError).status).toBe(404);
+    expect(exists(s, otherTeam)).toBe(true);
+  });
+
+  test('V5 own-team memories are deleted as usual', async () => {
     const { s } = await world();
-    const own = insertMemory(s, AGENT_ID, s.team.id);
+    const own = insertMemory(s, OWNER_ID, s.team.id);
     await chiefDelete(s, own);
     expect(exists(s, own)).toBe(false);
   });

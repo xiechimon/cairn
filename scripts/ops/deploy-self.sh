@@ -76,9 +76,7 @@ HOST_TOOLS_ALARM_TITLE="Host tools differ from main"
 SERVER_UNIT=cairn-server.service
 DAEMON_UNIT=cairn-daemon.service
 ORB_UNIT=cairn-daemon-orb.service
-COORDINATOR_UNIT=cairn-coordinator.service
 ORB_ALARM_TITLE="Orb daemon needs attention"
-COORDINATOR_ALARM_TITLE="Coordinator sidecar needs attention"
 DB="$DATA_DIR/server.db"
 
 EXIT_REFUSED=2
@@ -235,7 +233,7 @@ host_tools_alarm() {
 step_counts() {
   local cutoff=$(( ($(date +%s) - STEP_STALE_SECONDS) * 1000 ))
   sqlite3 -readonly -separator ' ' "$DB" \
-    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed'"
+    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed' and coalesce(buildId, '') not like 'chief-digest-%'"
 }
 
 step_wait_alarm() {
@@ -280,9 +278,18 @@ allow_builds_block() {
     awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
 }
 
+hook_lines() {
+  { git -C "$CHECKOUT" show "$1:$2" 2>/dev/null || true; } |
+    { grep -E '"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
+    sed -E 's/^[[:space:]]*//; s/,[[:space:]]*$//'
+}
+
 install_hooks_changed() {
-  git -C "$CHECKOUT" diff "$PREVIOUS" "$TARGET" -- '*package.json' |
-    grep -E '^[+-][^+-].*"(pre|post)?(install|prepare)"[[:space:]]*:' || true
+  local manifest
+  while IFS= read -r manifest; do
+    [ "$(hook_lines "$PREVIOUS" "$manifest")" = "$(hook_lines "$TARGET" "$manifest")" ] ||
+      echo "$manifest"
+  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- '*package.json')
   git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
 }
 
@@ -436,7 +443,6 @@ start_optional_unit() {
 
 stop_services() {
   stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  stop_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   systemctl --user stop "$DAEMON_UNIT" && systemctl --user stop "$SERVER_UNIT"
 }
 
@@ -449,7 +455,6 @@ start_and_check() {
   systemctl --user start "$DAEMON_UNIT"
   daemon_healthy "$started_ms" || return 1
   start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  start_optional_unit "$COORDINATOR_UNIT" coordinator "$COORDINATOR_ALARM_TITLE"
   return 0
 }
 

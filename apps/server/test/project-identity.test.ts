@@ -10,14 +10,13 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import type { AppContext } from '../src/context.js';
 import {
-  agent as agentTable,
   message as messageTable,
   project as projectTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bindAllAgents, bootServer, issueApiKey, req } from './helpers.js';
+import { bootServer, issueApiKey, req, seedSessionRoute } from './helpers.js';
 
 interface GhRoute {
   status?: number;
@@ -193,12 +192,7 @@ async function createTodoWithBuild(
   projectId: string,
   title: string,
 ): Promise<{ todoId: string; buildId: string }> {
-  const agentId = 'agent-ident-1';
-  srv.db
-    .insert(agentTable)
-    .values({ id: agentId, teamId: srv.team.id, displayName: 'ident-builder', modelId: 'm' })
-    .onConflictDoNothing()
-    .run();
+  seedSessionRoute(srv, { modelId: 'm' });
   const todoRes = await req(srv.app, 'POST', `/api/projects/${projectId}/todos`, {
     title,
     spec: 'spec',
@@ -206,8 +200,6 @@ async function createTodoWithBuild(
   const todoId = String(((await todoRes.json()) as { id: string }).id);
   const buildRes = await req(srv.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: { agentId }, build: { agentId } },
-    withPlan: false,
   });
   expect(buildRes.status).toBe(201);
   const buildId = (((await buildRes.json()) as { builds: { id: string }[] }).builds ?? [])[0]?.id;
@@ -631,12 +623,7 @@ describe('the claim payload repo shape after conversion (#1242)', () => {
       body: { teamId: s2.team.id, name: 'ident-mea', cliVersion: '0.1.0' },
     });
     const machineToken = ((await enrollRes.json()) as { token: string }).token;
-    const agentId = 'agent-ident-claim';
-    s2.db
-      .insert(agentTable)
-      .values({ id: agentId, teamId: s2.team.id, displayName: 'ident-claimer', modelId: 'm' })
-      .run();
-    bindAllAgents(s2);
+    seedSessionRoute(s2, { provider: 'p', modelId: 'm' });
     const projectId = 'proj-ident-c1';
     s2.db
       .insert(projectTable)
@@ -661,11 +648,7 @@ describe('the claim payload repo shape after conversion (#1242)', () => {
     });
     const todoId = ((await todoRes.json()) as { id: string }).id;
     const buildRes = await call(s2.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: { agentId }, build: { agentId } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoId] },
     });
     expect(buildRes.status).toBe(201);
     const claimRes = await call(s2.app, 'POST', '/api/machine/tasks/claim', {

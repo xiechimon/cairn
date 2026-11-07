@@ -37,7 +37,6 @@ import {
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { planChiefDigests } from './chief-digest.js';
-import { planChiefSummaries } from './chief-summary.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import { sweepIdleComposerDrafts } from './composer-drafts.js';
@@ -92,13 +91,12 @@ export interface CiPollRun {
 }
 
 export interface IssueIntakeRun {
-  intakeAgentAllowlist?: readonly string[];
   githubFetch: FetchLike;
   logger: IssueIntakeLogger;
 }
 
 export function issueIntakeRunOf(
-  config: { issueIntake: boolean; intakeAgentAllowlist?: readonly string[] },
+  config: { issueIntake: boolean },
   run: IssueIntakeRun,
 ): IssueIntakeRun | null {
   run.logger.info(
@@ -107,9 +105,7 @@ export function issueIntakeRunOf(
       ? `github issue intake on (${ENV_VARS.issueIntake})`
       : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
   );
-  return config.issueIntake
-    ? { ...run, intakeAgentAllowlist: config.intakeAgentAllowlist ?? [] }
-    : null;
+  return config.issueIntake ? run : null;
 }
 
 export function schedulingRunOf(
@@ -384,8 +380,6 @@ export function createScheduler(
       const [started] = startBuilds(deps, {
         projectId: row.projectId,
         todoIds: [row.todoId],
-        assignment: todoRow.assignment ?? { plan: null, build: null },
-        withPlan: false,
         triggerSource: 'schedule',
         scheduledBy: row.createdBy,
         prompt: workerCreated ? prompt : row.prompt || undefined,
@@ -512,7 +506,6 @@ export function createScheduler(
       }
     }
     planChiefDigests(deps, now);
-    planChiefSummaries(deps, now);
     sweepStaleMachines(deps);
     sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);

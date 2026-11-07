@@ -1,5 +1,4 @@
 import type { z } from 'zod';
-import { agentRecordSchema } from './agent.js';
 import { apiKeyRecordSchema } from './api-key.js';
 import { buildRecordSchema } from './build.js';
 import { chiefRecordSchema, chiefThreadSchema } from './chief.js';
@@ -47,7 +46,6 @@ export * from './named-prompts.js';
 export * from './needs-you.js';
 export * from './notification.js';
 export * from './permission-rules.js';
-export * from './persona.js';
 export * from './plan.js';
 export * from './project.js';
 export * from './prompts.js';
@@ -87,7 +85,6 @@ export const RECORD_SCHEMAS = {
   plan: planRecordSchema,
   schedule: scheduleRecordSchema,
   notification: notificationRecordSchema,
-  agent: agentRecordSchema,
   agent_memory: memoryRecordSchema,
   provider: providerRecordSchema,
   secret: secretRecordSchema,

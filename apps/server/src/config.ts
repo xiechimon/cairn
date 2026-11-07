@@ -11,7 +11,6 @@ import {
   ENV_VARS,
   formatAccessTokenFile,
   parseAccessTokenFile,
-  routingRulesFlagOn,
   SKILLS_DIR_DEFAULT,
   TEAM_STREAM_PING_INTERVAL_MS,
 } from '@cairn/shared';
@@ -71,11 +70,10 @@ export const serverConfigSchema = z.object({
   tsnet: tsnetSettingsSchema,
   mcpConfigPath: z.string(),
   issueIntake: z.boolean(),
-  intakeAgentAllowlist: z.array(z.string()),
   scheduling: z.boolean(),
   coordinatorServerContext: z.boolean(),
   coordinatorMachineId: z.string().nullable(),
-  routingRules: z.boolean(),
+  coordinatorInServer: z.boolean(),
   trajectoryOutcomeBackfill: z.boolean(),
   trajectoryReflectCurate: z.boolean(),
   trajectoryReflectOpenGuardIssues: z.boolean(),
@@ -97,6 +95,12 @@ function envPort(): number | undefined {
 function envStr(name: string): string | null {
   const raw = process.env[name];
   return raw !== undefined && raw !== '' ? raw : null;
+}
+
+function envFlagDefaultOn(name: string): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return true;
+  return !['0', 'false', 'no', 'off'].includes(raw.toLowerCase());
 }
 
 function envFlag(name: string): boolean {
@@ -205,14 +209,10 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
     issueIntake: envFlag(ENV_VARS.issueIntake),
-    intakeAgentAllowlist: (process.env[ENV_VARS.intakeAgentAllowlist] ?? '')
-      .split(',')
-      .map((name) => name.trim())
-      .filter((name) => name !== ''),
     scheduling: envFlag(ENV_VARS.scheduling),
     coordinatorServerContext: envFlag(ENV_VARS.coordinatorServerContext),
     coordinatorMachineId: envStr(ENV_VARS.coordinatorMachineId),
-    routingRules: routingRulesFlagOn(process.env[ENV_VARS.routingRules]),
+    coordinatorInServer: envFlagDefaultOn(ENV_VARS.coordinatorInServer),
     trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
     trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
     trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),
@@ -302,12 +302,9 @@ export function tokenAuthStartupLines(config: ServerConfig): string[] {
       `container mode (${ENV_VARS.requireToken}=1): the token value and one-time login link are never written to logs (hosted log dashboards are shared) — run \`${BRAND.cliCommandName} token\` on the host machine to see the current token`,
     ];
   }
-  const host = config.host;
-  const display =
-    host === '0.0.0.0' || host === '::' ? 'localhost' : host.includes(':') ? `[${host}]` : host;
   return [
     `token auth enabled — token source: ${source}; manage it with \`${BRAND.cliCommandName} token\` (\`${BRAND.cliCommandName} token --rotate\` writes a new one; restart the server to apply)`,
-    `one-time login link: http://${display}:${config.port}/app#token=${config.authToken}`,
+    `token auth enabled — run \`${BRAND.cliCommandName} token\` on this machine to print a login link`,
   ];
 }
 

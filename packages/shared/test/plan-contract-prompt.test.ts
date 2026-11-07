@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'vitest';
-import { personaByRole } from '../src/records/persona.js';
 import {
   appendPlanLocationNote,
   buildPlanContractRewritePrompt,
@@ -58,10 +57,6 @@ describe('prior art reaches planner prompts (#1838)', () => {
     );
     expect(PLAN_PRIOR_ART_RULE).toContain('Prior art');
     expect(PLAN_PRIOR_ART_RULE).toContain('Kind: fix');
-  });
-
-  test('the planner persona carries the same rule', () => {
-    expect(personaByRole('planner').description).toContain(PLAN_PRIOR_ART_RULE);
   });
 
   test('the previous contract-rewrite wording still classifies as synthetic', () => {

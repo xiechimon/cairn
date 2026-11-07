@@ -2,7 +2,6 @@ import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   autonomousMergeAdmission,
   build,
   gateState,
@@ -21,12 +20,13 @@ import { requestMerge, sweepAbandonedBuildSteps } from '../src/services/builds.j
 import { applyLocalMergeReport, enqueueLocalMerge } from '../src/services/local-merge.js';
 import { localGateFacts } from '../src/services/local-merge-facts.js';
 import { claimStep } from '../src/services/machine-claim.js';
-import { bootServer, req } from './helpers.js';
+import { bootServer, req, seedSessionRoute } from './helpers.js';
 
 const disposals: (() => void)[] = [];
 afterEach(() => {
   for (const dispose of disposals.splice(0)) dispose();
 });
+const LOCAL_TOOLS = ['合并分支', '推送分支'];
 const base = 'b'.repeat(40);
 const head = 'a'.repeat(40);
 
@@ -78,19 +78,7 @@ async function fixture(
       autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: policy, localChecks: ['true'] },
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent',
-      teamId: s.team.id,
-      displayName: 'Local agent',
-      description: '',
-      provider: 'anthropic',
-      modelId: 'claude-x',
-      tools: ['合并分支', '推送分支'],
-      machineId: null,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'anthropic', modelId: 'claude-x', tools: LOCAL_TOOLS });
   s.db
     .insert(todo)
     .values({
@@ -104,7 +92,6 @@ async function fixture(
       seqNum: 1,
       latestBuildId: 'build',
       sourceRef: 'github:xiechimon/cairn#1625',
-      assignment: { plan: null, build: { agentId: 'agent' } },
     })
     .run();
   s.db
@@ -450,10 +437,12 @@ test.each(['pause', 'cap'] as const)(
         enabledRuntimes: ['pi'],
       })
       .run();
-    f.s.db
-      .update(agentTable)
-      .set({ provider: 'stub-gw', modelId: 'stub', machineId: 'worker' })
-      .run();
+    seedSessionRoute(f.s, {
+      provider: 'stub-gw',
+      modelId: 'stub',
+      machineId: 'worker',
+      tools: LOCAL_TOOLS,
+    });
     await enqueueLocalMerge(f.deps, 'build', 'main');
     if (brake === 'pause') f.s.db.update(team).set({ autonomyPaused: true }).run();
     else f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
@@ -502,10 +491,12 @@ for (const brake of ['pause', 'cap'] as const) {
         enabledRuntimes: ['pi'],
       })
       .run();
-    f.s.db
-      .update(agentTable)
-      .set({ provider: 'stub-gw', modelId: 'stub', machineId: 'worker' })
-      .run();
+    seedSessionRoute(f.s, {
+      provider: 'stub-gw',
+      modelId: 'stub',
+      machineId: 'worker',
+      tools: LOCAL_TOOLS,
+    });
     await enqueueLocalMerge(f.deps, 'build', 'main');
     if (brake === 'pause') f.s.db.update(team).set({ autonomyPaused: true }).run();
     else
@@ -525,7 +516,6 @@ for (const brake of ['pause', 'cap'] as const) {
         phaseAt: 0,
         seqNum: 2,
         latestBuildId: 'next',
-        assignment: { plan: null, build: { agentId: 'agent' } },
       })
       .run();
     f.s.db

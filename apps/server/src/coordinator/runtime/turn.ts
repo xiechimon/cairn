@@ -1,17 +1,31 @@
-import type { ClaimedStep, MachineDoneBody, ModelUsage } from '@cairn/shared';
+import {
+  type ClaimedStep,
+  estimateTokens,
+  type MachineDoneBody,
+  type ModelUsage,
+} from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
-import type { AssistantMessage } from '@earendil-works/pi-ai';
+import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai';
 import { AssistantEntry, type EntryRecord, type Harness } from '@earendil-works/pi-durable';
-import { compactionWindow, estimateTokens, type ModelRef } from './compaction.js';
+import { compactionWindow, type ModelRef } from './compaction.js';
+import { activeConversation, type Conversation } from './conversations.js';
+import {
+  reportCompactionFailure,
+  reportLiveCompactionFailure,
+  taskFailure,
+} from './failure-report.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
-import type { StepGate } from './tools.js';
+import type { ConversationGate, StepGate } from './tools.js';
+import { emitTurnSpans } from './turn-spans.js';
+import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
 
 export interface TurnDeps {
   harness: Harness;
+  conversationId?: string | null;
   models: CoordinatorModels;
   api: MachineApi;
   context: Context;
@@ -19,6 +33,9 @@ export interface TurnDeps {
   stopPollMs?: number;
   now: () => number;
   gate?: StepGate;
+  conversationGate?: ConversationGate;
+  volatile?: VolatileContext;
+  volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -47,8 +64,9 @@ export const SWITCH_FOLD_INSTRUCTIONS =
 
 async function foldBeforeModelSwitch(
   deps: TurnDeps,
-  root: Awaited<ReturnType<Harness['root']>>,
+  root: Conversation,
   next: ModelRef,
+  scope: { threadId: string; stepId: string },
 ): Promise<void> {
   const current = (await root.agent(deps.context)).model;
   if (current === undefined) return;
@@ -59,9 +77,14 @@ async function foldBeforeModelSwitch(
   if (estimateTokens(JSON.stringify(view.messages)) < compactionWindow(window).backgroundAt) return;
   try {
     const task = await root.compact(SWITCH_FOLD_INSTRUCTIONS, deps.context);
-    await deps.harness.waitForTask(task, deps.context);
-  } catch {
-    return;
+    const settled = await deps.harness.waitForTask(task, deps.context);
+    const { outcome } = settled.state;
+    if (outcome.status !== 'completed') {
+      const reason = outcome.error?.message ?? outcome.reason ?? outcome.status;
+      reportCompactionFailure(scope, 'model-switch-fold', taskFailure(reason));
+    }
+  } catch (error) {
+    reportCompactionFailure(scope, 'model-switch-fold', error);
   }
 }
 
@@ -91,8 +114,17 @@ export async function runCoordinatorTurn(
   deps.gate?.set(stepId);
   deps.onModel?.({ provider, modelId });
   let stopPoll: ReturnType<typeof setInterval> | undefined;
+  let steerPoll: ReturnType<typeof setInterval> | undefined;
+  let rootKey: string | null = null;
   try {
-    const root = await harness.root(context);
+    const root = await activeConversation(harness, deps.conversationId, context);
+    if (root === undefined) {
+      return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
+    }
+    rootKey = String(root.id);
+    deps.conversationGate?.set(rootKey, stepId);
+    deps.volatile?.set(rootKey, deps.volatileText ?? null);
+    deps.volatile?.setStep(rootKey, stepId);
     let stopping: Promise<void> | null = null;
     let polling = false;
     stopPoll = setInterval(() => {
@@ -108,16 +140,54 @@ export async function runCoordinatorTurn(
           polling = false;
         });
     }, deps.stopPollMs ?? STOP_POLL_MS);
-    await foldBeforeModelSwitch(deps, root, { provider, modelId });
+    let inFlight = false;
+    let steering = false;
+    steerPoll = setInterval(() => {
+      if (!inFlight || steering || stopping !== null || api.steer === undefined) return;
+      steering = true;
+      void api
+        .steer(stepId)
+        .then(async (steer) => {
+          if (steer === null) return;
+          await root.submit(
+            {
+              type: 'input',
+              content: steer.content,
+              whenBusy: 'steer',
+              whenIdle: 'reject',
+              requestId: `steer-${stepId}-${steer.key}`,
+            },
+            context,
+          );
+          await api.ackSteer?.(stepId);
+        })
+        .catch(() => {})
+        .finally(() => {
+          steering = false;
+        });
+    }, deps.stopPollMs ?? STOP_POLL_MS);
+    await foldBeforeModelSwitch(
+      deps,
+      root,
+      { provider, modelId },
+      { threadId: claimed.chief.threadId, stepId },
+    );
     await root.configure(
-      { model: { provider, modelId }, instructions: claimed.chief.systemPrompt },
+      {
+        model: { provider, modelId },
+        instructions: claimed.chief.systemPrompt,
+        thinkingLevel: (claimed.agent?.thinkingLevel ?? null) as ModelThinkingLevel | null,
+      },
       context,
     );
     const newest = (await root.entries({}, 1, undefined, context)).items[0]?.id;
+    const threadId = claimed.chief.threadId;
     const mirror = createTurnMirror(api, stepId, newest);
     const watch = await root.watch(context);
     watch.start(async (call) => {
-      if (call.kind === 'value') await mirror.onView(call.value);
+      if (call.kind !== 'value') return;
+      reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
+      await mirror.onView(call.value);
     });
     if (stopping !== null) {
       await stopping;
@@ -127,13 +197,22 @@ export async function runCoordinatorTurn(
       { type: 'input', content: claimed.instruction ?? '', requestId: stepId },
       context,
     );
+    inFlight = true;
     const settled = await submission.wait(context);
+    inFlight = false;
+    clearInterval(steerPoll);
+    if (settled.entry !== undefined) await api.mapUserEntry?.(stepId, String(settled.entry));
     await watch.stop();
     const turnEntries =
       settled.entry === undefined
         ? []
         : (await root.entries({ minEntryId: settled.entry }, 500, undefined, context)).items;
     await mirror.flush(turnEntries);
+    emitTurnSpans(
+      { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
+      turnEntries,
+      deps.now,
+    );
     clearInterval(stopPoll);
     if (stopping !== null) {
       await stopping;
@@ -164,7 +243,13 @@ export async function runCoordinatorTurn(
     return finished;
   } finally {
     clearInterval(stopPoll);
+    clearInterval(steerPoll);
     deps.gate?.set(null);
+    if (rootKey !== null) {
+      deps.conversationGate?.set(rootKey, null);
+      deps.volatile?.set(rootKey, null);
+      deps.volatile?.setStep(rootKey, null);
+    }
     clearInterval(heartbeat);
   }
 }

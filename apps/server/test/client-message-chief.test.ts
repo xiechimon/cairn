@@ -9,7 +9,7 @@ import {
   step,
   todo,
 } from '../src/db/schema.js';
-import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
 registerChiefHarness();
@@ -143,7 +143,6 @@ describe('POST /api/todos/:id/messages with a client message id', () => {
         phaseAt: 1,
         seqNum: todoId === 'todo-a' ? 7 : 8,
         latestBuildId: buildId,
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
       })
       .run();
     H.s.db

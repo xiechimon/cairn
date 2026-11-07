@@ -205,17 +205,13 @@ try {
   if (!token || !machineId) {
     throw new Error(`enroll failed: ${enroll.status} ${JSON.stringify(enrolled).slice(0, 300)}`);
   }
-  const agentRes = await j(`/api/teams/${TEAM}/agents`, {
-    displayName: '物化验证 Agent',
-    provider: 'p',
-    modelId: 'm',
-    machineId,
-    skillsAllowlist: ['my-live-skill'],
-  });
-  const agentRec = await agentRes.json();
-  const agentId = agentRec.id ?? agentRec.agent?.id;
-  if (!agentId) {
-    throw new Error(`agent create failed: ${agentRes.status} ${JSON.stringify(agentRec).slice(0, 300)}`);
+  const routeRes = await j(`/api/teams/${TEAM}/routing-rules/session`, { provider: 'p', modelId: 'm', machineId }, 'PATCH');
+  if (!routeRes.ok) {
+    throw new Error(`routing rule failed: ${routeRes.status} ${(await routeRes.text()).slice(0, 300)}`);
+  }
+  const policyRes = await j(`/api/teams/${TEAM}/work-policies/session`, { skillsAllowlist: ['my-live-skill'] }, 'PATCH');
+  if (!policyRes.ok) {
+    throw new Error(`work policy failed: ${policyRes.status} ${(await policyRes.text()).slice(0, 300)}`);
   }
   const project = await (await j('/api/projects', { name: 'import-probe' })).json();
   const todo = await (
@@ -223,7 +219,6 @@ try {
   ).json();
   await j(`/api/projects/${project.id}/builds`, {
     todoIds: [todo.id],
-    assignment: { plan: null, build: { agentId } },
     withPlan: false,
   });
   const claim = await j('/api/machine/tasks/claim', {}, 'POST', token);

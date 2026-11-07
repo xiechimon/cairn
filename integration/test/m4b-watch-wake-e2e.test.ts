@@ -15,7 +15,6 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -89,17 +88,9 @@ async function waitThreadIdle(): Promise<void> {
 
 beforeAll(async () => {
   script = [
-    {
-      toolCall: {
-        name: 'run_builds',
-        arguments: {
-          todoIds: ['__TODO1__'],
-          withPlan: false,
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        },
-      },
-    },
-    { content: '已派工给执行 Agent。停在关口或落定后我会回来汇报。' },
+    { toolCall: { name: 'watch_todos', arguments: { todoIds: ['__FIRST__'] } } },
+    { toolCall: { name: 'open_thread', arguments: { todoId: '__FIRST__' } } },
+    { content: '已开 thread 并关注。停在关口或落定后我会回来汇报。' },
     {
       toolCall: {
         name: 'bash',
@@ -113,17 +104,9 @@ beforeAll(async () => {
     { content: '合并只由人触发，我不能代合。请在 web 界面 review 关口点「完成」触发合并。' },
     { content: '合并执行完成。' },
     { content: '「探针任务」已合并完成，状态为 done。README.md 已落地到项目根目录。' },
-    {
-      toolCall: {
-        name: 'run_builds',
-        arguments: {
-          todoIds: ['__TODO2__'],
-          withPlan: false,
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        },
-      },
-    },
-    { content: '已派工第二个任务。' },
+    { toolCall: { name: 'watch_todos', arguments: { todoIds: ['__SECOND__'] } } },
+    { toolCall: { name: 'open_thread', arguments: { todoId: '__SECOND__' } } },
+    { content: '已开第二个 thread。' },
     { status: 400 },
     { toolCall: { name: 'machines', arguments: {} } },
     {
@@ -177,22 +160,23 @@ beforeAll(async () => {
     spec: '本任务用于失败触发观测。',
   });
   todo2Id = (t2.body as { id: string }).id;
-  const dispatch = (todoId: string): StubResponse => ({
-    toolCall: {
-      name: 'run_builds',
-      arguments: {
-        todoIds: [todoId],
-        withPlan: false,
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      },
-    },
+  const watch = (todoId: string): StubResponse => ({
+    toolCall: { name: 'watch_todos', arguments: { todoIds: [todoId] } },
   });
-  script[0] = dispatch(world.todoId);
-  script[8] = dispatch(todo2Id);
+  const open = (todoId: string): StubResponse => ({
+    toolCall: { name: 'open_thread', arguments: { todoId } },
+  });
+  script[0] = watch(world.todoId);
+  script[1] = open(world.todoId);
+  script[9] = watch(todo2Id);
+  script[10] = open(todo2Id);
 
-  const patch = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
-    agent: { agentId: AGENT_ID, thinkingLevel: null },
-  });
+  const patch = await api(
+    server.url,
+    'PATCH',
+    `/api/teams/${server.teamId}/routing-rules/coordinator`,
+    { provider: 'stub-gw', modelId: 'stub-model' },
+  );
   expect(patch.status).toBe(200);
 }, 150_000);
 

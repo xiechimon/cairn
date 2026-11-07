@@ -8,7 +8,7 @@ import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { MODEL_ROUTING_HREF } from '../resources/hrefs.js';
+import { PROVIDERS_HREF } from '../resources/hrefs.js';
 import { MACHINES_HREF } from '../resources/machines-page.js';
 
 export interface ClaudeLoginWarning {
@@ -67,7 +67,7 @@ export function loginBannerLinks(
   if (warnings.some((warning) => warning.source === 'machine'))
     links.push({ id: 'machines', href: MACHINES_HREF });
   if (warnings.some((warning) => warning.source === 'subscription'))
-    links.push({ id: 'subscriptions', href: MODEL_ROUTING_HREF });
+    links.push({ id: 'subscriptions', href: PROVIDERS_HREF });
   return links;
 }
 
@@ -112,25 +112,17 @@ export function ClaudeLoginBanner({ warnings }: { warnings: readonly ClaudeLogin
       className="mt-4"
       title={title}
       body={<span data-testid="claude-login-summary">{body}</span>}
-      actions={
-        <>
-          {links.map((link) => (
-            <Button
-              key={link.id}
-              variant="outline"
-              size="sm"
-              className="px-3"
-              render={<Link to={link.href} />}
-            >
-              {links.length === 1
-                ? t('查看')
-                : link.id === 'machines'
-                  ? t('查看机器')
-                  : t('查看订阅')}
-            </Button>
-          ))}
-        </>
-      }
+      actions={links.map((link) => (
+        <Button
+          key={link.id}
+          variant="outline"
+          size="sm"
+          className="px-3"
+          render={<Link to={link.href} />}
+        >
+          {links.length === 1 ? t('查看') : link.id === 'machines' ? t('查看机器') : t('查看订阅')}
+        </Button>
+      ))}
     />
   );
 }

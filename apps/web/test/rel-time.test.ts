@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUsableTimestamp, relativeTime } from '../src/board/rel-time.js';
+import { isUsableTimestamp, joinMeta, relativeTime } from '../src/board/rel-time.js';
 import { EN } from '../src/i18n/en.js';
 import { translate, type TVars } from '../src/i18n/translate.js';
 
@@ -57,5 +57,19 @@ describe('isUsableTimestamp', () => {
 
   it('accepts a past timestamp', () => {
     expect(isUsableTimestamp(NOW - HOUR, NOW)).toBe(true);
+  });
+});
+
+describe('relativeTime without a usable start', () => {
+  it('returns nothing for null, undefined, 0 and non-finite times', () => {
+    for (const ts of [null, undefined, 0, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(relativeTime(ts, NOW)).toBe('');
+    }
+  });
+
+  it('joinMeta drops empty parts so no separator dangles', () => {
+    expect(joinMeta(['#9', relativeTime(0, NOW)])).toBe('#9');
+    expect(joinMeta(['#9', '2 小时前'])).toBe('#9 · 2 小时前');
+    expect(joinMeta([null, ''])).toBe('');
   });
 });

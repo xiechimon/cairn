@@ -155,7 +155,6 @@ async function mockLive(page: Page, state: State) {
         outage: state.outage,
       });
     if (p === '/api/conversations/chief-home/messages') return json({ messages: state.messages });
-    if (p === '/api/teams/t1/agents/agent-1') return json(AGENT);
     if (p === '/api/todos') return json([TASK]);
     if (p === '/api/projects') return json([PROJECT]);
     if (p === '/api/teams/t1/machines') return json([{ id: 'm-ready', name: 'omarchy', online: true }]);
