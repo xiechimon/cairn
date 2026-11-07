@@ -352,6 +352,31 @@ describe('a routed model only runs on a machine that can host it', () => {
   });
 });
 
+describe('claim validation and recording follow the router rules', () => {
+  test('a machine over the weekly cutoff cannot take a routed Claude step', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.8 });
+    const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
+    expect(
+      routedModelRunsOn(w.s.db, row, { provider: 'claude-code', modelId: 'claude-sonnet-5-5' }),
+    ).toBe(false);
+  });
+
+  test('a provider the router does not handle is recorded without a harness', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'rename one label');
+    const stepRow = w.s.db.select().from(step).all().at(0)!;
+    const row = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+      provider: 'gemini',
+      modelId: 'gemini-pro',
+      machineId: null,
+      requiredCapabilities: null,
+    });
+    expect(row.harness).toBeNull();
+  });
+});
+
 describe('the router leaves the execution constraints of the rule alone', () => {
   test('the chosen worker does not become the machine pin of an unpinned rule', async () => {
     const w = await setupWorld();
