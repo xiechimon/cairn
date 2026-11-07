@@ -10,7 +10,7 @@ Brand boundary: copy layout, spacing, type scale, color logic and interaction fe
 - Viewport: 1840x884 CSS px (the Chrome window is tiled by Hyprland at 2024 logical px with 110% zoom, so 1440 could not be set). Fixed sizes do not depend on the viewport; layout widths below are the product's max widths.
 - Dark is claude.ai's `System` theme on this machine. Light was set in claude.ai Settings for the light pass and set back to `System` afterwards.
 - One test chat was created for measurement (`Binary search explanation`). The account replies in Chinese, so the transcript text is CJK; the computed type values are the same for Latin text (`lang` is `en-US`).
-- Screenshots and GIFs are in [`claude-ai-spec/`](claude-ai-spec/). The chat history list and the account footer are painted over with the sidebar color; a browser-extension bubble at the right edge is painted over with the page color. Screenshot pixels are 0.852 of CSS px.
+- The phase 1 screenshots and GIFs were removed on 2026-11-07 because they showed private sidebar content. Evidence returns as redacted recordings that pass `scripts/design-capture` redaction and the capture audit; until then the values below cite the measurement, not an image.
 
 Not measured in this pass (second pass needed): the 375px layout (Hyprland ignores window resize for this tab and the in-app browser pane is not signed in to claude.ai; use the 454px shots in `docs/design/references/coordinator-chat/` until then), an artifact panel with content, tool-use blocks (web search, file tools), the `Search` palette, a project detail page, toasts, and tooltip delay.
 
@@ -18,18 +18,18 @@ Not measured in this pass (second pass needed): the 375px layout (Hyprland ignor
 
 | Cairn surface (code) | Claude.ai counterpart | Evidence |
 |---|---|---|
-| App shell and sidebar (`board/sidebar.tsx`, `board/app-sidebar.tsx`, `board/sidebar-thread-groups.tsx`) | Left sidebar: nav rows, `Pinned` and `Ungrouped` sections, account footer | `dark-new-chat-empty-1440.jpg`, `dark-sidebar-hover-and-collapse.gif` |
-| Coordinator home, empty (`board/home-c.tsx`, `chief/chief-root.tsx`) | New chat: greeting, one composer, model line, `Recent artifacts` strip | `dark-new-chat-empty-1440.jpg`, `dark-new-chat-tooltip-recent-artifacts.jpg` |
-| Coordinator conversation (`chief/chief-conversation.tsx`, `chief/chief-message-rows.tsx`) | Chat transcript: user bubble, reply prose, code block, table, action row | `dark-chat-reply-done-jump-to-latest.jpg`, `dark-chat-table-list-actions.jpg`, `dark-chat-code-block-hover-copy.jpg` |
-| Composer (`chief/composer-surface.tsx`, `chief/answer-composer.tsx`) | Composer card with `+`, voice, model and effort under it | `dark-new-chat-empty-1440.jpg`, `dark-model-menu-open.jpg` |
-| Jump to latest (`chief/chief-conversation.tsx`) | `Scroll to bottom` round button above the composer | `dark-send-stream-jump-to-latest.gif` |
-| Thread side panel (`board/side-chat.tsx`, `board/work-panel.tsx`, `chief/chief-drawer.tsx`) | Chat side panel (`aside`, 320px, files and tools) | `dark-chat-side-panel-open.jpg`, `dark-side-panel-open-close.gif` |
-| Settings pages (`settings/`, `routes/account-page.tsx`, `routes/api-keys-page.tsx`, `routes/team-page.tsx`, `routes/remote-access-page.tsx`, `pages/project-settings-page.tsx`) | Settings dialog: left nav, rows with label left and control right | `dark-settings-general.jpg`, `light-settings-general.jpg`, `dark-settings-loading-skeleton.jpg` |
-| Project list and project home (`pages/project-page.tsx`, `board/project-home.tsx`) | `Projects` page: serif title, `New project`, two-column cards | `dark-projects-list.jpg` |
-| Menus (`board/sidebar-project-menu.tsx`, `board/thread-actions.tsx`, `chief/project-menu.tsx`, model pickers) | Model menu, row `More options` menu | `dark-model-menu-open.jpg`, `dark-model-menu-open-close.gif` |
-| Dialogs (`DialogShell`, `chief/edit-charter-dialog.tsx`, `board/reset-confirm-dialog.tsx`) | Settings dialog chrome | `dark-settings-general.jpg` |
-| Hover card on a sidebar row | Row hover card (title and age) | `light-chat-hover-card.jpg` |
-| Tooltips (rule C4) | Composer `+` tooltip with shortcut | `dark-new-chat-tooltip-recent-artifacts.jpg` |
+| App shell and sidebar (`board/sidebar.tsx`, `board/app-sidebar.tsx`, `board/sidebar-thread-groups.tsx`) | Left sidebar: nav rows, `Pinned` and `Ungrouped` sections, account footer | removed, re-capture pending |
+| Coordinator home, empty (`board/home-c.tsx`, `chief/chief-root.tsx`) | New chat: greeting, one composer, model line, `Recent artifacts` strip | removed, re-capture pending |
+| Coordinator conversation (`chief/chief-conversation.tsx`, `chief/chief-message-rows.tsx`) | Chat transcript: user bubble, reply prose, code block, table, action row | removed, re-capture pending |
+| Composer (`chief/composer-surface.tsx`, `chief/answer-composer.tsx`) | Composer card with `+`, voice, model and effort under it | removed, re-capture pending |
+| Jump to latest (`chief/chief-conversation.tsx`) | `Scroll to bottom` round button above the composer | removed, re-capture pending |
+| Thread side panel (`board/side-chat.tsx`, `board/work-panel.tsx`, `chief/chief-drawer.tsx`) | Chat side panel (`aside`, 320px, files and tools) | removed, re-capture pending |
+| Settings pages (`settings/`, `routes/account-page.tsx`, `routes/api-keys-page.tsx`, `routes/team-page.tsx`, `routes/remote-access-page.tsx`, `pages/project-settings-page.tsx`) | Settings dialog: left nav, rows with label left and control right | removed, re-capture pending |
+| Project list and project home (`pages/project-page.tsx`, `board/project-home.tsx`) | `Projects` page: serif title, `New project`, two-column cards | removed, re-capture pending |
+| Menus (`board/sidebar-project-menu.tsx`, `board/thread-actions.tsx`, `chief/project-menu.tsx`, model pickers) | Model menu, row `More options` menu | removed, re-capture pending |
+| Dialogs (`DialogShell`, `chief/edit-charter-dialog.tsx`, `board/reset-confirm-dialog.tsx`) | Settings dialog chrome | removed, re-capture pending |
+| Hover card on a sidebar row | Row hover card (title and age) | removed, re-capture pending |
+| Tooltips (rule C4) | Composer `+` tooltip with shortcut | removed, re-capture pending |
 | Schedules (`pages/schedules-page.tsx`) | `Scheduled` page (not opened in this pass) | none yet |
 | Search (`search/`) | `Search` palette, Ctrl+K (not opened in this pass) | none yet |
 | No counterpart: needs-you tray and question card (`board/needs-you-tray.tsx`, `chief/chief-question-card.tsx`), board and activity (`routes/board-page.tsx`, `routes/activity-page.tsx`), machines and computer feed (`board/machines-panel.tsx`, `board/computer-feed.tsx`), diff and review | Apply the component rules below (card, row, menu, panel); keep the t3code and Amp references in `docs/design/references/` for structure | none |
@@ -42,7 +42,7 @@ Measured on the dark new-chat page: 5 distinct text colors (3 white alphas, 1 gr
 
 | Role | Dark | Light | Where measured |
 |---|---|---|---|
-| Page | `#191919` | `#ffffff` | `main` background; `dark-chat-reply-done-jump-to-latest.jpg`, `light-chat-hover-card.jpg` |
+| Page | `#191919` | `#ffffff` | `main` background; removed, re-capture pending |
 | Sidebar | `#1f1f1f` | `#fafafa` | `aside` 288px |
 | Raised: composer, menu, popover, hover card | `#303030` | `#ffffff` | composer box, `[role=menu]`, hover card |
 | Dialog | `#1f1f1f` | `#ffffff` | settings `[role=dialog]` |
@@ -145,19 +145,19 @@ claude.ai draws icons with an icon font in a 20px box (sidebar nav, composer) an
 
 | Behavior | Measured value | Evidence |
 |---|---|---|
-| Row hover (sidebar, menu item, settings nav) | Background fill appears instantly: the row's `transition` is `all 0s`. Fill covers the whole row at its radius, never a partial band. | `dark-sidebar-hover-and-collapse.gif` |
+| Row hover (sidebar, menu item, settings nav) | Background fill appears instantly: the row's `transition` is `all 0s`. Fill covers the whole row at its radius, never a partial band. | removed, re-capture pending |
 | Icon button hover | Inner fill white 7.5% appears instantly; only `box-shadow` and `color` transition, in 60ms with `cubic-bezier(.165,.84,.44,1)` | composer `+` |
 | Press | Inner element scales to 0.975 (`--cds-btn-press-sx`); release springs back over 450ms with a slight overshoot (`linear()` spring peaking at 1.09) | composer buttons |
-| Hover reveals | Row `More options` button and message timestamp appear on hover and take no layout | `light-chat-hover-card.jpg` |
-| Menu open and close | No animation: the menu is at full opacity and final position on the first sampled frame (under 10ms) and is removed on close | `dark-model-menu-open-close.gif` |
+| Hover reveals | Row `More options` button and message timestamp appear on hover and take no layout | removed, re-capture pending |
+| Menu open and close | No animation: the menu is at full opacity and final position on the first sampled frame (under 10ms) and is removed on close | removed, re-capture pending |
 | Dialog open | Opacity 0 to 1 and scale 0.98 to 1 over 200ms, `cubic-bezier(.165,.84,.44,1)`; backdrop black 50% (dark), 40% (light) | settings dialog |
-| Section collapse | Rows are removed at once; only the chevron rotates, in 60ms | `dark-sidebar-hover-and-collapse.gif` |
-| Side panel | Opens with no slide and no scrim; it pushes the transcript left instead of covering it | `dark-side-panel-open-close.gif` |
-| After send | The user message moves to the top of the transcript and the reply streams below it; streaming text fades in at the tail | `dark-chat-streaming-first-tokens.jpg` |
-| Long reply | The view does not follow the stream; a `Scroll to bottom` button appears above the composer | `dark-chat-reply-done-jump-to-latest.jpg` |
-| Jump to latest | One scroll event straight to the bottom (no smooth scroll); the button then fades out over 200ms | `dark-send-stream-jump-to-latest.gif` |
-| Loading | Settings content shows skeleton blocks in the final row shapes; the nav is usable at once | `dark-settings-loading-skeleton.jpg` |
-| Tooltip | Label plus shortcut in a small dark chip under the control | `dark-new-chat-tooltip-recent-artifacts.jpg` |
+| Section collapse | Rows are removed at once; only the chevron rotates, in 60ms | removed, re-capture pending |
+| Side panel | Opens with no slide and no scrim; it pushes the transcript left instead of covering it | removed, re-capture pending |
+| After send | The user message moves to the top of the transcript and the reply streams below it; streaming text fades in at the tail | removed, re-capture pending |
+| Long reply | The view does not follow the stream; a `Scroll to bottom` button appears above the composer | removed, re-capture pending |
+| Jump to latest | One scroll event straight to the bottom (no smooth scroll); the button then fades out over 200ms | removed, re-capture pending |
+| Loading | Settings content shows skeleton blocks in the final row shapes; the nav is usable at once | removed, re-capture pending |
+| Tooltip | Label plus shortcut in a small dark chip under the control | removed, re-capture pending |
 
 ## 8. Component rules for Cairn
 
@@ -175,25 +175,3 @@ These are the rules phase 2 makes checkable.
 10. Settings are rows (label left, control right, faint hairline between), grouped under a 15px section title, never one card per setting.
 11. Scrolling: no auto-follow of a stream; jump to latest is instant.
 
-## 9. Files
-
-| File | What it shows |
-|---|---|
-| `claude-ai-spec/dark-new-chat-empty-1440.jpg` | New chat, sidebar, greeting, composer |
-| `claude-ai-spec/dark-new-chat-tooltip-recent-artifacts.jpg` | Composer tooltip, model line, recent artifacts strip |
-| `claude-ai-spec/dark-chat-streaming-first-tokens.jpg` | User message at the top, reply starting below it |
-| `claude-ai-spec/dark-chat-reply-done-jump-to-latest.jpg` | Inline code, list, code block, jump button |
-| `claude-ai-spec/dark-chat-code-block-hover-copy.jpg` | Code block with the copy button on hover |
-| `claude-ai-spec/dark-chat-code-block-cjk.jpg` | Code block with language label, action row |
-| `claude-ai-spec/dark-chat-table-list-actions.jpg` | Table, list, message action row |
-| `claude-ai-spec/dark-model-menu-open.jpg` | Model menu |
-| `claude-ai-spec/dark-chat-side-panel-open.jpg` | Side panel open, transcript pushed left |
-| `claude-ai-spec/dark-settings-general.jpg` | Settings dialog, dark |
-| `claude-ai-spec/light-settings-general.jpg` | Settings dialog, light |
-| `claude-ai-spec/dark-settings-loading-skeleton.jpg` | Settings loading skeleton |
-| `claude-ai-spec/dark-projects-list.jpg` | Projects page |
-| `claude-ai-spec/light-chat-hover-card.jpg` | Light chat page, row hover fill and hover card |
-| `claude-ai-spec/dark-send-stream-jump-to-latest.gif` | Send, stream, scroll up, jump to latest |
-| `claude-ai-spec/dark-model-menu-open-close.gif` | Menu open and close |
-| `claude-ai-spec/dark-sidebar-hover-and-collapse.gif` | Row hover across rows, section collapse and expand |
-| `claude-ai-spec/dark-side-panel-open-close.gif` | Side panel open and close |
