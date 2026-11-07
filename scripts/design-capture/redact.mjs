@@ -16,20 +16,22 @@ if (!runDir) {
   process.exit(2);
 }
 
-const keyShape = /^([a-z][a-z0-9-]*)((?:\[[^\]]*\])*)("(?:[^"\\]|\\.)*")?(#\d+)?$/i;
 const safeToken = /^[a-z][a-z0-9-]*$/i;
 const stateWords =
   /^(true|false|open|closed|checked|unchecked|on|off|active|inactive|horizontal|vertical|delayed-open|instant-open|hidden|visible|\d+)$/i;
 
 const scrubKey = (k) => {
   if (typeof k !== 'string') return k;
-  const m = k.match(keyShape);
-  if (!m) return '~';
-  const kept = [...m[2].matchAll(/\[(role|tid)=([^\]]*)\]/g)]
+  const tag = k.match(/^[a-z][a-z0-9-]*/i)?.[0];
+  if (!tag) return '~';
+  const id = k.match(/#\d+$/)?.[0] ?? '';
+  const quote = k.indexOf('"', tag.length);
+  const head = k.slice(tag.length, quote === -1 ? k.length - id.length : quote);
+  const kept = [...head.matchAll(/\[(role|tid)=([^\]]*)\]/g)]
     .filter(([, , v]) => safeToken.test(v))
     .map(([x]) => x)
     .join('');
-  return `${m[1]}${kept}${m[3] ? '"~"' : ''}${m[4] ?? ''}`;
+  return `${tag}${kept}${quote === -1 ? '' : '"~"'}${id}`;
 };
 
 const scrubUrl = (u) =>
