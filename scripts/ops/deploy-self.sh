@@ -280,11 +280,18 @@ allow_builds_block() {
     awk '/^allowBuilds:/{inside=1; print; next} inside && /^[^[:space:]#]/{inside=0} inside{print}'
 }
 
+hook_lines() {
+  { git -C "$CHECKOUT" show "$1:$2" 2>/dev/null || true; } |
+    { grep -E '"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
+    sed -E 's/^[[:space:]]*//; s/,[[:space:]]*$//'
+}
+
 install_hooks_changed() {
-  git -C "$CHECKOUT" diff "$PREVIOUS" "$TARGET" -- '*package.json' |
-    { grep -E '^[+-][^+-].*"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
-    sed -E 's/^[+-][[:space:]]*//; s/,[[:space:]]*$//' |
-    sort | uniq -u
+  local manifest
+  while IFS= read -r manifest; do
+    [ "$(hook_lines "$PREVIOUS" "$manifest")" = "$(hook_lines "$TARGET" "$manifest")" ] ||
+      echo "$manifest"
+  done < <(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- '*package.json')
   git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
 }
 
