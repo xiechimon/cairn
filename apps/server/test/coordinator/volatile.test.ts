@@ -10,6 +10,7 @@ import { createConversationGate } from '../../src/coordinator/runtime/tools.js';
 import { runCoordinatorTurn } from '../../src/coordinator/runtime/turn.js';
 import {
   createVolatileContext,
+  shortenEarlierEvents,
   volatileContextExtension,
   withVolatileSection,
 } from '../../src/coordinator/runtime/volatile.js';
@@ -94,5 +95,97 @@ describe('volatile turn context', () => {
       'S',
     );
     expect(JSON.stringify(blocks)).toContain('"text":"\\n\\nS"');
+  });
+});
+
+describe('earlier events reach the model in short form', () => {
+  const t = { timestamp: 1 };
+  const big = (id: string) =>
+    `[wake:settle] provenance=watch:t1\n${'report line '.repeat(3_000)}\n\n[history id: ${id}]`;
+
+  it('shortens events before the latest user message and keeps the latest whole', () => {
+    const out = shortenEarlierEvents([
+      { role: 'user', content: big('s1'), ...t },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'ok' }],
+        api: 'x',
+        provider: 'p',
+        model: 'm',
+        usage: {} as never,
+        stopReason: 'stop',
+        ...t,
+      },
+      { role: 'user', content: big('s2'), ...t },
+    ]);
+    const first = out[0]?.role === 'user' ? String(out[0].content) : '';
+    const last = out[2]?.role === 'user' ? String(out[2].content) : '';
+    expect(first.length).toBeLessThan(600);
+    expect(first).toContain('read_history ids ["s1"]');
+    expect(last.length).toBeGreaterThan(30_000);
+  });
+
+  it('keeps the event of the running step whole even after a steered message follows it', () => {
+    const out = shortenEarlierEvents(
+      [
+        { role: 'user', content: big('user-s2'), ...t },
+        { role: 'user', content: 'also check the other repo', ...t },
+      ],
+      's2',
+    );
+    expect(out[0]?.role === 'user' && String(out[0].content).length).toBeGreaterThan(30_000);
+  });
+
+  it('leaves ordinary user messages untouched however long they are', () => {
+    const long = 'z'.repeat(20_000);
+    const out = shortenEarlierEvents([
+      { role: 'user', content: long, ...t },
+      { role: 'user', content: 'next', ...t },
+    ]);
+    expect(out[0]?.role === 'user' && out[0].content).toBe(long);
+  });
+
+  it('shortens block-form events and never touches the stored entry', async () => {
+    const dir = makeTestTempDir('coord-events-');
+    dirs.push(dir);
+    const requests: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    faux.setResponses(
+      Array(4).fill((c: { messages: unknown[] }) => {
+        requests.push(JSON.stringify(c.messages));
+        return fauxAssistantMessage('ok');
+      }),
+    );
+    const models = createCoordinatorModels([faux.provider]);
+    const volatile = createVolatileContext();
+    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
+      extensions: [volatileContextExtension(volatile)],
+    });
+    const deps = {
+      harness,
+      models,
+      api: fakeMachineApi(),
+      context: ctx,
+      heartbeatMs: 1000,
+      now: () => 1,
+      conversationGate: createConversationGate(),
+      volatile,
+    };
+    const fullEvent = `[wake:settle] provenance=watch:t1\n${'EVENT-BODY '.repeat(2_000)}TAIL-MARK`;
+    await runCoordinatorTurn(deps, chiefStep('ev-1', fullEvent));
+    await runCoordinatorTurn(deps, chiefStep('s2', 'what happened?'));
+    expect(requests[0]).toContain('TAIL-MARK');
+    expect(requests[1]).not.toContain('TAIL-MARK');
+    expect(requests[1]).toContain('[event settle]');
+    const stored = (await (await harness.root(ctx)).entries({}, 50, undefined, ctx)).items
+      .filter((entry) => UserEntry.is(entry))
+      .map((entry) => JSON.stringify(entry.model))
+      .join('');
+    expect(stored).toContain('TAIL-MARK');
+    await harness.close(ctx);
   });
 });

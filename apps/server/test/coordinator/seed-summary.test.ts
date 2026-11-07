@@ -215,4 +215,31 @@ describe('seed summary built on demand', () => {
     );
     expect(prompts.join('')).not.toMatch(/digest-secret|report-secret|system-secret/);
   });
+
+  test('a thread report in the gap reaches the summarizer as a short form with a pointer', async () => {
+    H.s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'ev-1',
+        threadId: H.threadId,
+        role: 'user',
+        content: `[wake:settle] provenance=watch:t1\n${'report line '.repeat(5_000)}REPORT-TAIL`,
+        createdAt: BASE,
+      })
+      .run();
+    const prompts: string[] = [];
+    await seedSummary(
+      H.s.db,
+      H.threadId,
+      { at: BASE + 10, rowid: 100 },
+      async (p) => {
+        prompts.push(p);
+        return 'ok';
+      },
+      noError,
+      1,
+    );
+    expect(prompts[0]).toContain('read_history ids ["ev-1"]');
+    expect(prompts[0]).not.toContain('REPORT-TAIL');
+  });
 });

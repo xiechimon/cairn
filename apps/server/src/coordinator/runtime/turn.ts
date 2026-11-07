@@ -108,6 +108,7 @@ export async function runCoordinatorTurn(
     rootKey = String(root.id);
     deps.conversationGate?.set(rootKey, stepId);
     deps.volatile?.set(rootKey, deps.volatileText ?? null);
+    deps.volatile?.setStep(rootKey, stepId);
     let stopping: Promise<void> | null = null;
     let polling = false;
     stopPoll = setInterval(() => {
@@ -223,6 +224,7 @@ export async function runCoordinatorTurn(
     if (rootKey !== null) {
       deps.conversationGate?.set(rootKey, null);
       deps.volatile?.set(rootKey, null);
+      deps.volatile?.setStep(rootKey, null);
     }
     clearInterval(heartbeat);
   }
