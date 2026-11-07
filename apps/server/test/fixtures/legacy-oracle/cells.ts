@@ -16,6 +16,7 @@ export const FACTORS = {
   existing: ['none', 'rule-and-policy', 'rule-only'],
   ruleMachine: ['null', 'pinned'],
   model: ['same-as-session', 'same-vendor', 'other-vendor'],
+  secondReviewer: ['none', 'independent-custom'],
 } as const;
 
 export type FactorName = keyof typeof FACTORS;
@@ -115,6 +116,7 @@ const BASE: Cell = {
   existing: 'none',
   ruleMachine: 'null',
   model: 'other-vendor',
+  secondReviewer: 'none',
 };
 
 export const NAMED_CELLS: Record<string, Cell> = {
@@ -163,6 +165,41 @@ export const NAMED_CELLS: Record<string, Cell> = {
     skills: 'some',
     defaultSkill: 'some',
   },
+  'assigned independent custom reviewer beside a same-vendor reviewer persona': {
+    ...BASE,
+    role: 'review',
+    kind: 'persona',
+    assigned: 'yes',
+    model: 'same-vendor',
+    secondReviewer: 'independent-custom',
+  },
+  'assigned custom reviewer with permissions and no default review policy': {
+    ...BASE,
+    role: 'review',
+    kind: 'custom',
+    assigned: 'yes',
+    model: 'other-vendor',
+    tools: 'all',
+    secrets: 'some',
+    mcp: 'some',
+    skills: 'some',
+    defaultSkill: 'some',
+  },
+  'existing coordinator rule with null capabilities and a different id': {
+    ...BASE,
+    role: 'coordinator',
+    existing: 'rule-only',
+    caps: 'mcp+models',
+    machine: 'orb-capability',
+    mcp: 'some',
+  },
+  'existing coordinator rule pinned to a machine': {
+    ...BASE,
+    role: 'coordinator',
+    existing: 'rule-only',
+    machine: 'native',
+    ruleMachine: 'pinned',
+  },
   'citation checker assigned on another vendor': {
     ...BASE,
     role: 'citation',
@@ -174,6 +211,12 @@ export const NAMED_CELLS: Record<string, Cell> = {
     role: 'citation',
     assigned: 'no',
     model: 'other-vendor',
+  },
+  'citation checker assigned on the same vendor': {
+    ...BASE,
+    role: 'citation',
+    assigned: 'yes',
+    model: 'same-vendor',
   },
   'citation checker unassigned on the same vendor': {
     ...BASE,
