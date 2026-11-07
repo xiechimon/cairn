@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import {
   buildReviewFindingsPrompt,
   buildWorkBranchNote,
+  CAIRN_REVIEW_HOLD_LABEL,
   isReviewBotAuthor,
   reviewFindingBadge,
   stripWorkBranchNote,
@@ -12,7 +13,7 @@ import { build, message, project, step, threadPr, todo } from '../src/db/schema.
 import { type FetchLike, GithubRateLimitedError } from '../src/lib/github.js';
 import { githubPrReviewFindings } from '../src/lib/github-review-findings.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { desiredDraft, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
+import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
 import { createPrWakes } from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import {
@@ -76,8 +77,9 @@ function fixture() {
     .run();
   const state = {
     draft: false,
-    viewer: 'cairnwright[bot]',
-    transition: null as null | { __typename: string; actor?: { login: string } | null },
+    head: 'abc',
+    labelId: 'LABEL_node' as string | null,
+    timeline: [{ __typename: 'PullRequestCommit', commit: { oid: 'abc' } }] as unknown[],
     failure: null as null | { operation: string; kind: string },
     resolved: false,
     outdated: false,
@@ -110,28 +112,50 @@ function fixture() {
               : [],
         text: async () => '',
       };
+    if (!String(url).endsWith('/graphql')) {
+      queries.push('createLabel');
+      const failure = state.failure?.operation === 'createLabel' ? state.failure.kind : null;
+      if (failure) state.failure = null;
+      if (!failure || failure === 'lost') state.labelId = 'LABEL_node';
+      if (failure === 'lost') throw new Error('response lost');
+      return {
+        ok: !failure,
+        status: failure === 'exists' ? 422 : failure ? 500 : 201,
+        headers: { get: () => null },
+        json: async () => (failure === 'exists' ? { errors: [{ code: 'already_exists' }] } : {}),
+        text: async () => '',
+      };
+    }
     const { query } = JSON.parse(init.body) as { query: string };
     queries.push(query);
     const operation = query.includes('mutation')
       ? query.includes('convertPullRequestToDraft')
         ? 'convert'
-        : 'ready'
+        : query.includes('markPullRequestReadyForReview')
+          ? 'ready'
+          : query.includes('addLabelsToLabelable')
+            ? 'addLabel'
+            : 'removeLabel'
       : 'snapshot';
     const failure = state.failure?.operation === operation ? state.failure.kind : null;
     if (failure) state.failure = null;
     if (query.includes('mutation') && state.apply && (!failure || failure === 'lost')) {
-      state.draft = operation === 'convert';
-      state.transition = state.draft
-        ? { __typename: 'ConvertToDraftEvent', actor: { login: state.viewer } }
-        : { __typename: 'ReadyForReviewEvent' };
+      if (operation === 'addLabel') state.labels.push(CAIRN_REVIEW_HOLD_LABEL);
+      else if (operation === 'removeLabel') {
+        state.labels = state.labels.filter((name) => name !== CAIRN_REVIEW_HOLD_LABEL);
+        state.timeline.push({
+          __typename: 'UnlabeledEvent',
+          label: { name: CAIRN_REVIEW_HOLD_LABEL },
+        });
+      } else state.draft = operation === 'convert';
     }
     if (failure === 'lost') throw new Error('response lost');
     const pull = {
-      timelineItems: { nodes: state.transition ? [state.transition] : [] },
+      timelineItems: { nodes: state.timeline },
       id: 'PR_node',
       state: 'OPEN',
       isDraft: state.draft,
-      headRefOid: 'abc',
+      headRefOid: state.head,
       labels: { nodes: state.labels.map((name) => ({ name })), pageInfo: { hasNextPage: false } },
       reviewThreads: {
         nodes: [
@@ -169,9 +193,15 @@ function fixture() {
                   ? {
                       changed: {
                         pullRequest: { isDraft: state.draft },
+                        labelable: { id: 'PR_node' },
                       },
                     }
-                  : { viewer: { login: state.viewer }, repository: { pullRequest: pull } },
+                  : {
+                      repository: {
+                        label: state.labelId ? { id: state.labelId } : null,
+                        pullRequest: pull,
+                      },
+                    },
               },
       text: async () => '',
     };
@@ -237,6 +267,7 @@ test.each([true, false])(
 test('dismissed cairn-held draft with zero findings stays draft', async () => {
   const f = fixture();
   await f.reconcile();
+  await f.reconcile();
   f.state.resolved = true;
   f.s.db.update(threadPr).set({ dismissed: true }).where(eq(threadPr.id, 'pr')).run();
   f.fetch.mockClear();
@@ -270,11 +301,12 @@ test('rate limits propagate', async () => {
 test('cairn draft releases from a fresh clean snapshot without read-back', async () => {
   const f = fixture();
   await f.reconcile();
+  await f.reconcile();
   f.state.resolved = true;
   await f.reconcile();
   expect(f.queries.some((q) => q.includes('markPullRequestReadyForReview'))).toBe(true);
   expect(f.state.draft).toBe(false);
-  expect(f.queries).toHaveLength(4);
+  expect(f.queries).toHaveLength(6);
   expect(f.queries.every((q) => !q.includes('node(id:'))).toBe(true);
   expect(f.s.db.select().from(message).all()).toEqual([]);
 });
@@ -283,6 +315,7 @@ test.each(['pending', 'claimed', 'waiting_quota'] as const)(
   'active %s work prevents release',
   async (status) => {
     const f = fixture();
+    await f.reconcile();
     await f.reconcile();
     f.state.resolved = true;
     f.s.db
@@ -305,8 +338,9 @@ test('a human draft is never released', async () => {
 test.each(['coordinator-hold', 'needs-decision'])('%s prevents release', async (label) => {
   const f = fixture();
   await f.reconcile();
+  await f.reconcile();
   f.state.resolved = true;
-  f.state.labels = [label];
+  f.state.labels.push(label);
   await f.reconcile();
   expect(f.state.draft).toBe(true);
 });
@@ -322,6 +356,7 @@ test.each([true, false])(
       .values({ id, conversationId: id, role: 'system', content: { reviews: 3 }, createdAt: 1 })
       .run();
     await f.wake();
+    await f.wake();
     expect(f.state.draft).toBe(true);
     expect(f.s.db.select().from(step).all()).toEqual([]);
     expect(JSON.stringify(f.s.db.select().from(message).all())).toContain(
@@ -334,6 +369,7 @@ test('autoFix off still holds, notifies and later releases', async () => {
   const f = fixture();
   f.s.db.update(threadPr).set({ autoFix: false }).where(eq(threadPr.id, 'pr')).run();
   await f.wake();
+  await f.wake();
   expect(f.state.draft).toBe(true);
   expect(f.s.db.select().from(step).all()).toEqual([]);
   expect(JSON.stringify(f.s.db.select().from(message).all())).toContain('Auto-fix');
@@ -344,6 +380,7 @@ test('autoFix off still holds, notifies and later releases', async () => {
 
 test('pending blocking worker question prevents release until answered', async () => {
   const f = fixture();
+  await f.reconcile();
   await f.reconcile();
   f.state.resolved = true;
   writeWorkerQuestion(
@@ -438,6 +475,7 @@ test('poller runtime witness holds PR 3377 and exposes the durable wake through 
     { teamId: f.s.team.id, login: 'owner', accessToken: 'fake', scope: 'repo' },
   );
   const watch = createPrWatch({ ...f.s.svc, box: f.s.secretBox }, { githubFetch: f.fetch });
+  await watch.sweep();
   const tally = await watch.sweep();
   expect(tally.unreadable).toBe(0);
   const response = await req(f.s.app, 'GET', '/api/prs?threadId=t');
@@ -458,7 +496,7 @@ test('poller runtime witness holds PR 3377 and exposes the durable wake through 
           body,
           githubQueries: f.queries,
           githubDraft: f.state.draft,
-          latestDraftTransition: f.state.transition,
+          timeline: f.state.timeline,
           steps: f.s.db.select().from(step).all(),
         },
         null,
@@ -500,8 +538,8 @@ test('Codex findings bypass permission while a human without write access is ign
 const cleanSnapshot = {
   state: 'OPEN',
   isDraft: true,
-  cairnHolds: true,
-  labels: [] as string[],
+  overridden: false,
+  labels: [CAIRN_REVIEW_HOLD_LABEL] as string[],
   findings: [] as {
     id: string;
     path: string;
@@ -512,111 +550,158 @@ const cleanSnapshot = {
   }[],
 };
 const idleLocal = { dismissed: false, activeStep: false, blockingQuestion: false };
+const finding = {
+  id: 'r',
+  path: 'a',
+  line: 1,
+  badge: null,
+  body: 'fix',
+  url: 'https://github.com',
+};
 
-test('desiredDraft covers conversion, release and every release blocker', () => {
-  const finding = {
-    id: 'r',
-    path: 'a',
-    line: 1,
-    badge: null,
-    body: 'fix',
-    url: 'https://github.com',
-  };
+test('desiredAction covers every ordered rule and release blocker', () => {
   for (const [snapshot, local, expected] of [
-    [cleanSnapshot, idleLocal, false],
-    [{ ...cleanSnapshot, isDraft: false, findings: [finding] }, idleLocal, true],
+    [cleanSnapshot, idleLocal, 'markReady'],
+    [{ ...cleanSnapshot, isDraft: false, labels: [], findings: [finding] }, idleLocal, 'addLabel'],
+    [{ ...cleanSnapshot, isDraft: false, findings: [finding] }, idleLocal, 'convertToDraft'],
+    [{ ...cleanSnapshot, overridden: true, findings: [finding] }, idleLocal, null],
+    [
+      { ...cleanSnapshot, overridden: true, isDraft: false, labels: [], findings: [finding] },
+      idleLocal,
+      null,
+    ],
     [{ ...cleanSnapshot, findings: [finding] }, idleLocal, null],
-    [{ ...cleanSnapshot, isDraft: false }, idleLocal, null],
-    [{ ...cleanSnapshot, cairnHolds: false }, idleLocal, null],
-    [{ ...cleanSnapshot, labels: ['coordinator-hold'] }, idleLocal, null],
-    [{ ...cleanSnapshot, labels: ['needs-decision'] }, idleLocal, null],
+    [{ ...cleanSnapshot, isDraft: false }, idleLocal, 'removeLabel'],
+    [{ ...cleanSnapshot, labels: [] }, idleLocal, null],
+    [{ ...cleanSnapshot, isDraft: false, labels: [] }, idleLocal, null],
+    [{ ...cleanSnapshot, labels: [CAIRN_REVIEW_HOLD_LABEL, 'coordinator-hold'] }, idleLocal, null],
+    [{ ...cleanSnapshot, labels: [CAIRN_REVIEW_HOLD_LABEL, 'needs-decision'] }, idleLocal, null],
     [cleanSnapshot, { ...idleLocal, activeStep: true }, null],
     [cleanSnapshot, { ...idleLocal, blockingQuestion: true }, null],
     [cleanSnapshot, { ...idleLocal, dismissed: true }, null],
-    [
-      { ...cleanSnapshot, isDraft: false, findings: [finding] },
-      { ...idleLocal, dismissed: true },
-      null,
-    ],
-    [{ ...cleanSnapshot, state: 'CLOSED' }, idleLocal, null],
+    [{ ...cleanSnapshot, findings: [finding] }, { ...idleLocal, dismissed: true }, null],
+    [{ ...cleanSnapshot, state: 'CLOSED', findings: [finding] }, idleLocal, null],
     [{ ...cleanSnapshot, state: 'MERGED' }, idleLocal, null],
   ] as const)
-    expect(desiredDraft(snapshot, local)).toBe(expected);
+    expect(desiredAction(snapshot, local)).toBe(expected);
 });
 
-test.each([
-  null,
-  { __typename: 'ConvertToDraftEvent', actor: { login: 'human' } },
-  { __typename: 'ConvertToDraftEvent', actor: null },
-  { __typename: 'ReadyForReviewEvent' },
-])('draft ownership requires the latest conversion by the viewer: %j', async (transition) => {
-  const f = fixture();
-  f.state.draft = true;
-  f.state.resolved = true;
-  f.state.transition = transition;
-  await f.reconcile();
-  expect(f.state.draft).toBe(true);
-  expect(f.queries.some((q) => q.includes('mutation'))).toBe(false);
-});
-
-test.each([
-  ['CAIRNWRIGHT', 'cairnwright[bot]'],
-  ['Cairnwright[bot]', 'cairnwright'],
-])('ownership normalizes viewer %s and actor %s', async (viewer, actor) => {
-  const f = fixture();
-  f.state.draft = true;
-  f.state.resolved = true;
-  f.state.viewer = viewer;
-  f.state.transition = { __typename: 'ConvertToDraftEvent', actor: { login: actor } };
-  await f.reconcile();
-  expect(f.state.draft).toBe(false);
-});
-
-test('reconciles within two clean polls after each single GitHub failure', async () => {
-  for (const operation of ['snapshot', 'convert', 'ready']) {
+test('each failed transition converges in exactly the remaining clean polls', async () => {
+  for (const operation of [
+    'snapshot',
+    'createLabel',
+    'addLabel',
+    'convert',
+    'ready',
+    'removeLabel',
+  ]) {
     for (const kind of ['http', 'graphql', 'lost']) {
-      for (const humanDraft of [false, true]) {
-        const f = fixture();
-        const poll = async (injected = false) => {
-          const before = f.queries.length;
-          if (injected && operation === 'snapshot') await expect(f.reconcile()).rejects.toThrow();
-          else await expect(f.reconcile()).resolves.toBeInstanceOf(Array);
-          expect(
-            f.queries.slice(before).filter((q) => q.includes('mutation')).length,
-          ).toBeLessThanOrEqual(1);
-          if (humanDraft) expect(f.state.draft).toBe(true);
-        };
-        if (humanDraft) {
-          f.state.draft = true;
-          f.state.transition = { __typename: 'ConvertToDraftEvent', actor: { login: 'human' } };
-        }
-        if (operation === 'ready') {
-          await poll();
-          f.state.resolved = true;
-        }
-        f.state.failure = { operation, kind };
-        await poll(true);
-        if (!humanDraft || operation === 'snapshot') expect(f.state.failure).toBeNull();
-        f.state.failure = null;
-        await poll();
-        await poll();
-        expect(f.state.draft).toBe(humanDraft || !f.state.resolved);
-        f.state.resolved = true;
-        await poll();
-        await poll();
-        expect(f.state.draft).toBe(humanDraft);
-        expect(f.s.db.select().from(message).all()).toEqual([]);
-        f.s.dispose();
-        servers.splice(servers.indexOf(f.s), 1);
-      }
+      const f = fixture();
+      const poll = async (fails = false) => {
+        const before = f.queries.length;
+        if (fails && operation === 'snapshot') await expect(f.reconcile()).rejects.toThrow();
+        else await expect(f.reconcile()).resolves.toBeInstanceOf(Array);
+        expect(
+          f.queries.slice(before).filter((q) => q.includes('mutation') || q === 'createLabel'),
+        ).toHaveLength(f.queries.length - before - 1);
+        expect(f.queries.length - before - 1).toBeLessThanOrEqual(1);
+      };
+      if (operation === 'createLabel') f.state.labelId = null;
+      if (['convert', 'ready', 'removeLabel'].includes(operation))
+        f.state.labels = [CAIRN_REVIEW_HOLD_LABEL];
+      if (operation === 'ready') f.state.draft = true;
+      if (['ready', 'removeLabel'].includes(operation)) f.state.resolved = true;
+      f.state.failure = { operation, kind };
+      await poll(true);
+      expect(f.state.failure).toBeNull();
+      const remaining = f.state.resolved
+        ? Number(f.state.draft) + Number(f.state.labels.includes(CAIRN_REVIEW_HOLD_LABEL))
+        : Number(!f.state.labelId) +
+          Number(!f.state.labels.includes(CAIRN_REVIEW_HOLD_LABEL)) +
+          Number(!f.state.draft);
+      for (let i = 0; i < remaining; i++) await poll();
+      expect(f.state.draft).toBe(!f.state.resolved);
+      expect(f.state.labels.includes(CAIRN_REVIEW_HOLD_LABEL)).toBe(!f.state.resolved);
+      f.s.dispose();
+      servers.splice(servers.indexOf(f.s), 1);
     }
   }
+});
+
+test.each([false, true])(
+  'human removal overrides a held head, including ready=%s',
+  async (ready) => {
+    const f = fixture();
+    await f.reconcile();
+    await f.reconcile();
+    f.state.labels = [];
+    f.state.timeline.push({
+      __typename: 'UnlabeledEvent',
+      label: { name: CAIRN_REVIEW_HOLD_LABEL },
+    });
+    f.state.draft = !ready;
+    const before = f.queries.length;
+    await f.reconcile();
+    expect(f.queries.slice(before).some((q) => q.includes('mutation'))).toBe(false);
+    f.state.resolved = true;
+    await f.reconcile();
+    expect(f.state.draft).toBe(!ready);
+    f.state.resolved = false;
+    f.state.head = 'new';
+    f.state.timeline.push({ __typename: 'HeadRefForcePushedEvent', afterCommit: { oid: 'new' } });
+    f.state.draft = false;
+    await f.reconcile();
+    expect(f.state.labels).toContain(CAIRN_REVIEW_HOLD_LABEL);
+    await f.reconcile();
+    expect(f.state.draft).toBe(true);
+  },
+);
+
+test('marking a held PR ready retains the hold until findings resolve', async () => {
+  const f = fixture();
+  await f.reconcile();
+  await f.reconcile();
+  f.state.draft = false;
+  await f.reconcile();
+  expect(f.state.draft).toBe(true);
+  f.state.resolved = true;
+  f.state.draft = false;
+  await f.reconcile();
+  expect(f.state.labels).toEqual([]);
+});
+
+test.each([
+  [[], false],
+  [[{ __typename: 'UnlabeledEvent', label: { name: CAIRN_REVIEW_HOLD_LABEL } }], true],
+  [[{ __typename: 'UnlabeledEvent', label: { name: 'other' } }], false],
+  [
+    [
+      { __typename: 'UnlabeledEvent', label: { name: CAIRN_REVIEW_HOLD_LABEL } },
+      { __typename: 'PullRequestCommit', commit: { oid: 'abc' } },
+    ],
+    false,
+  ],
+])('timeline window derives head override from %j', async (timeline, overridden) => {
+  const f = fixture();
+  f.state.timeline = timeline;
+  const snapshot = await githubPrReviewFindings(f.fetch, 'fake', 'o', 'r', 3377);
+  expect(snapshot.overridden).toBe(overridden);
+  expect(snapshot.cairnHolds).toBe(false);
+});
+
+test('already-existing label creation is a successful one-write poll', async () => {
+  const f = fixture();
+  f.state.labelId = null;
+  f.state.failure = { operation: 'createLabel', kind: 'exists' };
+  await expect(f.reconcile()).resolves.toHaveLength(1);
+  expect(f.queries).toHaveLength(2);
 });
 
 test.each(['http', 'graphql', 'lost', 'unverified'])(
   'failed conversion preserves review wake: %s',
   async (kind) => {
     const f = fixture();
+    f.state.labels = [CAIRN_REVIEW_HOLD_LABEL];
     if (kind === 'unverified') f.state.apply = false;
     else f.state.failure = { operation: 'convert', kind };
     await f.wake();
@@ -634,6 +719,7 @@ test('direct reconciliation of a dismissed PR performs no reads or writes', asyn
 
 test('unconfirmed ready response retries from GitHub truth', async () => {
   const f = fixture();
+  await f.reconcile();
   await f.reconcile();
   f.state.resolved = true;
   f.state.apply = false;
@@ -656,7 +742,7 @@ test('mutation rate limits propagate through the wake', async () => {
   expect(f.s.db.select().from(step).all()).toEqual([]);
 });
 
-test.each(['viewer', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])(
+test.each(['label', 'timeline', 'labels', 'changed', 'repeated', 'later-error'])(
   'incomplete or inconsistent snapshot fails closed: %s',
   async (failure) => {
     const f = fixture();
@@ -666,8 +752,8 @@ test.each(['viewer', 'timeline', 'labels', 'changed', 'repeated', 'later-error']
       const response = await implementation(url, init);
       const result = (await response.json()) as {
         data: {
-          viewer?: { login: string };
           repository: {
+            label?: unknown;
             pullRequest: {
               isDraft: boolean;
               timelineItems?: unknown;
@@ -679,7 +765,7 @@ test.each(['viewer', 'timeline', 'labels', 'changed', 'repeated', 'later-error']
       };
       const pull = result.data.repository.pullRequest;
       page += 1;
-      if (failure === 'viewer') delete result.data.viewer;
+      if (failure === 'label') delete result.data.repository.label;
       if (failure === 'timeline') delete pull.timelineItems;
       if (failure === 'labels') pull.labels.pageInfo.hasNextPage = true;
       if (['changed', 'repeated', 'later-error'].includes(failure)) {
@@ -692,5 +778,56 @@ test.each(['viewer', 'timeline', 'labels', 'changed', 'repeated', 'later-error']
     });
     await expect(f.reconcile()).rejects.toThrow();
     expect(f.queries.some((q) => q.includes('mutation'))).toBe(false);
+  },
+);
+
+test.each(['createLabel', 'addLabel'])('failed %s preserves the review wake', async (operation) => {
+  for (const kind of ['http', 'graphql', 'lost']) {
+    const f = fixture();
+    if (operation === 'createLabel') f.state.labelId = null;
+    f.state.failure = { operation, kind };
+    await f.wake();
+    expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+  }
+});
+
+test.each([false, true])(
+  'human draft stays untouched with resolved=%s through every failure',
+  async (resolved) => {
+    const f = fixture();
+    f.state.draft = true;
+    f.state.resolved = resolved;
+    for (const kind of ['http', 'graphql', 'lost']) {
+      f.state.failure = { operation: 'snapshot', kind };
+      await expect(f.reconcile()).rejects.toThrow();
+      await f.reconcile();
+      expect(f.state.draft).toBe(true);
+      expect(f.state.labels).toEqual([]);
+    }
+    expect(f.queries.some((q) => q.includes('mutation'))).toBe(false);
+  },
+);
+
+test.each([429, 403])(
+  'label creation propagates HTTP %s rate limits without a JSON body',
+  async (status) => {
+    const f = fixture();
+    f.state.labelId = null;
+    const implementation = f.fetch.getMockImplementation()!;
+    f.fetch.mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/labels'))
+        return {
+          ok: false,
+          status,
+          headers: { get: (name) => (name === 'retry-after' ? '60' : null) },
+          json: async () => {
+            throw new Error('not json');
+          },
+          text: async () => 'rate limit',
+        };
+      return implementation(url, init);
+    });
+    await expect(f.wake()).rejects.toBeInstanceOf(GithubRateLimitedError);
+    expect(f.s.db.select().from(step).all()).toEqual([]);
   },
 );

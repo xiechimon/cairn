@@ -1,32 +1,42 @@
-import type { PrReviewFinding } from '@cairn/shared';
+import { CAIRN_REVIEW_HOLD_LABEL, type PrReviewFinding } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { message, step, type threadPr } from '../db/schema.js';
 import { type FetchLike, GithubRateLimitedError } from '../lib/github.js';
-import { githubPrReviewFindings, githubSetPullDraft } from '../lib/github-review-findings.js';
+import {
+  githubCreateReviewHoldLabel,
+  githubPrReviewFindings,
+  githubSetPullDraft,
+  githubSetReviewHoldLabel,
+} from '../lib/github-review-findings.js';
 import type { BuildDeps } from './builds.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
-export function desiredDraft(
+export function desiredAction(
   snapshot: {
     state: string;
     isDraft: boolean;
-    cairnHolds: boolean;
+    overridden: boolean;
     labels: readonly string[];
     findings: readonly PrReviewFinding[];
   },
   local: { dismissed: boolean; activeStep: boolean; blockingQuestion: boolean },
-): boolean | null {
+): 'addLabel' | 'convertToDraft' | 'markReady' | 'removeLabel' | null {
   if (local.dismissed || snapshot.state !== 'OPEN') return null;
-  if (snapshot.findings.length > 0) return snapshot.isDraft ? null : true;
+  const labelPresent = snapshot.labels.includes(CAIRN_REVIEW_HOLD_LABEL);
+  if (snapshot.findings.length > 0) {
+    if (snapshot.overridden || snapshot.isDraft) return null;
+    return labelPresent ? 'convertToDraft' : 'addLabel';
+  }
   if (
-    snapshot.cairnHolds &&
+    labelPresent &&
     snapshot.isDraft &&
     !snapshot.labels.some((label) => ['coordinator-hold', 'needs-decision'].includes(label)) &&
     !local.activeStep &&
     !local.blockingQuestion
   )
-    return false;
+    return 'markReady';
+  if (!snapshot.isDraft && labelPresent) return 'removeLabel';
   return null;
 }
 
@@ -45,7 +55,7 @@ export async function reconcilePrReviewFindings(
   if (row.dismissed) return [];
   const pull = await githubPrReviewFindings(fetch, token, owner, repo, row.number);
   if (pull.state !== 'OPEN') return [];
-  const draft = desiredDraft(pull, {
+  const action = desiredAction(pull, {
     dismissed: row.dismissed,
     blockingQuestion: blockingWorkerQuestions(deps.db, row.buildId).length > 0,
     activeStep:
@@ -60,14 +70,19 @@ export async function reconcilePrReviewFindings(
         )
         .get() !== undefined,
   });
-  if (draft !== null) {
+  if (action !== null) {
     try {
-      await githubSetPullDraft(fetch, token, pull.id, draft);
+      if (action === 'addLabel' && pull.labelId === null)
+        await githubCreateReviewHoldLabel(fetch, token, owner, repo);
+      else if (action === 'addLabel' || action === 'removeLabel') {
+        if (pull.labelId === null) throw new Error('GitHub review hold label missing');
+        await githubSetReviewHoldLabel(fetch, token, pull.id, pull.labelId, action === 'addLabel');
+      } else await githubSetPullDraft(fetch, token, pull.id, action === 'convertToDraft');
     } catch (error) {
       if (error instanceof GithubRateLimitedError) throw error;
-      console.warn('GitHub review draft transition unconfirmed', {
+      console.warn('GitHub review hold transition unconfirmed', {
         pullRequestId: pull.id,
-        draft,
+        action,
         error,
       });
     }

@@ -1,3 +1,5 @@
+export const CAIRN_REVIEW_HOLD_LABEL = 'cairn-review-hold';
+
 export const REVIEW_BOT_LOGINS = ['chatgpt-codex-connector'] as const;
 
 export function isReviewBotAuthor(login: string, type: string): boolean {
