@@ -11,7 +11,6 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   chief,
   chiefMessage,
-  chiefSummary,
   chiefThread,
   coordinatorConversation,
   coordinatorEntry,
@@ -39,6 +38,7 @@ import {
   type ProviderBinding,
   type ServerRuntimeConfig,
 } from './runtime/server-runtime.js';
+import { seedSummary } from './seed-summary.js';
 import { createCoordinatorServerApi } from './server-api.js';
 import { parseWatermark } from './watermark.js';
 
@@ -153,44 +153,59 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         (r) => r.status === 'claimed' && r.machineId === null && !freshClaims.has(r.id),
       ),
       isLive: (requestId) => live.some((r) => r.id === requestId),
-      seed: () => {
+      seed: async (summarize) => {
         const teamId = threadTeam(threadId);
         const providers =
           teamId === null ? null : coordinatorProviders({ db, box: machine.box }, teamId);
-        const summary = db
-          .select({ summary: chiefSummary.summary })
-          .from(chiefSummary)
-          .where(eq(chiefSummary.threadId, threadId))
-          .get();
         const watermark = parseWatermark(row?.lastMirroredEntryId ?? null);
         const pendingUsers = new Set(live.map((r) => r.id));
         if (watermark?.kind === 'rewind') pendingUsers.add(watermark.anchorMessageId);
-        const rows = db
-          .select()
+        const window = db
+          .select({ message: chiefMessage, rowid: sql<number>`rowid` })
           .from(chiefMessage)
           .where(eq(chiefMessage.threadId, threadId))
           .orderBy(sql`${chiefMessage.createdAt} desc`, sql`rowid desc`)
           .limit(SEED_MAX_ROWS + pendingUsers.size + 20)
           .all()
           .filter(
-            (m) =>
+            ({ message: m }) =>
               m.role !== 'system' &&
               !pendingUsers.has(m.id) &&
               !m.id.startsWith('chief-digest-') &&
               !m.id.startsWith('chief-report-'),
           )
           .slice(0, SEED_MAX_ROWS)
-          .reverse()
-          .map(
-            (m): SeedRow => ({
-              id: m.id,
-              role: m.role,
-              content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-              createdAt: m.createdAt,
-            }),
-          );
+          .reverse();
+        const oldest = window[0];
+        const summary = await seedSummary(
+          db,
+          threadId,
+          oldest === undefined ? null : { at: oldest.message.createdAt, rowid: oldest.rowid },
+          summarize,
+          (error) => {
+            const ids = [providers?.router.provider, providers?.summary.provider].filter(
+              (id): id is string => id !== undefined,
+            );
+            const message = scrubProviderError(
+              { db, box: machine.box },
+              teamId ?? '',
+              ids,
+              String(error),
+            );
+            logger.warn({ threadId, error: message }, 'seed summary failed');
+          },
+          nowMs(),
+        );
+        const rows = window.map(
+          ({ message: m }): SeedRow => ({
+            id: m.id,
+            role: m.role,
+            content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+            createdAt: m.createdAt,
+          }),
+        );
         return {
-          summary: summary?.summary ?? '',
+          summary,
           rows,
           model: {
             provider: providers?.router.provider ?? 'unknown',
@@ -332,6 +347,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const keyed = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,
     );
+    const heartbeat = setInterval(
+      () => void api.heartbeat(row.id).catch(() => {}),
+      options.heartbeatMs ?? HEARTBEAT_MS,
+    );
     try {
       if (providers === null) throw new Error('Coordinator route resolves to no keyed provider');
       const payload = claimedPayload(row, providers);
@@ -351,6 +370,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         await api.done(row.id, { status: 'failed', errorMessage: scrubbed });
       }
     } finally {
+      clearInterval(heartbeat);
       freshClaims.delete(row.id);
     }
   };
