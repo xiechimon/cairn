@@ -406,6 +406,11 @@ export function ProvidersPage() {
           () => setParams({ scope: null, item: null }),
           t,
         );
+  const partialFailure = subscriptionsQ.isError
+    ? 'subscriptions'
+    : providersQ.isError
+      ? 'providers'
+      : null;
   const itemParam = searchParams.get('item');
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
 
@@ -429,14 +434,20 @@ export function ProvidersPage() {
             />
           }
         />
-        {live && machine === undefined && subscriptionsQ.isError && entries.length > 0 && (
+        {live && machine === undefined && partialFailure !== null && entries.length > 0 && (
           <p
-            data-testid="subscriptions-error"
+            data-testid="providers-partial-error"
             role="alert"
             className="m-0 flex items-center gap-2 px-1 text-meta text-content-tertiary"
           >
-            {t('订阅账户没能加载')}
-            <Button variant="ghost" size="sm" onClick={() => void subscriptionsQ.refetch()}>
+            {partialFailure === 'subscriptions' ? t('订阅账户没能加载') : t('模型服务没能加载')}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                void (partialFailure === 'subscriptions' ? subscriptionsQ : providersQ).refetch()
+              }
+            >
               {t('重试')}
             </Button>
           </p>

@@ -97,10 +97,32 @@ test('providers: a failed Claude subscriptions fetch still lists the API provide
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('provider-instance')).toContainText('Codex main');
   await expect(settings.getByTestId('provider-instance')).toContainText('订阅');
-  await expect(settings.getByTestId('subscriptions-error')).toContainText('订阅账户没能加载');
+  await expect(settings.getByTestId('providers-partial-error')).toContainText('订阅账户没能加载');
   state.fail = false;
-  await settings.getByTestId('subscriptions-error').getByRole('button', { name: '重试' }).click();
-  await expect(settings.getByTestId('subscriptions-error')).toHaveCount(0);
+  await settings.getByTestId('providers-partial-error').getByRole('button', { name: '重试' }).click();
+  await expect(settings.getByTestId('providers-partial-error')).toHaveCount(0);
+});
+
+test('providers: a failed API providers fetch next to a loaded subscription still shows an error and retries', async ({
+  page,
+}) => {
+  const state = { fail: true, ok: { providers: [] } as unknown };
+  await stub(page, 'providers', state);
+  await page.route('**/api/teams/team-1/claude-subscriptions', (route) =>
+    route.fulfill({
+      json: [{ id: 's1', label: 'Fresh', expiresAt: null, createdAt: 0, plan: null }],
+    }),
+  );
+  await page.route('**/api/teams/team-1/model-sources', (route) =>
+    route.fulfill({ json: { sources: [] } }),
+  );
+  await page.goto('/app/settings/providers');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('provider-instance')).toContainText('Fresh');
+  await expect(settings.getByTestId('providers-partial-error')).toContainText('模型服务没能加载');
+  state.fail = false;
+  await settings.getByTestId('providers-partial-error').getByRole('button', { name: '重试' }).click();
+  await expect(settings.getByTestId('providers-partial-error')).toHaveCount(0);
 });
 
 test('providers: a team whose only data is a failed subscriptions fetch sees an error, not the empty state', async ({
