@@ -1,5 +1,3 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { mockLive, THREAD, toolRow } from './chief-home-mock.js';
 
@@ -25,15 +23,7 @@ for (const width of [1440, 375]) {
       const summary = page.getByTestId('chief-tools-toggle').first();
       await summary.scrollIntoViewIfNeeded();
       await scroller.getByTestId('md-code').scrollIntoViewIfNeeded();
-      if (width === 1440 && process.env.CHAT_EVIDENCE_PHASE) {
-        const dir = resolve('../../docs/verify/chat-instant-feel');
-        await mkdir(dir, { recursive: true });
-        await page.screenshot({ path: resolve(dir, `${process.env.CHAT_EVIDENCE_PHASE}-${theme}-long-command.png`) });
-      }
       const geometry = await scroller.evaluate((el) => ({ width: el.clientWidth, scroll: el.scrollWidth }));
-      if (process.env.CHAT_EVIDENCE_PHASE) {
-        await writeFile(resolve('../../docs/verify/chat-instant-feel', `${process.env.CHAT_EVIDENCE_PHASE}-${width}-${theme}-metrics.json`), JSON.stringify(geometry));
-      }
       expect(geometry.scroll).toBeLessThanOrEqual(geometry.width);
       await expect(scroller).not.toHaveCSS('overscroll-behavior-x', 'auto');
       await expect(scroller).not.toHaveCSS('overscroll-behavior-y', 'auto');

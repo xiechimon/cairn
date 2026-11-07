@@ -277,17 +277,11 @@ for (const theme of ['light', 'dark'] as const) {
     const block = page.getByTestId('work-block').first();
     await summary.scrollIntoViewIfNeeded();
     if (await summary.getAttribute('aria-expanded') === 'true') await summary.click();
-    if (process.env.CHAT_EVIDENCE_PHASE) {
-      await block.screenshot({ path: `../../docs/verify/chat-instant-feel/${process.env.CHAT_EVIDENCE_PHASE}-${theme}-closed.png` });
-    }
     await summary.hover();
     await page.mouse.down();
     expect.soft(await summary.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
     await page.mouse.up();
     await expect(summary).toHaveAttribute('aria-expanded', 'true');
-    if (process.env.CHAT_EVIDENCE_PHASE) {
-      await block.screenshot({ path: `../../docs/verify/chat-instant-feel/${process.env.CHAT_EVIDENCE_PHASE}-${theme}-open.png` });
-    }
     expect.soft(await summary.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
     await expect.soft(summary.locator('..').getByRole('button', { name: '复制', exact: true })).toHaveCount(0);
     for (const row of await block.locator('[data-trace-card] button').all()) {
