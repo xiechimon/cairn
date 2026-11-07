@@ -21,6 +21,22 @@ test('release removes populated allocations and repeated release is harmless', (
   run.cleanup();
 });
 
+test('release kills processes still running inside the allocation before removing it', async () => {
+  const run = createTestTempRun();
+  const dir = run.allocate('busy-');
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+    cwd: dir,
+    detached: true,
+    stdio: 'ignore',
+  });
+  await once(child, 'spawn');
+  const exited = once(child, 'exit');
+  assert.equal(run.release(dir), true);
+  assert.equal(existsSync(dir), false);
+  const [, signal] = await exited;
+  assert.equal(signal, 'SIGKILL');
+});
+
 test('explicit cleanup works after an exception and allows later allocations', () => {
   const run = createTestTempRun();
   let dir;
