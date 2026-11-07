@@ -525,7 +525,48 @@ describe('the decision is recorded at claim and never changes in flight', () => 
   });
 });
 
-describe('claim-time routes are reconsidered until a session starts', () => {
+describe('claim-time routes are reconsidered only while pending without continuity', () => {
+  test('a claimed step without a session keeps its recorded over-quota Claude route', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const todoRow = await buildTodo(w, 'difficulty:standard');
+    const claimed = await claim(w);
+    expect(claimed?.agent?.modelId).toBe('claude-sonnet-5-5');
+    const stepRow = w.s.db.select().from(step).where(eq(step.id, claimed!.step.id)).get()!;
+    expect(stepRow).toMatchObject({ status: 'claimed', sessionId: null, checkpointCommit: null });
+    const recorded = w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()!;
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.98 });
+    expect
+      .soft(
+        decideStepRoute(w.s.db, todoRow, stepRow.kind, stepRow.id, {
+          machineId: null,
+          required: null,
+        }),
+      )
+      .toMatchObject({
+        chosen: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
+        reason: 'in-flight: keeps recorded model',
+        rejected: [],
+      });
+    expect.soft(profileForStep(w.s.db, todoRow, stepRow.kind, stepRow.id)).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+    });
+    expect
+      .soft(
+        recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
+          provider: 'openai-codex',
+          modelId: 'gpt-6.1-sol',
+          machineId: null,
+          requiredCapabilities: null,
+        }),
+      )
+      .toEqual(recorded);
+    expect(w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()).toEqual(
+      recorded,
+    );
+  });
+
   test('a pending step without a session re-routes from over-quota Claude to Codex', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: false, codex: false });

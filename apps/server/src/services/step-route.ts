@@ -113,13 +113,17 @@ export function storedStepRoute(db: Pick<Db, 'select'>, stepId: string): StepRou
   return db.select().from(stepRoute).where(eq(stepRoute.stepId, stepId)).get() ?? null;
 }
 
-function hasStartedSession(db: Pick<Db, 'select'>, stepId: string): boolean {
+function routeIsReleasable(db: Pick<Db, 'select'>, stepId: string): boolean {
   const row = db
-    .select({ sessionId: step.sessionId, checkpointCommit: step.checkpointCommit })
+    .select({
+      status: step.status,
+      sessionId: step.sessionId,
+      checkpointCommit: step.checkpointCommit,
+    })
     .from(step)
     .where(eq(step.id, stepId))
     .get();
-  return row !== undefined && (row.sessionId !== null || row.checkpointCommit !== null);
+  return row?.status === 'pending' && row.sessionId === null && row.checkpointCommit === null;
 }
 
 export function decideStepRoute(
@@ -135,7 +139,7 @@ export function decideStepRoute(
     stored !== null &&
     stored.provider !== null &&
     stored.modelId !== null &&
-    hasStartedSession(db, stored.stepId)
+    !routeIsReleasable(db, stored.stepId)
   ) {
     return routeWork(
       {
@@ -174,7 +178,7 @@ export function recordStepRoute(
   if (
     existing !== null &&
     ((existing.provider === effective.provider && existing.modelId === effective.modelId) ||
-      hasStartedSession(db, stepRow.id))
+      !routeIsReleasable(db, stepRow.id))
   ) {
     return existing;
   }
