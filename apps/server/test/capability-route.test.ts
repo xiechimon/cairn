@@ -11,7 +11,7 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { profileForStep } from '../src/services/routing-rules.js';
-import { recordStepRoute } from '../src/services/step-route.js';
+import { recordStepRoute, routedModelRunsOn } from '../src/services/step-route.js';
 import {
   bootServer,
   issueApiKey,
@@ -302,6 +302,53 @@ describe('the router agrees with what dispatch can execute', () => {
     });
     expect(row).toMatchObject({ provider: 'claude-code', modelId: 'claude-haiku-5-5' });
     expect(row.reason).toContain('availability changed during the claim');
+  });
+});
+
+describe('a routed model only runs on a machine that can host it', () => {
+  test('Codex needs a valid Codex login on the claiming machine', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: false });
+    w.s.db
+      .update(machineTable)
+      .set({ enabledRuntimes: ['claude-code', 'pi'] })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    const row = () =>
+      w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
+    const codex = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' };
+    expect(routedModelRunsOn(w.s.db, row(), codex)).toBe(false);
+    equipMachine(w, { claude: true, codex: true });
+    expect(routedModelRunsOn(w.s.db, row(), codex)).toBe(true);
+  });
+
+  test('a hard step is not claimed by a machine without the Codex login the router relied on', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    const other = 'claude-only-box';
+    w.s.db
+      .insert(machineTable)
+      .values({
+        ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
+        id: other,
+        name: other,
+        tokenHash: 'other-token-hash',
+      })
+      .run();
+    w.s.db
+      .update(machineTable)
+      .set({ enabledRuntimes: ['claude-code', 'pi'], capabilities: { mcpServers: [], skills: [] } })
+      .where(eq(machineTable.id, other))
+      .run();
+    const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
+    expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
+      provider: 'openai-codex',
+      routed: true,
+    });
+    const otherRow = w.s.db.select().from(machineTable).where(eq(machineTable.id, other)).get()!;
+    expect(
+      routedModelRunsOn(w.s.db, otherRow, { provider: 'openai-codex', modelId: 'gpt-6.1-sol' }),
+    ).toBe(false);
   });
 });
 

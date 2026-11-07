@@ -89,7 +89,7 @@ import {
 } from './routing-rules.js';
 import { reverifyShip } from './ship-gate.js';
 import { scanLocalSkills } from './skills.js';
-import { recordStepRoute } from './step-route.js';
+import { recordStepRoute, routedModelRunsOn } from './step-route.js';
 import { listProjectTagVocab } from './tags.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
@@ -507,6 +507,7 @@ async function tryClaim(
       localMerge: localMerge !== null,
     };
     if (workerIneligibility(db, machineRow, facts, catalog, now) !== null) continue;
+    if (agentRow.routed && !routedModelRunsOn(db, machineRow, model)) continue;
     const projectCap = projectOfTodo(db, cand.todoRow)?.maxConcurrent ?? null;
     const projectFull = (reader: Pick<typeof db, 'select'>) =>
       projectCap !== null &&

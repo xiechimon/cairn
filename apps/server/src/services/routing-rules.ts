@@ -43,6 +43,7 @@ export interface RouteProfile {
   mcpServers: string[];
   requiredCapabilities: RequiredCapabilities | null;
   fallbackModels: RoutingRuleRow['fallbackModels'];
+  routed: boolean;
 }
 
 export interface RoutedTodo {
@@ -153,6 +154,7 @@ export function routeProfile(
       ? withOverride(route.requiredCapabilities, override?.requiredCapabilities)
       : route.requiredCapabilities,
     fallbackModels: route.fallbackModels,
+    routed: false,
   };
 }
 
@@ -188,6 +190,7 @@ export function profileForStep(
     ...base,
     provider: decision.chosen.provider,
     modelId: decision.chosen.modelId,
+    routed: true,
   };
 }
 

@@ -180,3 +180,19 @@ export function recordStepRoute(
   db.insert(stepRoute).values(row).onConflictDoNothing().run();
   return storedStepRoute(db, stepRow.id) ?? row;
 }
+
+export function routedModelRunsOn(
+  db: Pick<Db, 'select'>,
+  machineRow: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
+  model: { provider: string | null; modelId: string | null },
+): boolean {
+  return capabilityCandidates(db, machineRow.teamId, {
+    machineId: machineRow.id,
+    required: null,
+  }).some(
+    (candidate) =>
+      candidate.available &&
+      candidate.provider === model.provider &&
+      candidate.modelId === model.modelId,
+  );
+}
