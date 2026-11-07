@@ -809,6 +809,7 @@ export const EN: Record<string, string> = {
   // original like any real user data would) ——
   '准备工作区...': 'Preparing workspace...',
   '处理中...': 'Working on it...',
+  '正在连接 {machine}...': 'Connecting to {machine}...',
   '执行中...': 'Running...',
   // #1108 queue rows (pending steps waiting for a machine) + machines page
   // concurrency face.
@@ -1553,6 +1554,12 @@ export const EN: Record<string, string> = {
   '回复 #{seq}…': 'Reply to #{seq}…',
   '你直接对 #{n} 说：{excerpt}': 'You told #{n} directly: {excerpt}',
   'Coordinator 直接对 #{n} 说：{excerpt}': 'The Coordinator told #{n} directly: {excerpt}',
+  '任务 #{n}': 'Task #{n}',
+  '{n} 次追问': '{n#1 follow-up|# follow-ups}',
+  '你：{excerpt}': 'You: {excerpt}',
+  'Coordinator：{excerpt}': 'Coordinator: {excerpt}',
+  展开活动: 'Show activity',
+  收起活动: 'Hide activity',
   '对某个 thread 说': 'Talk to a thread',
   '正在对 #{seq} 说': 'Talking to #{seq}',
   发给谁: 'Send to',

@@ -62,14 +62,36 @@ test('the newest message keeps its actions visible', async ({ page }) => {
   await expect.poll(() => opacityOf(tools(messageOf(page, 'second answer')))).toBe(1);
 });
 
-test('touch devices keep the actions of older messages visible', async ({ browser }) => {
+test('touch devices keep only the newest message actions visible', async ({ browser }) => {
   const context = await browser.newContext({ hasTouch: true, isMobile: true });
   const page = await context.newPage();
   await mockHistory(page);
   await page.goto('/app');
   await expect(messageOf(page, 'first question')).toBeVisible();
-  await expect.poll(() => opacityOf(tools(messageOf(page, 'first question')))).toBe(1);
+  await expect.poll(() => opacityOf(tools(messageOf(page, 'first question')))).toBe(0);
+  await expect.poll(() => opacityOf(tools(messageOf(page, 'first answer')))).toBe(0);
+  await expect.poll(() => opacityOf(tools(messageOf(page, 'second answer')))).toBe(1);
   await context.close();
+});
+
+test('the reveal fades in 120ms after a 100ms hover delay with no scale', async ({ page }) => {
+  await mockHistory(page);
+  await page.goto('/app');
+  const older = messageOf(page, 'first question');
+  await page.mouse.move(0, 0);
+  const face = () =>
+    tools(older).evaluate((node) => {
+      const style = getComputedStyle(node);
+      return {
+        duration: style.transitionDuration,
+        delay: style.transitionDelay,
+        property: style.transitionProperty,
+        transform: style.transform,
+      };
+    });
+  expect(await face()).toMatchObject({ duration: '0.12s', delay: '0s', property: 'opacity', transform: 'none' });
+  await older.hover();
+  expect(await face()).toMatchObject({ duration: '0.12s', delay: '0.1s', transform: 'none' });
 });
 
 test('each message shows a relative time with the absolute time in its title', async ({ page }) => {

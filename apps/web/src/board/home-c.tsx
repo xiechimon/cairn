@@ -25,6 +25,7 @@ import type {
   TodoRecord,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { GitBranch, History, ListLines, Puzzle } from '../icons/index.js';
 import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
 import { LoadingComposer } from './loading-composer.js';
@@ -50,7 +51,15 @@ export function greetingFor(hour: number): string {
 
 const NEEDS_YOU_PINNED = 3;
 
-const STARTERS = ['做个计划', '接一个仓库', '接着最近的活', '用我的工具'] as const;
+const STARTERS = [
+  { label: '做个计划', Icon: ListLines },
+  { label: '接一个仓库', Icon: GitBranch },
+  { label: '接着最近的活', Icon: History },
+  { label: '用我的工具', Icon: Puzzle },
+] as const;
+
+const STARTER_CHIP_CLS =
+  'h-9 min-h-8 gap-1.5 rounded-full border border-(--border) bg-transparent px-3 hover:border-(--input) [&_svg]:text-(--text-tertiary)';
 
 type NeedsYouEntry = { kind: 'thread'; key: string; todo: TodoRecord; status: string };
 
@@ -306,12 +315,14 @@ export function HomeC({
       {projectLinks}
       {needsYou}
       {entries.length === 0 && (
-        <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
-          {STARTERS.map((label) => (
+        <div data-testid="home-c-starters" className="mt-4 flex flex-wrap gap-2">
+          {STARTERS.map(({ label, Icon }) => (
             <SuggestionChip
               key={label}
+              className={STARTER_CHIP_CLS}
               onClick={() => setPrefill({ text: t(label), key: Date.now() })}
             >
+              <Icon width={16} height={16} />
               {t(label)}
             </SuggestionChip>
           ))}
