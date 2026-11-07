@@ -132,7 +132,6 @@ const AGENT = [
   'agent-',
   'team-create-agent',
   'registry-focus-ring',
-  'resource-back-spa',
   'task-panel',
   'chief-home-digest',
 ];
@@ -192,7 +191,6 @@ const PAGES = [
   'accent-typo',
   'page-scroll',
   'registry-focus-ring',
-  'resource-back-spa',
   'mobile-narrow',
   'task-panel',
 ];
@@ -211,7 +209,6 @@ const RESOURCES = [
   'dialog-',
   'checkbox-unified',
   'registry-focus-ring',
-  'resource-back-spa',
   'skill-import',
   'task-panel',
   'first-pr-report',
