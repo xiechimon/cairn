@@ -202,7 +202,7 @@ function machineEntries(
         id: 'pi',
         name: 'pi',
         Mark: PiMark,
-        status: online ? t('使用团队的服务商') : t('离线'),
+        status: online ? t('使用所有机器的服务商') : t('离线'),
         tone: online ? offTone('pi', 'ok') : 'warn',
         toggle: switchFor('pi'),
       },
