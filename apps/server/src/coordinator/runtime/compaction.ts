@@ -1,4 +1,5 @@
 import {
+  COORDINATOR_MEMORY_FLUSH_TRANSCRIPT_MAX_CHARS,
   COORDINATOR_SUMMARY_MAX_CHARS,
   COORDINATOR_SUMMARY_PROMPT_HEAD,
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
@@ -18,6 +19,7 @@ export const COMPACTION_RESERVE_TOKENS = 16_384;
 export const KEEP_RECENT_TOKENS = 8_000;
 const TOOL_ARGS_CHARS = 200;
 const SUMMARY_MEMO = 'cairn-c2-summary';
+const FLUSH_MEMO = 'cairn-c4-memory-flush';
 const SUMMARY_SYSTEM_PROMPT = "You are Cairn's Coordinator summarization step.";
 
 export interface ModelRef {
@@ -26,6 +28,10 @@ export interface ModelRef {
 }
 
 export type Summarize = (prompt: string) => Promise<string>;
+
+export interface MemoryFlush {
+  run(transcript: string, summarize: Summarize): Promise<void>;
+}
 
 export interface CompactionWindow {
   blockingAt: number;
@@ -101,6 +107,21 @@ export function transcriptLines(messages: readonly Message[]): string[] {
   return lines;
 }
 
+export function flushTranscript(
+  lines: readonly string[],
+  maxChars = COORDINATOR_MEMORY_FLUSH_TRANSCRIPT_MAX_CHARS,
+): string {
+  const kept: string[] = [];
+  let used = 0;
+  for (const line of [...lines].reverse()) {
+    const text = line.length > maxChars ? line.slice(0, maxChars) : line;
+    if (kept.length > 0 && used + text.length + 1 > maxChars) break;
+    kept.unshift(text);
+    used += text.length + 1;
+  }
+  return kept.join('\n');
+}
+
 export function summaryBatches(
   lines: readonly string[],
   maxChars = COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
@@ -159,7 +180,10 @@ export function summarizerFor(
   };
 }
 
-export function coordinatorCompactionExtension(summaryModel: () => ModelRef | null) {
+export function coordinatorCompactionExtension(
+  summaryModel: () => ModelRef | null,
+  flush: () => MemoryFlush | null = () => null,
+) {
   return defineExtension({
     name: 'cairn-coordinator-compaction',
     hooks: [
@@ -169,11 +193,15 @@ export function coordinatorCompactionExtension(summaryModel: () => ModelRef | nu
           if (cached !== undefined) return { summary: cached };
           const summarize = summarizerFor(api.models, summaryModel());
           const { previous, rest } = splitPreviousSummary(compaction.messages);
-          const summary = await foldSummary(
-            previous,
-            summaryBatches(transcriptLines(rest)),
-            summarize,
-          );
+          const lines = transcriptLines(rest);
+          const flusher = flush();
+          if (flusher !== null && (await api.memo<boolean>(FLUSH_MEMO, context)) === undefined) {
+            try {
+              await flusher.run(flushTranscript(lines), summarize);
+            } catch {}
+            await api.memo(FLUSH_MEMO, true, context);
+          }
+          const summary = await foldSummary(previous, summaryBatches(lines), summarize);
           return { summary: await api.memo(SUMMARY_MEMO, summary, context) };
         },
       }),

@@ -33,6 +33,7 @@ import {
   scrubProviderError,
 } from './credentials.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
+import { createMemoryFlush } from './memory-flush.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
 import type { SeedRow } from './runtime/seed.js';
@@ -248,6 +249,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
       ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
       factsFor,
+      memoryFlush: (threadId) => {
+        const teamId = threadTeam(threadId);
+        if (teamId === null) return null;
+        return createMemoryFlush(db, { teamId, threadId }, (result) =>
+          logger.info({ threadId, ...result }, 'coordinator memory flushed before compaction'),
+        );
+      },
       recordConversation: (threadId, conversationId, entryId) => {
         db.update(coordinatorConversation)
           .set({ conversationId, lastMirroredEntryId: String(entryId), updatedAt: nowMs() })
