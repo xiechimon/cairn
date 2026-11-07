@@ -4,15 +4,13 @@ import { openChiefWindow } from './helpers.js';
 const drawer = (page: Page) => page.locator('.chief-drawer');
 const minimize = (page: Page) => drawer(page).getByRole('button', { name: '最小化' });
 
-// the window enters with fade + scale (ADR 0013 D7) — measure only after the
-// entrance animation settles so transforms are off the boxes
 async function settled(page: Page) {
   await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 }
 
 const WIN_BOX = { x: 1440 - 8 - 380, y: 732 - 8 - 600, width: 380, height: 600 };
 
-const SHEET_W = 1440 - 248 - 8;
+const SHEET_W = 1440 - 248 - 16 - 2;
 
 test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc never closes the panel on a page route (D3)', async ({ page }) => {
@@ -88,7 +86,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
         left: el.getBoundingClientRect().left,
       };
     });
-    // an overlay anchored to the corner, not an in-flow column (D10)
     expect(skin.position).toBe('fixed');
 
     expect(skin.radius).toBe('18px');
@@ -103,7 +100,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
 
     expect(skin.left).toBeGreaterThanOrEqual(skin.sidebarRight);
 
-    // D1: the form toggle is retired — neither label exists anywhere
     await expect(page.locator('button[aria-label="全屏"]')).toHaveCount(0);
     await expect(page.locator('button[aria-label="退出全屏"]')).toHaveCount(0);
   });
@@ -150,8 +146,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await expect(cards.nth(2)).toContainText('总结一下我所有项目现在的进展');
     await expect(cards.nth(3)).toContainText('查一下这个月的 token 用量');
 
-    // the fixture face has no send callback (#129): clicking a card must
-    // not swap the hero for a thread view or crash the surface
     await cards.nth(0).click();
     await expect(drawer(page)).toBeVisible();
     await expect(examples).toBeVisible();
