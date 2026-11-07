@@ -5,7 +5,6 @@ import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
 let serverContextOn = false;
-let sidecarMachineId: string | null = null;
 let inServer = false;
 let wakeThread: (threadId: string) => void = () => {};
 
@@ -33,20 +32,8 @@ export function coordinatorServerContextEnabled(): boolean {
   return serverContextOn;
 }
 
-export function setCoordinatorMachineId(machineId: string | null): void {
-  sidecarMachineId = machineId;
-}
-
-export function coordinatorMachineId(): string | null {
-  return sidecarMachineId;
-}
-
-export function coordinatorSidecarEnabled(): boolean {
-  return sidecarMachineId !== null;
-}
-
 export function coordinatorRunsOnPi(): boolean {
-  return serverContextOn || inServer || coordinatorSidecarEnabled();
+  return serverContextOn || inServer;
 }
 
 function contextWindowOf(db: Db, teamId: string, usageModel: string): number {

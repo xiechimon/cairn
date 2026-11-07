@@ -44,11 +44,7 @@ import {
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-limit.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import {
-  coordinatorInServerEnabled,
-  coordinatorMachineId,
-  coordinatorSidecarEnabled,
-} from './coordinator-context.js';
+import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import {
@@ -160,11 +156,7 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .orderBy(asc(step.createdAt))
     .all()
     .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
-    .filter(
-      (row) =>
-        !sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow) &&
-        !serverTakesTurn(deps.db, teamId, row.stepRow),
-    );
+    .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
 }
 
 export function serverTakesTurn(
@@ -178,48 +170,6 @@ export function serverTakesTurn(
     !isChiefDigestStep(stepRow) &&
     coordinatorRoute(db, teamId) !== null
   );
-}
-
-function sidecarTakesTurn(
-  deps: MachineDeps,
-  teamId: string,
-  stepRow: typeof step.$inferSelect,
-  agentRow: RouteProfile,
-): boolean {
-  if (!coordinatorSidecarEnabled() || isChiefDigestStep(stepRow) || !agentRow.modelId) return false;
-  const model = effectiveModel(agentRow, stepRow);
-  return (
-    stepRuntimeFor(model.provider) === 'pi' &&
-    claudeUsageGatePasses(deps, { teamId, claudeCodeReport: null }, model)
-  );
-}
-
-function coordinatorTurnCandidates(deps: MachineDeps, machineId: string, teamId: string) {
-  return deps.db
-    .select({ stepRow: step, threadRow: chiefThread, ruleRow: routingRule })
-    .from(step)
-    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .innerJoin(
-      routingRule,
-      and(eq(routingRule.teamId, chiefThread.teamId), eq(routingRule.use, 'coordinator')),
-    )
-    .where(
-      and(
-        eq(step.kind, 'chief'),
-        eq(chiefThread.teamId, teamId),
-        or(
-          and(eq(step.status, 'claimed'), eq(step.machineId, machineId)),
-          and(
-            eq(step.status, 'pending'),
-            or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
-          ),
-        ),
-      ),
-    )
-    .orderBy(asc(step.createdAt))
-    .all()
-    .map((row) => ({ ...row, agentRow: routeProfile(row.ruleRow) }))
-    .filter((row) => sidecarTakesTurn(deps, teamId, row.stepRow, row.agentRow));
 }
 
 export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
@@ -335,41 +285,6 @@ function chiefClaimPayload(
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(digest ? { remoteToolsOnly: true as const } : {}),
   };
-}
-
-function claimCoordinatorTurn(
-  deps: MachineDeps,
-  machineId: string,
-  teamId: string,
-): ClaimedStep | null {
-  if (machineId !== coordinatorMachineId()) return null;
-  const { db } = deps;
-  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  if (!machineRow) return null;
-  for (const cand of coordinatorTurnCandidates(deps, machineId, teamId)) {
-    if (cand.stepRow.status === 'claimed') {
-      return chiefClaimPayload(
-        deps,
-        machineId,
-        cand.stepRow,
-        cand.threadRow,
-        cand.agentRow,
-        machineRow,
-      );
-    }
-    if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
-    if (!claimPendingChiefStep(db, cand.stepRow, machineId)) continue;
-    publishStepStatus(deps, cand.stepRow.id);
-    return chiefClaimPayload(
-      deps,
-      machineId,
-      cand.stepRow,
-      cand.threadRow,
-      cand.agentRow,
-      machineRow,
-    );
-  }
-  return null;
 }
 
 function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
@@ -728,14 +643,6 @@ export async function claimStep(
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
-  if (body?.role === 'coordinator') {
-    if (machineId !== coordinatorMachineId()) return null;
-    const first = claimCoordinatorTurn(deps, machineId, teamId);
-    if (first) return first;
-    await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
-    if (signal?.aborted || !stillAuthorized()) return null;
-    return claimCoordinatorTurn(deps, machineId, teamId);
-  }
   const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers, stillAuthorized);
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);

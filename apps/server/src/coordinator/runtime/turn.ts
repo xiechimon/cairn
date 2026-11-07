@@ -1,6 +1,6 @@
 import type { ClaimedStep, MachineDoneBody, ModelUsage } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
-import type { AssistantMessage } from '@earendil-works/pi-ai';
+import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai';
 import { AssistantEntry, type EntryRecord, type Harness } from '@earendil-works/pi-durable';
 import { compactionWindow, estimateTokens, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
@@ -8,6 +8,7 @@ import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
 import type { ConversationGate, StepGate } from './tools.js';
+import { emitTurnSpans } from './turn-spans.js';
 import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
@@ -150,7 +151,11 @@ export async function runCoordinatorTurn(
     }, deps.stopPollMs ?? STOP_POLL_MS);
     await foldBeforeModelSwitch(deps, root, { provider, modelId });
     await root.configure(
-      { model: { provider, modelId }, instructions: claimed.chief.systemPrompt },
+      {
+        model: { provider, modelId },
+        instructions: claimed.chief.systemPrompt,
+        thinkingLevel: (claimed.agent?.thinkingLevel ?? null) as ModelThinkingLevel | null,
+      },
       context,
     );
     const newest = (await root.entries({}, 1, undefined, context)).items[0]?.id;
@@ -178,6 +183,11 @@ export async function runCoordinatorTurn(
         ? []
         : (await root.entries({ minEntryId: settled.entry }, 500, undefined, context)).items;
     await mirror.flush(turnEntries);
+    emitTurnSpans(
+      { threadId: claimed.chief.threadId, stepId, provider, model: modelId },
+      turnEntries,
+      deps.now,
+    );
     clearInterval(stopPoll);
     if (stopping !== null) {
       await stopping;
