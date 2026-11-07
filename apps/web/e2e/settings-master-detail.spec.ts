@@ -42,6 +42,37 @@ test('search is quiet, shows a / hint and the / key focuses it', async ({ page }
   await expect(search).toHaveValue('');
 });
 
+const ringOf = (locator: Locator) =>
+  locator.evaluate((el) => {
+    const css = getComputedStyle(el);
+    const shadow = css.boxShadow.replace(/rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, )?/g, '').trim();
+    return { outline: css.outlineStyle, shadow: shadow === '' ? 'none' : shadow };
+  });
+
+test('search shows one ring on the whole pill while focused, and Esc clears and blurs it', async ({
+  page,
+}) => {
+  await page.goto(MACHINES);
+  const search = settings(page).getByLabel('搜索设置');
+  const pill = settings(page).getByTestId('settings-search');
+  expect(await ringOf(pill)).toMatchObject({ shadow: 'none' });
+  await page.keyboard.press('/');
+  await expect(search).toBeFocused();
+  expect((await ringOf(pill)).shadow).not.toBe('none');
+  const focusedInput = await ringOf(search);
+  expect(focusedInput.outline).toBe('none');
+  expect(focusedInput.shadow).toBe('none');
+  await page.keyboard.type('机');
+  await page.keyboard.press('Escape');
+  await expect(search).not.toBeFocused();
+  await expect(search).toHaveValue('');
+  await expect(settings(page)).toBeVisible();
+  expect(await ringOf(pill)).toMatchObject({ shadow: 'none' });
+  const idleInput = await ringOf(search);
+  expect(idleInput.outline).toBe('none');
+  expect(idleInput.shadow).toBe('none');
+});
+
 test('typing a slash inside another field does not steal focus', async ({ page }) => {
   await page.goto('/app/settings/providers?scenario=providers-fleet');
   const name = settings(page).getByLabel('名称');
