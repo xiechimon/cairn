@@ -206,3 +206,122 @@ test('the drawer follows a send and its streaming growth too', async ({ page }) 
     await expect.poll(gap).toBeLessThanOrEqual(2);
   }
 });
+
+for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-light'] as const) {
+  test(`jump to latest is instant with ${activation} through a long lazy history`, async ({
+    page,
+  }) => {
+    if (activation === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' });
+    if (activation === 'phone-light') {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: 'light' });
+    }
+    const history = historyOf(100);
+    for (const [index, message] of history.entries()) {
+      message.content = `${index === 99 ? 'Latest delivery report' : `Delivery review ${index}`}\n\n${'The deployment checks passed and the change is ready for review. '.repeat((index % 7) + 1)}`;
+    }
+    await mockLive(page, { threads: [THREAD], messages: history });
+    await page.goto('/app');
+    const body = viewport(page);
+    const jump = home(page).getByTestId('jump-to-latest');
+    await expect(row(page, 'Latest delivery report')).toBeAttached();
+    await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    await body.evaluate((node) => {
+      node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+      for (const item of node.querySelectorAll<HTMLElement>(
+        '[data-slot="message-scroller-item"]',
+      )) {
+        item.style.contentVisibility = 'auto';
+      }
+      node.scrollTop = 0;
+    });
+    await expect(jump).toHaveAttribute('data-active', 'true');
+    expect(await body.evaluate((node) => node.scrollHeight / node.clientHeight)).toBeGreaterThan(5);
+    expect(
+      await body
+        .locator('[data-slot="message-scroller-item"]')
+        .first()
+        .evaluate((node) => getComputedStyle(node).contentVisibility),
+    ).toBe('auto');
+    await jump.hover();
+    const transitions = await jump.evaluate((node) => ({
+      property: getComputedStyle(node).transitionProperty,
+      duration: getComputedStyle(node).transitionDuration,
+    }));
+    await jump.evaluate((button) => {
+      button.addEventListener(
+        'click',
+        () => {
+          const started = performance.now();
+          const root = button.closest('[data-slot="message-scroller"]');
+          const viewport = root?.querySelector('[data-slot="message-scroller-viewport"]');
+          if (!(viewport instanceof HTMLElement)) throw new Error('Missing conversation viewport');
+          const sample = () => {
+            const elapsed = performance.now() - started;
+            if (elapsed < 100) return requestAnimationFrame(sample);
+            const latest = [...viewport.querySelectorAll('[data-slot="message-scroller-item"]')].at(
+              -1,
+            );
+            const bounds = viewport.getBoundingClientRect();
+            const rect = latest?.getBoundingClientRect();
+            button.setAttribute(
+              'data-jump-measurement',
+              JSON.stringify({
+                elapsed,
+                gap: viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight,
+                opacity: getComputedStyle(button).opacity,
+                duration: getComputedStyle(button).transitionDuration,
+                latestVisible:
+                  rect != null && rect.bottom <= bounds.bottom + 2 && rect.bottom > bounds.top,
+              }),
+            );
+          };
+          requestAnimationFrame(sample);
+        },
+        { once: true },
+      );
+    });
+    if (activation === 'Enter' || activation === 'Space') {
+      await jump.focus();
+      await jump.press(activation === 'Space' ? 'Space' : 'Enter');
+    } else {
+      await page.mouse.down();
+      expect(await jump.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe('0s');
+      await page.mouse.up();
+    }
+    await jump.evaluate(async (node) => {
+      while (!node.hasAttribute('data-jump-measurement')) {
+        await new Promise(requestAnimationFrame);
+      }
+    });
+    const measurement = JSON.parse((await jump.getAttribute('data-jump-measurement')) ?? '{}') as {
+      elapsed: number;
+      gap: number;
+      opacity: string;
+      duration: string;
+      latestVisible: boolean;
+    };
+    if (activation === 'click') {
+      await page.screenshot({
+        path: `../../docs/verify/jump-latest-instant/${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-100ms.png`,
+      });
+    }
+    expect(measurement.elapsed).toBeLessThanOrEqual(150);
+    expect.soft(measurement.gap).toBeLessThanOrEqual(2);
+    expect.soft(measurement.latestVisible).toBe(true);
+    expect.soft(measurement.opacity).toBe('0');
+    expect
+      .soft(measurement.duration.split(',').every((value: string) => parseFloat(value) === 0))
+      .toBe(true);
+    expect
+      .soft(
+        transitions.property === 'none' ||
+          transitions.duration.split(',').every((value) => parseFloat(value) === 0),
+      )
+      .toBe(true);
+    await page.waitForTimeout(250);
+    await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    await expect(jump).toHaveAttribute('data-active', 'false');
+    expect(await body.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  });
+}
