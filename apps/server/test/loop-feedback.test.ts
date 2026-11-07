@@ -601,6 +601,7 @@ describe('correction loop', () => {
     const gh = mergeGithubFake({ 42: { state: 'open', merged: false } }, () =>
       conversationBranch('build-feedback'),
     );
+    gh.setGreenRequiredChecks(checkpoint);
     gh.onPut = () => {
       s.db
         .delete(message)

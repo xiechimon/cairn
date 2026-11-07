@@ -77,6 +77,7 @@ function makeWorld(opts: WorldOpts = {}): World {
     prNumber === null ? {} : { [prNumber]: { state: 'open', merged: false, ...opts.pull } },
     () => conversationBranch(buildId),
   );
+  fake.setGreenRequiredChecks(opts.pull?.headSha ?? CP);
   const s = bootServer({ githubFetch: fake.fetch });
   disposables.push(() => s.dispose());
   s.db
@@ -257,6 +258,158 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.phase()).toBe('review');
   });
 
+  test.each([
+    ['failure', 'completed', 'failure'],
+    ['in progress', 'in_progress', null],
+    ['missing', null, null],
+  ] as const)(
+    'required check %s returns HTTP 409 naming it without a merge PUT',
+    async (_name, status, conclusion) => {
+      const w = makeWorld();
+      w.fake.checkAnswers['/check-runs'] = {
+        status: 200,
+        body: {
+          total_count: status === null ? 0 : 1,
+          check_runs:
+            status === null
+              ? []
+              : [{ id: 1, name: 'check', head_sha: CP, status, conclusion, app: null }],
+        },
+      };
+      const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: expect.stringContaining('"check"') });
+      expect(w.fake.puts()).toHaveLength(0);
+      expectUntouched(w);
+    },
+  );
+
+  test('human merge succeeds with no classic required checks and no rulesets', async () => {
+    const w = makeWorld();
+    w.fake.checkAnswers['/branches/main'] = { status: 200, body: { protected: false } };
+    w.fake.checkAnswers['/check-runs'] = {
+      status: 200,
+      body: { total_count: 0, check_runs: [] },
+    };
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(202);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('done');
+  });
+
+  test.each([
+    [404, 'Not Found', 'success'],
+    [404, 'Not Found', 'failure'],
+    [
+      403,
+      'Upgrade to GitHub Pro or make this repository public to enable this feature.',
+      'success',
+    ],
+  ] as const)(
+    'rules endpoint %s (%s) defers to classic required checks with %s',
+    async (status, message, conclusion) => {
+      const w = makeWorld();
+      w.fake.checkAnswers['/rules/branches/main'] = { status, body: { message } };
+      w.fake.checkAnswers['/check-runs'] = {
+        status: 200,
+        body: {
+          total_count: 1,
+          check_runs: [
+            { id: 1, name: 'check', head_sha: CP, status: 'completed', conclusion, app: null },
+          ],
+        },
+      };
+      const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+      expect(response.status).toBe(conclusion === 'success' ? 202 : 409);
+      expect(w.fake.puts()).toHaveLength(conclusion === 'success' ? 1 : 0);
+      if (conclusion !== 'success') {
+        expect(await response.json()).toEqual({ error: expect.stringContaining('"check"') });
+        expectUntouched(w);
+      } else {
+        expect(w.phase()).toBe('done');
+      }
+    },
+  );
+
+  test.each<Answer>([
+    { status: 403, body: { message: 'Resource not accessible by integration' } },
+    { status: 401, body: { message: 'Upgrade to GitHub Pro' } },
+    {
+      status: 403,
+      body: { message: 'Upgrade to GitHub Pro' },
+      headers: { 'x-ratelimit-remaining': '0' },
+    },
+    { status: 429, body: { message: 'Too many requests' } },
+    'network',
+    'timeout',
+  ])('unreadable rules endpoint %j refuses human merge without a PUT', async (answer) => {
+    const w = makeWorld();
+    w.fake.checkAnswers['/rules/branches/main'] = answer;
+    const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: expect.stringContaining('required-checks-unreadable'),
+    });
+    expect(w.fake.puts()).toHaveLength(0);
+    expectUntouched(w);
+  });
+
+  test.each(['/branches/main', '/rules/branches/main'])(
+    'unreadable required checks at %s return HTTP 409 without a merge PUT',
+    async (path) => {
+      const w = makeWorld();
+      w.fake.checkAnswers[path] = { status: 503, body: {} };
+      const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        error: expect.stringContaining('required-checks-unreadable'),
+      });
+      expect(w.fake.puts()).toHaveLength(0);
+      expectUntouched(w);
+    },
+  );
+
+  test.each(['failure', 'pending', 'success'] as const)(
+    'required commit status %s follows readiness rules at the pinned head',
+    async (state) => {
+      const w = makeWorld();
+      w.fake.checkAnswers['/check-runs'] = {
+        status: 200,
+        body: { total_count: 0, check_runs: [] },
+      };
+      w.fake.checkAnswers['/status'] = {
+        status: 200,
+        body: {
+          sha: CP,
+          total_count: 1,
+          statuses: [
+            { context: 'check', state, description: null, updated_at: '2026-11-06T00:00:00Z' },
+          ],
+        },
+      };
+      const response = await req(w.s.app, 'POST', `/api/builds/${w.buildId}/merge`);
+      expect(response.status).toBe(state === 'success' ? 202 : 409);
+      expect(w.fake.puts()).toHaveLength(state === 'success' ? 1 : 0);
+      if (state !== 'success') {
+        expect(await response.json()).toEqual({ error: expect.stringContaining('"check"') });
+        expectUntouched(w);
+      }
+    },
+  );
+
+  test('checks read at another head fail closed without a merge PUT', async () => {
+    const w = makeWorld();
+    w.fake.checkAnswers['/status'] = {
+      status: 200,
+      body: { sha: 'a'.repeat(40), total_count: 0, statuses: [] },
+    };
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(err.message).toContain('checks not read at the PR head');
+    expect(w.fake.puts()).toHaveLength(0);
+    expectUntouched(w);
+  });
+
   test('[2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done', async () => {
     const w = makeWorld({ pendingVerify: true });
     const result = await requestMerge(w.deps, w.buildId, 'Xmon');
@@ -264,6 +417,10 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.fake.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       'GET https://api.github.com/repos/octo/demo/pulls/201',
       'GET https://api.github.com/repos/octo/demo/issues?state=open&labels=autonomy-paused&per_page=100&page=1',
+      'GET https://api.github.com/repos/octo/demo/branches/main',
+      'GET https://api.github.com/repos/octo/demo/rules/branches/main?per_page=100&page=1',
+      `GET https://api.github.com/repos/octo/demo/commits/${CP}/check-runs?filter=latest&per_page=100&page=1`,
+      `GET https://api.github.com/repos/octo/demo/commits/${CP}/status?per_page=100&page=1`,
       'PUT https://api.github.com/repos/octo/demo/pulls/201/merge',
     ]);
     const put = w.fake.puts()[0] as Recorded;
