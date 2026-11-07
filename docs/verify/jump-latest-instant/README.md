@@ -13,7 +13,7 @@ Use `JUMP_EVIDENCE_PHASE=before` on a tree with `jump-to-latest.tsx` from main t
 ## Files
 
 - `before-frames-*.json`, `after-frames-*.json`: per-animation-frame `{t, top, gap, opacity}` from the click for about half a second, for click, Enter, Space, reduced motion and phone (390px, light, 4x CPU throttle). The e2e fails on main and passes here.
-- `before-100ms.png`, `after-100ms.png`: screenshot at the first frame at or after 100ms in the click case.
+- `before-window-end.png`, `after-window-end.png`: screenshot taken when the click sampling window ends (about half a second after the click).
 - `claude-ai-frames.json`: the same probe on claude.ai. It also lands in one scroll event, but fades the button over 0.2s.
 - `live-1440-dark.png`, `live-390-light.png`: seeded real server and SQLite, gap 0 after one click.
 

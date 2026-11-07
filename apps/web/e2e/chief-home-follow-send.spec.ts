@@ -320,7 +320,7 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
       latestVisible: boolean;
     };
     if (activation === 'click') {
-      await evidenceShot(page, `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-100ms.png`);
+      await evidenceShot(page, `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-window-end.png`);
     }
     await evidenceJson(
       `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-frames-${activation}.json`,
