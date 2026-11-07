@@ -281,6 +281,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   setFailureSink({
     log: (fields, message) => logger.error(fields, message),
     stepOf: (threadId) => liveSteps(threadId)[0]?.id ?? null,
+    scrub: (threadId, message) => {
+      const teamId = threadTeam(threadId);
+      if (teamId === null) return message;
+      const providers = coordinatorProviders({ db, box: machine.box }, teamId);
+      const keyed = [providers?.router.provider, providers?.summary.provider].filter(
+        (id): id is string => id !== undefined,
+      );
+      return scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
+    },
   });
 
   const heldLease = (threadId: string): Lease | null => {

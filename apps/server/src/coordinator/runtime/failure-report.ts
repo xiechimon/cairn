@@ -17,12 +17,14 @@ export interface FailureScope {
 export interface FailureSink {
   log(fields: object, message: string): void;
   stepOf(threadId: string): string | null;
+  scrub(threadId: string, message: string): string;
 }
 
 const stderrSink: FailureSink = {
   log: (fields, message) =>
     process.stderr.write(`${JSON.stringify({ ...fields, msg: message })}\n`),
   stepOf: () => null,
+  scrub: (_threadId, message) => message,
 };
 
 let sink: FailureSink = stderrSink;
@@ -53,7 +55,10 @@ export function reportCompactionFailure(
   const count = (counts.get(stage) ?? 0) + 1;
   counts.set(stage, count);
   const errorClass = error instanceof Error ? error.name : typeof error;
-  const message = otelErrorMessage(error instanceof Error ? error.message : String(error));
+  const raw = error instanceof Error ? error.message : String(error);
+  const message = otelErrorMessage(
+    scope.threadId === undefined ? raw : sink.scrub(scope.threadId, raw),
+  );
   const stepId =
     scope.stepId ?? (scope.threadId === undefined ? null : sink.stepOf(scope.threadId));
   try {

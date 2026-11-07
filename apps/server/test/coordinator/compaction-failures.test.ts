@@ -12,6 +12,7 @@ import {
 import {
   COMPACTION_FAILURE_LOG,
   compactionFailureCounts,
+  reportCompactionFailure,
   resetCompactionFailureCounts,
   setFailureSink,
 } from '../../src/coordinator/runtime/failure-report.js';
@@ -41,6 +42,7 @@ beforeEach(() => {
   spans = [];
   resetCompactionFailureCounts();
   setFailureSink({
+    scrub: (_threadId, message) => message,
     log: (fields, message) => logs.push({ fields: fields as Record<string, unknown>, message }),
     stepOf: () => null,
   });
@@ -340,5 +342,28 @@ describe('compaction failures are never silent', () => {
     expect(() => parseFlushOutput('I saved nothing.')).toThrow(/memory flush output/);
     expect(() => parseFlushOutput('{"memories":"x"}')).toThrow(/memory flush output/);
     expect(parseFlushOutput('{"memories":[]}')).toEqual([]);
+  });
+
+  it('removes the resolved provider key from the log and the span even when it has no known prefix', async () => {
+    const credential = 'custom-provider-credential-1234567890';
+    const w = await world('hi', credential);
+    const { faux } = stub('unused');
+    boot(w, faux, {
+      logger: {
+        info: () => {},
+        warn: () => {},
+        error: (fields: object, message: string) =>
+          logs.push({ fields: fields as Record<string, unknown>, message }),
+      },
+    });
+    reportCompactionFailure(
+      { threadId: w.threadId },
+      'memory-flush',
+      new Error(`401 incorrect API key provided: ${credential}`),
+    );
+    await flushSpans();
+    expect(failureLogs()).toHaveLength(1);
+    expect(JSON.stringify(logs)).not.toContain(credential);
+    expect(JSON.stringify(spans)).not.toContain(credential);
   });
 });

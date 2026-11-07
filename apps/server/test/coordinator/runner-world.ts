@@ -36,7 +36,7 @@ export interface World {
   storageDir: string;
 }
 
-export async function world(content = 'hello'): Promise<World> {
+export async function world(content = 'hello', apiKey = KEY): Promise<World> {
   const s = bootServer();
   closers.push(() => s.dispose());
   const teamId = s.team.id;
@@ -49,7 +49,7 @@ export async function world(content = 'hello'): Promise<World> {
         label: 'Stub',
         baseUrl: 'http://127.0.0.1:9',
         api: 'openai-completions',
-        apiKey: KEY,
+        apiKey,
         models: [{ id: 'm', name: 'm' }],
       },
       createdBy: s.user.id,
