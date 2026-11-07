@@ -75,7 +75,7 @@ const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = 'w-full max-w-full';
 const BUBBLE_USER_CLS =
-  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title [overflow-wrap:anywhere] text-(--foreground)';
+  'w-fit max-w-full min-w-0 rounded-(--cds-radius-xl) bg-(--bubble-base) px-3 py-2 text-card-title break-words text-(--foreground)';
 const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 const MARKER_NOTE_CLS = 'my-2.5 text-meta text-(--text-tertiary)';
 const MARKER_CONTENT_CLS = 'max-w-[85%]';
@@ -257,7 +257,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
 const messageToolsReveal = (latest: boolean) =>
   latest
     ? 'opacity-100'
-    : 'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+    : 'opacity-0 transition-opacity duration-(--dur-fast) group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 
 const messageToolsPlace = (latest: boolean, side: 'left' | 'right', flowGap: string) =>
   latest ? flowGap : `absolute top-full z-10 ${side === 'right' ? 'right-0' : 'left-0'}`;

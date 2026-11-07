@@ -11,6 +11,7 @@ async function press(page: Page, control: Locator) {
   const box = await control.boundingBox();
   if (box === null) throw new Error('control has no box');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(250);
   const resting = await control.evaluate((el) => getComputedStyle(el).boxShadow);
   await page.mouse.down();
   expect(await control.evaluate((el) => el.matches(':active')), 'the control is pressed').toBe(true);
@@ -68,15 +69,15 @@ for (const surface of SURFACES) {
   });
 }
 
-test('a pressed conversation pane button stays flat with no transition', async ({
+test('a pressed ghost button lays a tint over its own background at once, with no transition', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/app?scenario=home-c');
   const control = page.getByTestId('home-c-pane-buttons').getByRole('button', { name: '任务' });
   const { resting, pressed } = await press(page, control);
-  expect(resting).toBe('none');
-  expect(pressed.shadow).toBe('none');
+  expect(pressed.shadow).not.toBe(resting);
+  expect(pressed.shadow).toContain('inset');
   expect(pressed.duration).toBe('0s');
   expect(pressed.transform).toBe('none');
 });
