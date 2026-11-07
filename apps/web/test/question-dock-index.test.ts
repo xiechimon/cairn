@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampQuestionIndex, coordinatorBadgeCount } from '../src/chief/question-dock-index.js';
+import { clampQuestionIndex } from '../src/chief/question-dock-index.js';
 import { originChiefQuestions } from '../src/chief/question-origin.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 
@@ -22,12 +22,6 @@ describe('question dock index', () => {
     expect(clampQuestionIndex(1, 1)).toBe(0);
     expect(clampQuestionIndex(5, 0)).toBe(0);
     expect(clampQuestionIndex(-1, 3)).toBe(0);
-  });
-
-  it('adds pending questions to the Coordinator badge', () => {
-    expect(coordinatorBadgeCount(0, 0)).toBe(0);
-    expect(coordinatorBadgeCount(2, 0)).toBe(2);
-    expect(coordinatorBadgeCount(1, 2)).toBe(3);
   });
 
   it('counts only pending questions', () => {

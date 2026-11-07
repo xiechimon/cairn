@@ -505,7 +505,7 @@ for (const locale of ['zh', 'en'] as const) {
       });
       expect(defects).toEqual([]);
       const dock = drawer.getByTestId('chief-question-dock');
-      await expect(dock.getByTestId('chief-question-dismiss')).toBeInViewport({ ratio: 1 });
+      await expect(dock.getByTestId('chief-question-more')).toBeInViewport({ ratio: 1 });
       await expect(drawer.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
     });
   }
@@ -607,7 +607,7 @@ for (const size of [
   { name: 'drawer', url: '/app/schedules?chief=chief-home', width: 1440, height: 900 },
   { name: '375px phone', url: '/app/schedules?chief=chief-home', width: 375, height: 667 },
 ]) {
-  test(`a very long header and prompt scroll inside the card and keep dismiss and submit clickable (${size.name})`, async ({
+  test(`a very long header and prompt scroll inside the card and keep the more menu and submit clickable (${size.name})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -619,7 +619,7 @@ for (const size of [
     await expect.poll(async () => (await card.boundingBox())!.height).toBeLessThanOrEqual(size.height * 0.4 + 1);
     await drawer.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
     await drawer.getByTestId('chief-question-option-0-0').click();
-    const dismiss = card.getByTestId('chief-question-dismiss');
+    const dismiss = card.getByTestId('chief-question-more');
     const submit = drawer.getByTestId('chief-question-primary');
     await expect(dismiss).toBeInViewport({ ratio: 1 });
     await expect(submit).toBeInViewport({ ratio: 1 });
