@@ -46,6 +46,11 @@ describe('thread report rows with the session line', () => {
     expect(html).toContain('Waiting on the export format');
   });
 
+  test('a report line wraps instead of being clipped', () => {
+    const html = render({ ...REPORT, phase: 'needs-you', id: 'r6', line: 'Which export format?' });
+    expect(html).not.toContain('truncate');
+  });
+
   test('an older row without a line renders as before', () => {
     const html = render({ ...REPORT, id: 'r2' });
     expect(plain(html)).toContain('Task #3 Export');

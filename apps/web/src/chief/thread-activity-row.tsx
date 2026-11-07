@@ -17,6 +17,8 @@ const REF_PATTERN = `#${REF_MARK}`;
 
 const ROW_CLS =
   'flex min-h-6 min-w-0 items-center gap-1.5 text-meta leading-5 text-(--text-tertiary)';
+const EVENT_CLS =
+  'flex min-h-6 min-w-0 items-start gap-1.5 text-meta leading-5 text-(--text-tertiary)';
 const ICON_CLS = 'flex-none text-(--text-tertiary)';
 const TOGGLE_CLS =
   "-my-0.5 size-6 min-h-0 flex-none cursor-pointer justify-center rounded-md border-0 bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
@@ -55,9 +57,9 @@ export function ThreadEventLine({
   const sentence = useRefSentence();
   const phase = item.kind === 'thread-report' ? item.phase : undefined;
   return (
-    <div className={ROW_CLS} data-testid={testId ?? eventTestId(item)} data-phase={phase}>
-      <FileText width={14} height={14} className={ICON_CLS} />
-      <span className="min-w-0 truncate">
+    <div className={EVENT_CLS} data-testid={testId ?? eventTestId(item)} data-phase={phase}>
+      <FileText width={14} height={14} className={`${ICON_CLS} mt-0.5`} />
+      <span className="min-w-0 break-words">
         {item.kind === 'thread-report'
           ? sentence('任务 #{n} {title}：{status}', item.todoId, item.seqNum, {
               title: item.title,
