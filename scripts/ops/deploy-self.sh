@@ -233,7 +233,7 @@ host_tools_alarm() {
 step_counts() {
   local cutoff=$(( ($(date +%s) - STEP_STALE_SECONDS) * 1000 ))
   sqlite3 -readonly -separator ' ' "$DB" \
-    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed'"
+    "select count(*), coalesce(sum(case when lastHeartbeatAt is null or lastHeartbeatAt < $cutoff then 1 else 0 end), 0) from step where status = 'claimed' and coalesce(buildId, '') not like 'chief-digest-%'"
 }
 
 step_wait_alarm() {

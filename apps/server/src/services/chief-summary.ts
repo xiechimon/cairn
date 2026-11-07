@@ -21,6 +21,7 @@ import { coordinatorServerContextEnabled } from './coordinator-context.js';
 
 export const SUMMARY_WINDOW_MESSAGES = 50;
 export const SUMMARY_BATCH_MESSAGES = 50;
+export const SUMMARY_BATCH_MAX_MESSAGES = 400;
 export const SUMMARY_MAX_CHARS = COORDINATOR_SUMMARY_MAX_CHARS;
 
 const SUMMARY_META_RE = /\nSummary thread=(\S+) through=(\S+) count=(\d+)$/;
@@ -127,6 +128,7 @@ function queueSummary(
   deps: DigestDeps,
   chiefRow: typeof chief.$inferSelect,
   thread: ThreadRow,
+  uncompacted: number,
   now: number,
 ) {
   const { db } = deps;
@@ -135,7 +137,7 @@ function queueSummary(
     .from(chiefMessage)
     .where(and(conversational(thread.id), after(cursorOf(db, thread.id))))
     .orderBy(asc(chiefMessage.createdAt), sql`rowid asc`)
-    .limit(SUMMARY_BATCH_MESSAGES)
+    .limit(Math.min(SUMMARY_BATCH_MAX_MESSAGES, uncompacted - SUMMARY_WINDOW_MESSAGES))
     .all();
   const previous =
     db.select().from(chiefSummary).where(eq(chiefSummary.threadId, thread.id)).get()?.summary ??
@@ -163,9 +165,9 @@ export function planChiefSummaries(deps: DigestDeps, now: number): void {
       )
       .all();
     for (const thread of threads) {
-      if (uncompactedCount(db, thread.id) < SUMMARY_WINDOW_MESSAGES + SUMMARY_BATCH_MESSAGES)
-        continue;
-      if (queueSummary(deps, chiefRow, thread, now)) break;
+      const uncompacted = uncompactedCount(db, thread.id);
+      if (uncompacted < SUMMARY_WINDOW_MESSAGES + SUMMARY_BATCH_MESSAGES) continue;
+      if (queueSummary(deps, chiefRow, thread, uncompacted, now)) break;
     }
   }
 }
