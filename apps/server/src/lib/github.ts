@@ -4,6 +4,7 @@ import {
   GithubCreateGateNotWritableError,
   parseGithubCreateRateLimit,
 } from '@cairn/shared/github-create-gate';
+import { RULESETS_NOT_ON_PLAN } from '../services/merge-gate/github-rules.js';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 import { githubApiBaseUrl, isGithubApiUrl } from './github-api-base.js';
@@ -1593,8 +1594,6 @@ export async function githubCommitCheckRuns(
   }
   return { notModified: false, etag: got.etag, checkRuns };
 }
-
-const RULESETS_NOT_ON_PLAN = /upgrade to github|enable this feature/i;
 
 export async function githubRequiredChecks(
   fetchImpl: FetchLike,
