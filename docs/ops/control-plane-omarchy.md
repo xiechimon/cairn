@@ -123,7 +123,7 @@ Rename the Mac server, web and deploy launch agents to `*.disabled-<date>` so a 
 The Coordinator is part of `cairn-server.service`. There is no sidecar unit, token or machine.
 
 - Switch: `CAIRN_COORDINATOR_IN_SERVER` is on unless set to `0`, `false`, `no` or `off`. When it is off, or no keyed Coordinator route resolves, daemons claim chief turns as before.
-- Route: the team's `coordinator` routing rule (D113: provider `vani`, model `deepseek/deepseek-v4.1-flash`) and the `compaction` summary route. Provider keys are read from the encrypted `provider` rows on each request; no key lives in `step`, `chief_message` or a store.
+- Route: the team's `coordinator` routing rule (D113 as changed on 2026-11-07: provider `openai-codex`, model `gpt-6.1-sol`, thinking `low`, authenticated by the host's Codex login in `$CODEX_HOME/auth.json`) and the `compaction` summary route. Provider keys are read from the encrypted `provider` rows on each request; no key lives in `step`, `chief_message` or a store.
 - State: one SQLite store per thread at `$CAIRN_HOME/server/coordinator/<threadId>.sqlite`, owned by one process through the `coordinator_lease` row. `chief_message` stays the truth; a store that disagrees with it is re-seeded and the old file is kept beside it as `*.stale-<ms>`.
 - Boot migration: a set `CAIRN_COORDINATOR_MACHINE_ID` is logged and that machine's token is revoked. Stores under `$CAIRN_HOME/coordinator/threads/` are moved into the server store directory when no store of the same name exists.
 - Backup: `backup-server-db.sh --coordinator <dir> --coordinator-out <dir>` copies each store after the server DB with `sqlite3 .backup` and `integrity_check`. A store newer than the DB copy is a reconcile case at the next boot.

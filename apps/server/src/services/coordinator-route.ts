@@ -1,4 +1,5 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
+import { CODEX_PROVIDER_ID, codexLoginAvailable } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -102,7 +103,17 @@ export function coordinatorRoute(db: Db, teamId: string) {
       ),
     )
     .get();
-  if (keyed === undefined) return fallback(teamId, 'rule-provider-has-no-key');
+  if (keyed === undefined) {
+    const subscription =
+      rule.provider === CODEX_PROVIDER_ID &&
+      db
+        .select({ id: provider.id })
+        .from(provider)
+        .where(and(eq(provider.teamId, teamId), eq(provider.providerId, CODEX_PROVIDER_ID)))
+        .get() !== undefined &&
+      codexLoginAvailable();
+    return subscription ? rule : fallback(teamId, 'rule-provider-has-no-key');
+  }
   if (keyed.api !== 'anthropic-messages') return rule;
   const usage = db
     .select({ claudeUsage: team.claudeUsage })
