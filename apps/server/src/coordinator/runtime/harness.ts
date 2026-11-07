@@ -13,7 +13,12 @@ export async function openCoordinatorHarness(
   storagePath: string,
   models: Models,
   context: Context,
-  options: { extensions?: readonly Extension[]; settings?: () => HarnessSettings } = {},
+  options: {
+    extensions?: readonly Extension[];
+    settings?: () => HarnessSettings;
+    beforeResume?: (harness: Harness) => Promise<void>;
+    resume?: boolean;
+  } = {},
 ): Promise<Harness> {
   const storage = await openNodeSqliteStorage(storagePath);
   const registry = createRegistry();
@@ -23,6 +28,7 @@ export async function openCoordinatorHarness(
     { models, registry, ...(options.settings ? { settings: options.settings } : {}) },
     context,
   );
-  harness.resume();
+  await options.beforeResume?.(harness);
+  if (options.resume !== false) harness.resume();
   return harness;
 }

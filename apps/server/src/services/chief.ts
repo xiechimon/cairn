@@ -80,7 +80,7 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
-import { coordinatorRunsOnPi, lastTurnContext } from './coordinator-context.js';
+import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
@@ -870,6 +870,7 @@ export function enqueueChiefStep(
     .where(eq(chiefThread.id, threadId))
     .run();
   deps.machineHub?.wake(threadRow.teamId);
+  wakeCoordinator(threadId);
   return id;
 }
 
