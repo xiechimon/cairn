@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -25,6 +23,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const PNG_BYTES = Buffer.from('89504e470d0a1a0a', 'hex');
 const DONE_EVENT: StepEvent = { type: 'done', usage: [] };
@@ -258,7 +257,7 @@ async function runImageStep(
   client: FakeClient;
   lines: string[];
 }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-image-'));
+  const home = testTempDir('cairn-runner-image-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -474,7 +473,7 @@ describe('runner 400-signal one-time degrade retry (#1671 slice 2)', () => {
 
     learned.add('stub-gw/stub-model');
     const secondClient = new FakeClient();
-    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-image-'));
+    const home = testTempDir('cairn-runner-image-');
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const journal = new StepJournal(paths.outboxDir);

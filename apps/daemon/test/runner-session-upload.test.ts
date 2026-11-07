@@ -1,5 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -19,6 +18,7 @@ import type { DaemonLogger } from '../src/log.js';
 import { type MachineApi, MachineApiError } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 class FakeClient implements MachineApi {
   uploads: { name: string; body: TranscriptUpload | string }[] = [];
@@ -129,7 +129,7 @@ function backendWithSession(sessionFile?: string): AgentBackend {
 }
 
 async function setup(backend: AgentBackend, client: FakeClient = new FakeClient()) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-session-'));
+  const home = testTempDir('cairn-runner-session-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = (() => {
@@ -185,7 +185,7 @@ async function setup(backend: AgentBackend, client: FakeClient = new FakeClient(
 
 describe('session JSONL upload at step close (#1512)', () => {
   test('failure mode 1: readable session file → original uploaded with the transcript', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-'));
+    const dir = testTempDir('cairn-pi-session-');
     const sessionFile = join(dir, 'sess.jsonl');
     const body = '{"type":"assistant","stopReason":"length"}\n';
     writeFileSync(sessionFile, body);
@@ -198,7 +198,7 @@ describe('session JSONL upload at step close (#1512)', () => {
   });
 
   test('failure mode 2: file missing → step succeeds, visible in logs, no session.jsonl request', async () => {
-    const missing = join(tmpdir(), `cairn-session-gone-${Date.now()}.jsonl`);
+    const missing = join(testTempDir('daemon-cwd-'), `cairn-session-gone-${Date.now()}.jsonl`);
     const { client, lines } = await setup(backendWithSession(missing));
     expect(client.uploadNames[0]).toEqual(['transcript.json']);
     expect(client.doneBodies[0]?.body.status).toBe('success');
@@ -206,7 +206,7 @@ describe('session JSONL upload at step close (#1512)', () => {
   });
 
   test('failure mode 3: over the cap → step succeeds, visible in logs, no session.jsonl request', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-big-'));
+    const dir = testTempDir('cairn-pi-session-big-');
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, 'x'.repeat(SESSION_JSONL_MAX_BYTES + 1));
     const { client, lines } = await setup(backendWithSession(sessionFile));
@@ -216,7 +216,7 @@ describe('session JSONL upload at step close (#1512)', () => {
   });
 
   test('failure mode 4: session PUT fails → transcript still uploaded, done still reported', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-pi-session-put-'));
+    const dir = testTempDir('cairn-pi-session-put-');
     const sessionFile = join(dir, 'sess.jsonl');
     writeFileSync(sessionFile, '{"ok":1}\n');
     const client = new FakeClient();

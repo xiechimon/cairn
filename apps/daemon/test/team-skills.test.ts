@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -10,7 +9,6 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MachineSkillsManifestResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
@@ -20,9 +18,10 @@ import {
   TEAM_SKILLS_CACHE_MAX_ENTRIES,
   TeamSkillsError,
 } from '../src/team-skills.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function cacheRoot(tag: string): string {
-  return join(mkdtempSync(join(tmpdir(), `cairn-team-skills-${tag}-`)), 'team-skills');
+  return join(testTempDir(`cairn-team-skills-${tag}-`), 'team-skills');
 }
 
 function sha256(bytes: Buffer): string {

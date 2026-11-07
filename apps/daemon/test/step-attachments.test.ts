@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 import type { MachineAttachmentResponse } from '@cairn/shared';
 import { buildTaskPromptText, formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { MachineClient } from '../src/machine-client.js';
 import { materializeFile, resolveStepImages } from '../src/step-attachments.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fakeClient(attachments: Record<string, MachineAttachmentResponse | Error>): {
   client: { attachment: (stepId: string, id: string) => Promise<MachineAttachmentResponse> };
@@ -38,7 +38,7 @@ function pngResponse(): MachineAttachmentResponse {
 }
 
 function setup() {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-step-att-'));
+  const home = testTempDir('cairn-step-att-');
   const materializeDir = join(home, 'step-attachments');
   const worktree = join(home, 'workspaces', 'conv-1');
   mkdirSync(worktree, { recursive: true });

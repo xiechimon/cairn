@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -26,6 +25,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const TASK = { id: 't1', seqNum: 3, title: '重启探针', spec: '第一轮会失败，重启轮要带上反馈。' };
 const TASK_TEXT = buildTaskPromptText(TASK.title, TASK.spec);
@@ -183,7 +183,7 @@ async function setup(
   backend: AgentBackend,
   options: { skill?: string; observeClient?: (client: FakeClient) => void } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-restart-'));
+  const home = testTempDir('cairn-runner-restart-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();
