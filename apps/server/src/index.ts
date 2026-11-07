@@ -18,6 +18,7 @@ import {
 } from './config.js';
 import { openDbWithHandle } from './db/client.js';
 import { seed } from './db/seed.js';
+import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import {
@@ -43,7 +44,7 @@ import {
 } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
-import { startTsnetRemote } from './services/tsnet-remote.js';
+import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
 import { startupMessage } from './startup-log.js';
 
 const loadedConfig = loadConfig();
@@ -104,8 +105,15 @@ const githubFetch = refreshingGithubFetch(
   { db, box: secretBox, oauthClient: config.githubOauth },
   globalThis.fetch,
 );
+let tsnetRemote: TsnetRemote | null = null;
 const app = createApp(
   {
+    remote: {
+      environmentId: loadOrCreateEnvironmentId(environmentIdPathOf(config.dataDir)),
+      listenHost: config.host,
+      listenPort: config.port,
+      tailnetStatus: () => tsnetRemote?.status() ?? null,
+    },
     db,
     hub,
     machineHub,
@@ -195,12 +203,15 @@ const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
 computerScreens.attach(server);
 
-const tsnetRemote = startTsnetRemote({
+const tsnetStarting = startTsnetRemote({
   settings: config.tsnet,
   homeDir: config.homeDir,
   app,
   authToken: config.authToken,
   logger,
+}).then((started) => {
+  tsnetRemote = started;
+  return started;
 });
 
 let shuttingDown = false;
@@ -211,7 +222,7 @@ async function shutdown(): Promise<void> {
   killInFlightPick();
   computerScreens.close();
   server.close();
-  await (await tsnetRemote)?.stop();
+  await (await tsnetStarting)?.stop();
   close();
   process.exit(0);
 }

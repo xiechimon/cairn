@@ -14,9 +14,15 @@ const PREVIEW_CHARS = 150;
 const AGENT_LINE_CLS =
   'text-meta leading-5 text-content-tertiary data-[status=error]:text-content-tertiary';
 
-export function ThinkingRow({ text }: { text: string }) {
+export function ThinkingRow({
+  text,
+  defaultOpen = false,
+}: {
+  text: string;
+  defaultOpen?: boolean;
+}) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const firstLine =
     text
       .trim()

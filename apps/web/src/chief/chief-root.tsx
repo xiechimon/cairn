@@ -3,6 +3,8 @@ import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { ChiefDrawer } from './chief-drawer.js';
+import { questionDockState } from './question-dock-state.js';
+import { questionDraftKey } from './question-drafts.js';
 import { type OriginChiefQuestion, originChiefQuestions } from './question-origin.js';
 import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
 
@@ -10,9 +12,6 @@ export interface ChiefRootApi {
   surface: ChiefSurface;
   openChiefThread: (threadId: string) => void;
   pendingQuestions: OriginChiefQuestion[];
-  questionsOpen: boolean;
-  setQuestionsOpen: (open: boolean) => void;
-  openQuestionOrigin: (conversationId: string) => void;
 }
 
 const ChiefRootContext = createContext<ChiefRootApi | null>(null);
@@ -53,7 +52,6 @@ export function ChiefRoot() {
   const onHome = pathname === '/app';
   const { teamId } = useLiveData();
   const surface = useChiefSurface(fixture, deepLink, onHome);
-  const [questionsOpen, setQuestionsOpenState] = useState(false);
   const pendingQuestions = useMemo(
     () =>
       originChiefQuestions(surface.chiefData.stream ?? [], {
@@ -63,30 +61,16 @@ export function ChiefRoot() {
       }),
     [surface.chiefData.stream, surface.chiefData.threadId, surface.chiefData.threadTitle, teamId],
   );
-  const setQuestionsOpen = useCallback(
-    (open: boolean) => {
-      if (open) surface.setChiefView('none');
-      setQuestionsOpenState(open);
-    },
-    [surface],
-  );
+  const conversationId = surface.chiefData.threadId ?? 'chief';
+  const stream = surface.chiefData.stream;
   useEffect(() => {
-    if (pendingQuestions.length === 0) setQuestionsOpenState(false);
-  }, [pendingQuestions.length]);
-  useEffect(() => {
-    if (surface.chiefView === 'drawer') setQuestionsOpenState(false);
-  }, [surface.chiefView]);
-  const openQuestionOrigin = useCallback(
-    (conversationId: string) => {
-      if (pathname === '/app') {
-        setQuestionsOpen(false);
-        return;
-      }
-      setLinkThreadId(conversationId);
-      navigate('/app');
-    },
-    [pathname, navigate],
-  );
+    for (const item of stream ?? []) {
+      if (item.kind !== 'question' || item.status === 'pending') continue;
+      questionDockState.clearAnswers(
+        questionDraftKey({ teamId: teamId ?? 'local', conversationId, requestId: item.requestId }),
+      );
+    }
+  }, [stream, conversationId, teamId]);
   const onSettings = useCallback(() => {
     if (pathname === '/app') surface.setChiefView('settings');
     else navigate('/app?chief=settings');
@@ -96,11 +80,8 @@ export function ChiefRoot() {
       surface,
       openChiefThread: setLinkThreadId,
       pendingQuestions,
-      questionsOpen,
-      setQuestionsOpen,
-      openQuestionOrigin,
     }),
-    [surface, pendingQuestions, questionsOpen, setQuestionsOpen, openQuestionOrigin],
+    [surface, pendingQuestions],
   );
   const ownsConversation = onHome;
   const windowOpen = surface.chiefView === 'drawer' && !ownsConversation;

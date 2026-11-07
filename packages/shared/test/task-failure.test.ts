@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   AGENT_FAILURE_KINDS,
+  CLAUDE_CODE_AUTH_FAILURE_MARKER,
   classifyAgentFailure,
   classifyStepFailure,
   isProviderAuthFailure,
@@ -233,6 +234,12 @@ describe('parseRetryAfterMs（#1261 F5）', () => {
 });
 
 describe('isProviderAuthFailure (#1493 degradation-chain trigger: auth failure)', () => {
+  test('recognizes the stable marker shared by both Claude Code credential messages', () => {
+    expect(isProviderAuthFailure(`${CLAUDE_CODE_AUTH_FAILURE_MARKER} credential rejected`)).toBe(
+      true,
+    );
+  });
+
   test.each([
     '401 Unauthorized: missing or bad api key',
     'Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
@@ -240,6 +247,10 @@ describe('isProviderAuthFailure (#1493 degradation-chain trigger: auth failure)'
     'incorrect api key',
     'invalid_api_key',
     'API key expired',
+    'Failed to authenticate: OAuth token revoked',
+    'Failed to authenticate',
+    'OAuth token revoked',
+    'authentication_failed',
   ])('matches: %s', (msg) => {
     expect(isProviderAuthFailure(msg)).toBe(true);
   });
@@ -250,6 +261,7 @@ describe('isProviderAuthFailure (#1493 degradation-chain trigger: auth failure)'
     '429 rate limited',
     'request took 4013ms',
     '400: bad protocol',
+    'build failed: test assertion failed',
     'Error: 403 usage limit reached',
     'Not logged in · Please run /login',
     "remote: Unauthorized\nfatal: unable to access 'https://github.com/x/y.git/': The requested URL returned error: 401",

@@ -27,10 +27,10 @@ const MIRRORED = [
 ] as const;
 
 const KIND_SKIN: Record<MentionKind, string> = {
-  agent: 'bg-(--chip-done-bg) text-(--chip-done-fg)',
-  skill: 'bg-(--chip-idle-bg) text-(--chip-idle-fg)',
-  machine: 'bg-(--chip-idle-bg) text-(--chip-idle-fg)',
-  project: 'bg-(--tile-orange-bg) text-(--tile-orange-fg)',
+  agent: 'bg-secondary text-content-secondary',
+  skill: 'bg-secondary text-content-secondary',
+  machine: 'bg-secondary text-content-secondary',
+  project: 'bg-secondary text-content-secondary',
   todo: 'bg-(--spot-soft) text-(--spot-text-on-tint)',
 };
 

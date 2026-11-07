@@ -7,7 +7,7 @@ colors:
   canvas: '#efe6d0'        # app background
   hover: 'rgb(255 252 248 / 0.05)'  # translucent
   online-ring: '#dfe9da'
-  project-tiles: ['#c06a43', '#7d8b5a']
+  chart-colors: ['#c06a43', '#7d8b5a']
 colors-dark:
   canvas: '#1a1612'
 rounded:
@@ -30,7 +30,7 @@ describe('parseFrontmatter', () => {
   it('reads translucent colors, arrays and unquoted values', () => {
     const doc = parseFrontmatter(DOC);
     expect(doc.colors?.hover).toBe('rgb(255 252 248 / 0.05)');
-    expect(doc.colors?.['project-tiles']).toEqual(['#c06a43', '#7d8b5a']);
+    expect(doc.colors?.['chart-colors']).toEqual(['#c06a43', '#7d8b5a']);
     expect(doc.rounded?.card).toBe('20px');
     expect(doc.spacing?.['card-padding']).toBe('12px 14px');
   });
@@ -40,9 +40,9 @@ describe('parseFrontmatter', () => {
   });
 
   it('reads double-quoted values and arrays', () => {
-    const doc = parseFrontmatter(`---\ncolors:\n  ink: "#2b2620"\n  project-tiles: ["#c06a43"]\n---\n`);
+    const doc = parseFrontmatter(`---\ncolors:\n  ink: "#2b2620"\n  chart-colors: ["#c06a43"]\n---\n`);
     expect(doc.colors?.ink).toBe('#2b2620');
-    expect(doc.colors?.['project-tiles']).toEqual(['#c06a43']);
+    expect(doc.colors?.['chart-colors']).toEqual(['#c06a43']);
   });
 
   it('reads a file saved with CRLF line endings', () => {
@@ -52,7 +52,7 @@ describe('parseFrontmatter', () => {
 });
 
 describe('docChecks', () => {
-  it('maps theme colors, project tiles and radii to CSS expressions', () => {
+  it('maps theme colors and radii to CSS expressions', () => {
     const { checks, unmapped } = docChecks(parseFrontmatter(DOC), 'light');
     expect(checks).toContainEqual({
       key: 'canvas',
@@ -61,21 +61,15 @@ describe('docChecks', () => {
       kind: 'color',
     });
     expect(checks).toContainEqual({
-      key: 'project-tiles-2',
-      expected: '#7d8b5a',
-      cssExpr: 'var(--project-tile-2)',
-      kind: 'color',
-    });
-    expect(checks).toContainEqual({
       key: 'rounded.card',
       expected: '20px',
       cssExpr: 'var(--radius-card)',
       kind: 'length',
     });
-    expect(unmapped).toEqual(['online-ring']);
+    expect(unmapped).toEqual(['online-ring', 'chart-colors']);
   });
 
-  it('treats only project-tiles as tile slots and reports other arrays as unmapped', () => {
+  it('reports color arrays as unmapped', () => {
     const doc = parseFrontmatter(`---\ncolors:\n  chart-colors: ['#111111', '#222222']\n---\n`);
     const { checks, unmapped } = docChecks(doc, 'light');
     expect(checks).toEqual([]);

@@ -75,7 +75,7 @@ const RAW_TOOL_DEF_HASH_KEYS = [
   'workflow_runs',
 ];
 
-describe('55-item vocabulary', () => {
+describe('56-item vocabulary', () => {
   const rawKeys: string[] = RAW_TOOL_DEF_HASH_KEYS;
   const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
   const added: readonly string[] = CHIEF_TOOLS_ADDED;
@@ -84,9 +84,9 @@ describe('55-item vocabulary', () => {
     ...added,
   ].sort();
 
-  it('raw key set is exactly 49; live vocabulary = raw - removals + additions = 55', () => {
+  it('raw key set is exactly 49; live vocabulary = raw - removals + additions = 56', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(55);
+    expect(CHIEF_TOOL_COUNT).toBe(56);
     expect(CHIEF_TOOL_COUNT).toBe(rawKeys.length - removed.length + added.length);
   });
 
@@ -95,7 +95,7 @@ describe('55-item vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + split_todo + update_memory + snooze_todos + search_history + read_history', () => {
+  it('removal registry = delete_skills + set_remote_shell; addition registry = create_skill + update_skill + models + split_todo + update_memory + snooze_todos + search_history + read_history + github_overlap', () => {
     expect(removed).toEqual(['delete_skills', 'set_remote_shell']);
     expect(added).toEqual([
       'create_skill',
@@ -106,6 +106,7 @@ describe('55-item vocabulary', () => {
       'snooze_todos',
       'search_history',
       'read_history',
+      'github_overlap',
     ]);
     expect(CHIEF_TOOL_CATEGORIES.organize).toContain('split_todo');
     expect(CHIEF_REMOTE_TOOLS.find((t) => t.name === 'split_todo')).toBeDefined();
@@ -119,8 +120,8 @@ describe('55-item vocabulary', () => {
     }
   });
 
-  it('groups = 18 read + 21 organize + 5 execute + 11 private', () => {
-    expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(18);
+  it('groups = 19 read + 21 organize + 5 execute + 11 private', () => {
+    expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(19);
     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(21);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);
     expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
@@ -160,7 +161,7 @@ describe('55-item vocabulary', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are five tools outside the 55-item base vocabulary, so the base count stays 55', () => {
+  it('are five tools outside the 56-item base vocabulary, so the base count stays 56', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
@@ -169,7 +170,7 @@ describe('D60 router tools', () => {
       'needs_you',
     ]);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
-    expect(CHIEF_TOOL_COUNT).toBe(55);
+    expect(CHIEF_TOOL_COUNT).toBe(56);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(CHIEF_TOOL_NAMES).not.toContain(name);
   });
 

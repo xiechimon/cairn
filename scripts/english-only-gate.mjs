@@ -5,7 +5,23 @@ import { resolve } from 'node:path';
 const HAN = /[\p{Script=Han}\u3000-\u303f\uff01-\uff60]/u;
 const PROSE = /\.(md|mdx|ya?ml)$/;
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|css|scss|py|sh)$/;
+export const RUNTIME_BLOCK_BEGIN = '<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->';
+export const RUNTIME_BLOCK_END = '<!-- END CAIRN-RUNTIME -->';
 const EXEMPT = [/^README\.zh\.md$/, /^apps\/web\/src\/i18n\//, /(^|\/)zh(-CN)?\.(md|ya?ml)$/];
+
+function blankRuntimeBlocks(text) {
+  let out = '';
+  let rest = text;
+  for (;;) {
+    const begin = rest.indexOf(RUNTIME_BLOCK_BEGIN);
+    if (begin === -1) return out + rest;
+    const end = rest.indexOf(RUNTIME_BLOCK_END, begin);
+    if (end === -1) return out + rest;
+    const stop = end + RUNTIME_BLOCK_END.length;
+    out += rest.slice(0, begin) + rest.slice(begin, stop).replace(/[^\n]/g, '');
+    rest = rest.slice(stop);
+  }
+}
 
 export function stripQuoted(text) {
   return text
@@ -103,9 +119,15 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
           else if (patchLine.startsWith('+') && !patchLine.startsWith('+++')) added.add(line++);
           else if (patchLine.startsWith(' ')) line++;
         }
-        const hits = fileViolations(path, readFileSync(path, 'utf8')).filter((line) =>
-          added.has(line),
-        );
+        let committed = '';
+        try {
+          committed = git('show', `HEAD:${path}`);
+        } catch {}
+        const onDisk = readFileSync(path, 'utf8');
+        const content = committed.includes(RUNTIME_BLOCK_BEGIN)
+          ? onDisk
+          : blankRuntimeBlocks(onDisk);
+        const hits = fileViolations(path, content).filter((line) => added.has(line));
         violations += report(path, hits);
       }
       for (const sha of git('rev-list', '--no-merges', `${base}..HEAD`).split('\n').filter(Boolean))

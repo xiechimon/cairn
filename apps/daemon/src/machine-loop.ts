@@ -19,6 +19,7 @@ import {
 } from '@cairn/shared';
 import { configuredAcpBackends, createGeminiBackend } from './backend/acp.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
+import { readCodexLogin } from './backend/codex-login.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import {
@@ -230,6 +231,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       : undefined);
   const capabilitiesReport = (): MachineCapabilities => ({
     ...capabilitiesProbe(),
+    codexLogin: readCodexLogin(paths.agentRuntimeDir),
     executor: orbProvider.kind,
     ...(orbComputer ? { computer: true as const } : {}),
     ...(hostComputer ? { ownComputer: true as const } : {}),

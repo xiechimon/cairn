@@ -20,6 +20,7 @@ export const DB_TABLES = [
   'provider',
   'secret',
   'api_key',
+  'paired_device',
   'machine',
   'token_usage',
   'chief',
@@ -60,6 +61,9 @@ export const DB_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -68,6 +72,7 @@ export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
+  'paired_device',
   'branch_sync',
   'stop_pending',
   'queued_message',
@@ -106,4 +111,7 @@ export const INTERNAL_ONLY_TABLES = [
   'harness_profile',
   'composer_draft',
   'thread_pr',
+  'coordinator_conversation',
+  'coordinator_entry',
+  'coordinator_lease',
 ] as const;

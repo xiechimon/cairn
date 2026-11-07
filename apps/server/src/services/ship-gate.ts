@@ -1,4 +1,8 @@
-import type { MergeBlockerCode, MergeReadiness } from '@cairn/shared';
+import {
+  type MergeBlockerCode,
+  type MergeReadiness,
+  projectMergeConfigSchema,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { build, type step, todo } from '../db/schema.js';
@@ -88,7 +92,7 @@ async function refusalOf(
   const brake = autonomousMergePolicy(
     deps.db,
     todoRow.teamId,
-    { mergePolicy: 'autonomous', localChecks: [], requireUpToDate: false },
+    projectMergeConfigSchema.parse({}),
     nowMs(),
     buildId,
   );

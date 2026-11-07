@@ -1,5 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -24,6 +23,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const RELAY_400 = '400: {"message":"Model does not support this protocol.","type":"server_error"}';
 
@@ -93,7 +93,7 @@ describe('materializeProvider (compat materialized into models.json)', () => {
   }
 
   test('failure mode 6: no compat (neither explicit nor learned) → entry has no compat key (same shape as before)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
+    const dir = testTempDir('cairn-mat-');
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-bare'));
     const entry = load(path)['mat-bare'];
@@ -103,7 +103,7 @@ describe('materializeProvider (compat materialized into models.json)', () => {
   });
 
   test('wire compat materialized verbatim (maxTokensField / supportsStore / supportsDeveloperRole)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
+    const dir = testTempDir('cairn-mat-');
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -124,7 +124,7 @@ describe('materializeProvider (compat materialized into models.json)', () => {
 
   test('failure modes 4/5: learning slot merged into materialization (later steps get the clean shape directly); explicit beats learning', () => {
     adaptProviderCompat(gateway('mat-learn'), RELAY_400);
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
+    const dir = testTempDir('cairn-mat-');
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-learn'));
     expect(load(path)['mat-learn']).toMatchObject({
@@ -307,7 +307,7 @@ async function runFallbackCase(
   opts?: { withAdapt?: boolean; providerId?: string },
 ) {
   const providerId = opts?.providerId ?? 'gw-fb';
-  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-fb-'));
+  const home = testTempDir('cairn-runner-fb-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

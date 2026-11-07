@@ -10,6 +10,8 @@ import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { formatClaudeLoginWarning } from '../claude-login-warning.js';
 import { ClaudeMark, GeminiMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
+import { withCodeSpans } from '../components/notice-banner.js';
+import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -141,7 +143,7 @@ function MachineConcurrencySelect({
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
             data-concurrency-source={source}
-            className="h-6 w-10 cursor-pointer justify-between gap-1 rounded-md px-1.5 text-meta font-normal text-content-tertiary hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
+            className="h-6 w-10 cursor-pointer justify-between gap-1 rounded-md px-1.5 text-meta font-normal text-content-tertiary hover:bg-(--surface-hover)"
           />
         }
       >
@@ -269,7 +271,7 @@ function MachineConcurrencySelect({
             data-testid="machine-concurrency-reset"
             data-concurrency-action="reset"
             onMouseDown={keepFocus}
-            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-meta font-normal text-content-secondary hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
+            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-meta font-normal text-content-secondary hover:bg-(--surface-hover)"
             onClick={() => {
               setDirty(false);
               setOpen(false);
@@ -320,7 +322,7 @@ export function MachinesPage() {
           waiting: machine.chiefWaiting === true,
         };
   const teamsQ = useTeams(live);
-  const teamName = live ? (teamsQ.data?.[0]?.name ?? TEAM_NAME) : TEAM_NAME;
+  const teamName = live ? (teamsQ.data?.[0]?.name ?? t('团队')) : TEAM_NAME;
   const [addOpen, setAddOpen] = useState(false);
   const mutations = useApiMutations(teamId);
 
@@ -381,16 +383,23 @@ export function MachinesPage() {
           {t('保存失败，请重试。')}
         </p>
       )}
-      {machines.length === 0 ? (
-        <EmptyState
-          testId="resource-empty"
-          className="mt-6"
-          icon={Monitor}
-          title={t('尚无机器。')}
-          description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
-          action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
-        />
-      ) : (
+      <QueryBoundary
+        query={live ? machinesQ : undefined}
+        isEmpty={machines.length === 0}
+        loadingLabel={t('正在加载机器')}
+        errorTitle={t('机器没能加载')}
+        className="mt-6"
+        empty={
+          <EmptyState
+            testId="resource-empty"
+            className="mt-6"
+            icon={Monitor}
+            title={t('尚无机器。')}
+            description={t('在要执行任务的机器上运行注册命令，它就会出现在这里。')}
+            action={{ label: t('添加机器'), onClick: () => setAddOpen(true) }}
+          />
+        }
+      >
         <ResourceList>
           {machines.map((machine) => {
             const chief = chiefState(machine);
@@ -512,19 +521,22 @@ export function MachinesPage() {
                 </span>
                 {loginWarning !== null && (
                   <span
-                    className="basis-full text-meta"
+                    className={cn(
+                      'basis-full text-meta',
+                      notice?.kind === 'expired' && 'font-medium text-foreground',
+                    )}
                     data-testid="claude-login-warning"
                     data-login={notice?.kind === 'expired' ? 'expired' : 'expiring'}
                     role="status"
                   >
-                    {loginWarning}
+                    {withCodeSpans(loginWarning)}
                   </span>
                 )}
               </ResourceRow>
             );
           })}
         </ResourceList>
-      )}
+      </QueryBoundary>
       <CreateMachineDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}

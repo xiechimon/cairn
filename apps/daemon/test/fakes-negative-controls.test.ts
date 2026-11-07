@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
+import { testTempDir } from './test-temp-dir.js';
 
 const root = resolve(import.meta.dirname, '../../..');
 
@@ -14,7 +14,7 @@ test.each([
 ])(
   '%s negative control fails the actual Vitest process',
   (fixture, message) => {
-    const dir = mkdtempSync(join(tmpdir(), 'cairn-fakes-negative-'));
+    const dir = testTempDir('cairn-fakes-negative-');
     try {
       const config = join(dir, 'vitest.config.mjs');
       writeFileSync(

@@ -19,12 +19,13 @@ import {
   CHIEF_DIGEST_GROUP_LABELS,
   CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_WATCH_REASON_DISPATCH,
+  COORDINATOR_GITHUB_OVERLAP_RULE,
+  COORDINATOR_NOT_READY,
   chiefDigestContentSchema,
   chiefDigestThreadId,
   chiefIdFormat,
   chiefTurnErrorContentSchema,
   fenceIssueText,
-  GITHUB_OVERLAP_RULE,
   ISSUE_FENCE_OPEN,
   isBackendRuntimeId,
   isChiefDigestThreadId,
@@ -468,11 +469,11 @@ export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | 
 
 function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
   if (row.agentId === null) {
-    throw new HttpError(409, 'chief agent not bound (请先为 Coordinator 选择一个 Agent。)');
+    throw new HttpError(409, 'chief agent not bound', COORDINATOR_NOT_READY);
   }
   const agentRow = deps.db.select().from(agent).where(eq(agent.id, row.agentId)).get();
   if (!agentRow?.modelId) {
-    throw new HttpError(409, 'chief agent has no model configured');
+    throw new HttpError(409, 'chief agent has no model configured', COORDINATOR_NOT_READY);
   }
   return agentRow;
 }
@@ -1425,7 +1426,7 @@ export function buildChiefSystemPrompt(
     chiefRow.charter !== '' ? chiefRow.charter : '（尚无章程）',
     '',
     '## 工作约定',
-    GITHUB_OVERLAP_RULE,
+    COORDINATOR_GITHUB_OVERLAP_RULE,
     '- 措辞→spec：把用户口语请求变换为 todo——title = 动词短语提炼；spec = 三段式：① 用户原文 blockquote（`> …`）② `要求：` bullet 展开（文件位置/内容要点/读者对象）③ 需要时 `补充信息（探测得出，非用户确认）：` bullet（先探测仓库/资源再写事实，显式标注非用户确认）。',
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
     ...(router

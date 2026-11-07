@@ -512,6 +512,7 @@ export async function executeChiefTool(
     }
     case 'issues':
     case 'pull_requests':
+    case 'github_overlap':
     case 'workflow_runs':
       return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
@@ -1293,7 +1294,7 @@ export async function confirmBuild(
     throw new HttpError(404, `build ${buildId}`);
   }
   try {
-    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
+    await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor, 'automatic');
   } catch (err) {
     if (
       err instanceof HttpError &&

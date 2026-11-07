@@ -99,7 +99,7 @@ test('a group header folds its rows', async ({ page }) => {
   await page.goto(`${HOME}&pane=tasks`);
   const waiting = panel(page).locator('[data-slot="stone-group"][data-tone="waiting"]');
   await expect(waiting.locator('[data-slot="thread-row"]')).toHaveCount(3);
-  await waiting.getByRole('button', { name: /等你处理/ }).click();
+  await waiting.getByRole('button', { name: /^等你处理/ }).click();
   await expect(waiting.locator('[data-slot="thread-row"]')).toHaveCount(0);
   await expect(panel(page)).toContainText('Orb canary round 7');
 });

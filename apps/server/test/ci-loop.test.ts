@@ -24,6 +24,7 @@ import {
   type CiCheckFailure,
   createCiPoller,
 } from '../src/services/ci-loop.js';
+import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
@@ -74,6 +75,7 @@ class CheckRunsMock {
       checks: CheckSpec[];
       etag?: string;
       status?: number;
+      pullState?: 'open' | 'merged' | 'closed';
       branch: string;
     },
   ) {}
@@ -87,13 +89,20 @@ class CheckRunsMock {
       return Promise.resolve(
         res(200, '"pr"', {
           number: n,
-          state: 'open',
-          merged: false,
+          state:
+            this.state.pullState === 'merged' || this.state.pullState === 'closed'
+              ? 'closed'
+              : 'open',
+          merged: this.state.pullState === 'merged',
           mergeable_state: 'clean',
           head: { sha: headOf(n), ref: this.state.branch, repo: { id: 1 } },
           base: { ref: 'main', repo: { id: 1, default_branch: 'main' } },
         }),
       );
+    }
+    if (url.includes('/pulls?')) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"list"', []));
     }
     if (/\/rules\/branches\//.test(url)) {
       this.otherRequests.push(url);
@@ -132,6 +141,7 @@ interface WorldOpts {
   checks?: CheckSpec[];
   etag?: string;
   status?: number;
+  pullState?: 'open' | 'merged' | 'closed';
 }
 
 interface PrWorld {
@@ -256,6 +266,7 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
     checks: opts.checks ?? [],
     etag: opts.etag,
     status: opts.status,
+    pullState: opts.pullState,
     branch: conversationBranch(buildId),
   });
   const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
@@ -515,6 +526,111 @@ describe('#1150 (1) scan-surface discipline: batch scan + conditional requests (
     expect(urls.filter((u) => u.includes('/check-runs'))).toEqual([]);
     expect(urls).toEqual([expect.stringMatching(/\/pulls\/\d+$/)]);
   });
+});
+
+describe('non-open PRs leave building for existing reconciliation', () => {
+  test('a merged PR with a deleted head settles after two sweeps and writes one done row', async () => {
+    const w = makePrWorld({ pullState: 'merged', status: 404 });
+    const info = vi.fn();
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.fetch, logger: { info } },
+    );
+
+    await poller.sweep(w.base);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.allSteps()).toHaveLength(1);
+    expect(info).toHaveBeenLastCalledWith(
+      expect.objectContaining({ candidates: 1, advanced: 1, unreadable: 0, errors: 0 }),
+      'ci pr-checks sweep',
+    );
+    await poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+    expect(w.todoRow().phase).toBe('done');
+    await poller.sweep(w.base + 2 * CI_POLL_INTERVAL_MS);
+    const rows = w.s.db
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.conversationId, w.buildId))
+      .all();
+    expect(rows.filter((row) => row.role === 'system' && row.content === DONE_ROW)).toHaveLength(1);
+    expect(w.mock.requests).toHaveLength(0);
+    expect(info.mock.calls.every(([tally]) => tally.unreadable === 0)).toBe(true);
+  });
+
+  test('a closed unmerged PR reaches the existing confirmed-close failure path', async () => {
+    const w = makePrWorld({ pullState: 'closed', status: 404 });
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
+    );
+    await w.poller.sweep(w.base);
+    expect(w.todoRow().phase).toBe('review');
+    await w.poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+    expect(w.todoRow().phase).toBe('review');
+    await w.poller.sweep(w.base + 2 * CI_POLL_INTERVAL_MS);
+    expect(w.todoRow().phase).toBe('failed');
+    expect(w.buildRow().errorMessage).toBe(prClosedUnmergedRow(w.prNumber));
+    expect(w.mock.requests).toHaveLength(0);
+  });
+
+  test('an open PR with pending checks stays building', async () => {
+    const w = makePrWorld({ pullState: 'open', checks: [{ name: 'ci', status: 'in_progress' }] });
+    await w.poller.sweep(w.base);
+    await w.poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+    expect(w.todoRow()).toMatchObject({ phase: 'building', v: 1 });
+    expect(w.mock.requests).toHaveLength(2);
+    expect(w.allSteps()).toHaveLength(1);
+  });
+
+  test.each(['pending', 'claimed', 'waiting_quota'] as const)(
+    'a merged PR stays building while a step is %s',
+    async (activeFix) => {
+      const w = makePrWorld({ pullState: 'merged', status: 404, activeFix });
+      await w.poller.sweep(w.base);
+      await w.poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+      expect(w.todoRow()).toMatchObject({ phase: 'building', v: 1 });
+      expect(w.mock.otherRequests).toHaveLength(0);
+      expect(w.allSteps()).toHaveLength(2);
+    },
+  );
+
+  test.each(['phase changed', 'step started'] as const)(
+    'a merged PR does not advance when %s during the PR read',
+    async (change) => {
+      const w = makePrWorld({ pullState: 'merged', status: 404 });
+      const poller = createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox },
+        {
+          githubFetch: (input, init) => {
+            if (String(input).endsWith(`/pulls/${w.prNumber}`)) {
+              if (change === 'phase changed') {
+                w.s.db
+                  .update(todoTable)
+                  .set({ phase: 'failed' })
+                  .where(eq(todoTable.id, w.todoId))
+                  .run();
+              } else {
+                w.s.db
+                  .insert(stepTable)
+                  .values({
+                    id: `racing-${w.buildId}`,
+                    buildId: w.buildId,
+                    kind: 'build',
+                    status: 'pending',
+                    createdAt: w.base,
+                  })
+                  .run();
+              }
+            }
+            return w.mock.fetch(input, init);
+          },
+        },
+      );
+      await poller.sweep(w.base);
+      expect(w.todoRow().phase).toBe(change === 'phase changed' ? 'failed' : 'building');
+      expect(w.mock.requests).toHaveLength(0);
+    },
+  );
 });
 
 describe('#1150 (2) pending checks not misjudged red (three-state machine)', () => {

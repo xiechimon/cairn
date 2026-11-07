@@ -10,14 +10,13 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from '../chief/chief-conversation.js';
-import { ChiefQuestionEntry } from '../chief/chief-question-panel.js';
-import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
+import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import type { QueryLike } from '../components/query-state.js';
 import { Greeting } from '../components/stream/greeting.js';
 import { SuggestionChip } from '../components/stream/suggestion-chip.js';
-import { TextureSkeleton } from '../components/texture/texture.js';
 import { Button } from '../components/ui/button.js';
 import type {
   ChiefStreamItem,
@@ -26,8 +25,9 @@ import type {
   TodoRecord,
 } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ClaudeLoginBanner } from './claude-login-banner.js';
+import { ComposerSetupHint } from './composer-setup-hint.js';
 import { ComposerThreadTarget, useComposerThreadTarget } from './composer-thread-target.js';
+import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
 import { ACT_ORDER, actRank, needsYouThreads } from './needs-you.js';
 import { NeedsYouThreadCard } from './needs-you-thread-card.js';
@@ -102,6 +102,9 @@ interface HomeCProps {
   machines?: readonly MachineRow[];
   schedules?: readonly ScheduleRecord[];
   coordinatorMachineId?: string | null;
+  machinesQuery?: QueryLike;
+  todosQuery?: QueryLike;
+  schedulesQuery?: QueryLike;
 }
 
 function projectHomeSearch(params: URLSearchParams): string {
@@ -120,9 +123,12 @@ export function HomeC({
   machines,
   schedules = [],
   coordinatorMachineId = null,
+  machinesQuery,
+  todosQuery,
+  schedulesQuery,
 }: HomeCProps) {
   const { t, locale } = useI18n();
-  const { user, live } = useLiveData();
+  const { user, live, teamId, teamsQuery } = useLiveData();
   const navigate = useNavigate();
   const location = useLocation();
   const composeAt = composeRequest(location.state);
@@ -139,7 +145,6 @@ export function HomeC({
     [machines, coordinatorMachineId],
   );
   const threadId = searchParams.get(THREAD_PARAM);
-  const questions = useOptionalChiefRoot();
   const showPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
@@ -148,17 +153,11 @@ export function HomeC({
     setSearchParams(params, { replace: true, state: location.state });
   };
   const togglePane = (next: WorkPane) => {
-    questions?.setQuestionsOpen(false);
     showPane(pane === next && threadId === null ? null : next);
   };
-  useEffect(() => {
-    if (questions?.questionsOpen !== true || pane === null) return;
-    const params = new URLSearchParams(searchParams);
-    params.delete(PANE_PARAM);
-    setSearchParams(params, { replace: true, state: location.state });
-  }, [questions?.questionsOpen, pane, searchParams, setSearchParams, location.state]);
   const openThread = useOpenThread();
   const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData, chiefView, setChiefView } = surface;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -305,7 +304,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {entries.length === 0 && (
         <div data-testid="home-c-starters" className="mt-4 -ml-2.5 flex flex-wrap gap-1">
@@ -327,7 +325,6 @@ export function HomeC({
       {greeting}
       {since}
       {projectLinks}
-      <ClaudeLoginBanner machines={machines} now={now} />
       {needsYou}
       {chiefData.hasEarlier === true && (
         <p
@@ -348,11 +345,11 @@ export function HomeC({
       <h1 className="m-0 mr-auto min-w-0 truncate text-ui font-semibold text-foreground">
         {projectName ?? t('Coordinator')}
       </h1>
-      <ChiefQuestionEntry />
       <MachineChip
         machines={computers}
         open={pane === 'machines' && threadId === null}
         onToggle={() => togglePane('machines')}
+        loading={machinesQuery?.isPending === true}
       />
       <IconTooltip
         label={t('任务')}
@@ -396,7 +393,7 @@ export function HomeC({
 
   const workPanel =
     threadId !== null ? null : pane === 'machines' ? (
-      <MachinesPanel machines={computers} onClose={() => showPane(null)} />
+      <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
     ) : (
       pane !== null && (
         <WorkPanel
@@ -410,29 +407,58 @@ export function HomeC({
           now={now}
           onClose={() => showPane(null)}
           onOpenThread={openThread}
+          todosQuery={todosQuery}
+          schedulesQuery={schedulesQuery}
         />
       )
     );
 
-  if (surface.load !== 'ready') {
+  const load =
+    live && teamId === undefined
+      ? teamsQuery?.isError === true
+        ? 'error'
+        : 'loading'
+      : surface.load;
+  const composerPlaceholder =
+    projectName != null
+      ? t('跟 Coordinator 说（在 {name} 里）…', { name: projectName })
+      : t('跟 Coordinator 说点什么，或描述一个新任务…');
+  const handedOver = load === 'ready' && loadingDraft !== '';
+  useEffect(() => {
+    if (!handedOver) return;
+    setPrefill({ text: loadingDraft, key: Date.now() });
+    setLoadingDraft('');
+  }, [handedOver, loadingDraft]);
+  if (load !== 'ready') {
     return (
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section data-testid="home-c" className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {paneButtons}
-          {surface.load === 'loading' ? (
-            <TextureSkeleton className="mx-auto mt-[12vh] h-40 w-[calc(100%-2rem)] max-w-182" />
+          {load === 'loading' ? (
+            <>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <ConversationSkeleton />
+              </div>
+              <LoadingComposer
+                draft={loadingDraft}
+                onDraftChange={setLoadingDraft}
+                placeholder={composerPlaceholder}
+              />
+            </>
           ) : (
             <>
               <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-6">
                 {projectLinks}
-                <ClaudeLoginBanner machines={machines} now={now} />
               </div>
               <EmptyState
                 testId="home-c-error"
                 icon={MessageSquareWarning}
                 title={t('对话加载失败')}
                 description={t('对话记录还在，重试一下。')}
-                action={{ label: t('重试'), onClick: surface.retry }}
+                action={{
+                  label: t('重试'),
+                  onClick: teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,
+                }}
                 className="mt-[12vh]"
               />
             </>
@@ -452,7 +478,9 @@ export function HomeC({
       >
         {paneButtons}
         {banner != null && (
-          <div className="mx-auto w-[calc(100%-2rem)] max-w-182 flex-none pt-3">{banner}</div>
+          <div className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-182 flex-none overflow-y-auto pt-3">
+            {banner}
+          </div>
         )}
         <ChiefScrollProvider>
           <ChiefConversation
@@ -475,6 +503,7 @@ export function HomeC({
             onStop={surface.onStop}
             earlier={surface.earlier}
             onSettings={() => surface.setChiefView('settings')}
+            showBindGate={!live}
             hero={hero}
             lead={lead}
             prefill={prefill}
@@ -486,12 +515,17 @@ export function HomeC({
             composerError={thread.error}
             targetPlaceholder={thread.placeholder}
             composerTools={
-              <ComposerThreadTarget
-                targets={thread.targets}
-                picked={thread.picked}
-                composerRef={composerRef}
-                onPick={thread.pick}
-              />
+              <>
+                <ComposerThreadTarget
+                  targets={thread.targets}
+                  picked={thread.picked}
+                  composerRef={composerRef}
+                  onPick={thread.pick}
+                />
+                <ComposerSetupHint
+                  onOpenCoordinatorSettings={() => surface.setChiefView('settings')}
+                />
+              </>
             }
             composerRef={(node) => {
               composerRef.current = node;

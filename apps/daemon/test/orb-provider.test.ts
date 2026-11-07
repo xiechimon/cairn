@@ -1,13 +1,13 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import { OrbLifecycle, resolveOrbCap } from '../src/orb/lifecycle.js';
 import { HostOrbProvider, NspawnOrbProvider, type OrbCommandRunner } from '../src/orb/provider.js';
 import { rejectGuestExec } from './orb-fake.js';
+import { testTempDir } from './test-temp-dir.js';
 
 function fixture() {
-  const runtimeRoot = mkdtempSync(join(tmpdir(), 'orb-provider-run-'));
+  const runtimeRoot = testTempDir('orb-provider-run-');
   const commands: string[][] = [];
   const machines = new Set<string>();
   const runner: OrbCommandRunner = async (argv) => {
@@ -20,7 +20,7 @@ function fixture() {
     if (argv[1] === 'poweroff' || argv[1] === 'terminate') machines.delete(argv[2]!);
     return { code: 0, stdout: argv[1] === 'list' ? [...machines].join('\n') : '', stderr: '' };
   };
-  const stateFile = join(mkdtempSync(join(tmpdir(), 'cairn-orbs-')), 'state.json');
+  const stateFile = join(testTempDir('cairn-orbs-'), 'state.json');
   const provider = new NspawnOrbProvider({ runner, stateFile, runtimeRoot });
   return { commands, machines, runner, provider, stateFile, runtimeRoot };
 }

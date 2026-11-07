@@ -234,6 +234,8 @@ export const threadReportContentSchema = z.object({
 });
 export type ThreadReportContent = z.infer<typeof threadReportContentSchema>;
 
+export const DONE_ROW = '🎉 任务已完成';
+
 export const THREAD_MESSAGE_EXCERPT_MAX = 280;
 
 export const threadMessageDeliverySchema = z.enum(['steer', 'new-turn', 'revision', 'restart']);

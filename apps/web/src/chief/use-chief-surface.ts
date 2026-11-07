@@ -10,6 +10,7 @@ import {
 import { useLocation } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
+import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
 import {
   useApiMutations,
   useChief,
@@ -40,7 +41,12 @@ import {
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
-import { questionActionThread, questionDraftKey, questionDraftStore } from './question-drafts.js';
+import {
+  questionActionThread,
+  questionDraftKey,
+  questionDraftStore,
+  questionSubmitStore,
+} from './question-drafts.js';
 
 export type { ChiefView };
 
@@ -264,13 +270,16 @@ export function useChiefSurface(
           conversationId: threadId,
           requestId: input.requestId,
         });
-        questionDraftStore.patch(key, { submitting: true, error: null });
+        questionSubmitStore.patch(key, { submitting: true, error: null });
         mutations.chiefAnswerQuestion.mutate(
           { threadId, requestId: input.requestId, answers: input.answers },
           {
-            onSuccess: () => questionDraftStore.clear(key),
+            onSuccess: () => {
+              questionDraftStore.clear(key);
+              questionSubmitStore.clear(key);
+            },
             onError: (e) => {
-              questionDraftStore.patch(key, {
+              questionSubmitStore.patch(key, {
                 submitting: false,
                 error: t('提交回答失败，草稿还在，请再试一次。'),
               });
@@ -334,7 +343,14 @@ export function useChiefSurface(
           })
           .then(() => sendKey.settle())
           .catch((error: unknown) => {
-            toastError(t('发送失败，请重试。'), error);
+            if (isCoordinatorNotReady(error)) {
+              toastCoordinatorNotReady(
+                t('Coordinator 还不能回答'),
+                t('点输入框下方的按钮，把模型来源、机器和 Coordinator 接上，再发一次。'),
+              );
+            } else {
+              toastError(t('发送失败，请重试。'), error);
+            }
             throw error;
           });
       }

@@ -414,6 +414,7 @@ export const plan = sqliteTable('plan', {
   version: integer('version').notNull().default(1),
   content: text('content').notNull().default(''),
   stepId: text('stepId'),
+  autoApprovePausedAt: epochMs('autoApprovePausedAt'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -636,6 +637,7 @@ export const pushSubscription = sqliteTable(
     endpoint: text('endpoint').notNull(),
     p256dh: text('p256dh').notNull(),
     auth: text('auth').notNull(),
+    pairedDeviceId: text('pairedDeviceId'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [uniqueIndex('push_subscription_endpoint_unique').on(t.endpoint)],
@@ -746,6 +748,22 @@ export const apiKey = sqliteTable('api_key', {
   masked: text('masked').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const pairedDevice = sqliteTable(
+  'paired_device',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    name: text('name').notNull(),
+    tokenHash: text('tokenHash').notNull(),
+    masked: text('masked').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    lastSeenAt: epochMs('lastSeenAt'),
+  },
+  (t) => [uniqueIndex('paired_device_tokenHash_unique').on(t.tokenHash)],
+);
 
 export const machine = sqliteTable(
   'machine',
@@ -869,6 +887,31 @@ export const chiefTurnUsage = sqliteTable(
     index('chief_turn_usage_thread_idx').on(t.threadId, t.createdAt),
   ],
 );
+
+export const coordinatorConversation = sqliteTable('coordinator_conversation', {
+  threadId: text('threadId').primaryKey(),
+  conversationId: text('conversationId').notNull(),
+  lastMirroredEntryId: text('lastMirroredEntryId'),
+  piVersion: text('piVersion').notNull(),
+  updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const coordinatorEntry = sqliteTable(
+  'coordinator_entry',
+  {
+    chiefMessageId: text('chiefMessageId').primaryKey(),
+    threadId: text('threadId').notNull(),
+    conversationId: text('conversationId').notNull(),
+    entryId: text('entryId').notNull(),
+  },
+  (t) => [index('coordinator_entry_thread_idx').on(t.threadId, t.conversationId)],
+);
+
+export const coordinatorLease = sqliteTable('coordinator_lease', {
+  storeKey: text('storeKey').primaryKey(),
+  owner: text('owner'),
+  heartbeatAt: epochMs('heartbeatAt').notNull(),
+});
 
 export const chiefSummary = sqliteTable('chief_summary', {
   threadId: text('threadId').primaryKey(),

@@ -7,7 +7,6 @@ import {
   buildTaskPromptText,
   claudeLoginBlocksClaim,
   claudeRateBlock,
-  formatSkillRouteSection,
   isBuildStepKind,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
@@ -17,7 +16,6 @@ import {
   type SkillInjectionRecord,
   type StepKind,
   selectSkillsForTask,
-  suggestSkillsForMessage,
   WORKER_ASK_USER_TOOL,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
@@ -29,11 +27,9 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { autonomousMergePolicy } from './autonomous-merge.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
-import { chiefClaimContext, parseChiefTrigger } from './chief.js';
 import {
   CHIEF_DIGEST_MIN_CLI_VERSION,
   CHIEF_DIGEST_REMOTE_TOOLS,
-  CHIEF_DIGEST_SYSTEM_PROMPT,
   isChiefDigestStep,
 } from './chief-digest.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
@@ -41,6 +37,7 @@ import { claudeUsageGatePasses, refreshClaudeRateParks } from './claude-rate-lim
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { coordinatorMachineId, coordinatorSidecarEnabled } from './coordinator-context.js';
 import { routedChiefAgent } from './coordinator-route.js';
+import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import {
   agentRunningCount,
   capabilityGatePasses,
@@ -71,8 +68,6 @@ import {
 import { injectMemories } from './memory.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
-import { stepScopeProjectId } from './picked-project.js';
-import { projectTurnContext } from './project-instructions.js';
 import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import {
   chiefRemoteTools,
@@ -248,20 +243,7 @@ function buildChiefClaim(
   if (!claudeUsageGatePasses(deps, machineRow, model)) return null;
   if (claudeCodeLoginBlocks(deps, machineRow, model.provider)) return null;
   if (!capabilityGatePasses(machineRow, agentRow)) return null;
-  const claimedAt = nowMs();
-  const res = deps.db
-    .update(step)
-    .set({
-      status: 'claimed',
-      machineId,
-      claimedAt,
-      lastHeartbeatAt: claimedAt,
-      holdReason: null,
-      holdUntil: null,
-    })
-    .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
-    .run();
-  if (res.changes === 0) return null;
+  if (!claimPendingChiefStep(deps.db, stepRow, machineId)) return null;
   return chiefClaimPayload(deps, machineId, stepRow, threadRow, agentRow, machineRow);
 }
 
@@ -274,40 +256,12 @@ function chiefClaimPayload(
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep {
   const model = effectiveModel(agentRow, stepRow);
-  const digest = isChiefDigestStep(stepRow);
-  const ctx = digest ? null : chiefClaimContext(deps, threadRow.id);
-  const trigger = parseChiefTrigger(stepRow.prompt);
-  const systemPrompt = digest ? CHIEF_DIGEST_SYSTEM_PROMPT : (ctx?.systemPrompt ?? '');
-  let routeSection = '';
-  if (ctx && trigger === 'user') {
-    const hint = suggestSkillsForMessage(
-      stepRow.prompt ?? '',
-      scanLocalSkills(deps.skillsDir).map((s) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description,
-      })),
-    );
-    if (hint) routeSection = formatSkillRouteSection(hint);
-  }
-  const memories = injectMemories(deps.db, {
-    agentId: agentRow.id,
-    teamId: threadRow.teamId,
-    threadId: threadRow.id,
-    projectId: null,
-  });
-  const projectSection = digest
-    ? null
-    : projectTurnContext(deps.db, {
-        teamId: threadRow.teamId,
-        agentId: agentRow.id,
-        projectId: stepScopeProjectId(stepRow),
-        threadId: threadRow.id,
-      });
-  const instruction =
-    stepRow.prompt === null
-      ? null
-      : [stepRow.prompt, projectSection, routeSection].filter((part) => part).join('\n\n');
+  const { digest, trigger, systemPrompt, memories, instruction } = chiefTurnContext(
+    deps,
+    stepRow,
+    threadRow,
+    agentRow.id,
+  );
   const chiefMcp = digest
     ? []
     : claimMcpSlugs(machineRow?.latestCliVersion ?? null, agentRow.mcpServers);
@@ -370,20 +324,7 @@ function claimCoordinatorTurn(
       );
     }
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
-    const claimedAt = nowMs();
-    const res = db
-      .update(step)
-      .set({
-        status: 'claimed',
-        machineId,
-        claimedAt,
-        lastHeartbeatAt: claimedAt,
-        holdReason: null,
-        holdUntil: null,
-      })
-      .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
-      .run();
-    if (res.changes === 0) continue;
+    if (!claimPendingChiefStep(db, cand.stepRow, machineId)) continue;
     publishStepStatus(deps, cand.stepRow.id);
     return chiefClaimPayload(
       deps,

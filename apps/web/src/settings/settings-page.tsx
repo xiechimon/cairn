@@ -10,6 +10,7 @@ import {
   Route,
   Server,
   ShieldEllipsis,
+  Smartphone,
   User,
   Users,
   Waypoints,
@@ -34,6 +35,7 @@ import { SecretsPage } from '../resources/secrets-page.js';
 import { SkillsPage } from '../resources/skills-page.js';
 import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
+import { RemoteAccessPage } from '../routes/remote-access-page.js';
 import { TeamPage } from '../routes/team-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type Theme } from '../theme.js';
@@ -116,6 +118,12 @@ const GROUPS: Group[] = [
     sections: [
       { id: 'team', label: '团队', Icon: Users, element: () => <TeamPage /> },
       { id: 'api-keys', label: 'API 密钥', Icon: KeyRound, element: () => <ApiKeysPage /> },
+      {
+        id: 'remote',
+        label: '远程访问',
+        Icon: Smartphone,
+        element: () => <RemoteAccessPage />,
+      },
     ],
   },
 ];

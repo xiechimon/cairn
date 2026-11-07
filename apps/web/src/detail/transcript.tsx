@@ -122,7 +122,7 @@ function ActionRow({
       {copy != null && (
         <Button
           variant="ghost"
-          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit [&_svg:not([class*='size-'])]:size-auto"
           aria-label={t('复制')}
           onClick={() => {
             void navigator.clipboard.writeText(copy);
@@ -291,7 +291,7 @@ function Row({
         <>
           <div className={`${ROW_BASE} chat-row--user justify-end ${margin}`}>
             <span
-              className={`chat-bubble bubble-gradient min-w-0 max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
+              className={`chat-bubble min-w-0 bg-(--bubble-base) max-w-[min(85%,42rem)] rounded-(--cds-radius-xl) px-3 py-2 text-card-title break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -422,7 +422,7 @@ function Row({
             {onOpenPlan != null ? (
               <Button
                 variant="ghost"
-                className="ml-auto mr-1.5 flex h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-[length:inherit] leading-[inherit] font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                className="ml-auto mr-1.5 flex h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-[length:inherit] leading-[inherit] font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto"
                 aria-label={t('打开方案')}
                 onClick={onOpenPlan}
               >
@@ -469,7 +469,7 @@ function Row({
           >
             <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
               <span
-                className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-(--chip-plan-bg) px-1.5 py-px text-caption leading-[1.5] font-semibold text-(--chip-plan-fg)${
+                className={`chat-review-tag flex-shrink-0 rounded-(--cds-radius-sm) bg-secondary px-1.5 py-px text-caption leading-[1.5] font-semibold text-content-secondary${
                   item.extractionError !== undefined
                     ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
                     : ''
@@ -557,7 +557,7 @@ function Row({
                   item.extractionError !== undefined
                     ? 'bg-(--danger-soft) text-destructive'
                     : item.passed
-                      ? 'bg-(--chip-plan-bg) text-(--chip-plan-fg)'
+                      ? 'bg-secondary text-content-secondary'
                       : 'bg-(--danger-soft) text-destructive'
                 }`}
               >
@@ -610,12 +610,14 @@ function FailRow({
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
-        <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
+        {item.body !== '' && (
+          <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
+        )}
         {item.title !== '' && (
           <p className={`${PARA} ${PARA_GAP} flex gap-3 text-meta text-(--text-tertiary)`}>
             <Button
               variant="ghost"
-              className="h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0"
+              className="h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-meta font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary)"
               onClick={() => setRawOpen(true)}
             >
               {t('查看原始错误')}
@@ -623,7 +625,7 @@ function FailRow({
           </p>
         )}
       </span>
-      <ActionRow copy={[item.title, item.body].join('\n')} t={t} />
+      <ActionRow copy={[item.title, item.body].filter((part) => part !== '').join('\n')} t={t} />
       <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
         <pre
           className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"

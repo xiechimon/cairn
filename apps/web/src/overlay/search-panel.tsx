@@ -1,5 +1,5 @@
 import { parseSearchQuery, type SearchResponse } from '@cairn/shared';
-import { Activity, CircleHelp } from 'lucide-react';
+import { Activity, CircleHelp, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
@@ -7,11 +7,12 @@ import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
+import type { QueryLike } from '../components/query-state.js';
+import { ShortcutHint } from '../components/shortcut-hint.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { Kbd } from '../components/ui/kbd.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -40,7 +41,7 @@ const NAV_ROWS = [
 ];
 
 export const ROW_BASE =
-  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
+  'flex h-8 w-full cursor-pointer items-center justify-start gap-2.5 rounded-(--radius-menu-item) border-none bg-transparent px-2.5 text-left text-ui font-normal text-foreground hover:text-foreground [&>svg]:flex-none [&>svg:not([data-glyph])]:text-content-tertiary';
 
 export const ROW_LIT = 'bg-(--menu-hover) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
@@ -74,6 +75,7 @@ interface SearchPanelProps {
   open: boolean;
   onClose: () => void;
   server?: SearchResponse;
+  serverQuery?: Pick<QueryLike, 'isError' | 'isFetching' | 'refetch'>;
   context?: SearchContext;
 }
 
@@ -158,6 +160,7 @@ export function SearchPanel({
   open,
   onClose,
   server,
+  serverQuery,
   context,
 }: SearchPanelProps) {
   const projectMark = useProjectMark();
@@ -302,6 +305,7 @@ export function SearchPanel({
   }, [cursor]);
 
   const kbd = cursor != null;
+  const searchFailed = q !== '' && serverQuery?.isError === true;
 
   return (
     <DialogShell
@@ -409,7 +413,25 @@ export function SearchPanel({
           />
         </div>
         <ChipProblems chips={chips} problems={chipProblems} />
-        {q !== '' && hitCount === 0 ? (
+        {searchFailed && (
+          <div
+            role="alert"
+            data-testid="search-error"
+            className="flex flex-none items-center gap-3 border-b border-border px-4 py-2.5 text-ui text-content-secondary"
+          >
+            <TriangleAlert aria-hidden="true" className="size-4 flex-none text-destructive" />
+            <span className="min-w-0 flex-1">{t('搜索没能完成，下面只是本地匹配的结果。')}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={serverQuery?.isFetching}
+              onClick={() => void serverQuery?.refetch()}
+            >
+              {t('重试')}
+            </Button>
+          </div>
+        )}
+        {q !== '' && hitCount === 0 && !searchFailed ? (
           <div className="flex flex-col gap-2 px-4 py-6 text-ui text-content-tertiary">
             <span>
               {chips.length > 0
@@ -555,7 +577,7 @@ export function SearchPanel({
                       <Activity width={15} height={15} />
                       {t('在活动里查看全部 {n} 条', { n: viewAllCount })}
                       <span className={ROW_END}>
-                        <Kbd>⌘↵</Kbd>
+                        <ShortcutHint keys={['mod', 'enter']} />
                       </span>
                     </Button>
                   </>
@@ -572,17 +594,16 @@ export function SearchPanel({
         )}
         <div className="flex h-9 flex-none items-center gap-4 border-t border-border px-3.5 text-caption text-content-tertiary">
           <span className="flex items-center gap-1.5">
-            <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd>
+            <ShortcutHint keys={['up', 'down']} />
             {t('移动')}
           </span>
           <span className="flex items-center gap-1.5">
-            <Kbd>↵</Kbd>
+            <ShortcutHint keys={['enter']} />
             {t('打开')}
           </span>
           {activeContext != null && (
             <span className="flex items-center gap-1.5">
-              <Kbd>⌫</Kbd>
+              <ShortcutHint keys={['backspace']} />
               {t('移除上下文')}
             </span>
           )}
@@ -597,7 +618,7 @@ export function SearchPanel({
               <CircleHelp data-icon="inline-start" />
               {t('语法')}
             </Button>
-            <Kbd>Esc</Kbd>
+            <ShortcutHint keys={['Esc']} />
             {t('关闭')}
           </span>
         </div>

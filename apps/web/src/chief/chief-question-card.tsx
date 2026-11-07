@@ -1,5 +1,16 @@
 import type { AskUserAnswer } from '@cairn/shared';
-import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CircleCheck,
+  CircleHelp,
+  type LucideIcon,
+  X,
+} from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -11,17 +22,20 @@ import {
 } from 'react';
 import { STATUS_WORDS } from '../board/status-words.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
+import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
-import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
   applyQuestionPick,
   emptyQuestionDrafts,
   type QuestionDraft,
   questionDraftComplete,
   questionDraftStore,
+  questionSubmitStore,
   replaceQuestionDraft,
 } from './question-drafts.js';
 
@@ -33,20 +47,29 @@ export interface ChiefQuestionCardProps {
   onCancel?: (requestId: string) => void;
   numberKeys?: boolean;
   draftKey?: string;
+  pager?: QuestionPager;
+  bound?: boolean;
+}
+
+export interface QuestionPager {
+  label: string;
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
 }
 
 const CARD_CLS =
   'flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3';
-const PIP_CLS = 'h-0.75 flex-1 rounded-full bg-border transition-colors duration-200 ease-out';
-const PIP_ON_CLS = 'bg-primary';
-const HINT_CLS = 'flex-1 text-caption text-content-tertiary';
-const BIG_CLS = 'text-card-title font-medium text-foreground';
+const HINT_CLS = 'min-w-0 flex-1 truncate text-caption text-content-tertiary';
 const NUM_CLS =
   'grid size-5 shrink-0 place-items-center rounded-(--cds-radius-sm) border text-caption leading-none font-semibold';
 const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
-const OPT_CLS =
-  'h-auto w-full justify-start gap-2 whitespace-normal rounded-md border-border bg-transparent px-3 py-2.5 text-left text-ui leading-normal font-normal';
+const ATTACHED_CARD_CLS =
+  '@container flex max-h-[40dvh] min-h-0 flex-col overflow-hidden rounded-t-(--radius-composer) border border-b-0 border-border bg-card shadow-(--e1)';
+const OPTION_ROW_CLS =
+  'h-auto w-full items-start justify-start gap-2.5 whitespace-normal rounded-md px-2 py-1.5 text-left font-normal';
 const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
 const OPT_TXT_CLS = 'min-w-0 flex-1';
 const ROW_STATIC_CLS =
@@ -62,21 +85,38 @@ const QUESTION_STATUS: Record<
   cancelled: { icon: Ban, ink: 'text-content-tertiary', label: '已取消' },
 };
 
-function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
+function QuestionStatus({
+  status,
+  quiet = false,
+}: {
+  status: ChiefQuestionItem['status'];
+  quiet?: boolean;
+}) {
   const { t } = useI18n();
   const { icon: Icon, ink, label } = QUESTION_STATUS[status];
   return (
     <span
       data-testid="chief-question-status"
-      className={`flex flex-none items-center gap-1 text-meta whitespace-nowrap ${ink}`}
+      className={
+        quiet
+          ? 'sr-only'
+          : `flex min-w-0 shrink-0 items-center gap-1 text-meta whitespace-nowrap ${ink}`
+      }
     >
       <Icon aria-hidden strokeWidth={1.75} className="size-3.25" />
-      {t(label)}
+      <span className="@max-md:sr-only">{t(label)}</span>
     </span>
   );
 }
 
 type Question = ChiefQuestionItem['questions'][number];
+
+function digitsReachCard(target: HTMLElement): boolean {
+  if (target.isContentEditable) return false;
+  if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-compose-target'))
+    return target.value === '';
+  return !/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+}
 
 export function recommendedFirst(question: Question): Question {
   return {
@@ -111,14 +151,11 @@ function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draft
   const [localStep, setLocalStep] = useState(0);
   const drafts = stored?.drafts ?? localDrafts;
   const step = stored?.step ?? localStep;
-  const submitting = stored?.submitting === true;
   const persist = (nextDrafts: QuestionDraft[], nextStep: number) => {
     if (draftKey === undefined) return;
     questionDraftStore.set(draftKey, {
       drafts: nextDrafts,
       step: nextStep,
-      submitting,
-      error: null,
     });
   };
   useEffect(() => {
@@ -127,7 +164,6 @@ function useQuestionDrafts(item: ChiefQuestionItem, questions: Question[], draft
   return {
     drafts,
     step,
-    submitting,
     setDrafts: (update: (prev: QuestionDraft[]) => QuestionDraft[]) => {
       const next = update(drafts);
       if (draftKey !== undefined) persist(next, step);
@@ -147,13 +183,16 @@ export function ChiefQuestionCard({
   onCancel,
   numberKeys = false,
   draftKey,
+  pager,
+  bound = false,
 }: ChiefQuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
-  const { drafts, step, submitting, setDrafts, setStep } = useQuestionDrafts(
-    item,
-    questions,
-    draftKey,
+  const { drafts, step, setDrafts, setStep } = useQuestionDrafts(item, questions, draftKey);
+  const submitting = useSyncExternalStore(
+    questionDraftStore.subscribe,
+    () => (draftKey === undefined ? false : questionSubmitStore.get(draftKey).submitting),
+    () => false,
   );
   const pending = item.status === 'pending' && onAnswer !== undefined && !submitting;
   const total = questions.length;
@@ -162,39 +201,71 @@ export function ChiefQuestionCard({
   const question = questions[step] ?? questions[0];
   const draft = drafts[step];
   const cardRef = useRef<HTMLDivElement | null>(null);
+  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const collapsed = questionDockState.isCollapsed(item.requestId);
+  useEffect(() => {
+    if (item.status !== 'pending') questionDockState.forgetCollapsed(item.requestId);
+  }, [item.status, item.requestId]);
+  const toggleCollapsed = () => questionDockState.toggleCollapsed(item.requestId);
 
   useLayoutEffect(() => {
-    if (!pending || !numberKeys || question === undefined || question.options.length === 0) return;
-    const max = question.options.length + 1;
+    if (
+      !pending ||
+      collapsed ||
+      !numberKeys ||
+      question === undefined ||
+      question.options.length === 0
+    )
+      return;
+    const max = question.options.length;
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (cardRef.current?.checkVisibility() !== true) return;
       const target = e.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
-      )
-        return;
+      if (target instanceof HTMLElement && !digitsReachCard(target)) return;
       const n = Number.parseInt(e.key, 10);
       if (!Number.isInteger(n) || n < 1 || n > max) return;
       e.preventDefault();
+      if (question.multiSelect !== true) setTextAt(step, '');
       setDrafts((prev) => applyQuestionPick(prev, step, question, n - 1));
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [pending, numberKeys, step, question]);
+  }, [pending, collapsed, numberKeys, bound, step, question]);
 
-  const stepComplete = useMemo(() => questionDraftComplete(draft, question), [draft, question]);
-  const allComplete = useMemo(
-    () => pending && questions.every((q, i) => questionDraftComplete(drafts[i], q)),
-    [pending, drafts, questions],
+  const [localTexts, setLocalTexts] = useState<Record<number, string>>({});
+  const textAt = (index: number): string =>
+    draftKey !== undefined
+      ? questionDockState.answerText(answerKeyOf(draftKey, index))
+      : (localTexts[index] ?? '');
+  const setTextAt = (index: number, text: string) => {
+    if (draftKey !== undefined) questionDockState.setAnswerText(answerKeyOf(draftKey, index), text);
+    else setLocalTexts((prev) => ({ ...prev, [index]: text }));
+  };
+  const withText = (
+    stored: QuestionDraft | undefined,
+    prompt: Question | undefined,
+    text: string,
+  ): QuestionDraft | undefined => {
+    if (stored === undefined || prompt === undefined) return stored;
+    if (stored.kind === 'text') return { kind: 'text', value: text };
+    if (!bound || text.trim() === '') return stored;
+    if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
+    return { kind: 'choices', picked: [], other: true, otherText: text };
+  };
+  const effectiveDrafts = drafts.map(
+    (stored, index) => withText(stored, questions[index], textAt(index)) ?? stored,
   );
+  const stepComplete = questionDraftComplete(effectiveDrafts[step], question);
+  const allComplete =
+    pending && questions.every((q, i) => questionDraftComplete(effectiveDrafts[i], q));
 
   const submit = () => {
     if (!allComplete) return;
+    if (draftKey !== undefined && questionSubmitStore.get(draftKey).submitting) return;
     onAnswer?.({
       requestId: item.requestId,
-      answers: drafts.map((d, i) => {
+      answers: effectiveDrafts.map((d, i) => {
         const header = questions[i]?.header ?? '';
         if (d.kind === 'text') return { header, text: d.value.trim() };
         const choices = [...d.picked];
@@ -203,6 +274,63 @@ export function ChiefQuestionCard({
       }),
     });
   };
+
+  const blockedByUpload = bound && questionDockState.uploading();
+  const canAdvance = pending && (last ? allComplete : stepComplete) && !blockedByUpload;
+  const primaryEnabled = canAdvance;
+  const advance = () => {
+    if (!canAdvance || (bound && questionDockState.uploading())) return;
+    if (last) {
+      submit();
+      return;
+    }
+    setStep((s) => Math.min(lastStep, s + 1));
+  };
+
+  const typedText = textAt(step);
+  const typedPicks = draft?.kind === 'choices' ? draft.picked.length : 0;
+  useEffect(() => {
+    if (!bound || !pending || question === undefined || question.multiSelect === true) return;
+    if (typedText.trim() === '' || typedPicks === 0) return;
+    setDrafts((prev) => {
+      const current = prev[step];
+      if (current?.kind !== 'choices') return prev;
+      return replaceQuestionDraft(prev, step, { ...current, picked: [] });
+    });
+  }, [typedText, typedPicks, bound, pending, step]);
+
+  useEffect(() => {
+    if (draftKey !== undefined && item.status !== 'pending')
+      questionDockState.clearAnswers(draftKey);
+  }, [draftKey, item.status]);
+
+  useEffect(() => {
+    if (!pending || !bound) {
+      questionDockState.clearPrimary(item.requestId);
+      return;
+    }
+    questionDockState.setPrimary({
+      requestId: item.requestId,
+      last,
+      enabled: primaryEnabled,
+      advance: () => advanceRef.current(),
+    });
+  }, [pending, bound, item.requestId, last, primaryEnabled]);
+  useEffect(() => () => questionDockState.clearPrimary(item.requestId), [item.requestId]);
+
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
+  useEffect(() => {
+    const node = cardRef.current;
+    if (node === null) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      advanceRef.current();
+    };
+    node.addEventListener('keydown', handler);
+    return () => node.removeEventListener('keydown', handler);
+  }, [item.status]);
 
   if (question === undefined) return null;
 
@@ -239,157 +367,233 @@ export function ChiefQuestionCard({
     );
   }
 
-  const scroll = question.options.length > 6;
   const pickedCount = draft?.kind === 'choices' ? draft.picked.length : 0;
-  const otherSelected = draft?.kind === 'choices' && draft.other;
+  const multi = question.multiSelect === true;
   const hintText =
     question.options.length === 0
       ? ''
-      : question.multiSelect === true
+      : multi
         ? pickedCount > 0
           ? t('已选 {n} 项', { n: pickedCount })
           : t('未选')
-        : numberKeys
-          ? t('数字键 1–{n} 选择', { n: question.options.length + 1 })
-          : '';
+        : '';
+  const shownPager: QuestionPager | undefined =
+    pager ??
+    (total > 1
+      ? {
+          label: t('{n} / {total}', { n: step + 1, total }),
+          canPrev: step > 0,
+          canNext: !last && stepComplete,
+          onPrev: () => setStep((s) => Math.max(0, s - 1)),
+          onNext: () => setStep((s) => Math.min(lastStep, s + 1)),
+        }
+      : undefined);
+  const pick = (optionIndex: number) => {
+    if (question.multiSelect !== true) setTextAt(step, '');
+    setDrafts((prev) => applyQuestionPick(prev, step, question, optionIndex));
+  };
 
   return (
     <div
       ref={cardRef}
       data-testid="chief-question-card"
       data-status={item.status}
-      className={CARD_CLS}
+      data-collapsed={collapsed ? '' : undefined}
+      className={ATTACHED_CARD_CLS}
     >
-      <div className="flex gap-1" aria-hidden="true">
-        {questions.map((_, i) => (
-          <span key={i} className={`${PIP_CLS}${i <= step ? ` ${PIP_ON_CLS}` : ''}`} />
-        ))}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <span data-testid="chief-question-step" className="text-caption text-content-tertiary">
-          {question.header} · {step + 1}/{total}
-        </span>
-        <QuestionStatus status={item.status} />
-      </div>
-      <div data-testid="chief-question-text" className={BIG_CLS}>
-        {question.question}
-      </div>
-      {question.options.length === 0 ? (
-        <Input
-          data-testid={`chief-question-input-${step}`}
-          className={FORM_CONTROL_CLS}
-          placeholder={t('输入你的回答')}
-          value={draft?.kind === 'text' ? draft.value : ''}
-          disabled={!pending}
-          onChange={(e) => {
-            const value = e.target.value;
-            setDrafts((prev) => replaceQuestionDraft(prev, step, { kind: 'text', value }));
-          }}
-        />
-      ) : (
-        <div className={`flex flex-col gap-1.5${scroll ? ' max-h-54 overflow-y-auto pr-0.5' : ''}`}>
-          {question.options.map((option, oi) => {
-            const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
-            return (
-              <Button
-                key={oi}
-                variant="outline"
-                size="sm"
-                data-testid={`chief-question-option-${step}-${oi}`}
-                disabled={!pending}
-                aria-pressed={selected}
-                title={option.description}
-                className={`${OPT_CLS}${selected ? ` ${OPT_SEL_CLS}` : ''}`}
-                onClick={() => setDrafts((prev) => applyQuestionPick(prev, step, question, oi))}
-              >
-                <span className={`${NUM_CLS} ${selected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
-                  {oi + 1}
-                </span>
-                <span className={OPT_TXT_CLS}>
-                  {option.label}
-                  {option.recommended === true && (
-                    <>
-                      {' '}
-                      <RecommendedMark />
-                    </>
-                  )}
-                </span>
-              </Button>
-            );
-          })}
-          <Button
-            key="other"
-            variant="outline"
-            size="sm"
-            data-testid={`chief-question-other-${step}`}
-            disabled={!pending}
-            aria-pressed={otherSelected}
-            className={`${OPT_CLS}${otherSelected ? ` ${OPT_SEL_CLS}` : ''}`}
-            onClick={() =>
-              setDrafts((prev) => applyQuestionPick(prev, step, question, question.options.length))
-            }
-          >
-            <span className={`${NUM_CLS} ${otherSelected ? NUM_ON_CLS : NUM_OFF_CLS}`}>
-              {question.options.length + 1}
-            </span>
-            <span className={OPT_TXT_CLS}>{t('用我自己的话回答')}</span>
-          </Button>
-          {otherSelected && (
-            <Input
-              data-testid={`chief-question-input-${step}`}
-              className={FORM_CONTROL_CLS}
-              placeholder={t('输入你的回答')}
-              value={draft?.kind === 'choices' ? draft.otherText : ''}
-              disabled={!pending}
-              onChange={(e) => {
-                const value = e.target.value;
-                setDrafts((prev) => {
-                  const current = prev[step];
-                  if (current?.kind !== 'choices') return prev;
-                  return replaceQuestionDraft(prev, step, { ...current, otherText: value });
-                });
-              }}
-            />
-          )}
-        </div>
-      )}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-none items-center gap-1 px-3.5 pt-2 pb-1">
+        <QuestionStatus status={item.status} quiet={!collapsed} />
         <Button
           variant="ghost"
-          className={DIALOG_TEXT_BUTTON}
-          disabled={!pending || onCancel === undefined}
-          onClick={() => onCancel?.(item.requestId)}
+          data-testid="chief-question-collapse"
+          aria-expanded={!collapsed}
+          title={collapsed ? t('展开提问') : t('收起提问')}
+          className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-sm px-0 py-0.5 text-left text-caption font-normal text-content-tertiary hover:bg-transparent aria-expanded:bg-transparent"
+          onClick={toggleCollapsed}
         >
-          {t('取消提问')}
+          <span className={collapsed ? 'max-w-1/2 truncate' : 'truncate'}>
+            {collapsed ? question.header : `${t('问题')} · ${question.header}`}
+          </span>
+          {collapsed && (
+            <>
+              <span aria-hidden className="h-3 w-px flex-none bg-border" />
+              <span className="min-w-0 flex-1 truncate text-foreground">{question.question}</span>
+            </>
+          )}
         </Button>
-        <span
-          data-testid="chief-question-hint"
-          className={question.multiSelect === true ? HINT_CLS : `${HINT_CLS} max-md:invisible`}
-        >
-          {hintText}
-        </span>
-        {step > 0 && (
-          <Button
-            variant="ghost"
-            className={DIALOG_TEXT_BUTTON}
-            disabled={!pending}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
+        {shownPager !== undefined && (
+          <div
+            className="flex flex-none items-center"
+            title={blockedByUpload ? t('附件上传中') : undefined}
           >
-            {t('上一步')}
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              data-testid="chief-question-prev"
+              aria-label={t('上一步')}
+              disabled={!pending || !shownPager.canPrev}
+              onClick={shownPager.onPrev}
+            >
+              <ChevronLeft aria-hidden className="size-3.5" />
+            </Button>
+            <span
+              data-testid="chief-question-position"
+              className="text-caption tabular-nums text-content-tertiary"
+            >
+              {shownPager.label}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              data-testid="chief-question-next"
+              aria-label={t('下一步')}
+              disabled={!pending || !shownPager.canNext}
+              onClick={shownPager.onNext}
+            >
+              <ChevronRight aria-hidden className="size-3.5" />
+            </Button>
+          </div>
         )}
         <Button
-          className={DIALOG_PRIMARY_BUTTON}
-          disabled={!pending || !(last ? allComplete : stepComplete)}
-          onClick={() => {
-            if (last) submit();
-            else setStep((s) => Math.min(lastStep, s + 1));
-          }}
+          variant="ghost"
+          size="icon-xs"
+          aria-label={collapsed ? t('展开提问') : t('收起提问')}
+          onClick={toggleCollapsed}
         >
-          {last ? t('提交回答') : t('下一步')}
+          {collapsed ? (
+            <ChevronUp aria-hidden className="size-3.5" />
+          ) : (
+            <ChevronDown aria-hidden className="size-3.5" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          data-testid="chief-question-dismiss"
+          aria-label={t('取消提问')}
+          title={t('取消提问')}
+          disabled={!pending || onCancel === undefined}
+          onClick={() =>
+            questionDockState.dismissWithUndo(
+              item.requestId,
+              { title: t('已取消提问'), undo: t('撤销') },
+              () => onCancel?.(item.requestId),
+            )
+          }
+        >
+          <X aria-hidden className="size-3.5" />
         </Button>
       </div>
+      {!collapsed && (
+        <>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div
+              data-testid="chief-question-text"
+              className="flex-none px-3.5 pb-1.5 text-ui break-words text-foreground"
+            >
+              {question.question}
+            </div>
+            {question.options.length === 0 ? (
+              bound ? null : (
+                <div className="flex-none px-3.5 pb-2">
+                  <Input
+                    data-testid={`chief-question-input-${step}`}
+                    className={FORM_CONTROL_CLS}
+                    placeholder={t('输入你的回答')}
+                    value={textAt(step)}
+                    disabled={!pending}
+                    onChange={(e) => setTextAt(step, e.target.value)}
+                  />
+                </div>
+              )
+            ) : (
+              <div className="flex flex-none flex-col px-1.5 pb-1.5">
+                {question.options.map((option, oi) => {
+                  const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
+                  return (
+                    <Button
+                      key={oi}
+                      variant="ghost"
+                      data-testid={`chief-question-option-${step}-${oi}`}
+                      disabled={!pending}
+                      aria-pressed={selected}
+                      className={OPTION_ROW_CLS}
+                      onClick={() => pick(oi)}
+                    >
+                      <ChoiceMark multi={multi} selected={selected} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-ui text-foreground">
+                          {option.label}
+                          {option.recommended === true && (
+                            <>
+                              {' '}
+                              <RecommendedMark />
+                            </>
+                          )}
+                        </span>
+                        {option.description !== undefined && (
+                          <span className="text-caption text-content-tertiary">
+                            {option.description}
+                          </span>
+                        )}
+                      </span>
+                      {oi < 9 && <Keycap>{oi + 1}</Keycap>}
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {!bound && (
+            <div className="flex flex-none flex-wrap items-center gap-2 px-3.5 py-1.5">
+              {hintText !== '' && (
+                <span data-testid="chief-question-hint" className={HINT_CLS}>
+                  {hintText}
+                </span>
+              )}
+              <Button
+                className={`${DIALOG_PRIMARY_BUTTON} ml-auto`}
+                disabled={!primaryEnabled}
+                onClick={advance}
+              >
+                {last ? t('提交回答') : t('下一步')}
+                <ShortcutHint
+                  keys={['mod', 'enter']}
+                  className="@max-md:hidden pointer-coarse:hidden ml-1"
+                />
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+function Keycap({ children }: { children: ReactNode }) {
+  return (
+    <span className="grid h-5 min-w-5 flex-none place-items-center rounded-(--cds-radius-sm) bg-(--hover-1) px-1 text-caption tabular-nums text-content-tertiary">
+      {children}
+    </span>
+  );
+}
+
+function ChoiceMark({ multi, selected }: { multi: boolean; selected: boolean }) {
+  const shape = multi ? 'rounded-md' : 'rounded-full';
+  return (
+    <span
+      aria-hidden
+      className={`mt-0.5 grid size-4 flex-none place-items-center border ${shape} ${
+        selected ? 'border-transparent bg-primary text-primary-foreground' : 'border-input'
+      }`}
+    >
+      {selected &&
+        (multi ? (
+          <Check strokeWidth={1.75} className="size-3.5" />
+        ) : (
+          <span className="size-1.5 rounded-full bg-primary-foreground" />
+        ))}
+    </span>
   );
 }
 

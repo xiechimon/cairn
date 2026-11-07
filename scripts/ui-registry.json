@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "3e68491bd79c74def659b2f772785fdbbe8551e5",
+    "sha": "1a9d869fd129263ba729c816adb2d9c9b86c0dfc",
     "date": "2026-11-06"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -46,7 +46,7 @@
       "upstreamItem": "button",
       "status": "deviated",
       "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer. Link targets (a render element carrying href or to) go through useRender instead of the Base UI button primitive, so they keep link semantics and never claim nativeButton or role=button; nativeButton=false would turn them into role=button and break link queries.",
-      "hash": "8c51764a708120617c467b2c90cad1ebf734a2595b018b665589b8a537244a1e"
+      "hash": "e7a480b92aa514297f53d119a578a6501b4d6f78b97205a8b2d1a1a1a02c2dae"
     },
     "card.tsx": {
       "kind": "registry",
@@ -182,8 +182,8 @@
     },
     "status-chip.tsx": {
       "kind": "adapter",
-      "reason": "#942 canon table §5.2 / #983 verdict (kept as zero-skin adapter): five-state task chip = registry Badge skeleton + data-tone state carrier + five --chip-* token utility pairs (spec/22 §1.7/1.8 1:1 values; plan/confirm have no registry variant semantics). The sm geometry tier is retired per #983 — all faces converge on the registry Badge h-5 default (#1006).",
-      "hash": "6ca04a9311f473be2072a4de9154114a0690555cd3c771ed705351a6558ea00e"
+      "reason": "#942 canon table §5.2 / #983 verdict (kept as zero-skin adapter): five-state task chip = registry Badge skeleton + data-tone state carrier + one neutral bg-secondary fill with the state in the text colour (confirm: --waiting-ink, failed: text-destructive; the five --chip-* fill pairs were retired by #3186, anti-slop palette roles). The sm geometry tier is retired per #983 — all faces converge on the registry Badge h-5 default (#1006).",
+      "hash": "c995f7b9e463bec1b24ec1482d4fc13fa8fad84d22d19b61b65e0cd8f10c8e1a"
     },
     "switch.tsx": {
       "kind": "registry",

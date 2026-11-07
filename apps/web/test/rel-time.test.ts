@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { relativeTime } from '../src/board/rel-time.js';
+import { isUsableTimestamp, relativeTime } from '../src/board/rel-time.js';
 import { EN } from '../src/i18n/en.js';
 import { translate, type TVars } from '../src/i18n/translate.js';
 
@@ -39,5 +39,23 @@ describe('relativeTime en (dict fallback)', () => {
     expect(relativeTime(NOW - 3 * HOUR, NOW, en)).toBe('3h ago');
     expect(relativeTime(NOW - 33 * HOUR, NOW, en)).toBe('yesterday');
     expect(relativeTime(NOW - 46 * HOUR, NOW, en)).toBe('2d ago');
+  });
+});
+
+describe('isUsableTimestamp', () => {
+  it('rejects epoch 0, null, undefined and NaN', () => {
+    expect(isUsableTimestamp(0, NOW)).toBe(false);
+    expect(isUsableTimestamp(null, NOW)).toBe(false);
+    expect(isUsableTimestamp(undefined, NOW)).toBe(false);
+    expect(isUsableTimestamp(Number.NaN, NOW)).toBe(false);
+  });
+
+  it('rejects a far-future value but tolerates clock skew', () => {
+    expect(isUsableTimestamp(NOW + 365 * 24 * HOUR, NOW)).toBe(false);
+    expect(isUsableTimestamp(NOW + MINUTE, NOW)).toBe(true);
+  });
+
+  it('accepts a past timestamp', () => {
+    expect(isUsableTimestamp(NOW - HOUR, NOW)).toBe(true);
   });
 });

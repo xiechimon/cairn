@@ -9,13 +9,16 @@ import {
   Server,
   Settings,
 } from 'lucide-react';
-import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
+import { coordinatorBadgeCount } from '../chief/question-dock-index.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
-import { SidebarProjectRow } from '../components/shell/sidebar-project.js';
+import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
 import { Kbd } from '../components/ui/kbd.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
@@ -26,13 +29,12 @@ import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { ACTIVITY_PATH } from '../search/activity-href.js';
 import { SETTINGS_HREF, settingsHref } from '../settings/settings-href.js';
-import { fleetStatusLine } from './fleet-status.js';
-import { needsYouThreads } from './needs-you.js';
+import { fleetSummary } from './fleet-status.js';
+import { needsYouCount } from './needs-you.js';
 import { splitProjectsByArchive } from './project-archive.js';
-import { ProjectAvatar } from './project-avatar.js';
 import { SidebarProjectMenu } from './sidebar-project-menu.js';
-import { SidebarProjectThreads } from './sidebar-project-threads.js';
-import { projectThreads } from './sidebar-threads.js';
+import { SidebarThreadGroups } from './sidebar-thread-groups.js';
+import { groupThreads, visibleTodos } from './sidebar-threads.js';
 import { THREAD_PARAM, threadHref } from './thread-copy.js';
 
 export type SidebarSelected =
@@ -60,7 +62,6 @@ const CANON_PROJECT: SidebarProject = { id: PROJECT_ID, name: PROJECT_NAME };
 interface BoardSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
-  attention?: number;
   machinesOnline?: number;
   machinesOffline?: number;
   offlineMachineNames?: string[];
@@ -70,6 +71,8 @@ interface BoardSidebarProps {
   projects?: SidebarProject[];
   todos?: TodoRecord[];
   onArchiveProject?: (id: string, archived: boolean) => void;
+  projectsState?: 'loading' | 'error';
+  onRetryProjects?: () => void;
 }
 
 export const GROUP_STORAGE_KEYS = {
@@ -111,12 +114,12 @@ const SEARCH_OPEN_DIM =
 const SEARCH_OPEN_DIM_CURRENT =
   '[html[data-search-open]_&_[aria-current=page]]:bg-transparent [html[data-search-open]_&_[aria-current=page]]:text-content-secondary';
 
-const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:not-aria-[haspopup]:translate-y-0 ${FOCUS}`;
+const ICON_BTN = `size-7 flex-none cursor-pointer rounded-(--radius-control) border-none bg-transparent p-0 text-content-tertiary hover:bg-sidebar-hover hover:text-foreground dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover active:shadow-none dark:active:shadow-none ${FOCUS}`;
 
 const RAIL_ROW = `rail-row relative flex size-8 flex-none items-center justify-center rounded-(--cds-radius-lg) text-content-tertiary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out hover:bg-sidebar-hover hover:text-foreground ${FOCUS_RING_INSET}`;
 const RAIL_ACTIVE = `bg-(--hover-1) text-(--card-button) hover:bg-(--hover-1) hover:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 const RAIL_BTN =
-  'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground active:not-aria-[haspopup]:translate-y-0';
+  'cursor-pointer border-none bg-transparent p-0 dark:hover:bg-sidebar-hover active:bg-sidebar-hover dark:active:bg-sidebar-hover active:shadow-none dark:active:shadow-none aria-expanded:bg-transparent aria-expanded:text-content-tertiary aria-expanded:hover:bg-sidebar-hover aria-expanded:hover:text-foreground';
 
 function SidebarFooterIcon({
   label,
@@ -165,7 +168,6 @@ function AttentionBadge({ count }: { count: number }) {
 export function BoardSidebar({
   collapsed = false,
   onToggle,
-  attention = 0,
   machinesOffline = 0,
   machinesOnline = 0,
   offlineMachineNames = [],
@@ -175,6 +177,8 @@ export function BoardSidebar({
   projects,
   todos,
   onArchiveProject,
+  projectsState,
+  onRetryProjects,
 }: BoardSidebarProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -189,6 +193,8 @@ export function BoardSidebar({
     return { pathname: '/app', search: `?${next}` };
   };
   const plain = `?${baseParams}`;
+  const threadParams = new URLSearchParams(baseParams);
+  if (projectParam !== null) threadParams.set('project', projectParam);
   const openThreadId = pathname === '/app' ? new URLSearchParams(search).get(THREAD_PARAM) : null;
   const { active: projectRows, archived: archivedRows } = useMemo(
     () => splitProjectsByArchive((projects ?? [CANON_PROJECT]).filter((row) => !isDeleted(row.id))),
@@ -207,13 +213,23 @@ export function BoardSidebar({
         onToggleArchive={() => onArchiveProject(row.id, !archived)}
       />
     );
-  const waitingByProject = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const todo of needsYouThreads(todos ?? [])) {
-      counts.set(todo.projectId, (counts.get(todo.projectId) ?? 0) + 1);
-    }
-    return counts;
-  }, [todos]);
+  const shownTodos = useMemo(
+    () => visibleTodos(todos ?? [], new Set(archivedRows.map((row) => row.id)), activeProject),
+    [todos, archivedRows, activeProject],
+  );
+  const threadGroups = useMemo(
+    () => groupThreads(shownTodos, activeProject),
+    [shownTodos, activeProject],
+  );
+  const chiefRoot = useOptionalChiefRoot();
+  const attention = coordinatorBadgeCount(
+    needsYouCount(shownTodos),
+    chiefRoot?.pendingQuestions.length ?? 0,
+  );
+  const projectNames = useMemo(
+    () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
+    [projectRows, archivedRows],
+  );
 
   const [projectsCollapsed, setProjectsCollapsed] = useState(() =>
     readProjectsCollapsed(safeLocalStorage()),
@@ -235,11 +251,10 @@ export function BoardSidebar({
   const activityLink = {
     to: { pathname: ACTIVITY_PATH, search: plain },
   };
-  const offlineLabel =
-    fleetStatusLine(
-      { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
-      t,
-    ) ?? '';
+  const fleet = fleetSummary(
+    { online: machinesOnline, offline: machinesOffline, offlineNames: offlineMachineNames },
+    t,
+  );
 
   if (collapsed) {
     const railLink = (
@@ -303,26 +318,25 @@ export function BoardSidebar({
             />
           </Button>
           {!projectsCollapsed &&
-            projectRows.map((row, i) => {
+            projectRows.map((row) => {
               const href = projectHref(row.id);
               return (
                 <Link key={row.id} {...railLink(href, activeProject === row.id, row.name)}>
-                  <ProjectAvatar name={row.name} tone={i} icon={row.icon} color={row.color} bare />
+                  <ProjectGlyph name={row.name} icon={row.icon} />
                 </Link>
               );
             })}
         </nav>
-        {machinesOffline > 0 && (
+        {fleet != null && (
           <Link
-            {...railLink(
-              { pathname: settingsHref('machines'), search: plain },
-              false,
-              offlineLabel,
-            )}
+            {...railLink({ pathname: settingsHref('machines'), search: plain }, false, fleet.title)}
             data-testid="sidebar-attention"
+            data-fleet={fleet.tone}
           >
             <Server className={ICON} strokeWidth={STROKE} />
-            <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--chip-confirm-fg)" />
+            {fleet.tone === 'offline' && (
+              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+            )}
           </Link>
         )}
         <Link {...railLink(settingsLink.to, false, t('设置'))} data-testid="sidebar-settings">
@@ -394,13 +408,19 @@ export function BoardSidebar({
         ref={navRef}
         className={`-mx-1 mt-3 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1 ${scrollFadeClassName()}`}
       >
+        <SidebarThreadGroups
+          groups={threadGroups}
+          openThreadId={openThreadId}
+          projectNames={projectNames}
+          onOpen={(id) => navigate(threadHref(id, threadParams.toString()))}
+        />
         <div
           data-testid="project-group"
-          className="mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
+          className="mt-3 mb-0.5 flex h-6 flex-none items-center pr-1 pl-2.5 text-caption font-medium text-content-tertiary"
         >
           <Button
             variant="ghost"
-            className={`sidebar-group group h-6 cursor-pointer gap-1 rounded-(--radius-control) border-none bg-transparent px-0 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 ${FOCUS} ${
+            className={`sidebar-group group h-6 cursor-pointer gap-1 rounded-(--radius-control) border-none bg-transparent px-0 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent ${FOCUS} ${
               projectsCollapsed ? 'sidebar-group--collapsed' : ''
             }`}
             aria-expanded={!projectsCollapsed}
@@ -409,7 +429,7 @@ export function BoardSidebar({
             {t('项目')}
             <ChevronDown
               aria-hidden
-              className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+              className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
               strokeWidth={STROKE}
             />
           </Button>
@@ -421,31 +441,50 @@ export function BoardSidebar({
             <Plus className="size-3.5" strokeWidth={STROKE} />
           </Link>
         </div>
+        {!projectsCollapsed && projectsState === 'loading' && (
+          <div
+            data-testid="sidebar-projects-loading"
+            aria-busy="true"
+            className="flex flex-col gap-1.5 px-2.5 py-1"
+          >
+            <span className="sr-only">{t('正在加载项目')}</span>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-6 w-full" />
+            ))}
+          </div>
+        )}
+        {!projectsCollapsed && projectsState === 'error' && (
+          <div
+            data-testid="sidebar-projects-error"
+            className="flex items-center gap-2 px-2.5 py-1 text-meta text-content-secondary"
+          >
+            <span className="min-w-0 flex-1">{t('项目没能加载')}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-meta"
+              onClick={onRetryProjects}
+            >
+              {t('重试')}
+            </Button>
+          </div>
+        )}
         {!projectsCollapsed &&
-          projectRows.map((row, i) => (
-            <Fragment key={row.id}>
-              <SidebarProjectRow
-                name={row.name}
-                tone={i}
-                icon={row.icon}
-                color={row.color}
-                waiting={waitingByProject.get(row.id) ?? 0}
-                active={activeProject === row.id}
-                onClick={() => navigate(projectHref(row.id))}
-                menu={projectMenu(row, false)}
-              />
-              <SidebarProjectThreads
-                threads={projectThreads(todos ?? [], row.id)}
-                openThreadId={openThreadId}
-                onOpen={(id) => navigate(threadHref(id, baseParams.toString()))}
-              />
-            </Fragment>
+          projectRows.map((row) => (
+            <SidebarProjectRow
+              key={row.id}
+              name={row.name}
+              icon={row.icon}
+              active={activeProject === row.id}
+              onClick={() => navigate(projectHref(row.id))}
+              menu={projectMenu(row, false)}
+            />
           ))}
         {archivedRows.length > 0 && (
           <div data-testid="archived-group" className="mt-2 flex flex-col gap-px">
             <Button
               variant="ghost"
-              className={`sidebar-group group h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 ${FOCUS} ${
+              className={`sidebar-group group h-6 w-full cursor-pointer justify-start gap-1 rounded-(--radius-control) border-none bg-transparent pr-1 pl-2.5 text-caption font-medium text-content-tertiary hover:bg-transparent hover:text-content-secondary dark:hover:bg-transparent aria-expanded:bg-transparent ${FOCUS} ${
                 archivedExpanded ? '' : 'sidebar-group--collapsed'
               }`}
               aria-expanded={archivedExpanded}
@@ -455,18 +494,16 @@ export function BoardSidebar({
               <span className="tabular-nums">{archivedRows.length}</span>
               <ChevronDown
                 aria-hidden
-                className="sidebar-group-chevron size-3 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
+                className="sidebar-group-chevron size-3.5 text-content-dim transition-transform duration-150 group-[.sidebar-group--collapsed]:-rotate-90"
                 strokeWidth={STROKE}
               />
             </Button>
             {archivedExpanded &&
-              archivedRows.map((row, i) => (
+              archivedRows.map((row) => (
                 <SidebarProjectRow
                   key={row.id}
                   name={row.name}
-                  tone={projectRows.length + i}
                   icon={row.icon}
-                  color={row.color}
                   muted
                   active={activeProject === row.id}
                   onClick={() => navigate(projectHref(row.id))}
@@ -477,30 +514,39 @@ export function BoardSidebar({
         )}
       </nav>
 
-      <div data-testid="sidebar-footer" className="flex flex-none flex-col gap-1 pt-2">
-        <div className="flex w-full items-center gap-0.5">
-          <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
-            <Settings className={ICON} strokeWidth={STROKE} />
+      <div
+        data-testid="sidebar-footer"
+        className="box-content flex h-8 flex-none items-center gap-0.5 pt-2"
+      >
+        <SidebarFooterIcon label={t('设置')} testId="sidebar-settings" {...settingsLink}>
+          <Settings className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
+          <Activity className={ICON} strokeWidth={STROKE} />
+        </SidebarFooterIcon>
+        {usageNav && (
+          <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
+            <ChartColumn className={ICON} strokeWidth={STROKE} />
           </SidebarFooterIcon>
-          <SidebarFooterIcon label={t('活动')} testId="sidebar-activity" {...activityLink}>
-            <Activity className={ICON} strokeWidth={STROKE} />
-          </SidebarFooterIcon>
-          {usageNav && (
-            <SidebarFooterIcon label={t('用量')} to={{ pathname: '/app/usage', search: plain }}>
-              <ChartColumn className={ICON} strokeWidth={STROKE} />
-            </SidebarFooterIcon>
-          )}
-        </div>
-        {machinesOffline > 0 && (
-          <Link
-            data-testid="sidebar-attention"
-            to={{ pathname: settingsHref('machines'), search: plain }}
-            title={offlineLabel}
-            className={`flex min-h-6 w-full min-w-0 items-start gap-1.5 rounded-md bg-(--chip-confirm-bg) px-2 py-1 text-caption font-medium text-(--chip-confirm-fg) no-underline ${FOCUS}`}
-          >
-            <span aria-hidden className="mt-1 size-1.5 flex-none rounded-full bg-current" />
-            <span className="min-w-0 break-words">{offlineLabel}</span>
-          </Link>
+        )}
+        {fleet != null && (
+          <div className="@container flex min-w-0 flex-1 justify-end">
+            <Link
+              data-testid="sidebar-attention"
+              data-fleet={fleet.tone}
+              to={{ pathname: settingsHref('machines'), search: plain }}
+              title={fleet.title}
+              aria-label={fleet.title}
+              className={`flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 text-caption whitespace-nowrap text-content-tertiary no-underline hover:text-content-secondary ${FOCUS}`}
+            >
+              <span
+                aria-hidden
+                className={`size-1.5 flex-none rounded-full ${fleet.tone === 'offline' ? 'bg-destructive' : 'bg-content-tertiary'}`}
+              />
+              <span className="@min-[9rem]:hidden">{fleet.short}</span>
+              <span className="hidden @min-[9rem]:inline">{fleet.label}</span>
+            </Link>
+          </div>
         )}
       </div>
     </aside>

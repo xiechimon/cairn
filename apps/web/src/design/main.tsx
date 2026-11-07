@@ -9,10 +9,13 @@ import { readStoredTheme } from '../theme.js';
 import '../styles/fonts.css';
 import '../styles/motion.css';
 import '../styles/app.css';
-import { Gallery } from './gallery.js';
+import { Gallery, GalleryOnly } from './gallery.js';
+import { readGalleryParams } from './gallery-params.js';
 
 trackPointerFocus();
-document.documentElement.classList.toggle('light', readStoredTheme(safeLocalStorage()) === 'light');
+const params = readGalleryParams(window.location.search);
+const theme = params.theme ?? readStoredTheme(safeLocalStorage());
+document.documentElement.classList.toggle('light', theme === 'light');
 
 const container = document.getElementById('root');
 if (container == null) {
@@ -23,7 +26,11 @@ createRoot(container).render(
   <StrictMode>
     <I18nProvider initialLocale="en">
       <TooltipProvider>
-        <Gallery />
+        {params.only == null ? (
+          <Gallery />
+        ) : (
+          <GalleryOnly id={params.only} theme={theme} width={params.width} />
+        )}
       </TooltipProvider>
       <Toaster expand visibleToasts={4} />
     </I18nProvider>
