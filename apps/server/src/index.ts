@@ -16,6 +16,7 @@ import {
   warnIgnoredTailscaleUsers,
   warnInsecureBind,
 } from './config.js';
+import { warnTeamsWithoutCoordinatorRule } from './coordinator/boot-guard.js';
 import { migrateSidecarState } from './coordinator/boot-migration.js';
 import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
@@ -194,6 +195,7 @@ if (config.coordinatorInServer) {
     sidecarMachineId: config.coordinatorMachineId,
     logger,
   });
+  warnTeamsWithoutCoordinatorRule(db, logger);
 }
 const coordinator = config.coordinatorInServer
   ? startCoordinator({

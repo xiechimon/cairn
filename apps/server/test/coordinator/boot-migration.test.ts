@@ -4,8 +4,9 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { loadConfig } from '../../src/config.js';
+import { warnTeamsWithoutCoordinatorRule } from '../../src/coordinator/boot-guard.js';
 import { migrateSidecarState } from '../../src/coordinator/boot-migration.js';
-import { machine } from '../../src/db/schema.js';
+import { machine, routingRule } from '../../src/db/schema.js';
 import { bootServer, issueApiKey } from '../helpers.js';
 
 const dirs: string[] = [];
@@ -107,5 +108,29 @@ describe('Coordinator sidecar boot migration', () => {
       if (saved === undefined) delete process.env.CAIRN_COORDINATOR_IN_SERVER;
       else process.env.CAIRN_COORDINATOR_IN_SERVER = saved;
     }
+  });
+
+  it('logs one error per team without a coordinator rule and stays quiet once it has one', () => {
+    const s = bootServer();
+    disposers.push(() => s.dispose());
+    const errors: object[] = [];
+    const capture = { ...logger, error: (obj: object) => errors.push(obj) };
+
+    expect(warnTeamsWithoutCoordinatorRule(s.db, capture)).toEqual([s.team.id]);
+    expect(errors).toEqual([{ teamId: s.team.id }]);
+
+    s.db
+      .insert(routingRule)
+      .values({
+        id: 'rule-1',
+        teamId: s.team.id,
+        use: 'coordinator',
+        provider: 'vani',
+        modelId: 'deepseek/deepseek-v4.1-flash',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    expect(warnTeamsWithoutCoordinatorRule(s.db, capture)).toEqual([]);
   });
 });
