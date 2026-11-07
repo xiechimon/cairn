@@ -7332,6 +7332,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "build",
   "step",
   "steer_pending",
+  "step_route",
   "stop_pending",
   "queued_message",
   "message",

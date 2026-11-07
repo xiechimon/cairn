@@ -1009,7 +1009,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
           const projected = projector.project({
             id: r.id,
             createdAt: r.createdAt,
-            homeMachineId: profileForStep(deps.db, todoRow, r.kind)?.machineId ?? null,
+            homeMachineId: profileForStep(deps.db, todoRow, r.kind, r.id)?.machineId ?? null,
             holdReason: r.holdReason,
             holdUntil: r.holdUntil,
           });
@@ -1186,7 +1186,7 @@ function authorModelOf(deps: BuildDeps, todoRow: TodoRow, buildId: string): stri
     .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt))
     .at(-1);
   if (authorStep === undefined) return null;
-  const authorAgent = profileForStep(deps.db, todoRow, authorStep.kind);
+  const authorAgent = profileForStep(deps.db, todoRow, authorStep.kind, authorStep.id);
   return authorAgent === null ? null : effectiveModel(authorAgent, authorStep).modelId;
 }
 
