@@ -2,6 +2,7 @@ import {
   chiefTurnErrorContentSchema,
   coordinatorTurnAttributes,
   GENAI_OPERATION,
+  LANGFUSE_ATTR,
   langfuseEnvironmentAttributes,
   langfuseTraceAttributes,
   otelEnvironment,
@@ -146,7 +147,15 @@ export function emitRuntimeStepSpan(
                 environment,
               }),
             }
-          : langfuseEnvironmentAttributes(environment)),
+          : {
+              ...langfuseEnvironmentAttributes(environment),
+              ...(buildRow
+                ? {
+                    [LANGFUSE_ATTR.sessionId]: buildRow.todoId,
+                    [LANGFUSE_ATTR.genericSessionId]: buildRow.todoId,
+                  }
+                : {}),
+            }),
       }),
       ...status,
     },
