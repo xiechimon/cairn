@@ -16,10 +16,10 @@ test('I1: the summary names the work performed and ends in a triangle', async ({
   await expect(summary(page).locator('svg').first()).toBeVisible();
 });
 
-test('I2: copy is available only while the work block is expanded', async ({ page }) => {
+test('I2: work activity has no copy action in either disclosure state', async ({ page }) => {
   await page.goto(ROUTE);
   await expect(summary(page)).toHaveAttribute('aria-expanded', 'true');
-  await expect(block(page).getByRole('button', { name: '复制', exact: true })).toHaveCount(1);
+  await expect(block(page).getByRole('button', { name: '复制', exact: true })).toHaveCount(0);
   await summary(page).click();
   await expect(page.getByTestId('work-call')).toHaveCount(0);
   await expect(block(page).getByRole('button', { name: '复制', exact: true })).toHaveCount(0);
@@ -27,14 +27,17 @@ test('I2: copy is available only while the work block is expanded', async ({ pag
   await expect(page.getByTestId('work-call')).toHaveCount(2);
 });
 
-test('I3: copying work includes commands and outputs', async ({ page }) => {
+test('I3: assistant message copy stays available', async ({ page }) => {
   await page.goto(ROUTE);
   await readClipboard(page);
-  await block(page).getByRole('button', { name: '复制', exact: true }).click();
-  const clip = await readClipboard(page);
-  expect(clip).toContain('ls -la');
-  expect(clip).toContain('total 16');
-  expect(clip).toContain('hello from cairn');
+  const reply = page.locator('[data-row="agent"]').filter({ has: page.locator('.chat-copy') }).first();
+  const heading = await reply.locator('h2').innerText();
+  await reply.hover();
+  await reply.getByRole('button', { name: '复制', exact: true }).click();
+  const clipboard = await readClipboard(page);
+  expect(clipboard).toContain(`## ${heading}`);
+  expect(clipboard).toContain('`ls -la`');
+  expect(clipboard).toContain('total 16');
 });
 
 test('I4: call rows sit flush in a hairline card at 36px', async ({ page }) => {
