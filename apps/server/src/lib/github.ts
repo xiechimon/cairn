@@ -2119,3 +2119,34 @@ export async function exchangeOAuthCode(
   }
   return projectTokenPayload(payload, 'oauth token exchange');
 }
+
+export async function githubGraphql(
+  fetchImpl: FetchLike,
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<unknown> {
+  const url = `${githubApiBaseUrl()}/graphql`;
+  const got = await intakeGet(fetchImpl, url, token, null, {
+    method: 'POST',
+    body: JSON.stringify({ query, variables }),
+  });
+  if (got === null || got.status < 200 || got.status >= 300)
+    throw new HttpError(502, 'GitHub GraphQL unavailable');
+  const root = got.data as { data?: unknown; errors?: unknown } | null;
+  if (!root || typeof root !== 'object')
+    throw new HttpError(502, 'GitHub GraphQL invalid response');
+  if (
+    Array.isArray(root.errors) &&
+    root.errors.some(
+      (entry) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        (entry as { type?: unknown }).type === 'RATE_LIMITED',
+    )
+  )
+    throw new GithubRateLimitedError(url, got.status, null, null);
+  if (root.errors !== undefined || root.data == null)
+    throw new HttpError(502, 'GitHub GraphQL incomplete response');
+  return root.data;
+}
