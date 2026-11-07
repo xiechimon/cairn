@@ -282,7 +282,9 @@ allow_builds_block() {
 
 install_hooks_changed() {
   git -C "$CHECKOUT" diff "$PREVIOUS" "$TARGET" -- '*package.json' |
-    grep -E '^[+-][^+-].*"(pre|post)?(install|prepare)"[[:space:]]*:' || true
+    { grep -E '^[+-][^+-].*"(pre|post)?(install|prepare)"[[:space:]]*:' || true; } |
+    sed -E 's/^[+-][[:space:]]*//; s/,[[:space:]]*$//' |
+    sort | uniq -u
   git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc'
 }
 
