@@ -343,7 +343,7 @@ export function AccountsSection() {
       <Specimen
         id="settings-scope"
         title="Settings scope sentence"
-        note="Server-side settings pages: one sentence names what the page edits, the menu lists the team and each machine, same-name machines get an id suffix, offline machines are marked; device and personal pages do not show it"
+        note="Server-side settings pages: one sentence names what the page edits, the menu lists All machines with a server icon and each machine with a monitor icon, same-name machines get an id suffix, offline machines are marked; device and personal pages do not show it"
         stage="sheet"
         code={`<SettingsScopeSentence machines={machines} scope={scope} onChange={setScope} trailing={<CheckedButton updatedAt={at} fetching={false} />} />`}
       >

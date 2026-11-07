@@ -22,7 +22,8 @@ import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/fixtures.js
 
 export const EN: Record<string, string> = {
   订阅账户没能加载: 'Subscriptions could not be loaded',
-  '路由按团队生效，{name} 沿用团队设置。': 'Routing is set for the whole team, including {name}.',
+  '路由对所有机器生效，{name} 沿用所有机器的设置。':
+    'Routing applies to all machines, including {name}.',
   移除订阅: 'Remove subscription',
   '移除后，后续步骤不再使用这个订阅。':
     'After removal, later steps no longer use this subscription.',
@@ -1506,14 +1507,14 @@ export const EN: Record<string, string> = {
   '这台机器还没上报 Claude Code 信息。': 'This machine has not reported Claude Code yet.',
   '{machine} 上的运行时': 'Runtime on {machine}',
   服务商: 'Providers',
-  'pi 步骤用团队里的服务商，不读这台机器的配置':
-    "pi steps use the team's providers, not this machine's config",
-  '团队的 {n} 个服务商': "The team's {n#1 provider|# providers}",
+  'pi 步骤用所有机器的服务商，不读这台机器的配置':
+    "pi steps use the providers for all machines, not this machine's config",
+  '所有机器的 {n} 个服务商': 'All machines: {n#1 provider|# providers}',
   'Gemini CLI 还不上报版本和模型；打开后，这台机器会接 Gemini 步骤。':
     'Gemini CLI does not report its version or models yet; when on, this machine takes Gemini steps.',
   '{n} 个模型': '{n#1 model|# models}',
   '{n} 个已下架': '{n} retired',
-  使用团队的服务商: "Uses the team's providers",
+  使用所有机器的服务商: 'Uses providers for all machines',
   范围: 'Scope',
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
@@ -1759,6 +1760,7 @@ export const EN: Record<string, string> = {
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
   '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
   设置作用于: 'Settings apply to',
+  所有机器: 'All machines',
   视图: 'View',
   '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
   '{n} 分钟后恢复': 'Back in {n#1 minute|# minutes}',
