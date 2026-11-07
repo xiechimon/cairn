@@ -507,7 +507,9 @@ async function tryClaim(
       localMerge: localMerge !== null,
     };
     if (workerIneligibility(db, machineRow, facts, catalog, now) !== null) continue;
-    if (agentRow.routed && !routedModelRunsOn(db, machineRow, model)) continue;
+    const fallbackActive =
+      model.provider !== agentRow.provider || model.modelId !== agentRow.modelId;
+    if (agentRow.routed && !fallbackActive && !routedModelRunsOn(db, machineRow, model)) continue;
     const projectCap = projectOfTodo(db, cand.todoRow)?.maxConcurrent ?? null;
     const projectFull = (reader: Pick<typeof db, 'select'>) =>
       projectCap !== null &&
