@@ -302,12 +302,9 @@ export function tokenAuthStartupLines(config: ServerConfig): string[] {
       `container mode (${ENV_VARS.requireToken}=1): the token value and one-time login link are never written to logs (hosted log dashboards are shared) — run \`${BRAND.cliCommandName} token\` on the host machine to see the current token`,
     ];
   }
-  const host = config.host;
-  const display =
-    host === '0.0.0.0' || host === '::' ? 'localhost' : host.includes(':') ? `[${host}]` : host;
   return [
     `token auth enabled — token source: ${source}; manage it with \`${BRAND.cliCommandName} token\` (\`${BRAND.cliCommandName} token --rotate\` writes a new one; restart the server to apply)`,
-    `one-time login link: http://${display}:${config.port}/app#token=${config.authToken}`,
+    `token auth enabled — run \`${BRAND.cliCommandName} token\` on this machine to print a login link`,
   ];
 }
 

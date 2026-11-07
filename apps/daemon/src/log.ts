@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { DAEMON_LOG_PREFIXES } from '@cairn/shared';
+import { DAEMON_LOG_PREFIXES, ENV_VARS, redactSecrets } from '@cairn/shared';
 import pino from 'pino';
 
 export type DaemonLogPrefix = (typeof DAEMON_LOG_PREFIXES)[number];
@@ -54,7 +54,7 @@ export function createDaemonLogger(opts: {
       } catch {
         fields = { msg: line.trimEnd() };
       }
-      const text = `${formatLine(fields)}\n`;
+      const text = `${redactSecrets(formatLine(fields), [process.env[ENV_VARS.token] ?? '']).value}\n`;
       if (opts.logFile) appendFileSync(opts.logFile, `${wallClock()} ${text}`);
       if (opts.stdout) process.stdout.write(text);
     },

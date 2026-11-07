@@ -8,6 +8,9 @@ const NEXT_SECRET = `(?!${BEARER_START}|${GITHUB_START}|${API_KEY_START}|${ENVEL
 
 const REDACTION_PATTERN = new RegExp(
   [
+    '#token=[^\\s"\'<>\\\\]*',
+    '(?<=[?&])token=[^\\s&"\'<>\\\\]*',
+    '(?<=Authorization:[\\t ]*)Basic[\\t ]+[A-Za-z0-9+/]+=*',
     `Bearer\\s+[A-Za-z0-9._~+/-](?:${NEXT_SECRET}[A-Za-z0-9._~+/-])*=*`,
     `(?:gh[pousr]_|github_pat_)(?:${NEXT_SECRET}[A-Za-z0-9_]){20,}`,
     `sk-(?:${NEXT_SECRET}[A-Za-z0-9_-]){20,}`,
@@ -15,23 +18,38 @@ const REDACTION_PATTERN = new RegExp(
     '(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}',
     'sk-[A-Za-z0-9_-]{20,}',
   ].join('|'),
-  'g',
+  'gi',
 );
 
-export function redactSecrets(source: unknown): { value: unknown; count: number } {
+export function redactSecrets(
+  source: unknown,
+  secrets: readonly string[] = [],
+): { value: unknown; count: number } {
   let count = 0;
-  const redactText = (text: string) =>
-    text.replace(REDACTION_PATTERN, () => {
+  const redactText = (text: string) => {
+    for (const secret of secrets) {
+      if (secret === '') continue;
+      text = text.replaceAll(secret, () => {
+        count++;
+        return '[REDACTED]';
+      });
+    }
+    return text.replace(REDACTION_PATTERN, () => {
       count++;
       return '[REDACTED]';
     });
+  };
   const visit = (value: unknown): unknown => {
     if (typeof value === 'string') return redactText(value);
     if (Array.isArray(value)) return value.map(visit);
     if (typeof value !== 'object' || value === null) return value;
-    const entries = Object.entries(value).map(
-      ([key, child]) => [redactText(key), visit(child)] as const,
-    );
+    const entries = Object.entries(value).map(([key, child]) => {
+      if (/^(authorization|token|authToken)$/i.test(key) && child !== null) {
+        count++;
+        return [key, '[REDACTED]'] as const;
+      }
+      return [redactText(key), visit(child)] as const;
+    });
     if (new Set(entries.map(([key]) => key)).size !== entries.length)
       throw new Error('Redacted object keys collide');
     return Object.fromEntries(entries);
