@@ -2,7 +2,7 @@ import { COORDINATOR_MEMORY_FLUSH_MAX, ISSUE_FENCE_OPEN } from '@cairn/shared';
 import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import { applyFlush, FLUSH_SOURCE, parseFlushOutput } from '../../src/coordinator/memory-flush.js';
-import { flushTranscript } from '../../src/coordinator/runtime/compaction.js';
+import { flushTranscript, summarizerFor } from '../../src/coordinator/runtime/compaction.js';
 import { agentMemory, project } from '../../src/db/schema.js';
 import { listMemoryEntries, saveMemoryEntry } from '../../src/services/memory.js';
 import { coordinatorProfile } from '../../src/services/routing-rules.js';
@@ -72,6 +72,23 @@ describe('applyFlush', () => {
     );
     expect(fenced).toEqual({ saved: 0, updated: 0, skipped: 1 });
     expect(w.s.db.select().from(agentMemory).all()).toHaveLength(1);
+  });
+
+  it('saves a fact whose words overlap an existing memory instead of dropping it', async () => {
+    const w = await world('hi');
+    const scope = { teamId: w.teamId, threadId: w.threadId };
+    applyFlush(
+      w.s.db,
+      scope,
+      json({ title: 'Release notes', content: 'Release notes go out on Fridays.' }),
+    );
+    const out = applyFlush(
+      w.s.db,
+      scope,
+      json({ title: 'Release notes', content: 'Release notes are signed off by Dana.' }),
+    );
+    expect(out).toEqual({ saved: 1, updated: 0, skipped: 0 });
+    expect(w.s.db.select().from(agentMemory).all()).toHaveLength(2);
   });
 
   it('replaces an existing memory by id and skips an unknown id', async () => {
@@ -187,4 +204,23 @@ describe('flush before a real compaction', () => {
     expect(folded).toBeGreaterThan(0);
     expect(w.s.db.select().from(agentMemory).all()).toEqual([]);
   }, 20_000);
+});
+
+describe('summarizerFor', () => {
+  it('asks for low reasoning so models without a none level accept the request', async () => {
+    const seen: unknown[] = [];
+    const model = { provider: 'p', id: 'm' };
+    const summarize = summarizerFor(
+      {
+        getModel: () => model,
+        completeSimple: async (_model: unknown, _context: unknown, options: unknown) => {
+          seen.push(options);
+          return { stopReason: 'stop', content: [{ type: 'text', text: 'done' }] };
+        },
+      } as never,
+      { provider: 'p', modelId: 'm' },
+    );
+    expect(await summarize('x')).toBe('done');
+    expect(seen).toEqual([{ reasoning: 'low' }]);
+  });
 });
