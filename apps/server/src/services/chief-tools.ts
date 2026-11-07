@@ -56,6 +56,7 @@ import {
   deleteMemoryEntry,
   listMemoryEntries,
   saveMemoryEntry,
+  searchMemoryEntries,
   updateMemoryEntry,
 } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -822,13 +823,13 @@ export async function executeChiefTool(
     }
     case 'memories': {
       if (ctx.chiefAgentId === null) return json([]);
-      return json(
-        listMemoryEntries(
-          db,
-          { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
-          bool(params, 'includeInvalid', false),
-        ),
+      const entries = listMemoryEntries(
+        db,
+        { agentId: ctx.chiefAgentId, teamId: ctx.teamId, threadId: ctx.threadId },
+        bool(params, 'includeInvalid', false),
       );
+      const query = optStr(params, 'query');
+      return json(query === undefined ? entries : searchMemoryEntries(entries, query));
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
