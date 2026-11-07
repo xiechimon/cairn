@@ -2,7 +2,6 @@ import { machineAttachmentResponseSchema, machineEnrollResponseSchema } from '@c
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   attachment as attachmentTable,
   message as messageTable,
   step as stepTable,
@@ -12,11 +11,11 @@ import {
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { createTodo, updateTodo } from '../src/services/todos.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
   req,
+  seedSessionRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -40,27 +39,7 @@ async function setupWorld(): Promise<World> {
   });
   expect(enrollAuth.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollAuth.json());
-  const agentId = 'agent-stub-att';
-  s.db
-    .insert(agentTable)
-    .values({
-      id: agentId,
-      teamId: s.team.id,
-      displayName: agentId,
-      description: null,
-      status: 'active',
-      avatarUrl: null,
-      provider: null,
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
   const projectId = await postProject(s.app);
   const todoRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: 'Attachment probe',
@@ -69,7 +48,6 @@ async function setupWorld(): Promise<World> {
   const todo = (await todoRes.json()) as { id: string };
   const buildRes = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todo.id],
-    assignment: { plan: null, build: { agentId } },
     withPlan: false,
   });
   expect(buildRes.status).toBe(201);
@@ -149,6 +127,7 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId} (#730)', () => {
           {
             teamId: w.s.team.id,
             agentId: 'agent-stub-att',
+            sourceName: null,
             todoId,
             projectId: null,
             buildId: w.buildId,

@@ -1,5 +1,4 @@
 import type {
-  Assignment,
   BuildMergePermission,
   BuildRecord,
   GithubRepoRef,
@@ -43,11 +42,9 @@ import {
   parseGithubIssueSourceRef,
   parseReviewPromptMeta,
   parseVerifyPromptMeta,
-  personaByRole,
   planVerificationItems,
   projectMergeConfigSchema,
   REVIEW_ANNOUNCEMENT,
-  REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
   type RouteOverride,
   reconcileVerifyVerdict,
@@ -76,7 +73,6 @@ import {
 } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agent,
   autonomousMergeAdmission,
   build,
   buildFeedback,
@@ -122,7 +118,6 @@ import {
 } from './client-message.js';
 import { assertCorrectionDone } from './correction.js';
 import { DONE_ROW } from './delivery-rows.js';
-import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { markFirstPrPromptDue } from './first-pr-report.js';
@@ -139,14 +134,11 @@ import { githubText } from './github-text.js';
 import type { HarnessEvalDispatchPort } from './harness-eval-coordinator.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { storeInfoReport } from './info-handoff.js';
-import { requireIntakeAssignment } from './intake-assignment.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { readCompareAt } from './merge-gate/github-facts.js';
-import { modelsAreIndependent } from './merge-gate/model-identity.js';
 import { bindGateVerdict } from './merge-gate/verdict.js';
 import { githubGatePort } from './merge-gate-github.js';
-import { effectiveModel } from './model-fallback.js';
 import { resolveNamedPrompt } from './named-prompts.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
@@ -155,7 +147,7 @@ import { projectMergeConfigOf, projectShipRouteOf } from './projects.js';
 import type { VapidKeys } from './push.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
-import { routeForStep, routingRulesEnabled } from './routing-rules.js';
+import { policyForStep, profileForStep, routeForStep } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import {
   appendShipGateInstruction,
@@ -180,7 +172,6 @@ import { blockingWorkerQuestions, cancelPendingWorkerQuestions } from './worker-
 import { settleWorkerReply } from './worker-questions.js';
 
 export interface BuildDeps {
-  intakeAgentAllowlist?: readonly string[];
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
   db: Db;
   hub: TeamStreamHub;
@@ -372,8 +363,6 @@ export async function sendBuildSteer(
       'Scheduled continuation would require a new build after the previous delivery. Create a new task.',
     );
   }
-  if (!running && todoRow.assignment !== null)
-    requireIntakeAssignment(deps, todoRow.teamId, todoRow.assignment);
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
@@ -1018,8 +1007,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
           const projected = projector.project({
             id: r.id,
             createdAt: r.createdAt,
-            homeMachineId:
-              agentForStep(deps.db, todoRow, r.kind, r.prompt, r.id)?.machineId ?? null,
+            homeMachineId: profileForStep(deps.db, todoRow, r.kind, r.id)?.machineId ?? null,
             holdReason: r.holdReason,
             holdUntil: r.holdUntil,
           });
@@ -1050,8 +1038,6 @@ export function startBuilds(
   input: {
     projectId: string;
     todoIds: string[];
-    assignment: Assignment;
-    withPlan: boolean;
     routeOverride?: RouteOverride;
     triggerSource?: TriggerSource;
     scheduledBy?: string;
@@ -1068,7 +1054,6 @@ export function startBuilds(
     if (projectRow?.teamId !== todoRecord.teamId) {
       throw new NotFoundError(`project ${input.projectId}`);
     }
-    requireIntakeAssignment(deps, todoRecord.teamId, input.assignment);
     const overrideMachine = input.routeOverride?.machineId;
     if (
       overrideMachine !== undefined &&
@@ -1091,7 +1076,6 @@ export function startBuilds(
     if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
   }
-  const useSession = routingRulesEnabled();
   const created: BuildRecord[] = [];
   for (const todoId of input.todoIds) {
     const todoRecord = getTodo(deps, todoId);
@@ -1104,7 +1088,7 @@ export function startBuilds(
       .values({
         id,
         todoId,
-        withPlan: useSession ? false : input.withPlan,
+        withPlan: false,
         prevPhase: todoRecord.phase,
         triggerSource,
         scheduledBy: input.scheduledBy ?? null,
@@ -1121,26 +1105,14 @@ export function startBuilds(
       todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
         ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
         : null;
-    if (useSession) {
-      enqueueStep(
-        deps,
-        id,
-        'session',
-        todoRecord.teamId,
-        [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
-      );
-    } else {
-      const firstKind = input.withPlan ? 'plan' : 'build';
-      enqueueStep(
-        deps,
-        id,
-        firstKind,
-        todoRecord.teamId,
-        withRetryLessons(input.prompt, firstKind, lessons),
-      );
-    }
+    enqueueStep(
+      deps,
+      id,
+      'session',
+      todoRecord.teamId,
+      [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
+    );
     setTodoPhase(deps, todoId, 'queued', {
-      assignment: input.assignment,
       ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
       latestBuildId: id,
       lastRunAt: createdAt,
@@ -1163,8 +1135,9 @@ export function maybeEnqueueVerifyStep(
   buildId: string,
   opts: { reverify?: boolean } = {},
 ): void {
-  const verifyAgentId = todoRow.assignment?.verify?.agentId;
-  if (verifyAgentId == null) return;
+  if (routeForStep(deps.db, todoRow, 'verify') === null) return;
+  const expectedHeadSha = dispatchHeadSha(deps, buildId);
+  if (expectedHeadSha === null) return;
   if (blockingWorkerQuestions(deps.db, buildId).length > 0) return;
   const existing = deps.db
     .select({ id: step.id })
@@ -1185,59 +1158,21 @@ export function maybeEnqueueVerifyStep(
   if (existing !== undefined) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (buildRow === undefined) return;
-  const ticketRef = ticketRefOf(todoRow);
+  if (githubPrOf(deps, todoRow, buildRow.prNumber) === null) return;
   const planRow = latestPlanRow(deps, buildId);
-  const expectedHeadSha = dispatchHeadSha(deps, buildId);
   const prompt = buildVerifyStepPrompt({
-    ticketRef,
+    ticketRef: ticketRefOf(todoRow),
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
     verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
-    ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
+    expectedHeadSha,
   });
   insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
 }
 
 const REVIEW_IN_FLIGHT = ['pending', 'claimed', 'waiting_quota'] as const;
-
-function authorModelOf(deps: BuildDeps, todoRow: TodoRow, buildId: string): string | null {
-  const authorStep = deps.db
-    .select()
-    .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.status, 'done')))
-    .all()
-    .filter((row) => isBuildStepKind(row.kind))
-    .sort((a, b) => (a.finishedAt ?? a.createdAt) - (b.finishedAt ?? b.createdAt))
-    .at(-1);
-  if (authorStep === undefined) return null;
-  const authorAgent = agentForStep(deps.db, todoRow, authorStep.kind, authorStep.prompt);
-  return authorAgent === null ? null : effectiveModel(authorAgent, authorStep).modelId;
-}
-
-function firstIndependentReviewer(
-  deps: BuildDeps,
-  todoRow: TodoRow,
-  buildId: string,
-  candidates: readonly string[],
-): string | null {
-  const authorModel = authorModelOf(deps, todoRow, buildId);
-  if (authorModel === null) return null;
-  return (
-    candidates.find((agentId) => {
-      const probe = buildReviewStepPrompt({
-        agentId,
-        gate: 'review',
-        planText: '',
-        changes: [],
-        checkout: false,
-      });
-      const reviewerModel = agentForStep(deps.db, todoRow, 'review', probe)?.modelId;
-      return reviewerModel != null && modelsAreIndependent(authorModel, reviewerModel);
-    }) ?? null
-  );
-}
 
 export function maybeEnqueueIndependentReview(
   deps: BuildDeps,
@@ -1263,23 +1198,9 @@ export function maybeEnqueueIndependentReview(
     )
   )
     return;
-  const slotted = todoRow.assignment?.review?.agentId ?? null;
-  const personaReviewer = deps.db
-    .select({ id: agent.id })
-    .from(agent)
-    .where(and(eq(agent.teamId, todoRow.teamId), eq(agent.persona, 'code_reviewer')))
-    .get();
-  const candidates = [
-    slotted,
-    personaReviewer?.id ?? null,
-    routeForStep(deps.db, todoRow, 'review')?.id ?? null,
-  ].filter((id): id is string => id !== null);
-  const agentId = routingRulesEnabled()
-    ? firstIndependentReviewer(deps, todoRow, buildId, candidates)
-    : (candidates[0] ?? null);
-  if (agentId === null) return;
-  const reviewer = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
-  const focus = reviewer?.persona != null ? personaByRole(reviewer.persona).reviewFocus : undefined;
+  const reviewRoute = routeForStep(deps.db, todoRow, 'review');
+  if (reviewRoute === null) return;
+  const agentId = reviewRoute.id;
   const plan = latestPlanRow(deps, buildId);
   const reviewInstruction = reviewInstructionOf(deps, todoRow.teamId, 'review');
   const prompt = buildReviewStepPrompt({
@@ -1289,7 +1210,6 @@ export function maybeEnqueueIndependentReview(
     changes: [],
     checkout: hasRepoBinding(projectOfTodo(deps.db, todoRow)),
     expectedHeadSha: head,
-    ...(focus !== undefined && focus !== '' ? { focus } : {}),
     ...(reviewInstruction !== undefined ? { instruction: reviewInstruction } : {}),
   });
   insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, deps.user.displayName);
@@ -1303,14 +1223,10 @@ export function advanceSplitWaves(deps: BuildDeps, childTodoId: string): void {
     (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
   );
   for (const child of ready) {
-    const assignment = child.assignment ?? { plan: null, build: null };
-    if (assignment.build == null) continue;
     try {
       startBuilds(deps, {
         projectId: child.projectId,
         todoIds: [child.id],
-        assignment,
-        withPlan: false,
         triggerSource: 'chief',
       });
     } catch {}
@@ -1323,14 +1239,10 @@ export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number
   );
   let dispatched = 0;
   for (const child of ready) {
-    const assignment = child.assignment ?? { plan: null, build: null };
-    if (assignment.build == null) continue;
     try {
       startBuilds(deps, {
         projectId: child.projectId,
         todoIds: [child.id],
-        assignment,
-        withPlan: false,
         triggerSource: 'chief',
       });
       dispatched += 1;
@@ -1443,8 +1355,6 @@ function applyBuildConfirm(deps: BuildDeps, buildId: string, actorName: string):
   if (todoRecord.phase !== 'confirm') {
     throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
   }
-  if (todoRecord.assignment !== null)
-    requireIntakeAssignment(deps, todoRecord.teamId, todoRecord.assignment);
   insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
   if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
     dispatchSplitChildren(deps, todoRecord.id);
@@ -1461,7 +1371,7 @@ export async function applyBuildStepAction(
   body:
     | { action: 'confirm' }
     | { action: 'revision'; side: 'plan'; feedback: string; clientMessageId: string }
-    | { action: 'review'; agentId?: string; focus?: string }
+    | { action: 'review'; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   actor?: string,
   origin: 'person' | 'automatic' = 'person',
@@ -1478,8 +1388,6 @@ export async function applyBuildStepAction(
     if (todoRecord.phase !== 'failed') {
       throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
     }
-    const assignment = todoRecord.assignment ?? { plan: null, build: null };
-    requireIntakeAssignment(deps, todoRecord.teamId, assignment);
     const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
     const preservedStep = deps.db
       .select({ id: step.id })
@@ -1546,7 +1454,6 @@ export async function applyBuildStepAction(
         .where(eq(build.id, reworkTarget.id))
         .run();
       setTodoPhase(deps, todoRecord.id, 'queued', {
-        assignment,
         latestBuildId: reworkTarget.id,
         lastRunAt: now,
       });
@@ -1557,7 +1464,6 @@ export async function applyBuildStepAction(
     }
     const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
     recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
-    const freshSession = routingRulesEnabled() || buildRunsSession(deps, row.id);
     const newId = newUuidv7();
     const createdAt = nowMs();
     deps.db
@@ -1565,7 +1471,7 @@ export async function applyBuildStepAction(
       .values({
         id: newId,
         todoId: todoRecord.id,
-        withPlan: freshSession ? false : row.withPlan,
+        withPlan: false,
         prevPhase: todoRecord.phase,
         triggerSource: 'user',
         planDocId: null,
@@ -1599,24 +1505,16 @@ export async function applyBuildStepAction(
       });
     }
     const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-    const firstKind = freshSession ? 'session' : row.withPlan ? 'plan' : 'build';
     enqueueStep(
       deps,
       newId,
-      firstKind,
+      'session',
       todoRecord.teamId,
-      freshSession
-        ? [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n')
-        : withRetryLessons(
-            restartPrompt,
-            firstKind === 'session' ? 'build' : firstKind,
-            priorLessons,
-          ),
+      [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
       false,
       origin === 'person',
     );
     setTodoPhase(deps, todoRecord.id, 'queued', {
-      assignment,
       latestBuildId: newId,
       lastRunAt: createdAt,
     });
@@ -1635,15 +1533,12 @@ export async function applyBuildStepAction(
     return;
   }
   if (body.action === 'review') {
-    if (
-      body.agentId !== undefined &&
-      deps.db
-        .select({ id: agent.id })
-        .from(agent)
-        .where(and(eq(agent.id, body.agentId), eq(agent.teamId, todoRecord.teamId)))
-        .get() === undefined
-    ) {
-      throw new NotFoundError(`agent ${body.agentId}`);
+    const reviewRoute = routeForStep(deps.db, todoRecord, 'review');
+    if (reviewRoute === null) {
+      throw new HttpError(
+        400,
+        'No review routing rule: add a `review` routing rule in routing settings before requesting an AI review.',
+      );
     }
     restoreFailedReview(deps, row);
     if (todoRecord.phase === 'failed') {
@@ -1687,44 +1582,8 @@ export async function applyBuildStepAction(
       checkout,
       ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
     } as const;
-    if (body.agentId === undefined) {
-      const currentTodo = todoRecord;
-      const fanout = REVIEW_FANOUT_ROLES.map((role) => ({
-        row: deps.db
-          .select({ id: agent.id })
-          .from(agent)
-          .where(and(eq(agent.teamId, currentTodo.teamId), eq(agent.persona, role)))
-          .get(),
-        focus: personaByRole(role).reviewFocus ?? '',
-      })).filter((p): p is { row: { id: string }; focus: string } => p.row !== undefined);
-      if (fanout.length > 0) {
-        for (const perspective of fanout) {
-          const focus =
-            body.focus !== undefined && body.focus.trim() !== ''
-              ? `${body.focus.trim()}\n\n本视角重点：${perspective.focus}`
-              : `本视角重点：${perspective.focus}`;
-          const prompt = buildReviewStepPrompt({
-            agentId: perspective.row.id,
-            ...promptArgs,
-            focus,
-          });
-          enqueueStep(deps, buildId, 'review', todoRecord.teamId, prompt);
-        }
-        return;
-      }
-      const fallback = todoRecord.assignment?.review?.agentId ?? null;
-      if (fallback === null) {
-        throw new HttpError(
-          400,
-          '无可用审核人：团队未播种 persona（CodeReviewer/SecurityAuditor/TestEngineer）且任务的 assignment.review 槽为空。指派审核 Agent（assignment.review 槽）或在请求里携带 agentId。',
-        );
-      }
-      const prompt = buildReviewStepPrompt({ agentId: fallback, ...promptArgs });
-      enqueueStep(deps, buildId, 'review', todoRecord.teamId, prompt);
-      return;
-    }
     const reviewPrompt = buildReviewStepPrompt({
-      agentId: body.agentId,
+      agentId: reviewRoute.id,
       ...promptArgs,
       ...(body.focus !== undefined ? { focus: body.focus } : {}),
     });
@@ -1938,33 +1797,22 @@ export function buildMergePermission(deps: BuildDeps, buildId: string): BuildMer
   if (!buildRow) throw new NotFoundError(`build ${buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  const { missingTools } = mergeToolPermission(deps, todoRow);
+  const missingTools = missingMergeTools(deps, todoRow);
   return { permitted: missingTools.length === 0, missingTools, prUrl: buildRow.prUrl };
 }
 
-function mergeToolPermission(
-  deps: BuildDeps,
-  todoRow: TodoRow,
-): { agentName: string | null; missingTools: string[] } {
-  const agentId = todoRow.assignment?.build?.agentId;
-  const agentRow = agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
-    : undefined;
-  return {
-    agentName: agentRow?.displayName ?? null,
-    missingTools:
-      agentRow === undefined
-        ? []
-        : [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !agentRow.tools.includes(tool)),
-  };
+function missingMergeTools(deps: BuildDeps, todoRow: TodoRow): string[] {
+  const policy = policyForStep(deps.db, todoRow, 'session');
+  if (policy === null || policy.seededFromAgentId === null) return [];
+  return [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((tool) => !policy.tools.includes(tool));
 }
 
 function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
-  const { agentName, missingTools } = mergeToolPermission(deps, todoRow);
+  const missingTools = missingMergeTools(deps, todoRow);
   if (missingTools.length > 0) {
     throw new HttpError(
       403,
-      `Agent ${agentName} 未获「${missingTools.join('」「')}」授权（Agent 详情页权限 tab），无法发起合并`,
+      `The session work policy lacks 「${missingTools.join('」「')}」, so it cannot start a merge (routing settings, work policies)`,
     );
   }
 }
@@ -2101,19 +1949,14 @@ export async function flushVerdictDigests(): Promise<void> {
 function persistGateVerdict(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
-  todoRow: typeof todo.$inferSelect | undefined,
   facts: { stepFailed: boolean; extracted: boolean; blocked: boolean; report: VerdictReport },
 ): void {
   if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
   const expectedHeadSha = expectedHeadOf(stepRow);
   if (expectedHeadSha === null) return;
-  const perspective =
-    stepRow.kind === 'review' && todoRow !== undefined
-      ? (agentForStep(deps.db, todoRow, 'review', stepRow.prompt)?.persona ?? null)
-      : null;
   const bound = bindGateVerdict({
     kind: stepRow.kind,
-    perspective,
+    perspective: null,
     expectedHeadSha,
     reportedHeadSha: facts.report.reportedHeadSha,
     stepFailed: facts.stepFailed,
@@ -2577,7 +2420,7 @@ export function applyStepFailure(
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
   const failedStep = finished ?? stepRow;
   emitRuntimeBuildSpan(db, buildRow.id, 'failed');
-  persistGateVerdict(deps, failedStep, todoRow, {
+  persistGateVerdict(deps, failedStep, {
     stepFailed: true,
     extracted: false,
     blocked: false,
@@ -3105,7 +2948,6 @@ export function completeStep(
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
       });
-      maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
       return;
     }
     if (todoRow.phase === 'building' || canTransitionPhase(todoRow.phase, 'building')) {
@@ -3140,7 +2982,7 @@ export function completeStep(
       }),
       createdAt: nowMs(),
     });
-    persistGateVerdict(deps, stepRow, todoRow, {
+    persistGateVerdict(deps, stepRow, {
       stepFailed: false,
       extracted: outcome.findings !== undefined,
       blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
@@ -3213,7 +3055,7 @@ export function completeStep(
       }),
       createdAt: nowMs(),
     });
-    persistGateVerdict(deps, stepRow, todoRow, {
+    persistGateVerdict(deps, stepRow, {
       stepFailed: false,
       extracted: outcome.verifyVerdict !== undefined,
       blocked: outcome.verifyVerdict !== undefined && !verdict.passed,

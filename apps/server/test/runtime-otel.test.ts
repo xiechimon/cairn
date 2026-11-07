@@ -4,10 +4,15 @@ import {
   otlpTraceIdOfBuild,
   otlpTraceIdOfTurn,
 } from '@cairn/shared/otel';
+import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
+  chiefMessage,
+  chiefThread,
+  machine as machineTable,
   project as projectTable,
+  schedule,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -27,7 +32,7 @@ interface CapturedOtlp {
           spanId: string;
           parentSpanId?: string;
           name: string;
-          status?: { code: number };
+          status?: { code: number; message: string };
           attributes: { key: string; value: unknown }[];
         }[];
       }[];
@@ -61,6 +66,7 @@ interface World {
   s: TestServer;
   buildId: string;
   stepId: string;
+  todoId: string;
 }
 
 function makeWorld(stepRow: {
@@ -115,7 +121,7 @@ function makeWorld(stepRow: {
       createdAt: 1_700_000_000_000,
     })
     .run();
-  return { s, buildId, stepId };
+  return { s, buildId, stepId, todoId };
 }
 
 const env = {
@@ -160,9 +166,43 @@ describe('emitRuntimeStepSpan', () => {
     expect(span.name).toBe('step build');
     expect(span.status).toBeUndefined();
     const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+    expect(attrs['cairn.error_message']).toBeUndefined();
     expect(attrs['cairn.step_id']).toEqual({ stringValue: stepId });
     expect(attrs['cairn.step_kind']).toEqual({ stringValue: 'build' });
     expect(attrs['cairn.checkpoint_commit']).toEqual({ stringValue: 'sha-checkpoint' });
+  });
+
+  test.each(['plan', 'build', 'verify', 'review', 'merge', 'session'] as const)(
+    'exports the todo session on a %s step before the build root is emitted',
+    (kind) => {
+      const { s, stepId, todoId } = makeWorld({
+        status: 'done',
+        claimedAt: 1000,
+        finishedAt: 2000,
+      });
+      s.db.update(stepTable).set({ kind }).where(eq(stepTable.id, stepId)).run();
+      const captured = captureFetch();
+      emitRuntimeStepSpan(s.db, stepId, env);
+      expect(captured).toHaveLength(1);
+      const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+      const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+      expect(attrs['langfuse.session.id']).toEqual({ stringValue: todoId });
+      expect(attrs['session.id']).toEqual({ stringValue: todoId });
+      expect(attrs['langfuse.trace.name']).toBeUndefined();
+      expect(attrs['langfuse.trace.tags']).toBeUndefined();
+    },
+  );
+
+  test('does not invent a session when the step has no build row', () => {
+    const { s, stepId } = makeWorld({ status: 'done', claimedAt: 1000, finishedAt: 2000 });
+    s.db.update(stepTable).set({ buildId: 'missing-build' }).where(eq(stepTable.id, stepId)).run();
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    expect(captured).toHaveLength(1);
+    const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+    expect(attrs['langfuse.session.id']).toBeUndefined();
+    expect(attrs['session.id']).toBeUndefined();
   });
 
   test('marks failed steps as error and re-reads finishedAt after the terminal update', () => {
@@ -176,6 +216,130 @@ describe('emitRuntimeStepSpan', () => {
     const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     expect(span.status).toEqual({ code: 2, message: 'failed' });
     expect(span.traceId).toBe(otlpTraceIdOfBuild(buildId));
+  });
+
+  test.each([
+    [
+      'normalizes build failure reasons',
+      '  OAuth token revoked\n  please log in  ',
+      'OAuth token revoked please log in',
+    ],
+    ['caps failure reasons', 'x'.repeat(600), 'x'.repeat(500)],
+    [
+      'redacts failure reasons before export',
+      'Bearer abc.def at https://192.0.2.1:443/v1?token=secret',
+      '<redacted> at https://<ip>:443/v1?<redacted>',
+    ],
+    ['ignores blank reasons', ' \n ', undefined],
+  ])('%s', (_name, reason, expected) => {
+    const { s, buildId, stepId } = makeWorld({
+      status: 'failed',
+      claimedAt: 1000,
+      finishedAt: 2000,
+    });
+    s.db.update(buildTable).set({ errorMessage: reason }).where(eq(buildTable.id, buildId)).run();
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+    expect(span.status).toEqual({ code: 2, message: expected ?? 'failed' });
+    expect(attrs['cairn.error_message']).toEqual(
+      expected === undefined ? undefined : { stringValue: expected },
+    );
+  });
+
+  test('exports persisted step identity and fallback model without guessing missing models', () => {
+    const { s, buildId, stepId, todoId } = makeWorld({
+      status: 'done',
+      claimedAt: 1000,
+      finishedAt: 2000,
+    });
+    s.db
+      .insert(machineTable)
+      .values({ id: 'otel-machine', teamId: s.team.id, name: 'worker' })
+      .run();
+    s.db.update(stepTable).set({ machineId: 'otel-machine' }).where(eq(stepTable.id, stepId)).run();
+    s.db
+      .update(buildTable)
+      .set({ errorMessage: 'stale failure' })
+      .where(eq(buildTable.id, buildId))
+      .run();
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    let span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    let attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+    expect(attrs['cairn.build_id']).toEqual({ stringValue: buildId });
+    expect(attrs['cairn.todo_id']).toEqual({ stringValue: todoId });
+    expect(attrs['cairn.machine_id']).toEqual({ stringValue: 'otel-machine' });
+    expect(attrs['cairn.machine_name']).toEqual({ stringValue: 'worker' });
+    expect(attrs['gen_ai.request.model']).toBeUndefined();
+    expect(attrs['gen_ai.provider.name']).toBeUndefined();
+    expect(attrs['cairn.runtime']).toBeUndefined();
+    expect(attrs['cairn.error_message']).toBeUndefined();
+    expect(span.status).toBeUndefined();
+    s.db
+      .update(stepTable)
+      .set({
+        fallback: {
+          model: { provider: 'anthropic', modelId: 'fallback-model' },
+          tried: [],
+          zeroUsageRetried: false,
+        },
+      })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    span = captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+    expect(attrs['gen_ai.provider.name']).toEqual({ stringValue: 'anthropic' });
+    expect(attrs['gen_ai.request.model']).toEqual({ stringValue: 'fallback-model' });
+    expect(attrs['cairn.runtime']).toEqual({ stringValue: 'pi' });
+  });
+
+  test('prefers a scheduled step reason and ignores a reason belonging to another step', () => {
+    const { s, buildId, stepId, todoId } = makeWorld({
+      status: 'failed',
+      claimedAt: 1000,
+      finishedAt: 2000,
+    });
+    s.db
+      .update(buildTable)
+      .set({ errorMessage: 'build reason' })
+      .where(eq(buildTable.id, buildId))
+      .run();
+    s.db
+      .insert(schedule)
+      .values({
+        id: 'otel-schedule',
+        teamId: s.team.id,
+        projectId: 'project',
+        todoId,
+        kind: 'once',
+        tz: 'UTC',
+        createdBy: 'user',
+        lastRunStepId: stepId,
+        lastRunError: 'step reason',
+      })
+      .run();
+    s.db
+      .update(stepTable)
+      .set({ scheduleId: 'otel-schedule' })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    expect(captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.status?.message).toBe(
+      'step reason',
+    );
+    s.db
+      .update(schedule)
+      .set({ lastRunStepId: 'other-step' })
+      .where(eq(schedule.id, 'otel-schedule'))
+      .run();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    expect(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!.status?.message).toBe(
+      'build reason',
+    );
   });
 
   test('skips steps that were never claimed', () => {
@@ -203,6 +367,29 @@ describe('emitRuntimeBuildSpan', () => {
     expect(attrs['cairn.base_sha']).toEqual({ stringValue: 'sha-base' });
     expect(attrs['cairn.harness_hash']).toEqual({ stringValue: 'hash-harness' });
   });
+
+  test.each(['failed', 'cancelled'] as const)(
+    'exports the todo and sanitized reason on a %s build root',
+    (outcome) => {
+      const { s, buildId, todoId } = makeWorld({
+        status: 'failed',
+        claimedAt: 1000,
+        finishedAt: 2000,
+      });
+      s.db
+        .update(buildTable)
+        .set({ errorMessage: 'OAuth failed\nBearer secret at http://192.0.2.1' })
+        .where(eq(buildTable.id, buildId))
+        .run();
+      const captured = captureFetch();
+      emitRuntimeBuildSpan(s.db, buildId, outcome, env);
+      const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+      const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+      expect(span.status).toEqual({ code: 2, message: 'OAuth failed <redacted> at http://<ip>' });
+      expect(attrs['cairn.error_message']).toEqual({ stringValue: span.status?.message });
+      expect(attrs['cairn.todo_id']).toEqual({ stringValue: todoId });
+    },
+  );
 
   test('marks failed and cancelled builds as error', () => {
     const { s, buildId } = makeWorld({ status: 'failed', claimedAt: 1000, finishedAt: 2000 });
@@ -277,8 +464,59 @@ describe('Coordinator turn export', () => {
     });
     expect(attrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
     expect(attrs['deployment.environment']).toEqual({ stringValue: 'prod' });
+    for (const key of [
+      'cairn.build_id',
+      'cairn.todo_id',
+      'cairn.machine_id',
+      'cairn.machine_name',
+      'cairn.runtime',
+      'gen_ai.provider.name',
+      'gen_ai.request.model',
+      'cairn.error_message',
+    ])
+      expect(attrs[key]).toBeUndefined();
     expect(attrs['cairn.thread_id']).toEqual({ stringValue: 'chief-thread-9' });
     expect(attrs['cairn.chief_trigger']).toEqual({ stringValue: 'user' });
+  });
+
+  test('exports the chief step error record without adding build identity attributes', () => {
+    const { s, stepId } = chiefTurn(null);
+    s.db
+      .insert(chiefThread)
+      .values({
+        id: 'chief-thread-9',
+        chiefId: 'chief',
+        userId: 'user',
+        teamId: s.team.id,
+        title: 'thread',
+        sessionId: 'session',
+        sessionOpenedAt: 900,
+        createdAt: 900,
+        updatedAt: 900,
+      })
+      .run();
+    s.db
+      .insert(chiefMessage)
+      .values({
+        id: `chief-err-${stepId}`,
+        threadId: 'chief-thread-9',
+        role: 'system',
+        content: JSON.stringify({
+          kind: 'chief_turn_error',
+          message: 'OAuth revoked\nBearer secret',
+        }),
+        createdAt: 2000,
+      })
+      .run();
+    s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, stepId)).run();
+    const captured = captureFetch();
+    emitRuntimeStepSpan(s.db, stepId, env);
+    const span = captured[0]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    expect(span.status).toEqual({ code: 2, message: 'OAuth revoked <redacted>' });
+    expect(attrsOf(span)['cairn.error_message']).toEqual({
+      stringValue: 'OAuth revoked <redacted>',
+    });
+    expect(attrsOf(span)['cairn.build_id']).toBeUndefined();
   });
 
   test('never exports the turn prompt', () => {
@@ -342,6 +580,8 @@ describe('Coordinator turn export', () => {
     expect(root['langfuse.session.id']).toEqual({ stringValue: expect.stringMatching(/^todo-/) });
     expect(root['langfuse.environment']).toEqual({ stringValue: 'prod' });
     const stepAttrs = attrsOf(captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!);
+    expect(stepAttrs['langfuse.session.id']).toEqual(root['langfuse.session.id']);
+    expect(stepAttrs['session.id']).toEqual(root['session.id']);
     expect(stepAttrs['langfuse.environment']).toEqual({ stringValue: 'prod' });
     expect(stepAttrs['langfuse.trace.name']).toBeUndefined();
   });

@@ -12,36 +12,20 @@ import {
   parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
-import {
-  agent,
-  build,
-  chief,
-  chiefThread,
-  machine,
-  type QuotaWaitRow,
-  step,
-  team,
-  todo,
-} from '../db/schema.js';
+import { build, chiefThread, machine, type QuotaWaitRow, step, team, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { routedChiefAgent } from './coordinator-route.js';
-import {
-  agentForStep,
-  capabilityGatePasses,
-  runtimeGatePasses,
-  stepRuntimeFor,
-} from './dispatch-eligibility.js';
+import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import { effectiveModel } from './model-fallback.js';
 import { isClaudeModel, machineUsesClaudeSubscription } from './model-routing.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
-import { routeForStep } from './routing-rules.js';
+import { coordinatorProfile, profileForStep, type RouteProfile } from './routing-rules.js';
 import { getTodo } from './todos.js';
 
 type StepRow = typeof step.$inferSelect;
-type AgentRow = typeof agent.$inferSelect;
+type AgentRow = RouteProfile;
 
 export function claudeUsageGatePasses(
   deps: Pick<MachineDeps, 'db'>,
@@ -139,10 +123,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     const model = effectiveModel(agentRow, stepRow);
     const owner = agentRow.machineId ? byId.get(agentRow.machineId) : undefined;
     const ownerBlock = owner ? claudeRateBlock(owner.claudeRateLimits ?? [], now) : null;
-    const pinned =
-      todoRow === null ||
-      stepRow.kind === 'chief' ||
-      routeForStep(deps.db, todoRow, stepRow.kind) === null;
+    const pinned = stepRow.kind === 'chief' && agentRow.machineId !== null;
     const claimants = machines.filter(
       (row) =>
         row.online &&
@@ -253,15 +234,14 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     )
     .all();
   for (const row of workers) {
-    const agentRow = agentForStep(deps.db, row.todo, row.step.kind, row.step.prompt, row.step.id);
+    const agentRow = profileForStep(deps.db, row.todo, row.step.kind, row.step.id);
     if (agentRow) consider(row.step, agentRow, row.todo);
   }
+  const coordinator = coordinatorProfile(deps.db, teamId);
   const chiefs = deps.db
-    .select({ step, agent })
+    .select({ step })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-    .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(
       and(
         eq(chiefThread.teamId, teamId),
@@ -270,7 +250,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
       ),
     )
     .all();
-  for (const row of chiefs) consider(row.step, routedChiefAgent(deps.db, teamId, row.agent), null);
+  if (coordinator !== null) for (const row of chiefs) consider(row.step, coordinator, null);
   if (changed) deps.machineHub.wake(teamId);
 }
 
@@ -311,22 +291,18 @@ export function recoverClaudeRateLimitFailure(
   const block = claudeRateBlock(machineRow?.claudeRateLimits ?? [], now);
   let agentPick: Pick<AgentRow, 'provider' | 'modelId'> | null = null;
   if (isChiefConversation(stepRow.buildId)) {
-    const bound = deps.db
-      .select({ agentRow: agent, teamId: chiefThread.teamId })
+    const thread = deps.db
+      .select({ teamId: chiefThread.teamId })
       .from(chiefThread)
-      .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-      .innerJoin(agent, eq(chief.agentId, agent.id))
       .where(eq(chiefThread.id, stepRow.buildId))
       .get();
-    agentPick = bound ? routedChiefAgent(deps.db, bound.teamId, bound.agentRow) : null;
+    agentPick = thread ? coordinatorProfile(deps.db, thread.teamId) : null;
   } else {
     const linked = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
     const todoRow = linked
       ? deps.db.select().from(todo).where(eq(todo.id, linked.todoId)).get()
       : undefined;
-    agentPick = todoRow
-      ? agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt, stepRow.id)
-      : null;
+    agentPick = todoRow ? profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id) : null;
   }
   const claude = agentPick !== null && usesClaudeCode(agentPick, stepRow);
   const teamId = stepTeamId(deps, stepRow);

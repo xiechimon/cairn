@@ -5,111 +5,6 @@ import { pressAndExpect } from './helpers.js';
 const USER_SRC = spiralAvatarUrl('Xmon Dai');
 const AGENT_SRC = spiralAvatarUrl('r3-builder');
 
-const SVG_BODY =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="12"/></svg>';
-
-test('team agent card seeds by agent displayName — user/agent srcs differ (different names, different avatars)', async ({
-  page,
-}) => {
-  await page.goto('/app/team?scenario=12');
-  const card = page.getByTestId('team-agent-card').filter({ hasText: 'r3-builder' });
-  await expect(card.locator('img')).toHaveAttribute('src', AGENT_SRC);
-});
-
-test('live members projection: two agents → two distinct seeded srcs; avatarUrl override wins', async ({
-  page,
-}) => {
-  await page.route('**/api/**', (route, request) => {
-    if (request.method() !== 'GET') return route.fallback();
-    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
-  });
-  await page.route('**/api/teams', (route) =>
-    route.fulfill({
-      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-    }),
-  );
-  await page.route('**/api/user/me', (route) =>
-    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
-  );
-  const agent = (id: string, displayName: string, avatarUrl: string | null) => ({
-    id: `m-${id}`,
-    teamId: 'team-1',
-    actorId: id,
-    memberType: 'agent',
-    actor: { id, displayName, avatarUrl, modelId: null, description: null },
-  });
-  const override = `data:image/svg+xml,${encodeURIComponent(SVG_BODY)}`;
-  await page.route('**/api/teams/team-1/members', (route) =>
-    route.fulfill({
-      json: [
-        agent('a1', 'Alpha', null),
-        agent('a2', 'Beta', null),
-        agent('a3', 'Gamma', override),
-      ],
-    }),
-  );
-  await page.goto('/app/team');
-
-  const alpha = page.getByTestId('team-agent-card').filter({ hasText: 'Alpha' });
-  const beta = page.getByTestId('team-agent-card').filter({ hasText: 'Beta' });
-  const gamma = page.getByTestId('team-agent-card').filter({ hasText: 'Gamma' });
-  await expect(alpha.locator('img')).toHaveAttribute('src', spiralAvatarUrl('Alpha'));
-  await expect(beta.locator('img')).toHaveAttribute('src', spiralAvatarUrl('Beta'));
-  expect(spiralAvatarUrl('Alpha')).not.toBe(spiralAvatarUrl('Beta'));
-  await expect(gamma.locator('img')).toHaveAttribute('src', override);
-});
-
-test('create-agent dialog: empty name keeps the static asset; typing previews the seeded avatar', async ({
-  page,
-}) => {
-  await page.goto('/app/team?scenario=12');
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-  const img = page.getByTestId('agent-avatar').locator('img');
-  await expect(img).toHaveAttribute('src', '/avatar-robot-1.svg');
-  await page.locator('#dlg-agent-name').fill('nova');
-  await expect(img).toHaveAttribute('src', spiralAvatarUrl('nova'));
-});
-
-test('unreachable avatarUrl override → img onError falls back to the static asset (no broken image)', async ({
-  page,
-}) => {
-  await page.route('**/avatars.invalid/**', (route) => route.abort());
-  await page.route('**/api/**', (route, request) => {
-    if (request.method() !== 'GET') return route.fallback();
-    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
-  });
-  await page.route('**/api/teams', (route) =>
-    route.fulfill({
-      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
-    }),
-  );
-  await page.route('**/api/user/me', (route) =>
-    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
-  );
-  await page.route('**/api/teams/team-1/members', (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: 'm-a1',
-          teamId: 'team-1',
-          actorId: 'a1',
-          memberType: 'agent',
-          actor: {
-            id: 'a1',
-            displayName: 'Alpha',
-            avatarUrl: 'https://avatars.invalid/alpha.png',
-            modelId: null,
-            description: null,
-          },
-        },
-      ],
-    }),
-  );
-  await page.goto('/app/team');
-  const alpha = page.getByTestId('team-agent-card').filter({ hasText: 'Alpha' });
-  await expect(alpha.locator('img')).toHaveAttribute('src', '/avatar-robot-1.svg');
-});
-
 test('no avatar surface reaches a third-party avatar host', async ({ page }) => {
   const hits: string[] = [];
   page.on('request', (request) => {
@@ -117,8 +12,6 @@ test('no avatar surface reaches a third-party avatar host', async ({ page }) => 
   });
   await page.goto('/app/account?scenario=01');
   await expect(page.locator('.account-avatar img')).toBeVisible();
-  await page.goto('/app/team?scenario=12');
-  await expect(page.getByTestId('team-agent-card').first().locator('img')).toBeVisible();
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
   await expect(page.locator('.chat-row--agent').first()).toBeVisible();
   expect(hits).toEqual([]);

@@ -6,9 +6,9 @@ import type { Hono } from 'hono';
 import pino from 'pino';
 import { describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   machine as machineTable,
   provider as providerTable,
+  routingRule as routingRuleTable,
   step as stepTable,
   team as teamTable,
 } from '../src/db/schema.js';
@@ -17,7 +17,7 @@ import { routeVerdict, targetUnavailable } from '../src/services/machine-routing
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import { seedLocalMachine } from '../src/services/machines.js';
 import * as shipGate from '../src/services/ship-gate.js';
-import { bindAllAgents, bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, postProject, seedSessionRoute, type TestServer } from './helpers.js';
 
 function issueKey(s: TestServer, name: string): string {
   return createApiKey(s, {
@@ -31,7 +31,6 @@ function issueKey(s: TestServer, name: string): string {
 }
 
 const OWNER_TOKEN = 'cairn-owner-revoke-2494';
-const AGENT_ID = 'agent-revoke-1';
 
 function call(
   app: Hono,
@@ -159,7 +158,6 @@ function pinnedHold(s: TestServer, machineId: string) {
           model: { provider: 'stub-gw', modelId: 'stub-model' },
           localProject: false,
           localMerge: true,
-          routed: false,
         },
         [],
         now,
@@ -192,7 +190,7 @@ async function setupWorld(
     pingIntervalMs?: number;
     authToken?: string;
     logger?: pino.Logger;
-    bindAgents?: boolean;
+    pinRoute?: boolean;
   } = {},
 ) {
   const s = bootServer({
@@ -220,18 +218,12 @@ async function setupWorld(
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
   const a = await enroll(s, apiKey, 'host-a');
-  if (opts.bindAgents !== false) bindAllAgents(s, a.machineId);
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: opts.pinRoute !== false ? a.machineId : null,
+  });
   return { s, apiKey, a };
 }
 
@@ -261,8 +253,12 @@ describe('machine token revocation (#2494)', () => {
       expect(row?.tokenHash).toBeNull();
       expect(row?.online).toBe(false);
       expect(row?.apiKeyId).not.toBeNull();
-      const bound = w.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get();
-      expect(bound?.machineId).toBe(w.a.machineId);
+      const pinned = w.s.db
+        .select()
+        .from(routingRuleTable)
+        .where(eq(routingRuleTable.use, 'session'))
+        .get();
+      expect(pinned?.machineId).toBe(w.a.machineId);
     } finally {
       w.s.dispose();
     }
@@ -309,7 +305,6 @@ describe('machine token revocation (#2494)', () => {
       const started = await call(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {
         body: {
           todoIds: [todo.id],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
           withPlan: true,
         },
       });
@@ -369,7 +364,6 @@ describe('machine token revocation (#2494)', () => {
       const started = await call(w.s.app, 'POST', `/api/projects/${projectId}/builds`, {
         body: {
           todoIds: [todo.id],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
           withPlan: true,
         },
       });
@@ -412,7 +406,6 @@ describe('machine token revocation (#2494)', () => {
               body: {
                 todoIds: [todo.id],
                 withPlan: true,
-                assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
               },
             })
           ).status,
@@ -558,7 +551,7 @@ describe('machine token revocation (#2494)', () => {
   });
 
   test('owner-approved re-claim of the local machine closes the previous local stream', async () => {
-    const w = await setupWorld({ authToken: OWNER_TOKEN, bindAgents: false });
+    const w = await setupWorld({ authToken: OWNER_TOKEN, pinRoute: false });
     try {
       seedLocalMachine(w.s.db, w.s.team.id);
       const claimLocal = async (): Promise<{ machineId: string; token: string }> => {
@@ -595,7 +588,7 @@ describe('machine token revocation (#2494)', () => {
   });
 
   test('byKey rotation of an already-online machine marks it offline and publishes presence before closing the stream', async () => {
-    const w = await setupWorld({ bindAgents: false });
+    const w = await setupWorld({ pinRoute: false });
     try {
       const present = await call(w.s.app, 'POST', '/api/machine/presence', {
         cred: w.a.token,
@@ -645,7 +638,7 @@ describe('machine token revocation (#2494)', () => {
   });
 
   test('authorizeEnrollmentMachine rotation of an already-online local machine marks it offline and publishes presence before closing the stream', async () => {
-    const w = await setupWorld({ authToken: OWNER_TOKEN, bindAgents: false });
+    const w = await setupWorld({ authToken: OWNER_TOKEN, pinRoute: false });
     try {
       seedLocalMachine(w.s.db, w.s.team.id);
       const claimLocal = async (): Promise<{ machineId: string; token: string }> => {
@@ -710,7 +703,7 @@ describe('machine token revocation (#2494)', () => {
   });
 
   test('DELETE closes the live stream of the deleted machine', async () => {
-    const w = await setupWorld({ bindAgents: false });
+    const w = await setupWorld({ pinRoute: false });
     try {
       const stream = await openMachineStream(w.s.app, w.a.token);
       await waitFor(() => w.s.machineHub.streamCount(w.s.team.id) === 1);
@@ -742,7 +735,7 @@ describe('machine token revocation (#2494)', () => {
   });
 
   test('ping-time revalidation closes a stream whose machine row was deleted directly', async () => {
-    const w = await setupWorld({ pingIntervalMs: 30, bindAgents: false });
+    const w = await setupWorld({ pingIntervalMs: 30, pinRoute: false });
     try {
       const stream = await openMachineStream(w.s.app, w.a.token);
       await waitFor(() => w.s.machineHub.streamCount(w.s.team.id) === 1);

@@ -4,8 +4,8 @@ import { build as buildTable, plan as planTable, step as stepTable } from '../sr
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { planDocumentDiff } from '../src/services/documents.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
-import { req } from './helpers.js';
+import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { req, startLegacyBuild } from './helpers.js';
 
 registerChiefHarness();
 
@@ -72,11 +72,7 @@ describe('rejection loop plan v2 + unified diff (r5 section 4 / 02 section 4.2)'
     })) as {
       id: string;
     };
-    const out = (await relay('run_builds', {
-      todoIds: [todoRec.id],
-      assignment: { plan: { agentId: AGENT_ID } },
-    })) as { builds: { id: string }[] };
-    const buildId = out.builds[0]!.id;
+    const buildId = startLegacyBuild(H.s, todoRec.id, { withPlan: true });
     setTodoPhase(
       { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
       todoRec.id,

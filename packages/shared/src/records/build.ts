@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { routeOverrideSchema } from './routing-rule.js';
-import { assignmentSchema } from './todo.js';
 
 export const triggerSourceSchema = z.enum(['user', 'chief', 'schedule']);
 export type TriggerSource = z.infer<typeof triggerSourceSchema>;
@@ -31,8 +30,8 @@ export type BuildMergePermission = z.infer<typeof buildMergePermissionSchema>;
 
 export const startBuildsBodySchema = z.object({
   todoIds: z.array(recordId),
-  assignment: assignmentSchema,
-  withPlan: z.boolean(),
+  assignment: z.unknown().optional(),
+  withPlan: z.unknown().optional(),
   routeOverride: routeOverrideSchema.optional(),
 });
 export type StartBuildsBody = z.infer<typeof startBuildsBodySchema>;

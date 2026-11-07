@@ -52,7 +52,6 @@ for (const path of [
   '/app/resources/mcp-servers',
   '/app/resources/secrets',
   '/app/api-keys',
-  '/app/team',
 ]) {
   test(`settings ${path}: skeleton and no conclusion while loading`, async ({ page }) => {
     await delayEveryApi(page);

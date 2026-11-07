@@ -1,30 +1,13 @@
 import {
-  type ClaimedStep,
   claimedStepSchema,
-  type MachineAskBody,
-  type MachineAskResponse,
-  type MachineDoneBody,
-  type MachineTokenResponse,
   machineAskResponseSchema,
   machineStopResponseSchema,
   machineTokenResponseSchema,
-  type StepRecord,
   stepRecordSchema,
-  type TranscriptRow,
 } from '@cairn/shared';
+import type { MachineApi } from '../../server/src/coordinator/runtime/machine-api.js';
 
-export interface MachineApi {
-  claim(): Promise<ClaimedStep | null>;
-  recover(): Promise<StepRecord[]>;
-  token(stepId: string): Promise<MachineTokenResponse>;
-  heartbeat(stepId: string): Promise<void>;
-  stop(stepId: string): Promise<boolean | null>;
-  relayTool(stepId: string, name: string, params: Record<string, unknown>): Promise<string>;
-  askUser(stepId: string, body: MachineAskBody, signal?: AbortSignal): Promise<MachineAskResponse>;
-  transcriptRow(stepId: string, row: TranscriptRow): Promise<void>;
-  transcriptDelta(stepId: string, text: string): Promise<void>;
-  done(stepId: string, body: MachineDoneBody): Promise<void>;
-}
+export type { MachineApi };
 
 const ASK_HOLD_MS = 70_000;
 const ASK_REQUEST_TIMEOUT_MS = ASK_HOLD_MS + 15_000;

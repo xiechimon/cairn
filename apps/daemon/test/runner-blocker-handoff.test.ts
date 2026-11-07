@@ -1,5 +1,3 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   appendBlockerHandoff,
@@ -17,6 +15,7 @@ import type { DaemonLogger } from '../src/log.js';
 import { buildTaskPrompt, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { FakeMachineApi, fakeBackend } from './machine-loop-harness.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const silent: DaemonLogger = {
   raw: () => {},
@@ -85,7 +84,7 @@ function claimed(opts: {
 async function deliver(
   step: ClaimedStep,
 ): Promise<{ prompt: string; systemPrompt: string; home: string }> {
-  const home = mkdtempSync(join(tmpdir(), 'cairn-blocker-handoff-'));
+  const home = testTempDir('cairn-blocker-handoff-');
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { backend, created } = fakeBackend([{ type: 'done', usage: [] }]);

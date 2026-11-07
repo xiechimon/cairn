@@ -100,12 +100,11 @@ try {
   const machineToken = enroll.body?.token;
   const machineId = enroll.body?.id ?? enroll.body?.machineId;
   if (!machineToken || !machineId) throw new Error(`enroll: ${JSON.stringify(enroll.body)}`);
-  const agent = await jpost(`/api/teams/${teamId}/agents`, {
-    displayName: 'verify-builder-1258',
+  const agent = await jpost(`/api/teams/${teamId}/routing-rules/session`, {
     provider: 'stub-gw',
     modelId: 'stub-model',
     machineId,
-  });
+  }, undefined, 'PATCH');
   const agentId = agent.body?.id ?? agent.body?.agentId ?? agent.body?.record?.id;
   if (!agentId) throw new Error(`agent create: ${JSON.stringify(agent.body)}`);
   const project = await jpost('/api/projects', {
@@ -123,7 +122,6 @@ try {
   if (!todoId) throw new Error(`todo create: ${JSON.stringify(todo.body)}`);
   const started = await jpost(`/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: { agentId }, build: { agentId } },
     withPlan: true,
   });
   const buildId = started.body?.builds?.[0]?.id;

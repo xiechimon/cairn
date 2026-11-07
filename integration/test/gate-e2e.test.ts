@@ -15,7 +15,6 @@ import {
 import { message as messageTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
@@ -122,7 +121,7 @@ describe('#929 command gate tool_call seam E2E: both directions + MCP coverage',
     const authed = await api(
       server.url,
       'PATCH',
-      `/api/teams/${server.teamId}/agents/${AGENT_ID}`,
+      `/api/teams/${server.teamId}/work-policies/session`,
       { mcpServers: ['demo'] },
     );
     expect(authed.status).toBe(200);
@@ -135,8 +134,6 @@ describe('#929 command gate tool_call seam E2E: both directions + MCP coverage',
     );
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;

@@ -7,9 +7,9 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   apiKey as apiKeyTable,
   build as buildTable,
+  machine as machineTable,
   message as messageTable,
   plan as planTable,
   step as stepTable,
@@ -18,14 +18,16 @@ import {
 import { systemGitOps } from '../src/lib/git.js';
 import { MERGE_NOT_LANDED_NOTE } from '../src/services/machines.js';
 import {
-  bindAllAgents,
   bootServer,
+  dropQueuedVerify,
   issueApiKey,
+  seedSessionRoute,
+  startLegacyBuild,
   type TestServer,
   withVerification,
 } from './helpers.js';
 
-const AGENT_ID = 'agent-m3b-1';
+const GIT_TOOLS = ['合并分支', '推送分支'];
 
 async function call(
   app: Hono,
@@ -52,7 +54,7 @@ interface GitWorld {
   projectId: string;
   todoId: string;
   repoDir: string;
-  startBuild(): Promise<string>;
+  startBuild(): string;
   claim(): Promise<ClaimedStep>;
   done(stepId: string, body: Record<string, unknown>): Promise<Response>;
   uploadPlan(stepId: string, content: string): Promise<void>;
@@ -72,17 +74,12 @@ async function setupGitWorld(): Promise<GitWorld> {
     body: { teamId: s.team.id, name: 'm3b-mbp', cliVersion: '0.1.0' },
   });
   const machineJson = (await enrollRes.json()) as { token: string };
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'm3b-builder',
-      modelId: 'm',
-      tools: ['合并分支', '推送分支'],
-    })
-    .run();
-  bindAllAgents(s);
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'm',
+    machineId: s.db.select().from(machineTable).get()!.id,
+    tools: GIT_TOOLS,
+  });
   const projRes = await call(s.app, 'POST', '/api/projects', {
     body: { name: 'm3b-lifecycle', repoKind: 'hosted' },
   });
@@ -99,17 +96,8 @@ async function setupGitWorld(): Promise<GitWorld> {
     projectId: project.id,
     todoId: todoBody.id,
     repoDir,
-    async startBuild() {
-      const res = await call(s.app, 'POST', `/api/projects/${project.id}/builds`, {
-        body: {
-          todoIds: [todoBody.id],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-          withPlan: true,
-        },
-      });
-      expect(res.status).toBe(201);
-      const body = (await res.json()) as { builds: { id: string }[] };
-      return body.builds[0]!.id;
+    startBuild() {
+      return startLegacyBuild(s, todoBody.id, { withPlan: true });
     },
     async claim() {
       const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {
@@ -169,7 +157,7 @@ async function fakePushConvBranch(repoDir: string, branch: string): Promise<stri
 describe('claim payload repo binding slot (M3b worktree contract wiring, 02 section 3/5.5)', () => {
   test('hosted project -> project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>}', async () => {
     const w = await setupGitWorld();
-    await w.startBuild();
+    w.startBuild();
     const claimed = await w.claim();
     expect(claimed.project!.repo?.kind).toBe('hosted');
     const url = new URL(claimed.project!.repo!.cloneUrl);
@@ -182,7 +170,7 @@ describe('claim payload repo binding slot (M3b worktree contract wiring, 02 sect
 describe('per-step one-time git credential (02 section 5.4/8; relay tool name matches push_credential r5 section 3.1)', () => {
   test('token/{stepId} -> git {username,password}; revoked after done (revoke = row delete)', async () => {
     const w = await setupGitWorld();
-    await w.startBuild();
+    w.startBuild();
     const claimed = await w.claim();
     const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
       cred: w.token,
@@ -229,11 +217,11 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
       body: { teamId: s.team.id, name: 'm3b-plain' },
     });
     const { token } = (await enroll.json()) as { token: string };
-    s.db
-      .insert(agentTable)
-      .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'b', modelId: 'm' })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, {
+      provider: 'stub-gw',
+      modelId: 'm',
+      machineId: s.db.select().from(machineTable).get()!.id,
+    });
 
     const projRes = await call(s.app, 'POST', '/api/projects', { body: { name: 'plain' } });
     const project = (await projRes.json()) as { id: string };
@@ -241,13 +229,7 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
       body: { title: 't', spec: 's' },
     });
     const todoBody = (await todoRes.json()) as { id: string };
-    await call(s.app, 'POST', `/api/projects/${project.id}/builds`, {
-      body: {
-        todoIds: [todoBody.id],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan: true,
-      },
-    });
+    startLegacyBuild(s, todoBody.id, { withPlan: true });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
       body: {},
@@ -265,7 +247,7 @@ describe('per-step one-time git credential (02 section 5.4/8; relay tool name ma
 describe('plan.md artifact upload (02 section 4.2 / r5 section 4: plan is a file, version = file version)', () => {
   test('upload-urls plan.md -> plan v1 + build.planDocId; replan round -> v2', async () => {
     const w = await setupGitWorld();
-    const buildId = await w.startBuild();
+    const buildId = w.startBuild();
     const claimed = await w.claim();
     const stepId = claimed.step.id;
 
@@ -306,7 +288,7 @@ describe('plan.md artifact upload (02 section 4.2 / r5 section 4: plan is a file
 describe('done commit report = per-step checkpoint (r3 section 3.5 "restore here" data surface)', () => {
   test('step.checkpointCommit persisted', async () => {
     const w = await setupGitWorld();
-    await w.startBuild();
+    w.startBuild();
     const claimed = await w.claim();
     const sha = 'a'.repeat(40);
     await w.done(claimed.step.id, { status: 'success', sessionId: 'pi-1', commit: sha });
@@ -318,7 +300,7 @@ describe('done commit report = per-step checkpoint (r3 section 3.5 "restore here
 describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section 3.6 server-side main verify)', () => {
   test('merge step done(commit) -> bare repo main fast-forward + timeline 🎉', async () => {
     const w = await setupGitWorld();
-    const buildId = await w.startBuild();
+    const buildId = w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -331,6 +313,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
       hasChanges: true,
       commit: convSha,
     });
+    dropQueuedVerify(w.s, buildId);
     const todoNow = () => w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
     expect(todoNow().phase).toBe('review');
 
@@ -365,7 +348,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
 
   test('not fast-forward (main advanced during the merge window) -> step failed + todo failed (failure only human rerun, 02/A6)', async () => {
     const w = await setupGitWorld();
-    const buildId = await w.startBuild();
+    const buildId = w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -373,6 +356,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
     const buildStep = await w.claim();
     const convSha = await fakePushConvBranch(w.repoDir, `cairn/conv-${buildId}`);
     await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-1', commit: convSha });
+    dropQueuedVerify(w.s, buildId);
     await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     const mergeStep = await w.claim();
     await fakePushConvBranch(w.repoDir, 'main');
@@ -394,7 +378,7 @@ describe('merge 202 delegated -> merge step lands (02 section 4.2/A6; r3 section
 describe('#1487 merge step in flight when the card leaves review: success report not landed; repeated merge request 409', () => {
   async function mergeInFlight() {
     const w = await setupGitWorld();
-    const buildId = await w.startBuild();
+    const buildId = w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -407,6 +391,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
       hasChanges: true,
       commit: convSha,
     });
+    dropQueuedVerify(w.s, buildId);
     const mainBefore = await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main');
     expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
       202,
@@ -470,7 +455,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
 
   test('failure mode 3: same build already has an in-flight merge step (pending or claimed) -> another merge request 409, no extra one queued', async () => {
     const w = await setupGitWorld();
-    const buildId = await w.startBuild();
+    const buildId = w.startBuild();
     const planStep = await w.claim();
     await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -483,6 +468,7 @@ describe('#1487 merge step in flight when the card leaves review: success report
       hasChanges: true,
       commit: convSha,
     });
+    dropQueuedVerify(w.s, buildId);
     expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
       202,
     );

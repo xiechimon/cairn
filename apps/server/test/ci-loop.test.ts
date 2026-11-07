@@ -1,13 +1,18 @@
 import { rm } from 'node:fs/promises';
-import { conversationBranch, type Phase, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
+import {
+  conversationBranch,
+  type Phase,
+  parseVerifyPromptMeta,
+  RESEARCH_STUCK_SOURCE_KIND,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
+  plan as planTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -24,12 +29,19 @@ import {
   type CiCheckFailure,
   createCiPoller,
 } from '../src/services/ci-loop.js';
+import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { finishStep } from '../src/services/machine-finish-step.js';
 import { openCitationCheck } from '../src/services/research-citations.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+  withVerification,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 let throttleHome: string;
@@ -74,6 +86,7 @@ class CheckRunsMock {
       checks: CheckSpec[];
       etag?: string;
       status?: number;
+      pullState?: 'open' | 'merged' | 'closed';
       branch: string;
     },
   ) {}
@@ -87,13 +100,20 @@ class CheckRunsMock {
       return Promise.resolve(
         res(200, '"pr"', {
           number: n,
-          state: 'open',
-          merged: false,
+          state:
+            this.state.pullState === 'merged' || this.state.pullState === 'closed'
+              ? 'closed'
+              : 'open',
+          merged: this.state.pullState === 'merged',
           mergeable_state: 'clean',
           head: { sha: headOf(n), ref: this.state.branch, repo: { id: 1 } },
           base: { ref: 'main', repo: { id: 1, default_branch: 'main' } },
         }),
       );
+    }
+    if (url.includes('/pulls?')) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"list"', []));
     }
     if (/\/rules\/branches\//.test(url)) {
       this.otherRequests.push(url);
@@ -132,6 +152,7 @@ interface WorldOpts {
   checks?: CheckSpec[];
   etag?: string;
   status?: number;
+  pullState?: 'open' | 'merged' | 'closed';
 }
 
 interface PrWorld {
@@ -182,7 +203,6 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
       phaseAt: base,
       seqNum: 1,
       latestBuildId: buildId,
-      assignment: { plan: null, build: { agentId: `agent-ci-${rnd}` } },
     })
     .run();
   s.db
@@ -256,6 +276,7 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
     checks: opts.checks ?? [],
     etag: opts.etag,
     status: opts.status,
+    pullState: opts.pullState,
     branch: conversationBranch(buildId),
   });
   const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
@@ -517,6 +538,111 @@ describe('#1150 (1) scan-surface discipline: batch scan + conditional requests (
   });
 });
 
+describe('non-open PRs leave building for existing reconciliation', () => {
+  test('a merged PR with a deleted head settles after two sweeps and writes one done row', async () => {
+    const w = makePrWorld({ pullState: 'merged', status: 404 });
+    const info = vi.fn();
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.fetch, logger: { info } },
+    );
+
+    await poller.sweep(w.base);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.allSteps()).toHaveLength(1);
+    expect(info).toHaveBeenLastCalledWith(
+      expect.objectContaining({ candidates: 1, advanced: 1, unreadable: 0, errors: 0 }),
+      'ci pr-checks sweep',
+    );
+    await poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+    expect(w.todoRow().phase).toBe('done');
+    await poller.sweep(w.base + 2 * CI_POLL_INTERVAL_MS);
+    const rows = w.s.db
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.conversationId, w.buildId))
+      .all();
+    expect(rows.filter((row) => row.role === 'system' && row.content === DONE_ROW)).toHaveLength(1);
+    expect(w.mock.requests).toHaveLength(0);
+    expect(info.mock.calls.every(([tally]) => tally.unreadable === 0)).toBe(true);
+  });
+
+  test('a closed unmerged PR reaches the existing confirmed-close failure path', async () => {
+    const w = makePrWorld({ pullState: 'closed', status: 404 });
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
+    );
+    await w.poller.sweep(w.base);
+    expect(w.todoRow().phase).toBe('review');
+    await w.poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+    expect(w.todoRow().phase).toBe('review');
+    await w.poller.sweep(w.base + 2 * CI_POLL_INTERVAL_MS);
+    expect(w.todoRow().phase).toBe('failed');
+    expect(w.buildRow().errorMessage).toBe(prClosedUnmergedRow(w.prNumber));
+    expect(w.mock.requests).toHaveLength(0);
+  });
+
+  test('an open PR with pending checks stays building', async () => {
+    const w = makePrWorld({ pullState: 'open', checks: [{ name: 'ci', status: 'in_progress' }] });
+    await w.poller.sweep(w.base);
+    await w.poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+    expect(w.todoRow()).toMatchObject({ phase: 'building', v: 1 });
+    expect(w.mock.requests).toHaveLength(2);
+    expect(w.allSteps()).toHaveLength(1);
+  });
+
+  test.each(['pending', 'claimed', 'waiting_quota'] as const)(
+    'a merged PR stays building while a step is %s',
+    async (activeFix) => {
+      const w = makePrWorld({ pullState: 'merged', status: 404, activeFix });
+      await w.poller.sweep(w.base);
+      await w.poller.sweep(w.base + CI_POLL_INTERVAL_MS);
+      expect(w.todoRow()).toMatchObject({ phase: 'building', v: 1 });
+      expect(w.mock.otherRequests).toHaveLength(0);
+      expect(w.allSteps()).toHaveLength(2);
+    },
+  );
+
+  test.each(['phase changed', 'step started'] as const)(
+    'a merged PR does not advance when %s during the PR read',
+    async (change) => {
+      const w = makePrWorld({ pullState: 'merged', status: 404 });
+      const poller = createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox },
+        {
+          githubFetch: (input, init) => {
+            if (String(input).endsWith(`/pulls/${w.prNumber}`)) {
+              if (change === 'phase changed') {
+                w.s.db
+                  .update(todoTable)
+                  .set({ phase: 'failed' })
+                  .where(eq(todoTable.id, w.todoId))
+                  .run();
+              } else {
+                w.s.db
+                  .insert(stepTable)
+                  .values({
+                    id: `racing-${w.buildId}`,
+                    buildId: w.buildId,
+                    kind: 'build',
+                    status: 'pending',
+                    createdAt: w.base,
+                  })
+                  .run();
+              }
+            }
+            return w.mock.fetch(input, init);
+          },
+        },
+      );
+      await poller.sweep(w.base);
+      expect(w.todoRow().phase).toBe(change === 'phase changed' ? 'failed' : 'building');
+      expect(w.mock.requests).toHaveLength(0);
+    },
+  );
+});
+
 describe('#1150 (2) pending checks not misjudged red (three-state machine)', () => {
   test('running/queued -> untouched: no fix step, phase unchanged, no errorMessage', async () => {
     const w = makePrWorld({ checks: [{ name: 'e2e', status: 'in_progress' }] });
@@ -675,33 +801,16 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
     expect(w.mock.requests.length).toBe(before);
   });
 
-  function addResearchAgents(w: PrWorld) {
-    w.s.db
-      .insert(agentTable)
-      .values([
-        {
-          id: `agent-research-${w.buildId}`,
-          teamId: w.teamId,
-          displayName: 'Research',
-          provider: 'claude-code',
-          modelId: 'claude-sonnet-5-5',
-        },
-        {
-          id: `agent-checker-${w.buildId}`,
-          teamId: w.teamId,
-          displayName: 'Checker',
-          provider: 'openai-codex',
-          modelId: 'gpt-6.1-sol',
-        },
-      ])
-      .run();
+  function addResearchRoutes(w: PrWorld) {
+    seedSessionRoute(w.s);
+    seedRoute(w.s, 'citation_check', { provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
   }
 
   test('an earlier red CI round still appends a fix step and does not open research', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(1);
     expect(
@@ -718,7 +827,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(CI_FIX_ROUNDS_MAX - 1);
     expect(w.todoRow().phase).toBe('building');
@@ -745,7 +854,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     const requested = w.s.db
       .select()
@@ -775,7 +884,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     await w.poller.sweep();
     const research = w.s.db
       .select()
@@ -840,7 +949,7 @@ describe('#1150 (3) fix-step dead-loop gate (stop after N consecutive red rounds
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
       fixRounds: CI_FIX_ROUNDS_MAX - 1,
     });
-    addResearchAgents(w);
+    addResearchRoutes(w);
     w.s.db
       .update(buildTable)
       .set({ errorMessage: 'monthly usage limit' })
@@ -923,6 +1032,66 @@ describe('#1150 green push-through / completeStep holds building / scheduler wir
     expect(w.todoRow().phase).toBe('review');
     expect(w.fixRoundSteps()).toHaveLength(0);
     expect(w.todoRow().hasChanges).toBe(true);
+  });
+
+  test('green queues one verify step bound to the delivered head; a CI fix round is verified again on its own head', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    seedSessionRoute(w.s);
+    w.s.db
+      .insert(planTable)
+      .values({
+        id: 'plan-verify-ci',
+        buildId: w.buildId,
+        version: 1,
+        content: withVerification('## Changes\n- touch a.ts'),
+        createdAt: w.base,
+      })
+      .run();
+    const delivered = 'ab'.repeat(20);
+    const fixed = headOf(w.prNumber);
+    w.s.db
+      .update(stepTable)
+      .set({ checkpointCommit: delivered })
+      .where(eq(stepTable.buildId, w.buildId))
+      .run();
+    await w.poller.sweep();
+    const verifies = () => w.allSteps().filter((row) => row.kind === 'verify');
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(1);
+    expect(parseVerifyPromptMeta(verifies()[0]?.prompt ?? null)?.expectedHeadSha).toBe(delivered);
+
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: w.base + 1 })
+      .where(eq(stepTable.id, verifies()[0]?.id ?? ''))
+      .run();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-ci-fix-after-verify',
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: fixed,
+        finishedAt: w.base + 3_000,
+        createdAt: w.base + 2_000,
+      })
+      .run();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
+    const restarted = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.mock.fetch },
+    );
+    await restarted.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(verifies()).toHaveLength(2);
+    expect(verifies().map((row) => parseVerifyPromptMeta(row.prompt)?.expectedHeadSha)).toEqual(
+      expect.arrayContaining([delivered, fixed]),
+    );
+    await w.poller.sweep();
+    expect(verifies()).toHaveLength(2);
   });
 
   test('after green the candidate leaves the grind-green set: another sweep no longer reads checks (moves to the #1403 reconcile surface)', async () => {

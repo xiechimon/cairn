@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   chiefMessage,
   machine as machineTable,
   notification as notificationTable,
@@ -19,15 +18,7 @@ import {
   holdForQuestion,
 } from '../src/services/chief-questions.js';
 import { stepSessionPath } from '../src/services/machine-uploads.js';
-import {
-  bindAgentHome,
-  bootServer,
-  issueApiKey,
-  machineIdByName,
-  type TestServer,
-} from './helpers.js';
-
-const AGENT_ID = 'agent-ask-unit';
+import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -74,21 +65,7 @@ async function makeWorld(): Promise<World> {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: 'ask-agent',
-      description: '调度',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-    })
-    .run();
-  const patchRes = await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-  });
-  expect(patchRes.status).toBe(200);
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model' });
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content: '帮我定缩进' },
   });
@@ -100,7 +77,11 @@ async function makeWorld(): Promise<World> {
     body: { teamId, name: 'ask-mbp', cliVersion: '0.1.0' },
   });
   const { token } = (await enrollRes.json()) as { token: string };
-  bindAgentHome(s, AGENT_ID, machineIdByName(s, 'ask-mbp'));
+  seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: machineIdByName(s, 'ask-mbp'),
+  });
   const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
     cred: token,
     body: {},

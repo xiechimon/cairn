@@ -33,7 +33,7 @@ const server = spawn('pnpm', ['exec', 'tsx', 'src/index.ts'], {
     CAIRN_SKILLS_DIR: join(home, 'skills'),
     CAIRN_AUTH: 'off',
     NODE_OPTIONS:
-      `${process.env.NODE_OPTIONS ?? ''} --require ${join(import.meta.dirname, 'fixed-hostname.cjs')}`.trim(),
+      `${process.env.NODE_OPTIONS ?? ''} --require ${join(import.meta.dirname, 'fixed-hostname.cjs')} --import ${new URL('fixed-clock.mjs', import.meta.url).href}`.trim(),
   },
   stdio: ['ignore', log, log],
 });

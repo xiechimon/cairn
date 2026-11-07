@@ -12,13 +12,14 @@ import {
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { agent, chief, chiefMessage, chiefThread, step } from '../db/schema.js';
+import { chief, chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { notifyChiefMessage } from './notifications.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
+import { coordinatorProfile } from './routing-rules.js';
 
 export interface ChiefQuestionDeps {
   db: Db;
@@ -158,10 +159,7 @@ export function createOrGetQuestion(
     threadRow === undefined
       ? undefined
       : deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-  const agentRow =
-    chiefRow?.agentId !== undefined && chiefRow.agentId !== null
-      ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-      : undefined;
+  const agentRow = chiefRow === undefined ? null : coordinatorProfile(deps.db, chiefRow.teamId);
   deps.db.transaction(() => {
     writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
     if (deps.hub !== undefined && deps.user !== undefined) {
@@ -171,7 +169,7 @@ export function createOrGetQuestion(
           threadId: input.threadId,
           message: input.questions[0]?.question ?? '',
           ...(agentRow
-            ? { agent: { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl } }
+            ? { agent: { name: agentRow.displayName, avatarUrl: null } }
             : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
         },
       );

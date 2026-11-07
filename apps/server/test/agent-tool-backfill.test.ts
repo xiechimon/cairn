@@ -23,7 +23,7 @@ function readJournal(folder: string): { entries: { idx: number; tag: string }[] 
   return JSON.parse(readFileSync(join(folder, 'meta', '_journal.json'), 'utf8'));
 }
 
-function preBackfillMigrations(): string {
+function migrationsThrough(includeBackfill: boolean): string {
   const journal = readJournal(MIGRATIONS_FOLDER);
   const backfillIdx = journal.entries.findIndex((entry) =>
     /json_insert\(`?tools`?.*'推送分支'/i.test(
@@ -31,9 +31,10 @@ function preBackfillMigrations(): string {
     ),
   );
   expect(backfillIdx, 'push-branch backfill migration missing from journal').toBeGreaterThan(0);
+  const cut = backfillIdx + (includeBackfill ? 1 : 0);
   const dir = temp('cairn-migrations-pre-backfill-');
   mkdirSync(join(dir, 'meta'));
-  for (const entry of journal.entries.slice(0, backfillIdx)) {
+  for (const entry of journal.entries.slice(0, cut)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
     const snapshot = join(MIGRATIONS_FOLDER, 'meta', `${entry.tag}_snapshot.json`);
     try {
@@ -43,7 +44,7 @@ function preBackfillMigrations(): string {
   const full = readJournal(MIGRATIONS_FOLDER);
   writeFileSync(
     join(dir, 'meta', '_journal.json'),
-    JSON.stringify({ ...full, entries: full.entries.slice(0, backfillIdx) }, null, 2),
+    JSON.stringify({ ...full, entries: full.entries.slice(0, cut) }, null, 2),
   );
   return dir;
 }
@@ -58,7 +59,7 @@ function buildPreBackfillDb(rows: LegacyAgent[]): { dbPath: string } {
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: preBackfillMigrations() });
+  migrate(db, { migrationsFolder: migrationsThrough(false) });
   const { teamId } = insertLegacyUserAndTeam(sqlite, {
     userId: 'user-legacy',
     teamId: 'team-legacy',
@@ -92,13 +93,13 @@ describe('0018 push-branch backfill (XMON-84 B4 legacy rows preserved on deliver
     ]);
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });
-    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    migrate(db, { migrationsFolder: migrationsThrough(true) });
     sqlite.close();
 
     expect(readTools(dbPath, 'bf-empty')).toEqual(['推送分支']);
     expect(readTools(dbPath, 'bf-merge-only')).toEqual(['合并分支', '推送分支']);
     expect(readTools(dbPath, 'bf-has-push')).toEqual(['推送分支']);
-    expect(readTools(dbPath, 'bf-junk')).toEqual(['自造档', '推送分支']);
+    expect(readTools(dbPath, 'bf-junk')).toEqual(['远程 shell', '自造档', '推送分支']);
   });
 
   test('backfill SQL itself is idempotent (defensive replay produces no duplicates)', () => {

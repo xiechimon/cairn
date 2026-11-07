@@ -6,15 +6,22 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openDbWithHandle } from '../src/db/client.js';
-import { agent, build, buildFeedback, plan, project, step, todo } from '../src/db/schema.js';
+import {
+  build,
+  buildFeedback,
+  plan,
+  project,
+  routingRule,
+  step,
+  todo,
+  workPolicy,
+} from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { applyBuildStepAction, sweepPlanAutoConfirm } from '../src/services/builds.js';
-import { addChiefWatch } from '../src/services/chief.js';
-import { confirmBuild, executeChiefTool } from '../src/services/chief-tools.js';
+import { confirmBuild } from '../src/services/chief-tools.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
-import { getTodo } from '../src/services/todos.js';
 import { req } from './helpers.js';
 
 const cleanups: (() => void)[] = [];
@@ -65,8 +72,29 @@ function world() {
       autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: 'autonomous' },
     })
     .run();
-  db.insert(agent)
-    .values({ id: 'agent', teamId: team.id, displayName: 'Builder', tools: [] })
+  db.insert(routingRule)
+    .values({
+      id: 'session-rule',
+      teamId: team.id,
+      use: 'session',
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      createdAt: READY_AT,
+      updatedAt: READY_AT,
+    })
+    .run();
+  db.insert(workPolicy)
+    .values({
+      id: 'session-policy',
+      teamId: team.id,
+      use: 'session',
+      seededFromAgentId: 'legacy-agent',
+      tools: [],
+      mcpServers: [],
+      secrets: [],
+      createdAt: READY_AT,
+      updatedAt: READY_AT,
+    })
     .run();
   db.insert(todo)
     .values({
@@ -79,7 +107,6 @@ function world() {
       phase: 'confirm',
       phaseAt: READY_AT,
       seqNum: 1,
-      assignment: { plan: { agentId: 'agent' }, build: { agentId: 'agent' } },
     })
     .run();
   db.insert(build)
@@ -155,12 +182,12 @@ test.each([null, 'github'] as const)(
   },
 );
 
-test('merge permission API follows both current agent switches', async () => {
+test('merge permission API follows both session policy switches', async () => {
   const w = world();
   w.db
-    .update(agent)
+    .update(workPolicy)
     .set({ tools: ['合并分支', '推送分支'] })
-    .where(eq(agent.id, 'agent'))
+    .where(eq(workPolicy.id, 'session-policy'))
     .run();
   const response = await req(w.app, 'GET', '/api/builds/build/merge-permission');
   expect(await response.json()).toMatchObject({ permitted: true, missingTools: [] });
@@ -370,7 +397,7 @@ test('project toggle rejects non-booleans and re-enabling does not clear a plan 
 });
 
 test.each(['pause', 'disabled'] as const)(
-  'every agent confirmation respects %s while user approval proceeds',
+  'automatic confirmation respects %s while user approval proceeds',
   async (reason) => {
     const w = world();
     if (reason === 'pause')
@@ -389,23 +416,6 @@ test.each(['pause', 'disabled'] as const)(
       reason === 'pause'
         ? /paused.*explicit user approval/i
         : /disabled.*project.*explicit user approval/i;
-    addChiefWatch(w.deps, {
-      teamId: w.deps.team.id,
-      todo: getTodo(w.deps, 'todo')!,
-      projectName: 'D121',
-      threadId: 'thread',
-    });
-    const toolCtx = {
-      teamId: w.deps.team.id,
-      userId: w.deps.user.id,
-      chiefId: 'chief',
-      threadId: 'thread',
-      chiefAgentId: 'agent',
-      conversationId: 'thread',
-    };
-    await expect(
-      executeChiefTool(w.deps, toolCtx, 'confirm_builds', { buildIds: ['build'] }),
-    ).rejects.toThrow(message);
     await expect(confirmBuild(w.deps, 'build')).rejects.toThrow(message);
     await expect(
       applyBuildStepAction(w.deps, 'build', { action: 'confirm' }, 'Agent', 'automatic'),
@@ -418,23 +428,3 @@ test.each(['pause', 'disabled'] as const)(
     expect(w.phase()).toBe('building');
   },
 );
-
-test('Chief can confirm an eligible plan before the scheduler deadline', async () => {
-  const w = world();
-  await expect(
-    executeChiefTool(
-      w.deps,
-      {
-        teamId: w.deps.team.id,
-        userId: w.deps.user.id,
-        chiefId: 'chief',
-        threadId: 'thread',
-        chiefAgentId: 'agent',
-        conversationId: 'thread',
-      },
-      'confirm_builds',
-      { buildIds: ['build'] },
-    ),
-  ).resolves.toBe(JSON.stringify({ confirmed: ['build'] }));
-  expect(w.phase()).toBe('building');
-});

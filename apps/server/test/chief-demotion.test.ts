@@ -2,7 +2,6 @@ import { chiefTurnErrorContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   chiefMessage,
   chief as chiefTable,
@@ -18,6 +17,7 @@ import {
   insertMachine,
   postProject,
   req,
+  seedRoute,
   subscriptionClaudeReport,
   type TestServer,
 } from './helpers.js';
@@ -26,8 +26,6 @@ const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
-
-const AGENT_ID = 'agent-chief-demote';
 
 interface World {
   s: TestServer;
@@ -50,26 +48,22 @@ function machineDepsOf(s: TestServer): MachineDeps {
 }
 
 async function setupWorld(
-  opts: { agentMachineId?: string | null; bindAgent?: boolean; provider?: string } = {},
+  opts: { homeMachineId?: string | null; bindRoute?: boolean; provider?: string } = {},
 ): Promise<World> {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const machineAId = insertMachine(s, { name: 'demote-a' });
   const machineBId = insertMachine(s, { name: 'demote-b' });
   const projectId = await postProject(s.app, 'demote-proj');
-  const home = opts.agentMachineId === undefined ? machineAId : opts.agentMachineId;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'demote-agent',
+  const home = opts.homeMachineId === undefined ? machineAId : opts.homeMachineId;
+  if (opts.bindRoute !== false) {
+    seedRoute(s, 'coordinator', {
       provider: opts.provider ?? 'stub-gw',
       modelId: 'stub-model',
       thinkingLevel: 'high',
       machineId: home,
-    })
-    .run();
+    });
+  }
   const chiefId = `chief-${s.svc.user.id}-${s.team.id}`;
   s.db
     .insert(chiefTable)
@@ -77,7 +71,6 @@ async function setupWorld(
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      agentId: opts.bindAgent === false ? null : AGENT_ID,
       charter: '',
       createdAt: 1,
     })
@@ -157,7 +150,6 @@ function insertClaimedOn(w: World, kind: 'build' | 'chief'): void {
       spec: '',
       phase: 'building',
       phaseAt: 4,
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
     })
     .run();
   w.s.db
@@ -198,7 +190,6 @@ function insertPendingWorkerStep(w: World): string {
       spec: '',
       phase: 'queued',
       phaseAt: 6,
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
     })
     .run();
   w.s.db
@@ -225,7 +216,7 @@ function insertPendingWorkerStep(w: World): string {
   return 'step-build-waiting';
 }
 
-describe('#1260 route re-source: chief step destination = the bound Agent home machine', () => {
+describe('#1260 route re-source: chief step destination = the coordinator rule home machine', () => {
   test('failure mode 1: another machine claims empty, step stays pending; the home machine claims it', async () => {
     const w = await setupWorld();
     expect(await claimOn(w, w.machineBId)).toBeNull();
@@ -246,7 +237,7 @@ describe('#1260 route re-source: chief step destination = the bound Agent home m
     expect(stepRowOf(w).status).toBe('pending');
   });
 
-  test('failure mode 5: payload model/thinking level = the bound Agent own config (no override slot)', async () => {
+  test('failure mode 5: payload model/thinking level = the coordinator rule own config (no override slot)', async () => {
     const w = await setupWorld();
     const claimed = await claimOn(w, w.machineAId);
     expect(claimed?.agent?.provider).toBe('stub-gw');
@@ -255,7 +246,7 @@ describe('#1260 route re-source: chief step destination = the bound Agent home m
   });
 });
 
-describe('#1260 slot occupancy: chief steps are ordinary consumers of the machine and Agent slots', () => {
+describe('#1260 slot occupancy: chief steps are ordinary consumers of the machine slots', () => {
   test('failure mode 3a: worker at capacity (cap 1) -> chief step comes up empty, step stays pending', async () => {
     const w = await setupWorld();
     w.s.db
@@ -281,55 +272,10 @@ describe('#1260 slot occupancy: chief steps are ordinary consumers of the machin
     expect(stepRowOf(w, waiting).status).toBe('pending');
     expect(stepRowOf(w).status).toBe('pending');
   });
-
-  test('failure mode 4: Agent slot (maxConcurrentTasks=1) -- chief step running -> same-Agent workers and other-thread chiefs all come up empty', async () => {
-    const w = await setupWorld();
-    w.s.db
-      .update(agentTable)
-      .set({ maxConcurrentTasks: 1 })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
-    insertClaimedOn(w, 'chief');
-    const waiting = insertPendingWorkerStep(w);
-    w.s.db
-      .insert(chiefThreadTable)
-      .values({
-        id: 'chief-demote-thread-2',
-        chiefId: w.chiefId,
-        userId: w.s.svc.user.id,
-        teamId: w.s.team.id,
-        title: '第二线程',
-        createdAt: 8,
-        updatedAt: 8,
-        sessionRuntime: 'pi',
-        sessionId: '',
-        sessionOpenedAt: 8,
-        pendingSessionResumeAt: null,
-        toolDefHashes: {},
-        toolResultHashes: {},
-        activeRun: null,
-        archivedAt: 8,
-      })
-      .run();
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: 'step-chief-demote-2',
-        buildId: 'chief-demote-thread-2',
-        kind: 'chief',
-        status: 'pending',
-        createdAt: 9,
-      })
-      .run();
-    expect(await claimOn(w, w.machineAId)).toBeNull();
-    expect(stepRowOf(w).status).toBe('pending');
-    expect(stepRowOf(w, 'step-chief-demote-2').status).toBe('pending');
-    expect(stepRowOf(w, waiting).status).toBe('pending');
-  });
 });
 
 describe('#1260 retired-slot wire surface', () => {
-  test('failure mode 6: PATCH carrying only machineId/model/compactionModel -> 400; GET chief record has none of the three keys; orchestration.homeMachineId = bound Agent home machine', async () => {
+  test('failure mode 6: PATCH carrying only machineId/model/compactionModel -> 400; GET chief record has none of the three keys; orchestration.homeMachineId = coordinator rule home machine', async () => {
     const w = await setupWorld();
     for (const body of [
       { machineId: w.machineBId },
@@ -350,25 +296,25 @@ describe('#1260 retired-slot wire surface', () => {
     expect(orch.homeMachineId).toBe(w.machineAId);
   });
 
-  test('PATCH agent slot no longer accepts a thinkingLevel override (binding/rebinding still 200)', async () => {
+  test('PATCH binding an agent to the Coordinator answers 410 removed under D60', async () => {
     const w = await setupWorld();
     const res = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: 'low' },
+      agent: { agentId: 'any-agent' },
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(410);
   });
 });
 
 describe('#1260 sweep suspension surface (sweepAbandonedChiefSteps, #1257 suspension semantics)', () => {
-  test('failure mode 7: no Agent bound -> suspended waiting for binding (step stays pending, no failure row)', async () => {
-    const w = await setupWorld({ bindAgent: false });
+  test('failure mode 7: no coordinator rule -> suspended waiting for one (step stays pending, no failure row)', async () => {
+    const w = await setupWorld({ bindRoute: false });
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorMessage(w)).toBeNull();
   });
 
-  test('failure mode 8: bound Agent has no home machine -> suspended waiting for it to be set (step stays pending)', async () => {
-    const w = await setupWorld({ agentMachineId: null });
+  test('failure mode 8: coordinator rule has no home machine -> suspended waiting for it to be set (step stays pending)', async () => {
+    const w = await setupWorld({ homeMachineId: null });
     sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorMessage(w)).toBeNull();

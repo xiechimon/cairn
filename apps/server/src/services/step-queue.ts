@@ -6,15 +6,9 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
+import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { routedChiefAgent } from './coordinator-route.js';
-import {
-  agentForStep,
-  agentIdForStep,
-  missingCapabilities,
-  runtimeGatePasses,
-} from './dispatch-eligibility.js';
+import { missingCapabilities, runtimeGatePasses } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import {
   priorSessionOf,
@@ -28,7 +22,12 @@ import {
 } from './machine-routing.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
-import { applyRoute, policyForStep, routeForStep } from './routing-rules.js';
+import {
+  coordinatorProfile,
+  profileForStep,
+  type RouteProfile,
+  routeForStep,
+} from './routing-rules.js';
 
 export interface QueueTargetStep {
   id: string;
@@ -59,27 +58,29 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .all();
   const workerQueue = workerRows.map((r) => ({
     ...r,
-    home: agentForStep(db, r.todoRow, r.kind, r.prompt, r.id)?.machineId ?? null,
+    home: profileForStep(db, r.todoRow, r.kind, r.id)?.machineId ?? null,
   }));
   const chiefRows = db
     .select({
       id: step.id,
       createdAt: step.createdAt,
       threadId: step.buildId,
-      boundAgent: agent,
+      teamId: chiefThread.teamId,
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
       chiefId: chiefThread.chiefId,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-    .innerJoin(agent, eq(chief.agentId, agent.id))
+    .innerJoin(
+      routingRule,
+      and(eq(routingRule.teamId, chiefThread.teamId), eq(routingRule.use, 'coordinator')),
+    )
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
     .all()
-    .map(({ boundAgent, ...row }) => ({
+    .map((row) => ({
       ...row,
-      home: routedChiefAgent(db, teamId, boundAgent).machineId,
+      home: coordinatorProfile(db, teamId)?.machineId ?? null,
     }));
   const queue = [...workerQueue, ...chiefRows].sort(
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
@@ -106,32 +107,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
   };
 
   const teamMachines = db.select().from(machine).where(eq(machine.teamId, teamId)).all();
-  const agentCache = new Map<string, typeof agent.$inferSelect | null>();
-  const agentRowOf = (agentId: string | null): typeof agent.$inferSelect | null => {
-    if (agentId === null) return null;
-    if (!agentCache.has(agentId)) {
-      agentCache.set(agentId, db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null);
-    }
-    return agentCache.get(agentId) ?? null;
-  };
-
-  function agentForRow(row: (typeof queue)[number]): typeof agent.$inferSelect | null {
-    if ('todoRow' in row) {
-      const base = agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
-      return base === null
-        ? null
-        : applyRoute(
-            base,
-            routeForStep(db, row.todoRow, row.kind, row.id),
-            row.todoRow.routeOverride,
-            policyForStep(db, row.todoRow, row.kind),
-          );
-    }
-    const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
-    const bound = agentRowOf(chiefRow?.agentId ?? null);
-    return bound === null || chiefRow === undefined
-      ? bound
-      : routedChiefAgent(db, chiefRow.teamId, bound);
+  function agentForRow(row: (typeof queue)[number]): RouteProfile | null {
+    if ('todoRow' in row) return profileForStep(db, row.todoRow, row.kind, row.id);
+    return coordinatorProfile(db, teamId);
   }
 
   const catalog = mergedCatalogModels();
@@ -153,7 +131,6 @@ export function stepQueueProjector(db: Db, teamId: string) {
       model: effectiveModel(agentRow, row),
       localProject: projectOfTodo(db, row.todoRow)?.repoKind === 'local',
       localMerge: parseLocalMergeInstruction(row.prompt) !== null,
-      routed: true,
     };
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);

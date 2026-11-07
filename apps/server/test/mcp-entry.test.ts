@@ -4,7 +4,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import {
-  agent,
   build,
   chief,
   chiefMessage,
@@ -12,6 +11,7 @@ import {
   message,
   project,
   queuedMessage,
+  routingRule,
   steerPending,
   step,
   stopPending,
@@ -19,7 +19,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
-import { patchChief, sendChiefMessage } from '../src/services/chief.js';
+import { sendChiefMessage } from '../src/services/chief.js';
 import { createOrGetQuestion } from '../src/services/chief-questions.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
@@ -80,12 +80,18 @@ async function call<T = ThreadResponse>(
 }
 
 function bindCoordinator(s: TestServer, teamId = s.team.id) {
-  const agentId = `coordinator-${teamId}`;
   s.db
-    .insert(agent)
-    .values({ id: agentId, teamId, displayName: 'Coordinator', provider: 'test', modelId: 'test' })
+    .insert(routingRule)
+    .values({
+      id: `coordinator-${teamId}`,
+      teamId,
+      use: 'coordinator',
+      provider: 'test',
+      modelId: 'test',
+      createdAt: 1,
+      updatedAt: 1,
+    })
     .run();
-  patchChief(s.svc, teamId, { agent: { agentId } });
 }
 
 async function world() {

@@ -29,10 +29,10 @@ import { recommendMachineConcurrency } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
 import {
-  agentForStep,
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  profileForStep,
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
@@ -42,10 +42,10 @@ import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
-  agentForStep,
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  profileForStep,
   publishStepStatus,
   upsertChiefRow,
   upsertMessage,
@@ -616,7 +616,7 @@ function skillsSelection(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  const agentRow = agentForStep(deps, todoRow, row.kind, row.prompt, row.id);
+  const agentRow = profileForStep(deps, todoRow, row.kind, row.id);
   const allowlist = agentRow?.skillsAllowlist ?? null;
   if (allowlist === null) return { isChief: false, unrestricted: true, wanted: scanned };
   const whitelist = new Set(allowlist);

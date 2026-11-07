@@ -5,32 +5,16 @@ import {
   type TeamRoutingSettings,
   type WorkPolicyRecord,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { agent as agentTable, routingRule } from '../src/db/schema.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
-import { bindAllAgents, bootServer, insertMachine, req } from './helpers.js';
-
-beforeEach(() => setRoutingRulesEnabled(false));
-afterEach(() => setRoutingRulesEnabled(false));
+import { describe, expect, test } from 'vitest';
+import { bootServer, insertMachine, req } from './helpers.js';
 
 describe('routing settings API (D60 PR8)', () => {
-  test('GET returns empty rules with the flag off by default', async () => {
+  test('GET returns empty rules and policies for a team with none configured', async () => {
     const s = bootServer();
     const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as TeamRoutingSettings;
-    expect(body).toEqual({ enabled: false, rules: [], policies: [] });
-  });
-
-  test('GET reports enabled true when the flag is on, without flipping the default', async () => {
-    const s = bootServer();
-    setRoutingRulesEnabled(true);
-    const body = (await (
-      await req(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`)
-    ).json()) as TeamRoutingSettings;
-    expect(body.enabled).toBe(true);
-    expect(body.rules).toEqual([]);
+    expect(body).toEqual({ rules: [], policies: [] });
   });
 
   test('PATCH creates a session rule and a later PATCH updates it', async () => {
@@ -111,62 +95,9 @@ describe('routing settings API (D60 PR8)', () => {
     });
   });
 
-  test('seed creates session and review rows from agents without enabling the flag', async () => {
-    const s = bootServer();
-    const machineId = insertMachine(s);
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-impl',
-        teamId: s.team.id,
-        displayName: 'impl',
-        persona: 'implementer',
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-        machineId,
-        tools: [AGENT_TOOL_PUSH],
-        secrets: [],
-        mcpServers: [],
-      })
-      .run();
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-review',
-        teamId: s.team.id,
-        displayName: 'reviewer',
-        persona: 'code_reviewer',
-        provider: 'openai',
-        modelId: 'gpt-5.4',
-        machineId,
-        tools: [AGENT_TOOL_PUSH, AGENT_TOOL_MERGE],
-        secrets: ['X'],
-        mcpServers: [],
-      })
-      .run();
-    bindAllAgents(s);
-    const seeded = await req(s.app, 'POST', `/api/teams/${s.team.id}/routing-settings/seed`);
-    expect(seeded.status).toBe(200);
-    const body = (await seeded.json()) as TeamRoutingSettings;
-    expect(body.enabled).toBe(false);
-    expect(body.rules.map((r) => r.use).sort()).toEqual(['review', 'session']);
-    expect(body.policies.map((p) => p.use).sort()).toEqual(['review', 'session']);
-    expect(body.rules.find((r) => r.use === 'session')).toMatchObject({
-      provider: 'claude-code',
-      modelId: 'claude-sonnet-5-5',
-      seededFromAgentId: 'agent-impl',
-    });
-    expect(body.policies.find((p) => p.use === 'review')?.secrets).toEqual([]);
-    expect(body.policies.find((p) => p.use === 'review')?.tools).not.toContain(AGENT_TOOL_MERGE);
-    expect(
-      s.db.select().from(routingRule).where(eq(routingRule.teamId, s.team.id)).all(),
-    ).toHaveLength(2);
-  });
-
   test('foreign team returns 404', async () => {
     const s = bootServer();
     expect((await req(s.app, 'GET', '/api/teams/other/routing-settings')).status).toBe(404);
-    expect((await req(s.app, 'POST', '/api/teams/other/routing-settings/seed')).status).toBe(404);
     expect(
       (
         await req(s.app, 'PATCH', '/api/teams/other/routing-rules/session', {

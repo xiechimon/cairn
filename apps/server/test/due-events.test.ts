@@ -9,7 +9,7 @@ import {
   dueBackoffMs,
 } from '../src/services/due-events.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, postProject, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 class FakeClock implements DueClock {
   time: number;
@@ -334,6 +334,7 @@ describe('due events (#2502)', () => {
 
   test('a once schedule waits out an active step instead of arming immediately again', async () => {
     const server = boot();
+    seedSessionRoute(server);
     const projectId = await postProject(server.app, 'busy-schedule');
     const created = (await (
       await req(server.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -344,7 +345,6 @@ describe('due events (#2502)', () => {
     const started = (await (
       await req(server.app, 'POST', `/api/projects/${projectId}/builds`, {
         todoIds: [created.id],
-        assignment: { plan: null, build: null },
         withPlan: false,
       })
     ).json()) as { builds: unknown[] };

@@ -2,20 +2,43 @@ import {
   type CapabilityCandidate,
   classifyDifficulty,
   REVIEW_MODEL,
+  type RequiredCapabilities,
   type RouteWorkDecision,
   routeWork,
   type StepKind,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { machine, type routingRule, type step, stepRoute, team, type todo } from '../db/schema.js';
+import { machine, type step, stepRoute, team, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { missingCapabilityItems } from './dispatch-eligibility.js';
 import { machineUsesClaudeSubscription } from './model-routing.js';
 
-type RoutingRuleRow = typeof routingRule.$inferSelect;
 type StepRouteRow = typeof stepRoute.$inferSelect;
 type RoutedTodo = Pick<typeof todo.$inferSelect, 'teamId'> &
   Partial<Pick<typeof todo.$inferSelect, 'title' | 'spec'>>;
+
+export interface RouteConstraints {
+  machineId: string | null;
+  required: RequiredCapabilities | null;
+}
+
+function machineSatisfies(
+  row: typeof machine.$inferSelect,
+  constraints: RouteConstraints,
+): boolean {
+  if (constraints.machineId !== null && constraints.machineId !== row.id) return false;
+  const missing = missingCapabilityItems(row, constraints.required);
+  return (
+    missing.executor === undefined && missing.mcpServers.length === 0 && missing.models.length === 0
+  );
+}
+
+function reportsModel(models: readonly { id: string }[] | undefined, modelId: string): boolean {
+  return (
+    models === undefined || models.length === 0 || models.some((model) => model.id === modelId)
+  );
+}
 
 const CLAUDE_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 const SECONDS_TO_MS = 1000;
@@ -35,12 +58,17 @@ function weeklyUsedPercent(row: typeof machine.$inferSelect): number | null {
   return week.utilization * 100;
 }
 
-export function capabilityCandidates(db: Db, teamId: string): CapabilityCandidate[] {
+export function capabilityCandidates(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  constraints: RouteConstraints,
+): CapabilityCandidate[] {
   const now = nowMs();
   const allowPaid =
     db.select().from(team).where(eq(team.id, teamId)).get()?.claudeUsage === 'allow-paid';
   const candidates: CapabilityCandidate[] = [];
   for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
+    if (!machineSatisfies(row, constraints)) continue;
     const report = row.claudeCodeReport;
     const claudeInstalled =
       report?.installed === true && row.enabledRuntimes.includes('claude-code');
@@ -57,7 +85,7 @@ export function capabilityCandidates(db: Db, teamId: string): CapabilityCandidat
         provider: 'claude-code',
         modelId,
         machineId: row.id,
-        available: claudeUsable,
+        available: claudeUsable && reportsModel(report?.models, modelId),
         ...(claudeInstalled ? {} : { unavailableWhy: 'harness-missing' as const }),
         weeklyUsedPercent: weeklyUsedPercent(row),
       });
@@ -88,10 +116,11 @@ export function storedStepRoute(db: Pick<Db, 'select'>, stepId: string): StepRou
 }
 
 export function decideStepRoute(
-  db: Db,
+  db: Pick<Db, 'select'>,
   todoRow: RoutedTodo,
   kind: StepKind,
   stepId: string | null,
+  constraints: RouteConstraints,
 ): RouteWorkDecision {
   const difficulty = classifyDifficulty({ title: todoRow.title ?? '', spec: todoRow.spec ?? null });
   const stored = stepId === null ? null : storedStepRoute(db, stepId);
@@ -109,28 +138,7 @@ export function decideStepRoute(
       [],
     );
   }
-  return routeWork({ kind, difficulty }, capabilityCandidates(db, todoRow.teamId));
-}
-
-export function routedRule(
-  db: Db,
-  rule: RoutingRuleRow,
-  todoRow: RoutedTodo,
-  kind: StepKind,
-  stepId: string | null,
-): RoutingRuleRow {
-  const decision = decideStepRoute(db, todoRow, kind, stepId);
-  if (decision.chosen === null) {
-    return rule.use === 'review'
-      ? { ...rule, provider: REVIEW_MODEL.provider, modelId: REVIEW_MODEL.modelId }
-      : rule;
-  }
-  return {
-    ...rule,
-    provider: decision.chosen.provider,
-    modelId: decision.chosen.modelId,
-    machineId: rule.machineId ?? decision.chosen.machineId,
-  };
+  return routeWork({ kind, difficulty }, capabilityCandidates(db, todoRow.teamId, constraints));
 }
 
 export function recordStepRoute(
@@ -138,11 +146,19 @@ export function recordStepRoute(
   stepRow: Pick<typeof step.$inferSelect, 'id' | 'kind'>,
   todoRow: RoutedTodo,
   claimingMachineId: string,
-  effective: { provider: string | null; modelId: string | null },
+  effective: {
+    provider: string | null;
+    modelId: string | null;
+    machineId: string | null;
+    requiredCapabilities: RequiredCapabilities | null;
+  },
 ): StepRouteRow {
   const existing = storedStepRoute(db, stepRow.id);
   if (existing !== null) return existing;
-  const decision = decideStepRoute(db, todoRow, stepRow.kind, null);
+  const decision = decideStepRoute(db, todoRow, stepRow.kind, null, {
+    machineId: effective.machineId,
+    required: effective.requiredCapabilities,
+  });
   const row: StepRouteRow = {
     stepId: stepRow.id,
     teamId: todoRow.teamId,

@@ -1,3 +1,5 @@
+import { redactSecrets } from './secret-redaction.js';
+
 export type AttributeValue = string | number | boolean | readonly string[] | { double: number };
 export type Attributes = Record<string, AttributeValue>;
 
@@ -27,6 +29,11 @@ export const GENAI_ATTR = {
 
 export const CAIRN_ATTR = {
   buildId: 'cairn.build_id',
+  todoId: 'cairn.todo_id',
+  machineId: 'cairn.machine_id',
+  machineName: 'cairn.machine_name',
+  runtime: 'cairn.runtime',
+  errorMessage: 'cairn.error_message',
   baseSha: 'cairn.base_sha',
   harnessHash: 'cairn.harness_hash',
   persona: 'cairn.persona',
@@ -51,6 +58,23 @@ export const CAIRN_ATTR = {
   routeReason: 'cairn.route.reason',
   routeRejected: 'cairn.route.rejected',
 } as const;
+
+export function otelErrorMessage(reason: string | null | undefined): string | undefined {
+  if (reason == null) return undefined;
+  const redacted = String(redactSecrets(reason).value)
+    .replaceAll('[REDACTED]', '<redacted>')
+    .replace(
+      /(?:Bearer\s+[^\s"'<>,;]+|(?:token|key)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s&"'<>,;]+)|(?:sk-|oat01|gh[pousr]_|github_pat_)[A-Za-z0-9_-]+)/gi,
+      '<redacted>',
+    )
+    .replace(
+      /(\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s/@]+@)?)(?:\d{1,3}\.){3}\d{1,3}(?=[:/\s?#"'<>),;\]]|$)/gi,
+      '$1<ip>',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+  return redacted === '' ? undefined : redacted.slice(0, 500);
+}
 
 export const LANGFUSE_ATTR = {
   traceName: 'langfuse.trace.name',
@@ -180,6 +204,8 @@ export function invokeAgentAttributes(build: {
 
 export function runtimeBuildAttributes(build: {
   buildId: string;
+  todoId?: string;
+  errorMessage?: string;
   baseSha: string | null;
   harnessHash: string | null;
   agentName?: string;
@@ -187,6 +213,8 @@ export function runtimeBuildAttributes(build: {
   return compact({
     [GENAI_ATTR.operationName]: GENAI_OPERATION.invokeAgent,
     [GENAI_ATTR.agentName]: build.agentName,
+    [CAIRN_ATTR.todoId]: build.todoId,
+    [CAIRN_ATTR.errorMessage]: build.errorMessage,
     [CAIRN_ATTR.buildId]: build.buildId,
     [CAIRN_ATTR.baseSha]: build.baseSha,
     [CAIRN_ATTR.harnessHash]: build.harnessHash,
@@ -194,6 +222,14 @@ export function runtimeBuildAttributes(build: {
 }
 
 export function stepAttributes(step: {
+  buildId?: string;
+  todoId?: string;
+  machineId?: string | null;
+  machineName?: string;
+  runtime?: string;
+  provider?: string;
+  model?: string;
+  errorMessage?: string;
   stepId: string;
   kind: string;
   checkpointCommit: string | null;
@@ -207,6 +243,14 @@ export function stepAttributes(step: {
   } | null;
 }): Attributes {
   return compact({
+    [CAIRN_ATTR.buildId]: step.buildId,
+    [CAIRN_ATTR.todoId]: step.todoId,
+    [CAIRN_ATTR.machineId]: step.machineId,
+    [CAIRN_ATTR.machineName]: step.machineName,
+    [CAIRN_ATTR.runtime]: step.runtime,
+    [GENAI_ATTR.providerName]: step.provider,
+    [GENAI_ATTR.requestModel]: step.model,
+    [CAIRN_ATTR.errorMessage]: step.errorMessage,
     [CAIRN_ATTR.stepId]: step.stepId,
     [CAIRN_ATTR.stepKind]: step.kind,
     [CAIRN_ATTR.checkpointCommit]: step.checkpointCommit,

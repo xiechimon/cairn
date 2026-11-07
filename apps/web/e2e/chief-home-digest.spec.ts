@@ -52,8 +52,8 @@ async function mockDigest(page: Parameters<typeof mockLive>[0], messages: Row[])
   const memories = [MEMORY];
   const deleted: string[] = [];
   await mockLive(page, { threads: [THREAD], messages }, (p, route, json) => {
-    if (p === '/api/teams/t1/agents/agent-1/memories') return json(memories);
-    if (p.startsWith('/api/teams/t1/agents/agent-1/memories/') && route.request().method() === 'DELETE') {
+    if (p === '/api/teams/t1/memories') return json(memories);
+    if (p.startsWith('/api/teams/t1/memories/') && route.request().method() === 'DELETE') {
       const id = p.split('/').pop() ?? '';
       deleted.push(id);
       memories.splice(
@@ -110,35 +110,19 @@ test.describe('long-chat summaries on the home chat (T7)', () => {
     await evidenceShot(page, 'digest-open.png');
   });
 
-  test('a remembered item links to its memory row and can be deleted from the card', async ({
-    page,
-  }) => {
+  test('a remembered item can be deleted from the card', async ({ page }) => {
     const deleted = await mockDigest(page, withDigest('daily'));
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
     const item = stream.getByTestId('chief-digest-item').filter({ hasText: '先查 npm 源' });
-    await expect(item.getByRole('link', { name: '查看这条记忆' })).toHaveAttribute(
-      'href',
-      '/app/resources/agents/agent-1?tab=memory#memory-mem-1',
-    );
+    await expect(item.getByRole('link', { name: '查看这条记忆' })).toHaveCount(0);
     await item.getByRole('button', { name: '让 Coordinator 忘掉这条' }).click();
     await expect.poll(() => deleted).toEqual(['mem-1']);
     await expect(item).toHaveAttribute('data-gone', '');
     await expect(item).toContainText('已忘掉');
     await expect(item.getByRole('button', { name: '让 Coordinator 忘掉这条' })).toHaveCount(0);
     await evidenceShot(page, 'digest-forgot.png');
-  });
-
-  test('the memory link opens the memory tab with that row in view', async ({ page }) => {
-    await mockDigest(page, withDigest('daily'));
-    await page.goto('/app');
-    const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    await stream.getByRole('button', { name: /整理成了 4 条摘要/ }).click();
-    await stream.getByRole('link', { name: '查看这条记忆' }).click();
-    await expect(page).toHaveURL(/\/app\/resources\/agents\/agent-1\?tab=memory#memory-mem-1$/);
-    await expect(page.locator('#memory-mem-1')).toBeVisible();
-    await expect(page.locator('#memory-mem-1')).toContainText('发布卡住时先查 npm 源');
   });
 
   test('a memory deleted elsewhere shows as forgotten without a delete button', async ({ page }) => {

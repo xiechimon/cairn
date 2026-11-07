@@ -1,12 +1,20 @@
 import { z } from 'zod';
 import { thinkingLevelSchema } from '../agent-backend.js';
+import { FALLBACK_MODELS_MAX } from './agent.js';
 import { epochMs, recordId } from './common.js';
 import { requiredCapabilitiesSchema } from './machine-capabilities.js';
 import { modelRefSchema } from './model-source.js';
 import type { StepKind } from './step.js';
 import { workPolicyRecordSchema } from './work-policy.js';
 
-export const ROUTE_USES = ['coordinator', 'session', 'review', 'digest', 'compaction'] as const;
+export const ROUTE_USES = [
+  'coordinator',
+  'session',
+  'review',
+  'digest',
+  'compaction',
+  'citation_check',
+] as const;
 export type RouteUse = (typeof ROUTE_USES)[number];
 export const routeUseSchema = z.enum(ROUTE_USES);
 
@@ -43,15 +51,15 @@ export const patchRoutingRuleBodySchema = z
     provider: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
     thinkingLevel: thinkingLevelSchema.nullable().optional(),
-    fallbackModels: z.array(modelRefSchema).nullable().optional(),
+    fallbackModels: z.array(modelRefSchema).max(FALLBACK_MODELS_MAX).nullable().optional(),
     machineId: recordId.nullable().optional(),
     requiredCapabilities: requiredCapabilitiesSchema.nullable().optional(),
+    mcpServers: z.array(z.string()).nullable().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
 export type PatchRoutingRuleBody = z.infer<typeof patchRoutingRuleBodySchema>;
 
 export const teamRoutingSettingsSchema = z.object({
-  enabled: z.boolean(),
   rules: z.array(routingRuleRecordSchema),
   policies: z.array(workPolicyRecordSchema),
 });

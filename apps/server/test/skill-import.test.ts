@@ -19,9 +19,9 @@ import {
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { agent as agentTable, skillAudit } from '../src/db/schema.js';
+import { skillAudit } from '../src/db/schema.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bootServer, issueApiKey, postProject, req, seedSessionRoute } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
@@ -908,19 +908,7 @@ describe('refresh and the machine-wire listing (the #920 handoff)', () => {
       });
       expect(enroll.status).toBe(200);
       const { token } = (await enroll.json()) as { token: string };
-      s.db
-        .insert(agentTable)
-        .values({
-          id: 'agent-import-dist',
-          teamId: s.team.id,
-          displayName: '发技能的',
-          provider: 'p',
-          modelId: 'm',
-          tools: [],
-          skillsAllowlist: ['dist-skill'],
-        })
-        .run();
-      bindAllAgents(s);
+      seedSessionRoute(s, { provider: 'p', modelId: 'm', skillsAllowlist: ['dist-skill'] });
 
       const projectId = await postProject(s.app);
       const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -928,11 +916,7 @@ describe('refresh and the machine-wire listing (the #920 handoff)', () => {
       });
       const { id: todoId } = (await todoRes.json()) as { id: string };
       await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: {
-          todoIds: [todoId],
-          assignment: { plan: null, build: { agentId: 'agent-import-dist' } },
-          withPlan: false,
-        },
+        body: { todoIds: [todoId] },
       });
       const claim = await call(s.app, 'POST', '/api/machine/tasks/claim', {
         cred: token,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { chiefStep, fakeMachineApi } from '../../server/test/coordinator/fake-machine-api.js';
 import { claimLoop } from '../src/loop.js';
-import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 
 describe('claimLoop', () => {
   it('runs claimed turns in order and backs off after errors', async () => {

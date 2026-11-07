@@ -30,15 +30,6 @@ async function expectBackIsSpaNavigation(
   expect.soft(documentRequests).toBe(0);
 }
 
-test('agent detail back is an in-SPA navigation, not a document reload', async ({ page }) => {
-  await expectBackIsSpaNavigation(
-    page,
-    '/app/resources/agents/r3-builder?scenario=agent-detail',
-    '/app/settings/team',
-    '[data-route="team"]',
-  );
-});
-
 // Paper page shell (PR 6): sidebar destinations (skills) carry no back arrow
 // any more; the second detail face is machine detail → the machines list.
 test('machine detail back is an in-SPA navigation, not a document reload', async ({ page }) => {

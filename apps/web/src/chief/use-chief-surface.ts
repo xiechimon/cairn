@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -41,7 +42,12 @@ import {
   coordinatorLoad,
   globalCoordinatorThread,
 } from './coordinator-load.js';
-import { questionActionThread, questionDraftKey, questionDraftStore } from './question-drafts.js';
+import {
+  questionActionThread,
+  questionDraftKey,
+  questionDraftStore,
+  questionSubmitStore,
+} from './question-drafts.js';
 
 export type { ChiefView };
 
@@ -265,13 +271,16 @@ export function useChiefSurface(
           conversationId: threadId,
           requestId: input.requestId,
         });
-        questionDraftStore.patch(key, { submitting: true, error: null });
+        questionSubmitStore.patch(key, { submitting: true, error: null });
         mutations.chiefAnswerQuestion.mutate(
           { threadId, requestId: input.requestId, answers: input.answers },
           {
-            onSuccess: () => questionDraftStore.clear(key),
+            onSuccess: () => {
+              questionDraftStore.clear(key);
+              questionSubmitStore.clear(key);
+            },
             onError: (e) => {
-              questionDraftStore.patch(key, {
+              questionSubmitStore.patch(key, {
                 submitting: false,
                 error: t('提交回答失败，草稿还在，请再试一次。'),
               });
@@ -352,14 +361,19 @@ export function useChiefSurface(
         }
       : undefined;
 
+  const wasReadyRef = useRef(false);
   const load: CoordinatorLoad = live
     ? coordinatorLoad({
         chief: chiefQ,
         coordinator: chiefThreadsQ,
         messages: chiefMessagesQ,
         hasThread: activeThread !== null,
+        wasReady: wasReadyRef.current,
       })
     : 'ready';
+  if (activeThread === null && chiefQ.isSuccess && chiefThreadsQ.isSuccess)
+    wasReadyRef.current = true;
+  else if (activeThread !== null && !chiefMessagesQ.isPending) wasReadyRef.current = false;
   const retry = () => {
     void chiefQ.refetch();
     void chiefThreadsQ.refetch();

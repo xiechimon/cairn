@@ -6,15 +6,15 @@ import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
-import { agent as agentTable, message as messageTable } from '../../apps/server/src/db/schema.js';
+import { message as messageTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
   type RealServer,
   seedWorld,
+  updateSessionPolicy,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -124,13 +124,8 @@ beforeAll(async () => {
   server = await bootRealServer({
     providerBaseUrl: stub.url,
     claimHoldMs: 1_000,
-    agentDescription: '你是集成测试 Agent：按指令使用工具，然后简短汇报。',
   });
-  server.db
-    .update(agentTable)
-    .set({ skillsAllowlist: ['demo-skill'] })
-    .where(eq(agentTable.id, AGENT_ID))
-    .run();
+  updateSessionPolicy(server, { skillsAllowlist: ['demo-skill'] });
   home = makeTestTempDir('cairn-it-skills-home-');
   const config = loadDaemonConfig(
     {
@@ -195,8 +190,6 @@ describe('spec 14 skills execution-plane injection E2E', () => {
     );
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      withPlan: false,
     });
     expect(started.status).toBe(201);
     buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
@@ -221,7 +214,6 @@ describe('spec 14 skills execution-plane injection E2E', () => {
     expect(flat).toContain('<available_skills>');
     expect(flat).toContain('<name>demo-skill</name>');
     expect(flat).toContain(skillFile);
-    expect(flat).toContain('你是集成测试 Agent');
     expect(flat).not.toContain('extra-skill');
 
     const msgs = server.db

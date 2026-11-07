@@ -1,37 +1,26 @@
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
-import {
-  agent as agentTable,
-  machine as machineTable,
-  routingRule,
-  step,
-  stepRoute,
-  todo as todoTable,
-} from '../src/db/schema.js';
-import { newRecordId, nowMs } from '../src/lib/ids.js';
-import { agentForStep } from '../src/services/dispatch-eligibility.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
+import { afterAll, describe, expect, test } from 'vitest';
+import { machine as machineTable, step, stepRoute, todo as todoTable } from '../src/db/schema.js';
+import { nowMs } from '../src/lib/ids.js';
+import { profileForStep } from '../src/services/routing-rules.js';
 import { recordStepRoute } from '../src/services/step-route.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
   req,
+  seedRoute,
   type TestServer,
 } from './helpers.js';
 
-const AGENT_BUILD = 'capability-route-agent';
 const HOUR_MS = 3_600_000;
 
 const servers: TestServer[] = [];
 afterAll(() => {
   for (const s of servers) s.dispose();
 });
-beforeEach(() => setRoutingRulesEnabled(true));
-afterEach(() => setRoutingRulesEnabled(false));
 
 interface World {
   s: TestServer;
@@ -93,39 +82,22 @@ async function setupWorld(): Promise<World> {
   });
   expect(res.status).toBe(200);
   const machineToken = ((await res.json()) as { token: string }).token;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_BUILD,
-      teamId: s.team.id,
-      displayName: AGENT_BUILD,
-      provider: 'agent-provider',
-      modelId: 'agent-model',
-      thinkingLevel: 'low',
-    })
-    .run();
-  bindAllAgents(s);
   const machineId = s.db
     .select({ id: machineTable.id })
     .from(machineTable)
     .where(eq(machineTable.teamId, s.team.id))
     .get()!.id;
   const projectId = await postProject(s.app, 'capability-proj');
-  for (const use of ['session', 'review'] as const) {
-    s.db
-      .insert(routingRule)
-      .values({
-        id: newRecordId(),
-        teamId: s.team.id,
-        use,
-        provider: 'claude-code',
-        modelId: 'claude-sonnet-5-5',
-        thinkingLevel: 'low',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-  }
+  seedRoute(s, 'session', {
+    provider: 'claude-code',
+    modelId: 'claude-sonnet-5-5',
+    thinkingLevel: 'low',
+  });
+  seedRoute(s, 'review', {
+    provider: 'claude-code',
+    modelId: 'claude-sonnet-5-5',
+    thinkingLevel: 'low',
+  });
   return { s, machineToken, machineId, projectId };
 }
 
@@ -138,7 +110,6 @@ async function buildTodo(w: World, spec: string): Promise<typeof todoTable.$infe
   const todoId = ((await todoRes.json()) as { id: string }).id;
   const started = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: AGENT_BUILD } },
     withPlan: false,
   });
   expect(started.status).toBe(201);
@@ -161,12 +132,12 @@ describe('one path decides what a dispatched step runs on', () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const easy = await buildTodo(w, 'rename one label');
-    expect(agentForStep(w.s.db, easy, 'build')).toMatchObject({
+    expect(profileForStep(w.s.db, easy, 'build')).toMatchObject({
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
     });
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
-    expect(agentForStep(w.s.db, hard, 'build')).toMatchObject({
+    expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
       provider: 'openai-codex',
       modelId: 'gpt-6.1-sol',
     });
@@ -176,7 +147,7 @@ describe('one path decides what a dispatched step runs on', () => {
     const w = await setupWorld();
     equipMachine(w, { claude: false, codex: false });
     const todoRow = await buildTodo(w, 'rename one label');
-    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({
       provider: 'claude-code',
       modelId: 'claude-sonnet-5-5',
     });
@@ -186,7 +157,7 @@ describe('one path decides what a dispatched step runs on', () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: false });
     const todoRow = await buildTodo(w, 'rename one label');
-    expect(agentForStep(w.s.db, todoRow, 'review')).toMatchObject({
+    expect(profileForStep(w.s.db, todoRow, 'review')).toMatchObject({
       provider: 'openai-codex',
       modelId: 'gpt-6.1-sol',
     });
@@ -201,21 +172,99 @@ describe('one path decides what a dispatched step runs on', () => {
       .where(eq(machineTable.id, w.machineId))
       .run();
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
-    expect(agentForStep(w.s.db, hard, 'build')).toMatchObject({ modelId: 'claude-opus-5-5' });
+    expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({ modelId: 'claude-opus-5-5' });
   });
 
   test('Claude quota at 70% weekly use moves standard work to Codex', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.7 });
     const todoRow = await buildTodo(w, 'x'.repeat(800));
-    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
   });
 
   test('harness missing on the machine: claude-code is rejected and the choice falls to Codex', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: false, codex: true });
     const todoRow = await buildTodo(w, 'x'.repeat(800));
-    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
+  });
+});
+
+describe('the router respects where the step can actually run', () => {
+  test('a machine that lists only Sonnet is never given Haiku', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: false });
+    const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!;
+    w.s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: {
+          ...row.claudeCodeReport!,
+          models: [{ id: 'claude-sonnet-5-5', name: 'Sonnet' }],
+        },
+      })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    const easy = await buildTodo(w, 'rename one label');
+    expect(profileForStep(w.s.db, easy, 'build')).toMatchObject({ modelId: 'claude-sonnet-5-5' });
+  });
+
+  test('a rule pinned to a Claude-only machine never picks Codex found on another machine', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: false });
+    const other = 'other-machine';
+    w.s.db
+      .insert(machineTable)
+      .values({
+        ...w.s.db.select().from(machineTable).where(eq(machineTable.id, w.machineId)).get()!,
+        id: other,
+        name: 'codex-box',
+      })
+      .run();
+    w.s.db
+      .update(machineTable)
+      .set({
+        enabledRuntimes: ['pi'],
+        claudeCodeReport: null,
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          codexLogin: { state: 'ok', expiresAt: nowMs() + HOUR_MS },
+        },
+      })
+      .where(eq(machineTable.id, other))
+      .run();
+    seedRoute(w.s, 'session', {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      machineId: w.machineId,
+    });
+    const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
+    expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
+      provider: 'claude-code',
+      modelId: 'claude-opus-5-5',
+      machineId: w.machineId,
+    });
+  });
+
+  test('a required MCP server only the Claude machine has rules out Codex machines', async () => {
+    const w = await setupWorld();
+    equipMachine(w, { claude: true, codex: true });
+    w.s.db
+      .update(machineTable)
+      .set({
+        enabledRuntimes: ['claude-code'],
+        capabilities: { mcpServers: ['linear'], skills: [] },
+      })
+      .where(eq(machineTable.id, w.machineId))
+      .run();
+    seedRoute(w.s, 'session', {
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-5-5',
+      requiredCapabilities: { mcpServers: ['linear'] },
+    });
+    const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
+    expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({ provider: 'claude-code' });
   });
 });
 
@@ -245,13 +294,15 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
+      machineId: null,
+      requiredCapabilities: null,
     });
     equipMachine(w, { claude: false, codex: true });
-    expect(agentForStep(w.s.db, todoRow, 'build', stepRow.prompt, stepRow.id)).toMatchObject({
+    expect(profileForStep(w.s.db, todoRow, 'build', stepRow.id)).toMatchObject({
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
     });
-    expect(agentForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
+    expect(profileForStep(w.s.db, todoRow, 'build')).toMatchObject({ modelId: 'gpt-6.1-sol' });
   });
 
   test('recording twice keeps the first decision', async () => {
@@ -262,11 +313,15 @@ describe('the decision is recorded at claim and never changes in flight', () => 
     const first = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'claude-code',
       modelId: 'claude-haiku-5-5',
+      machineId: null,
+      requiredCapabilities: null,
     });
     equipMachine(w, { claude: false, codex: true });
     const second = recordStepRoute(w.s.db, stepRow, todoRow, w.machineId, {
       provider: 'openai-codex',
       modelId: 'gpt-6.1-sol',
+      machineId: null,
+      requiredCapabilities: null,
     });
     expect(second).toEqual(first);
   });

@@ -2,19 +2,17 @@ import type { ClaimedStep } from '@cairn/shared';
 import { CHIEF_ROUTER_TOOL_NAMES, CHIEF_TOOL_COUNT, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, afterEach, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
-  chief as chiefTable,
+  build as buildTable,
+  chiefMessage,
   chiefThread,
   notification as notificationTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
-import { bootServer, issueApiKey, machineIdByName, type TestServer } from './helpers.js';
-
-const AGENT_ID = 'agent-m4a-chief';
+import { setTodoPhase } from '../src/services/todos.js';
+import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -45,6 +43,7 @@ interface ChiefWorld {
   teamId: string;
   projectId: string;
   threadId: string;
+  coordinatorRouteId: string;
   claim(): Promise<ClaimedStep>;
   relay(stepId: string, name: string, params: Record<string, unknown>): Promise<unknown>;
   done(stepId: string, body: Record<string, unknown>): Promise<Response>;
@@ -72,24 +71,13 @@ async function setupChiefWorld(opts?: {
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'm4a-mbp');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: 'm4a-chief-agent',
-      description: '负责调度',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-      machineId,
-    })
-    .run();
+  const coordinatorRouteId = seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId,
+  });
   const projRes = await call(s.app, 'POST', '/api/projects', { body: { name: 'm4a-proj' } });
   const project = (await projRes.json()) as { id: string };
-  const patchRes = await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-  });
-  expect(patchRes.status).toBe(200);
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content: '帮 m4a-proj 写一份 CONTRIBUTING.md 贡献指南。' },
   });
@@ -102,6 +90,7 @@ async function setupChiefWorld(opts?: {
     teamId,
     projectId: project.id,
     threadId: thread.id,
+    coordinatorRouteId,
     async claim() {
       const res = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
       const body = (await res.json()) as { step: ClaimedStep | null };
@@ -137,7 +126,7 @@ async function setupChiefWorld(opts?: {
 }
 
 describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections 3.1/3.2/3.5)', () => {
-  test('claim → relay(create_todo/run_builds) → transcript → done → gate wake', async () => {
+  test('claim → relay(create_todo/open_thread) → transcript → done → thread report', async () => {
     const w = await setupChiefWorld();
 
     const claimed = await w.claim();
@@ -145,8 +134,8 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(claimed.conversationId).toBe(w.threadId);
     expect(claimed.chief?.threadId).toBe(w.threadId);
     expect(claimed.chief?.systemPrompt).toContain('Coordinator');
-    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT);
-    expect(claimed.agent?.id).toBe(AGENT_ID);
+    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length);
+    expect(claimed.agent?.id).toBe(w.coordinatorRouteId);
     expect(claimed.agent?.modelId).toBe('stub-model');
     expect(claimed.agent?.skillsAllowlist).toBeUndefined();
     expect(claimed.agent?.defaultSkill).toBeUndefined();
@@ -160,26 +149,20 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
       title: '编写 CONTRIBUTING.md 贡献指南',
       spec,
     })) as { id: string; createdBy: string | null; sourceBuildId: string | null };
-    expect(created.createdBy).toBe(AGENT_ID);
+    expect(created.createdBy).toBe(w.coordinatorRouteId);
     expect(created.sourceBuildId).toBe(`chief-${w.s.user.id}-${w.teamId}`);
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
     expect(todoRow.spec).toContain('补充信息（探测得出，非用户确认）：');
 
-    const runOut = (await w.relay(stepId, 'run_builds', {
-      todoIds: [created.id],
-      assignment: { build: { agentId: AGENT_ID } },
+    const opened = (await w.relay(stepId, 'open_thread', { todoId: created.id })) as {
+      buildId: string;
+    };
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, opened.buildId)).get(),
+    ).toMatchObject({
       withPlan: false,
-    })) as { builds: { id: string; withPlan: boolean; triggerSource: string }[] };
-    expect(runOut.builds[0]!.withPlan).toBe(false);
-    expect(runOut.builds[0]!.triggerSource).toBe('chief');
-    const chiefRow = w.s.db
-      .select()
-      .from(chiefTable)
-      .where(eq(chiefTable.id, `chief-${w.s.user.id}-${w.teamId}`))
-      .get()!;
-    expect(chiefRow.watches).toHaveLength(1);
-    expect(chiefRow.watches[0]!.todoId).toBe(created.id);
-
+      triggerSource: 'chief',
+    });
     await w.uploadTranscript(stepId, [
       {
         id: `user-${stepId}`,
@@ -220,19 +203,20 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     expect(stepDone.status).toBe('done');
 
     const svc = { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user };
-    const { setTodoPhase } = await import('../src/services/todos.js');
     setTodoPhase(svc, created.id, 'building');
     setTodoPhase(svc, created.id, 'review');
-    const wakeSteps = w.s.db
+    const reports = w.s.db
       .select()
-      .from(stepTable)
-      .where(eq(stepTable.buildId, w.threadId))
+      .from(chiefMessage)
       .all()
-      .filter((st) => st.prompt?.includes('[wake:gate]'));
-    expect(wakeSteps.length).toBeGreaterThanOrEqual(1);
+      .filter((m) => {
+        const content = String(m.content);
+        return content.includes('"kind":"thread-report"') && content.includes(created.id);
+      });
+    expect(reports.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('models candidates -> create_agent uses valid values -> agents read back (#627)', async () => {
+  test('models candidates list the Claude Code models the machine reports (#627)', async () => {
     const w = await setupChiefWorld({
       claudeCode: {
         installed: true,
@@ -271,22 +255,6 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
         modelName: 'model-b',
       },
     ]);
-
-    const pick = rows[0]!;
-    const created = (await w.relay(stepId, 'create_agent', {
-      displayName: 'm4a-models-agent',
-      description: '按候选清单配模型的 Agent',
-      provider: pick.provider,
-      modelId: pick.modelId,
-    })) as { id: string };
-    const agents = (await w.relay(stepId, 'agents', {})) as {
-      id: string;
-      provider: string | null;
-      modelId: string | null;
-    }[];
-    const row = agents.find((a) => a.id === created.id);
-    expect(row?.provider).toBe('claude-code');
-    expect(row?.modelId).toBe('model-a');
   });
 
   test('done(failed) -> failure reason lands in a chief_message system row, no notification', async () => {
@@ -339,21 +307,7 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
 });
 
 describe('Coordinator router tools over the machine protocol (D60)', () => {
-  afterEach(() => setRoutingRulesEnabled(false));
-
-  test('flag off: the claim carries the 55-tool vocabulary and open_thread is refused', async () => {
-    const w = await setupChiefWorld();
-    const claimed = await w.claim();
-    expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT);
-    const names = claimed.remoteTools?.map((t) => t.name) ?? [];
-    for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).not.toContain(name);
-    await expect(w.relay(claimed.step.id, 'open_thread', { todoId: 'x' })).rejects.toThrow(
-      /routing rules are off/,
-    );
-  });
-
-  test('flag on: the claim adds the five router tools, open_thread starts a session, run_builds says removed under D60', async () => {
-    setRoutingRulesEnabled(true);
+  test('the claim carries the router tools, open_thread starts a session, run_builds says removed under D60', async () => {
     const w = await setupChiefWorld();
     const claimed = await w.claim();
     expect(claimed.remoteTools).toHaveLength(CHIEF_TOOL_COUNT + CHIEF_ROUTER_TOOL_NAMES.length);
@@ -367,12 +321,9 @@ describe('Coordinator router tools over the machine protocol (D60)', () => {
       title: 'Export the board',
       spec: '> Add an export.',
     })) as { id: string };
-    await expect(
-      w.relay(stepId, 'run_builds', {
-        todoIds: [created.id],
-        assignment: { build: { agentId: AGENT_ID } },
-      }),
-    ).rejects.toThrow(/run_builds was removed under D60/);
+    await expect(w.relay(stepId, 'run_builds', { todoIds: [created.id] })).rejects.toThrow(
+      /run_builds was removed under D60/,
+    );
     const opened = (await w.relay(stepId, 'open_thread', { todoId: created.id })) as {
       buildId: string;
     };
