@@ -41,7 +41,7 @@ export function ProjectCard({
   return (
     <article
       data-slot="project-card"
-      className="group/pcard relative flex items-start gap-3.5 rounded-(--radius-card) bg-card p-4 shadow-(--e1) hover:shadow-(--card-lift)"
+      className="group/pcard relative flex items-start gap-3.5 rounded-(--radius-card) bg-card p-4 shadow-(--e1)"
     >
       <ProjectAvatar
         name={name}
