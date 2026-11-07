@@ -4,6 +4,7 @@ import {
   classifyDifficulty,
   claudeLoginBlocksClaim,
   claudeRateBlock,
+  QUOTA_REJECT_PERCENT,
   type RequiredCapabilities,
   type RouteWorkDecision,
   routeWork,
@@ -138,6 +139,11 @@ export function decideStepRoute(
   return routeWork({ kind, difficulty }, capabilityCandidates(db, todoRow.teamId, constraints));
 }
 
+function harnessOf(provider: string | null): 'claude-code' | 'pi' | null {
+  if (provider === 'claude-code') return 'claude-code';
+  return provider === CODEX_MODEL.provider ? 'pi' : null;
+}
+
 export function recordStepRoute(
   db: Db,
   stepRow: Pick<typeof step.$inferSelect, 'id' | 'kind'>,
@@ -165,7 +171,7 @@ export function recordStepRoute(
     teamId: todoRow.teamId,
     kind: stepRow.kind,
     difficulty: decision.difficulty,
-    harness: effective.provider === 'claude-code' ? 'claude-code' : 'pi',
+    harness: harnessOf(effective.provider),
     provider: effective.provider,
     modelId: effective.modelId,
     machineId: claimingMachineId,
@@ -192,6 +198,8 @@ export function routedModelRunsOn(
   }).some(
     (candidate) =>
       candidate.available &&
+      (candidate.weeklyUsedPercent === null ||
+        candidate.weeklyUsedPercent < QUOTA_REJECT_PERCENT) &&
       candidate.provider === model.provider &&
       candidate.modelId === model.modelId,
   );
