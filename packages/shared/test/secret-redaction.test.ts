@@ -96,3 +96,35 @@ test.each([
   redactSecrets(text);
   expect(performance.now() - started).toBeLessThan(500);
 });
+
+test('redacts login URLs, authorization headers and explicit access tokens', () => {
+  const token = 'synthetic-access-token-for-logs';
+  const source = {
+    url: `http://localhost/app#token=${token}`,
+    stream: `/stream?token=${token}`,
+    headers: { Authorization: 'Basic dXNlcjpwYXNz', authorization: 'custom credential' },
+    error: `access denied for ${token}`,
+  };
+  const text = JSON.stringify(redactSecrets(source, [token]).value);
+  expect(text.includes(token)).toBe(false);
+  expect(text.includes('#token=')).toBe(false);
+  expect(text.includes('dXNlcjpwYXNz')).toBe(false);
+  expect(text.includes('custom credential')).toBe(false);
+});
+
+test('preserves query separators when redacting token parameters', () => {
+  expect(redactSecrets('/stream?token=synthetic&other=1').value).toBe('/stream?[REDACTED]&other=1');
+});
+
+test('authorization redaction preserves incomplete Bearer prefixes and surrounding text', () => {
+  expect(redactSecrets('Authorization: Bearer ').value).toBe('Authorization: Bearer ');
+  expect(redactSecrets('Authorization: Basic dXNlcjpwYXNz after').value).toBe(
+    'Authorization: [REDACTED] after',
+  );
+});
+
+test('preserves ordinary Basic prose outside an authorization header', () => {
+  expect(redactSecrets('Basic functionality and basic examples').value).toBe(
+    'Basic functionality and basic examples',
+  );
+});

@@ -51,6 +51,12 @@ export function runTokenCommand(opts: { rotate: boolean }, io: TokenCommandIo): 
     return 0;
   }
   io.writeOut(`${token}\n`);
+  const host = io.env.HOST ?? '127.0.0.1';
+  const display =
+    host === '0.0.0.0' || host === '::' ? 'localhost' : host.includes(':') ? `[${host}]` : host;
+  const url = new URL(`http://${display}:${io.env.PORT ?? '8787'}/app`);
+  url.hash = new URLSearchParams({ token }).toString();
+  io.writeOut(`Login link: ${url.href}\n`);
   io.writeOut(
     envToken !== null ? `(from environment variable ${ENV_VARS.token})\n` : `(from ${filePath})\n`,
   );
