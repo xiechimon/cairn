@@ -1,18 +1,26 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
+  routingRule as routingRuleTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { listChiefThreads } from '../src/services/chief.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const shipGate = vi.hoisted(() => ({ duringReverify: null as (() => void) | null }));
 vi.mock('../src/services/ship-gate.js', async (importOriginal) => {
@@ -33,8 +41,6 @@ afterAll(() => {
   for (const d of disposables) d();
 });
 
-const AGENT_ID = 'agent-chief-cap-1';
-
 interface World {
   s: TestServer;
   tokenA: string;
@@ -53,24 +59,12 @@ async function setupWorld(): Promise<World> {
     .from(machineTable)
     .where(eq(machineTable.name, 'chief-cap-mbp'))
     .get()!.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'chief-cap-agent',
-      machineId: machineAId,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineAId });
+  seedRoute(s, 'coordinator', {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: machineAId,
+  });
   const projectId = await postProject(s.app, 'chief-cap-proj');
   return { s, tokenA, machineAId, projectId };
 }
@@ -102,7 +96,6 @@ function insertPendingBuildStep(s: TestServer, world: World): string {
       spec: '探针',
       phase: 'queued',
       phaseAt: now,
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
     })
     .run();
   s.db
@@ -175,7 +168,6 @@ function insertPendingChiefStep(s: TestServer, opts: { createdAt?: number } = {}
         id: `chief-${s.svc.user.id}-${s.team.id}`,
         userId: s.svc.user.id,
         teamId: s.team.id,
-        agentId: AGENT_ID,
         charter: '',
         createdAt: now,
       })
@@ -309,8 +301,14 @@ describe('#1260 read-surface semantics (runningSteps includes running chiefs)', 
   test('failure mode 3b: waitingFor.running includes chief (queue projection)', async () => {
     const w = await setupWorld();
     setCap(w, 1);
+    w.s.db
+      .update(machineTable)
+      .set({ online: true, enabledRuntimes: ['pi'] })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
     const target = insertPendingBuildStep(w.s, w);
+    w.s.db.update(stepTable).set({ createdAt: Date.now() }).where(eq(stepTable.id, target)).run();
     const projector = stepQueueProjector(w.s.db, w.s.team.id);
     const info = projector.project({
       id: target,
@@ -381,7 +379,7 @@ describe('#1148/#1260 claim body maxWorkers (env fallback server consumption sur
 });
 
 describe('chief turns never wait behind a worker step another machine owns', () => {
-  test('an older pending step bound to an offline machine does not hold back a newer chief turn', async () => {
+  test('an older pending step whose preferred machine is online elsewhere does not hold back a newer chief turn', async () => {
     const w = await setupWorld();
     setCap(w, 8);
     const key = await issueApiKey(w.s);
@@ -397,30 +395,22 @@ describe('chief turns never wait behind a worker step another machine owns', () 
       .where(eq(machineTable.name, 'offline-orb'))
       .get()!.id;
     w.s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-planner-elsewhere',
-        teamId: w.s.team.id,
-        displayName: 'planner-elsewhere',
-        machineId: otherMachineId,
-        status: 'active',
-        avatarUrl: null,
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        thinkingLevel: null,
-        tools: [],
-        secrets: [],
-        skillsAllowlist: null,
-        mcpServers: [],
-      })
+      .update(machineTable)
+      .set({ online: true, enabledRuntimes: ['pi'] })
+      .where(eq(machineTable.id, otherMachineId))
       .run();
+    seedSessionRoute(w.s, {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: otherMachineId,
+    });
     const elsewhere = insertPendingBuildStep(w.s, w);
-    const elsewhereRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!;
     w.s.db
-      .update(todoTable)
-      .set({ assignment: { plan: null, build: { agentId: 'agent-planner-elsewhere' } } })
-      .where(eq(todoTable.id, elsewhereRow.buildId.replace('build-', 'todo-')))
+      .update(stepTable)
+      .set({ createdAt: Date.now() - 1_000 })
+      .where(eq(stepTable.id, elsewhere))
       .run();
+    const elsewhereRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!;
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: elsewhereRow.createdAt + 5 });
     expect((await claimAs(w))?.step.id).toBe(chiefStepId);
     expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, elsewhere)).get()!.status).toBe(
@@ -465,11 +455,12 @@ describe('the late chief claim reads the machine as it is after the worker loop'
   test('a capability the machine drops while the worker loop awaited blocks the newer chief turn', async () => {
     const w = await setupWorld();
     setCap(w, 8);
-    w.s.db
-      .update(agentTable)
-      .set({ requiredCapabilities: { mcpServers: ['linear'] } })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: w.machineAId,
+      requiredCapabilities: { mcpServers: ['linear'] },
+    });
     w.s.db
       .update(machineTable)
       .set({ capabilities: { mcpServers: ['linear'], skills: [] } })
@@ -493,8 +484,8 @@ describe('the late chief claim reads the machine as it is after the worker loop'
   });
 });
 
-describe('the late chief claim sees agent changes made while the worker loop awaited', () => {
-  test('a chief agent moved to another machine meanwhile is not claimed here', async () => {
+describe('the late chief claim sees routing changes made while the worker loop awaited', () => {
+  test('a coordinator route moved to another machine meanwhile is not claimed here', async () => {
     const w = await setupWorld();
     setCap(w, 8);
     const key = await issueApiKey(w.s);
@@ -514,9 +505,9 @@ describe('the late chief claim sees agent changes made while the worker loop awa
     shipGate.duringReverify = () => {
       w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
       w.s.db
-        .update(agentTable)
+        .update(routingRuleTable)
         .set({ machineId: otherId })
-        .where(eq(agentTable.id, AGENT_ID))
+        .where(eq(routingRuleTable.use, 'coordinator'))
         .run();
     };
     expect(await claimAs(w)).toBeNull();

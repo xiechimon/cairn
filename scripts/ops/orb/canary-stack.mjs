@@ -272,8 +272,7 @@ export async function startStack({
         { signal, timeout: 60000, label: 'non-interactive daemon enrollment' },
       );
       await stopChild(daemon, join(checkout, 'apps/daemon'), 'src/cli.ts');
-      const agent = await api('POST', `/api/teams/${team.id}/agents`, {
-        displayName: `Canary ${executor}`,
+      await api('PATCH', `/api/teams/${team.id}/routing-rules/session`, {
         provider: 'canary',
         modelId: 'canary-model',
         machineId: registration.machineId,
@@ -306,7 +305,6 @@ export async function startStack({
         });
         const started = await api('POST', `/api/projects/${project.id}/builds`, {
           todoIds: [task.id],
-          assignment: { plan: null, build: { agentId: agent.id } },
           withPlan: false,
         });
         const candidate = started.builds[0].id;
@@ -371,7 +369,7 @@ export async function startStack({
           if (runnerDaemon.exitCode !== null || runnerDaemon.signalCode !== null)
             throw new Error('Scratch daemon exited during the Thread');
           const steps = await api('GET', `/api/builds/${buildId}/steps`);
-          const step = steps.find((entry) => entry.kind === 'build');
+          const step = steps.find((entry) => entry.kind === 'session');
           if (step?.status === 'failed')
             throw new Error(
               `Scratch ${executor} runner failed: ${String(step.errorMessage ?? 'no error message').slice(0, 2000)}`,

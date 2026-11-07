@@ -153,9 +153,9 @@ export function coordinatorToolsExtension(
   options: { routerTools?: boolean; shuttingDown?: () => boolean } = {},
 ) {
   const defs =
-    options.routerTools === true
-      ? [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS]
-      : CHIEF_REMOTE_TOOLS;
+    options.routerTools === false
+      ? CHIEF_REMOTE_TOOLS
+      : [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
   return defineExtension({
     name: 'cairn-coordinator-tools',
     tools: defs.map((def) => coordinatorTool(def, channel, gate, options.shuttingDown)),

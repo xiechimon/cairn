@@ -1,14 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machines.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, seedRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -37,24 +36,12 @@ async function setup() {
   disposables.push(() => s.dispose());
   const owner = await enroll(s, 'relay-owner');
   const other = await enroll(s, 'relay-other');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'Coordinator',
-      machineId: owner.id,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+  seedRoute(s, 'coordinator', {
+    id: AGENT_ID,
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+    machineId: owner.id,
+  });
   const chiefId = `chief-${s.svc.user.id}-${s.team.id}`;
   s.db
     .insert(chiefTable)
@@ -62,11 +49,10 @@ async function setup() {
       id: chiefId,
       userId: s.svc.user.id,
       teamId: s.team.id,
-      agentId: AGENT_ID,
       charter: '',
       createdAt: 1,
     })
-    .onConflictDoUpdate({ target: chiefTable.id, set: { agentId: AGENT_ID } })
+    .onConflictDoNothing()
     .run();
   s.db
     .insert(chiefThreadTable)

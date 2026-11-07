@@ -132,7 +132,6 @@ async function seedReview(title, changesDiff) {
   if (todo.status !== 201) throw new Error('todo → ' + todo.status);
   const build = await sendJson(SERVER + '/api/projects/' + project.body.id + '/builds', {
     todoIds: [todo.body.id],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
     withPlan: false,
   });
   if (build.status !== 201) throw new Error('builds → ' + build.status + ' ' + JSON.stringify(build.body));
@@ -145,7 +144,6 @@ async function seedReview(title, changesDiff) {
   return { teamId, todoId: todo.body.id, buildId, face: face.body, changes: changes.body };
 }
 
-let AGENT_ID = null;
 
 const session = await getJson(SERVER + '/api/auth/session');
 check('session Owner', session.status === 200 && session.body.displayName === 'Owner', session.body?.displayName);
@@ -183,21 +181,17 @@ const MACHINE_ID = enroll.body?.machineId;
 if (enroll.status !== 200 || !MACHINE_TOKEN || !MACHINE_ID) {
   throw new Error('enroll → ' + enroll.status + ' ' + JSON.stringify(enroll.body));
 }
-const agent = await sendJson(SERVER + '/api/teams/' + TEAM_ID + '/agents', {
-  displayName: 'empty-review-builder',
+const route = await sendJson(SERVER + '/api/teams/' + TEAM_ID + '/routing-rules/session', {
   provider: 'stub-gw',
   modelId: 'stub-model',
-  tools: ['推送分支'],
   machineId: MACHINE_ID,
-});
-if (agent.status !== 201 && agent.status !== 200) throw new Error('agent → ' + agent.status + ' ' + JSON.stringify(agent.body));
-AGENT_ID = agent.body?.id ?? agent.body?.agent?.id;
-if (!AGENT_ID) throw new Error('agent 无 id：' + JSON.stringify(agent.body));
-const members = await getJson(SERVER + '/api/teams/' + TEAM_ID + '/members');
-const member = (members.body ?? []).find((m) => m.actorId === AGENT_ID);
-const tools = member?.actor?.tools ?? [];
-check('agent 缺合并分支', tools.includes('推送分支') && !tools.includes('合并分支'), JSON.stringify(tools));
-await saveJson('agent-tools.json', { agentId: AGENT_ID, tools });
+}, 'PATCH');
+if (route.status !== 200) throw new Error('routing rule → ' + route.status + ' ' + JSON.stringify(route.body));
+const policy = await sendJson(SERVER + '/api/teams/' + TEAM_ID + '/work-policies/session', { tools: ['推送分支'] }, 'PATCH');
+if (policy.status !== 200) throw new Error('work policy → ' + policy.status + ' ' + JSON.stringify(policy.body));
+const tools = policy.body?.tools ?? [];
+check('session 策略缺合并分支', tools.includes('推送分支') && !tools.includes('合并分支'), JSON.stringify(tools));
+await saveJson('policy-tools.json', { tools });
 
 if (FOCUS === 'hunkless') {
   const rename = await seedReview('纯重命名', RENAME_DIFF);

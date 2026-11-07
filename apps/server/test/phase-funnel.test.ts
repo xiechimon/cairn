@@ -15,8 +15,6 @@ async function withConfirmTodo(): Promise<TestServer & { todoId: string }> {
   startBuilds(s.svc, {
     projectId,
     todoIds: [todoDoc.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
   });
   setTodoPhase(s.svc, todoDoc.id, 'planning');
   setTodoPhase(s.svc, todoDoc.id, 'confirm');

@@ -7,7 +7,6 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   githubConnection as githubConnectionTable,
   message as messageTable,
@@ -23,7 +22,7 @@ import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -43,7 +42,6 @@ interface WorldOpts {
   checkpoint?: string | null;
   buildStepStatus?: 'done' | 'failed';
   connected?: boolean;
-  tools?: string[];
   source?: { kind: 'github-issue' | 'github-issue-self' | 'orchestration'; ref: string } | null;
   pendingVerify?: boolean;
   mergePolicy?: 'human' | 'shadow' | 'autonomous';
@@ -73,7 +71,6 @@ function makeWorld(opts: WorldOpts = {}): World {
   const projectId = `proj-mapi-${rnd}`;
   const todoId = `todo-mapi-${rnd}`;
   const buildId = `build-mapi-${rnd}`;
-  const agentId = `agent-mapi-${rnd}`;
   const prNumber = opts.prNumber === undefined ? 201 : opts.prNumber;
   const repoKind = opts.repoKind ?? 'github';
   const fake = mergeGithubFake(
@@ -95,17 +92,10 @@ function makeWorld(opts: WorldOpts = {}): World {
         : { autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, mergePolicy: opts.mergePolicy } }),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: agentId,
-      teamId: s.team.id,
-      displayName: 'merge-api-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      tools: opts.tools ?? ['合并分支', '推送分支'],
-    })
-    .run();
+  seedSessionRoute(s, {
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+  });
   s.db
     .insert(todoTable)
     .values({
@@ -118,7 +108,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       phaseAt: base,
       seqNum: 1,
       hasChanges: true,
-      assignment: { plan: null, build: { agentId } },
       sourceKind: opts.source?.kind ?? null,
       sourceRef: opts.source?.ref ?? null,
     })
@@ -1026,15 +1015,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.message).toContain('审核关口恢复仅对本轮已交付的 build 开放');
     expect(w.fake.requests).toEqual([]);
     expectUntouched(w, 'failed');
-  });
-
-  test('[2b-D20] the permission gate refuses before any request', async () => {
-    const w = makeWorld({ tools: ['推送分支'] });
-    const err = await refusal(requestMerge(w.deps, w.buildId));
-    expect(err.status).toBe(403);
-    expect(err.message).toContain('合并分支');
-    expect(w.fake.requests).toEqual([]);
-    expectUntouched(w);
   });
 
   test('[2b-D21] a building card → 409; no request, no row', async () => {

@@ -173,18 +173,6 @@ test('mcp page is read-only: no create entry, no per-row more-menu ink, empty st
   await expect(page.getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
 });
 
-test('create-agent dialog drops the avatar `更换` ink (#307)', async ({ page }) => {
-  await page.goto('/app/team?scenario=12');
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-
-  const dialog = page.getByRole('dialog', { name: '创建 agent' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.dlg-agent-swap')).toHaveCount(0);
-
-  await expect(dialog.getByTestId('agent-avatar').locator('img')).toBeVisible();
-  await expect(dialog.getByLabel('名称')).toBeVisible();
-});
-
 test('project settings drops the avatar `更换` ink (#307, supersedes the #177 chrome verdict)', async ({
   page,
 }) => {

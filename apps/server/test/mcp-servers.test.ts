@@ -5,21 +5,20 @@ import {
   claimedStepSchema,
   MCP_MIN_CLI_VERSION,
   mcpServerRecordSchema,
-  WORKER_REMOTE_TOOLS,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { agentMemory, agent as agentTable, todo } from '../src/db/schema.js';
+import { agentMemory } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
+import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { listMcpServers, readClaudeMcpServers } from '../src/services/mcp-servers.js';
 import {
-  bindAllAgents,
   bootServer,
-  insertMachine,
   issueApiKey,
   postProject,
+  seedPolicy,
+  seedSessionRoute,
   type TestServer,
 } from './helpers.js';
 
@@ -183,16 +182,10 @@ describe('REST surface: GET re-sourced, management write surface deleted (spec 1
   });
 });
 
-describe('agent grant surface: mcpServers[] = config key names, unknown keys silently tolerated', () => {
+describe('work policy grant surface: mcpServers[] = config key names, unknown keys silently tolerated', () => {
   test('PATCH unknown key = 200 stored as-is (DB existence check already deleted with the management surface)', async () => {
     const s = bootServer();
-    const agentRes = await call(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
-      body: { displayName: 'worker-a', machineId: insertMachine(s) },
-    });
-    expect(agentRes.status).toBe(201);
-    const { id: agentId } = (await agentRes.json()) as { id: string };
-
-    const patch = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/agents/${agentId}`, {
+    const patch = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/work-policies/session`, {
       body: { mcpServers: ['ghost', 'demo'] },
     });
     expect(patch.status).toBe(200);
@@ -201,27 +194,21 @@ describe('agent grant surface: mcpServers[] = config key names, unknown keys sil
       'demo',
     ]);
 
-    const get = await call(s.app, 'GET', `/api/teams/${s.team.id}/agents/${agentId}`);
+    const get = await call(s.app, 'GET', `/api/teams/${s.team.id}/routing-settings`);
     expect(get.status).toBe(200);
-    expect(((await get.json()) as { mcpServers: string[] }).mcpServers).toEqual(['ghost', 'demo']);
-    s.dispose();
-  });
-
-  test('POST agents carrying mcpServers = tolerated same law', async () => {
-    const s = bootServer();
-    const res = await call(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
-      body: { displayName: 'w', machineId: insertMachine(s), mcpServers: ['ghost'] },
-    });
-    expect(res.status).toBe(201);
+    const settings = (await get.json()) as {
+      policies: { use: string; mcpServers: string[] }[];
+    };
+    expect(settings.policies.find((p) => p.use === 'session')?.mcpServers).toEqual([
+      'ghost',
+      'demo',
+    ]);
     s.dispose();
   });
 });
 
 describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (machine-wire contract break)', () => {
-  async function world(
-    cliVersion: string,
-    opts: { slugs?: string[]; intakePreset?: boolean } = {},
-  ) {
+  async function world(cliVersion: string, opts: { slugs?: string[] } = {}) {
     const s = bootServer({ claimHoldMs: 250 });
     const plain = await issueApiKey(s);
     const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
@@ -229,19 +216,7 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
       body: { teamId: s.team.id, name: 'm4b-mbp', cliVersion },
     });
     const { token } = (await enroll.json()) as { token: string };
-    const agentId = 'agent-m4b';
-    s.db
-      .insert(agentTable)
-      .values({
-        id: agentId,
-        teamId: s.team.id,
-        displayName: 'w',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        mcpServers: [],
-      })
-      .run();
-    bindAllAgents(s);
+    seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
 
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -249,20 +224,9 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     });
     const { id: todoId } = (await todoRes.json()) as { id: string };
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: { todoIds: [todoId], assignment: { plan: null, build: { agentId } }, withPlan: false },
+      body: { todoIds: [todoId] },
     });
-    if (opts.intakePreset) {
-      s.db
-        .update(todo)
-        .set({ assignment: { source: 'intake-label', plan: null, build: { agentId } } })
-        .where(eq(todo.id, todoId))
-        .run();
-    }
-    s.db
-      .update(agentTable)
-      .set({ mcpServers: opts.slugs ?? ['demo'] })
-      .where(eq(agentTable.id, agentId))
-      .run();
+    seedPolicy(s, 'session', { mcpServers: opts.slugs ?? ['demo'] });
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
       body: {},
@@ -275,27 +239,9 @@ describe('claim payload: mcpServers slug-ized (string[]) + version-wall bump (ma
     const { s, step } = await world(MCP_MIN_CLI_VERSION, { slugs: ['demo', 'ghost'] });
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toEqual(['demo', 'ghost']);
-    expect(step!.remoteTools?.map((t) => t.name)).toEqual(WORKER_REMOTE_TOOLS.map((t) => t.name));
-    s.dispose();
-  });
-
-  test.each([true, false])(
-    'worker claims filter newly granted agent MCP servers for intake preset=%s',
-    async (intakePreset) => {
-      const { s, step } = await world(MCP_MIN_CLI_VERSION, {
-        slugs: ['demo', 'ghost'],
-        intakePreset,
-      });
-      expect(step).not.toBeNull();
-      if (intakePreset) expect(step?.mcpServers).toEqual([]);
-      else expect(step?.mcpServers).toEqual(['demo', 'ghost']);
-      s.dispose();
-    },
-  );
-
-  test('a daemon below the MCP version gate does not claim an intake-preset step', async () => {
-    const { s, step } = await world('0.1.1', { intakePreset: true });
-    expect(step).toBeNull();
+    expect(step!.remoteTools?.map((t) => t.name)).toEqual(
+      workerRemoteTools('session', false).map((t) => t.name),
+    );
     s.dispose();
   });
 
@@ -367,9 +313,8 @@ describe('chief mcp_servers read tool: data source = local config (spec 13 re-so
 });
 
 describe('memory delete REST surface (02 section 4.4 "list/delete API shape-preserving"; DELETE same name [inferred])', () => {
-  test('DELETE memories/{mid} -> 204; unknown/out-of-scope agent = 404', async () => {
+  test('DELETE memories/{mid} -> 204; unknown memory = 404', async () => {
     const s: TestServer = bootServer();
-    s.db.insert(agentTable).values({ id: 'a1', teamId: s.team.id, displayName: 'w' }).run();
 
     s.db
       .insert(agentMemory)
@@ -386,12 +331,10 @@ describe('memory delete REST surface (02 section 4.4 "list/delete API shape-pres
         updatedAt: 1,
       })
       .run();
-    const base = `/api/teams/${s.team.id}/agents/a1/memories`;
+    const base = `/api/teams/${s.team.id}/memories`;
     expect((await call(s.app, 'GET', base)).status).toBe(200);
     expect((await call(s.app, 'DELETE', `${base}/mem-x`)).status).toBe(404);
-    expect(
-      (await call(s.app, 'DELETE', `/api/teams/${s.team.id}/agents/none/memories/mem-1`)).status,
-    ).toBe(404);
+    expect((await call(s.app, 'DELETE', `/api/teams/other-team/memories/mem-1`)).status).toBe(404);
     expect((await call(s.app, 'DELETE', `${base}/mem-1`)).status).toBe(204);
     expect(s.db.select().from(agentMemory).all()).toHaveLength(0);
     s.dispose();

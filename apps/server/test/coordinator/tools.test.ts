@@ -50,38 +50,20 @@ describe('coordinator tools', () => {
   it('offers every Coordinator tool with its replay rule from the shared definitions', () => {
     const extension = coordinatorToolsExtension(fakeMachineApi(), createStepGate());
     const tools = extension.tools ?? [];
-    expect(tools.map((t) => t.name).sort()).toEqual(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort());
-    for (const def of CHIEF_REMOTE_TOOLS) {
+    const defs = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS];
+    expect(tools.map((t) => t.name).sort()).toEqual(defs.map((t) => t.name).sort());
+    for (const def of defs) {
       const tool = tools.find((t) => t.name === def.name);
       expect({ name: def.name, replay: tool?.replay }).toEqual({
         name: def.name,
         replay: def.replaySafe === true || def.name === 'ask_user' ? 'safe' : 'unsafe',
       });
     }
-    for (const dispatching of ['run_builds', 'create_todo', 'set_secret', 'delete_todos']) {
+    for (const dispatching of ['open_thread', 'create_todo', 'set_secret', 'delete_todos']) {
       expect(tools.find((t) => t.name === dispatching)?.replay).toBe('unsafe');
     }
     for (const reading of ['todos', 'read_history', 'search_history']) {
       expect(tools.find((t) => t.name === reading)?.replay).toBe('safe');
-    }
-  });
-
-  it('offers the router tools only when asked, with the replay rule of their shared definitions', () => {
-    const plain = coordinatorToolsExtension(fakeMachineApi(), createStepGate()).tools ?? [];
-    for (const def of CHIEF_ROUTER_TOOLS) {
-      expect(plain.map((t) => t.name)).not.toContain(def.name);
-    }
-    const routed =
-      coordinatorToolsExtension(fakeMachineApi(), createStepGate(), { routerTools: true }).tools ??
-      [];
-    expect(routed.map((t) => t.name).sort()).toEqual(
-      [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS].map((t) => t.name).sort(),
-    );
-    for (const def of CHIEF_ROUTER_TOOLS) {
-      expect({ name: def.name, replay: routed.find((t) => t.name === def.name)?.replay }).toEqual({
-        name: def.name,
-        replay: def.replaySafe === true ? 'safe' : 'unsafe',
-      });
     }
   });
 

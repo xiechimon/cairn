@@ -2,15 +2,16 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeEach } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import {
-  agent as agentTable,
-  chief as chiefTable,
-  chiefThread,
-  machine as machineTable,
-} from '../src/db/schema.js';
+import { chief as chiefTable, chiefThread, machine as machineTable } from '../src/db/schema.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  postProject,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 export const AGENT_ID = 'agent-chief-1';
 export const AGENT2_ID = 'agent-chief-2';
@@ -27,7 +28,6 @@ export const H = {} as ChiefHarnessState;
 
 export function toolDeps() {
   return {
-    intakeAgentAllowlist: [AGENT_ID, AGENT2_ID],
     db: H.s.db,
     hub: H.s.hub,
     machineHub: H.s.machineHub,
@@ -82,28 +82,6 @@ afterAll(() => {
   for (const dir of claudeHomes.splice(0)) releaseTestTempDir(dir);
 });
 
-export function seedAgent(id: string, description: string, modelId = 'stub-model') {
-  H.s.db
-    .insert(agentTable)
-    .values({
-      id,
-      teamId: H.teamId,
-      displayName: id,
-      description,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId,
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
-}
-
 export function seedChiefThread(): void {
   const now = nowMs();
   H.s.db
@@ -112,7 +90,6 @@ export function seedChiefThread(): void {
       id: H.chiefId,
       userId: H.userId,
       teamId: H.teamId,
-      agentId: AGENT_ID,
       charter: '',
       watches: [],
       wakes: [],
@@ -146,8 +123,8 @@ export function registerChiefHarness(): void {
     H.chiefId = `chief-${H.userId}-${H.teamId}`;
     H.threadId = `chief-${newUuidv7()}`;
     H.projectId = await postProject(H.s.app, 'demo');
-    seedAgent(AGENT_ID, '负责撰写与润色各类文档。');
-    seedAgent(AGENT2_ID, '负责代码实现与工程修改。', 'stub-model-2');
+    seedRoute(H.s, 'coordinator', { id: AGENT_ID, provider: 'stub-gw', modelId: 'stub-model' });
+    seedSessionRoute(H.s, { id: AGENT2_ID, provider: 'stub-gw', modelId: 'stub-model-2' });
     seedChiefThread();
   });
 }

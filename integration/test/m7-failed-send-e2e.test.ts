@@ -1,13 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
-import {
-  appendPlanLocationNote,
-  buildRestartPrompt,
-  buildTaskPromptText,
-  composeTaskPromptWithInstruction,
-  PLAN_FILE_NAME,
-} from '@cairn/shared';
+import { buildTaskPromptText } from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -22,12 +15,12 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
-  AGENT_ID,
   api,
   bootRealServer,
   daemonLogLines,
   type RealServer,
   seedWorld,
+  startLegacyBuild,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
@@ -109,19 +102,13 @@ afterAll(async () => {
   if (home) rmSync(home, { recursive: true, force: true });
 });
 
-describe('M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to confirm', () => {
+describe('M7 failed-phase send E2E: failed send → restart → feedback joins the new round session → runs to review', () => {
   test('full-chain persistence + new round actually runs + phase gate rejects', async () => {
     const world = await seedWorld(server.url, server.teamId, {
       title: 'restart 探针',
       spec: '这个任务的第一轮会失败。',
     });
-    const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
-      todoIds: [world.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    });
-    expect(started.status).toBe(201);
-    const failedBuildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
+    const failedBuildId = startLegacyBuild(server, world.todoId, { withPlan: true });
 
     await waitFor(() => server.todoPhase(world.todoId) === 'failed', 150_000);
 
@@ -142,12 +129,8 @@ describe('M7 failed-phase send E2E: failed send → restart → feedback joins t
       .where(eq(buildTable.id, newBuildId))
       .get()!;
     expect(newBuild.prevPhase).toBe('failed');
-    expect(newBuild.withPlan).toBe(true);
+    expect(newBuild.withPlan).toBe(false);
     expect(newBuild.triggerSource).toBe('user');
-    expect(todoRow.assignment).toEqual({
-      plan: { agentId: AGENT_ID },
-      build: { agentId: AGENT_ID },
-    });
 
     const face = await api(server.url, 'GET', `/api/conversations/${newBuildId}/messages`);
     const faceBody = face.body as { messages: { role: string; content: unknown }[] };
@@ -168,26 +151,32 @@ describe('M7 failed-phase send E2E: failed send → restart → feedback joins t
       .orderBy(asc(stepTable.createdAt))
       .all()[0]!;
     expect(msgRow.createdAt).toBeLessThanOrEqual(firstStep.createdAt);
-    expect(firstStep.kind).toBe('plan');
+    expect(firstStep.kind).toBe('session');
     expect(firstStep.prompt).toContain('把测试也补上');
 
-    await waitFor(() => server.todoPhase(world.todoId) === 'confirm', 120_000);
+    await waitFor(() => server.todoPhase(world.todoId) === 'review', 120_000);
 
-    const expectedPrompt = appendPlanLocationNote(
-      composeTaskPromptWithInstruction(
-        buildTaskPromptText('restart 探针', '这个任务的第一轮会失败。'),
-        buildRestartPrompt('把测试也补上'),
-      ),
-      join(paths.plansDir, newBuildId, PLAN_FILE_NAME),
-    );
+    const taskPrompt = buildTaskPromptText('restart 探针', '这个任务的第一轮会失败。');
     const llmSawFeedback = stub.requests.some((r) =>
-      r.messages.some((m) => m.role === 'user' && userWireText(m) === expectedPrompt),
+      r.messages.some((m) => {
+        if (m.role !== 'user') return false;
+        const text = userWireText(m);
+        return text?.startsWith(taskPrompt) && text?.includes('把测试也补上');
+      }),
     );
     expect(llmSawFeedback).toBe(true);
     const faceAfter = await api(server.url, 'GET', `/api/conversations/${newBuildId}/messages`);
     const rowsAfter = (faceAfter.body as { messages: { role: string; content: unknown }[] })
       .messages;
-    expect(rowsAfter.some((m) => m.role === 'user' && m.content === expectedPrompt)).toBe(true);
+    expect(
+      rowsAfter.some(
+        (m) =>
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.startsWith(taskPrompt) &&
+          m.content.includes('把测试也补上'),
+      ),
+    ).toBe(true);
 
     const againNew = await api(server.url, 'POST', `/api/builds/${newBuildId}/steps`, {
       action: 'restart',

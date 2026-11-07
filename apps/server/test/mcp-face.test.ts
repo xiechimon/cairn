@@ -104,14 +104,14 @@ describe('/api/mcp tool whitelist preserves legacy tools and adds Thread entry',
     s.dispose();
   });
 
-  test('full grant -> tools/list exactly 32 items = registry list (16 read + 16 write)', async () => {
+  test('full grant -> tools/list exactly 29 items = registry list (15 read + 14 write)', async () => {
     const s = bootServer();
     const key = await issueMcpKey(s, { read: ALL_READ, write: ALL_WRITE });
     const res = await rpc(s.app, key, 'tools/list', {});
     const body = res.body as JsonRpcResponse;
     const names = (body.result?.tools ?? []).map((t) => t.name).sort();
     expect(names).toEqual(MCP_TOOL_REGISTRY.map((t) => t.name).sort());
-    expect(names).toHaveLength(32);
+    expect(names).toHaveLength(29);
     s.dispose();
   });
 
@@ -180,41 +180,6 @@ describe('/api/mcp tool execution = key owner identity (02 section 7.2)', () => 
       .body as JsonRpcResponse;
     const todos = JSON.parse(list.result?.content?.[0]?.text ?? '[]') as { id: string }[];
     expect(todos.map((t) => t.id)).toContain(created.id);
-    s.dispose();
-  });
-
-  test('run_builds (key owner) -> triggerSource user, no chief watch created', async () => {
-    const s = bootServer();
-    const projectId = await postProject(s.app);
-    const key = await issueMcpKey(s, { read: [], write: ['Create Todo', 'Run Builds'] });
-    const created = JSON.parse(
-      (
-        (
-          await rpc(s.app, key, 'tools/call', {
-            name: 'create_todo',
-            arguments: { projectId, title: 't', spec: 's' },
-          })
-        ).body as JsonRpcResponse
-      ).result?.content?.[0]?.text ?? '{}',
-    ) as { id: string };
-    const res = (
-      await rpc(s.app, key, 'tools/call', {
-        name: 'run_builds',
-        arguments: { todoIds: [created.id] },
-      })
-    ).body as JsonRpcResponse;
-    expect(res.error).toBeUndefined();
-    const { build: buildTable, chief: chiefTable } = await import('../src/db/schema.js');
-    const builds = s.db.select().from(buildTable).all();
-    expect(builds).toHaveLength(1);
-    expect(builds[0]!.triggerSource).toBe('user');
-    expect(
-      s.db
-        .select()
-        .from(chiefTable)
-        .all()
-        .flatMap((r) => r.watches),
-    ).toHaveLength(0);
     s.dispose();
   });
 

@@ -94,17 +94,3 @@ test('account: editing the name keeps the card untouched (no row appears)', asyn
   expect(p.rows).toHaveLength(2);
   expectOneCardShape(p);
 });
-
-test('agent overview: same card shape; one-line rows are 52px, two-line rows grow', async ({
-  page,
-}) => {
-  await page.goto('/app/resources/agents/r3-builder?scenario=agent-detail');
-  const card = page.locator('.agent-overview .settings-card');
-  await expect(card).toBeVisible();
-  const p = await probe(card);
-  expect(p.rows.map((r) => r.label)).toEqual(['职责', '默认 skill', '运行时', '模型', '思考强度']);
-  expectOneCardShape(p);
-  for (const row of p.rows) expect(row.h).toBeGreaterThanOrEqual(52);
-  expect(p.rows.slice(1).map((r) => r.h)).toEqual([52, 52, 52, 52]);
-  await expect(headerName(page, '.agent-overview')).toHaveText('r3-builder');
-});

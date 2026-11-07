@@ -1,9 +1,9 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { build, machine, notification, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { agentForStep } from './dispatch-eligibility.js';
 import { waitingSince } from './machine-routing.js';
 import { type NotificationDeps, notifyNoMachine } from './notifications.js';
+import { profileForStep } from './routing-rules.js';
 import { stepQueueProjector } from './step-queue.js';
 
 export const NO_MACHINE_ALERT_MS = 10 * 60_000;
@@ -25,8 +25,7 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     if (waited < NO_MACHINE_ALERT_MS) continue;
     const projector = projectors.get(todoRow.teamId) ?? stepQueueProjector(deps.db, todoRow.teamId);
     projectors.set(todoRow.teamId, projector);
-    const homeMachineId =
-      agentForStep(deps.db, todoRow, stepRow.kind, stepRow.prompt)?.machineId ?? null;
+    const homeMachineId = profileForStep(deps.db, todoRow, stepRow.kind)?.machineId ?? null;
     const queue = projector.project({
       id: stepRow.id,
       createdAt: stepRow.createdAt,

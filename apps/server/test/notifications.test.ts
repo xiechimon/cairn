@@ -1,60 +1,33 @@
 import { notificationEventSchema, notificationRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { agent, chiefThread, notification, plan as planTable } from '../src/db/schema.js';
-import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
-import { completeStep, startBuilds } from '../src/services/builds.js';
+import { chiefThread, notification, plan as planTable } from '../src/db/schema.js';
+import { newUuidv7, nowMs } from '../src/lib/ids.js';
+import { completeStep } from '../src/services/builds.js';
 import { notifyChiefMessage } from '../src/services/notifications.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, openStream, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  openStream,
+  postProject,
+  req,
+  startLegacyBuild,
+  type TestServer,
+} from './helpers.js';
 
 async function withRunningTodo(
-  opts: {
-    withPlan?: boolean;
-    triggerSource?: 'user' | 'schedule';
-    assignAgent?: boolean;
-    pingIntervalMs?: number;
-  } = {},
+  opts: { withPlan?: boolean; triggerSource?: 'user' | 'schedule'; pingIntervalMs?: number } = {},
 ) {
   const s = bootServer({ pingIntervalMs: opts.pingIntervalMs });
   const projectId = await postProject(s.app);
   const todoDoc = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: '写周报', spec: '' })
   ).json()) as { id: string; projectId: string; title: string; seqNum: number };
-  const agentId = newRecordId();
-  if (opts.assignAgent !== false) {
-    s.db
-      .insert(agent)
-      .values({
-        id: agentId,
-        teamId: s.team.id,
-        displayName: '小林',
-        description: null,
-        status: 'active',
-        avatarUrl: null,
-        provider: null,
-        modelId: null,
-        thinkingLevel: null,
-        tools: ['合并分支', '推送分支'],
-        secrets: [],
-        defaultSkill: null,
-        skillsAllowlist: null,
-        mcpServers: [],
-      })
-      .run();
-  }
-  const assignment =
-    opts.assignAgent === false ? { plan: null, build: null } : { plan: null, build: { agentId } };
-  const builds = startBuilds(s.svc, {
-    projectId,
-    todoIds: [todoDoc.id],
-    assignment,
+  const buildId = startLegacyBuild(s, todoDoc.id, {
     withPlan: opts.withPlan ?? true,
     ...(opts.triggerSource ? { triggerSource: opts.triggerSource } : {}),
   });
-  const buildId = builds[0]?.id;
-  if (!buildId) throw new Error('no build started');
-  return { ...s, projectId, todoDoc, agentId, buildId };
+  return { ...s, projectId, todoDoc, buildId };
 }
 
 function notificationFrames(stream: Awaited<ReturnType<typeof openStream>>) {
@@ -95,7 +68,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
         type: 'plan_ready',
         entityId: s.todoDoc.id,
         entityRef: { title: '写周报', projectId: s.projectId, seqNum: 1 },
-        agent: { name: '小林', avatarUrl: null },
+        agent: { name: s.user.displayName, avatarUrl: s.user.avatarUrl },
         snippet: null,
         readAt: null,
         channels: ['in_app'],
@@ -190,12 +163,7 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
           spec: '',
         })
       ).json()) as { id: string };
-      startBuilds(s.svc, {
-        projectId: s.projectId,
-        todoIds: [second.id],
-        assignment: { plan: null, build: null },
-        withPlan: false,
-      });
+      startLegacyBuild(s, second.id, { withPlan: false });
       setTodoPhase(s.svc, second.id, 'building');
       setTodoPhase(s.svc, second.id, 'failed');
       const failedFrame = notificationEventSchema.parse(await notificationFrames(stream)(3000));
@@ -256,8 +224,8 @@ describe('three-event matrix (r5 section 7.2 field by field)', () => {
     }
   });
 
-  test('no Agent assigned = owner acts on its behalf [inferred]; unread linkage GET notifications -> unreadThreadIds', async () => {
-    const s = await withRunningTodo({ assignAgent: false });
+  test('the notification agent is the owner acting on its behalf [inferred]; unread linkage GET notifications -> unreadThreadIds', async () => {
+    const s = await withRunningTodo();
     const stream = await openStream(s.app, s.team.id);
     try {
       setTodoPhase(s.svc, s.todoDoc.id, 'planning');

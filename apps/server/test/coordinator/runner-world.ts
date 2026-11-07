@@ -2,7 +2,7 @@ import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
 import { afterEach, beforeEach, expect } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
 import { type Coordinator, startCoordinator } from '../../src/coordinator/index.js';
-import { agent as agentTable, routingRule, step } from '../../src/db/schema.js';
+import { routingRule, step } from '../../src/db/schema.js';
 import {
   setCoordinatorInServer,
   setCoordinatorServerContextEnabled,
@@ -40,21 +40,6 @@ export async function world(content = 'hello'): Promise<World> {
   const s = bootServer();
   closers.push(() => s.dispose());
   const teamId = s.team.id;
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-chief',
-      teamId,
-      displayName: 'chief',
-      description: 'c',
-      provider: 'stub',
-      modelId: 'm',
-    })
-    .run();
-  const patched = await req(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    agent: { agentId: 'agent-chief', thinkingLevel: null },
-  });
-  expect(patched.status).toBe(200);
   createProvider(
     { db: s.db, box: s.secretBox },
     {

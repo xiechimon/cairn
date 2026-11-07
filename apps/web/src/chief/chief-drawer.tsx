@@ -1,5 +1,4 @@
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
-import type { AskUserAnswer } from '@cairn/shared';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChiefConversation, ChiefScrollProvider } from './chief-conversation.js';
@@ -20,8 +19,6 @@ interface DrawerProps {
   onClose: () => void;
   onSend?: (text: string, projectId: string | null) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
-  onAnswerQuestion?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancelQuestion?: (requestId: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   onSteer?: (messageId: string) => void;
   onStop?: () => void;

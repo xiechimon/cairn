@@ -2,7 +2,6 @@ import { machineClaimResponseSchema, machineEnrollResponseSchema } from '@cairn/
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   project as projectTable,
@@ -10,7 +9,14 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machines.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -59,17 +65,7 @@ function makeWorld(): World {
       .values({ id, teamId, name, online: true, enabledRuntimes: ['pi'] })
       .run();
   }
-  s.db
-    .insert(agentTable)
-    .values({
-      id: `agent-${suffix}`,
-      teamId,
-      displayName: 'zombie-agent',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId: machineBId,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId: machineBId });
   s.db
     .insert(projectTable)
     .values({ id: `proj-${suffix}`, name: 'zombie', teamId })
@@ -84,7 +80,6 @@ function makeWorld(): World {
       phase: 'building',
       phaseAt: base,
       seqNum: 1,
-      assignment: { plan: null, build: { agentId: `agent-${suffix}` } },
     })
     .run();
   s.db
@@ -248,16 +243,6 @@ describe('#1065 route wiring (claim route passes the request signal through)', (
   test('connection dropped during hold -> new step enqueued: dead-machine route does not claim, live-machine route still claims', async () => {
     const s = bootServer({ claimHoldMs: HOLD_MS });
     disposables.push(() => s.dispose());
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-route',
-        teamId: s.team.id,
-        displayName: 'route-agent',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-      })
-      .run();
     const enroll = async (name: string) => {
       const key = await issueApiKey(s);
       const res = await s.app.request('/api/machine/enroll', {
@@ -277,11 +262,11 @@ describe('#1065 route wiring (claim route passes the request signal through)', (
     });
     const todoId = ((await todoRes.json()) as { id: string }).id;
 
-    s.db
-      .update(agentTable)
-      .set({ machineId: machineB.machineId })
-      .where(eq(agentTable.id, 'agent-route'))
-      .run();
+    seedSessionRoute(s, {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: machineB.machineId,
+    });
     const ctrl = new AbortController();
     const claimReq = new Request('http://localhost/api/machine/tasks/claim', {
       method: 'POST',
@@ -294,8 +279,6 @@ describe('#1065 route wiring (claim route passes the request signal through)', (
     ctrl.abort();
     const buildRes = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       todoIds: [todoId],
-      assignment: { plan: { agentId: 'agent-route' }, build: { agentId: 'agent-route' } },
-      withPlan: true,
     });
     expect(buildRes.status).toBe(201);
     const res = await settleSoon(resPromise, 300, '路由 claim 未随 abort 即时返回');

@@ -9,19 +9,21 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
+  machine as machineTable,
   plan as planTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   openConvStream,
   postProject,
+  seedRoute,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
 
@@ -44,8 +46,6 @@ async function call(
   );
 }
 
-const AGENT_ID = 'agent-ph-1';
-
 async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200 });
   const key = await issueApiKey(s);
@@ -67,22 +67,14 @@ async function setupWorld() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'ph-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'ph-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s);
+  const machineId = s.db.select().from(machineTable).get()!.id;
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
+  seedRoute(s, 'review', { provider: 'stub-gw', modelId: 'stub-model', machineId });
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -90,17 +82,8 @@ async function setupWorld() {
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
 
-  async function startBuild(withPlan = true): Promise<string> {
-    const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-        withPlan,
-      },
-    });
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { builds: { id: string }[] };
-    return body.builds[0]!.id;
+  function startBuild(withPlan = true): string {
+    return startLegacyBuild(s, todoId, { withPlan });
   }
   async function claim(): Promise<ClaimedStep> {
     const res = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
@@ -176,7 +159,7 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
   test('the plan step produced no plan.md -> does not reach confirm: stays planning + an automatic backfill step queued (with the backfill instruction)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       expect(planStep.step.kind).toBe('plan');
       expect(planStep.session.action).toBe('new');
@@ -196,7 +179,7 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
   test('the backfill round still has no plan.md -> #703 gate 1 closes as failed (confirm unreachable, no more free pass)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       const rewrite = await w.claim();
@@ -215,7 +198,7 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
   test('no regression on the normal path: the plan.md deliverable present -> confirm + hasPlan set (no backfill step)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案\nContext: x'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -230,7 +213,7 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
   test('a reject-and-replan round that produced no new plan.md -> straight to confirm (the automatic backfill does not stack another instruction step)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -260,7 +243,7 @@ describe('the build step spec fallback (#113 candidate 2: deliverable still miss
   test('plan.md absent at confirm (a leftover state from the upgrade window) -> the build step claim = new session + the todo original spec in the payload', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -282,7 +265,7 @@ describe('the build step spec fallback (#113 candidate 2: deliverable still miss
   test('plan.md present -> the build step continue session unchanged (no regression on the normal path)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案\nContext: x'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -298,7 +281,7 @@ describe('the build step spec fallback (#113 candidate 2: deliverable still miss
   test('withPlan=false direct execution unaffected (planDocId always null, never mistaken for a missing deliverable)', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild(false);
+      w.startBuild(false);
       const buildStep = await w.claim();
       expect(buildStep.step.kind).toBe('build');
       expect(buildStep.session).toEqual({ action: 'new', sessionId: null });
@@ -313,7 +296,7 @@ describe('XMON-59: the upload seam emits events + done replay is idempotent (the
   test('plan.md emits a conversation stream step event the moment it is stored (no done involved, the subscription precedes the upload)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const claimed = await w.claim();
       const stream = await openConvStream(w.s.app, buildId);
       try {
@@ -333,7 +316,7 @@ describe('XMON-59: the upload seam emits events + done replay is idempotent (the
   test('done replay (recover surface) is same-phase idempotent: no 500, the replay has zero side effects (v/phaseAt unchanged)', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild(true);
+      w.startBuild(true);
       const claimed = await w.claim();
       await w.uploadPlan(claimed.step.id, withVerification('# 方案 v1'));
       await w.done(claimed.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -355,7 +338,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
   test('a build step PUT plan.md -> rejected 400: no version stored, planDocId unchanged (the #1027 rejection leg)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(false);
+      const buildId = w.startBuild(false);
       const buildStep = await w.claim();
       expect(buildStep.step.kind).toBe('build');
       const res = await w.tryUploadPlan(buildStep.step.id, '# 伪方案');
@@ -371,7 +354,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
   test('a review step PUT plan.md -> rejected 400: no version stored, planDocId unchanged (the #1027 rejection leg)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -379,7 +362,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
       const buildStep = await w.claim();
       await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-1', hasChanges: true });
       const revRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-        body: { action: 'review', agentId: AGENT_ID },
+        body: { action: 'review' },
       });
       expect(revRes.status).toBe(202);
       const reviewStep = await w.claim();
@@ -397,7 +380,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
   test('a late PUT after the step is done -> rejected 409: the plan table untouched (the #1027 state leg)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -413,7 +396,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
   test('a repeated same-content PUT in the same tick -> idempotent: no duplicate version, planDocId does not drift (#1026)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
@@ -433,7 +416,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
   test('the content really changed -> a new version lands as usual (idempotent is not never-add, the #1026 positive leg)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v2（改稿）'));
@@ -448,7 +431,7 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
   test('the same text re-planned in another step -> a new version still lands (idempotency key = step + content; the reject-round v2 semantics do not regress)', async () => {
     const w = await setupWorld();
     try {
-      const buildId = await w.startBuild(true);
+      const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });

@@ -194,10 +194,15 @@ describe('worker reports in the chief conversation', () => {
     }
   });
 
-  test('unwatched tasks do not report into chief conversations', async () => {
+  test('unwatched tasks report into the Coordinator thread without waking it', async () => {
     const { deps, todoId } = await seedTask(false);
     setTodoPhase(deps, todoId, 'done');
-    expect(await messages()).toEqual([]);
+    const rows = await messages();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.role).toBe('system');
+    const report = JSON.parse(rows[0]!.content as string);
+    expect(report).toMatchObject({ kind: 'thread-report', todoId, phase: 'done' });
+    expect(report.wakeStepId).toBeUndefined();
     expect(H.s.db.select().from(step).where(eq(step.buildId, H.threadId)).all()).toEqual([]);
   });
 

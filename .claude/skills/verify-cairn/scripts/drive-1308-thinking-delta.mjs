@@ -128,13 +128,11 @@ const machineId = enroll.body?.machineId;
 if (enroll.status !== 200 || !machineToken || !machineId) {
   throw new Error('enroll ' + enroll.status + ' ' + JSON.stringify(enroll.body).slice(0, 200));
 }
-const agent = await sendJson('/api/teams/' + teamId + '/agents', {
-  displayName: 'probe-1308-' + runTag,
+const agent = await sendJson('/api/teams/' + teamId + '/routing-rules/session', {
   provider: 'stub-1308-' + runTag,
   modelId: 'stub-model',
   machineId,
-  skillsAllowlist: null,
-});
+}, 'PATCH');
 const agentId = agent.body?.id ?? agent.body?.agent?.id;
 if (!agentId) throw new Error('agent ' + agent.status + ' ' + JSON.stringify(agent.body).slice(0, 240));
 const project = await sendJson('/api/projects', { name: 'probe-1308-' + runTag, teamId });
@@ -147,7 +145,6 @@ const todoRes = await sendJson('/api/projects/' + projectId + '/todos', {
 const todoId = todoRes.body?.id;
 const buildRes = await sendJson('/api/projects/' + projectId + '/builds', {
   todoIds: [todoId],
-  assignment: { plan: { agentId }, build: { agentId } },
   withPlan: false,
 });
 const buildId = buildRes.body?.builds?.[0]?.id;

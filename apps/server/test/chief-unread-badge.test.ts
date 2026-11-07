@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   chief as chiefTable,
   chiefThread,
   notification as notificationTable,
@@ -13,7 +12,7 @@ import {
 import { enqueueChiefStep } from '../src/services/chief.js';
 import { notifyChiefMessage } from '../src/services/notifications.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, issueApiKey, machineIdByName, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
 
 const IDLE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -60,22 +59,7 @@ async function setupTurn(content: string): Promise<TurnWorld> {
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = machineIdByName(s, 'unread-mbp');
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-unread',
-      teamId,
-      displayName: 'unread-agent',
-      description: '调度',
-      modelId: 'stub-model',
-      provider: 'stub-gw',
-      machineId,
-    })
-    .run();
-  const patchRes = await call(s.app, 'PATCH', `/api/teams/${teamId}/chief`, {
-    body: { agent: { agentId: 'agent-unread' } },
-  });
-  expect(patchRes.status).toBe(200);
+  seedRoute(s, 'coordinator', { provider: 'stub-gw', modelId: 'stub-model', machineId });
   const msgRes = await call(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
     body: { content },
   });
@@ -206,7 +190,6 @@ describe('idle chief unread sweep (#1303)', () => {
           id: chiefId,
           userId: s.user.id,
           teamId: s.team.id,
-          agentId: null,
           charter: '',
           watches: [],
           wakes: [],

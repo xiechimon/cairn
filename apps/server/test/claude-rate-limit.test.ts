@@ -1,16 +1,16 @@
 import type { ClaimedStep } from '@cairn/shared';
-import { claimedStepSchema } from '@cairn/shared';
+import { buildReviewStepPrompt, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   claudeSubscription,
   machine as machineTable,
+  routingRule,
   step as stepTable,
   team as teamTable,
 } from '../src/db/schema.js';
-import { bootServer, postProject } from './helpers.js';
+import { bootServer, postProject, seedRoute, seedSessionRoute } from './helpers.js';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -66,7 +66,7 @@ async function enroll(s: ReturnType<typeof bootServer>, key: string, name: strin
       claudeCodeReport: {
         installed: true,
         hostname: name,
-        models: [],
+        models: [{ id: 'claude-sonnet', name: 'Sonnet' }],
         auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
       },
     })
@@ -75,38 +75,23 @@ async function enroll(s: ReturnType<typeof bootServer>, key: string, name: strin
   return { token, machineId: row.id };
 }
 
-function insertAgent(
-  s: ReturnType<typeof bootServer>,
-  id: string,
-  machineId: string,
-  provider: string,
-) {
-  s.db
-    .insert(agentTable)
-    .values({
-      id,
-      teamId: s.team.id,
-      displayName: id,
-      provider,
-      modelId: provider === 'claude-code' ? 'claude-sonnet' : 'stub-model',
-      machineId,
-    })
-    .run();
+function useSessionRoute(s: ReturnType<typeof bootServer>, machineId: string, provider: string) {
+  seedSessionRoute(s, {
+    provider,
+    modelId: provider === 'claude-code' ? 'claude-sonnet' : 'stub-model',
+    machineId,
+  });
 }
 
-async function startBuild(s: ReturnType<typeof bootServer>, agentId: string): Promise<string> {
+async function startBuild(s: ReturnType<typeof bootServer>): Promise<string> {
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-    body: { title: `Rate limit task ${agentId}`, spec: 'Touch README.md' },
+    body: { title: 'Rate limit task', spec: 'Touch README.md' },
   });
   expect(todoRes.status).toBe(201);
   const { id: todoId } = (await todoRes.json()) as { id: string };
   const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: null, build: { agentId } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoId] },
   });
   expect(res.status).toBe(201);
   const body = (await res.json()) as { builds: { id: string }[] };
@@ -184,8 +169,8 @@ describe('claude rate limit (#1852)', () => {
   test('a rejected machine is skipped until resetsAt, then claims again', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    const buildId = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const buildId = await startBuild(s);
     const resetsAt = Date.now() + 2 * HOUR;
     expect(
       (
@@ -227,8 +212,8 @@ describe('claude rate limit (#1852)', () => {
   test('allowed and allowed_warning do not block a claim', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    const warningBuild = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const warningBuild = await startBuild(s);
     expect(
       (
         await report(s, machine.token, machine.machineId, {
@@ -240,7 +225,7 @@ describe('claude rate limit (#1852)', () => {
       ).status,
     ).toBe(200);
     expect((await claim(s, machine.token))?.step.buildId).toBe(warningBuild);
-    const allowedBuild = await startBuild(s, 'agent-cc');
+    const allowedBuild = await startBuild(s);
     expect(
       (
         await report(s, machine.token, machine.machineId, {
@@ -257,8 +242,8 @@ describe('claude rate limit (#1852)', () => {
   test('a local merge already parked by the rate limiter resumes after an allowed report', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'owner-key'), 'owner');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    const buildId = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const buildId = await startBuild(s);
     await report(s, machine.token, machine.machineId, {
       status: 'rejected',
       rateLimitType: 'five_hour',
@@ -301,8 +286,8 @@ describe('claude rate limit (#1852)', () => {
   test('a later allowed report clears the same window and a different window stays rejected', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    const buildId = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const buildId = await startBuild(s);
     await report(s, machine.token, machine.machineId, {
       status: 'rejected',
       rateLimitType: 'seven_day',
@@ -323,12 +308,12 @@ describe('claude rate limit (#1852)', () => {
     s.dispose();
   });
 
-  test('another online machine takes the step and the agent stays bound to its owner', async () => {
+  test('another online machine takes the step and the session rule stays bound to its owner', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const owner = await enroll(s, await issueKey(s, 'owner-key'), 'omarchy');
     const other = await enroll(s, await issueKey(s, 'spare-key'), 'spare');
-    insertAgent(s, 'agent-cc', owner.machineId, 'claude-code');
-    const buildId = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, owner.machineId, 'claude-code');
+    const buildId = await startBuild(s);
     await report(s, owner.token, owner.machineId, {
       status: 'rejected',
       rateLimitType: 'five_hour',
@@ -339,7 +324,7 @@ describe('claude rate limit (#1852)', () => {
     expect(claimed?.step.buildId).toBe(buildId);
     expect(claimed?.step.machineId).toBe(other.machineId);
     expect(
-      s.db.select().from(agentTable).where(eq(agentTable.id, 'agent-cc')).get()?.machineId,
+      s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get()?.machineId,
     ).toBe(owner.machineId);
     expect(await claim(s, owner.token)).toBeNull();
     s.dispose();
@@ -373,8 +358,8 @@ describe('claude rate limit (#1852)', () => {
         claudeUsage: 'subscription-only',
       });
       expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
-      insertAgent(s, 'agent-cc', owner.machineId, 'claude-code');
-      const buildId = await startBuild(s, 'agent-cc');
+      useSessionRoute(s, owner.machineId, 'claude-code');
+      const buildId = await startBuild(s);
       expect(
         (
           await report(s, owner.token, owner.machineId, {
@@ -392,7 +377,7 @@ describe('claude rate limit (#1852)', () => {
       expect(claimed?.step.machineId).toBe(oauth.machineId);
       expect(stepOfBuild(s, buildId).status).toBe('claimed');
       expect(
-        s.db.select().from(agentTable).where(eq(agentTable.id, 'agent-cc')).get()?.machineId,
+        s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get()?.machineId,
       ).toBe(owner.machineId);
     } finally {
       s.dispose();
@@ -431,8 +416,8 @@ describe('claude rate limit (#1852)', () => {
             .run();
         }
         expect(s.db.select().from(claudeSubscription).all()).toEqual([]);
-        insertAgent(s, 'agent-cc', owner.machineId, 'claude-code');
-        const buildId = await startBuild(s, 'agent-cc');
+        useSessionRoute(s, owner.machineId, 'claude-code');
+        const buildId = await startBuild(s);
         expect(
           (
             await report(s, owner.token, owner.machineId, {
@@ -447,7 +432,7 @@ describe('claude rate limit (#1852)', () => {
           step: { buildId, machineId: claimant.machineId },
         });
         expect(
-          s.db.select().from(agentTable).where(eq(agentTable.id, 'agent-cc')).get()?.machineId,
+          s.db.select().from(routingRule).where(eq(routingRule.use, 'session')).get()?.machineId,
         ).toBe(owner.machineId);
       } finally {
         s.dispose();
@@ -471,8 +456,8 @@ describe('claude rate limit (#1852)', () => {
         })
         .where(eq(machineTable.id, machine.machineId))
         .run();
-      insertAgent(s, 'agent-pi', machine.machineId, 'stub-gw');
-      const buildId = await startBuild(s, 'agent-pi');
+      useSessionRoute(s, machine.machineId, 'stub-gw');
+      const buildId = await startBuild(s);
       await report(s, machine.token, machine.machineId, {
         status: 'rejected',
         rateLimitType: 'five_hour',
@@ -490,8 +475,8 @@ describe('claude rate limit (#1852)', () => {
   test('the only rejected machine parks the step and a failed done does not fail it', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    const buildId = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const buildId = await startBuild(s);
     const claimed = await claim(s, machine.token);
     expect(claimed?.step.buildId).toBe(buildId);
     await report(s, machine.token, machine.machineId, {
@@ -515,8 +500,8 @@ describe('claude rate limit (#1852)', () => {
   test('a quota block for claude-code parks even when the rate-limit row was not stored', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    const buildId = await startBuild(s, 'agent-cc');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    const buildId = await startBuild(s);
     const claimed = await claim(s, machine.token);
     const done = await call(s.app, 'POST', `/api/machine/done/${claimed!.step.id}`, {
       cred: machine.token,
@@ -541,10 +526,22 @@ describe('claude rate limit (#1852)', () => {
   test('a pi step on the rejected machine still claims and a pi failure stays a failure', async () => {
     const s = bootServer({ claimHoldMs: 50 });
     const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    insertAgent(s, 'agent-cc', machine.machineId, 'claude-code');
-    insertAgent(s, 'agent-pi', machine.machineId, 'stub-gw');
-    const claudeBuild = await startBuild(s, 'agent-cc');
-    const piBuild = await startBuild(s, 'agent-pi');
+    useSessionRoute(s, machine.machineId, 'claude-code');
+    seedRoute(s, 'review', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: machine.machineId,
+    });
+    const claudeBuild = await startBuild(s);
+    const piBuild = await startBuild(s);
+    s.db
+      .update(stepTable)
+      .set({
+        kind: 'review',
+        prompt: buildReviewStepPrompt({ agentId: 'review-route', gate: 'review', planText: '' }),
+      })
+      .where(eq(stepTable.buildId, piBuild))
+      .run();
     await report(s, machine.token, machine.machineId, {
       status: 'rejected',
       rateLimitType: 'five_hour',

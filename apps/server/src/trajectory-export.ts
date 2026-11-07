@@ -24,7 +24,6 @@ import { ZodError } from 'zod';
 import type { ServerConfig } from './config.js';
 import * as schema from './db/schema.js';
 import {
-  agent,
   build,
   buildFeedback,
   gateVerdict,
@@ -34,6 +33,7 @@ import {
   todo,
   tokenUsage,
 } from './db/schema.js';
+import { routeForStep } from './services/routing-rules.js';
 import { derivePackOutcome } from './trajectory-outcome.js';
 
 export class TrajectoryExportError extends Error {}
@@ -109,10 +109,8 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
             .orderBy(asc(step.createdAt), asc(step.id))
             .all();
           const first = steps[0];
-          const slot = first?.kind === 'plan' ? task?.assignment?.plan : task?.assignment?.build;
-          const assigned = slot
-            ? db.select().from(agent).where(eq(agent.id, slot.agentId)).get()
-            : undefined;
+          const routed =
+            task === undefined || first === undefined ? null : routeForStep(db, task, first.kind);
           const usage = db
             .select()
             .from(tokenUsage)
@@ -202,8 +200,8 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               sourceRef: task?.sourceRef,
               baseSha: b.baseSha,
               harnessHash: b.harnessHash,
-              persona: assigned?.persona ?? null,
-              agentId: assigned?.id,
+              persona: null,
+              agentId: routed?.id,
               model: runtimeModel ?? (usage.length === 1 ? usage[0]?.model : undefined),
               skillInjection: first?.skillInjection ?? null,
               blockerHandoff: steps.find((s) => s.blockerHandoff !== null)?.blockerHandoff ?? null,

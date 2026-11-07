@@ -2,7 +2,6 @@ import { type ClaimedStep, type Phase, STOP_MESSAGE } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   project as projectTable,
@@ -16,8 +15,8 @@ import {
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
-import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
-import { bindAllAgents, bootServer, type TestServer } from './helpers.js';
+import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { bootServer, pinSessionRoute, seedSessionRoute, type TestServer } from './helpers.js';
 
 registerChiefHarness();
 
@@ -45,19 +44,16 @@ function insertMachine(s: TestServer, id: string, opts: { cap?: number; online?:
 }
 
 describe('#1219 the chief cancel -> re-dispatch chain', () => {
-  test('cancel a queued build: the todo falls back + a later run_builds succeeds + the new step is claimed within seconds', async () => {
+  test('cancel a queued build: the todo falls back + a later open_thread succeeds + the new step is claimed within seconds', async () => {
     insertMachine(H.s, 'machine-rerun');
-    bindAllAgents(H.s, 'machine-rerun');
+    pinSessionRoute(H.s, 'machine-rerun');
     const todoRec = (await relay('create_todo', {
       projectId: H.projectId,
       title: '被取消后重派',
       spec: 's',
     })) as { id: string };
-    const started = (await relay('run_builds', {
-      todoIds: [todoRec.id],
-      assignment: { build: { agentId: AGENT_ID } },
-    })) as { builds: { id: string }[] };
-    const buildId = started.builds[0]!.id;
+    const started = (await relay('open_thread', { todoId: todoRec.id })) as { buildId: string };
+    const buildId = started.buildId;
 
     const cancelled = (await relay('cancel_builds', { buildIds: [buildId] })) as {
       cancelled: string[];
@@ -71,13 +67,9 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
     const buildRow = H.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.errorMessage).toBe(STOP_MESSAGE);
 
-    const rerun = (await relay('run_builds', {
-      todoIds: [todoRec.id],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    })) as { builds: { id: string }[] };
-    expect(rerun.builds).toHaveLength(1);
+    const rerun = (await relay('open_thread', { todoId: todoRec.id })) as { buildId: string };
 
-    const target = rerun.builds[0]!.id;
+    const target = rerun.buildId;
     let claimedTarget: ClaimedStep | null = null;
     for (let i = 0; i < 5 && claimedTarget === null; i++) {
       const c = await claimStep(
@@ -120,17 +112,7 @@ describe('#1219 the cancelBuild funnel (claimed delegation / idempotent zombie r
     const machineId = `machine-${Math.random().toString(36).slice(2)}`;
     s.db.insert(projectTable).values({ id: 'proj-c', name: 'cancel', teamId }).run();
     insertMachine(s, machineId);
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-c',
-        teamId,
-        displayName: 'cancel-agent',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        machineId,
-      })
-      .run();
+    seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
     s.db
       .insert(todoTable)
       .values({
@@ -141,7 +123,6 @@ describe('#1219 the cancelBuild funnel (claimed delegation / idempotent zombie r
         phase: step.phase ?? 'queued',
         phaseAt: base,
         seqNum: 1,
-        assignment: { plan: { agentId: 'agent-c' }, build: { agentId: 'agent-c' } },
         latestBuildId: buildId,
       })
       .run();
@@ -241,7 +222,6 @@ describe('#1219 sweepZombieQueuedTodos repairs legacy zombies', () => {
           phase: 'queued',
           phaseAt: base,
           seqNum: 1,
-          assignment: { plan: { agentId: 'agent-z' }, build: { agentId: 'agent-z' } },
           latestBuildId: buildId,
         })
         .run();
@@ -313,17 +293,7 @@ describe('#1219 the grace period for a pinned online machine not claiming', () =
     const machineId = `machine-w-${Math.random().toString(36).slice(2)}`;
     s.db.insert(projectTable).values({ id: 'proj-w', name: 'wedge', teamId }).run();
     insertMachine(s, machineId, { cap: opts.machineCap });
-    s.db
-      .insert(agentTable)
-      .values({
-        id: 'agent-w',
-        teamId,
-        displayName: 'wedge-agent',
-        provider: 'stub-gw',
-        modelId: 'stub-model',
-        machineId,
-      })
-      .run();
+    seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
     s.db
       .insert(todoTable)
       .values({
@@ -334,7 +304,6 @@ describe('#1219 the grace period for a pinned online machine not claiming', () =
         phase: 'queued',
         phaseAt: base,
         seqNum: 1,
-        assignment: { plan: { agentId: 'agent-w' }, build: { agentId: 'agent-w' } },
         latestBuildId: buildId,
       })
       .run();
@@ -365,7 +334,6 @@ describe('#1219 the grace period for a pinned online machine not claiming', () =
         phase: 'building',
         phaseAt: base,
         seqNum: 2,
-        assignment: { plan: { agentId: 'agent-w' }, build: { agentId: 'agent-w' } },
         latestBuildId: loadBuild,
       })
       .run();
