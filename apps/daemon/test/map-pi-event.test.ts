@@ -342,6 +342,40 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
     ]);
   });
 
+  test.each([
+    ['status 503', true],
+    ['503 Service Unavailable', true],
+    ['HTTP 502', true],
+    ['HTTP/1.1 500 Internal Server Error', true],
+    ['status: 504', true],
+    ['rate limit hit', true],
+    ['overloaded', true],
+    ['timeout', true],
+    ['temporarily unavailable', true],
+    ['request id req-abc503def failed', false],
+    ['request id 503 failed', false],
+    ['connection refused at localhost:5030', false],
+    ['connection refused at localhost:503', false],
+    ['invalid model model-503', false],
+    ['status 5030', false],
+    ['HTTP 502abc', false],
+    ['404 Model model-503 is not supported', false],
+    ['404 timeout; status 503', false],
+    ['model_not_found: rate limit hit', false],
+    ['model-not-found: overloaded', false],
+    ['Model model-503 not found; temporarily unavailable', false],
+    ['model not found: HTTP 502', false],
+    ['Model is not supported: timeout', false],
+    ['not_supported: status 503', false],
+    ['not-supported: overloaded', false],
+  ])('classifies provider error %s as retryable=%s', (message, retryable) => {
+    const out = map({
+      type: 'message_end',
+      message: { role: 'assistant', stopReason: 'error', errorMessage: message },
+    });
+    expect(out[1]).toEqual({ type: 'error', error: { message, retryable } });
+  });
+
   test('auto_retry_start/end and compaction_start/end pass through same-named', () => {
     expect(map({ type: 'auto_retry_start', attempt: 2 })).toEqual([
       { type: 'auto_retry_start', attempt: 2 },

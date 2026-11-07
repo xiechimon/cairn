@@ -554,7 +554,14 @@ function toMessageRecord(msg: PiMessageLike): {
 }
 
 function isRetryableError(message: string): boolean {
-  return /rate.?limit|overloaded|timeout|temporarily|5\d\d/i.test(message);
+  if (
+    /\b404\b|\bmodel(?:[\s_-]+[^\n]*?)?not[\s_-]+found\b|\bnot[\s_-]+supported\b/i.test(message)
+  ) {
+    return false;
+  }
+  return /rate.?limit|overloaded|timeout|temporarily|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status)\s*:?\s*5\d\d\b|\b5\d\d\s+(?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout|HTTP Version Not Supported|Variant Also Negotiates|Insufficient Storage|Loop Detected|Not Extended|Network Authentication Required)\b/i.test(
+    message,
+  );
 }
 
 export function mapPiSessionEvent(event: AgentSessionEventLike, state: MapState): StepEvent[] {
