@@ -1,3 +1,4 @@
+import { Monitor, Server } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import type { MachineRow } from '../fixtures/records.js';
@@ -51,14 +52,26 @@ export function SettingsScopeSentence({
             className="min-w-0 text-ui text-foreground"
           >
             <SelectValue>
-              {current === undefined ? t('团队') : machineLabel(current, machines)}
+              {current === undefined ? <Server aria-hidden /> : <Monitor aria-hidden />}
+              {current === undefined ? t('所有机器') : machineLabel(current, machines)}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent aria-label={t('设置作用于')}>
-            <SelectItem value={TEAM_SCOPE}>{t('团队')}</SelectItem>
+          <SelectContent
+            aria-label={t('设置作用于')}
+            className="w-max min-w-0 max-w-(--available-width)"
+          >
+            <SelectItem value={TEAM_SCOPE}>
+              <Server aria-hidden />
+              {t('所有机器')}
+            </SelectItem>
             {machines.map((m) =>
               m.id === undefined ? null : (
-                <SelectItem key={m.id} value={m.id}>
+                <SelectItem
+                  key={m.id}
+                  value={m.id}
+                  className="[&>span:first-child]:min-w-0 [&>span:first-child]:shrink [&>span:first-child]:whitespace-normal [&>span:first-child]:[overflow-wrap:anywhere]"
+                >
+                  <Monitor aria-hidden />
                   <MachineName machine={m} all={machines} />
                   {m.online === false && (
                     <span className="text-content-tertiary">{` · ${t('离线')}`}</span>
