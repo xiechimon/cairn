@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 
@@ -58,4 +58,11 @@ export async function evidencePanelShot(
   const right = Math.min(viewport?.width ?? Number.POSITIVE_INFINITY, box.x + box.width + pad);
   const bottom = Math.min(viewport?.height ?? Number.POSITIVE_INFINITY, box.y + box.height + pad);
   await evidenceShot(page, name, { x, y, width: right - x, height: bottom - y });
+}
+
+/** Write `data` as JSON under CAIRN_E2E_EVIDENCE; silently skipped when unset. */
+export async function evidenceJson(name: string, data: unknown): Promise<void> {
+  if (EVIDENCE_ROOT === null) return;
+  mkdirSync(EVIDENCE_ROOT, { recursive: true });
+  writeFileSync(resolve(EVIDENCE_ROOT, name), `${JSON.stringify(data, null, 1)}\n`);
 }

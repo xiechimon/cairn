@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive, type Row, THREAD, toolRow } from './chief-home-mock';
-import { evidenceShot } from './evidence';
+import { evidenceJson, evidenceShot } from './evidence';
 import { openChiefWindow } from './helpers.js';
 
 const historyOf = (total: number): Row[] =>
@@ -255,9 +255,10 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
         .evaluate((node) => getComputedStyle(node).contentVisibility),
     ).toBe('auto');
     await jump.hover();
-    const transitions = await jump.evaluate((node) => ({
+    const resting = await jump.evaluate((node) => ({
       property: getComputedStyle(node).transitionProperty,
       duration: getComputedStyle(node).transitionDuration,
+      background: getComputedStyle(node).backgroundColor,
     }));
     await jump.evaluate((button) => {
       button.addEventListener(
@@ -267,9 +268,16 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
           const root = button.closest('[data-slot="message-scroller"]');
           const viewport = root?.querySelector('[data-slot="message-scroller-viewport"]');
           if (!(viewport instanceof HTMLElement)) throw new Error('Missing conversation viewport');
+          const frames: { t: number; top: number; gap: number; opacity: number }[] = [];
           const sample = () => {
-            const elapsed = performance.now() - started;
-            if (elapsed < 100) return requestAnimationFrame(sample);
+            const t = performance.now() - started;
+            frames.push({
+              t: Math.round(t * 10) / 10,
+              top: Math.round(viewport.scrollTop),
+              gap: Math.round(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight),
+              opacity: Number(getComputedStyle(button).opacity),
+            });
+            if (t < 400) return requestAnimationFrame(sample);
             const latest = [...viewport.querySelectorAll('[data-slot="message-scroller-item"]')].at(
               -1,
             );
@@ -278,10 +286,7 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
             button.setAttribute(
               'data-jump-measurement',
               JSON.stringify({
-                elapsed,
-                gap: viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight,
-                opacity: getComputedStyle(button).opacity,
-                duration: getComputedStyle(button).transitionDuration,
+                frames,
                 latestVisible:
                   rect != null && rect.bottom <= bounds.bottom + 2 && rect.bottom > bounds.top,
               }),
@@ -297,7 +302,12 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
       await jump.press(activation === 'Space' ? 'Space' : 'Enter');
     } else {
       await page.mouse.down();
-      expect(await jump.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe('0s');
+      const pressed = await jump.evaluate((node) => ({
+        duration: getComputedStyle(node).transitionDuration,
+        background: getComputedStyle(node).backgroundColor,
+      }));
+      expect.soft(pressed.duration).toBe('0s');
+      expect.soft(pressed.background).not.toBe(resting.background);
       await page.mouse.up();
     }
     await jump.evaluate(async (node) => {
@@ -306,28 +316,25 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
       }
     });
     const measurement = JSON.parse((await jump.getAttribute('data-jump-measurement')) ?? '{}') as {
-      elapsed: number;
-      gap: number;
-      opacity: string;
-      duration: string;
+      frames: { t: number; top: number; gap: number; opacity: number }[];
       latestVisible: boolean;
     };
     if (activation === 'click') {
       await evidenceShot(page, `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-100ms.png`);
     }
-    expect(measurement.elapsed).toBeLessThanOrEqual(150);
-    expect.soft(measurement.gap).toBeLessThanOrEqual(2);
-    expect.soft(measurement.latestVisible).toBe(true);
-    expect.soft(measurement.opacity).toBe('0');
-    expect
-      .soft(measurement.duration.split(',').every((value: string) => parseFloat(value) === 0))
-      .toBe(true);
-    expect
-      .soft(
-        transitions.property === 'none' ||
-          transitions.duration.split(',').every((value) => parseFloat(value) === 0),
-      )
-      .toBe(true);
+    await evidenceJson(
+      `${process.env.JUMP_EVIDENCE_PHASE ?? 'after'}-frames-${activation}.json`,
+      measurement.frames,
+    );
+    const landed = measurement.frames.findIndex((frame) => frame.gap <= 2);
+    const hidden = measurement.frames.findIndex((frame) => frame.opacity === 0);
+    expect(landed).toBeGreaterThanOrEqual(0);
+    expect(measurement.frames[landed]?.t).toBeLessThanOrEqual(150);
+    expect(measurement.frames.slice(landed).every((frame) => frame.gap <= 2)).toBe(true);
+    expect(hidden).toBeGreaterThanOrEqual(0);
+    expect(measurement.frames[hidden]?.t).toBeLessThanOrEqual(150);
+    expect(measurement.latestVisible).toBe(true);
+    expect(resting.property === 'none' || resting.duration.split(',').every((v) => parseFloat(v) === 0)).toBe(true);
     await page.waitForTimeout(250);
     await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
     await expect(jump).toHaveAttribute('data-active', 'false');
