@@ -6,7 +6,8 @@ import { compactionWindow, estimateTokens, type ModelRef } from './compaction.js
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
-import type { StepGate } from './tools.js';
+import type { ConversationGate, StepGate } from './tools.js';
+import type { VolatileContext } from './volatile.js';
 
 const STOP_POLL_MS = 1_000;
 
@@ -19,6 +20,9 @@ export interface TurnDeps {
   stopPollMs?: number;
   now: () => number;
   gate?: StepGate;
+  conversationGate?: ConversationGate;
+  volatile?: VolatileContext;
+  volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
 }
 
@@ -91,8 +95,12 @@ export async function runCoordinatorTurn(
   deps.gate?.set(stepId);
   deps.onModel?.({ provider, modelId });
   let stopPoll: ReturnType<typeof setInterval> | undefined;
+  let rootKey: string | null = null;
   try {
     const root = await harness.root(context);
+    rootKey = String(root.id);
+    deps.conversationGate?.set(rootKey, stepId);
+    deps.volatile?.set(rootKey, deps.volatileText ?? null);
     let stopping: Promise<void> | null = null;
     let polling = false;
     stopPoll = setInterval(() => {
@@ -128,6 +136,7 @@ export async function runCoordinatorTurn(
       context,
     );
     const settled = await submission.wait(context);
+    if (settled.entry !== undefined) await api.mapUserEntry?.(stepId, String(settled.entry));
     await watch.stop();
     const turnEntries =
       settled.entry === undefined
@@ -165,6 +174,10 @@ export async function runCoordinatorTurn(
   } finally {
     clearInterval(stopPoll);
     deps.gate?.set(null);
+    if (rootKey !== null) {
+      deps.conversationGate?.set(rootKey, null);
+      deps.volatile?.set(rootKey, null);
+    }
     clearInterval(heartbeat);
   }
 }

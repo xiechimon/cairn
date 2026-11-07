@@ -41,7 +41,7 @@ import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js
 
 export async function machineAsk(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   body: MachineAskBody,
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
@@ -87,7 +87,7 @@ export async function machineAsk(
 
 export async function executeRelayToolCall(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   name: string,
   params: Record<string, unknown>,

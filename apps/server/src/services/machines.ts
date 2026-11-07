@@ -102,7 +102,7 @@ export function ackSteer(
 
 export function fetchStop(
   deps: { db: Db },
-  machine: { id: string },
+  machine: { id: string | null },
   stepId: string,
 ): { discard: boolean | null } {
   const { db } = deps;
@@ -479,7 +479,7 @@ function toStepRecord(r: typeof step.$inferSelect): StepRecord {
   };
 }
 
-export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: string): void {
+export function heartbeatStep(deps: MachineDeps, machineId: string | null, stepId: string): void {
   if (!deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get()) {
     throw new HttpError(410, `step ${stepId} no longer exists`);
   }
@@ -509,7 +509,7 @@ export function reportTool(
 
 export function reportTranscriptDelta(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   text: string,
 ): void {
@@ -531,7 +531,7 @@ export function reportThinkingDelta(
 
 export function reportTranscriptRow(
   deps: MachineDeps,
-  machineId: string,
+  machineId: string | null,
   stepId: string,
   row: TranscriptRow,
 ): void {
