@@ -1,15 +1,10 @@
 import { DEFAULT_NAMED_PROMPTS, REVIEW_GATE_HEAD } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import {
-  agent as agentTable,
-  project as projectTable,
-  step as stepTable,
-  todo as todoTable,
-} from '../src/db/schema.js';
+import { project as projectTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { startBuilds } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, postProject, req, seedRoute } from './helpers.js';
 
 const s = bootServer();
 afterAll(() => s.dispose());
@@ -35,8 +30,6 @@ async function reviewTodo(projectId: string): Promise<{ todoId: string; buildId:
   startBuilds(s.svc, {
     projectId,
     todoIds: [created.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
   });
   setTodoPhase(s.svc, created.id, 'planning');
   setTodoPhase(s.svc, created.id, 'confirm');
@@ -168,17 +161,12 @@ describe('the ship action uses the stored route and prompt', () => {
   });
 
   test('review action swaps the review-gate instruction for the edited Review prompt only when overridden', async () => {
-    const agentId = 'agent-named-prompts';
-    s.db
-      .insert(agentTable)
-      .values({ id: agentId, teamId: s.team.id, displayName: 'Reviewer', status: 'active' })
-      .run();
+    seedRoute(s, 'review');
     const projectId = await postProject(s.app);
 
     const plain = await reviewTodo(projectId);
     const first = await req(s.app, 'POST', `/api/builds/${plain.buildId}/steps`, {
       action: 'review',
-      agentId,
     });
     expect(first.status).toBe(202);
     expect(stepsOf(plain.buildId, 'review')[0]?.prompt ?? '').toContain(REVIEW_GATE_HEAD);
@@ -187,7 +175,6 @@ describe('the ship action uses the stored route and prompt', () => {
     const edited = await reviewTodo(projectId);
     const second = await req(s.app, 'POST', `/api/builds/${edited.buildId}/steps`, {
       action: 'review',
-      agentId,
     });
     expect(second.status).toBe(202);
     const editedPrompt = stepsOf(edited.buildId, 'review')[0]?.prompt ?? '';

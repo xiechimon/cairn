@@ -507,8 +507,6 @@ describe('F7 the existing delete paths succeed with gate rows present', () => {
     const [b] = startBuilds(s.svc, {
       projectId,
       todoIds: [todo.id],
-      assignment: { plan: null, build: null },
-      withPlan: true,
     });
     const buildId = b!.id;
     const stepRow = s.db

@@ -152,27 +152,6 @@ test('files seg + tasks view toggle: hover steps the unselected ink (dark)', asy
   );
 });
 
-test('team layout toggle: segmented face (paper track, white ringed chip)', async ({ page }) => {
-  await themed(page, 'light', '/app/team?scenario=12');
-
-  const bar = page.getByTestId('page-topbar');
-  const group = await bar.getByRole('tablist').evaluate((g) => ({
-    border: getComputedStyle(g).borderTopWidth,
-    groupBg: getComputedStyle(g).backgroundColor,
-  }));
-  expect(group.border).toBe('0px');
-  expect(group.groupBg).toBe(CANVAS_LIGHT);
-  const active = bar.getByRole('tab', { selected: true });
-  expect(await bg(active)).toBe(CARD_LIGHT);
-  expect(await active.evaluate((el) => getComputedStyle(el).boxShadow)).toContain('0px 0px 0px 1px');
-  expect(await active.evaluate((el) => el.getBoundingClientRect().width)).toBe(28);
-
-  const chart = bar.getByRole('tab', { name: 'chart' });
-  expect(await bg(chart)).toBe(CLEAR);
-  await chart.hover();
-  await expect.poll(() => bg(chart)).toBe(CLEAR);
-});
-
 test('chief tabs: hover steps the ink, click swaps the view', async ({ page }) => {
   await themed(page, 'light', '/app?scenario=101');
   const charter = page.getByRole('tab', { name: '章程' });

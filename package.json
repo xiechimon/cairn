@@ -35,7 +35,8 @@
     "pr:check": "node scripts/pr-body-check.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
     "format": "biome format --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "migration-oracle:full": "node scripts/migration-oracle-full.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

@@ -8,7 +8,12 @@ import {
   stepOtelContext,
 } from '@cairn/shared/otel';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { claudeTelemetryEnv, daemonOtelFromEnv, PiStepSpanSink } from '../src/backend/otel.js';
+import {
+  claudeCliEnv,
+  claudeTelemetryEnv,
+  daemonOtelFromEnv,
+  PiStepSpanSink,
+} from '../src/backend/otel.js';
 
 const env = {
   CAIRN_OTEL_ENDPOINT: 'http://pk:sk@127.0.0.1:3000/api/public/otel',
@@ -38,6 +43,38 @@ describe('daemonOtelFromEnv', () => {
       OtlpTargetConfigError,
     );
   });
+});
+
+test('Claude child environment keeps its telemetry scrub and unrelated variables', () => {
+  const source = {
+    ...env,
+    CAIRN_OTEL_ENVIRONMENT: 'production',
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
+    OTEL_SDK_DISABLED: 'false',
+    ANT_OTEL_ENDPOINT: 'http://127.0.0.1:9',
+    BETA_TRACING_ENDPOINT: 'http://127.0.0.1:9',
+    ENABLE_BETA_TRACING_DETAILED: '1',
+    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
+    PATH: '/usr/bin',
+    HOME: '/synthetic/home',
+    FOO: 'bar',
+    TRACEPARENT: 'existing-traceparent',
+    UNSET: undefined,
+  };
+  expect(claudeCliEnv(source)).toEqual({
+    PATH: '/usr/bin',
+    HOME: '/synthetic/home',
+    FOO: 'bar',
+    TRACEPARENT: 'existing-traceparent',
+    CLAUDE_CODE_ENABLE_TELEMETRY: '0',
+    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
+    OTEL_SDK_DISABLED: 'true',
+    ENABLE_BETA_TRACING_DETAILED: '0',
+    BETA_TRACING_ENDPOINT: '',
+  });
+  expect(source.CAIRN_OTEL_ENDPOINT).toBe(env.CAIRN_OTEL_ENDPOINT);
+  expect(source.OTEL_SDK_DISABLED).toBe('false');
 });
 
 describe('claudeTelemetryEnv', () => {

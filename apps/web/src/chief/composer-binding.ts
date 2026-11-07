@@ -1,6 +1,7 @@
 export interface ComposerBinding {
   draft: string;
   setDraft?: (value: string) => void;
+  readDraft?: () => string;
 }
 
 export interface KeyedDraftStore {

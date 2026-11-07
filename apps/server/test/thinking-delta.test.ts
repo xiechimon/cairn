@@ -1,8 +1,14 @@
 import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agent as agentTable, provider as providerTable } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, openConvStream, postProject } from './helpers.js';
+import { provider as providerTable } from '../src/db/schema.js';
+import {
+  bootServer,
+  issueApiKey,
+  openConvStream,
+  postProject,
+  seedSessionRoute,
+} from './helpers.js';
 
 const MARKER = 'REASONING-MARKER-1308';
 
@@ -45,33 +51,19 @@ async function world() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: 'agent-1308',
-      teamId: s.team.id,
-      displayName: 'probe',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: apiKey,
     body: { teamId: s.team.id, name: 'm-1308', cliVersion: '0.1.0' },
   });
   const { token } = (await enrollRes.json()) as { token: string };
-  bindAllAgents(s);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '1308', spec: 'thinking stream' },
   });
   const { id: todoId } = (await todoRes.json()) as { id: string };
   const buildRes = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: 'agent-1308' }, build: { agentId: 'agent-1308' } },
-      withPlan: false,
-    },
+    body: { todoIds: [todoId] },
   });
   expect(buildRes.status).toBe(201);
   const { builds } = (await buildRes.json()) as { builds: { id: string }[] };

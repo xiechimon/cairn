@@ -1,11 +1,8 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { type agent, provider, routingRule, team } from '../db/schema.js';
+import { provider, routingRule, team } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
-import { applyRoute } from './routing-rules.js';
-
-type AgentRow = typeof agent.$inferSelect;
 
 export type CoordinatorRouteFallback =
   | 'no-api-key-provider'
@@ -116,8 +113,4 @@ export function coordinatorRoute(db: Db, teamId: string) {
     return fallback(teamId, 'paid-claude-not-allowed');
   }
   return rule;
-}
-
-export function routedChiefAgent(db: Db, teamId: string, agentRow: AgentRow): AgentRow {
-  return applyRoute(agentRow, coordinatorRoute(db, teamId));
 }

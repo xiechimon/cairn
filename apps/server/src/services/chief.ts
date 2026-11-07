@@ -19,20 +19,19 @@ import {
   CHIEF_DIGEST_GROUP_LABELS,
   CHIEF_DIGEST_ROW_ID_PREFIX,
   CHIEF_WATCH_REASON_DISPATCH,
+  COORDINATOR_GITHUB_OVERLAP_RULE,
   COORDINATOR_NOT_READY,
   chiefDigestContentSchema,
   chiefDigestThreadId,
   chiefIdFormat,
   chiefTurnErrorContentSchema,
   fenceIssueText,
-  GITHUB_OVERLAP_RULE,
   ISSUE_FENCE_OPEN,
   isBackendRuntimeId,
   isChiefDigestThreadId,
   isIssueSourcedTask,
   newChiefThreadId,
   orchestratedTodoIdOf,
-  PLAN_PRIOR_ART_RULE,
   redactSecrets,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
@@ -52,13 +51,11 @@ import {
 } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agent,
   build,
   chief,
   chiefMessage,
   chiefThread,
   machine,
-  plan,
   project,
   step,
   todo,
@@ -89,7 +86,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemories } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
-import { chiefRemoteTools, routingRulesEnabled } from './routing-rules.js';
+import { chiefRemoteTools, coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo } from './todos.js';
@@ -123,7 +120,6 @@ export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
       id,
       userId: deps.user.id,
       teamId,
-      agentId: null,
       charter: '',
       watches: [],
       wakes: [],
@@ -137,12 +133,12 @@ export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
   return row;
 }
 
-function toChiefRecord(row: ChiefRow): ChiefGetResponse['chief'] {
+function toChiefRecord(row: ChiefRow, profile: RouteProfile | null): ChiefGetResponse['chief'] {
   return {
     id: row.id,
     userId: row.userId,
     teamId: row.teamId,
-    agent: row.agentId !== null ? { agentId: row.agentId } : null,
+    agent: profile !== null ? { agentId: profile.id } : null,
     charter: row.charter,
     lastTurnAt: row.lastTurnAt,
     createdAt: row.createdAt,
@@ -150,13 +146,13 @@ function toChiefRecord(row: ChiefRow): ChiefGetResponse['chief'] {
   };
 }
 
-export function agentRecordOfRow(row: typeof agent.$inferSelect): AgentRecord {
+export function coordinatorRecordOf(row: RouteProfile): AgentRecord {
   return {
     id: row.id,
     displayName: row.displayName,
     description: row.description,
     status: 'active',
-    avatarUrl: row.avatarUrl,
+    avatarUrl: null,
     provider: row.provider,
     modelId: row.modelId,
     thinkingLevel: row.thinkingLevel,
@@ -215,11 +211,7 @@ function chiefRuntimeGatePasses(
   return machineRow.enabledRuntimes.includes(runtime);
 }
 
-function chiefOrchestration(
-  deps: ChiefDeps,
-  teamId: string,
-  row: ChiefRow,
-): ChiefGetResponse['orchestration'] {
+function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['orchestration'] {
   const steps = deps.db
     .select({ machineId: step.machineId, status: step.status })
     .from(step)
@@ -232,9 +224,7 @@ function chiefOrchestration(
       ),
     )
     .all();
-  const agentRow = row.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, row.agentId)).get()
-    : undefined;
+  const agentRow = coordinatorProfile(deps.db, teamId);
   const counts = new Map<string, { running: number; waiting: number }>();
   const bump = (machineId: string): { running: number; waiting: number } => {
     let entry = counts.get(machineId);
@@ -268,16 +258,14 @@ function chiefOrchestration(
 
 export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
-  const agentRow = row.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, row.agentId)).get()
-    : undefined;
+  const agentRow = coordinatorProfile(deps.db, teamId);
   return {
-    chief: toChiefRecord(row),
-    agentActor: agentRow ? agentRecordOfRow(agentRow) : null,
+    chief: toChiefRecord(row, agentRow),
+    agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
     context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row) : chiefContext(deps, row.id),
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
-    orchestration: chiefOrchestration(deps, teamId, row),
+    orchestration: chiefOrchestration(deps, teamId),
     outage: chiefOutage(deps.db, row.id),
   };
 }
@@ -290,17 +278,10 @@ export function patchChief(
   const row = ensureChief(deps, teamId);
   const sets: Partial<ChiefRow> = {};
   if (body.agent !== undefined) {
-    if (body.agent === null) {
-      sets.agentId = null;
-    } else {
-      const agentRow = deps.db
-        .select()
-        .from(agent)
-        .where(and(eq(agent.id, body.agent.agentId), eq(agent.teamId, teamId)))
-        .get();
-      if (!agentRow) throw new HttpError(404, `agent ${body.agent.agentId}`);
-      sets.agentId = agentRow.id;
-    }
+    throw new HttpError(
+      410,
+      'Binding the Coordinator to an agent was removed under D60. Set the coordinator routing rule instead (PATCH /api/teams/:id/routing-rules/coordinator).',
+    );
   }
   if (body.charter !== undefined) sets.charter = body.charter ?? '';
   if (Object.keys(sets).length > 0) {
@@ -467,15 +448,22 @@ export function getChiefThread(deps: { db: Db }, threadId: string): ThreadRow | 
   return deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
 }
 
-function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
-  if (row.agentId === null) {
-    throw new HttpError(409, 'chief agent not bound', COORDINATOR_NOT_READY);
+function requireCoordinatorRule(deps: ChiefDeps, teamId: string): RouteProfile {
+  const profile = coordinatorProfile(deps.db, teamId);
+  if (profile === null) {
+    throw new HttpError(
+      409,
+      'no coordinator routing rule (set one in routing settings: PATCH /api/teams/:id/routing-rules/coordinator)',
+      COORDINATOR_NOT_READY,
+    );
   }
-  const agentRow = deps.db.select().from(agent).where(eq(agent.id, row.agentId)).get();
-  if (!agentRow?.modelId) {
-    throw new HttpError(409, 'chief agent has no model configured', COORDINATOR_NOT_READY);
-  }
-  return agentRow;
+  if (!profile.modelId)
+    throw new HttpError(
+      409,
+      'coordinator routing rule has no model configured',
+      COORDINATOR_NOT_READY,
+    );
+  return profile;
 }
 
 function chiefRowOf(deps: ChiefDeps, teamId: string): ChiefRow | undefined {
@@ -490,17 +478,9 @@ export function chiefBinding(
   deps: ChiefDeps,
   teamId: string,
 ): { agentId: string | null; canOrchestrate: boolean } {
-  const row = chiefRowOf(deps, teamId);
-  if (row === undefined || row.agentId === null) return { agentId: null, canOrchestrate: false };
-  try {
-    requireBoundAgent(deps, row);
-    return { agentId: row.agentId, canOrchestrate: true };
-  } catch (err) {
-    if (err instanceof HttpError && err.status === 409) {
-      return { agentId: row.agentId, canOrchestrate: false };
-    }
-    throw err;
-  }
+  const profile = coordinatorProfile(deps.db, teamId);
+  if (profile === null) return { agentId: null, canOrchestrate: false };
+  return { agentId: profile.id, canOrchestrate: !!profile.modelId };
 }
 
 function pickedProjectOf(
@@ -669,7 +649,7 @@ export function submitChiefMessage(
   const chiefRow = ensureChief(deps, teamId);
   const replay = replayedChiefSend(deps, teamId, chiefRow, body);
   if (replay !== undefined) return { result: replay, replayed: true };
-  requireBoundAgent(deps, chiefRow);
+  requireCoordinatorRule(deps, teamId);
   const picked = pickedProjectOf(deps.db, teamId, body.projectId);
   if (body.projectId != null && picked === null) {
     throw new HttpError(400, `project ${body.projectId} not in team`);
@@ -789,7 +769,7 @@ export function answerChiefQuestion(
   const threadRow = getChiefThread(deps, input.threadId);
   if (!threadRow) throw new HttpError(404, `chief thread ${input.threadId}`);
   requireWritableThread(threadRow);
-  requireBoundAgent(deps, ensureChief(deps, teamId));
+  requireCoordinatorRule(deps, teamId);
   const projectId = waiting?.projectId ?? null;
   if (projectId !== null) requireUnarchivedProject(deps.db, projectId);
   return deps.db.transaction(() => {
@@ -1070,7 +1050,7 @@ export function postThreadReport(
 
 export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: Phase): void {
   if (to !== 'confirm' && to !== 'review' && to !== 'done' && to !== 'failed') return;
-  if (routingRulesEnabled() && to !== 'confirm') {
+  if (to !== 'confirm') {
     const teamChiefs = deps.db
       .select()
       .from(chief)
@@ -1090,10 +1070,6 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
     const buildRow = buildId
       ? deps.db.select().from(build).where(eq(build.id, buildId)).get()
       : undefined;
-    const isSplitParent =
-      kind === 'gate' &&
-      deps.db.select({ id: todo.id }).from(todo).where(eq(todo.sourceTodo, todoRecord.id)).all()
-        .length > 0;
     for (const watch of watches) {
       if (!getChiefThread(deps, watch.threadId)) {
         removeChiefWatches(deps, todoRecord.teamId, [todoRecord.id]);
@@ -1104,18 +1080,9 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
         insertThreadReport(deps, watch.threadId, todoRecord, to, { wakeStepId });
       }
       if (kind === 'gate') {
-        enqueueGateWake(
-          deps,
-          watch.threadId,
-          { ...todoRecord, phase: to },
-          isSplitParent,
-          false,
-          wakeStepId,
-        );
+        enqueueGateWake(deps, watch.threadId, { ...todoRecord, phase: to }, false, wakeStepId);
       } else {
-        const facts = wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null, {
-          isSplitParent,
-        });
+        const facts = wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null);
         enqueueChiefStep(deps, watch.threadId, {
           id: wakeStepId,
           prompt: facts,
@@ -1135,21 +1102,10 @@ function enqueueGateWake(
   deps: ChiefDeps,
   threadId: string,
   record: TodoRecord,
-  isSplitParent: boolean,
   retry: boolean,
   id = newRecordId(),
 ): void {
-  const latestPlan =
-    record.latestBuildId && record.phase === 'confirm'
-      ? deps.db
-          .select()
-          .from(plan)
-          .where(eq(plan.buildId, record.latestBuildId))
-          .orderBy(desc(plan.version))
-          .limit(1)
-          .get()
-      : undefined;
-  const facts = wakeFacts('gate', record, null, { isSplitParent, planText: latestPlan?.content });
+  const facts = wakeFacts('gate', record, null);
   const metadata = `Gate todo=${encodeURIComponent(record.id)} build=${encodeURIComponent(record.latestBuildId ?? '')} phase=${record.phase} attempt=${retry ? 1 : 0}`;
   enqueueChiefStep(deps, threadId, {
     id,
@@ -1178,14 +1134,7 @@ export function recoverGateWake(deps: ChiefDeps, failedStep: typeof step.$inferS
   )
     return;
   if (match[4] === '0') {
-    const isSplitParent =
-      deps.db
-        .select({ id: todo.id })
-        .from(todo)
-        .where(eq(todo.sourceTodo, record.id))
-        .limit(1)
-        .get() !== undefined;
-    enqueueGateWake(deps, thread.id, record, isSplitParent, true);
+    enqueueGateWake(deps, thread.id, record, true);
     return;
   }
   if (record.latestBuildId)
@@ -1201,13 +1150,12 @@ export function wakeFacts(
   kind: ChiefWakeKind,
   todo: TodoRecord,
   errorMessage: string | null,
-  context?: { isSplitParent?: boolean; planText?: string },
 ): string {
   if (!isIssueSourcedTask(todo)) {
-    return wakeFactText(kind, todo, `#${todo.seqNum}「${todo.title}」`, errorMessage, context);
+    return wakeFactText(kind, todo, `#${todo.seqNum}「${todo.title}」`, errorMessage);
   }
   const ref = `#${todo.seqNum}（标题出自 GitHub issue，原文在下方围栏里）`;
-  const facts = wakeFactText(kind, todo, ref, errorMessage, context);
+  const facts = wakeFactText(kind, todo, ref, errorMessage);
   return `${facts}\n${fenceIssueText(todo.sourceRef, todo.title)}`;
 }
 
@@ -1216,44 +1164,10 @@ function wakeFactText(
   todo: TodoRecord,
   ref: string,
   errorMessage: string | null,
-  context?: { isSplitParent?: boolean; planText?: string },
 ): string {
   switch (kind) {
     case 'gate': {
-      if (routingRulesEnabled()) {
-        return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;
-      }
-      if (todo.phase === 'review') {
-        return [
-          `任务 ${ref} 停驻在 review 关口：Evaluate merge readiness under the project's mergePolicy.`,
-          'This is not a confirm gate; do not call confirm_builds. Under autonomous, you may request a merge only through the merge-readiness gate (ADR 0026).',
-          'Read this build conversation for CI, verification, and review results. Message the user only when a blocker needs them (ask_user or notify_user); otherwise end the turn. Projects that explicitly choose human still require the user to click the review gate completion button.',
-          '本轮还没有审核结论时，可以调 run_review 发起一次独立审核。',
-        ].join('');
-      }
-      const text = context?.planText;
-      const planText =
-        text === undefined || text.trim() === ''
-          ? '\nPlan unavailable. Do not auto-confirm; ask the user to review this gate.'
-          : `\nLatest build plan:\n${text.slice(0, 40000)}${text.length > 40000 ? '\n[Plan truncated at 40000 characters. Do not auto-confirm; ask the user to review the full plan.]' : ''}`;
-      const isSplit = context?.isSplitParent === true;
-      if (isSplit) {
-        return (
-          [
-            `任务 ${ref} 停驻在 ${todo.phase} 关口。`,
-            '本卡是 split_todo 父卡——拆解方案必须人审，不自动过闸。用 ask_user 把拆解方案交给用户确认，用户确认后才调 confirm_builds。',
-          ].join('') + planText
-        );
-      }
-      return (
-        [
-          `任务 ${ref} 停驻在 ${todo.phase} 关口。自动确认规则：`,
-          '先读下附方案，判以下三档——',
-          '1. 用户驳回后的重新规划（revision）→ 不调 confirm_builds，用 ask_user 请用户就新方案表态；',
-          '2. 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点，不自动过闸；',
-          '3. 方案与票面一致、无分叉 → 直接调 confirm_builds 过闸进 building（闸宣告行自动落审计记录），不用告诉用户。',
-        ].join('') + planText
-      );
+      return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;
     }
     case 'settle':
       return `任务 ${ref} 已合并完成（done）。对话里已记下这条，不用再告诉用户；该任务的关注已自动解除。`;
@@ -1261,7 +1175,6 @@ function wakeFactText(
       return `任务 ${ref} 运行失败${errorMessage ? `：${errorMessage}` : ''}。请先调用 machines 等工具核实环境；需要用户决定或动手时，用 ask_user 或 notify_user 做法证式说明（失败原因/定性/工作保全位置/环境建议），否则不发消息。`;
   }
 }
-
 export function setChiefWake(
   deps: ChiefDeps,
   teamId: string,
@@ -1390,17 +1303,13 @@ export function buildChiefSystemPrompt(
   teamId: string,
   threadId?: string,
 ): ChiefSystemPrompt {
-  const router = routingRulesEnabled();
   const chiefRow = ensureChief(deps, teamId);
-  const agentRow = chiefRow.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-    : undefined;
+  const coordinator = coordinatorProfile(deps.db, teamId);
   const projects = deps.db.select().from(project).where(eq(project.teamId, teamId)).all();
-  const agents = router ? [] : deps.db.select().from(agent).where(eq(agent.teamId, teamId)).all();
   const skills = scanLocalSkills(deps.skillsDir);
-  const memories = agentRow
+  const memories = coordinator
     ? injectMemories(deps.db, {
-        agentId: agentRow.id,
+        agentId: coordinator.id,
         teamId,
         threadId: threadId ?? undefined,
         projectId: null,
@@ -1432,49 +1341,24 @@ export function buildChiefSystemPrompt(
     }
   }
   const staticLines: string[] = [
-    router
-      ? '你是「Coordinator」——每「用户×团队」一个的路由与对话代理：理解用户请求、创建任务、用 open_thread 把任务交给一条 thread，并从 thread 状态回答用户。你不写方案、不选 Agent、不亲自做事；plan、测试、实现、自检都由 thread 自己完成。'
-      : '你是「Coordinator」——每「用户×团队」一个的调度与对话代理：理解用户请求、创建任务、分派给合适的 Agent 执行，并在关口/落地/失败时跟进汇报。',
+    '你是「Coordinator」——每「用户×团队」一个的路由与对话代理：理解用户请求、创建任务、用 open_thread 把任务交给一条 thread，并从 thread 状态回答用户。你不写方案、不选模型、不亲自做事；plan、测试、实现、自检都由 thread 自己完成。',
     '',
     '## 章程（常设指示）',
     chiefRow.charter !== '' ? chiefRow.charter : '（尚无章程）',
     '',
     '## 工作约定',
-    GITHUB_OVERLAP_RULE,
+    COORDINATOR_GITHUB_OVERLAP_RULE,
     '- 措辞→spec：把用户口语请求变换为 todo——title = 动词短语提炼；spec = 三段式：① 用户原文 blockquote（`> …`）② `要求：` bullet 展开（文件位置/内容要点/读者对象）③ 需要时 `补充信息（探测得出，非用户确认）：` bullet（先探测仓库/资源再写事实，显式标注非用户确认）。',
     '- 拆分：拆分粒度 = 核销次数——按可独立验收的成果拆，不按执行步骤拆；同类小事项合并一张卡（多子事项以 ` + ` 并入标题），跨类型、可各自独立验收的交付物才拆成多张。子卡 spec 必须内嵌用户原文片段（`> …` blockquote）并给兄弟任务文字交叉引用。',
-    ...(router
-      ? ROUTER_DISPATCH_LINES
-      : [
-          '- 编排回合（开始任务入口，消息形「开始任务 #n」+ 编排请求行）：先规划再派发——单一工作单元：直接 run_builds 派该任务（assignment 按职责文本选）；确含多个可独立验收的交付物：create_todo 拆子卡 + run_builds 逐个派发 + close_todos 关掉原卡（看板不留父卡），回执列全部子卡实体引用。',
-          '- 派发判定（逐次派发自行判断，无团队设置槽，ADR 0014）：先规划还是直接修，由你自己判。判断纪律：当信息会实质改变结果、执行方式、权限或安全时才问；否则自己决定，并说出你决定了什么。可判信号（非硬规则）：有可复现步骤或失败测试的缺陷 → 直接修（run_builds 传 withPlan=false）；引入新能力、或改动跨包 → 先问（问 = ask_user 结构化提问：本回合会挂起等用户在问答卡上作答，一次可带最多 4 问；判不准且不便当面问时也可传 withPlan=true 先规划，方案停在确认关口，用户批准或打回即表态）；判不准 → 先规划（withPlan 缺省即先规划）。直接修只跳过方案确认闸，审阅关口恒在——完成后仍停在审阅关口等用户审。',
-          `- ${PLAN_PRIOR_ART_RULE}`,
-          '- 派发回执：每次派发把判定理由写进 run_builds 的 dispatchReason 参数（随调用落 transcript，判定可审计），并在给用户的回执里写明「我判为直接修 / 先规划，因为 X」。用户可就地一句话推翻该判定——推翻只影响这一次派发（已开跑的先 cancel_builds 取消，再按相反模式重派），不外推为常设偏好。',
-        ]),
+    ...ROUTER_DISPATCH_LINES,
     '- 项目归属：create_todo 前先定 projectId。用户消息以「【输入框选定项目：X（id: …）】」起头时，本回合新建的任务都放 X，不再调查也不问，回执里说「放在 X（你选的）」。用户点名项目就用它；没点名时先查再定——对照 projects 的 name/description，必要时用 docs 读候选项目的文件、用 todos 看各项目已有任务，按证据选一个，并在回执里说「放在 X，因为 Y」。查完仍然分不出时才 ask_user，问题里只列仍然分不出的候选，不列已排除的项目，选项最后加一个「都不是」，本回合不建任务。一句话涉及多个项目时，每个项目一张 todo，spec 里写明彼此关系与先后顺序。只是提问、没要求改动时只回答，不建任务。',
     '- 换项目：用户说任务放错了项目时，还没开始的任务用 update_todo 传 projectId 挪过去（标签会清掉）；已经开始的任务不能挪，告诉用户可以关掉它，再在正确的项目里新建。',
-    ...(router
-      ? []
-      : [
-          '- 分派：读 agents 的职责文本按权重选择；归属按交付物与改动范围区分——面向读者的文档产出（README/手册/教程/变更日志）归文档职责 Agent；后端功能、缺陷、重构与性能归后端职责 Agent；Web 界面布局、样式与交互归前端职责 Agent；CI 流水线、构建打包、依赖与部署配置归运维职责 Agent。归属拿不准时先 ask_user 澄清，不猜。run_builds 传 assignment.build.agentId。',
-          '- 交付物优先于路径：归属看交付物，不看请求里出现的路径或技术词——要更新的是 README 就归文档职责，哪怕那个 README 躺在 apps/web 下。',
-          '- 主任务定归属：一句请求含多个同类子项时按主任务定归属，不拆成多个 todo，次任务随主任务交给同一个 Agent。',
-          '- 症状按改动范围定：同一个用户可见症状可能归不同职责，看要改的代码在哪——接口返回错归后端，界面上点不到归前端。',
-          '- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明需要用户决定时会来问。',
-        ]),
     '- ADR 0026: mergePolicy defaults to autonomous. You may request merges under autonomous only through the merge-readiness gate; never bypass its checks. Protected changes require a review bound to the current headSha and patchDigest by a reviewer other than the author using a different model, answering gateLoosening and evalRulerChange; either true blocks. Explicit human policies still require the user to merge in the Web UI.',
     '- wake 轮（提示以 [wake:…] 起头，由事件而不是用户触发）默认安静：你在这一轮写的普通文字不会送到用户面前。只有需要用户知道或决定时，才调 notify_user 或 ask_user，并把提示首行 provenance= 后面的值原样填进 provenance 参数；不需要用户时什么都不发，直接结束本轮。failed wake 先调 machines 等工具核实环境，需要用户时再做法证式说明（失败原因/定性/工作保全位置/环境建议）。',
     '- ask_user 选项：把你推荐的那个选项设 recommended: true（卡片会把它放第一个并标「推荐」）；卡片自带「用我自己的话回答」，不用再加「其他」选项。',
-    ...(router
-      ? []
-      : [
-          '- confirm 关口自动确认（#1254）：plan 就绪后默认自动过闸——读 wake 附带的最新方案（方案缺失或被截断时停驻请人审），若与票面一致且无分叉（非 revision、非 split_todo 父卡），直接调 confirm_builds 进 building（闸宣告行自动落审计记录），不用告诉用户。仅以下情况停驻等人，并用 ask_user 交给用户：① 本卡是 split_todo 父卡（拆解方案必须人审）→ 请用户确认拆解方案；② 用户驳回后的重新规划（revision）→ 请用户就新方案表态，不自动过闸；③ 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 逐项列决策点。',
-        ]),
-    '- 正文内联实体引用用自定义 URI markdown：[名](agent:<id>)、[#n](todo:<id>)。',
+    '- 正文内联实体引用用自定义 URI markdown：[#n](todo:<id>)。',
     '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。',
-    router
-      ? '- 对话续接：create_todo 前先查同类进行中的 todo（threads）；若存在，用 message_thread 把新信息发给那条 thread，不重复 create_todo。'
-      : '- 对话续接：create_todo 前先查同类进行中的 todo；若存在，用 message_todo 追加到运行中的 todo，不重复 create_todo。',
+    '- 对话续接：create_todo 前先查同类进行中的 todo（threads）；若存在，用 message_thread 把新信息发给那条 thread，不重复 create_todo。',
     '- 状态问答：回答进度/合并/运行状态前必须先调 todos、pull_requests、workflow_runs 或 machines 取当前状态，不凭记忆回答。',
     '- 对话摘要：摘要只记对话，任务状态以工具查到的为准，两者对不上时信任务状态。用户问起以前的决定时，先从摘要里找，再用 todos 查任务现状，只回答，不建任务。',
     '- 回复简短：用用户语言、白话短句回复；没有新信息时不要回复。',
@@ -1487,9 +1371,9 @@ export function buildChiefSystemPrompt(
   ];
   const teamLines: string[] = [
     '## 你的运行位',
-    agentRow
-      ? `绑定 Agent：${agentRow.displayName}（${agentRow.provider ?? 'n/a'}/${agentRow.modelId ?? 'n/a'}）。职责：${agentRow.description ?? '未设置职责'}`
-      : '未绑定 Agent。',
+    coordinator
+      ? `路由规则 coordinator：${coordinator.provider ?? 'n/a'}/${coordinator.modelId ?? 'n/a'}。`
+      : '团队还没有 coordinator 路由规则。',
     '',
     '## 团队资源清单',
     `projects: ${JSON.stringify(
@@ -1501,21 +1385,10 @@ export function buildChiefSystemPrompt(
         ...(p.githubRepo !== null ? { githubRepo: p.githubRepo } : {}),
       })),
     )}`,
-    ...(router
-      ? routerStateLines(deps.db, teamId)
-      : [
-          agents.length > 0
-            ? `agents:\n${agents
-                .map(
-                  (a) =>
-                    `- ${a.displayName}（id: ${a.id}，模型: ${a.modelId ?? 'n/a'}）：${a.description ?? '未设置职责'}`,
-                )
-                .join('\n')}`
-            : 'agents: （无）',
-        ]),
+    ...routerStateLines(deps.db, teamId),
     `skills: ${JSON.stringify(skills.map((s) => ({ id: s.id, name: s.name, description: s.description })))}`,
     '',
-    '## 记忆（与绑定 Agent 共用同一份存储）',
+    '## 记忆（团队共用同一份存储）',
     memories.length > 0
       ? memories.map((m) => `- ${m.title}：${m.content}`).join('\n')
       : '（尚无记忆）',
@@ -1665,14 +1538,12 @@ export function notifyChiefTurn(
   const text = last ? extractText(last.content) : null;
   if (text === null || text === '') return;
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-  const agentRow = chiefRow?.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-    : undefined;
+  const agentRow = chiefRow ? coordinatorProfile(deps.db, chiefRow.teamId) : null;
   notifyChiefMessage(deps, {
     threadId,
     message: text,
     agent: agentRow
-      ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
+      ? { name: agentRow.displayName, avatarUrl: null }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
   });
 }

@@ -6,7 +6,6 @@ import {
   MACHINE_ENDPOINTS,
   MACHINE_WIRE,
   MACHINE_WIRE_EXTENSIONS,
-  MERGE_ANNOUNCEMENT,
   machineClaimResponseSchema,
   machineEnrollResponseSchema,
   machineOkResponseSchema,
@@ -22,7 +21,6 @@ import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -32,10 +30,12 @@ import {
   tokenUsage,
 } from '../src/db/schema.js';
 import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   postProject,
+  seedPolicy,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
 
@@ -60,8 +60,6 @@ async function call(
   );
 }
 
-const AGENT_ID = 'agent-stub-1';
-
 interface World {
   s: TestServer;
   apiKey: string;
@@ -69,6 +67,7 @@ interface World {
   machineId: string;
   projectId: string;
   todoId: string;
+  sessionRouteId: string;
   startBuild(withPlan?: boolean): Promise<{ buildId: string }>;
   claim(): Promise<{ res: Response; body: { step: ClaimedStep | null } }>;
 }
@@ -99,22 +98,12 @@ async function setupWorld(
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'stub-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
+  const sessionRouteId = seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key.plain,
     body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s);
   expect(enrollRes.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollRes.json());
   const projectId = await postProject(s.app);
@@ -129,13 +118,11 @@ async function setupWorld(
     machineId: machineJson.machineId,
     projectId,
     todoId: todoBody.id,
+    sessionRouteId,
     async startBuild(withPlan = true) {
+      if (withPlan) return { buildId: startLegacyBuild(s, todoBody.id, { withPlan: true }) };
       const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: {
-          todoIds: [todoBody.id],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-          withPlan,
-        },
+        body: { todoIds: [todoBody.id] },
       });
       expect(res.status).toBe(201);
       const body = (await res.json()) as { builds: { id: string }[] };
@@ -401,7 +388,7 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     expect(claimed.session).toEqual({ action: 'new', sessionId: null });
     expect(claimed.todo).toMatchObject({ id: w.todoId, seqNum: 1, title: '探针任务' });
     expect(claimed.agent).toMatchObject({
-      id: AGENT_ID,
+      id: w.sessionRouteId,
       provider: 'stub-gw',
       modelId: 'stub-model',
     });
@@ -548,11 +535,6 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     });
     expect(todoNow().phase).toBe('review');
 
-    w.s.db
-      .update(agentTable)
-      .set({ tools: ['合并分支', '推送分支'] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
     const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     expect(mergeRes.status).toBe(202);
     expect(await mergeRes.json()).toEqual({ delegated: true });
@@ -652,11 +634,7 @@ describe('claim payload: agent.skillsAllowlist grant + defaultSkill carried (#11
     skillsAllowlist?: string[] | null;
   }): Promise<ClaimedStep | null> {
     const w = await setupWorld({ claimHoldMs: 200 });
-    w.s.db
-      .update(agentTable)
-      .set({ ...opts })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
+    seedPolicy(w.s, 'session', opts);
     await w.startBuild(false);
     const { body } = await w.claim();
     const step = body.step ? claimedStepSchema.parse(body.step) : null;
@@ -696,7 +674,7 @@ describe('claim payload: agent.skillsAllowlist grant + defaultSkill carried (#11
 describe('claim payload: agent.tools permission switch set passthrough (XMON-77)', () => {
   async function claimWithTools(tools: string[]): Promise<ClaimedStep | null> {
     const w = await setupWorld({ claimHoldMs: 200 });
-    w.s.db.update(agentTable).set({ tools }).where(eq(agentTable.id, AGENT_ID)).run();
+    seedPolicy(w.s, 'session', { tools });
     await w.startBuild(false);
     const { body } = await w.claim();
     const step = body.step ? claimedStepSchema.parse(body.step) : null;
@@ -714,104 +692,5 @@ describe('claim payload: agent.tools permission switch set passthrough (XMON-77)
     const step = await claimWithTools([]);
     expect(step).not.toBeNull();
     expect(step!.agent?.tools).toEqual([]);
-  });
-});
-
-describe('merge permission gate: requestMerge validates the build-slot Agent two switches (XMON-77)', () => {
-  async function reachReview(): Promise<World> {
-    const w = await setupWorld({ claimHoldMs: 200 });
-    const cred = { cred: w.token };
-    const { buildId } = await w.startBuild(true);
-    const { body: claim1 } = await w.claim();
-    const step1 = claimedStepSchema.parse(claim1.step);
-    const planUrls = await call(w.s.app, 'POST', `/api/machine/upload-urls/${step1.step.id}`, {
-      ...cred,
-      body: { files: [{ name: PLAN_FILE_NAME }] },
-    });
-    const planUpload = machineUploadUrlsResponseSchema.parse(await planUrls.json()).uploads[0]!;
-    await call(w.s.app, 'PUT', planUpload.url.replace(/^https?:\/\/[^/]+/, ''), {
-      ...cred,
-      text: withVerification('# 方案\n'),
-      contentType: 'text/markdown',
-    });
-    await call(w.s.app, 'POST', `/api/machine/done/${step1.step.id}`, {
-      ...cred,
-      body: { status: 'success', sessionId: 'pi-session-1' },
-    });
-    await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
-    const { body: claim2 } = await w.claim();
-    const step2 = claimedStepSchema.parse(claim2.step);
-    await call(w.s.app, 'POST', `/api/machine/done/${step2.step.id}`, {
-      ...cred,
-      body: { status: 'success', sessionId: 'pi-session-1', hasChanges: true },
-    });
-    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!.phase).toBe(
-      'review',
-    );
-    return w;
-  }
-
-  test('all-off agent (default []) -> 403 naming both switches; no merge step/no timeline row/phase stays review', async () => {
-    const w = await reachReview();
-    const buildId = w.s.db
-      .select()
-      .from(buildTable)
-      .where(eq(buildTable.todoId, w.todoId))
-      .get()!.id;
-    const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
-    expect(mergeRes.status).toBe(403);
-    const errBody = (await mergeRes.json()) as { error: string };
-    expect(Object.keys(errBody)).toEqual(['error']);
-    expect(errBody.error).toContain('合并分支');
-    expect(errBody.error).toContain('推送分支');
-    const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
-    expect(steps.every((s) => s.kind !== 'merge')).toBe(true);
-    const msgRows = w.s.db
-      .select()
-      .from(messageTable)
-      .where(eq(messageTable.conversationId, buildId))
-      .all();
-    expect(msgRows.map((m) => m.content)).not.toContain(MERGE_ANNOUNCEMENT);
-    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!.phase).toBe(
-      'review',
-    );
-    w.s.dispose();
-  });
-
-  test('only holding merge branch (missing push) -> 403 naming only push branch (landing requires push first)', async () => {
-    const w = await reachReview();
-    w.s.db
-      .update(agentTable)
-      .set({ tools: ['合并分支'] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
-    const buildId = w.s.db
-      .select()
-      .from(buildTable)
-      .where(eq(buildTable.todoId, w.todoId))
-      .get()!.id;
-    const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
-    expect(mergeRes.status).toBe(403);
-    const errBody = (await mergeRes.json()) as { error: string };
-    expect(errBody.error).toContain('推送分支');
-    w.s.dispose();
-  });
-
-  test('both switches on -> 202 delegated (positive path pinned in the main-timeline full-chain test)', async () => {
-    const w = await reachReview();
-    w.s.db
-      .update(agentTable)
-      .set({ tools: ['合并分支', '推送分支'] })
-      .where(eq(agentTable.id, AGENT_ID))
-      .run();
-    const buildId = w.s.db
-      .select()
-      .from(buildTable)
-      .where(eq(buildTable.todoId, w.todoId))
-      .get()!.id;
-    const mergeRes = await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
-    expect(mergeRes.status).toBe(202);
-    expect(await mergeRes.json()).toEqual({ delegated: true });
-    w.s.dispose();
   });
 });

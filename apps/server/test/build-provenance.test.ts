@@ -10,7 +10,7 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import { build, step, todo } from '../src/db/schema.js';
 import { applyBuildStepAction } from '../src/services/builds.js';
-import { bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bootServer, issueApiKey, postProject, req, startLegacyBuild } from './helpers.js';
 
 async function world() {
   const s = bootServer();
@@ -18,13 +18,10 @@ async function world() {
   const t = (await (
     await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title: 'probe', spec: 'body' })
   ).json()) as { id: string };
-  const response = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    todoIds: [t.id],
-    assignment: { plan: null, build: null },
-    withPlan: true,
-  });
-  expect(response.status).toBe(201);
-  const b = buildRecordSchema.parse(((await response.json()) as { builds: unknown[] }).builds[0]);
+  const buildId = startLegacyBuild(s, t.id, { withPlan: true });
+  const b = buildRecordSchema.parse(
+    await (await req(s.app, 'GET', `/api/builds/${buildId}`)).json(),
+  );
   const st = s.db.select().from(step).where(eq(step.buildId, b.id)).get()!;
   return { s, todoId: t.id, buildId: b.id, stepId: st.id };
 }

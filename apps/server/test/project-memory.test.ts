@@ -143,37 +143,19 @@ describe('a turn that was steered into another project (D74 P2)', () => {
 describe('promoting a project memory to team-wide (D74 P2)', () => {
   test('promote clears the project so every turn and thread sees it', async () => {
     const row = seedMemory('promote me', 'reviews need two vendors', H.projectId);
-    const res = await req(
-      H.s.app,
-      'POST',
-      `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories/${row.id}/promote`,
-    );
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/memories/${row.id}/promote`);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ id: row.id, projectId: null });
     const stored = H.s.db.select().from(agentMemory).where(eq(agentMemory.id, row.id)).get();
     expect(stored?.projectId).toBeNull();
     expect(composeChiefSystemPrompt(toolDeps(), H.teamId)).toContain('promote me');
-    const again = await req(
-      H.s.app,
-      'POST',
-      `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories/${row.id}/promote`,
-    );
+    const again = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/memories/${row.id}/promote`);
     expect(again.status).toBe(200);
   });
 
-  test('promoting a memory of another agent or a missing memory is 404', async () => {
+  test('promoting a missing memory is 404', async () => {
     const row = seedMemory('mine', 'staging lives on port 8399', H.projectId);
-    const wrongAgent = await req(
-      H.s.app,
-      'POST',
-      `/api/teams/${H.teamId}/agents/someone-else/memories/${row.id}/promote`,
-    );
-    expect(wrongAgent.status).toBe(404);
-    const missing = await req(
-      H.s.app,
-      'POST',
-      `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories/no-such/promote`,
-    );
+    const missing = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/memories/no-such/promote`);
     expect(missing.status).toBe(404);
     expect(
       H.s.db.select().from(agentMemory).where(eq(agentMemory.id, row.id)).get()?.projectId,

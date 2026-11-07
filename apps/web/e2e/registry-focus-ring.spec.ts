@@ -1,11 +1,9 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { settleTransitions } from './helpers.js';
 
-const AGENT =
-  '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06';
 const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/files?scenario=prj-tasks&tab=tasks';
-const AGENT_PERMS = '/app/resources/agents/r3-builder?scenario=agent-detail';
+const ROUTING_POLICIES = '/app/settings/work-routing?scenario=routing-settings';
 const ACCEPT = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=34';
 
 const BADGES = '/app?scenario=home-c&pane=machines';
@@ -101,38 +99,32 @@ async function themed(page: Page, theme: 'dark' | 'light', url: string) {
   await page.goto(url);
 }
 
-test.describe('#1244 registry focus: outline on buttons, field ring on text fields', () => {
-  test('input and select wear the field ring; the button keeps the global outline', async ({
-    page,
-  }) => {
-    await themed(page, 'dark', AGENT);
-    await page.getByRole('button', { name: '创建 Agent' }).click();
-    const dialog = page.getByRole('dialog', { name: '创建 agent' });
-    await expect(dialog).toBeVisible();
+async function openSkillDialog(page: Page, theme: 'dark' | 'light') {
+  await themed(page, theme, SKILLS);
+  await page.getByTestId('resource-empty').getByRole('button', { name: '新建技能' }).click();
+  const dialog = page.getByRole('dialog', { name: '新建技能' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
 
-    const input = dialog.locator('#dlg-agent-name');
+test.describe('#1244 registry focus: outline on buttons, field ring on text fields', () => {
+  test('input wears the field ring; the button keeps the global outline', async ({ page }) => {
+    const dialog = await openSkillDialog(page, 'dark');
+
+    const input = dialog.locator('#dlg-skill-name');
     await focusKeyboard(input);
     expectFieldRing(await readFocus(input));
-
-    const select = dialog.locator('.dlg-agent-machine-select');
-    await focusKeyboard(select);
-    expectFieldRing(await readFocus(select));
 
     const button = dialog.getByRole('button', { name: '关闭' });
     await focusKeyboard(button);
     expectGlobalOutline(await readFocus(button));
   });
 
-  test('the same three controls in light', async ({ page }) => {
-    await themed(page, 'light', AGENT);
-    await page.getByRole('button', { name: '创建 Agent' }).click();
-    const dialog = page.getByRole('dialog', { name: '创建 agent' });
-    await expect(dialog).toBeVisible();
-    const input = dialog.locator('#dlg-agent-name');
+  test('the same controls in light', async ({ page }) => {
+    const dialog = await openSkillDialog(page, 'light');
+    const input = dialog.locator('#dlg-skill-name');
     await focusKeyboard(input);
     expectFieldRing(await readFocus(input));
-    await focusKeyboard(dialog.locator('.dlg-agent-machine-select'));
-    expectFieldRing(await readFocus(dialog.locator('.dlg-agent-machine-select')));
     await focusKeyboard(dialog.getByRole('button', { name: '关闭' }));
     expectGlobalOutline(await readFocus(dialog.getByRole('button', { name: '关闭' })));
   });
@@ -150,9 +142,8 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
   });
 
   test('clicking the name input shows the field ring, not the gray ring', async ({ page }) => {
-    await themed(page, 'dark', AGENT);
-    await page.getByRole('button', { name: '创建 Agent' }).click();
-    const input = page.locator('#dlg-agent-name');
+    const dialog = await openSkillDialog(page, 'dark');
+    const input = dialog.locator('#dlg-skill-name');
     await input.click();
     await settleTransitions(page);
     expectFieldRing(await readFocus(input));
@@ -161,9 +152,8 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
   test('aria-invalid focus draws a destructive border and a 3px danger halo, no outline', async ({
     page,
   }) => {
-    await themed(page, 'dark', AGENT);
-    await page.getByRole('button', { name: '创建 Agent' }).click();
-    const input = page.locator('#dlg-agent-name');
+    const dialog = await openSkillDialog(page, 'dark');
+    const input = dialog.locator('#dlg-skill-name');
     await focusKeyboard(input);
     await input.evaluate((el) => el.setAttribute('aria-invalid', 'true'));
     await settleTransitions(page);
@@ -200,8 +190,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
     expectGlobalOutline(unchecked);
     expect(unchecked.borderTopColor).toBe(hexToRgb(unchecked.inputColor));
 
-    await themed(page, 'dark', AGENT_PERMS);
-    await page.locator('.agent-detail .agent-tab').nth(2).click();
+    await themed(page, 'dark', ROUTING_POLICIES);
     const sw = page.locator('[data-slot="switch"]').first();
     await expect(sw).toBeVisible();
     await focusKeyboard(sw);

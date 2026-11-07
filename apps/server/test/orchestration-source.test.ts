@@ -4,10 +4,10 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
-  agent as agentTable,
   build as buildTable,
   chief as chiefTable,
   chiefThread,
+  routingRule,
   step as stepTable,
   tag as tagTable,
   todo as todoTable,
@@ -18,7 +18,7 @@ import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
-import { bootServer, postProject, req, type TestServer } from './helpers.js';
+import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-orch-1';
 const REPO = 'octo/alpha';
@@ -43,26 +43,8 @@ afterAll(async () => {
   await rm(throttleHome, { recursive: true, force: true });
 });
 
-function seedAgent(): void {
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId,
-      displayName: AGENT_ID,
-      description: '负责代码实现与工程修改。',
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: [],
-    })
-    .run();
+function seedCoordinator(): void {
+  seedRoute(s, 'coordinator', { id: AGENT_ID, provider: 'stub-gw', modelId: 'stub-model' });
 }
 
 function seedChiefThread(): void {
@@ -73,7 +55,6 @@ function seedChiefThread(): void {
       id: chiefId,
       userId,
       teamId,
-      agentId: AGENT_ID,
       charter: '',
       watches: [],
       wakes: [],
@@ -159,7 +140,7 @@ beforeEach(async () => {
   chiefId = `chief-${userId}-${teamId}`;
   threadId = `chief-${newUuidv7()}`;
   projectId = await postProject(s.app, 'demo');
-  seedAgent();
+  seedCoordinator();
   seedChiefThread();
 });
 
@@ -328,16 +309,16 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     expect((await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`)).status).toBe(409);
   });
 
-  test('D4 the chief has no bound agent -> 409 (the gating entry is canon, not silent)', async () => {
+  test('D4 the team has no coordinator routing rule -> 409 (the gating entry is canon, not silent)', async () => {
     const todoId = await makeTodo();
-    s.db.update(chiefTable).set({ agentId: null }).where(eq(chiefTable.id, chiefId)).run();
+    s.db.delete(routingRule).where(eq(routingRule.id, AGENT_ID)).run();
     const res = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
     expect(res.status).toBe(409);
   });
 });
 
 describe('B prompt surface: orchestration round splitting discipline (the r14 §5.2 guardrails in the system prompt)', () => {
-  test('B1 the system prompt contains granularity=verifications per round / the spec embedded verbatim / single-task direct dispatch / splitting closes the original card', () => {
+  test('B1 the system prompt contains granularity=verifications per round / the spec embedded verbatim / dispatch through open_thread', () => {
     const prompt = composeChiefSystemPrompt(
       { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user, skillsDir: s.skillsDir },
       teamId,
@@ -346,9 +327,7 @@ describe('B prompt surface: orchestration round splitting discipline (the r14 §
     expect(prompt).toContain('可独立验收');
     expect(prompt).toContain('原文片段');
     expect(prompt).toContain('兄弟任务');
-    expect(prompt).toContain('close_todos');
-    expect(prompt).toContain('当信息会实质改变结果、执行方式、权限或安全时才问');
-    expect(prompt).toContain('判不准 → 先规划');
+    expect(prompt).toContain('open_thread');
     expect(prompt).not.toContain('withPlan:false');
   });
 });

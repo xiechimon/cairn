@@ -150,20 +150,12 @@ const prov = await sendJson(SERVER + '/api/teams/' + teamId + '/providers', {
 });
 if (![200, 201, 409].includes(prov.status)) throw new Error('provider → ' + prov.status);
 
-const agent = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
-  displayName: '段行验证员',
+const agent = await sendJson(SERVER + '/api/teams/' + teamId + '/routing-rules/coordinator', {
   provider: 'stub-gw',
   modelId: 'stub-model',
-});
+}, 'PATCH');
 const AGENT_ID = agent.body?.id ?? agent.body?.agentId ?? agent.body?.record?.id;
 if (!AGENT_ID) throw new Error('agent 无 id：' + JSON.stringify(agent.body));
-
-const bind = await sendJson(
-  SERVER + '/api/teams/' + teamId + '/chief',
-  { agent: { agentId: AGENT_ID, thinkingLevel: null } },
-  'PATCH',
-);
-if (bind.status !== 200) throw new Error('chief bind → ' + bind.status);
 
 const thread = await sendJson(SERVER + '/api/teams/' + teamId + '/chief/threads', {
   content: '请依次核对三段，先说结论。',

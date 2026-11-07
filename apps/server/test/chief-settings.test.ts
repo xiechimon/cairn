@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
   agentMemory,
-  agent as agentTable,
   chiefMessage,
   chief as chiefTable,
   chiefThread,
@@ -17,7 +16,7 @@ import {
   sendChiefMessage,
 } from '../src/services/chief.js';
 import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay } from './chief-harness.js';
-import { issueApiKey, req } from './helpers.js';
+import { issueApiKey, req, seedRoute } from './helpers.js';
 
 registerChiefHarness();
 
@@ -38,21 +37,14 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(wire.chief.id).toBe(H.chiefId);
   });
 
-  test('PATCH /chief binding a new Agent = rebind (memories do not migrate: no memory copy action)', async () => {
+  test('PATCH /chief refuses binding an Agent: the Coordinator model is the coordinator routing rule (D60)', async () => {
     await relay('save_memory', { title: '旧记忆', content: '属于原 Agent' });
     const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
       agent: { agentId: AGENT2_ID, thinkingLevel: null },
     });
-    expect(res.status).toBe(200);
-    const env = (await res.json()) as {
-      chief: { agent: { agentId: string } | null };
-      agentActor: { id: string } | null;
-    };
-    expect(env.chief.agent).toEqual({ agentId: AGENT2_ID });
-    expect(env.agentActor?.id).toBe(AGENT2_ID);
+    expect(res.status).toBe(410);
     const mems = H.s.db.select().from(agentMemory).all();
     expect(mems.every((m) => m.agentId === AGENT_ID)).toBe(true);
-    expect(mems.some((m) => m.agentId === AGENT2_ID)).toBe(false);
   });
 
   test('PATCH /chief charter slot persisted (charter tab save surface [inferred])', async () => {
@@ -99,7 +91,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect('compactionModel' in got.chief).toBe(false);
   });
 
-  test('chief step claim payload always = the bound Agent own model (#1260 no inherited state)', async () => {
+  test('chief step claim payload always = the coordinator rule model (#1260 no inherited state)', async () => {
     const plain = await issueApiKey(H.s);
     const enroll = await H.s.app.request('/api/machine/enroll', {
       method: 'POST',
@@ -113,7 +105,11 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       .from(machineTable)
       .where(eq(machineTable.name, 'chief-override-probe'))
       .get()!;
-    H.s.db.update(agentTable).set({ machineId: probe.id }).where(eq(agentTable.id, AGENT_ID)).run();
+    seedRoute(H.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: probe.id,
+    });
     const claim = async () => {
       const res = await H.s.app.request('/api/machine/tasks/claim', {
         method: 'POST',
@@ -207,12 +203,12 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(partial.status).toBe(400);
   });
 
-  test('memory tab = shared storage with the bound Agent (GET agents/{aid}/memories)', async () => {
-    await relay('save_memory', { title: '共用记忆', content: 'chief 与 agent 同源' });
-    const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/agents/${AGENT_ID}/memories`);
+  test('memory tab = the team shared storage (GET teams/{id}/memories)', async () => {
+    await relay('save_memory', { title: '共用记忆', content: 'chief 与 thread 同源' });
+    const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/memories`);
     expect(res.status).toBe(200);
-    const mems = (await res.json()) as { title: string; agentId: string }[];
-    expect(mems.some((m) => m.title === '共用记忆' && m.agentId === AGENT_ID)).toBe(true);
+    const mems = (await res.json()) as { title: string }[];
+    expect(mems.some((m) => m.title === '共用记忆')).toBe(true);
   });
 
   test('systemPrompt composition includes charter + resource list + memories (02 section 4.3 input contract)', () => {
@@ -232,7 +228,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       H.teamId,
     );
     expect(prompt).toContain('优先文档 Agent');
-    expect(prompt).toContain('agents:');
+    expect(prompt).toContain('projects:');
     expect(prompt).toContain('autonomous');
     expect(prompt).toContain('ADR 0026');
     expect(prompt).not.toContain('合并（merge）动作只由人触发');
@@ -263,7 +259,7 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
     expect(prompt).toContain('只回答，不建任务');
   });
 
-  test('systemPrompt dispatch-decision section: judgment discipline + three signals + review gate always present + receipt can override, static and independent of settings (#903)', () => {
+  test('systemPrompt dispatch section: tasks go to a thread through open_thread, no agent or plan mode, static and independent of settings', () => {
     const deps = {
       db: H.s.db,
       hub: H.s.hub,
@@ -272,23 +268,19 @@ describe('chief settings 4 tabs + PATCH /chief (r5 section 2)', () => {
       skillsDir: H.s.skillsDir,
     };
     const prompt = composeChiefSystemPrompt(deps, H.teamId);
-    expect(prompt).toContain('当信息会实质改变结果、执行方式、权限或安全时才问');
-    expect(prompt).toContain('否则自己决定，并说出你决定了什么');
-    expect(prompt).toContain('有可复现步骤或失败测试的缺陷 → 直接修');
-    expect(prompt).toContain('引入新能力、或改动跨包 → 先问');
-    expect(prompt).toContain('判不准 → 先规划');
-    expect(prompt).toContain('Prior art');
-    expect(prompt).toContain('审阅关口恒在');
-    expect(prompt).toContain('dispatchReason');
-    expect(prompt).toContain('就地一句话推翻');
-    expect(prompt).toContain('只影响这一次');
+    expect(prompt).toContain('open_thread');
+    expect(prompt).toContain('不选 Agent、不选计划模式');
+    expect(prompt).toContain('thread 自己 plan、写测试、实现、自检');
+    expect(prompt).toContain('message_thread');
+    expect(prompt).toContain('ADR 0026');
     expect(prompt).not.toContain('withPlan:false');
+    expect(prompt).not.toContain('dispatchReason');
     expect(prompt).not.toContain('派发模式（团队设置');
 
     patchChief(deps, H.teamId, { charter: '用户自己的章程' });
     const after = composeChiefSystemPrompt(deps, H.teamId);
     expect(after).toContain('用户自己的章程');
-    expect(after).toContain('当信息会实质改变结果、执行方式、权限或安全时才问');
+    expect(after).toContain('不选 Agent、不选计划模式');
     expect(after).not.toContain('withPlan:false');
   });
 });

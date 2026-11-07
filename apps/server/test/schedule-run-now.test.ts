@@ -1,28 +1,18 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
-import { agent, project, schedule, step, todo } from '../src/db/schema.js';
+import { project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
 import { runScheduleNow } from '../src/services/schedule-run.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
-import { bootServer, insertMachine, postProject, req } from './helpers.js';
+import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
 afterEach(() => vi.restoreAllMocks());
 
 async function world(createdBy?: string) {
   const s = bootServer();
   const machineId = insertMachine(s);
-  s.db
-    .insert(agent)
-    .values({
-      id: 'run-now-agent',
-      teamId: s.team.id,
-      displayName: 'Worker',
-      provider: 'p',
-      modelId: 'm',
-      machineId,
-    })
-    .run();
+  seedSessionRoute(s, { provider: 'p', modelId: 'm', machineId });
   const projectId = await postProject(s.app, 'Run now');
   const response = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: 'Check changes',
@@ -32,8 +22,6 @@ async function world(createdBy?: string) {
   const [started] = builds.startBuilds(s.svc, {
     projectId,
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: 'run-now-agent' } },
-    withPlan: false,
   });
   const buildId = started!.id;
   const first = s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;

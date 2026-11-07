@@ -1,11 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { build, message, steerPending, step, todo } from '../src/db/schema.js';
-import { executeChiefTool } from '../src/services/chief-tools.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
-import { AGENT_ID, ctx, H, registerChiefHarness, toolDeps } from './chief-harness.js';
-import { bindAllAgents, insertMachine } from './helpers.js';
+import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
+import { insertMachine, seedSessionRoute } from './helpers.js';
 
 registerChiefHarness();
 
@@ -21,7 +20,6 @@ function seedThread(phase: 'building' | 'review' | 'done', status: 'claimed' | '
       phaseAt: 1,
       seqNum: 1,
       latestBuildId: 'message-build',
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
     })
     .run();
   H.s.db
@@ -47,19 +45,16 @@ function seedThread(phase: 'building' | 'review' | 'done', status: 'claimed' | '
     .run();
 }
 
-describe.each(['chief', 'mcp'] as const)('%s message_todo', (entry) => {
+describe('mcp message_todo', () => {
   async function send(todoId = 'message-todo', content = 'Include regression coverage') {
     const deps = { ...toolDeps(), convHub: H.s.convHub };
     const args = { todoId, content };
-    const result =
-      entry === 'chief'
-        ? await executeChiefTool(deps, ctx(), 'message_todo', args)
-        : await executeMcpTool(
-            deps,
-            { teamId: H.teamId, user: H.s.user, grants: new Set(['Message Todo']) },
-            'message_todo',
-            args,
-          );
+    const result = await executeMcpTool(
+      deps,
+      { teamId: H.teamId, user: H.s.user, grants: new Set(['Message Todo']) },
+      'message_todo',
+      args,
+    );
     return JSON.parse(result) as Record<string, unknown>;
   }
 
@@ -140,7 +135,7 @@ describe.each(['chief', 'mcp'] as const)('%s message_todo', (entry) => {
     async (kind) => {
       seedThread('review');
       const machineId = insertMachine(H.s);
-      bindAllAgents(H.s, machineId);
+      seedSessionRoute(H.s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
       H.s.db
         .insert(step)
         .values({

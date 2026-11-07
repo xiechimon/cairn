@@ -217,7 +217,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     {
       storageDir: options.storageDir,
       heartbeatMs: options.heartbeatMs ?? HEARTBEAT_MS,
-      routerTools: options.routerTools ?? false,
+      routerTools: options.routerTools ?? true,
       ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
       ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
       factsFor,

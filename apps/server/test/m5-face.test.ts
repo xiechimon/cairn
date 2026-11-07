@@ -1,28 +1,22 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  agentTaskSchema,
   conversationStreamEventSchema,
   machineRecordSchema,
   tokenUsageSchema,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { plan as planTable, provider as providerTable } from '../src/db/schema.js';
 import {
-  agent as agentTable,
-  plan as planTable,
-  provider as providerTable,
-  todo as todoTable,
-} from '../src/db/schema.js';
-import {
-  bindAllAgents,
   bootServer,
   issueApiKey,
   openConvStream,
   postProject,
   req,
+  seedSessionRoute,
+  startLegacyBuild,
   withVerification,
 } from './helpers.js';
 
@@ -46,8 +40,6 @@ async function call(
     }),
   );
 }
-
-const AGENT_ID = 'agent-m5-1';
 
 async function setupWorld(opts: { webDir?: string | null; pingIntervalMs?: number } = {}) {
   const s = bootServer({
@@ -74,23 +66,13 @@ async function setupWorld(opts: { webDir?: string | null; pingIntervalMs?: numbe
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'm5-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: apiKey,
     body: { teamId: s.team.id, name: 'm5-mbp', cliVersion: '0.1.0' },
   });
 
-  bindAllAgents(s);
   const { token, machineId } = (await enrollRes.json()) as { token: string; machineId: string };
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: 'M5 探针', spec: '探针 spec' },
@@ -99,23 +81,14 @@ async function setupWorld(opts: { webDir?: string | null; pingIntervalMs?: numbe
   return { s, token, machineId, projectId, todoId };
 }
 
-async function startBuild(s: TestServer, projectId: string, todoId: string): Promise<string> {
-  const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-    body: {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan: true,
-    },
-  });
-  expect(res.status).toBe(201);
-  const body = (await res.json()) as { builds: { id: string }[] };
-  return body.builds[0]!.id;
+function startBuild(s: TestServer, todoId: string): string {
+  return startLegacyBuild(s, todoId, { withPlan: true });
 }
 
 describe('conversation stream (02 section 1.2 conversation stream, M5 live streaming server half)', () => {
   test('connect pings immediately; step events/tool rows/text increments/rejection rows pass the schema frame by frame', async () => {
-    const { s, token, projectId, todoId } = await setupWorld({ pingIntervalMs: 60 });
-    const buildId = await startBuild(s, projectId, todoId);
+    const { s, token, todoId } = await setupWorld({ pingIntervalMs: 60 });
+    const buildId = startBuild(s, todoId);
     const stream = await openConvStream(s.app, buildId);
     try {
       const ping = await stream.next((ev) => ev.type === 'ping');
@@ -274,8 +247,8 @@ describe('conversation stream (02 section 1.2 conversation stream, M5 live strea
   });
 
   test('rejection loop: revision user feedback row enters the conversation stream immediately (r5 section 4 timeline)', async () => {
-    const { s, token, projectId, todoId } = await setupWorld();
-    const buildId = await startBuild(s, projectId, todoId);
+    const { s, token, todoId } = await setupWorld();
+    const buildId = startBuild(s, todoId);
     const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
       cred: token,
       body: { running: 0 },
@@ -339,8 +312,8 @@ describe('M5 vocabulary completion surface (02 section 6.1 canonical)', () => {
     }
   });
 
-  test('models/progress/agents tasks/telemetry surface', async () => {
-    const { s, projectId, todoId } = await setupWorld();
+  test('models/progress/telemetry surface', async () => {
+    const { s } = await setupWorld();
     try {
       const models = (await (await req(s.app, 'GET', `/api/teams/${s.team.id}/models`)).json()) as {
         id: string;
@@ -362,22 +335,6 @@ describe('M5 vocabulary completion surface (02 section 6.1 canonical)', () => {
       expect(progress.todos.total).toBe(1);
       expect(progress.todos.byPhase.todo).toBe(1);
 
-      await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-        body: {
-          todoIds: [todoId],
-          assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-          withPlan: false,
-        },
-      });
-      const tasks = (await (
-        await req(s.app, 'GET', `/api/teams/${s.team.id}/agents/${AGENT_ID}/tasks`)
-      ).json()) as { todo: { id: string } }[];
-      expect(tasks.map((t) => t.todo.id)).toEqual([todoId]);
-      const noTasks = (await (
-        await req(s.app, 'GET', `/api/teams/${s.team.id}/agents/other/tasks`)
-      ).json()) as unknown[];
-      expect(noTasks).toEqual([]);
-
       expect((await req(s.app, 'POST', '/api/analytics/first-touch', {})).status).toBe(204);
       expect((await req(s.app, 'POST', '/_mp/api/track', {})).status).toBe(204);
     } finally {
@@ -386,57 +343,9 @@ describe('M5 vocabulary completion surface (02 section 6.1 canonical)', () => {
   });
 });
 
-describe('Agent detail "in progress" section (shape = shared agentTaskSchema)', () => {
-  const pathFor = (teamId: string, agentId: string) =>
-    `/api/teams/${teamId}/agents/${agentId}/tasks`;
-
-  test('only running builds enter the list; shape/status slots line up with the original one by one', async () => {
-    const { s, projectId, todoId } = await setupWorld();
-    try {
-      const path = pathFor(s.team.id, AGENT_ID);
-      const seqNum = (
-        (await (await req(s.app, 'GET', `/api/todos/${todoId}`)).json()) as { seqNum: number }
-      ).seqNum;
-
-      expect(await (await req(s.app, 'GET', path)).json()).toEqual([]);
-
-      const buildId = await startBuild(s, projectId, todoId);
-      const queued = (await (await req(s.app, 'GET', path)).json()) as unknown[];
-      expect(queued).toHaveLength(1);
-      const row = agentTaskSchema.parse(queued[0]);
-      expect(row).toEqual({
-        kind: 'build',
-        state: 'waiting',
-        buildId,
-        todo: { id: todoId, seqNum, title: 'M5 探针', phase: 'queued' },
-      });
-
-      for (const phase of ['planning', 'building'] as const) {
-        s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, todoId)).run();
-        const live = agentTaskSchema.parse(
-          ((await (await req(s.app, 'GET', path)).json()) as unknown[])[0],
-        );
-        expect(live.state).toBeNull();
-        expect(live.todo.phase).toBe(phase);
-        expect(live.buildId).toBe(buildId);
-      }
-
-      for (const phase of ['review', 'confirm', 'done', 'failed', 'closed'] as const) {
-        s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, todoId)).run();
-        expect(await (await req(s.app, 'GET', path)).json()).toEqual([]);
-      }
-
-      s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, todoId)).run();
-      expect(await (await req(s.app, 'GET', pathFor(s.team.id, 'agent-other'))).json()).toEqual([]);
-    } finally {
-      s.dispose();
-    }
-  });
-});
-
 describe('[inferred] build detail read surface (M5 overlay data source, registered in wire.test)', () => {
   test('plans/changes/usage: unknown build 404; empty artifacts = empty-set shape', async () => {
-    const { s, projectId, todoId } = await setupWorld();
+    const { s, todoId } = await setupWorld();
     try {
       for (const path of [
         '/api/builds/nope/plans',
@@ -445,7 +354,7 @@ describe('[inferred] build detail read surface (M5 overlay data source, register
       ]) {
         expect((await req(s.app, 'GET', path)).status).toBe(404);
       }
-      const buildId = await startBuild(s, projectId, todoId);
+      const buildId = startBuild(s, todoId);
       expect(await (await req(s.app, 'GET', `/api/builds/${buildId}/plans`)).json()).toEqual([]);
       expect(await (await req(s.app, 'GET', `/api/builds/${buildId}/usage`)).json()).toEqual([]);
       expect(await (await req(s.app, 'GET', `/api/builds/${buildId}/changes`)).json()).toEqual({
@@ -458,9 +367,9 @@ describe('[inferred] build detail read surface (M5 overlay data source, register
   });
 
   test('after plans are persisted = version set + content; usage = tokenUsageSchema rows', async () => {
-    const { s, token, projectId, todoId } = await setupWorld();
+    const { s, token, todoId } = await setupWorld();
     try {
-      const buildId = await startBuild(s, projectId, todoId);
+      const buildId = startBuild(s, todoId);
       const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
         cred: token,
         body: { running: 0 },

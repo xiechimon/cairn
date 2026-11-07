@@ -130,7 +130,6 @@ async function seedWorld(
         spec: `Spec ${merge.todoId}`,
         phaseAt: 1,
         seqNum: merge.pr,
-        assignment: { plan: null, build: null },
       })
       .run();
     s.db

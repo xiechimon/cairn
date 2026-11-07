@@ -104,7 +104,7 @@ for (const width of [360, 390]) {
       ];
       for (const url of pages) {
         await page.goto(url);
-        await page.locator('.settings-card, [data-testid="team-agent-grid"], [data-testid="chief-settings-col"]').first().waitFor();
+        await page.locator('.settings-card, [data-testid="team-agents-removed"], [data-testid="chief-settings-col"]').first().waitFor();
         const report = await page.evaluate(() => {
           const rail = document.querySelector('.board-sidebar--collapsed')?.getBoundingClientRect();
           const railRight = rail?.right ?? 0;

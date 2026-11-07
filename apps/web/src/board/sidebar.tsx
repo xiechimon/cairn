@@ -12,6 +12,7 @@ import {
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, type To, useLocation, useNavigate } from 'react-router';
 import { SpiralMark } from '../chief/chief-fab-icon.js';
+import { useOptionalChiefRoot } from '../chief/chief-root.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import { ProjectGlyph, SidebarProjectRow } from '../components/shell/sidebar-project.js';
 import { Button } from '../components/ui/button.js';
@@ -219,7 +220,8 @@ export function BoardSidebar({
     () => groupThreads(shownTodos, activeProject),
     [shownTodos, activeProject],
   );
-  const attention = needsYouCount(shownTodos);
+  const chiefRoot = useOptionalChiefRoot();
+  const attention = needsYouCount(shownTodos, chiefRoot?.pendingQuestions.length ?? 0);
   const projectNames = useMemo(
     () => new Map([...projectRows, ...archivedRows].map((row) => [row.id, row.name])),
     [projectRows, archivedRows],

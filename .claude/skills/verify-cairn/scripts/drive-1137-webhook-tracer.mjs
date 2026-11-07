@@ -100,17 +100,12 @@ const teamId = teamRow.id;
 
 upsertGithubConnection({ db, box }, { teamId, login: 'verify-1137', accessToken: GH_TOKEN, scope: 'repo' });
 
-const agentId = 'agent-verify-1137';
-db.insert(schema.agent)
-  .values({ id: agentId, teamId, displayName: 'agent-verify-1137', provider: 'stub-gw', modelId: 'stub-model' })
-  .run();
 const chiefId = `chief-${userRow.id}-${teamId}`;
 db.insert(schema.chief)
   .values({
     id: chiefId,
     userId: userRow.id,
     teamId,
-    agentId,
     charter: '',
     watches: [],
     wakes: [],
@@ -164,7 +159,7 @@ const messages = db.select().from(schema.chiefMessage).all().filter((m) => m.thr
 
 const steps = db.select().from(schema.step).all().filter((s) => s.buildId === threadId);
 save('04-dispatch-rows.json', { chiefThread: threadRow ?? null, chiefMessages: messages, steps });
-check('C1 chief_thread 行落库 + chief 绑定 agent（派发段）', threadRow?.id === threadId && threadRow?.chiefId === chiefId && chiefRow?.agentId === agentId, `threadId=${threadId}`);
+check('C1 chief_thread 行落库 + chief 落库（派发段）', threadRow?.id === threadId && threadRow?.chiefId === chiefId && chiefRow != null, `threadId=${threadId}`);
 check('C2 chief_message 首条用户消息含任务锚点（todo id）', messages.length >= 1 && messages.some((m) => typeof m.content === 'string' && m.content.includes(todoId)), `messages=${messages.length}`);
 check('C3 step 行 kind=chief + pending（派发段）', steps.length >= 1 && steps.some((s) => s.kind === 'chief' && s.status === 'pending'), `steps=${steps.length}`);
 

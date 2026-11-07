@@ -51,6 +51,7 @@ export interface LiveRowProps {
   label: string;
   labelVars?: TVars;
   quiet?: boolean;
+  waiting?: boolean;
   disclosure?: { expand: string; collapse: string } | null;
   children?: ReactNode;
 }
@@ -60,12 +61,15 @@ export function LiveRow({
   label,
   labelVars,
   quiet = false,
+  waiting = false,
   disclosure = null,
   children,
 }: LiveRowProps) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const labelCls = 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
+  const labelCls = waiting
+    ? 'chat-streaming-label truncate'
+    : 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
   const body = (
     <>
       <span className={labelCls}>{t(label, labelVars)}</span>
@@ -92,7 +96,7 @@ export function LiveRow({
         </Button>
       )}
       {disclosure != null && expanded && children}
-      <LivePulse className="mt-1 ml-0.5" />
+      {!waiting && <LivePulse className="mt-1 ml-0.5" />}
     </div>
   );
 }

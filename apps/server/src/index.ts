@@ -28,15 +28,13 @@ import {
   setCoordinatorServerContextEnabled,
   setCoordinatorWake,
 } from './services/coordinator-context.js';
-import { setCoordinatorRouteLog } from './services/coordinator-route.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
-import { runRoutingMigration } from './services/routing-migration.js';
-import { setRoutingRulesEnabled } from './services/routing-rules.js';
+import { seedDefaultRouting } from './services/routing-migration.js';
 import {
   createScheduler,
   issueIntakeRunOf,
@@ -66,7 +64,21 @@ if (refusal !== null) {
 }
 const config = ensureAccessToken(loadedConfig);
 
-const { db, close } = openDbWithHandle(config.dbPath, { legacyExportDir: config.homeDir });
+const opened = (() => {
+  try {
+    return openDbWithHandle(config.dbPath, {
+      legacyExportDir: config.homeDir,
+      migrationLogger: logger,
+    });
+  } catch (error) {
+    logger.fatal(
+      { err: error },
+      error instanceof Error ? error.message : 'database migration failed',
+    );
+    process.exit(1);
+  }
+})();
+const { db, close } = opened;
 const secretBox = createKeyfileSecretBox(config.keyfilePath);
 const vapidKeys = loadOrCreateVapidKeys(
   config.vapidKeysPath,
@@ -76,20 +88,10 @@ const vapidKeys = loadOrCreateVapidKeys(
 const seeded = seed(db);
 seedLocalMachine(db, seeded.team.id);
 backfillFixedTags(db);
-setRoutingRulesEnabled(config.routingRules);
 setCoordinatorServerContextEnabled(config.coordinatorServerContext || config.coordinatorInServer);
 setCoordinatorInServer(config.coordinatorInServer);
 setCoordinatorMachineId(config.coordinatorMachineId);
-setCoordinatorRouteLog((teamId, reason) =>
-  logger.warn({ teamId, reason }, 'coordinator route: falling back to the bound chief agent'),
-);
-if (config.routingRules) {
-  const { withheldSecrets, ...inserted } = runRoutingMigration(db);
-  logger.info(inserted, 'routing rules migration');
-  for (const row of withheldSecrets) {
-    logger.warn(row, 'routing rules migration: agent secrets not granted to the session policy');
-  }
-}
+logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 backfillTokenUsageCost(db);
 const concurrencyBackfilled = backfillMachineConcurrency(db);
 if (concurrencyBackfilled > 0) {
@@ -142,7 +144,6 @@ const app = createApp(
     webDir: config.webDir,
     authToken: config.authToken,
     mcpConfigPath: config.mcpConfigPath,
-    intakeAgentAllowlist: config.intakeAgentAllowlist,
     logger,
   },
   logger,
@@ -161,7 +162,6 @@ const scheduler = createScheduler(
     vapidKeys,
     convHub,
     box: secretBox,
-    intakeAgentAllowlist: config.intakeAgentAllowlist,
     reposDir,
     githubFetch,
     oauthClient: config.githubOauth,
@@ -200,14 +200,12 @@ const coordinator = config.coordinatorInServer
         attachmentsDir,
         skillsDir: config.skillsDir,
         mcpConfigPath: config.mcpConfigPath,
-        intakeAgentAllowlist: config.intakeAgentAllowlist,
         convHub,
         githubFetch,
         oauthClient: config.githubOauth,
       },
       storageDir: coordinatorStoreDir(config.dataDir),
       logger,
-      routerTools: config.routingRules,
     })
   : null;
 if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));

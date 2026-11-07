@@ -5,14 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import {
-  build as buildTable,
-  message as messageTable,
-  plan as planTable,
-  step as stepTable,
-} from '../../apps/server/src/db/schema.js';
+import { message as messageTable, step as stepTable } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { AGENT_ID, api, bootRealServer, type RealServer, waitFor } from './helpers.js';
+import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
 const WEB_DIST = join(ROOT, 'apps/web/dist');
@@ -26,10 +21,7 @@ let page: Page;
 let projectId = '';
 let machineToken = '';
 
-const PLAN_MD =
-  '# Plan\nKind: fix\n\nContext: 探针。\nChanges: 探针改动。\nEdge cases: 无。\nVerification: 读回 README.md。\n';
-
-type StepKind = 'build' | 'chief' | 'merge' | 'plan' | 'review';
+type StepKind = 'session' | 'chief' | 'merge' | 'review';
 
 function stepsOf(buildId: string, kind?: StepKind) {
   return server.db
@@ -131,14 +123,12 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
   const todoId = (created.body as { id: string }).id;
   const started = await api(server.url, 'POST', `/api/projects/${projectId}/builds`, {
     todoIds: [todoId],
-    assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-    withPlan: false,
   });
   expect(started.status).toBe(201);
   const buildId = (started.body as { builds: { id: string }[] }).builds[0]!.id;
 
   const runBuildStep = async () => {
-    const step = await waitForStep(buildId, (s) => s.kind === 'build');
+    const step = await waitForStep(buildId, (s) => s.kind === 'session');
     await doneStep(step.id, 'success', { hasChanges: true });
     await waitFor(() => server.todoPhase(todoId) === 'review', 15_000);
   };
@@ -148,33 +138,11 @@ async function driveToReview(spec: string, opts: { rework: boolean }) {
     const revision = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
       action: 'revision',
       side: 'plan',
-      feedback: '探针：请求修改，方案补一处边界说明。',
+      feedback: '探针：请求修改，补一处边界说明。',
       clientMessageId: crypto.randomUUID(),
     });
     expect(revision.status).toBe(202);
-    const planStep = await waitForStep(buildId, (s) => s.kind === 'plan');
-    server.db
-      .insert(planTable)
-      .values({
-        id: `plan-probe-${planStep.id}`,
-        buildId,
-        version: 1,
-        content: PLAN_MD,
-        stepId: planStep.id,
-        createdAt: Date.now(),
-      })
-      .run();
-    server.db
-      .update(buildTable)
-      .set({ planDocId: `plan-probe-${planStep.id}` })
-      .where(eq(buildTable.id, buildId))
-      .run();
-    await doneStep(planStep.id, 'success');
-    await waitFor(() => server.todoPhase(todoId) === 'confirm', 15_000);
-    const confirm = await api(server.url, 'POST', `/api/builds/${buildId}/steps`, {
-      action: 'confirm',
-    });
-    expect(confirm.status).toBe(202);
+    await waitFor(() => server.todoPhase(todoId) === 'queued', 15_000);
     await runBuildStep();
   }
   return { todoId, buildId, title };
@@ -353,10 +321,16 @@ describe('#1236 task-done confirmation dialog (real web dist + real server + fak
   }, 120_000);
 
   test('⑤ failed card (build leg delivered): merge checkbox locked — done can only land via merge', async () => {
+    const reviewRule = await api(
+      server.url,
+      'PATCH',
+      `/api/teams/${server.teamId}/routing-rules/review`,
+      { provider: 'stub-gw', modelId: 'stub-model' },
+    );
+    expect(reviewRule.status).toBe(200);
     const card = await driveToReview('失败卡锁定探针：不许给出假选项。', { rework: false });
     const review = await api(server.url, 'POST', `/api/builds/${card.buildId}/steps`, {
       action: 'review',
-      agentId: AGENT_ID,
     });
     expect(review.status).toBe(202);
     const reviewStep = await waitForStep(card.buildId, (s) => s.kind === 'review');

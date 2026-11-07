@@ -7,7 +7,6 @@ import {
 import { and, asc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  agent,
   chief,
   chiefMessage,
   chiefThread,
@@ -23,6 +22,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
+import { coordinatorProfile } from './routing-rules.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -133,9 +133,7 @@ export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
   const latest = rows[0];
   if (latest === undefined) return null;
   const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
-  const agentRow = chiefRow?.agentId
-    ? db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-    : undefined;
+  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId) : null;
   const ran = latest.fallback?.model ?? {
     provider: agentRow?.provider ?? null,
     modelId: agentRow?.modelId ?? null,
@@ -227,12 +225,7 @@ export function steerChiefMessage(
     scope !== null && scope !== stepScopeProjectId(running)
       ? projectTurnContext(deps.db, {
           teamId: thread.teamId,
-          agentId:
-            deps.db
-              .select({ agentId: chief.agentId })
-              .from(chief)
-              .where(eq(chief.id, thread.chiefId))
-              .get()?.agentId ?? null,
+          agentId: coordinatorProfile(deps.db, thread.teamId)?.id ?? null,
           projectId: scope,
           threadId,
         })

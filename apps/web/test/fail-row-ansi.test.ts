@@ -31,8 +31,6 @@ const FAILED_CARD: TodoRecord = {
 
 const FAILED_WIRE_CARD: WireTodo = {
   ...FAILED_CARD,
-  assignment: null,
-  agent: null,
   createdBy: null,
   ownerId: null,
   sourceBuildId: null,

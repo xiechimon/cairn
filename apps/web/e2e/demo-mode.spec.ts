@@ -145,9 +145,6 @@ test('the selling points browse end to end with no backend traffic', async ({ pa
   await expect(page.getByRole('link', { name: 'dev-mac' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'build-box' })).toBeVisible();
 
-  await page.goto(`${demo.base}/app/team`);
-  await expect(page.getByText('reviewer-turing').first()).toBeVisible();
-
   await page.goto(`${demo.base}/app/schedules`);
   await expect(page.getByRole('heading', { name: /定时/ }).first()).toBeVisible();
 
@@ -205,20 +202,6 @@ test('write: sending to the Coordinator drawer is blocked', async ({ page }) => 
   await input.fill('把购物车那张票提到最前面');
   await input.press('Enter');
   await expect(toast(page)).toBeVisible();
-  expectQuiet(traffic);
-});
-
-test('write: the create dialog on the team page is blocked', async ({ page }) => {
-  const traffic = watchTraffic(page);
-  await page.goto(`${demo.base}/app/team`);
-  await page.getByRole('button', { name: '创建 Agent' }).click();
-  const dialog = page.getByRole('dialog', { name: '创建 agent' });
-  await dialog.getByLabel('名称').fill('demo-agent');
-  await dialog.locator('.dlg-agent-machine-select').click();
-  await page.locator('.dlg-agent-machine-row', { hasText: 'dev-mac' }).click();
-  await dialog.getByRole('button', { name: '创建', exact: true }).click();
-  await expect(toast(page)).toBeVisible();
-  await expect(page.getByText('demo-agent')).toHaveCount(0);
   expectQuiet(traffic);
 });
 

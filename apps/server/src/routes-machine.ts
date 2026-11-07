@@ -185,7 +185,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     reposDir: ctx.reposDir,
     attachmentsDir: ctx.attachmentsDir,
     mcpConfigPath: ctx.mcpConfigPath,
-    intakeAgentAllowlist: ctx.intakeAgentAllowlist,
     skillsDir: ctx.skillsDir,
     convHub: ctx.convHub,
     oauthClient: ctx.oauthClient,

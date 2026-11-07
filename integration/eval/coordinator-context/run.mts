@@ -11,10 +11,10 @@ import { sql } from 'drizzle-orm';
 import { FIRST_TOKEN_EVENTS } from '../../../apps/daemon/src/backend/pi.js';
 import { openMemoryDb } from '../../../apps/server/src/db/client.js';
 import {
-  agent as agentTable,
   chiefMessage,
   chiefTurnUsage,
   project as projectTable,
+  routingRule as routingRuleTable,
 } from '../../../apps/server/src/db/schema.js';
 import { seed } from '../../../apps/server/src/db/seed.js';
 import {
@@ -27,7 +27,6 @@ import { TeamStreamHub } from '../../../apps/server/src/services/events.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { assemble, estimateTokens } from './assemble.mts';
 import {
-  AGENTS,
   buildFixture,
   type FixtureToolCall,
   type FixtureTurn,
@@ -100,17 +99,18 @@ function makeWorld() {
     db.insert(projectTable)
       .values({ id: `project-${name.toLowerCase()}`, teamId: team.id, name })
       .run();
-  for (const name of AGENTS)
-    db.insert(agentTable)
-      .values({
-        id: `agent-${name.toLowerCase()}`,
-        teamId: team.id,
-        displayName: name,
-        description: `${name} work for every project.`,
-        provider: PROVIDER,
-        modelId: MODEL_ID,
-      })
-      .run();
+  const routedAt = Date.now();
+  db.insert(routingRuleTable)
+    .values({
+      id: 'route-coordinator',
+      teamId: team.id,
+      use: 'coordinator',
+      provider: PROVIDER,
+      modelId: MODEL_ID,
+      createdAt: routedAt,
+      updatedAt: routedAt,
+    })
+    .run();
   const chiefRow = ensureChief(deps, team.id);
   const thread = coordinatorThreadRow(deps, chiefRow);
   const system = buildChiefSystemPrompt(deps, team.id, thread.id).text;

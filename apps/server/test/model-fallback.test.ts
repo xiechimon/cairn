@@ -2,7 +2,6 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -13,9 +12,19 @@ import {
 } from '../src/db/schema.js';
 import { providerHealth } from '../src/services/provider-health.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
-import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  seedRoute,
+  startLegacyBuild,
+  type TestServer,
+} from './helpers.js';
 
-const AGENT_ID = 'agent-fallback-1';
+const DEFAULT_FALLBACKS = [
+  { provider: 'relay-b', modelId: 'model-b' },
+  { provider: 'relay-c', modelId: 'model-c' },
+];
 
 async function call(
   app: Hono,
@@ -72,26 +81,12 @@ function insertProvider(s: TestServer, providerId: string): void {
 }
 
 async function setupWorld(
-  fallbackModels: { provider: string; modelId: string }[] | null = [
-    { provider: 'relay-b', modelId: 'model-b' },
-    { provider: 'relay-c', modelId: 'model-c' },
-  ],
+  fallbackModels: { provider: string; modelId: string }[] | null = DEFAULT_FALLBACKS,
 ): Promise<World> {
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
   disposables.push(() => s.dispose());
   const key = await issueApiKey(s);
   for (const p of ['relay-a', 'relay-b', 'relay-c']) insertProvider(s, p);
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'fallback-builder',
-      provider: 'relay-a',
-      modelId: 'model-a',
-      fallbackModels,
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'fallback-box', cliVersion: '0.1.0' },
@@ -104,11 +99,12 @@ async function setupWorld(
     .set({ enabledRuntimes: ['pi'] })
     .where(eq(machineTable.id, machineRow.id))
     .run();
-  s.db
-    .update(agentTable)
-    .set({ machineId: machineRow.id })
-    .where(eq(agentTable.id, AGENT_ID))
-    .run();
+  seedRoute(s, 'session', {
+    provider: 'relay-a',
+    modelId: 'model-a',
+    fallbackModels,
+    machineId: machineRow.id,
+  });
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '降级链探针', spec: '写一行探针' },
@@ -118,12 +114,9 @@ async function setupWorld(
 }
 
 async function startBuild(w: World, withPlan = false): Promise<string> {
+  if (withPlan) return startLegacyBuild(w.s, w.todoId, { withPlan: true });
   const res = await call(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
-    body: {
-      todoIds: [w.todoId],
-      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      withPlan,
-    },
+    body: { todoIds: [w.todoId] },
   });
   expect(res.status).toBe(201);
   return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id;
@@ -262,12 +255,19 @@ describe('model fallback chain (#1493)', () => {
     async (kind) => {
       const w = await setupWorld();
       await startBuild(w);
+      if (kind === 'review') {
+        seedRoute(w.s, 'review', {
+          provider: 'relay-a',
+          modelId: 'model-a',
+          fallbackModels: DEFAULT_FALLBACKS,
+        });
+      }
       const pending = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get()!;
       w.s.db
         .update(stepTable)
         .set({
           kind,
-          prompt: kind === 'review' ? `{"kind":"review","agentId":"${AGENT_ID}"}\n审一下` : null,
+          prompt: kind === 'review' ? '{"kind":"review","agentId":"review-rule"}\n审一下' : null,
         })
         .where(eq(stepTable.id, pending.id))
         .run();
@@ -286,7 +286,7 @@ describe('model fallback chain (#1493)', () => {
     },
   );
 
-  test('X4: agent has no fallbacks -> old behavior (waiting_quota)', async () => {
+  test('X4: the route has no fallbacks -> old behavior (waiting_quota)', async () => {
     const w = await setupWorld(null);
     await startBuild(w);
     const c = await claim(w);
@@ -627,14 +627,10 @@ describe('0 token silent failure (#1493)', () => {
   });
 });
 
-describe('agent write surface (#1493)', () => {
-  test('PATCH fallbackModels: persisted + record projection + more than 5 -> 400 + null clears', async () => {
+describe('routing rule write surface (#1493)', () => {
+  test('PATCH fallbackModels: persisted + record projection + null clears', async () => {
     const w = await setupWorld(null);
-    const path = `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`;
-    const six = Array.from({ length: 6 }, (_, i) => ({ provider: 'relay-b', modelId: `m${i}` }));
-    expect((await call(w.s.app, 'PATCH', path, { body: { fallbackModels: six } })).status).toBe(
-      400,
-    );
+    const path = `/api/teams/${w.s.team.id}/routing-rules/session`;
     const ok = await call(w.s.app, 'PATCH', path, {
       body: { fallbackModels: [{ provider: 'relay-b', modelId: 'model-b' }] },
     });

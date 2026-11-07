@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   machine as machineTable,
   message as messageTable,
@@ -14,7 +13,7 @@ import {
 } from '../src/db/schema.js';
 import { QUOTA_HOLD_BACKOFF_MS, quotaHoldBackoffMs } from '../src/services/dispatch-timeouts.js';
 import { toTodoRecord } from '../src/services/todos.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
 
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 const NETWORK_ERROR = 'upstream stream disconnected: connection reset by peer';
@@ -47,8 +46,6 @@ async function call(
   );
 }
 
-const AGENT_ID = 'agent-quota-1';
-
 async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200 });
   const key = await issueApiKey(s);
@@ -70,16 +67,6 @@ async function setupWorld() {
       updatedAt: Date.now(),
     })
     .run();
-  s.db
-    .insert(agentTable)
-    .values({
-      id: AGENT_ID,
-      teamId: s.team.id,
-      displayName: 'quota-builder',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-    })
-    .run();
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: { teamId: s.team.id, name: 'quota-mbp', cliVersion: '0.1.0' },
@@ -87,7 +74,7 @@ async function setupWorld() {
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).limit(1).all()[0]!.id;
   s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, machineId)).run();
-  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model', machineId });
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '额度探针任务', spec: '写一行探针到 README.md' },
@@ -96,11 +83,7 @@ async function setupWorld() {
 
   async function startBuild(): Promise<string> {
     const res = await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
-      body: {
-        todoIds: [todoId],
-        assignment: { plan: null, build: { agentId: AGENT_ID } },
-        withPlan: false,
-      },
+      body: { todoIds: [todoId] },
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as { builds: { id: string }[] };
@@ -151,7 +134,7 @@ describe('#1257 quota hold (done-surface classification + the hold/resume loop)'
       },
     });
     const step = (await w.claim())!;
-    expect(step.step.kind).toBe('build');
+    expect(step.step.kind).toBe('session');
 
     const before = Date.now();
     await w.done(step.step.id, {

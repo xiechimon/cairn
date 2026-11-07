@@ -1,7 +1,7 @@
+import type { RequiredCapabilities, RouteOverride } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
-  agent as agentTable,
   build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -10,7 +10,15 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machines.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  seedRoute,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -28,6 +36,7 @@ async function setupWorld(): Promise<World> {
   const s = bootServer({ claimHoldMs: 100 });
   disposables.push(() => s.dispose());
   const projectId = await postProject(s.app, 'capgate-proj');
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub-model' });
   return { s, projectId };
 }
 
@@ -74,46 +83,16 @@ async function enrollMachineRest(
   return body;
 }
 
-function insertAgent(
-  w: World,
-  opts: {
-    id: string;
-    requiredCapabilities?: { mcpServers?: string[]; models?: string[]; executor?: 'orb' } | null;
-    mcpServers?: string[];
-    modelId?: string | null;
-  },
-): void {
-  w.s.db
-    .insert(agentTable)
-    .values({
-      id: opts.id,
-      teamId: w.s.team.id,
-      displayName: opts.id,
-      status: 'active',
-      avatarUrl: null,
-      provider: 'stub-gw',
-      modelId: opts.modelId === undefined ? 'stub-model' : opts.modelId,
-      thinkingLevel: null,
-      tools: [],
-      secrets: [],
-      defaultSkill: null,
-      skillsAllowlist: null,
-      mcpServers: opts.mcpServers ?? [],
-      maxConcurrentTasks: null,
-      requiredCapabilities: opts.requiredCapabilities ?? null,
-    })
-    .run();
-}
-
 function insertPendingStep(
   w: World,
-  opts: { agentId: string; homeMachineId?: string | null },
+  opts: { requiredCapabilities?: RequiredCapabilities; homeMachineId?: string | null } = {},
 ): { stepId: string; buildId: string } {
-  w.s.db
-    .update(agentTable)
-    .set({ machineId: opts.homeMachineId ?? null })
-    .where(eq(agentTable.id, opts.agentId))
-    .run();
+  const routeOverride: RouteOverride = {
+    ...(opts.homeMachineId != null ? { machineId: opts.homeMachineId } : {}),
+    ...(opts.requiredCapabilities !== undefined
+      ? { requiredCapabilities: opts.requiredCapabilities }
+      : {}),
+  };
   const suffix = Math.random().toString(36).slice(2, 8);
   seqCounter += 1;
   const now = seqCounter;
@@ -131,7 +110,7 @@ function insertPendingStep(
       spec: '探针',
       phase: 'queued',
       phaseAt: now,
-      assignment: { plan: null, build: { agentId: opts.agentId } },
+      routeOverride,
     })
     .run();
   w.s.db
@@ -264,10 +243,8 @@ describe('#1251 capability report persistence + heartbeat red line', () => {
 });
 
 describe('#1251 claim capability gate', () => {
-  test('failure mode 3: MCP dimension -- machine missing slug claims empty and stays pending, complete one claims', async () => {
+  test('failure mode 3: MCP dimension -- the home machine missing a slug claims empty and the step stays pending until a complete machine takes it', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-mcp-a', requiredCapabilities: { mcpServers: ['figma'] } });
-    insertAgent(w, { id: 'agent-cap-mcp-b', requiredCapabilities: { mcpServers: ['figma'] } });
     const lacking = await enrollMachineRest(w, {
       name: 'cap-lacking',
       capabilities: { mcpServers: ['ctx'], skills: [] },
@@ -277,26 +254,41 @@ describe('#1251 claim capability gate', () => {
       capabilities: { mcpServers: ['figma', 'ctx'], skills: [] },
     });
     const blocked = insertPendingStep(w, {
-      agentId: 'agent-cap-mcp-a',
+      requiredCapabilities: { mcpServers: ['figma'] },
       homeMachineId: lacking.machineId,
-    });
-    const runnable = insertPendingStep(w, {
-      agentId: 'agent-cap-mcp-b',
-      homeMachineId: capable.machineId,
     });
 
     expect(await claimAs(w, lacking.machineId)).toBeNull();
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
 
     const claimed = await claimAs(w, capable.machineId);
-    expect(claimed?.step.id).toBe(runnable.stepId);
-    expect(stepRow(w, runnable.stepId).status).toBe('claimed');
+    expect(claimed?.step.id).toBe(blocked.stepId);
+    expect(stepRow(w, blocked.stepId).status).toBe('claimed');
   });
 
-  test('failure mode 4: model dimension -- claudeCodeReport missing a model id blocks, containing it allows', async () => {
+  test('failure mode 3: the capability on the session rule gates every step of the team', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-model-a', requiredCapabilities: { models: ['glm-5.3'] } });
-    insertAgent(w, { id: 'agent-cap-model-b', requiredCapabilities: { models: ['glm-5.3'] } });
+    seedRoute(w.s, 'session', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      requiredCapabilities: { mcpServers: ['figma'] },
+    });
+    const lacking = await enrollMachineRest(w, {
+      name: 'cap-rule-lacking',
+      capabilities: { mcpServers: ['ctx'], skills: [] },
+    });
+    const capable = await enrollMachineRest(w, {
+      name: 'cap-rule-capable',
+      capabilities: { mcpServers: ['figma'], skills: [] },
+    });
+    const { stepId } = insertPendingStep(w);
+    expect(await claimAs(w, lacking.machineId)).toBeNull();
+    expect(stepRow(w, stepId).status).toBe('pending');
+    expect((await claimAs(w, capable.machineId))?.step.id).toBe(stepId);
+  });
+
+  test('failure mode 4: model dimension -- claudeCodeReport missing a model id blocks, a machine containing it takes the step', async () => {
+    const w = await setupWorld();
     const noModel = await enrollMachineRest(w, {
       name: 'cap-model-no',
       capabilities: { mcpServers: [], skills: [] },
@@ -308,24 +300,19 @@ describe('#1251 claim capability gate', () => {
       claudeCodeModels: ['glm-5.3'],
     });
     const blocked = insertPendingStep(w, {
-      agentId: 'agent-cap-model-a',
+      requiredCapabilities: { models: ['glm-5.3'] },
       homeMachineId: noModel.machineId,
-    });
-    const runnable = insertPendingStep(w, {
-      agentId: 'agent-cap-model-b',
-      homeMachineId: hasModel.machineId,
     });
     expect(await claimAs(w, noModel.machineId)).toBeNull();
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
-    expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(runnable.stepId);
+    expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(blocked.stepId);
   });
 
   test('D71 failure mode 5: no snapshot reported fails closed -- a legacy daemon does not claim a step that requires a capability', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-open', requiredCapabilities: { mcpServers: ['figma'] } });
     const legacy = await enrollMachineRest(w, { name: 'cap-open-legacy' });
     const { stepId } = insertPendingStep(w, {
-      agentId: 'agent-cap-open',
+      requiredCapabilities: { mcpServers: ['figma'] },
       homeMachineId: legacy.machineId,
     });
     expect(await claimAs(w, legacy.machineId)).toBeNull();
@@ -334,54 +321,46 @@ describe('#1251 claim capability gate', () => {
 
   test('D71 failure mode 5: models dimension fails closed the same way for claudeCodeReport null', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-open2', requiredCapabilities: { models: ['glm-5.3'] } });
     const noReport = await enrollMachineRest(w, {
       name: 'cap-open-noreport',
       capabilities: { mcpServers: [], skills: [] },
     });
     const { stepId } = insertPendingStep(w, {
-      agentId: 'agent-cap-open2',
+      requiredCapabilities: { models: ['glm-5.3'] },
       homeMachineId: noReport.machineId,
     });
     expect(await claimAs(w, noReport.machineId)).toBeNull();
     expect(stepRow(w, stepId).status).toBe('pending');
   });
 
-  test('failure mode 6: zero regression -- agent without requiredCapabilities behaves unchanged', async () => {
+  test('failure mode 6: zero regression -- a step without requiredCapabilities behaves unchanged', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-none' });
     const m = await enrollMachineRest(w, {
       name: 'cap-regress',
       capabilities: { mcpServers: [], skills: [] },
     });
-    const { stepId } = insertPendingStep(w, {
-      agentId: 'agent-cap-none',
-      homeMachineId: m.machineId,
-    });
+    const { stepId } = insertPendingStep(w, { homeMachineId: m.machineId });
     expect((await claimAs(w, m.machineId))?.step.id).toBe(stepId);
   });
 
   test('failure mode 7: blocked candidates do not block the head -- later legal candidates in the same batch still claim', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-blocked', requiredCapabilities: { mcpServers: ['figma'] } });
-    insertAgent(w, { id: 'agent-cap-free' });
     const m = await enrollMachineRest(w, {
       name: 'cap-hol',
       capabilities: { mcpServers: [], skills: [] },
     });
     const blocked = insertPendingStep(w, {
-      agentId: 'agent-cap-blocked',
+      requiredCapabilities: { mcpServers: ['figma'] },
       homeMachineId: m.machineId,
     });
-    const free = insertPendingStep(w, { agentId: 'agent-cap-free', homeMachineId: m.machineId });
+    const free = insertPendingStep(w, { homeMachineId: m.machineId });
     const claimed = await claimAs(w, m.machineId);
     expect(claimed?.step.id).toBe(free.stepId);
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
   });
 
-  test('failure mode 8: chief steps same law -- bound Agent missing capability not claimed, complete claimed', async () => {
+  test('failure mode 8: chief steps same law -- Coordinator rule missing capability not claimed, complete claimed', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-chief', requiredCapabilities: { mcpServers: ['figma'] } });
     const lacking = await enrollMachineRest(w, {
       name: 'cap-chief-no',
       capabilities: { mcpServers: [], skills: [] },
@@ -390,11 +369,12 @@ describe('#1251 claim capability gate', () => {
       name: 'cap-chief-yes',
       capabilities: { mcpServers: ['figma'], skills: [] },
     });
-    w.s.db
-      .update(agentTable)
-      .set({ machineId: lacking.machineId })
-      .where(eq(agentTable.id, 'agent-cap-chief'))
-      .run();
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: lacking.machineId,
+      requiredCapabilities: { mcpServers: ['figma'] },
+    });
     const suffix = Math.random().toString(36).slice(2, 8);
     const now = Date.now();
     const chiefId = `chief-cap-${suffix}`;
@@ -406,7 +386,6 @@ describe('#1251 claim capability gate', () => {
         id: chiefId,
         userId: w.s.user.id,
         teamId: w.s.team.id,
-        agentId: 'agent-cap-chief',
         charter: '',
         createdAt: now,
       })
@@ -444,140 +423,60 @@ describe('#1251 claim capability gate', () => {
       .run();
     expect(await claimAs(w, lacking.machineId)).toBeNull();
     expect(stepRow(w, stepId).status).toBe('pending');
-    w.s.db
-      .update(agentTable)
-      .set({ machineId: capable.machineId })
-      .where(eq(agentTable.id, 'agent-cap-chief'))
-      .run();
+    seedRoute(w.s, 'coordinator', {
+      provider: 'stub-gw',
+      modelId: 'stub-model',
+      machineId: capable.machineId,
+      requiredCapabilities: { mcpServers: ['figma'] },
+    });
     expect((await claimAs(w, capable.machineId))?.step.id).toBe(stepId);
   });
 });
 
-describe('#1251 agent requiredCapabilities write/read surface', () => {
-  test('failure mode 9: POST create carries the bits, PATCH rewrites, explicit null clears, type error 400', async () => {
+describe('#1251 routing rule requiredCapabilities write/read surface', () => {
+  async function capabilitiesOf(w: World): Promise<unknown> {
+    const got = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/routing-settings`);
+    const settings = (await got.json()) as {
+      rules: { use: string; requiredCapabilities: unknown }[];
+    };
+    return settings.rules.find((rule) => rule.use === 'session')?.requiredCapabilities ?? null;
+  }
+
+  test('failure mode 9: PATCH carries the bits, rewrites, explicit null clears, type error 400', async () => {
     const w = await setupWorld();
-    const home = await enrollMachineRest(w, { name: 'cap-write-home' });
-    const created = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/agents`, {
-      displayName: 'cap-agent',
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId: home.machineId,
+    const url = `/api/teams/${w.s.team.id}/routing-rules/session`;
+    const patched = await req(w.s.app, 'PATCH', url, {
       requiredCapabilities: { mcpServers: ['figma'] },
     });
-    expect(created.status).toBe(201);
-    const { id } = (await created.json()) as { id: string };
-    const got = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/agents/${id}`);
-    expect(((await got.json()) as { requiredCapabilities?: unknown }).requiredCapabilities).toEqual(
-      { mcpServers: ['figma'] },
-    );
+    expect(patched.status).toBe(200);
+    expect(await capabilitiesOf(w)).toEqual({ mcpServers: ['figma'] });
 
-    const patched = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${id}`, {
+    const rewritten = await req(w.s.app, 'PATCH', url, {
       requiredCapabilities: { models: ['glm-5.3'] },
     });
-    expect(patched.status).toBe(200);
-    const got2 = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/agents/${id}`);
-    expect(
-      ((await got2.json()) as { requiredCapabilities?: unknown }).requiredCapabilities,
-    ).toEqual({ models: ['glm-5.3'] });
+    expect(rewritten.status).toBe(200);
+    expect(await capabilitiesOf(w)).toEqual({ models: ['glm-5.3'] });
 
-    const cleared = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${id}`, {
-      requiredCapabilities: null,
-    });
+    const cleared = await req(w.s.app, 'PATCH', url, { requiredCapabilities: null });
     expect(cleared.status).toBe(200);
-    const got3 = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/agents/${id}`);
-    expect(
-      ((await got3.json()) as { requiredCapabilities?: unknown }).requiredCapabilities ?? null,
-    ).toBeNull();
+    expect(await capabilitiesOf(w)).toBeNull();
 
-    const bad = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${id}`, {
+    const bad = await req(w.s.app, 'PATCH', url, {
       requiredCapabilities: { mcpServers: 'figma' },
     });
     expect(bad.status).toBe(400);
   });
-
-  test('failure mode 9: members list read surface follows the row (agent list = members embedded actor)', async () => {
-    const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-members', requiredCapabilities: { mcpServers: ['ctx'] } });
-    const res = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/members`);
-    const body = (await res.json()) as {
-      memberType: string;
-      actor?: { id: string; requiredCapabilities?: unknown };
-    }[];
-    const row = body.find((m) => m.actor?.id === 'agent-cap-members');
-    expect(row?.actor?.requiredCapabilities).toEqual({ mcpServers: ['ctx'] });
-  });
 });
 
-describe('#1251 machine-fit read surface (agent surface "which machines can run it")', () => {
-  test('failure mode 10: canRun/missing/mcpGaps/runtimeOk four states', async () => {
-    const w = await setupWorld();
-    insertAgent(w, {
-      id: 'agent-fit',
-      requiredCapabilities: { mcpServers: ['figma'] },
-      mcpServers: ['figma', 'ctx'],
-    });
-    const capable = await enrollMachineRest(w, {
-      name: 'fit-capable',
-      capabilities: { mcpServers: ['figma'], skills: [] },
-    });
-    const lacking = await enrollMachineRest(w, {
-      name: 'fit-lacking',
-      capabilities: { mcpServers: ['ctx'], skills: [] },
-    });
-    const legacy = await enrollMachineRest(w, { name: 'fit-legacy' });
-    const noRuntime = await enrollMachineRest(w, {
-      name: 'fit-noruntime',
-      capabilities: { mcpServers: ['figma'], skills: [] },
-      runtimes: [],
-    });
-
-    const res = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/agents/agent-fit/machine-fit`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      machines: {
-        machineId: string;
-        name: string;
-        online: boolean;
-        runtimeOk: boolean;
-        missing: string[] | null;
-        mcpGaps: string[] | null;
-        canRun: boolean;
-      }[];
-    };
-    const byId = Object.fromEntries(body.machines.map((m) => [m.machineId, m]));
-
-    expect(byId[capable.machineId]).toMatchObject({
-      runtimeOk: true,
-      missing: [],
-      canRun: true,
-      mcpGaps: ['ctx'],
-    });
-    expect(byId[lacking.machineId]).toMatchObject({
-      runtimeOk: true,
-      missing: ['MCP server "figma"'],
-      canRun: false,
-      mcpGaps: ['figma'],
-    });
-    expect(byId[legacy.machineId]).toMatchObject({
-      runtimeOk: true,
-      missing: null,
-      mcpGaps: null,
-      canRun: false,
-    });
-    expect(byId[noRuntime.machineId]).toMatchObject({ runtimeOk: false, canRun: false });
-  });
-});
-
-describe('D71 an agent that requires the Orb never runs on a plain host', () => {
+describe('D71 a rule that requires the Orb never runs on a plain host', () => {
   test('a host executor does not claim an Orb-required step', async () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'orb-req-host',
       capabilities: { mcpServers: [], skills: [], executor: 'host' },
     });
-    insertAgent(w, { id: 'agent-orb-host', requiredCapabilities: { executor: 'orb' } });
     const { stepId } = insertPendingStep(w, {
-      agentId: 'agent-orb-host',
+      requiredCapabilities: { executor: 'orb' },
       homeMachineId: m.machineId,
     });
     expect(await claimAs(w, m.machineId)).toBeNull();
@@ -590,9 +489,8 @@ describe('D71 an agent that requires the Orb never runs on a plain host', () => 
       name: 'orb-req-legacy',
       capabilities: { mcpServers: [], skills: [] },
     });
-    insertAgent(w, { id: 'agent-orb-legacy', requiredCapabilities: { executor: 'orb' } });
     const { stepId } = insertPendingStep(w, {
-      agentId: 'agent-orb-legacy',
+      requiredCapabilities: { executor: 'orb' },
       homeMachineId: m.machineId,
     });
     expect(await claimAs(w, m.machineId)).toBeNull();
@@ -605,31 +503,11 @@ describe('D71 an agent that requires the Orb never runs on a plain host', () => 
       name: 'orb-req-orb',
       capabilities: { mcpServers: [], skills: [], executor: 'orb' },
     });
-    insertAgent(w, { id: 'agent-orb-orb', requiredCapabilities: { executor: 'orb' } });
     const { stepId } = insertPendingStep(w, {
-      agentId: 'agent-orb-orb',
+      requiredCapabilities: { executor: 'orb' },
       homeMachineId: m.machineId,
     });
     const claimed = await claimAs(w, m.machineId);
     expect(claimed?.step.id).toBe(stepId);
-  });
-
-  test('machine-fit never shows a machine without an executor report as able to run an Orb-required agent', async () => {
-    const w = await setupWorld();
-    insertAgent(w, { id: 'agent-orb-fit', requiredCapabilities: { executor: 'orb' } });
-    const legacy = await enrollMachineRest(w, { name: 'orb-fit-legacy' });
-    const orb = await enrollMachineRest(w, {
-      name: 'orb-fit-orb',
-      capabilities: { mcpServers: [], skills: [], executor: 'orb' },
-    });
-    const res = await req(
-      w.s.app,
-      'GET',
-      `/api/teams/${w.s.team.id}/agents/agent-orb-fit/machine-fit`,
-    );
-    const body = (await res.json()) as { machines: { machineId: string; canRun: boolean }[] };
-    const byId = Object.fromEntries(body.machines.map((m) => [m.machineId, m]));
-    expect(byId[legacy.machineId]?.canRun).toBe(false);
-    expect(byId[orb.machineId]?.canRun).toBe(true);
   });
 });

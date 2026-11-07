@@ -7,13 +7,13 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openDbWithHandle } from '../src/db/client.js';
 import {
-  agent,
   build,
   buildFeedback,
   gateVerdict,
   message,
   plan,
   project,
+  routingRule,
   step,
   team,
   todo,
@@ -33,13 +33,15 @@ function fixture(spec = 'Implement export') {
   const db = opened.db;
   db.insert(team).values({ id: 'team-1', name: 'Test', createdAt: 1 }).run();
   db.insert(project).values({ id: 'project-1', teamId: 'team-1', name: 'Test' }).run();
-  db.insert(agent)
+  db.insert(routingRule)
     .values({
       id: 'agent-1',
       teamId: 'team-1',
-      displayName: 'Builder',
+      use: 'session',
       provider: 'test',
       modelId: 'model',
+      createdAt: 1,
+      updatedAt: 1,
     })
     .run();
   db.insert(todo)
@@ -51,7 +53,6 @@ function fixture(spec = 'Implement export') {
       spec,
       phaseAt: 1,
       seqNum: 1,
-      assignment: { plan: null, build: { agentId: 'agent-1' } },
     })
     .run();
   db.insert(build)
@@ -603,25 +604,12 @@ test('time window export skips each dirty build by reason and keeps the clean on
   const { home, dbPath } = fixture();
   const sessions = join(home, 'server/attachments/step-sessions');
   const opened = openDbWithHandle(dbPath);
-  opened.db
-    .insert(todo)
-    .values({
-      id: 'todo-unassigned',
-      teamId: 'team-1',
-      projectId: 'project-1',
-      title: 'Unassigned',
-      phaseAt: 1,
-      seqNum: 2,
-      assignment: null,
-    })
-    .run();
-  const dirty: [string, { todoId?: string; baseSha?: string | null; session?: string }][] = [
+  const dirty: [string, { baseSha?: string | null; session?: string }][] = [
     [
       'build-no-model',
       { session: JSON.stringify({ type: 'message', message: { role: 'user', content: 'go' } }) },
     ],
     ['build-no-base', { baseSha: null }],
-    ['build-no-agent', { todoId: 'todo-unassigned' }],
     [
       'build-no-role',
       { session: JSON.stringify({ type: 'message', message: { content: 'orphan' } }) },
@@ -635,7 +623,7 @@ test('time window export skips each dirty build by reason and keeps the clean on
       .insert(build)
       .values({
         id,
-        todoId: defect.todoId ?? 'todo-1',
+        todoId: 'todo-1',
         withPlan: false,
         triggerSource: 'user',
         createdAt: 2000 + index,
@@ -667,7 +655,7 @@ test('time window export skips each dirty build by reason and keeps the clean on
   expect(ids).toEqual(['build-1', 'build-clean']);
   expect(result.stdout).toContain('exported=2');
   expect(result.stdout).toContain(
-    'skipped=6 (session_missing=1, session_invalid=1, schema_invalid=4)',
+    'skipped=5 (session_missing=1, session_invalid=1, schema_invalid=3)',
   );
 
   const single = join(home, 'build-no-model.jsonl');

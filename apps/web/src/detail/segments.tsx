@@ -7,7 +7,6 @@ import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
-import { AGENTS_HREF } from '../routes/agent-detail-page.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
@@ -24,7 +23,6 @@ interface SegmentsProps {
 function mentionHref(seg: DocSegment, threadHref: (id: string) => string): string | null {
   if (seg.mentionId == null) return null;
   if (seg.mentionKind === 'todo') return threadHref(seg.mentionId);
-  if (seg.mentionKind === 'agent') return `${AGENTS_HREF}/${seg.mentionId}`;
   return null;
 }
 

@@ -34,7 +34,6 @@ export const searchResponseSchema = z.object({
     }),
   ),
   projects: z.array(z.object({ id: recordId, name: z.string() })),
-  agents: z.array(z.object({ id: recordId, displayName: z.string() })),
   filters: z.array(searchFilterResultSchema).optional(),
 });
 export type SearchResponse = z.infer<typeof searchResponseSchema>;

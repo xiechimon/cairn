@@ -155,14 +155,13 @@ const runtime = await sendJson(
 );
 if (runtime.status !== 200) throw new Error('enable runtime → ' + runtime.status);
 
-const agent = await sendJson(SERVER + '/api/teams/' + teamId + '/agents', {
-  displayName: '重启探针',
+const agent = await sendJson(SERVER + '/api/teams/' + teamId + '/routing-rules/session', {
   provider: 'stub-1279-' + RUN,
   modelId: 'stub-model',
   machineId,
-});
+}, 'PATCH');
 const AGENT_ID = agent.body?.id as string | undefined;
-if (agent.status !== 201 || !AGENT_ID) {
+if (agent.status !== 200 || !AGENT_ID) {
   throw new Error('agent → ' + agent.status + ' ' + JSON.stringify(agent.body));
 }
 
@@ -179,7 +178,6 @@ if (!todoId) throw new Error('todo → ' + JSON.stringify(todoRes.body));
 
 const buildRes = await sendJson(SERVER + '/api/projects/' + projectId + '/builds', {
   todoIds: [todoId],
-  assignment: { plan: null, build: { agentId: AGENT_ID } },
   withPlan: false,
 });
 const builds = buildRes.body?.builds as { id: string }[] | undefined;

@@ -32,7 +32,7 @@ import {
 } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { agent, chief, chiefMessage, chiefThread, step } from '../db/schema.js';
+import { chief, chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { chiefToolDefHashes, extractText } from './chief.js';
@@ -54,6 +54,7 @@ import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { listMemoryEntries, saveMemoryEntry } from './memory.js';
 import type { VapidKeys } from './push.js';
+import { coordinatorProfile } from './routing-rules.js';
 import { serverTimezone } from './schedules.js';
 
 export const CHIEF_DIGEST_THRESHOLD_CHARS = 40_000;
@@ -421,8 +422,7 @@ function queueReport(
 export function planChiefDigests(deps: DigestDeps, now: number): void {
   const { db } = deps;
   for (const chiefRow of db.select().from(chief).all()) {
-    if (chiefRow.agentId === null) continue;
-    if (!db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()?.modelId) continue;
+    if (!coordinatorProfile(db, chiefRow.teamId)?.modelId) continue;
     const digestThreadId = chiefDigestThreadId(chiefRow.id);
     const lastRun = db
       .select()
@@ -601,7 +601,7 @@ export function finishChiefDigest(
   const rememberAs =
     prompt.includes(ISSUE_FENCE_OPEN) || prompt.includes(THREAD_FENCE_OPEN)
       ? null
-      : chiefRow.agentId;
+      : (coordinatorProfile(db, chiefRow.teamId)?.id ?? null);
   const content: ChiefDigestContent = {
     kind: CHIEF_DIGEST_KIND,
     reason: meta[4] === 'daily' ? 'daily' : 'threshold',

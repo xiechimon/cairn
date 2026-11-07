@@ -92,13 +92,12 @@ export interface CiPollRun {
 }
 
 export interface IssueIntakeRun {
-  intakeAgentAllowlist?: readonly string[];
   githubFetch: FetchLike;
   logger: IssueIntakeLogger;
 }
 
 export function issueIntakeRunOf(
-  config: { issueIntake: boolean; intakeAgentAllowlist?: readonly string[] },
+  config: { issueIntake: boolean },
   run: IssueIntakeRun,
 ): IssueIntakeRun | null {
   run.logger.info(
@@ -107,9 +106,7 @@ export function issueIntakeRunOf(
       ? `github issue intake on (${ENV_VARS.issueIntake})`
       : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
   );
-  return config.issueIntake
-    ? { ...run, intakeAgentAllowlist: config.intakeAgentAllowlist ?? [] }
-    : null;
+  return config.issueIntake ? run : null;
 }
 
 export function schedulingRunOf(
@@ -384,8 +381,6 @@ export function createScheduler(
       const [started] = startBuilds(deps, {
         projectId: row.projectId,
         todoIds: [row.todoId],
-        assignment: todoRow.assignment ?? { plan: null, build: null },
-        withPlan: false,
         triggerSource: 'schedule',
         scheduledBy: row.createdBy,
         prompt: workerCreated ? prompt : row.prompt || undefined,

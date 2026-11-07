@@ -1,18 +1,15 @@
 import { SESSION_BRIEF } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { build, step, todo } from '../src/db/schema.js';
-import { completeStep, maybeEnqueueVerifyStep, startBuilds } from '../src/services/builds.js';
+import { completeStep, startBuilds } from '../src/services/builds.js';
 import { countMarkedRounds } from '../src/services/ci-loop.js';
 import { priorSessionOf } from '../src/services/machine-routing.js';
-import { setRoutingRulesEnabled } from '../src/services/routing-rules.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
-import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+import { H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
-beforeEach(() => setRoutingRulesEnabled(true));
-afterEach(() => setRoutingRulesEnabled(false));
 
 function deps() {
   return {
@@ -41,21 +38,19 @@ function seedTodo(id = 'session-todo') {
   return id;
 }
 
-function startSession(withPlan = true) {
+function startSession() {
   const todoId = seedTodo();
   const [started] = startBuilds(deps(), {
     projectId: H.projectId,
     todoIds: [todoId],
-    assignment: { plan: null, build: { agentId: AGENT_ID } },
-    withPlan,
   });
   const stepRow = H.s.db.select().from(step).where(eq(step.buildId, started!.id)).get()!;
   return { todoId, buildId: started!.id, stepRow };
 }
 
-describe('session step kind (flag on)', () => {
-  test('startBuilds enqueues one session step carrying the brief, even when a plan was requested', () => {
-    const { buildId, stepRow } = startSession(true);
+describe('session step kind', () => {
+  test('startBuilds enqueues one session step carrying the brief and no plan', () => {
+    const { buildId, stepRow } = startSession();
     const steps = H.s.db.select().from(step).where(eq(step.buildId, buildId)).all();
     expect(steps).toHaveLength(1);
     expect(stepRow.kind).toBe('session');
@@ -63,37 +58,8 @@ describe('session step kind (flag on)', () => {
     expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.withPlan).toBe(false);
   });
 
-  test('flag off keeps the plan step', () => {
-    setRoutingRulesEnabled(false);
-    const { stepRow } = startSession(true);
-    expect(stepRow.kind).toBe('plan');
-  });
-
-  test('a finished session build with a verifier assigned still gets a verify step', () => {
-    const { todoId, buildId } = startSession(false);
-    H.s.db
-      .update(todo)
-      .set({
-        assignment: { plan: null, build: { agentId: AGENT_ID }, verify: { agentId: AGENT_ID } },
-      })
-      .where(eq(todo.id, todoId))
-      .run();
-    const row = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    if (row === undefined) throw new Error('todo missing');
-    maybeEnqueueVerifyStep(deps(), row, buildId);
-    expect(
-      H.s.db
-        .select()
-        .from(step)
-        .where(eq(step.buildId, buildId))
-        .all()
-        .map((r) => r.kind)
-        .sort(),
-    ).toEqual(['session', 'verify']);
-  });
-
   test('rework at review continues the same session as a session step, not a plan', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db
       .update(step)
       .set({ status: 'done', sessionId: 'sess-1' })
@@ -124,7 +90,7 @@ describe('session steps share the build-step paths', () => {
   }
 
   test('a session turn with no changes and no question still fails the artifact gate', () => {
-    const { todoId, stepRow } = startSession(false);
+    const { todoId, stepRow } = startSession();
     H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
     claim(stepRow.id);
     completeStep(deps(), stepRow.id, { hasChanges: false });
@@ -132,7 +98,7 @@ describe('session steps share the build-step paths', () => {
   });
 
   test('session steps count toward the marked repair rounds', () => {
-    const { buildId } = startSession(false);
+    const { buildId } = startSession();
     H.s.db
       .insert(step)
       .values({
@@ -148,7 +114,7 @@ describe('session steps share the build-step paths', () => {
   });
 
   test('restart reuses the build when a failed session step preserved a checkpoint', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db
       .update(step)
       .set({ status: 'failed', checkpointCommit: 'c'.repeat(40) })
@@ -164,7 +130,7 @@ describe('session steps share the build-step paths', () => {
   });
 
   test('rework from review resumes the implementation session, not a reviewer or verifier session', async () => {
-    const { todoId, buildId, stepRow } = startSession(false);
+    const { todoId, buildId, stepRow } = startSession();
     H.s.db
       .update(step)
       .set({ status: 'done', sessionId: 'impl-session', createdAt: 1 })
@@ -197,7 +163,7 @@ describe('session steps share the build-step paths', () => {
   });
 
   test('a build step enqueued inside a session build resumes the session step', async () => {
-    const { buildId, stepRow } = startSession(false);
+    const { buildId, stepRow } = startSession();
     H.s.db
       .update(step)
       .set({ status: 'done', sessionId: 'impl-session', createdAt: 1 })
