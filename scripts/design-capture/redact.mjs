@@ -229,12 +229,14 @@ for (const entry of readdirSync(runDir, { withFileTypes: true })) {
     if (openAt !== null)
       specs.push({ name: 'drawer', box: [0, 250, vw0, vh0 - 250], from: openAt - 100, to: lastT });
   }
-  if (mark('start:open-palette') && mark('end:type-query'))
+  if (mark('start:open-palette'))
     specs.push({
       name: 'palette-recents',
       box: [0, 0, vw0, vh0],
       from: mark('start:open-palette') - 100,
-      to: mark('end:type-query'),
+      to:
+        (mark('end:close-palette') ?? mark('end:type-query') ?? mark('start:open-palette') + 5000) +
+        200,
     });
   const composer = (dumps.initial?.els ?? []).find((e) => (e.roles ?? []).includes('composer.box'));
   const sent = Object.entries(dumps).some(
