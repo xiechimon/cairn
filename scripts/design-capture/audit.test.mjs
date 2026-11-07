@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { makeTestTempDir } from '../test-tmpdir.mjs';
 
 const audit = fileURLToPath(new URL('./audit.mjs', import.meta.url));
 const region = { name: 'sidebar', box: [0, 0.3, 0.3, 0.7] };
@@ -33,7 +33,7 @@ const textImage = (file) =>
 
 const run = (dir) => spawnSync(process.execPath, [audit, dir], { encoding: 'utf8' });
 
-const fresh = () => mkdtempSync(join(tmpdir(), 'audit-test-'));
+const fresh = () => makeTestTempDir('audit-test-');
 
 test('a readable region fails even when marked reviewed', () => {
   const dir = fresh();
