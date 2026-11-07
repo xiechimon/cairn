@@ -186,7 +186,7 @@ export function MachineRowView({
     >
       <div
         className={cn(
-          'relative flex min-w-0 items-center gap-3 px-4 py-2.5',
+          'relative flex min-w-0 items-center gap-3 px-4 py-2',
           'has-[[data-testid=machine-toggle]:focus-visible]:outline-2 has-[[data-testid=machine-toggle]:focus-visible]:-outline-offset-2 has-[[data-testid=machine-toggle]:focus-visible]:outline-(--focus-ring)',
         )}
       >
